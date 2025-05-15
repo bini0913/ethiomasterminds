@@ -5,9 +5,13 @@ import { useUser } from "@/context/UserContext";
 import { Link } from "react-router-dom";
 import UserLevel from "../profile/UserLevel";
 import { motion } from "framer-motion";
+import DailyChallenge from "../challenges/DailyChallenge";
+import { useAIHelper } from "@/context/AIHelperContext";
+import { Bot } from "lucide-react";
 
 const MainMenu: React.FC = () => {
   const { user, logout } = useUser();
+  const { openHelper } = useAIHelper();
 
   const menuItems = [
     { 
@@ -35,22 +39,10 @@ const MainMenu: React.FC = () => {
       color: "bg-gradient-to-r from-yellow-500 to-amber-600" 
     },
     { 
-      title: "My Avatar", 
-      icon: "👤", 
-      path: "/avatar",
-      color: "bg-gradient-to-r from-pink-500 to-rose-600" 
-    },
-    { 
       title: "Settings", 
       icon: "⚙️", 
       path: "/settings",
-      color: "bg-gradient-to-r from-gray-500 to-slate-600" 
-    },
-    { 
-      title: "Help", 
-      icon: "❓", 
-      path: "/help",
-      color: "bg-gradient-to-r from-violet-500 to-purple-600" 
+      color: "bg-gradient-to-r from-pink-500 to-rose-600" 
     },
   ];
 
@@ -78,14 +70,24 @@ const MainMenu: React.FC = () => {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-white">Master Minds</h1>
           {user && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={logout}
-              className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
-            >
-              Logout
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={openHelper}
+                className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
+              >
+                <Bot className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={logout}
+                className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
+              >
+                Logout
+              </Button>
+            </div>
           )}
         </div>
       </header>
@@ -104,6 +106,11 @@ const MainMenu: React.FC = () => {
             <UserLevel level={user.level} xp={user.xp} />
           </div>
         )}
+      </div>
+
+      {/* Daily Challenge */}
+      <div className="px-4 py-6">
+        <DailyChallenge />
       </div>
 
       {/* Menu Grid */}
@@ -126,6 +133,10 @@ const MainMenu: React.FC = () => {
           </motion.div>
         ))}
       </motion.div>
+      
+      <div className="p-4 text-center text-xs text-gray-500">
+        <p>Master Minds v1.0 - Created by Biniam Bogale, 14 years old, Ethiopia</p>
+      </div>
     </div>
   );
 };
