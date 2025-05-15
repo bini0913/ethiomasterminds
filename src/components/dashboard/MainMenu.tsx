@@ -54,7 +54,8 @@ const MainMenu: React.FC = () => {
     },
   ];
 
-  const container = {
+  // Define the container animation variants
+  const containerVariants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -64,7 +65,8 @@ const MainMenu: React.FC = () => {
     }
   };
 
-  const item = {
+  // Define the item animation variants
+  const itemVariants = {
     hidden: { y: 20, opacity: 0 },
     show: { y: 0, opacity: 1 }
   };
@@ -106,13 +108,13 @@ const MainMenu: React.FC = () => {
 
       {/* Menu Grid */}
       <motion.div 
-        variants={container}
+        variants={containerVariants}
         initial="hidden"
         animate="show"
         className="flex-1 px-4 py-6 grid grid-cols-2 gap-4"
       >
         {menuItems.map((item) => (
-          <motion.div key={item.path} variants={item}>
+          <motion.div key={item.path} variants={itemVariants}>
             <Link to={item.path} className="block">
               <div 
                 className={`${item.color} h-32 rounded-xl shadow-md flex flex-col items-center justify-center text-white transition-transform hover:scale-105`}
