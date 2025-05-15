@@ -15,36 +15,43 @@ import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
 import { AIHelperProvider } from "./context/AIHelperContext";
 import { FriendsProvider } from "./context/FriendsContext";
+import { LanguageProvider } from "./context/LanguageContext";
 import AIHelper from "./components/ai/AIHelper";
+import TeacherDashboard from "./pages/TeacherDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <UserProvider>
-      <QuizProvider>
-        <AIHelperProvider>
-          <FriendsProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/quiz" element={<Quiz />} />
-                  <Route path="/multiplayer" element={<Multiplayer />} />
-                  <Route path="/leaderboard" element={<Leaderboard />} />
-                  <Route path="/friends" element={<Friends />} />
-                  <Route path="/settings" element={<Settings />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-                <AIHelper />
-              </BrowserRouter>
-            </TooltipProvider>
-          </FriendsProvider>
-        </AIHelperProvider>
-      </QuizProvider>
+      <LanguageProvider>
+        <QuizProvider>
+          <AIHelperProvider>
+            <FriendsProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/quiz" element={<Quiz />} />
+                    <Route path="/multiplayer" element={<Multiplayer />} />
+                    <Route path="/leaderboard" element={<Leaderboard />} />
+                    <Route path="/friends" element={<Friends />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/teacher" element={<TeacherDashboard />} />
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                  <AIHelper />
+                </BrowserRouter>
+              </TooltipProvider>
+            </FriendsProvider>
+          </AIHelperProvider>
+        </QuizProvider>
+      </LanguageProvider>
     </UserProvider>
   </QueryClientProvider>
 );

@@ -1,146 +1,189 @@
 
 import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/context/UserContext";
-import { toast } from "sonner";
-import { ArrowLeft, Globe, Volume2, User } from "lucide-react";
+import { ChevronLeft, Languages, Volume2, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import AvatarCreator from "@/components/profile/AvatarCreator";
+import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLanguage } from "@/context/LanguageContext";
+import { toast } from "sonner";
 
 const Settings: React.FC = () => {
-  const { user, updateProfile } = useUser();
+  const { user } = useUser();
   const navigate = useNavigate();
-
-  // Language settings
-  const [language, setLanguage] = React.useState("english");
+  const { language, setLanguage, t } = useLanguage();
   
-  // Sound settings
-  const [sfxEnabled, setSfxEnabled] = React.useState(true);
-  const [musicEnabled, setMusicEnabled] = React.useState(true);
+  const [volume, setVolume] = React.useState(70);
+  const [notifications, setNotifications] = React.useState(true);
+  const [soundEffects, setSoundEffects] = React.useState(true);
+  const [vibration, setVibration] = React.useState(true);
+  const [darkMode, setDarkMode] = React.useState(false);
   
-  // Avatar settings
-  const [selectedAvatar, setSelectedAvatar] = React.useState(user?.avatar || "avatar-1");
-
   const handleLanguageChange = (value: string) => {
-    setLanguage(value);
-    toast.success(`Language changed to ${value}`);
-    // In a real app, this would update app language
+    setLanguage(value as "english" | "amharic" | "afaan-oromoo");
+    toast.success(`${t("language")} ${t("settings")} ${t("save")}`);
   };
-
-  const handleSoundChange = (type: 'sfx' | 'music', enabled: boolean) => {
-    if (type === 'sfx') {
-      setSfxEnabled(enabled);
-    } else {
-      setMusicEnabled(enabled);
-    }
-    toast.success(`${type === 'sfx' ? 'Sound effects' : 'Music'} ${enabled ? 'enabled' : 'disabled'}`);
-  };
-
-  const handleAvatarChange = (avatar: string) => {
-    setSelectedAvatar(avatar);
-  };
-
-  const saveAvatarSettings = () => {
-    updateProfile({ avatar: selectedAvatar });
-    toast.success("Avatar updated successfully!");
-  };
-
+  
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-primary px-4 py-3 shadow-md">
-        <div className="flex items-center">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate("/")}
-            className="mr-2 text-white"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-bold text-white">Settings</h1>
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate("/")}
+              className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-2xl font-bold text-white">{t("settings")}</h1>
+          </div>
         </div>
       </header>
 
       <div className="container max-w-md mx-auto py-6 px-4">
-        <Tabs defaultValue="language">
+        <Tabs defaultValue="general">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="language" className="flex items-center gap-2">
-              <Globe className="h-4 w-4" />
-              <span>Language</span>
-            </TabsTrigger>
-            <TabsTrigger value="sound" className="flex items-center gap-2">
-              <Volume2 className="h-4 w-4" />
-              <span>Sound</span>
-            </TabsTrigger>
-            <TabsTrigger value="avatar" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span>Avatar</span>
-            </TabsTrigger>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="sound">Sound</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="language" className="mt-4">
-            <Card className="p-4">
-              <h2 className="text-lg font-semibold mb-4">Select Language</h2>
-              <RadioGroup value={language} onValueChange={handleLanguageChange}>
-                <div className="flex items-center space-x-2 mb-3">
-                  <RadioGroupItem value="english" id="english" />
-                  <Label htmlFor="english">English</Label>
+          <TabsContent value="general" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Languages className="h-5 w-5" />
+                  {t("language")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup value={language} onValueChange={handleLanguageChange} className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="english" id="english" />
+                    <Label htmlFor="english">{t("english")}</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="amharic" id="amharic" />
+                    <Label htmlFor="amharic">{t("amharic")}</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="afaan-oromoo" id="afaan-oromoo" />
+                    <Label htmlFor="afaan-oromoo">{t("afaan-oromoo")}</Label>
+                  </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Display</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="dark-mode">Dark Mode</Label>
+                  <Switch
+                    id="dark-mode"
+                    checked={darkMode}
+                    onCheckedChange={setDarkMode}
+                  />
                 </div>
-                <div className="flex items-center space-x-2 mb-3">
-                  <RadioGroupItem value="amharic" id="amharic" />
-                  <Label htmlFor="amharic">Amharic</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="afaan-oromoo" id="afaan-oromoo" />
-                  <Label htmlFor="afaan-oromoo">Afaan Oromoo</Label>
-                </div>
-              </RadioGroup>
+              </CardContent>
             </Card>
           </TabsContent>
           
-          <TabsContent value="sound" className="mt-4">
-            <Card className="p-4">
-              <h2 className="text-lg font-semibold mb-4">Sound Settings</h2>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="sfx">Sound Effects</Label>
-                  <Switch 
-                    id="sfx" 
-                    checked={sfxEnabled} 
-                    onCheckedChange={(checked) => handleSoundChange('sfx', checked)} 
+          <TabsContent value="sound" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Volume2 className="h-5 w-5" />
+                  Sound
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label htmlFor="volume">Volume</Label>
+                    <span>{volume}%</span>
+                  </div>
+                  <Slider
+                    id="volume"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[volume]}
+                    onValueChange={(value) => setVolume(value[0])}
                   />
                 </div>
+                
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="music">Music</Label>
-                  <Switch 
-                    id="music" 
-                    checked={musicEnabled} 
-                    onCheckedChange={(checked) => handleSoundChange('music', checked)} 
+                  <Label htmlFor="sound-effects">Sound Effects</Label>
+                  <Switch
+                    id="sound-effects"
+                    checked={soundEffects}
+                    onCheckedChange={setSoundEffects}
                   />
                 </div>
-              </div>
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="vibration">Vibration</Label>
+                  <Switch
+                    id="vibration"
+                    checked={vibration}
+                    onCheckedChange={setVibration}
+                  />
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
           
-          <TabsContent value="avatar" className="mt-4">
-            <Card className="p-4">
-              <h2 className="text-lg font-semibold mb-4">Customize Avatar</h2>
-              <AvatarCreator 
-                onSelect={handleAvatarChange}
-                selectedAvatar={selectedAvatar}
-              />
-              <Button 
-                onClick={saveAvatarSettings}
-                className="w-full mt-4 bg-primary hover:bg-primary-dark"
-              >
-                Save Avatar
-              </Button>
+          <TabsContent value="notifications" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Notifications
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="notifications">Enable Notifications</Label>
+                  <Switch
+                    id="notifications"
+                    checked={notifications}
+                    onCheckedChange={setNotifications}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm">Notification Types</Label>
+                  <div className="space-y-2 pl-2 pt-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="friend-requests">Friend Requests</Label>
+                      <Switch id="friend-requests" defaultChecked />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="messages">Messages</Label>
+                      <Switch id="messages" defaultChecked />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="game-invites">Game Invites</Label>
+                      <Switch id="game-invites" defaultChecked />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="daily-quiz">Daily Quiz</Label>
+                      <Switch id="daily-quiz" />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
         </Tabs>

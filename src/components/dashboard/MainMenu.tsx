@@ -7,44 +7,74 @@ import UserLevel from "../profile/UserLevel";
 import { motion } from "framer-motion";
 import DailyChallenge from "../challenges/DailyChallenge";
 import { useAIHelper } from "@/context/AIHelperContext";
-import { Bot } from "lucide-react";
+import { Bot, BookOpen, User } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
+import { avatarToEmoji } from "@/utils/avatarUtils";
 
 const MainMenu: React.FC = () => {
   const { user, logout } = useUser();
   const { openHelper } = useAIHelper();
+  const { t } = useLanguage();
 
-  const menuItems = [
+  const commonMenuItems = [
     { 
-      title: "Play Quiz", 
+      title: t("quiz"), 
       icon: "🎯", 
       path: "/quiz",
       color: "bg-gradient-to-r from-indigo-500 to-purple-600" 
     },
     { 
-      title: "Multiplayer", 
+      title: t("multiplayer"), 
       icon: "👥", 
       path: "/multiplayer",
       color: "bg-gradient-to-r from-blue-500 to-cyan-600" 
     },
     { 
-      title: "Leaderboard", 
+      title: t("leaderboard"), 
       icon: "🏆", 
       path: "/leaderboard",
       color: "bg-gradient-to-r from-green-500 to-teal-600" 
     },
     { 
-      title: "Friends", 
+      title: t("friends"), 
       icon: "👋", 
       path: "/friends",
       color: "bg-gradient-to-r from-yellow-500 to-amber-600" 
     },
     { 
-      title: "Settings", 
+      title: t("settings"), 
       icon: "⚙️", 
       path: "/settings",
       color: "bg-gradient-to-r from-pink-500 to-rose-600" 
     },
   ];
+
+  // Add role-specific menu items
+  const menuItems = React.useMemo(() => {
+    if (!user) return commonMenuItems;
+
+    let items = [...commonMenuItems];
+    
+    if (user.role === "teacher") {
+      items.push({
+        title: "Teacher Dashboard",
+        icon: "📚",
+        path: "/teacher",
+        color: "bg-gradient-to-r from-purple-500 to-indigo-600"
+      });
+    } 
+    
+    if (user.role === "admin") {
+      items.push({
+        title: "Admin Dashboard",
+        icon: "🔑",
+        path: "/admin",
+        color: "bg-gradient-to-r from-red-500 to-orange-600"
+      });
+    }
+    
+    return items;
+  }, [user, commonMenuItems]);
 
   // Define the container animation variants
   const containerVariants = {
@@ -85,7 +115,7 @@ const MainMenu: React.FC = () => {
                 onClick={logout}
                 className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
               >
-                Logout
+                {t("logout")}
               </Button>
             </div>
           )}
@@ -140,18 +170,5 @@ const MainMenu: React.FC = () => {
     </div>
   );
 };
-
-// Helper function to convert avatar ids to emojis
-function avatarToEmoji(avatarId: string): string {
-  const map: {[key: string]: string} = {
-    "avatar-1": "👦",
-    "avatar-2": "👧",
-    "avatar-3": "🧑",
-    "avatar-4": "👩‍🎓",
-    "avatar-5": "🧠",
-    "avatar-6": "🦸",
-  };
-  return map[avatarId] || "👤";
-}
 
 export default MainMenu;
