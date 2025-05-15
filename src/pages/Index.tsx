@@ -4,8 +4,7 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import AuthForm from "@/components/auth/AuthForm";
 import ProfileSetup from "@/components/profile/ProfileSetup";
 import MainMenu from "@/components/dashboard/MainMenu";
-import { UserProvider, useUser } from "@/context/UserContext";
-import { QuizProvider } from "@/context/QuizContext";
+import { useUser } from "@/context/UserContext";
 
 // App stages
 enum AppStage {
@@ -15,7 +14,7 @@ enum AppStage {
   MainMenu
 }
 
-const AppContent: React.FC = () => {
+const Index: React.FC = () => {
   const { user, isAuthenticated } = useUser();
   const [appStage, setAppStage] = useState<AppStage>(AppStage.Welcome);
   
@@ -54,16 +53,6 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       {renderContent()}
     </div>
-  );
-};
-
-const Index: React.FC = () => {
-  return (
-    <UserProvider>
-      <QuizProvider>
-        <AppContent />
-      </QuizProvider>
-    </UserProvider>
   );
 };
 
