@@ -15,8 +15,9 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
   const welcomeTexts = [
     t("welcome"),
     "Master Minds",
-    "An educational journey to explore and expand your knowledge",
-    "Created with love by your dedicated development team"
+    "A quiz game and learning world created by Biniam Bogale, 14-year-old student from Ethiopia.",
+    "Compete, learn, and level up your mind!",
+    "Created with passion to help students learn and grow"
   ];
 
   useEffect(() => {
@@ -57,7 +58,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
             className={`${
               index === 0 ? "text-xl font-light" :
               index === 1 ? "text-5xl font-bold text-white" :
-              index === 3 ? "text-sm italic mt-8" :
+              index === 4 ? "text-sm italic mt-8" :
               "text-lg"
             }`}
           >
