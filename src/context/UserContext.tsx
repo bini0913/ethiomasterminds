@@ -26,12 +26,16 @@ interface UserContextType {
   logout: () => void;
   updateProfile: (profileData: Partial<UserProfile>) => void;
   addXP: (amount: number) => void;
+  deleteAccount: () => void;
+  getAllUsers: () => Array<Omit<UserProfile, 'password'>>;
+  deleteUserById: (id: string) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 // User storage key
 const USER_STORAGE_KEY = "masterminds_user";
+const USERS_STORAGE_KEY = "masterminds_users";
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -75,7 +79,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       const hashedPassword = await hashPassword(password);
       
       // Check if user exists in localStorage
-      const usersStr = localStorage.getItem("masterminds_users") || "[]";
+      const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
       const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
       
       const foundUser = users.find(u => 
@@ -107,7 +111,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Check if user already exists
-      const usersStr = localStorage.getItem("masterminds_users") || "[]";
+      const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
       const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
       
       if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
@@ -132,7 +136,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       
       // Save to "database" (localStorage)
       users.push(newUser);
-      localStorage.setItem("masterminds_users", JSON.stringify(users));
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
       
       // Login the user (without password in state)
       const { password: _, ...userWithoutPassword } = newUser;
@@ -157,7 +161,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setUser(updatedUser);
     
     // Update user in storage
-    const usersStr = localStorage.getItem("masterminds_users") || "[]";
+    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
     const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
     
     const updatedUsers = users.map(u => {
@@ -168,7 +172,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       return u;
     });
     
-    localStorage.setItem("masterminds_users", JSON.stringify(updatedUsers));
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
     toast.success("Profile updated successfully!");
   };
   
@@ -187,6 +191,48 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     } else {
       toast.success(`+${amount} XP gained!`);
     }
+  };
+
+  // Delete the currently logged-in user's account
+  const deleteAccount = () => {
+    if (!user) return;
+    
+    // Remove from storage
+    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
+    const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
+    
+    const updatedUsers = users.filter(u => u.id !== user.id);
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
+    
+    // Clear current user
+    setUser(null);
+    toast.success("Your account has been deleted");
+  };
+
+  // Get all users (for admin functions)
+  const getAllUsers = () => {
+    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
+    const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
+    
+    // Remove passwords from the returned data
+    return users.map(({password, ...user}) => user);
+  };
+
+  // Delete any user by ID (admin function)
+  const deleteUserById = (id: string) => {
+    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
+    const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
+    
+    // If attempting to delete the current user, use deleteAccount instead
+    if (user?.id === id) {
+      deleteAccount();
+      return;
+    }
+    
+    const updatedUsers = users.filter(u => u.id !== id);
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
+    
+    toast.success("User account deleted successfully");
   };
 
   // Simple password hashing function (NOT secure - just for demo)
@@ -211,6 +257,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         logout,
         updateProfile,
         addXP,
+        deleteAccount,
+        getAllUsers,
+        deleteUserById
       }}
     >
       {children}

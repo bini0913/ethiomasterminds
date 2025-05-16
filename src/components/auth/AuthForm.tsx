@@ -74,28 +74,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
     }
   };
 
-  const handleDemoLogin = async (role: UserRole) => {
-    setIsLoading(true);
-    try {
-      // Create a demo account if it doesn't exist yet
-      const email = `demo-${role}@example.com`;
-      const password = "demo123456";
-      const name = `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`;
-      
-      // Try to log in first
-      await login(email, password);
-      
-      // If login fails, create the account (this creates an account only if it doesn't exist)
-      await signup(email, password, name);
-      
-      onSuccess();
-    } catch (error) {
-      console.error("Demo auth error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -107,39 +85,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-primary">Master Minds</h1>
           <p className="text-gray-500">Log in or sign up to continue</p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Button 
-            type="button"
-            variant="outline" 
-            onClick={() => handleDemoLogin("student")}
-            disabled={isLoading}
-            className="flex items-center justify-center space-x-2 w-full py-6"
-          >
-            <UserRound className="w-5 h-5 mr-2" />
-            <span>Continue as Demo Student</span>
-          </Button>
-          
-          <Button 
-            type="button"
-            variant="outline" 
-            onClick={() => handleDemoLogin("teacher")}
-            disabled={isLoading}
-            className="flex items-center justify-center space-x-2 w-full py-6"
-          >
-            <UserRound className="w-5 h-5 mr-2" />
-            <span>Continue as Demo Teacher</span>
-          </Button>
-        </div>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-gray-300"></span>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">or continue with</span>
-          </div>
         </div>
 
         <Tabs defaultValue="login" className="w-full">
