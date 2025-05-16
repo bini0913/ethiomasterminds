@@ -15,8 +15,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
   const welcomeTexts = [
     t("welcome"),
     "Master Minds",
-    "An educational quiz app to challenge your knowledge",
-    "Created by Biniam Bogale, 14 years old, from Ethiopia"
+    "An educational journey to explore and expand your knowledge",
+    "Created with love by your dedicated development team"
   ];
 
   useEffect(() => {
