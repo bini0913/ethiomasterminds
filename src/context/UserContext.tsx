@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { toast } from "sonner";
 
 // Types
@@ -30,30 +30,32 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Mock users for demo
-const mockUsers: UserProfile[] = [
-  {
-    id: "1",
-    name: "Demo Student",
-    email: "student@example.com",
-    role: "student",
-    xp: 100,
-    level: 1,
-    avatar: "avatar-1",
-  },
-  {
-    id: "2",
-    name: "Demo Teacher",
-    email: "teacher@example.com",
-    role: "teacher",
-    xp: 500,
-    level: 5,
-    avatar: "avatar-2",
-  },
-];
+// User storage key
+const USER_STORAGE_KEY = "masterminds_user";
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
+
+  // Load user from localStorage on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem(USER_STORAGE_KEY);
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error("Failed to parse stored user data:", error);
+      }
+    }
+  }, []);
+
+  // Save user to localStorage when it changes
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(USER_STORAGE_KEY);
+    }
+  }, [user]);
 
   const calculateLevel = (xp: number) => {
     // Simple level calculation: each level requires 100 XP
@@ -62,11 +64,29 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   
   const login = async (email: string, password: string) => {
     try {
-      // Mock authentication
-      const foundUser = mockUsers.find((u) => u.email === email);
+      // Validate input
+      if (!email || !password) {
+        toast.error("Please enter both email and password");
+        return;
+      }
+
+      // Create a hash of the password (for demo purposes only - NOT secure)
+      // In a real app, this would be server-side authentication
+      const hashedPassword = await hashPassword(password);
+      
+      // Check if user exists in localStorage
+      const usersStr = localStorage.getItem("masterminds_users") || "[]";
+      const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
+      
+      const foundUser = users.find(u => 
+        u.email.toLowerCase() === email.toLowerCase() && 
+        u.password === hashedPassword
+      );
       
       if (foundUser) {
-        setUser(foundUser);
+        // Remove password before setting in state
+        const { password, ...userWithoutPassword } = foundUser;
+        setUser(userWithoutPassword);
         toast.success("Logged in successfully!");
         return;
       }
@@ -80,19 +100,43 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   
   const signup = async (email: string, password: string, name: string) => {
     try {
-      // Mock signup - in a real app, this would create a new user in the database
-      const newUser: UserProfile = {
+      // Validate input
+      if (!email || !password || !name) {
+        toast.error("Please fill all required fields");
+        return;
+      }
+
+      // Check if user already exists
+      const usersStr = localStorage.getItem("masterminds_users") || "[]";
+      const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
+      
+      if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+        toast.error("User with this email already exists");
+        return;
+      }
+      
+      // Create hashed password (demo only - NOT secure)
+      const hashedPassword = await hashPassword(password);
+      
+      // Create new user
+      const newUser: UserProfile & { password: string } = {
         id: `user-${Date.now()}`,
         name,
         email,
+        password: hashedPassword,
         role: "student", // Default role
         xp: 0,
         level: 1,
         avatar: "avatar-1", // Default avatar
       };
       
-      mockUsers.push(newUser);
-      setUser(newUser);
+      // Save to "database" (localStorage)
+      users.push(newUser);
+      localStorage.setItem("masterminds_users", JSON.stringify(users));
+      
+      // Login the user (without password in state)
+      const { password: _, ...userWithoutPassword } = newUser;
+      setUser(userWithoutPassword);
       toast.success("Account created successfully!");
     } catch (error) {
       toast.error("Signup failed. Please try again.");
@@ -106,25 +150,55 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const updateProfile = (profileData: Partial<UserProfile>) => {
-    if (user) {
-      setUser({ ...user, ...profileData });
-      toast.success("Profile updated successfully!");
-    }
+    if (!user) return;
+    
+    // Update user in state
+    const updatedUser = { ...user, ...profileData };
+    setUser(updatedUser);
+    
+    // Update user in storage
+    const usersStr = localStorage.getItem("masterminds_users") || "[]";
+    const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
+    
+    const updatedUsers = users.map(u => {
+      if (u.id === user.id) {
+        // Preserve the password field which isn't in the state
+        return { ...u, ...profileData };
+      }
+      return u;
+    });
+    
+    localStorage.setItem("masterminds_users", JSON.stringify(updatedUsers));
+    toast.success("Profile updated successfully!");
   };
   
   const addXP = (amount: number) => {
-    if (user) {
-      const newXP = user.xp + amount;
-      const newLevel = calculateLevel(newXP);
-      
-      setUser({ ...user, xp: newXP, level: newLevel });
-      
-      if (newLevel > user.level) {
-        toast.success(`Level up! You are now level ${newLevel}!`);
-      } else {
-        toast.success(`+${amount} XP gained!`);
-      }
+    if (!user) return;
+    
+    const newXP = user.xp + amount;
+    const newLevel = calculateLevel(newXP);
+    
+    // Update user with new XP and possibly new level
+    const updatedUser = { ...user, xp: newXP, level: newLevel };
+    updateProfile(updatedUser);
+    
+    if (newLevel > user.level) {
+      toast.success(`Level up! You are now level ${newLevel}!`);
+    } else {
+      toast.success(`+${amount} XP gained!`);
     }
+  };
+
+  // Simple password hashing function (NOT secure - just for demo)
+  const hashPassword = async (password: string): Promise<string> => {
+    // In a real app, use a proper hashing algorithm like bcrypt
+    // This is just a simple demo hash
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
   };
   
   return (
