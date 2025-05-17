@@ -10,9 +10,11 @@ import { useAIHelper } from "@/context/AIHelperContext";
 import { Bot, BookOpen, User } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { avatarToEmoji } from "@/utils/avatarUtils";
+import LevelUpModal from "../profile/LevelUpModal";
+import GainXPButton from "../profile/GainXPButton";
 
 const MainMenu: React.FC = () => {
-  const { user, logout } = useUser();
+  const { user, logout, showLevelUp, setShowLevelUp, previousLevel } = useUser();
   const { openHelper } = useAIHelper();
   const { t } = useLanguage();
 
@@ -141,6 +143,8 @@ const MainMenu: React.FC = () => {
       {/* Daily Challenge */}
       <div className="px-4 py-6">
         <DailyChallenge />
+        {/* For testing, we'll add the XP button here */}
+        {user && <GainXPButton className="mt-4 mx-auto" />}
       </div>
 
       {/* Menu Grid */}
@@ -167,6 +171,15 @@ const MainMenu: React.FC = () => {
       <div className="p-4 text-center text-xs text-gray-500">
         <p>Master Minds v1.0 - Created by Biniam Bogale, 14 years old, Ethiopia</p>
       </div>
+
+      {/* Level Up Modal */}
+      {showLevelUp && user && (
+        <LevelUpModal 
+          previousLevel={previousLevel} 
+          newLevel={user.level}
+          onClose={() => setShowLevelUp(false)}
+        />
+      )}
     </div>
   );
 };

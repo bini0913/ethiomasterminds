@@ -16,6 +16,9 @@ export type UserProfile = {
   xp: number;
   level: number;
   avatar: string;
+  // New fields for enhanced leveling system
+  rank?: string;
+  badges?: string[];
 };
 
 interface UserContextType {
@@ -29,6 +32,9 @@ interface UserContextType {
   deleteAccount: () => void;
   getAllUsers: () => Array<Omit<UserProfile, 'password'>>;
   deleteUserById: (id: string) => void;
+  showLevelUp: boolean;
+  setShowLevelUp: (show: boolean) => void;
+  previousLevel: number;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -39,6 +45,8 @@ const USERS_STORAGE_KEY = "masterminds_users";
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [showLevelUp, setShowLevelUp] = useState<boolean>(false);
+  const [previousLevel, setPreviousLevel] = useState<number>(1);
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -182,13 +190,20 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const newXP = user.xp + amount;
     const newLevel = calculateLevel(newXP);
     
+    // If the user is leveling up, show the level up modal
+    if (newLevel > user.level) {
+      setPreviousLevel(user.level);
+      setTimeout(() => {
+        setShowLevelUp(true);
+      }, 500);
+    }
+    
     // Update user with new XP and possibly new level
     const updatedUser = { ...user, xp: newXP, level: newLevel };
     updateProfile(updatedUser);
     
-    if (newLevel > user.level) {
-      toast.success(`Level up! You are now level ${newLevel}!`);
-    } else {
+    // We'll let the LevelUpModal handle the level up notification now
+    if (newLevel <= user.level) {
       toast.success(`+${amount} XP gained!`);
     }
   };
@@ -259,7 +274,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         addXP,
         deleteAccount,
         getAllUsers,
-        deleteUserById
+        deleteUserById,
+        showLevelUp,
+        setShowLevelUp,
+        previousLevel
       }}
     >
       {children}
