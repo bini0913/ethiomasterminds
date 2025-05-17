@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
@@ -135,7 +134,7 @@ const MainMenu: React.FC = () => {
               <h2 className="text-lg font-semibold">{user.name}</h2>
               <div className="text-sm text-gray-500 capitalize">{user.role}</div>
             </div>
-            <UserLevel level={user.level} xp={user.xp} />
+            <UserLevel level={user.level} xp={user.xp} showBadge={true} />
           </div>
         )}
       </div>
@@ -144,7 +143,7 @@ const MainMenu: React.FC = () => {
       <div className="px-4 py-6">
         <DailyChallenge />
         {/* For testing, we'll add the XP button here */}
-        {user && <GainXPButton className="mt-4 mx-auto" />}
+        {user && <GainXPButton className="mt-4 mx-auto" variant="secondary" />}
       </div>
 
       {/* Menu Grid */}

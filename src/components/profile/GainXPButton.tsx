@@ -9,8 +9,8 @@ import { toast } from "sonner";
 interface GainXPButtonProps {
   amount?: number;
   className?: string;
-  variant?: "default" | "outline" | "primary" | "quiz";
-  size?: "sm" | "md" | "lg";
+  variant?: "default" | "outline" | "secondary" | "ghost";
+  size?: "default" | "sm" | "lg";
   label?: string;
 }
 
@@ -40,19 +40,16 @@ const GainXPButton: React.FC<GainXPButtonProps> = ({
   };
   
   const getVariantClasses = () => {
-    switch(variant) {
-      case "primary":
-        return "bg-primary text-white hover:bg-primary/90";
-      case "quiz":
-        return "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:opacity-90";
-      default:
-        return "";
+    // Using custom classes for the quiz style that's not in the button variants
+    if (variant === "secondary") {
+      return "bg-secondary text-secondary-foreground hover:bg-secondary/80";
     }
+    return "";
   };
   
   const getSizeClasses = () => {
     switch(size) {
-      case "md":
+      case "default":
         return "px-4 py-2";
       case "lg":
         return "px-6 py-3 text-lg";
@@ -68,7 +65,7 @@ const GainXPButton: React.FC<GainXPButtonProps> = ({
     >
       <Button 
         onClick={handleClick}
-        variant={variant !== "quiz" ? variant : "default"}
+        variant={variant}
         size={size}
         className={`flex items-center gap-2 ${getVariantClasses()} ${getSizeClasses()} ${className}`}
         disabled={isAnimating}

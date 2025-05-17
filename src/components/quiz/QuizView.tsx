@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +5,7 @@ import { useUser } from "@/context/UserContext";
 import { Question, Quiz } from "@/context/QuizContext";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import GainXPButton from "../profile/GainXPButton";
 
 interface QuizViewProps {
   quiz: Quiz;
@@ -14,13 +14,14 @@ interface QuizViewProps {
 }
 
 const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
-  const { addXP } = useUser();
+  const { addXP, user } = useUser();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(20);
   const [quizCompleted, setQuizCompleted] = useState(false);
+  const [earnedXP, setEarnedXP] = useState(0);
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   
@@ -87,12 +88,22 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
       const finalScore = score;
       setQuizCompleted(true);
       
-      // Award XP based on score
-      const earnedXP = Math.floor(finalScore / 2);
-      addXP(earnedXP);
+      // Calculate XP to award based on score
+      const xpToEarn = Math.floor(finalScore / 2);
+      setEarnedXP(xpToEarn);
       
       // Call the onComplete callback
       onComplete(finalScore);
+    }
+  };
+  
+  const handleClaimXP = () => {
+    if (earnedXP > 0) {
+      addXP(earnedXP);
+      toast.success(`You've claimed ${earnedXP} XP!`, {
+        description: "Keep playing to level up faster!"
+      });
+      setEarnedXP(0);
     }
   };
   
@@ -115,6 +126,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
             </div>
           </div>
           
+          {/* Question Card */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="text-lg leading-tight">
@@ -193,10 +205,40 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
                   <div className="text-sm text-gray-500">Accuracy</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-green-500">+{Math.floor(score / 2)}</div>
-                  <div className="text-sm text-gray-500">XP Earned</div>
+                  <div className="text-2xl font-bold text-green-500">+{earnedXP}</div>
+                  <div className="text-sm text-gray-500">XP Available</div>
                 </div>
               </div>
+              
+              {/* XP Claim Button */}
+              {earnedXP > 0 && (
+                <div className="mt-4">
+                  <GainXPButton 
+                    amount={earnedXP} 
+                    variant="secondary" 
+                    size="lg"
+                    label={`Claim ${earnedXP} XP`}
+                    className="mx-auto"
+                    onClick={handleClaimXP}
+                  />
+                </div>
+              )}
+
+              {/* Rank Display */}
+              {user && (
+                <div className="mt-4 p-3 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-lg">
+                  <div className="text-sm text-gray-600">Current Level</div>
+                  <div className="flex items-center justify-center gap-2 text-lg font-semibold">
+                    Level {user.level} 
+                    <span className="text-xs px-2 py-0.5 bg-primary text-white rounded-full">
+                      {user.level < 3 ? "Rookie" : 
+                       user.level < 6 ? "Thinker" : 
+                       user.level < 10 ? "Challenger" : 
+                       user.level < 15 ? "Genius" : "Master Mind"}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter className="justify-center space-x-4">
