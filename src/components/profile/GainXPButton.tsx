@@ -12,6 +12,7 @@ interface GainXPButtonProps {
   variant?: "default" | "outline" | "secondary" | "ghost";
   size?: "default" | "sm" | "lg";
   label?: string;
+  onClick?: () => void; // Added onClick handler support
 }
 
 const GainXPButton: React.FC<GainXPButtonProps> = ({ 
@@ -20,6 +21,7 @@ const GainXPButton: React.FC<GainXPButtonProps> = ({
   variant = "outline",
   size = "sm",
   label,
+  onClick, // Added onClick handler
 }) => {
   const { addXP } = useUser();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -35,6 +37,11 @@ const GainXPButton: React.FC<GainXPButtonProps> = ({
     toast.success(`+${amount} XP gained!`, {
       description: message,
     });
+    
+    // Call the onClick handler if provided
+    if (onClick) {
+      onClick();
+    }
     
     setTimeout(() => setIsAnimating(false), 700);
   };
