@@ -64,7 +64,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
         }
       }
       
-      await login(email, password, loginType as UserRole);
+      // Fix: Pass only email and password to login
+      await login(email, password);
       onSuccess();
       toast.success(`Welcome back, ${loginType}!`);
     } catch (error) {
@@ -98,8 +99,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
         return;
       }
       
-      // Only students can sign up
-      await signup(email, password, name, "student");
+      // Fix: Pass email, password, and name to signup (removed the incorrect 4th parameter)
+      await signup(email, password, name);
       toast.success("Account created successfully!");
       onSuccess();
     } catch (error) {

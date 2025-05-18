@@ -51,15 +51,14 @@ export const AIHelperProvider = ({ children }: { children: ReactNode }) => {
     
     setMessages((prev) => [...prev, userMessage]);
     
-    // In a real app, this would call a real AI service
-    // For now, we simulate a response based on keywords
+    // Enhanced AI responses
     setTimeout(() => {
-      let response = "I'm not sure how to help with that. Can you try asking something about quizzes, the app features, or how to play?";
+      let response = "I'm here to help with Master Minds! You can ask about quizzes, subjects, multiplayer, or how to use the app.";
       
       const lowerCaseMessage = message.toLowerCase();
       
       if (lowerCaseMessage.includes("quiz") || lowerCaseMessage.includes("question")) {
-        response = "Our quiz system includes subjects like Math, Science, General Knowledge, and English. Questions are arranged by grade level and difficulty. You can earn XP based on your performance!";
+        response = "Our quiz system includes subjects like Math, Science, General Knowledge, and English. Questions are arranged by grade level and difficulty. Each grade has unlimited questions that adapt to your learning progress!";
       } else if (lowerCaseMessage.includes("multiplayer") || lowerCaseMessage.includes("play with friend")) {
         response = "In multiplayer mode, you can play 1v1, 2v2, or create custom rooms. You can invite friends or auto-match with other players. Each match has a countdown timer before starting.";
       } else if (lowerCaseMessage.includes("profile") || lowerCaseMessage.includes("avatar")) {
@@ -71,7 +70,13 @@ export const AIHelperProvider = ({ children }: { children: ReactNode }) => {
       } else if (lowerCaseMessage.includes("hello") || lowerCaseMessage.includes("hi") || lowerCaseMessage.includes("hey")) {
         response = "Hello! I'm the Master Minds AI Helper. I can answer questions about the app, explain difficult quiz questions, or offer learning tips. What would you like to know?";
       } else if (lowerCaseMessage.includes("thank")) {
-        response = "You're welcome! If you have any more questions about Master Minds, feel free to ask!";
+        response = "You're welcome! If you have more questions about Master Minds, feel free to ask!";
+      } else if (lowerCaseMessage.includes("contact") || lowerCaseMessage.includes("help") || lowerCaseMessage.includes("support")) {
+        response = "Need help? You can contact Master Minds support at +251713445505 or visit the Contact Us section at the bottom of the Quiz page.";
+      } else if (lowerCaseMessage.includes("grade") || lowerCaseMessage.includes("level")) {
+        response = "Master Minds has content for grades 1-8 with appropriate difficulty levels for each. As you progress and earn XP, you'll unlock more challenging questions!";
+      } else if (lowerCaseMessage.includes("difficult") || lowerCaseMessage.includes("hard") || lowerCaseMessage.includes("easy")) {
+        response = "Questions in Master Minds come in three difficulty levels: Easy, Medium, and Hard. The difficulty determines how many points and XP you can earn!";
       }
       
       const aiMessage: AIHelperMessage = {
@@ -82,7 +87,7 @@ export const AIHelperProvider = ({ children }: { children: ReactNode }) => {
       };
       
       setMessages((prev) => [...prev, aiMessage]);
-    }, 1000);
+    }, 800);
   };
 
   const clearMessages = () => {

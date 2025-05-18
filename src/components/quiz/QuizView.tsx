@@ -10,7 +10,7 @@ import GainXPButton from "../profile/GainXPButton";
 
 interface QuizViewProps {
   quiz: Quiz;
-  onComplete: (score: number) => void;
+  onComplete: (score: number, completedQuestionIds: string[]) => void;
   onExit: () => void;
 }
 
@@ -24,6 +24,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [earnedXP, setEarnedXP] = useState(0);
   const [userAnswers, setUserAnswers] = useState<{[key: string]: string}>({});
+  const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
 
   // Get the current question from the quiz
   const currentQuestion = quiz.questions[currentQuestionIndex];
@@ -59,6 +60,10 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
         ...prev,
         [currentQuestion.id]: "no_answer"
       }));
+
+      // Add to completed questions
+      setCompletedQuestionIds(prev => [...prev, currentQuestion.id]);
+      
       toast.error("Time's up!");
     }
   };
@@ -74,6 +79,9 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
       ...prev,
       [currentQuestion.id]: option
     }));
+    
+    // Add to completed questions
+    setCompletedQuestionIds(prev => [...prev, currentQuestion.id]);
     
     if (option === currentQuestion.correctAnswer) {
       const pointsEarned = calculatePoints(timeLeft);
@@ -106,8 +114,8 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
       const xpToEarn = Math.floor(finalScore / 2);
       setEarnedXP(xpToEarn);
       
-      // Call the onComplete callback
-      onComplete(finalScore);
+      // Call the onComplete callback with completed question IDs
+      onComplete(finalScore, completedQuestionIds);
     }
   };
   
@@ -128,6 +136,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
     setScore(0);
     setUserAnswers({});
     setQuizCompleted(false);
+    setCompletedQuestionIds([]);
   };
   
   // Calculate accuracy percentage

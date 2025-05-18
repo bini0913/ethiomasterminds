@@ -7,10 +7,11 @@ import QuizCard from "@/components/quiz/QuizCard";
 import QuizView from "@/components/quiz/QuizView";
 import { useUser } from "@/context/UserContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Book, Award, Calculator, Atom, BookOpen, Brain } from "lucide-react";
+import { Book, Award, Calculator, Atom, BookOpen, Brain, Phone } from "lucide-react";
 import { toast } from "sonner";
+import AIHelper from "@/components/ai/AIHelper";
 
 const Quiz: React.FC = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const Quiz: React.FC = () => {
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("easy");
   const [activeTab, setActiveTab] = useState<string>("browse");
   const [numQuestions, setNumQuestions] = useState<number>(5);
+  const [askedQuestions, setAskedQuestions] = useState<Set<string>>(new Set());
   
   // Filter unique categories from all quizzes
   const categories = [...new Set(quizzes.map(quiz => quiz.category))];
@@ -34,7 +36,22 @@ const Quiz: React.FC = () => {
   });
 
   const handleStartQuiz = (quiz: QuizType) => {
-    setActiveQuiz(quiz);
+    // Create a copy of the quiz with questions that haven't been asked before
+    const uniqueQuestions = quiz.questions.filter(q => !askedQuestions.has(q.id));
+    
+    if (uniqueQuestions.length === 0) {
+      toast.warning("You've already completed all questions in this quiz. We'll reset and give you some new challenges!");
+      // Reset asked questions if all have been asked
+      setAskedQuestions(new Set());
+      setActiveQuiz(quiz);
+    } else {
+      // Create a modified quiz with only unique questions
+      const modifiedQuiz = {
+        ...quiz,
+        questions: uniqueQuestions.length > 0 ? uniqueQuestions : quiz.questions,
+      };
+      setActiveQuiz(modifiedQuiz);
+    }
   };
   
   const handleCreateRandomQuiz = () => {
@@ -51,16 +68,33 @@ const Quiz: React.FC = () => {
     );
     
     if (randomQuiz) {
-      setActiveQuiz(randomQuiz);
-      toast.success(`Created a ${difficulty} ${selectedCategory} quiz with ${numQuestions} questions`);
+      // Filter out previously asked questions
+      const uniqueQuestions = randomQuiz.questions.filter(q => !askedQuestions.has(q.id));
+      
+      if (uniqueQuestions.length < numQuestions / 2) {
+        toast.warning("You've seen most questions at this level! We'll add some new ones to keep it interesting.");
+      }
+      
+      const finalQuiz = {
+        ...randomQuiz,
+        questions: uniqueQuestions.length > numQuestions / 2 ? uniqueQuestions : randomQuiz.questions,
+      };
+      
+      setActiveQuiz(finalQuiz);
+      toast.success(`Created a ${difficulty} ${selectedCategory} quiz with ${finalQuiz.questions.length} questions`);
     } else {
       toast.error("Could not create quiz. Not enough questions available for selected criteria.");
     }
   };
   
-  const handleQuizComplete = (score: number) => {
-    // This will be called when a quiz is completed
+  const handleQuizComplete = (score: number, completedQuestionIds: string[]) => {
+    // Add completed questions to the set of asked questions
+    const newAskedQuestions = new Set(askedQuestions);
+    completedQuestionIds.forEach(id => newAskedQuestions.add(id));
+    setAskedQuestions(newAskedQuestions);
+    
     console.log("Quiz completed with score:", score);
+    console.log("Total unique questions asked so far:", newAskedQuestions.size);
   };
   
   const handleExitQuiz = () => {
@@ -275,7 +309,7 @@ const Quiz: React.FC = () => {
               </CardContent>
             </Card>
             
-            {/* Daily Challenges - Placeholder for future implementation */}
+            {/* Daily Challenges */}
             <Card>
               <CardHeader>
                 <CardTitle>Daily Challenges</CardTitle>
@@ -291,7 +325,32 @@ const Quiz: React.FC = () => {
             </Card>
           </TabsContent>
         </Tabs>
+        
+        {/* Contact Information */}
+        <Card className="mt-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Phone className="h-5 w-5" />
+              Contact Us
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600">
+              Need help or have questions about Master Minds? Reach out to us:
+            </p>
+            <div className="mt-2 font-medium">+251713445505</div>
+          </CardContent>
+          <CardFooter className="pt-0">
+            <Button variant="outline" size="sm" className="flex items-center gap-1">
+              <Phone className="h-4 w-4" />
+              Call Now
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
+      
+      {/* Enhanced AI Helper */}
+      <AIHelper />
     </div>
   );
 };
