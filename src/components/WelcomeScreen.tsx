@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -63,12 +62,17 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
   useEffect(() => {
     const animateParticles = () => {
       setParticles(prevParticles =>
-        prevParticles.map(particle => ({
-          ...particle,
-          y: particle.y - particle.speed,
-          opacity: particle.y <= 0 ? Math.random() * 0.5 + 0.1 : particle.opacity,
-          y: particle.y <= 0 ? 100 : particle.y
-        }))
+        prevParticles.map(particle => {
+          // Fix: The duplicate property 'y' is causing the error
+          // First calculate the new y position
+          const newY = particle.y - particle.speed;
+          // Then return the updated particle with the correct y value
+          return {
+            ...particle,
+            y: newY <= 0 ? 100 : newY,
+            opacity: newY <= 0 ? Math.random() * 0.5 + 0.1 : particle.opacity
+          };
+        })
       );
     };
 
