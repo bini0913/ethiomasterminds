@@ -25,11 +25,13 @@ interface QuizContextType {
   setActiveQuiz: (quiz: Quiz | null) => void;
   getQuizzesByCategory: (category: string) => Quiz[];
   getQuizzesByGrade: (grade: number) => Quiz[];
+  getQuizzesByDifficulty: (difficulty: "easy" | "medium" | "hard") => Quiz[];
+  createRandomQuiz: (category: string, count: number, gradeLevel: number) => Quiz | null;
 }
 
 const QuizContext = createContext<QuizContextType | undefined>(undefined);
 
-// Sample quiz data
+// Expanded sample quiz data
 const sampleQuizzes: Quiz[] = [
   {
     id: "math-quiz-1",
@@ -62,6 +64,24 @@ const sampleQuizzes: Quiz[] = [
         correctAnswer: "4",
         category: "Math",
         difficulty: "easy",
+        gradeLevel: 5,
+      },
+      {
+        id: "math-q4",
+        text: "What is 15 - 9?",
+        options: ["6", "7", "5", "4"],
+        correctAnswer: "6",
+        category: "Math",
+        difficulty: "easy",
+        gradeLevel: 5,
+      },
+      {
+        id: "math-q5",
+        text: "Which of these is not a prime number?",
+        options: ["2", "3", "4", "5"],
+        correctAnswer: "4",
+        category: "Math",
+        difficulty: "medium",
         gradeLevel: 5,
       },
     ],
@@ -99,6 +119,24 @@ const sampleQuizzes: Quiz[] = [
         difficulty: "easy",
         gradeLevel: 5,
       },
+      {
+        id: "science-q4",
+        text: "Which of these is not a state of matter?",
+        options: ["Solid", "Liquid", "Gas", "Energy"],
+        correctAnswer: "Energy",
+        category: "Science",
+        difficulty: "medium",
+        gradeLevel: 5,
+      },
+      {
+        id: "science-q5",
+        text: "What is the largest organ in the human body?",
+        options: ["Heart", "Liver", "Skin", "Brain"],
+        correctAnswer: "Skin",
+        category: "Science",
+        difficulty: "medium", 
+        gradeLevel: 5,
+      },
     ],
   },
   {
@@ -134,6 +172,77 @@ const sampleQuizzes: Quiz[] = [
         difficulty: "easy",
         gradeLevel: 5,
       },
+      {
+        id: "english-q4",
+        text: "Which of these is an adverb?",
+        options: ["Quickly", "Happy", "Tall", "Green"],
+        correctAnswer: "Quickly",
+        category: "English",
+        difficulty: "medium",
+        gradeLevel: 5,
+      },
+      {
+        id: "english-q5",
+        text: "Which sentence has correct punctuation?",
+        options: ["Where are you going.", "where are you going?", "Where are you going?", "where are you going."],
+        correctAnswer: "Where are you going?",
+        category: "English",
+        difficulty: "medium",
+        gradeLevel: 5,
+      },
+    ],
+  },
+  {
+    id: "gk-quiz-1",
+    title: "General Knowledge",
+    category: "General Knowledge",
+    gradeLevel: 5,
+    questions: [
+      {
+        id: "gk-q1",
+        text: "What is the capital of Ethiopia?",
+        options: ["Cairo", "Nairobi", "Addis Ababa", "Lagos"],
+        correctAnswer: "Addis Ababa",
+        category: "General Knowledge",
+        difficulty: "medium",
+        gradeLevel: 5,
+      },
+      {
+        id: "gk-q2",
+        text: "Which is the largest continent?",
+        options: ["North America", "Europe", "Africa", "Asia"],
+        correctAnswer: "Asia",
+        category: "General Knowledge",
+        difficulty: "easy",
+        gradeLevel: 5,
+      },
+      {
+        id: "gk-q3",
+        text: "How many sides does a hexagon have?",
+        options: ["5", "6", "7", "8"],
+        correctAnswer: "6",
+        category: "General Knowledge",
+        difficulty: "easy",
+        gradeLevel: 5,
+      },
+      {
+        id: "gk-q4",
+        text: "What is the currency of Japan?",
+        options: ["Dollar", "Euro", "Yen", "Pound"],
+        correctAnswer: "Yen",
+        category: "General Knowledge",
+        difficulty: "medium",
+        gradeLevel: 5,
+      },
+      {
+        id: "gk-q5",
+        text: "Which famous inventor is known for the lightbulb?",
+        options: ["Einstein", "Edison", "Tesla", "Graham Bell"],
+        correctAnswer: "Edison",
+        category: "General Knowledge",
+        difficulty: "medium",
+        gradeLevel: 5,
+      },
     ],
   },
 ];
@@ -142,12 +251,55 @@ export const QuizProvider = ({ children }: { children: ReactNode }) => {
   const [quizzes] = useState<Quiz[]>(sampleQuizzes);
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
 
+  // Helper function to shuffle an array
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  };
+
   const getQuizzesByCategory = (category: string): Quiz[] => {
     return quizzes.filter(quiz => quiz.category.toLowerCase() === category.toLowerCase());
   };
 
   const getQuizzesByGrade = (grade: number): Quiz[] => {
     return quizzes.filter(quiz => quiz.gradeLevel === grade);
+  };
+  
+  const getQuizzesByDifficulty = (difficulty: "easy" | "medium" | "hard"): Quiz[] => {
+    // This returns quizzes where most questions match the requested difficulty
+    return quizzes.filter(quiz => {
+      const questions = quiz.questions;
+      const matchingDifficulty = questions.filter(q => q.difficulty === difficulty).length;
+      return matchingDifficulty >= questions.length / 2;
+    });
+  };
+  
+  const createRandomQuiz = (category: string, count: number, gradeLevel: number): Quiz | null => {
+    // Get all questions that match the category and grade level
+    const allQuestions = quizzes
+      .filter(quiz => quiz.category.toLowerCase() === category.toLowerCase())
+      .flatMap(quiz => quiz.questions)
+      .filter(q => q.gradeLevel === gradeLevel);
+    
+    if (allQuestions.length === 0) return null;
+    
+    // Shuffle and take requested number of questions (or as many as available)
+    const randomQuestions = shuffleArray(allQuestions).slice(0, count);
+    
+    if (randomQuestions.length === 0) return null;
+    
+    // Create a new randomized quiz
+    return {
+      id: `random-${category.toLowerCase()}-${Date.now()}`,
+      title: `Random ${category} Quiz`,
+      category: category,
+      questions: randomQuestions,
+      gradeLevel: gradeLevel
+    };
   };
 
   return (
@@ -158,6 +310,8 @@ export const QuizProvider = ({ children }: { children: ReactNode }) => {
         setActiveQuiz,
         getQuizzesByCategory,
         getQuizzesByGrade,
+        getQuizzesByDifficulty,
+        createRandomQuiz,
       }}
     >
       {children}

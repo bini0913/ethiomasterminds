@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +23,9 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const [timeLeft, setTimeLeft] = useState(20);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [earnedXP, setEarnedXP] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<{[key: string]: string}>({});
 
+  // Get the current question from the quiz
   const currentQuestion = quiz.questions[currentQuestionIndex];
   
   // Timer effect
@@ -51,6 +54,11 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const handleTimeout = () => {
     if (!isAnswered) {
       setIsAnswered(true);
+      // Record that the user didn't answer this question
+      setUserAnswers(prev => ({
+        ...prev,
+        [currentQuestion.id]: "no_answer"
+      }));
       toast.error("Time's up!");
     }
   };
@@ -60,6 +68,12 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
     
     setSelectedOption(option);
     setIsAnswered(true);
+    
+    // Record user's answer
+    setUserAnswers(prev => ({
+      ...prev,
+      [currentQuestion.id]: option
+    }));
     
     if (option === currentQuestion.correctAnswer) {
       const pointsEarned = calculatePoints(timeLeft);
@@ -105,6 +119,30 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
       });
       setEarnedXP(0);
     }
+  };
+  
+  const handlePlayAgain = () => {
+    setCurrentQuestionIndex(0);
+    setSelectedOption(null);
+    setIsAnswered(false);
+    setScore(0);
+    setUserAnswers({});
+    setQuizCompleted(false);
+  };
+  
+  // Calculate accuracy percentage
+  const calculateAccuracy = () => {
+    const totalAnswered = Object.keys(userAnswers).length;
+    if (totalAnswered === 0) return 0;
+    
+    const correctAnswers = Object.entries(userAnswers).filter(
+      ([questionId, answer]) => {
+        const question = quiz.questions.find(q => q.id === questionId);
+        return question && answer === question.correctAnswer;
+      }
+    ).length;
+    
+    return Math.floor((correctAnswers / totalAnswered) * 100);
   };
   
   return (
@@ -201,7 +239,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
               <div className="text-lg font-semibold mb-2">Your Results</div>
               <div className="flex justify-center space-x-8">
                 <div>
-                  <div className="text-2xl font-bold text-primary">{Math.floor(score / (quiz.questions.length * 20) * 100)}%</div>
+                  <div className="text-2xl font-bold text-primary">{calculateAccuracy()}%</div>
                   <div className="text-sm text-gray-500">Accuracy</div>
                 </div>
                 <div>
@@ -246,13 +284,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
               Return to Menu
             </Button>
             <Button 
-              onClick={() => {
-                setCurrentQuestionIndex(0);
-                setSelectedOption(null);
-                setIsAnswered(false);
-                setScore(0);
-                setQuizCompleted(false);
-              }}
+              onClick={handlePlayAgain}
               className="bg-primary hover:bg-primary-dark"
             >
               Play Again

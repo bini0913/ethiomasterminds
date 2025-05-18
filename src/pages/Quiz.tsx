@@ -5,23 +5,47 @@ import { useNavigate } from "react-router-dom";
 import { useQuiz, Quiz as QuizType } from "@/context/QuizContext";
 import QuizCard from "@/components/quiz/QuizCard";
 import QuizView from "@/components/quiz/QuizView";
+import { useUser } from "@/context/UserContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Book, Award, Calculator, Atom, BookOpen, Brain } from "lucide-react";
 
 const Quiz: React.FC = () => {
   const navigate = useNavigate();
-  const { quizzes } = useQuiz();
+  const { quizzes, createRandomQuiz } = useQuiz();
+  const { user } = useUser();
   const [activeQuiz, setActiveQuiz] = useState<QuizType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedGrade, setSelectedGrade] = useState<string>(user?.grade || "5");
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("easy");
+  const [activeTab, setActiveTab] = useState<string>("browse");
   
   // Filter unique categories from all quizzes
   const categories = [...new Set(quizzes.map(quiz => quiz.category))];
   
-  // Filter quizzes by selected category
-  const filteredQuizzes = selectedCategory 
-    ? quizzes.filter(quiz => quiz.category === selectedCategory)
-    : quizzes;
-  
+  // Filter quizzes by selected filters
+  const filteredQuizzes = quizzes.filter(quiz => {
+    const matchesCategory = !selectedCategory || quiz.category === selectedCategory;
+    const matchesGrade = quiz.gradeLevel.toString() === selectedGrade;
+    return matchesCategory && matchesGrade;
+  });
+
   const handleStartQuiz = (quiz: QuizType) => {
     setActiveQuiz(quiz);
+  };
+  
+  const handleCreateRandomQuiz = () => {
+    if (!selectedCategory) return;
+    const randomQuiz = createRandomQuiz(
+      selectedCategory, 
+      5, // Number of questions
+      parseInt(selectedGrade)
+    );
+    
+    if (randomQuiz) {
+      setActiveQuiz(randomQuiz);
+    }
   };
   
   const handleQuizComplete = (score: number) => {
@@ -31,6 +55,22 @@ const Quiz: React.FC = () => {
   
   const handleExitQuiz = () => {
     setActiveQuiz(null);
+  };
+
+  // Get category icon
+  const getCategoryIcon = (category: string) => {
+    switch(category.toLowerCase()) {
+      case "math":
+        return <Calculator className="h-5 w-5" />;
+      case "science":
+        return <Atom className="h-5 w-5" />;
+      case "english":
+        return <BookOpen className="h-5 w-5" />;
+      case "general knowledge":
+        return <Brain className="h-5 w-5" />;
+      default:
+        return <Book className="h-5 w-5" />;
+    }
   };
   
   if (activeQuiz) {
@@ -59,42 +99,168 @@ const Quiz: React.FC = () => {
         </div>
       </header>
       
-      {/* Category Filter */}
-      <div className="px-4 py-4">
-        <div className="flex items-center space-x-2 overflow-x-auto pb-2">
-          <Button
-            variant={selectedCategory === null ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedCategory(null)}
-            className={selectedCategory === null ? "bg-primary" : ""}
-          >
-            All
-          </Button>
-          {categories.map((category) => (
-            <Button
-              key={category}
-              variant={selectedCategory === category ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedCategory(category)}
-              className={selectedCategory === category ? "bg-primary" : ""}
-            >
-              {category}
-            </Button>
-          ))}
-        </div>
-      </div>
-      
-      {/* Quiz List */}
-      <div className="px-4 py-2 space-y-4">
-        {filteredQuizzes.map((quiz) => (
-          <QuizCard key={quiz.id} quiz={quiz} onStart={handleStartQuiz} />
-        ))}
-        
-        {filteredQuizzes.length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-gray-500">No quizzes available for this category.</p>
-          </div>
-        )}
+      <div className="container mx-auto py-6 px-4">
+        <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="browse" className="flex items-center gap-2">
+              <Book className="h-4 w-4" />
+              Browse Quizzes
+            </TabsTrigger>
+            <TabsTrigger value="random" className="flex items-center gap-2">
+              <Award className="h-4 w-4" />
+              Quick Quiz
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="browse">
+            {/* Category Filter */}
+            <div className="flex flex-wrap items-center gap-3 mb-4 overflow-x-auto pb-2">
+              <Button
+                variant={selectedCategory === null ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(null)}
+                className={selectedCategory === null ? "bg-primary" : ""}
+              >
+                All Subjects
+              </Button>
+              {categories.map((category) => (
+                <Button
+                  key={category}
+                  variant={selectedCategory === category ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedCategory(category)}
+                  className={`flex items-center gap-1 ${selectedCategory === category ? "bg-primary" : ""}`}
+                >
+                  {getCategoryIcon(category)}
+                  {category}
+                </Button>
+              ))}
+            </div>
+            
+            {/* Grade Filter */}
+            <div className="flex items-center gap-3 mb-6">
+              <span className="text-sm font-medium">Grade:</span>
+              <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Select Grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((grade) => (
+                    <SelectItem key={grade} value={grade.toString()}>
+                      Grade {grade}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Quiz List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredQuizzes.map((quiz) => (
+                <QuizCard key={quiz.id} quiz={quiz} onStart={handleStartQuiz} />
+              ))}
+              
+              {filteredQuizzes.length === 0 && (
+                <div className="col-span-full text-center py-8">
+                  <p className="text-gray-500">No quizzes available with the selected filters.</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="random">
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Quick Quiz</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-gray-500">
+                  Create a random quiz based on your preferences. Great for quick practice or daily challenges!
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Category Selection */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Subject</span>
+                    <Select 
+                      value={selectedCategory || ""} 
+                      onValueChange={val => setSelectedCategory(val || null)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Subject" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Grade Selection */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Grade</span>
+                    <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Grade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((grade) => (
+                          <SelectItem key={grade} value={grade.toString()}>
+                            Grade {grade}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Difficulty Selection */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Difficulty</span>
+                    <Select 
+                      value={difficulty} 
+                      onValueChange={(val) => setDifficulty(val as "easy" | "medium" | "hard")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Difficulty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="easy">Easy</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="hard">Hard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <Button 
+                  onClick={handleCreateRandomQuiz} 
+                  className="w-full"
+                  disabled={!selectedCategory}
+                >
+                  Start Quick Quiz
+                </Button>
+              </CardContent>
+            </Card>
+            
+            {/* Daily Challenges - Placeholder for future implementation */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Daily Challenges</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-500 mb-4">
+                  Complete daily challenges to earn extra XP and special rewards!
+                </p>
+                <div className="text-center p-6 border border-dashed rounded-lg">
+                  <p className="text-gray-400">Daily challenges coming soon!</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
