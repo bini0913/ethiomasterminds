@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
 export interface Question {
@@ -25,7 +26,7 @@ interface QuizContextType {
   getQuizzesByCategory: (category: string) => Quiz[];
   getQuizzesByGrade: (grade: number) => Quiz[];
   getQuizzesByDifficulty: (difficulty: "easy" | "medium" | "hard") => Quiz[];
-  createRandomQuiz: (category: string, count: number, gradeLevel: number) => Quiz | null;
+  createRandomQuiz: (category: string, count: number, gradeLevel: number, difficulty?: "easy" | "medium" | "hard") => Quiz | null;
 }
 
 const QuizContext = createContext<QuizContextType | undefined>(undefined);
@@ -842,12 +843,35 @@ export const QuizProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const createRandomQuiz = (category: string, count: number, gradeLevel: number): Quiz | null => {
-    // Get all questions that match the category and grade level
-    const allQuestions = quizzes
+  const createRandomQuiz = (
+    category: string, 
+    count: number, 
+    gradeLevel: number, 
+    difficulty?: "easy" | "medium" | "hard"
+  ): Quiz | null => {
+    // Get all questions that match the criteria
+    let allQuestions = quizzes
       .filter(quiz => quiz.category.toLowerCase() === category.toLowerCase())
       .flatMap(quiz => quiz.questions)
       .filter(q => q.gradeLevel === gradeLevel);
+    
+    // Filter by difficulty if specified
+    if (difficulty) {
+      const difficultyQuestions = allQuestions.filter(q => q.difficulty === difficulty);
+      
+      // If we don't have enough questions at the specified difficulty, use all available
+      // but prioritize the requested difficulty
+      if (difficultyQuestions.length >= count) {
+        allQuestions = difficultyQuestions;
+      } else {
+        // Sort so that requested difficulty comes first
+        allQuestions.sort((a, b) => {
+          if (a.difficulty === difficulty) return -1;
+          if (b.difficulty === difficulty) return 1;
+          return 0;
+        });
+      }
+    }
     
     if (allQuestions.length === 0) return null;
     
@@ -859,7 +883,7 @@ export const QuizProvider = ({ children }: { children: ReactNode }) => {
     // Create a new randomized quiz
     return {
       id: `random-${category.toLowerCase()}-${Date.now()}`,
-      title: `Random ${category} Quiz`,
+      title: `${difficulty ? difficulty.charAt(0).toUpperCase() + difficulty.slice(1) + " " : ""}${category} Quiz`,
       category: category,
       questions: randomQuestions,
       gradeLevel: gradeLevel

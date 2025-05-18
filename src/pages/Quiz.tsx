@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Book, Award, Calculator, Atom, BookOpen, Brain } from "lucide-react";
+import { toast } from "sonner";
 
 const Quiz: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const Quiz: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState<string>(user?.grade || "5");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("easy");
   const [activeTab, setActiveTab] = useState<string>("browse");
+  const [numQuestions, setNumQuestions] = useState<number>(5);
   
   // Filter unique categories from all quizzes
   const categories = [...new Set(quizzes.map(quiz => quiz.category))];
@@ -36,15 +38,23 @@ const Quiz: React.FC = () => {
   };
   
   const handleCreateRandomQuiz = () => {
-    if (!selectedCategory) return;
+    if (!selectedCategory) {
+      toast.error("Please select a subject first");
+      return;
+    }
+    
     const randomQuiz = createRandomQuiz(
       selectedCategory, 
-      5, // Number of questions
-      parseInt(selectedGrade)
+      numQuestions, // Number of questions
+      parseInt(selectedGrade),
+      difficulty
     );
     
     if (randomQuiz) {
       setActiveQuiz(randomQuiz);
+      toast.success(`Created a ${difficulty} ${selectedCategory} quiz with ${numQuestions} questions`);
+    } else {
+      toast.error("Could not create quiz. Not enough questions available for selected criteria.");
     }
   };
   
@@ -233,6 +243,26 @@ const Quiz: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                
+                {/* Number of Questions Selection */}
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">Number of Questions</span>
+                  <Select 
+                    value={numQuestions.toString()} 
+                    onValueChange={(val) => setNumQuestions(parseInt(val))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Number of Questions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 15, 20].map((num) => (
+                        <SelectItem key={num} value={num.toString()}>
+                          {num} Questions
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <Button 

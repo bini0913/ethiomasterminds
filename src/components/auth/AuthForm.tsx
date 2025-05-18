@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser, UserRole } from "@/context/UserContext";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Mail, Lock, UserRound } from "lucide-react";
+import { Mail, Lock, UserRound, KeyRound } from "lucide-react";
 
 interface AuthFormProps {
   onSuccess: () => void;
@@ -20,7 +20,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<UserRole>("student");
+  const [accessCode, setAccessCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loginType, setLoginType] = useState<"student" | "teacher" | "admin">("student");
 
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -31,15 +33,43 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
     setIsLoading(true);
     
     try {
-      if (!validateEmail(email)) {
+      if (!validateEmail(email) && loginType === "student") {
         toast.error("Please enter a valid email address");
+        setIsLoading(false);
         return;
       }
       
-      await login(email, password);
+      // For teacher and admin logins, verify access code
+      if (loginType !== "student") {
+        if (!accessCode) {
+          toast.error("Access code is required for teacher and admin logins");
+          setIsLoading(false);
+          return;
+        }
+        
+        // Verify access code (in a real app, this would be checked against a database)
+        const validTeacherCode = "teacher123";
+        const validAdminCode = "admin456";
+        
+        if (loginType === "teacher" && accessCode !== validTeacherCode) {
+          toast.error("Invalid teacher access code");
+          setIsLoading(false);
+          return;
+        }
+        
+        if (loginType === "admin" && accessCode !== validAdminCode) {
+          toast.error("Invalid admin access code");
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      await login(email, password, loginType as UserRole);
       onSuccess();
+      toast.success(`Welcome back, ${loginType}!`);
     } catch (error) {
       console.error("Login error:", error);
+      toast.error("Failed to login. Please check your credentials.");
     } finally {
       setIsLoading(false);
     }
@@ -52,23 +82,29 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
     try {
       if (!validateEmail(email)) {
         toast.error("Please enter a valid email address");
+        setIsLoading(false);
         return;
       }
       
       if (password.length < 6) {
         toast.error("Password must be at least 6 characters long");
+        setIsLoading(false);
         return;
       }
       
       if (password !== confirmPassword) {
         toast.error("Passwords don't match");
+        setIsLoading(false);
         return;
       }
       
-      await signup(email, password, name);
+      // Only students can sign up
+      await signup(email, password, name, "student");
+      toast.success("Account created successfully!");
       onSuccess();
     } catch (error) {
       console.error("Signup error:", error);
+      toast.error("Failed to create account. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -86,11 +122,30 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
           <h1 className="text-3xl font-bold text-primary">Master Minds</h1>
           <p className="text-gray-500">Log in or sign up to continue</p>
         </div>
+        
+        {/* Login Type Selection */}
+        <div className="mb-4">
+          <Label>I am a:</Label>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {["student", "teacher", "admin"].map((type) => (
+              <Button
+                key={type}
+                type="button"
+                variant={loginType === type ? "default" : "outline"}
+                className={loginType === type ? "bg-primary hover:bg-primary-dark" : ""}
+                onClick={() => setLoginType(type as "student" | "teacher" | "admin")}
+              >
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </Button>
+            ))}
+          </div>
+        </div>
 
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs defaultValue={loginType === "student" ? "login" : "login-secure"} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            {loginType === "student" && <TabsTrigger value="signup">Sign Up</TabsTrigger>}
+            {loginType !== "student" && <TabsTrigger value="login-secure">Secure Login</TabsTrigger>}
           </TabsList>
           
           <TabsContent value="login">
@@ -131,6 +186,62 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                 disabled={isLoading}
               >
                 {isLoading ? "Logging in..." : "Log in"}
+              </Button>
+            </form>
+          </TabsContent>
+          
+          <TabsContent value="login-secure">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="secure-username">Username</Label>
+                <div className="relative">
+                  <UserRound className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                  <Input
+                    id="secure-username"
+                    placeholder="Username"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="secure-password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                  <Input
+                    id="secure-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="access-code">Access Code</Label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                  <Input
+                    id="access-code"
+                    type="password"
+                    placeholder="Access Code"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full bg-primary hover:bg-primary-dark" 
+                disabled={isLoading}
+              >
+                {isLoading ? "Verifying..." : "Secure Login"}
               </Button>
             </form>
           </TabsContent>
@@ -194,22 +305,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                     className="pl-10"
                     required
                   />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>I am a:</Label>
-                <div className="grid grid-cols-3 gap-2 pt-2">
-                  {["student", "teacher", "admin"].map((r) => (
-                    <Button
-                      key={r}
-                      type="button"
-                      variant={role === r ? "default" : "outline"}
-                      className={role === r ? "bg-primary hover:bg-primary-dark" : ""}
-                      onClick={() => setRole(r as UserRole)}
-                    >
-                      {r.charAt(0).toUpperCase() + r.slice(1)}
-                    </Button>
-                  ))}
                 </div>
               </div>
               <Button 
