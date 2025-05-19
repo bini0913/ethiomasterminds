@@ -20,6 +20,7 @@ import { LanguageProvider } from "./context/LanguageContext";
 import AIHelper from "./components/ai/AIHelper";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import QuizFilter from "./pages/QuizFilter";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/quiz" element={<Quiz />} />
+                    <Route path="/quiz/filter" element={<QuizFilter />} />
                     <Route path="/multiplayer" element={<Multiplayer />} />
                     <Route path="/lobby" element={<Lobby />} />
                     <Route path="/leaderboard" element={<Leaderboard />} />

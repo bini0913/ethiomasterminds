@@ -1,905 +1,413 @@
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
-export interface Question {
+// Define types for quiz questions
+export type QuizQuestion = {
   id: string;
-  text: string;
+  question: string;
   options: string[];
-  correctAnswer: string;
-  category: string;
-  difficulty: "easy" | "medium" | "hard";
-  gradeLevel: number;
-}
+  correctAnswer: string | string[];
+  explanation?: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  grade: string;
+  subject: string;
+  topic: string;
+  type: "Multiple Choice" | "True/False" | "Fill in the Blank" | "Matching";
+  image?: string;
+};
 
-export interface Quiz {
-  id: string;
-  title: string;
-  category: string;
-  questions: Question[];
-  gradeLevel: number;
-}
+export type QuizFilters = {
+  grade?: string;
+  subject?: string;
+  topic?: string;
+  difficulty?: string;
+  questionType?: string;
+};
 
 interface QuizContextType {
-  quizzes: Quiz[];
-  activeQuiz: Quiz | null;
-  setActiveQuiz: (quiz: Quiz | null) => void;
-  getQuizzesByCategory: (category: string) => Quiz[];
-  getQuizzesByGrade: (grade: number) => Quiz[];
-  getQuizzesByDifficulty: (difficulty: "easy" | "medium" | "hard") => Quiz[];
-  createRandomQuiz: (category: string, count: number, gradeLevel: number, difficulty?: "easy" | "medium" | "hard") => Quiz | null;
+  currentQuestion: QuizQuestion | null;
+  setCurrentQuestion: (question: QuizQuestion | null) => void;
+  questions: QuizQuestion[];
+  setQuestions: (questions: QuizQuestion[]) => void;
+  askQuestion: (excludeIds?: string[]) => QuizQuestion | null;
+  addQuestion: (question: QuizQuestion) => void;
+  updateQuestion: (question: QuizQuestion) => void;
+  deleteQuestion: (id: string) => void;
+  askedQuestions: QuizQuestion[];
+  clearAskedQuestions: () => void;
+  quizFilters: QuizFilters;
+  setQuizFilters: (filters: QuizFilters) => void;
+  getFilteredQuestions: (filters: QuizFilters) => QuizQuestion[];
 }
 
 const QuizContext = createContext<QuizContextType | undefined>(undefined);
 
-// Expanded sample quiz data with questions for multiple grade levels
-const sampleQuizzes: Quiz[] = [
-  // Grade 1 Quizzes
+// Sample questions with improved structure
+const sampleQuestions: QuizQuestion[] = [
   {
-    id: "math-quiz-g1",
-    title: "Basic Numbers",
-    category: "Math",
-    gradeLevel: 1,
-    questions: [
-      {
-        id: "math-g1-q1",
-        text: "What comes after 5?",
-        options: ["4", "5", "6", "7"],
-        correctAnswer: "6",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-      {
-        id: "math-g1-q2",
-        text: "How many sides does a triangle have?",
-        options: ["2", "3", "4", "5"],
-        correctAnswer: "3",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-      {
-        id: "math-g1-q3",
-        text: "Which shape is a circle?",
-        options: ["◼️", "🔺", "⭐", "⚪"],
-        correctAnswer: "⚪",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-      {
-        id: "math-g1-q4",
-        text: "What is 2 + 3?",
-        options: ["4", "5", "6", "7"],
-        correctAnswer: "5",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-      {
-        id: "math-g1-q5",
-        text: "Which number is bigger: 8 or 3?",
-        options: ["3", "8", "They are the same", "Neither"],
-        correctAnswer: "8",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-    ],
+    id: "q1",
+    question: "What is 5 + 7?",
+    options: ["10", "12", "15", "18"],
+    correctAnswer: "12",
+    difficulty: "Easy",
+    grade: "3",
+    subject: "Mathematics",
+    topic: "Numbers",
+    type: "Multiple Choice"
   },
   {
-    id: "english-quiz-g1",
-    title: "ABC Fun",
-    category: "English",
-    gradeLevel: 1,
-    questions: [
-      {
-        id: "eng-g1-q1",
-        text: "Which letter comes after A?",
-        options: ["B", "C", "D", "Z"],
-        correctAnswer: "B",
-        category: "English",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-      {
-        id: "eng-g1-q2",
-        text: "Which word starts with the letter C?",
-        options: ["Apple", "Banana", "Cat", "Dog"],
-        correctAnswer: "Cat",
-        category: "English",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-      {
-        id: "eng-g1-q3",
-        text: "How many letters are in the word 'dog'?",
-        options: ["2", "3", "4", "5"],
-        correctAnswer: "3",
-        category: "English",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-      {
-        id: "eng-g1-q4",
-        text: "Which is a color?",
-        options: ["Apple", "Red", "Tree", "House"],
-        correctAnswer: "Red",
-        category: "English",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-      {
-        id: "eng-g1-q5",
-        text: "Which word rhymes with 'cat'?",
-        options: ["Dog", "Bat", "Pig", "Fish"],
-        correctAnswer: "Bat",
-        category: "English",
-        difficulty: "easy",
-        gradeLevel: 1,
-      },
-    ],
-  },
-  
-  // Grade 2 Quizzes
-  {
-    id: "math-quiz-g2",
-    title: "Addition & Subtraction",
-    category: "Math",
-    gradeLevel: 2,
-    questions: [
-      {
-        id: "math-g2-q1",
-        text: "What is 10 - 4?",
-        options: ["4", "5", "6", "7"],
-        correctAnswer: "6",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 2,
-      },
-      {
-        id: "math-g2-q2",
-        text: "If you have 5 apples and get 3 more, how many do you have?",
-        options: ["7", "8", "9", "10"],
-        correctAnswer: "8",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 2,
-      },
-      {
-        id: "math-g2-q3",
-        text: "What is double 7?",
-        options: ["12", "13", "14", "15"],
-        correctAnswer: "14",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 2,
-      },
-      {
-        id: "math-g2-q4",
-        text: "20 - 7 = ?",
-        options: ["12", "13", "14", "15"],
-        correctAnswer: "13",
-        category: "Math",
-        difficulty: "medium",
-        gradeLevel: 2,
-      },
-      {
-        id: "math-g2-q5",
-        text: "What is half of 18?",
-        options: ["7", "8", "9", "10"],
-        correctAnswer: "9",
-        category: "Math",
-        difficulty: "medium",
-        gradeLevel: 2,
-      },
-    ],
-  },
-  
-  // Grade 3 Quizzes
-  {
-    id: "science-quiz-g3",
-    title: "Plants & Animals",
-    category: "Science",
-    gradeLevel: 3,
-    questions: [
-      {
-        id: "sci-g3-q1",
-        text: "Which part of the plant absorbs water from soil?",
-        options: ["Leaves", "Stem", "Roots", "Flowers"],
-        correctAnswer: "Roots",
-        category: "Science",
-        difficulty: "easy",
-        gradeLevel: 3,
-      },
-      {
-        id: "sci-g3-q2",
-        text: "What do plants need to make their food?",
-        options: ["Only water", "Only sunlight", "Water and sunlight", "Only soil"],
-        correctAnswer: "Water and sunlight",
-        category: "Science",
-        difficulty: "easy",
-        gradeLevel: 3,
-      },
-      {
-        id: "sci-g3-q3",
-        text: "Which animal lays eggs?",
-        options: ["Dog", "Cat", "Chicken", "Cow"],
-        correctAnswer: "Chicken",
-        category: "Science",
-        difficulty: "easy",
-        gradeLevel: 3,
-      },
-      {
-        id: "sci-g3-q4",
-        text: "What helps birds to fly?",
-        options: ["Scales", "Fur", "Feathers", "Fins"],
-        correctAnswer: "Feathers",
-        category: "Science",
-        difficulty: "easy",
-        gradeLevel: 3,
-      },
-      {
-        id: "sci-g3-q5",
-        text: "Which is not a living thing?",
-        options: ["Tree", "Rock", "Dog", "Flower"],
-        correctAnswer: "Rock",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 3,
-      },
-    ],
-  },
-  
-  // Grade 4 Quizzes
-  {
-    id: "gk-quiz-g4",
-    title: "World Geography",
-    category: "General Knowledge",
-    gradeLevel: 4,
-    questions: [
-      {
-        id: "gk-g4-q1",
-        text: "Which is the largest ocean on Earth?",
-        options: ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean", "Pacific Ocean"],
-        correctAnswer: "Pacific Ocean",
-        category: "General Knowledge",
-        difficulty: "medium",
-        gradeLevel: 4,
-      },
-      {
-        id: "gk-g4-q2",
-        text: "How many continents are there on Earth?",
-        options: ["5", "6", "7", "8"],
-        correctAnswer: "7",
-        category: "General Knowledge",
-        difficulty: "easy",
-        gradeLevel: 4,
-      },
-      {
-        id: "gk-g4-q3",
-        text: "Which planet is closest to the Sun?",
-        options: ["Earth", "Mars", "Venus", "Mercury"],
-        correctAnswer: "Mercury",
-        category: "General Knowledge",
-        difficulty: "medium",
-        gradeLevel: 4,
-      },
-      {
-        id: "gk-g4-q4",
-        text: "What is the capital of Japan?",
-        options: ["Beijing", "Seoul", "Tokyo", "Bangkok"],
-        correctAnswer: "Tokyo",
-        category: "General Knowledge",
-        difficulty: "medium",
-        gradeLevel: 4,
-      },
-      {
-        id: "gk-g4-q5",
-        text: "Which is the longest river in the world?",
-        options: ["Amazon", "Nile", "Mississippi", "Yangtze"],
-        correctAnswer: "Nile",
-        category: "General Knowledge",
-        difficulty: "medium",
-        gradeLevel: 4,
-      },
-    ],
-  },
-  
-  // Grade 5 Quizzes - Keep the existing ones
-  {
-    id: "math-quiz-1",
-    title: "Basic Mathematics",
-    category: "Math",
-    gradeLevel: 5,
-    questions: [
-      {
-        id: "math-q1",
-        text: "What is 5 + 7?",
-        options: ["10", "12", "15", "11"],
-        correctAnswer: "12",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "math-q2",
-        text: "What is 8 × 4?",
-        options: ["24", "32", "36", "28"],
-        correctAnswer: "32",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "math-q3",
-        text: "What is 20 ÷ 5?",
-        options: ["4", "5", "6", "3"],
-        correctAnswer: "4",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "math-q4",
-        text: "What is 15 - 9?",
-        options: ["6", "7", "5", "4"],
-        correctAnswer: "6",
-        category: "Math",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "math-q5",
-        text: "Which of these is not a prime number?",
-        options: ["2", "3", "4", "5"],
-        correctAnswer: "4",
-        category: "Math",
-        difficulty: "medium",
-        gradeLevel: 5,
-      },
-    ],
+    id: "q2",
+    question: "The Earth revolves around the Sun.",
+    options: ["True", "False"],
+    correctAnswer: "True",
+    explanation: "The Earth orbits the Sun in approximately 365.25 days.",
+    difficulty: "Easy",
+    grade: "4",
+    subject: "Science",
+    topic: "Astronomy",
+    type: "True/False"
   },
   {
-    id: "science-quiz-1",
-    title: "Basic Science",
-    category: "Science",
-    gradeLevel: 5,
-    questions: [
-      {
-        id: "science-q1",
-        text: "What is the closest planet to the Sun?",
-        options: ["Venus", "Earth", "Mercury", "Mars"],
-        correctAnswer: "Mercury",
-        category: "Science",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "science-q2",
-        text: "What is the chemical symbol for water?",
-        options: ["WA", "H2O", "W", "O2H"],
-        correctAnswer: "H2O",
-        category: "Science",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "science-q3",
-        text: "Which gas do plants absorb from the atmosphere?",
-        options: ["Oxygen", "Carbon Dioxide", "Nitrogen", "Hydrogen"],
-        correctAnswer: "Carbon Dioxide",
-        category: "Science",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "science-q4",
-        text: "Which of these is not a state of matter?",
-        options: ["Solid", "Liquid", "Gas", "Energy"],
-        correctAnswer: "Energy",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 5,
-      },
-      {
-        id: "science-q5",
-        text: "What is the largest organ in the human body?",
-        options: ["Heart", "Liver", "Skin", "Brain"],
-        correctAnswer: "Skin",
-        category: "Science",
-        difficulty: "medium", 
-        gradeLevel: 5,
-      },
-    ],
+    id: "q3",
+    question: "What is the capital of France?",
+    options: ["London", "Berlin", "Paris", "Madrid"],
+    correctAnswer: "Paris",
+    difficulty: "Medium",
+    grade: "5",
+    subject: "Social Studies",
+    topic: "Geography",
+    type: "Multiple Choice"
   },
   {
-    id: "english-quiz-1",
-    title: "Basic English",
-    category: "English",
-    gradeLevel: 5,
-    questions: [
-      {
-        id: "english-q1",
-        text: "What is the past tense of 'run'?",
-        options: ["Runned", "Ran", "Running", "Runs"],
-        correctAnswer: "Ran",
-        category: "English",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "english-q2",
-        text: "Which of these is a noun?",
-        options: ["Jump", "Fast", "House", "Beautiful"],
-        correctAnswer: "House",
-        category: "English",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "english-q3",
-        text: "What is the opposite of 'big'?",
-        options: ["Large", "Small", "Huge", "Tiny"],
-        correctAnswer: "Small",
-        category: "English",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "english-q4",
-        text: "Which of these is an adverb?",
-        options: ["Quickly", "Happy", "Tall", "Green"],
-        correctAnswer: "Quickly",
-        category: "English",
-        difficulty: "medium",
-        gradeLevel: 5,
-      },
-      {
-        id: "english-q5",
-        text: "Which sentence has correct punctuation?",
-        options: ["Where are you going.", "where are you going?", "Where are you going?", "where are you going."],
-        correctAnswer: "Where are you going?",
-        category: "English",
-        difficulty: "medium",
-        gradeLevel: 5,
-      },
-    ],
+    id: "q4",
+    question: "Which word is a synonym for 'happy'?",
+    options: ["Sad", "Angry", "Joyful", "Tired"],
+    correctAnswer: "Joyful",
+    difficulty: "Medium",
+    grade: "4",
+    subject: "English",
+    topic: "Vocabulary",
+    type: "Multiple Choice"
   },
   {
-    id: "gk-quiz-1",
-    title: "General Knowledge",
-    category: "General Knowledge",
-    gradeLevel: 5,
-    questions: [
-      {
-        id: "gk-q1",
-        text: "What is the capital of Ethiopia?",
-        options: ["Cairo", "Nairobi", "Addis Ababa", "Lagos"],
-        correctAnswer: "Addis Ababa",
-        category: "General Knowledge",
-        difficulty: "medium",
-        gradeLevel: 5,
-      },
-      {
-        id: "gk-q2",
-        text: "Which is the largest continent?",
-        options: ["North America", "Europe", "Africa", "Asia"],
-        correctAnswer: "Asia",
-        category: "General Knowledge",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "gk-q3",
-        text: "How many sides does a hexagon have?",
-        options: ["5", "6", "7", "8"],
-        correctAnswer: "6",
-        category: "General Knowledge",
-        difficulty: "easy",
-        gradeLevel: 5,
-      },
-      {
-        id: "gk-q4",
-        text: "What is the currency of Japan?",
-        options: ["Dollar", "Euro", "Yen", "Pound"],
-        correctAnswer: "Yen",
-        category: "General Knowledge",
-        difficulty: "medium",
-        gradeLevel: 5,
-      },
-      {
-        id: "gk-q5",
-        text: "Which famous inventor is known for the lightbulb?",
-        options: ["Einstein", "Edison", "Tesla", "Graham Bell"],
-        correctAnswer: "Edison",
-        category: "General Knowledge",
-        difficulty: "medium",
-        gradeLevel: 5,
-      },
-    ],
-  },
-  
-  // Grade 6 Quizzes
-  {
-    id: "math-quiz-g6",
-    title: "Fractions & Decimals",
-    category: "Math",
-    gradeLevel: 6,
-    questions: [
-      {
-        id: "math-g6-q1",
-        text: "Which decimal is equal to 1/2?",
-        options: ["0.2", "0.25", "0.5", "0.75"],
-        correctAnswer: "0.5",
-        category: "Math",
-        difficulty: "medium",
-        gradeLevel: 6,
-      },
-      {
-        id: "math-g6-q2",
-        text: "What is 3/4 + 1/4?",
-        options: ["1/2", "3/4", "1", "4/4"],
-        correctAnswer: "1",
-        category: "Math",
-        difficulty: "medium",
-        gradeLevel: 6,
-      },
-      {
-        id: "math-g6-q3",
-        text: "Which fraction is greater: 3/5 or 2/3?",
-        options: ["3/5", "2/3", "They are equal", "Cannot be determined"],
-        correctAnswer: "2/3",
-        category: "Math",
-        difficulty: "hard",
-        gradeLevel: 6,
-      },
-      {
-        id: "math-g6-q4",
-        text: "What is 0.7 × 10?",
-        options: ["0.07", "0.7", "7", "70"],
-        correctAnswer: "7",
-        category: "Math",
-        difficulty: "medium",
-        gradeLevel: 6,
-      },
-      {
-        id: "math-g6-q5",
-        text: "Convert 3/8 to a decimal.",
-        options: ["0.375", "0.38", "0.35", "0.4"],
-        correctAnswer: "0.375",
-        category: "Math",
-        difficulty: "hard",
-        gradeLevel: 6,
-      },
-    ],
+    id: "q5",
+    question: "What is 8 × 9?",
+    options: ["63", "72", "81", "90"],
+    correctAnswer: "72",
+    difficulty: "Medium",
+    grade: "4",
+    subject: "Mathematics",
+    topic: "Numbers",
+    type: "Multiple Choice"
   },
   {
-    id: "science-quiz-g6",
-    title: "Earth & Space",
-    category: "Science",
-    gradeLevel: 6,
-    questions: [
-      {
-        id: "sci-g6-q1",
-        text: "What causes day and night on Earth?",
-        options: ["Revolution around the Sun", "Rotation on its axis", "Moon's shadow", "Clouds blocking sunlight"],
-        correctAnswer: "Rotation on its axis",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 6,
-      },
-      {
-        id: "sci-g6-q2",
-        text: "What is the order of planets from the Sun?",
-        options: [
-          "Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune",
-          "Mercury, Earth, Venus, Mars, Jupiter, Saturn, Uranus, Neptune",
-          "Mercury, Venus, Earth, Jupiter, Mars, Saturn, Uranus, Neptune",
-          "Mercury, Venus, Earth, Mars, Saturn, Jupiter, Uranus, Neptune"
-        ],
-        correctAnswer: "Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune",
-        category: "Science",
-        difficulty: "hard",
-        gradeLevel: 6,
-      },
-      {
-        id: "sci-g6-q3",
-        text: "What causes the seasons on Earth?",
-        options: ["Distance from the Sun", "Earth's tilt on its axis", "Ocean currents", "Wind patterns"],
-        correctAnswer: "Earth's tilt on its axis",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 6,
-      },
-      {
-        id: "sci-g6-q4",
-        text: "What are the layers of Earth from outside to inside?",
-        options: [
-          "Crust, Mantle, Outer Core, Inner Core",
-          "Crust, Outer Core, Mantle, Inner Core",
-          "Inner Core, Outer Core, Mantle, Crust",
-          "Mantle, Crust, Outer Core, Inner Core"
-        ],
-        correctAnswer: "Crust, Mantle, Outer Core, Inner Core",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 6,
-      },
-      {
-        id: "sci-g6-q5",
-        text: "Which planet has the Great Red Spot?",
-        options: ["Mars", "Jupiter", "Venus", "Saturn"],
-        correctAnswer: "Jupiter",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 6,
-      },
-    ],
-  },
-  
-  // Grade 7 Quizzes
-  {
-    id: "english-quiz-g7",
-    title: "Grammar & Literature",
-    category: "English",
-    gradeLevel: 7,
-    questions: [
-      {
-        id: "eng-g7-q1",
-        text: "Which of the following is a preposition?",
-        options: ["Run", "Quickly", "Under", "Beautiful"],
-        correctAnswer: "Under",
-        category: "English",
-        difficulty: "medium",
-        gradeLevel: 7,
-      },
-      {
-        id: "eng-g7-q2",
-        text: "Identify the correct sentence:",
-        options: [
-          "They was going to the store.",
-          "She don't like chocolate.",
-          "He doesn't have any money.",
-          "We is ready to leave."
-        ],
-        correctAnswer: "He doesn't have any money.",
-        category: "English",
-        difficulty: "medium",
-        gradeLevel: 7,
-      },
-      {
-        id: "eng-g7-q3",
-        text: "Which literary device uses 'like' or 'as' to compare things?",
-        options: ["Metaphor", "Simile", "Personification", "Hyperbole"],
-        correctAnswer: "Simile",
-        category: "English",
-        difficulty: "medium",
-        gradeLevel: 7,
-      },
-      {
-        id: "eng-g7-q4",
-        text: "What is the past tense of 'begin'?",
-        options: ["Begun", "Beginning", "Began", "Begined"],
-        correctAnswer: "Began",
-        category: "English",
-        difficulty: "medium",
-        gradeLevel: 7,
-      },
-      {
-        id: "eng-g7-q5",
-        text: "Identify the adjective: 'The red car drove quickly.'",
-        options: ["The", "Red", "Drove", "Quickly"],
-        correctAnswer: "Red",
-        category: "English",
-        difficulty: "medium",
-        gradeLevel: 7,
-      },
-    ],
-  },
-  
-  // Grade 8 Quizzes
-  {
-    id: "science-quiz-g8",
-    title: "Chemistry Basics",
-    category: "Science",
-    gradeLevel: 8,
-    questions: [
-      {
-        id: "sci-g8-q1",
-        text: "What is the chemical formula for water?",
-        options: ["CO2", "H2O", "O2", "H2O2"],
-        correctAnswer: "H2O",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 8,
-      },
-      {
-        id: "sci-g8-q2",
-        text: "What is the smallest unit of matter?",
-        options: ["Element", "Molecule", "Atom", "Cell"],
-        correctAnswer: "Atom",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 8,
-      },
-      {
-        id: "sci-g8-q3",
-        text: "What is the pH of a neutral solution?",
-        options: ["0", "7", "14", "10"],
-        correctAnswer: "7",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 8,
-      },
-      {
-        id: "sci-g8-q4",
-        text: "Which element has the symbol 'Fe'?",
-        options: ["Fluorine", "Iron", "Francium", "Fermium"],
-        correctAnswer: "Iron",
-        category: "Science",
-        difficulty: "medium",
-        gradeLevel: 8,
-      },
-      {
-        id: "sci-g8-q5",
-        text: "Which of these is a physical change?",
-        options: [
-          "Rusting of iron",
-          "Burning of paper",
-          "Melting of ice",
-          "Digesting food"
-        ],
-        correctAnswer: "Melting of ice",
-        category: "Science",
-        difficulty: "hard",
-        gradeLevel: 8,
-      },
-    ],
+    id: "q6",
+    question: "Water boils at 100°C at sea level.",
+    options: ["True", "False"],
+    correctAnswer: "True",
+    explanation: "Water boils at 100 degrees Celsius (212°F) at standard atmospheric pressure at sea level.",
+    difficulty: "Easy",
+    grade: "5",
+    subject: "Science",
+    topic: "Physics",
+    type: "True/False"
   },
   {
-    id: "math-quiz-g8",
-    title: "Algebra Fundamentals",
-    category: "Math",
-    gradeLevel: 8,
-    questions: [
-      {
-        id: "math-g8-q1",
-        text: "Solve for x: 3x + 5 = 20",
-        options: ["5", "7", "8", "5/3"],
-        correctAnswer: "5",
-        category: "Math",
-        difficulty: "hard",
-        gradeLevel: 8,
-      },
-      {
-        id: "math-g8-q2",
-        text: "What is the slope of the line y = 2x + 3?",
-        options: ["1", "2", "3", "-2"],
-        correctAnswer: "2",
-        category: "Math",
-        difficulty: "hard",
-        gradeLevel: 8,
-      },
-      {
-        id: "math-g8-q3",
-        text: "Simplify: 2(x + 4) - 3(x - 1)",
-        options: ["2x - 5", "2x + 11", "-x + 11", "-x + 5"],
-        correctAnswer: "-x + 11",
-        category: "Math",
-        difficulty: "hard",
-        gradeLevel: 8,
-      },
-      {
-        id: "math-g8-q4",
-        text: "If y is directly proportional to x, and y = 15 when x = 3, find y when x = 7.",
-        options: ["25", "35", "21", "45"],
-        correctAnswer: "35",
-        category: "Math",
-        difficulty: "hard",
-        gradeLevel: 8,
-      },
-      {
-        id: "math-g8-q5",
-        text: "What is the solution to the inequality 2x - 7 > 5?",
-        options: ["x > 6", "x < 6", "x > -1", "x < -1"],
-        correctAnswer: "x > 6",
-        category: "Math",
-        difficulty: "hard",
-        gradeLevel: 8,
-      },
-    ],
+    id: "q7",
+    question: "Complete the sentence: The cat sat ___ the mat.",
+    options: ["on", "in", "at", "by"],
+    correctAnswer: "on",
+    difficulty: "Easy",
+    grade: "3",
+    subject: "English",
+    topic: "Grammar",
+    type: "Fill in the Blank"
+  },
+  {
+    id: "q8",
+    question: "What is the largest planet in our solar system?",
+    options: ["Earth", "Mars", "Jupiter", "Saturn"],
+    correctAnswer: "Jupiter",
+    difficulty: "Medium",
+    grade: "5",
+    subject: "Science",
+    topic: "Astronomy",
+    type: "Multiple Choice"
+  },
+  {
+    id: "q9",
+    question: "Which of these is NOT a primary color?",
+    options: ["Red", "Blue", "Green", "Yellow"],
+    correctAnswer: "Green",
+    difficulty: "Medium",
+    grade: "4",
+    subject: "Science",
+    topic: "Physics",
+    type: "Multiple Choice"
+  },
+  {
+    id: "q10",
+    question: "Who wrote 'Romeo and Juliet'?",
+    options: ["Charles Dickens", "William Shakespeare", "Jane Austen", "Mark Twain"],
+    correctAnswer: "William Shakespeare",
+    difficulty: "Hard",
+    grade: "7",
+    subject: "English",
+    topic: "Literature",
+    type: "Multiple Choice"
   }
 ];
 
-export const QuizProvider = ({ children }: { children: ReactNode }) => {
-  const [quizzes] = useState<Quiz[]>(sampleQuizzes);
-  const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
-
-  // Helper function to shuffle an array
-  const shuffleArray = <T,>(array: T[]): T[] => {
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+// Generate 50 more questions across different grades, subjects, and difficulties
+const generateMoreQuestions = (): QuizQuestion[] => {
+  const extraQuestions: QuizQuestion[] = [];
+  const subjects = ["Mathematics", "Science", "English", "Social Studies", "General Knowledge"];
+  const topics: { [key: string]: string[] } = {
+    "Mathematics": ["Numbers", "Algebra", "Geometry", "Fractions", "Decimals"],
+    "Science": ["Biology", "Chemistry", "Physics", "Earth Science", "Astronomy"],
+    "English": ["Grammar", "Vocabulary", "Reading", "Writing", "Literature"],
+    "Social Studies": ["History", "Geography", "Civics", "Economics"],
+    "General Knowledge": ["Current Affairs", "Sports", "Arts", "Technology"]
+  };
+  const difficulties = ["Easy", "Medium", "Hard"];
+  const types = ["Multiple Choice", "True/False", "Fill in the Blank", "Matching"];
+  
+  // Add 50 questions (5 per grade for grades 1-10)
+  for (let grade = 1; grade <= 10; grade++) {
+    for (let i = 0; i < 5; i++) {
+      const subjectIndex = Math.floor(Math.random() * subjects.length);
+      const subject = subjects[subjectIndex];
+      const topicArray = topics[subject];
+      const topic = topicArray[Math.floor(Math.random() * topicArray.length)];
+      const difficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+      const type = types[Math.floor(Math.random() * types.length)] as "Multiple Choice" | "True/False" | "Fill in the Blank" | "Matching";
+      
+      let question: string;
+      let options: string[];
+      let correctAnswer: string;
+      
+      // Generate content based on subject
+      switch (subject) {
+        case "Mathematics":
+          if (grade <= 3) {
+            // Basic addition/subtraction for lower grades
+            const num1 = Math.floor(Math.random() * 10) + 1;
+            const num2 = Math.floor(Math.random() * 10) + 1;
+            question = `What is ${num1} + ${num2}?`;
+            correctAnswer = (num1 + num2).toString();
+            options = [
+              correctAnswer,
+              (num1 + num2 + 1).toString(),
+              (num1 + num2 - 1).toString(),
+              (num1 + num2 + 2).toString()
+            ].sort(() => Math.random() - 0.5);
+          } else if (grade <= 6) {
+            // Multiplication/division for middle grades
+            const num1 = Math.floor(Math.random() * 12) + 1;
+            const num2 = Math.floor(Math.random() * 12) + 1;
+            question = `What is ${num1} × ${num2}?`;
+            correctAnswer = (num1 * num2).toString();
+            options = [
+              correctAnswer,
+              (num1 * num2 + Math.floor(Math.random() * 5) + 1).toString(),
+              (num1 * num2 - Math.floor(Math.random() * 5) - 1).toString(),
+              (num1 * (num2 + 1)).toString()
+            ].sort(() => Math.random() - 0.5);
+          } else {
+            // Basic algebra for higher grades
+            const a = Math.floor(Math.random() * 5) + 1;
+            const b = Math.floor(Math.random() * 10) + 5;
+            question = `Solve for x: ${a}x = ${a * b}`;
+            correctAnswer = b.toString();
+            options = [
+              correctAnswer,
+              (b + 1).toString(),
+              (b - 1).toString(),
+              (b + 2).toString()
+            ].sort(() => Math.random() - 0.5);
+          }
+          break;
+          
+        case "Science":
+          if (topic === "Biology") {
+            const biologyQuestions = [
+              "Which organ pumps blood through the body?",
+              "What do plants use to make their food?",
+              "Which gas do humans breathe out?",
+              "What is the process called when plants make their own food?"
+            ];
+            const biologyAnswers = ["Heart", "Sunlight", "Carbon dioxide", "Photosynthesis"];
+            const wrongAnswers = [
+              ["Lungs", "Brain", "Stomach"],
+              ["Water", "Soil", "Air"],
+              ["Oxygen", "Nitrogen", "Hydrogen"],
+              ["Respiration", "Digestion", "Circulation"]
+            ];
+            
+            const qIndex = Math.floor(Math.random() * biologyQuestions.length);
+            question = biologyQuestions[qIndex];
+            correctAnswer = biologyAnswers[qIndex];
+            options = [correctAnswer, ...wrongAnswers[qIndex]].sort(() => Math.random() - 0.5);
+          } else {
+            const scienceQuestions = [
+              "Which planet is closest to the sun?",
+              "What state of matter is water at room temperature?",
+              "What force pulls objects toward Earth?"
+            ];
+            const scienceAnswers = ["Mercury", "Liquid", "Gravity"];
+            const wrongAnswers = [
+              ["Venus", "Earth", "Mars"],
+              ["Solid", "Gas", "Plasma"],
+              ["Magnetism", "Electricity", "Friction"]
+            ];
+            
+            const qIndex = Math.floor(Math.random() * scienceQuestions.length);
+            question = scienceQuestions[qIndex];
+            correctAnswer = scienceAnswers[qIndex];
+            options = [correctAnswer, ...wrongAnswers[qIndex]].sort(() => Math.random() - 0.5);
+          }
+          break;
+          
+        default:
+          // General knowledge for other subjects
+          const generalQuestions = [
+            "Which is the largest ocean on Earth?",
+            "Who wrote the Harry Potter books?",
+            "What is the capital of Ethiopia?",
+            "Which language is spoken in Brazil?"
+          ];
+          const generalAnswers = ["Pacific Ocean", "J.K. Rowling", "Addis Ababa", "Portuguese"];
+          const wrongAnswers = [
+            ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean"],
+            ["Roald Dahl", "Enid Blyton", "C.S. Lewis"],
+            ["Nairobi", "Cairo", "Lagos"],
+            ["Spanish", "English", "French"]
+          ];
+          
+          const qIndex = Math.floor(Math.random() * generalQuestions.length);
+          question = generalQuestions[qIndex];
+          correctAnswer = generalAnswers[qIndex];
+          options = [correctAnswer, ...wrongAnswers[qIndex]].sort(() => Math.random() - 0.5);
+      }
+      
+      extraQuestions.push({
+        id: `ex-q${grade}-${i}`,
+        question,
+        options,
+        correctAnswer,
+        difficulty: difficulty as "Easy" | "Medium" | "Hard",
+        grade: grade.toString(),
+        subject,
+        topic,
+        type
+      });
     }
-    return newArray;
-  };
+  }
+  
+  return extraQuestions;
+};
 
-  const getQuizzesByCategory = (category: string): Quiz[] => {
-    return quizzes.filter(quiz => quiz.category.toLowerCase() === category.toLowerCase());
-  };
-
-  const getQuizzesByGrade = (grade: number): Quiz[] => {
-    return quizzes.filter(quiz => quiz.gradeLevel === grade);
+export const QuizProvider = ({ children }: { children: ReactNode }) => {
+  // Combine sample questions with generated ones
+  const allQuestions = [...sampleQuestions, ...generateMoreQuestions()];
+  
+  const [questions, setQuestions] = useState<QuizQuestion[]>(allQuestions);
+  const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(null);
+  const [askedQuestions, setAskedQuestions] = useState<QuizQuestion[]>([]);
+  const [quizFilters, setQuizFilters] = useState<QuizFilters>({});
+  
+  // Add a new question
+  const addQuestion = (question: QuizQuestion) => {
+    setQuestions([...questions, question]);
   };
   
-  const getQuizzesByDifficulty = (difficulty: "easy" | "medium" | "hard"): Quiz[] => {
-    // This returns quizzes where most questions match the requested difficulty
-    return quizzes.filter(quiz => {
-      const questions = quiz.questions;
-      const matchingDifficulty = questions.filter(q => q.difficulty === difficulty).length;
-      return matchingDifficulty >= questions.length / 2;
+  // Update an existing question
+  const updateQuestion = (updatedQuestion: QuizQuestion) => {
+    setQuestions(
+      questions.map(q => (q.id === updatedQuestion.id ? updatedQuestion : q))
+    );
+  };
+  
+  // Delete a question
+  const deleteQuestion = (id: string) => {
+    setQuestions(questions.filter(q => q.id !== id));
+  };
+  
+  // Get questions that match the filters
+  const getFilteredQuestions = (filters: QuizFilters): QuizQuestion[] => {
+    return questions.filter(q => {
+      // Check each filter criterion
+      if (filters.grade && q.grade !== filters.grade) return false;
+      if (filters.subject && q.subject !== filters.subject) return false;
+      if (filters.topic && q.topic !== filters.topic) return false;
+      if (filters.difficulty && q.difficulty !== filters.difficulty) return false;
+      if (filters.questionType && q.type !== filters.questionType) return false;
+      
+      return true;
     });
   };
   
-  const createRandomQuiz = (
-    category: string, 
-    count: number, 
-    gradeLevel: number, 
-    difficulty?: "easy" | "medium" | "hard"
-  ): Quiz | null => {
-    // Get all questions that match the criteria
-    let allQuestions = quizzes
-      .filter(quiz => quiz.category.toLowerCase() === category.toLowerCase())
-      .flatMap(quiz => quiz.questions)
-      .filter(q => q.gradeLevel === gradeLevel);
+  // Ask a new question, excluding any questions with IDs in the excludeIds array
+  const askQuestion = (excludeIds: string[] = []): QuizQuestion | null => {
+    // Get questions that match current filters
+    const filteredQuestions = getFilteredQuestions(quizFilters);
     
-    // Filter by difficulty if specified
-    if (difficulty) {
-      const difficultyQuestions = allQuestions.filter(q => q.difficulty === difficulty);
+    // Further filter to exclude already asked questions and specified IDs
+    const availableQuestions = filteredQuestions.filter(
+      q => 
+        !askedQuestions.some(aq => aq.id === q.id) && 
+        !excludeIds.includes(q.id)
+    );
+    
+    if (availableQuestions.length === 0) {
+      // If no questions are available, clear asked questions and try again
+      // (but still respect the excludeIds parameter)
+      const resetAvailableQuestions = filteredQuestions.filter(
+        q => !excludeIds.includes(q.id)
+      );
       
-      // If we don't have enough questions at the specified difficulty, use all available
-      // but prioritize the requested difficulty
-      if (difficultyQuestions.length >= count) {
-        allQuestions = difficultyQuestions;
-      } else {
-        // Sort so that requested difficulty comes first
-        allQuestions.sort((a, b) => {
-          if (a.difficulty === difficulty) return -1;
-          if (b.difficulty === difficulty) return 1;
-          return 0;
-        });
+      if (resetAvailableQuestions.length === 0) {
+        return null; // No questions available even after resetting
       }
+      
+      // Reset asked questions and pick a new one
+      setAskedQuestions([]);
+      const randomIndex = Math.floor(Math.random() * resetAvailableQuestions.length);
+      const newQuestion = resetAvailableQuestions[randomIndex];
+      setCurrentQuestion(newQuestion);
+      setAskedQuestions([newQuestion]);
+      return newQuestion;
     }
     
-    if (allQuestions.length === 0) return null;
-    
-    // Shuffle and take requested number of questions (or as many as available)
-    const randomQuestions = shuffleArray(allQuestions).slice(0, count);
-    
-    if (randomQuestions.length === 0) return null;
-    
-    // Create a new randomized quiz
-    return {
-      id: `random-${category.toLowerCase()}-${Date.now()}`,
-      title: `${difficulty ? difficulty.charAt(0).toUpperCase() + difficulty.slice(1) + " " : ""}${category} Quiz`,
-      category: category,
-      questions: randomQuestions,
-      gradeLevel: gradeLevel
-    };
+    // Pick a random question from available ones
+    const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+    const newQuestion = availableQuestions[randomIndex];
+    setCurrentQuestion(newQuestion);
+    setAskedQuestions(prev => [...prev, newQuestion]);
+    return newQuestion;
   };
-
+  
+  // Clear the list of asked questions to start fresh
+  const clearAskedQuestions = () => {
+    setAskedQuestions([]);
+  };
+  
   return (
     <QuizContext.Provider
       value={{
-        quizzes,
-        activeQuiz,
-        setActiveQuiz,
-        getQuizzesByCategory,
-        getQuizzesByGrade,
-        getQuizzesByDifficulty,
-        createRandomQuiz,
+        currentQuestion,
+        setCurrentQuestion,
+        questions,
+        setQuestions,
+        askQuestion,
+        addQuestion,
+        updateQuestion,
+        deleteQuestion,
+        askedQuestions,
+        clearAskedQuestions,
+        quizFilters,
+        setQuizFilters,
+        getFilteredQuestions
       }}
     >
       {children}
