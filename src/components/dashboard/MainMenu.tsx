@@ -16,7 +16,9 @@ import {
   Users, 
   Settings, 
   GraduationCap,
-  School
+  School,
+  MessageSquare,
+  Gamepad
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { avatarToEmoji } from "@/utils/avatarUtils";
@@ -57,6 +59,15 @@ const MainMenu: React.FC = () => {
       category: "all",
       color: "bg-gradient-to-r from-blue-500 to-cyan-600",
       description: "Compete with friends in real-time"
+    },
+    { 
+      title: "Multiplayer Lobby", 
+      icon: <Gamepad className="h-6 w-6 text-white" />,
+      emoji: "🎮", 
+      path: "/lobby",
+      category: "all",
+      color: "bg-gradient-to-r from-green-400 to-emerald-500",
+      description: "Join the lobby to find matches and chat"
     },
     { 
       title: t("leaderboard"), 
@@ -293,6 +304,7 @@ const MainMenu: React.FC = () => {
       
       <div className="p-4 text-center text-xs text-gray-500">
         <p>Master Minds v1.0 - Created by Biniam Bogale, 14 years old, Ethiopia</p>
+        <p>Contact: +251713445505</p>
       </div>
 
       {/* Level Up Modal */}

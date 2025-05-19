@@ -19,10 +19,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState<UserRole>("student");
-  const [accessCode, setAccessCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loginType, setLoginType] = useState<"student" | "teacher" | "admin">("student");
+  const [accessCode, setAccessCode] = useState("");
+  const [username, setUsername] = useState("");
 
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -33,39 +33,27 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
     setIsLoading(true);
     
     try {
-      if (!validateEmail(email) && loginType === "student") {
-        toast.error("Please enter a valid email address");
-        setIsLoading(false);
-        return;
+      if (loginType === "student") {
+        if (!validateEmail(email)) {
+          toast.error("Please enter a valid email address");
+          setIsLoading(false);
+          return;
+        }
+        
+        // Student login with email and password
+        await login(email, password, "student");
+      } else {
+        // Teacher or admin login with username and password
+        if (!username) {
+          toast.error("Please enter a username");
+          setIsLoading(false);
+          return;
+        }
+        
+        // Pass the loginType to know which credentials to check
+        await login(username, password, loginType);
       }
       
-      // For teacher and admin logins, verify access code
-      if (loginType !== "student") {
-        if (!accessCode) {
-          toast.error("Access code is required for teacher and admin logins");
-          setIsLoading(false);
-          return;
-        }
-        
-        // Verify access code (in a real app, this would be checked against a database)
-        const validTeacherCode = "teacher123";
-        const validAdminCode = "admin456";
-        
-        if (loginType === "teacher" && accessCode !== validTeacherCode) {
-          toast.error("Invalid teacher access code");
-          setIsLoading(false);
-          return;
-        }
-        
-        if (loginType === "admin" && accessCode !== validAdminCode) {
-          toast.error("Invalid admin access code");
-          setIsLoading(false);
-          return;
-        }
-      }
-      
-      // Fix: Pass only email and password to login
-      await login(email, password);
       onSuccess();
       toast.success(`Welcome back, ${loginType}!`);
     } catch (error) {
@@ -99,7 +87,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
         return;
       }
       
-      // Fix: Pass email, password, and name to signup (removed the incorrect 4th parameter)
+      // Only students can sign up - teachers and admins use predefined credentials
       await signup(email, password, name);
       toast.success("Account created successfully!");
       onSuccess();
@@ -122,6 +110,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-primary">Master Minds</h1>
           <p className="text-gray-500">Log in or sign up to continue</p>
+          <p className="text-xs text-gray-500 mt-2">Contact: +251713445505</p>
         </div>
         
         {/* Login Type Selection */}
@@ -200,8 +189,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                   <Input
                     id="secure-username"
                     placeholder="Username"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     className="pl-10"
                     required
                   />
@@ -217,21 +206,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="access-code">Access Code</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                  <Input
-                    id="access-code"
-                    type="password"
-                    placeholder="Access Code"
-                    value={accessCode}
-                    onChange={(e) => setAccessCode(e.target.value)}
                     className="pl-10"
                     required
                   />

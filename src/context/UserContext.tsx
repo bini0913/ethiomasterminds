@@ -8,7 +8,8 @@ export type UserRole = "student" | "teacher" | "admin";
 export type UserProfile = {
   id: string;
   name: string;
-  email: string;
+  email?: string;
+  username?: string;
   role: UserRole;
   gender?: string;
   grade?: string;
@@ -24,7 +25,7 @@ export type UserProfile = {
 interface UserContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (emailOrUsername: string, password: string, type?: "student" | "teacher" | "admin") => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
   updateProfile: (profileData: Partial<UserProfile>) => void;
@@ -42,6 +43,20 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 // User storage key
 const USER_STORAGE_KEY = "masterminds_user";
 const USERS_STORAGE_KEY = "masterminds_users";
+
+// Predefined teacher and admin credentials
+const PREDEFINED_CREDENTIALS = [
+  { username: "teacher1", password: "pass123", role: "teacher", name: "Teacher One" },
+  { username: "teacher2", password: "pass234", role: "teacher", name: "Teacher Two" },
+  { username: "teacher3", password: "pass345", role: "teacher", name: "Teacher Three" },
+  { username: "teacher4", password: "pass456", role: "teacher", name: "Teacher Four" },
+  { username: "teacher5", password: "pass567", role: "teacher", name: "Teacher Five" },
+  { username: "admin1", password: "admin123", role: "admin", name: "Admin One" },
+  { username: "admin2", password: "admin234", role: "admin", name: "Admin Two" },
+  { username: "admin3", password: "admin345", role: "admin", name: "Admin Three" },
+  { username: "admin4", password: "admin456", role: "admin", name: "Admin Four" },
+  { username: "admin5", password: "admin567", role: "admin", name: "Admin Five" },
+];
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -69,31 +84,80 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
+  // Ensure predefined credentials are stored in localStorage
+  useEffect(() => {
+    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
+    let users: Array<any> = JSON.parse(usersStr);
+    
+    // Check if we need to add predefined credentials
+    let needsUpdate = false;
+    
+    for (const cred of PREDEFINED_CREDENTIALS) {
+      const exists = users.some(u => 
+        u.username === cred.username && 
+        u.role === cred.role
+      );
+      
+      if (!exists) {
+        needsUpdate = true;
+        // Generate hashed password for the predefined credential
+        hashPassword(cred.password).then(hashedPassword => {
+          users.push({
+            id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            username: cred.username,
+            password: hashedPassword,
+            name: cred.name,
+            role: cred.role,
+            xp: 0,
+            level: 1,
+            avatar: "avatar-1",
+          });
+        });
+      }
+    }
+    
+    if (needsUpdate) {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    }
+  }, []);
+
   const calculateLevel = (xp: number) => {
     // Simple level calculation: each level requires 100 XP
     return Math.floor(xp / 100) + 1;
   };
   
-  const login = async (email: string, password: string) => {
+  const login = async (emailOrUsername: string, password: string, type: "student" | "teacher" | "admin" = "student") => {
     try {
       // Validate input
-      if (!email || !password) {
-        toast.error("Please enter both email and password");
+      if (!emailOrUsername || !password) {
+        toast.error("Please enter both email/username and password");
         return;
       }
 
       // Create a hash of the password (for demo purposes only - NOT secure)
-      // In a real app, this would be server-side authentication
       const hashedPassword = await hashPassword(password);
       
       // Check if user exists in localStorage
       const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-      const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
+      const users: Array<any> = JSON.parse(usersStr);
       
-      const foundUser = users.find(u => 
-        u.email.toLowerCase() === email.toLowerCase() && 
-        u.password === hashedPassword
-      );
+      let foundUser;
+      
+      if (type === "student") {
+        // Student login - using email
+        foundUser = users.find(u => 
+          u.email?.toLowerCase() === emailOrUsername.toLowerCase() && 
+          u.password === hashedPassword &&
+          u.role === "student"
+        );
+      } else {
+        // Teacher or admin login - using username
+        foundUser = users.find(u => 
+          u.username?.toLowerCase() === emailOrUsername.toLowerCase() && 
+          u.password === hashedPassword &&
+          u.role === type
+        );
+      }
       
       if (foundUser) {
         // Remove password before setting in state
@@ -103,7 +167,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      toast.error("Invalid email or password");
+      if (type === "student") {
+        toast.error("Invalid email or password");
+      } else {
+        toast.error(`Invalid ${type} credentials`);
+      }
     } catch (error) {
       toast.error("Login failed. Please try again.");
       console.error("Login error:", error);
@@ -122,7 +190,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
       const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
       
-      if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+      if (users.some(u => u.email?.toLowerCase() === email.toLowerCase())) {
         toast.error("User with this email already exists");
         return;
       }

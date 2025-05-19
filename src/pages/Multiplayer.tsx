@@ -5,15 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
+import { Users, MessageSquare, Trophy, Gamepad } from "lucide-react";
 
 const Multiplayer: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
   
   const joinMatchmaking = (mode: string) => {
-    toast.info(`Looking for ${mode} match...`, {
-      description: "This feature is coming in a future update!",
-    });
+    // Redirect to the Lobby page
+    navigate("/lobby");
   };
   
   return (
@@ -32,79 +33,130 @@ const Multiplayer: React.FC = () => {
         </div>
       </header>
       
-      <div className="container max-w-md mx-auto py-6 px-4">
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-center">Match Types</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* 1v1 Match */}
-            <div 
-              className="border rounded-lg p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => joinMatchmaking("1v1")}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-bold">1v1 Duel</h3>
-                  <p className="text-sm opacity-80">Challenge another player head-to-head</p>
-                </div>
-                <div className="text-2xl">⚔️</div>
-              </div>
-            </div>
-            
-            {/* 2v2 Match */}
-            <div 
-              className="border rounded-lg p-4 bg-gradient-to-r from-green-500 to-teal-600 text-white cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => joinMatchmaking("2v2")}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-bold">2v2 Team Battle</h3>
-                  <p className="text-sm opacity-80">Join forces with another player</p>
-                </div>
-                <div className="text-2xl">👥</div>
-              </div>
-            </div>
-            
-            {/* Custom Match */}
-            <div 
-              className="border rounded-lg p-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => joinMatchmaking("custom")}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-bold">Custom Match</h3>
-                  <p className="text-sm opacity-80">Create a private match with friends</p>
-                </div>
-                <div className="text-2xl">🎮</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="container max-w-4xl mx-auto py-6 px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-8"
+        >
+          <h2 className="text-2xl font-bold text-gray-800">Welcome to Multiplayer Mode</h2>
+          <p className="text-gray-600 max-w-xl mx-auto mt-2">
+            Challenge friends, compete in tournaments, and show off your skills in real-time matches!
+          </p>
+        </motion.div>
         
-        {/* Online Players */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Online Players</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {/* Mock online players */}
-              {["Alex", "Maria", "David", "Sophie"].map((name) => (
-                <div key={name} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-md">
-                  <div className="h-8 w-8 rounded-full bg-primary-light flex items-center justify-center">
-                    {name.charAt(0)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium">{name}</div>
-                    <div className="text-xs text-gray-500">Online • Grade 5</div>
-                  </div>
-                  <div className="h-2 w-2 rounded-full bg-green-500"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <motion.div
+            whileHover={{ scale: 1.03 }}
+            transition={{ duration: 0.2 }}
+            className="col-span-2"
+          >
+            <Card className="shadow-lg overflow-hidden border-2 border-primary bg-gradient-to-br from-primary/10 to-indigo-100">
+              <CardHeader className="bg-primary text-white pb-3">
+                <CardTitle className="text-xl flex items-center">
+                  <Gamepad className="mr-2 h-5 w-5" />
+                  Enter the Multiplayer Lobby
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center">
+                  <p className="text-center mb-4">
+                    Join the Multiplayer Lobby to see who's online, chat with other players, and find matches.
+                  </p>
+                  <Button 
+                    size="lg" 
+                    className="bg-primary hover:bg-primary-dark"
+                    onClick={() => navigate("/lobby")}
+                  >
+                    Enter Lobby
+                  </Button>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Card className="shadow-md h-full bg-gradient-to-br from-blue-500/10 to-blue-100">
+              <CardHeader className="bg-blue-500 text-white pb-3">
+                <CardTitle className="text-lg flex items-center">
+                  <Users className="mr-2 h-5 w-5" />
+                  Player Vs Player
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <p className="text-sm mb-4">
+                  Challenge another player to a 1v1 duel or team up for 2v2 matches.
+                </p>
+                <Button 
+                  className="w-full bg-blue-500 hover:bg-blue-600" 
+                  onClick={() => joinMatchmaking("pvp")}
+                >
+                  Find Match
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+          
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Card className="shadow-md h-full bg-gradient-to-br from-green-500/10 to-green-100">
+              <CardHeader className="bg-green-500 text-white pb-3">
+                <CardTitle className="text-lg flex items-center">
+                  <Trophy className="mr-2 h-5 w-5" />
+                  Tournaments
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <p className="text-sm mb-4">
+                  Join scheduled tournaments to compete for XP and special rewards.
+                </p>
+                <Button 
+                  className="w-full bg-green-500 hover:bg-green-600" 
+                  onClick={() => joinMatchmaking("tournament")}
+                >
+                  View Tournaments
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+          
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Card className="shadow-md h-full bg-gradient-to-br from-purple-500/10 to-purple-100">
+              <CardHeader className="bg-purple-500 text-white pb-3">
+                <CardTitle className="text-lg flex items-center">
+                  <MessageSquare className="mr-2 h-5 w-5" />
+                  Custom Rooms
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <p className="text-sm mb-4">
+                  Create private rooms with custom settings to play with friends.
+                </p>
+                <Button 
+                  className="w-full bg-purple-500 hover:bg-purple-600" 
+                  onClick={() => joinMatchmaking("custom")}
+                >
+                  Create Room
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+        
+        <div className="mt-8 text-center text-sm text-gray-500">
+          <p>Need help? Contact support at +251713445505</p>
+        </div>
       </div>
     </div>
   );
