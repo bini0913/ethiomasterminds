@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
-import { BookOpen, Users, Trophy, ShieldCheck, GraduationCap } from "lucide-react";
+import { BookOpen, Users, ShieldCheck, GraduationCap } from "lucide-react";
 
 interface WelcomeScreenProps {
   onContinue: () => void;
@@ -13,12 +13,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const { t } = useLanguage();
   
+  // Animation text content
   const welcomeTexts = [
     t("welcome"),
     "Master Minds",
     "Learn. Play. Grow.",
     "A powerful and interactive learning app where students explore subjects, challenge friends, and grow smarter every day.",
-    "Created with passion to help students learn and grow"
   ];
 
   // Particle animation setup
@@ -31,6 +31,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
     opacity: number;
   }>>([]);
 
+  // Setup initial particles and text animation
   useEffect(() => {
     // Create particles for background animation
     const particleCount = 20;
@@ -74,12 +75,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
       );
     };
 
-    const animationFrame = requestAnimationFrame(() => {
-      const interval = setInterval(animateParticles, 50);
-      return () => clearInterval(interval);
-    });
-
-    return () => cancelAnimationFrame(animationFrame);
+    const interval = setInterval(animateParticles, 50);
+    return () => clearInterval(interval);
   }, []);
 
   // Subject icons for background
@@ -155,7 +152,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
         ))}
       </div>
       
-      {/* Dark overlay */}
+      {/* Dark overlay for better readability */}
       <div className="absolute inset-0 bg-black opacity-30 z-10"></div>
       
       <div className="relative z-20 flex flex-col items-center justify-center min-h-screen p-6 text-white">
@@ -192,7 +189,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
                 index === 0 ? "text-xl font-light" :
                 index === 1 ? "text-5xl font-bold text-white" :
                 index === 2 ? "text-2xl font-semibold" :
-                index === 4 ? "text-sm italic mt-4" :
                 "text-lg"
               }`}
             >
@@ -201,7 +197,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
           ))}
         </div>
         
-        {/* Login Option Buttons */}
+        {/* Login Option Buttons - shown after text animation completes */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: activeIndex >= 3 ? 1 : 0 }}
@@ -257,10 +253,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
           </motion.div>
         </motion.div>
         
-        {/* About Creator */}
+        {/* About Creator - shown at the very end */}
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: activeIndex >= 4 ? 0.8 : 0 }}
+          animate={{ opacity: activeIndex >= 3 ? 0.8 : 0 }}
           transition={{ delay: 2.5, duration: 1 }}
           className="absolute bottom-8 left-0 right-0 px-6"
         >

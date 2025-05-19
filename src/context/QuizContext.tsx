@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // Define the Question and Quiz types that were missing
@@ -91,10 +92,10 @@ const generateRandomQuiz = (
       correctAnswer: options.length > 0 ? options[Math.floor(Math.random() * options.length)] : '',
       difficulty: properDifficulty,
       subject: category,
-      grade,
-      topic,
+      grade: grade || 5,
+      topic: topic || 'General',
       type: questionType,
-      points: difficulty === 'Easy' ? 5 : difficulty === 'Medium' ? 10 : 15,
+      points: properDifficulty === 'Easy' ? 5 : properDifficulty === 'Medium' ? 10 : 15,
       timeLimit: 30,
       explanation: 'This is a sample explanation for this question.'
     });
@@ -102,30 +103,30 @@ const generateRandomQuiz = (
   
   return {
     id: `quiz-${Math.random().toString(36).substr(2, 9)}`,
-    title: `${category} Quiz - Grade ${grade} - ${topic}`,
-    description: `A ${properDifficulty} quiz about ${category} for Grade ${grade} students focusing on ${topic}.`,
+    title: `${category} Quiz - Grade ${grade || 5} - ${topic || 'General'}`,
+    description: `A ${properDifficulty} quiz about ${category} for Grade ${grade || 5} students focusing on ${topic || 'General'}.`,
     questions,
     subject: category,
-    grade,
+    grade: grade || 5,
     difficulty: properDifficulty,
     timeLimit: count * 30,
     createdAt: new Date(),
-    topics: [topic],
+    topics: [topic || 'General'],
     category,
-    gradeLevel: grade
+    gradeLevel: grade || 5
   };
 };
 
 // Generate some initial quizzes for different subjects and grades
 const initialQuizzes: Quiz[] = [
-  generateRandomQuiz('Mathematics', 10, 5, 'Medium', 'Algebra'),
-  generateRandomQuiz('Science', 10, 6, 'Medium', 'Biology'),
-  generateRandomQuiz('English', 10, 4, 'Easy', 'Grammar'),
-  generateRandomQuiz('General Knowledge', 10, 7, 'Hard', 'History'),
-  generateRandomQuiz('Mathematics', 10, 3, 'Easy', 'Geometry'),
-  generateRandomQuiz('Science', 10, 8, 'Hard', 'Chemistry'),
-  generateRandomQuiz('English', 10, 5, 'Medium', 'Literature'),
-  generateRandomQuiz('General Knowledge', 10, 4, 'Easy', 'Geography'),
+  generateRandomQuiz('Mathematics', 10, 5, 'medium', 'Algebra'),
+  generateRandomQuiz('Science', 10, 6, 'medium', 'Biology'),
+  generateRandomQuiz('English', 10, 4, 'easy', 'Grammar'),
+  generateRandomQuiz('General Knowledge', 10, 7, 'hard', 'History'),
+  generateRandomQuiz('Mathematics', 10, 3, 'easy', 'Geometry'),
+  generateRandomQuiz('Science', 10, 8, 'hard', 'Chemistry'),
+  generateRandomQuiz('English', 10, 5, 'medium', 'Literature'),
+  generateRandomQuiz('General Knowledge', 10, 4, 'easy', 'Geography'),
 ];
 
 // Create the context with a default undefined value
@@ -166,14 +167,15 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     
     const properDifficulty = difficulty ? difficultyMapping[difficulty] : 'Medium';
+    const topic = 'General';
     
     // Filter out questions that have been asked before
     const newQuiz = generateRandomQuiz(
       category, 
       count, 
       grade || 5, 
-      properDifficulty,
-      'General'
+      difficulty,
+      topic
     );
     
     // Ensure no repeated questions by filtering out previously asked ones
@@ -184,11 +186,11 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // If we have filtered out too many questions, generate new ones
     while (newQuiz.questions.length < count) {
       const additionalQ = generateRandomQuiz(
-        count - newQuiz.questions.length, 
         category, 
+        count - newQuiz.questions.length, 
         grade || 5, 
-        properDifficulty,
-        'General'
+        difficulty,
+        topic
       ).questions;
       
       // Add only questions that haven't been asked before
@@ -261,7 +263,10 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     
     if (filters.grade) {
-      filtered = filtered.filter(quiz => quiz.grade.toString() === filters.grade);
+      const gradeNum = parseInt(filters.grade);
+      if (!isNaN(gradeNum)) {
+        filtered = filtered.filter(quiz => quiz.grade === gradeNum);
+      }
     }
     
     if (filters.difficulty) {

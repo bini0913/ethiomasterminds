@@ -50,20 +50,20 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStart }) => {
       whileHover={{ scale: 1.02 }}
       transition={{ type: "spring", stiffness: 300 }}
     >
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden h-full flex flex-col">
         <div className={`h-24 bg-gradient-to-r ${getCategoryColor(quiz.category)} flex items-center justify-center`}>
           <span className="text-4xl">{getCategoryEmoji(quiz.category)}</span>
         </div>
         <CardHeader className="pb-2">
-          <CardTitle>{quiz.title}</CardTitle>
+          <CardTitle className="line-clamp-1">{quiz.title}</CardTitle>
           <CardDescription>
             Grade {quiz.gradeLevel} • {quiz.questions.length} Questions
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-grow flex flex-col justify-end">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Difficulty: {getDifficultyLabel(quiz)}
+              Difficulty: {quiz.difficulty}
             </div>
             <Button 
               onClick={() => onStart(quiz)} 
@@ -76,23 +76,6 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStart }) => {
       </Card>
     </motion.div>
   );
-};
-
-// Helper function to determine overall quiz difficulty
-const getDifficultyLabel = (quiz: Quiz): string => {
-  const difficulties = quiz.questions.map(q => q.difficulty);
-  const difficultyCount = {
-    Easy: difficulties.filter(d => d === "Easy").length,
-    Medium: difficulties.filter(d => d === "Medium").length,
-    Hard: difficulties.filter(d => d === "Hard").length,
-  };
-  
-  if (difficultyCount.Hard > difficultyCount.Medium && difficultyCount.Hard > difficultyCount.Easy) {
-    return "Hard";
-  } else if (difficultyCount.Medium > difficultyCount.Easy) {
-    return "Medium";
-  }
-  return "Easy";
 };
 
 export default QuizCard;
