@@ -15,6 +15,7 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStart }) => {
   const getCategoryEmoji = (category: string): string => {
     switch (category.toLowerCase()) {
       case "math":
+      case "mathematics":
         return "🧮";
       case "science":
         return "🔬";
@@ -31,6 +32,7 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStart }) => {
   const getCategoryColor = (category: string): string => {
     switch (category.toLowerCase()) {
       case "math":
+      case "mathematics":
         return "from-blue-500 to-indigo-600";
       case "science":
         return "from-green-500 to-teal-600";
@@ -80,14 +82,14 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStart }) => {
 const getDifficultyLabel = (quiz: Quiz): string => {
   const difficulties = quiz.questions.map(q => q.difficulty);
   const difficultyCount = {
-    easy: difficulties.filter(d => d === "easy").length,
-    medium: difficulties.filter(d => d === "medium").length,
-    hard: difficulties.filter(d => d === "hard").length,
+    Easy: difficulties.filter(d => d === "Easy").length,
+    Medium: difficulties.filter(d => d === "Medium").length,
+    Hard: difficulties.filter(d => d === "Hard").length,
   };
   
-  if (difficultyCount.hard > difficultyCount.medium && difficultyCount.hard > difficultyCount.easy) {
+  if (difficultyCount.Hard > difficultyCount.Medium && difficultyCount.Hard > difficultyCount.Easy) {
     return "Hard";
-  } else if (difficultyCount.medium > difficultyCount.easy) {
+  } else if (difficultyCount.Medium > difficultyCount.Easy) {
     return "Medium";
   }
   return "Easy";
