@@ -1,126 +1,157 @@
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
-import { toast } from "sonner";
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-// Types
-export type AIHelperMessage = {
-  id: string;
-  text: string;
-  sender: "user" | "ai";
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
   timestamp: Date;
-};
+}
 
 interface AIHelperContextType {
   isOpen: boolean;
-  messages: AIHelperMessage[];
   openHelper: () => void;
   closeHelper: () => void;
-  sendMessage: (message: string) => Promise<void>;
+  toggleHelper: () => void;
+  messages: Message[];
+  addMessage: (content: string, role: 'user' | 'assistant') => void;
+  sendMessage: (content: string) => Promise<void>;
+  isLoading: boolean;
   clearMessages: () => void;
 }
 
 const AIHelperContext = createContext<AIHelperContextType | undefined>(undefined);
 
-export const AIHelperProvider = ({ children }: { children: ReactNode }) => {
-  const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [messages, setMessages] = useState<AIHelperMessage[]>([
-    {
-      id: "welcome",
-      text: "Hi there! I'm your AI Helper. How can I assist you today with Master Minds?",
-      sender: "ai",
-      timestamp: new Date(),
-    },
-  ]);
-
-  const openHelper = () => {
-    setIsOpen(true);
-  };
-
-  const closeHelper = () => {
-    setIsOpen(false);
-  };
-
-  const sendMessage = async (message: string): Promise<void> => {
-    // Add user message
-    const userMessage: AIHelperMessage = {
-      id: `user-${Date.now()}`,
-      text: message,
-      sender: "user",
-      timestamp: new Date(),
-    };
-    
-    setMessages((prev) => [...prev, userMessage]);
-    
-    // Enhanced AI responses
+// Sample responses based on keywords
+const getAIResponse = (message: string): Promise<string> => {
+  // Convert to lowercase for easier matching
+  const lowerMsg = message.toLowerCase();
+  
+  // Create a promise to simulate API delay
+  return new Promise((resolve) => {
     setTimeout(() => {
-      let response = "I'm here to help with Master Minds! You can ask about quizzes, subjects, multiplayer, or how to use the app.";
-      
-      const lowerCaseMessage = message.toLowerCase();
-      
-      if (lowerCaseMessage.includes("quiz") || lowerCaseMessage.includes("question")) {
-        response = "Our quiz system includes subjects like Math, Science, General Knowledge, and English. Questions are arranged by grade level and difficulty. Each grade has unlimited questions that adapt to your learning progress!";
-      } else if (lowerCaseMessage.includes("multiplayer") || lowerCaseMessage.includes("play with friend")) {
-        response = "In multiplayer mode, you can play 1v1, 2v2, or create custom rooms. You can invite friends or auto-match with other players. Each match has a countdown timer before starting.";
-      } else if (lowerCaseMessage.includes("profile") || lowerCaseMessage.includes("avatar")) {
-        response = "You can customize your avatar and earn outfits and accessories through achievements. As you play and win quizzes, you'll earn XP and level up from Rookie to Master Mind!";
-      } else if (lowerCaseMessage.includes("language") || lowerCaseMessage.includes("translate")) {
-        response = "Master Minds supports English, Amharic, and Afaan Oromoo languages. You can switch languages anytime in the settings menu.";
-      } else if (lowerCaseMessage.includes("teacher") || lowerCaseMessage.includes("admin")) {
-        response = "Teachers can create quiz questions, assign quizzes to students, and view detailed progress results. Admins have full control over app content, user management, and moderation.";
-      } else if (lowerCaseMessage.includes("hello") || lowerCaseMessage.includes("hi") || lowerCaseMessage.includes("hey")) {
-        response = "Hello! I'm the Master Minds AI Helper. I can answer questions about the app, explain difficult quiz questions, or offer learning tips. What would you like to know?";
-      } else if (lowerCaseMessage.includes("thank")) {
-        response = "You're welcome! If you have more questions about Master Minds, feel free to ask!";
-      } else if (lowerCaseMessage.includes("contact") || lowerCaseMessage.includes("help") || lowerCaseMessage.includes("support")) {
-        response = "Need help? You can contact Master Minds support at +251713445505 or visit the Contact Us section at the bottom of the Quiz page.";
-      } else if (lowerCaseMessage.includes("grade") || lowerCaseMessage.includes("level")) {
-        response = "Master Minds has content for grades 1-8 with appropriate difficulty levels for each. As you progress and earn XP, you'll unlock more challenging questions!";
-      } else if (lowerCaseMessage.includes("difficult") || lowerCaseMessage.includes("hard") || lowerCaseMessage.includes("easy")) {
-        response = "Questions in Master Minds come in three difficulty levels: Easy, Medium, and Hard. The difficulty determines how many points and XP you can earn!";
+      // Subject-specific responses
+      if (lowerMsg.includes('math') || lowerMsg.includes('mathematics')) {
+        resolve("I can help with math! What specific topic are you studying? Algebra, geometry, arithmetic, or something else?");
+      } 
+      else if (lowerMsg.includes('science')) {
+        resolve("Science is fascinating! Are you interested in biology, chemistry, physics, or another branch of science?");
       }
+      else if (lowerMsg.includes('english') || lowerMsg.includes('grammar')) {
+        resolve("I'd be happy to help with English! Do you need assistance with grammar, vocabulary, reading comprehension, or writing?");
+      }
+      // Game and quiz related responses  
+      else if (lowerMsg.includes('quiz') || lowerMsg.includes('question')) {
+        resolve("To practice with quizzes, go to the Quiz section from the main menu. You can filter by subject, grade level, and difficulty!");
+      }
+      else if (lowerMsg.includes('multiplayer') || lowerMsg.includes('friend') || lowerMsg.includes('compete')) {
+        resolve("The multiplayer mode lets you challenge friends to quiz battles! Visit the Lobby to find opponents or create a custom game room.");
+      }
+      // General app help
+      else if (lowerMsg.includes('help') || lowerMsg.includes('how to')) {
+        resolve("I'm your AI helper in Master Minds! I can explain topics, guide you through the app, or assist with study questions. What would you like help with?");
+      }
+      else if (lowerMsg.includes('contact') || lowerMsg.includes('creator')) {
+        resolve("Master Minds was created by Biniam Bogale from Ethiopia. You can contact them at +251713445505.");
+      }
+      // Greetings and general conversation
+      else if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
+        resolve("Hello! I'm your AI learning assistant. How can I help you today with your studies or using the Master Minds app?");
+      }
+      else if (lowerMsg.includes('thank')) {
+        resolve("You're welcome! Don't hesitate to ask if you have more questions. Happy learning!");
+      }
+      // Specific topics in subjects
+      else if (lowerMsg.includes('algebra')) {
+        resolve("Algebra involves using letters and symbols to represent values in equations and formulas. What specific algebra concept are you studying?");
+      }
+      else if (lowerMsg.includes('geometry')) {
+        resolve("Geometry is all about shapes, sizes, properties of space, and measurements. What geometry problem are you working on?");
+      }
+      else if (lowerMsg.includes('photosynthesis')) {
+        resolve("Photosynthesis is the process plants use to convert light energy into chemical energy. They take in CO2 and water and produce glucose and oxygen. Would you like more details on a specific part of this process?");
+      }
+      // Fallback response
+      else {
+        resolve("I'm here to help you learn and navigate Master Minds! Feel free to ask about specific subjects, quiz features, or how to use the app.");
+      }
+    }, 1000); // 1 second delay to simulate thinking
+  });
+};
+
+export const AIHelperProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content: "Hi! I'm your AI learning assistant. How can I help you today with your studies or using the Master Minds app?",
+      timestamp: new Date()
+    }
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const openHelper = () => setIsOpen(true);
+  const closeHelper = () => setIsOpen(false);
+  const toggleHelper = () => setIsOpen(!isOpen);
+
+  const addMessage = (content: string, role: 'user' | 'assistant') => {
+    setMessages(prev => [
+      ...prev,
+      { role, content, timestamp: new Date() }
+    ]);
+  };
+
+  const sendMessage = async (content: string) => {
+    // Add user message
+    addMessage(content, 'user');
+    
+    // Show loading state
+    setIsLoading(true);
+    
+    try {
+      // Get AI response
+      const response = await getAIResponse(content);
       
-      const aiMessage: AIHelperMessage = {
-        id: `ai-${Date.now()}`,
-        text: response,
-        sender: "ai",
-        timestamp: new Date(),
-      };
-      
-      setMessages((prev) => [...prev, aiMessage]);
-    }, 800);
+      // Add AI response
+      addMessage(response, 'assistant');
+    } catch (error) {
+      // Handle error
+      console.error('Error getting AI response:', error);
+      addMessage("I'm sorry, I couldn't process your request. Please try again.", 'assistant');
+    } finally {
+      // Hide loading state
+      setIsLoading(false);
+    }
   };
 
   const clearMessages = () => {
     setMessages([
       {
-        id: "welcome",
-        text: "Hi there! I'm your AI Helper. How can I assist you today with Master Minds?",
-        sender: "ai",
-        timestamp: new Date(),
-      },
+        role: 'assistant',
+        content: "Hi! I'm your AI learning assistant. How can I help you today?",
+        timestamp: new Date()
+      }
     ]);
   };
 
-  return (
-    <AIHelperContext.Provider
-      value={{
-        isOpen,
-        messages,
-        openHelper,
-        closeHelper,
-        sendMessage,
-        clearMessages,
-      }}
-    >
-      {children}
-    </AIHelperContext.Provider>
-  );
+  const value = {
+    isOpen,
+    openHelper,
+    closeHelper,
+    toggleHelper,
+    messages,
+    addMessage,
+    sendMessage,
+    isLoading,
+    clearMessages
+  };
+
+  return <AIHelperContext.Provider value={value}>{children}</AIHelperContext.Provider>;
 };
 
-export const useAIHelper = () => {
+export const useAIHelper = (): AIHelperContextType => {
   const context = useContext(AIHelperContext);
   if (context === undefined) {
-    throw new Error("useAIHelper must be used within an AIHelperProvider");
+    throw new Error('useAIHelper must be used within an AIHelperProvider');
   }
   return context;
 };

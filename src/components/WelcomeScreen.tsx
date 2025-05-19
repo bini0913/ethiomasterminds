@@ -1,8 +1,9 @@
+
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
-import { BookOpen, Users, Trophy } from "lucide-react"; // Import icons we'll use
+import { BookOpen, Users, Trophy, ShieldCheck, GraduationCap } from "lucide-react";
 
 interface WelcomeScreenProps {
   onContinue: () => void;
@@ -15,8 +16,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
   const welcomeTexts = [
     t("welcome"),
     "Master Minds",
-    "A quiz game and learning world created by Biniam Bogale, 14-year-old student from Ethiopia.",
-    "Compete, learn, and level up your mind!",
+    "Learn. Play. Grow.",
+    "A powerful and interactive learning app where students explore subjects, challenge friends, and grow smarter every day.",
     "Created with passion to help students learn and grow"
   ];
 
@@ -63,10 +64,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
     const animateParticles = () => {
       setParticles(prevParticles =>
         prevParticles.map(particle => {
-          // Fix: The duplicate property 'y' is causing the error
-          // First calculate the new y position
           const newY = particle.y - particle.speed;
-          // Then return the updated particle with the correct y value
           return {
             ...particle,
             y: newY <= 0 ? 100 : newY,
@@ -84,26 +82,16 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
     return () => cancelAnimationFrame(animationFrame);
   }, []);
 
-  // Role selection cards data
-  const roleCards = [
-    {
-      role: "Student",
-      icon: <BookOpen className="h-8 w-8 mb-2" />,
-      description: "Take quizzes, compete with friends, and level up",
-      gradient: "from-blue-500 to-purple-600"
-    },
-    {
-      role: "Teacher", 
-      icon: <Users className="h-8 w-8 mb-2" />,
-      description: "Create quizzes, track student progress",
-      gradient: "from-green-500 to-teal-600"
-    },
-    {
-      role: "Admin",
-      icon: <Trophy className="h-8 w-8 mb-2" />,
-      description: "Full control over users, quizzes, and content",
-      gradient: "from-yellow-500 to-amber-600"
-    }
+  // Subject icons for background
+  const subjectIcons = [
+    { name: "Math", emoji: "🧮", color: "bg-blue-500" },
+    { name: "Science", emoji: "🔬", color: "bg-green-500" },
+    { name: "English", emoji: "📚", color: "bg-purple-500" },
+    { name: "History", emoji: "🏛️", color: "bg-amber-500" },
+    { name: "Geography", emoji: "🌍", color: "bg-teal-500" },
+    { name: "Art", emoji: "🎨", color: "bg-pink-500" },
+    { name: "Music", emoji: "🎵", color: "bg-indigo-500" },
+    { name: "Sports", emoji: "⚽", color: "bg-red-500" },
   ];
 
   return (
@@ -132,6 +120,39 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
             }}
           />
         ))}
+        
+        {/* Floating subject icons */}
+        {subjectIcons.map((icon, index) => (
+          <motion.div
+            key={index}
+            className={`absolute rounded-full ${icon.color} flex items-center justify-center w-12 h-12 text-white shadow-lg`}
+            initial={{ 
+              x: Math.random() * 100 + "%", 
+              y: Math.random() * 100 + "%", 
+              opacity: 0.5 
+            }}
+            animate={{
+              x: [
+                Math.random() * 80 + 10 + "%", 
+                Math.random() * 80 + 10 + "%"
+              ],
+              y: [
+                Math.random() * 80 + 10 + "%", 
+                Math.random() * 80 + 10 + "%"
+              ],
+              opacity: [0.5, 0.8, 0.5],
+              scale: [1, 1.2, 1]
+            }}
+            transition={{
+              duration: Math.random() * 10 + 20,
+              repeat: Infinity,
+              repeatType: "reverse",
+              ease: "easeInOut"
+            }}
+          >
+            <span className="text-2xl">{icon.emoji}</span>
+          </motion.div>
+        ))}
       </div>
       
       {/* Dark overlay */}
@@ -157,7 +178,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
         </motion.div>
         
         {/* Welcome Text Animation */}
-        <div className="max-w-md w-full space-y-4 text-center mb-8">
+        <div className="max-w-md w-full space-y-4 text-center mb-12">
           {welcomeTexts.map((text, index) => (
             <motion.div
               key={index}
@@ -170,6 +191,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
               className={`${
                 index === 0 ? "text-xl font-light" :
                 index === 1 ? "text-5xl font-bold text-white" :
+                index === 2 ? "text-2xl font-semibold" :
                 index === 4 ? "text-sm italic mt-4" :
                 "text-lg"
               }`}
@@ -179,59 +201,76 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
           ))}
         </div>
         
-        {/* Role Selection Cards */}
+        {/* Login Option Buttons */}
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: activeIndex >= 2 ? 1 : 0 }}
+          animate={{ opacity: activeIndex >= 3 ? 1 : 0 }}
           transition={{ delay: 1, duration: 0.5 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-4xl mb-8"
+          className="flex flex-col space-y-4 w-full max-w-md mb-8"
         >
-          {roleCards.map((card, index) => (
-            <motion.div
-              key={card.role}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.5 + index * 0.2, duration: 0.5 }}
-              whileHover={{ scale: 1.05 }}
-              className={`bg-gradient-to-r ${card.gradient} p-6 rounded-xl shadow-lg text-center cursor-pointer`}
-              onClick={() => {
-                // In a real app, we'd route to specific login pages here
-                onContinue();
-              }}
-            >
-              <div className="flex flex-col items-center">
-                {card.icon}
-                <h3 className="text-xl font-bold mb-2">Login as {card.role}</h3>
-                <p className="text-sm opacity-90">{card.description}</p>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-        
-        {/* Get Started Button */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: activeIndex === welcomeTexts.length - 1 ? 1 : 0 }}
-          transition={{ delay: 1, duration: 0.5 }}
-        >
-          <Button 
-            onClick={onContinue}
-            className="bg-white text-primary hover:bg-primary-light hover:text-primary transition-all duration-300 px-8 py-6 rounded-xl text-lg font-semibold animate-bounce-subtle"
-            size="lg"
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.5, duration: 0.5 }}
+            whileHover={{ scale: 1.05 }}
           >
-            {t("get-started")}
-          </Button>
+            <Button 
+              onClick={onContinue}
+              className="w-full bg-white text-primary hover:bg-blue-100 transition-all duration-300 py-6 rounded-xl text-lg font-semibold"
+              size="lg"
+            >
+              <GraduationCap className="mr-2 h-5 w-5" />
+              Log In as Student
+            </Button>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.7, duration: 0.5 }}
+            whileHover={{ scale: 1.05 }}
+          >
+            <Button 
+              onClick={onContinue}
+              className="w-full bg-green-500 text-white hover:bg-green-600 transition-all duration-300 py-6 rounded-xl text-lg font-semibold"
+              size="lg"
+            >
+              <Users className="mr-2 h-5 w-5" />
+              Log In as Teacher
+            </Button>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.9, duration: 0.5 }}
+            whileHover={{ scale: 1.05 }}
+          >
+            <Button 
+              onClick={onContinue}
+              className="w-full bg-amber-500 text-white hover:bg-amber-600 transition-all duration-300 py-6 rounded-xl text-lg font-semibold"
+              size="lg"
+            >
+              <ShieldCheck className="mr-2 h-5 w-5" />
+              Log In as Admin
+            </Button>
+          </motion.div>
         </motion.div>
         
-        {/* Tap to continue text */}
+        {/* About Creator */}
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 3, duration: 1 }}
-          className="absolute bottom-8 left-0 right-0 flex justify-center"
+          animate={{ opacity: activeIndex >= 4 ? 0.8 : 0 }}
+          transition={{ delay: 2.5, duration: 1 }}
+          className="absolute bottom-8 left-0 right-0 px-6"
         >
-          <div className="text-center text-sm opacity-70">
-            {t("tap-to-continue")}
+          <div className="text-center max-w-md mx-auto bg-black bg-opacity-30 p-4 rounded-lg">
+            <p className="text-sm text-white">
+              Created by Biniam Bogale, a passionate student from Ethiopia who envisions a smarter world where learning is engaging, challenging, and accessible to all.
+            </p>
+            <p className="text-xs mt-2 text-white opacity-70">
+              Contact: +251713445505
+            </p>
           </div>
         </motion.div>
       </div>
