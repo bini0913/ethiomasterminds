@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Question } from "@/context/QuizContext";
 import { Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface QuestionCardProps {
   question: Question;
@@ -31,7 +32,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLef
     if (isCorrect) {
       toast.success("Correct answer!");
     } else {
-      toast.error("Incorrect answer!");
+      toast.error(`Incorrect! The correct answer was: ${question.correctAnswer}`);
     }
   };
   
@@ -45,8 +46,13 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLef
     >
       <div className="mb-6">
         <h3 className="text-xl font-medium mb-2">{question.text}</h3>
-        <div className={`text-sm ${timeLeft <= 5 ? "text-red-500 font-semibold" : "text-gray-500"}`}>
-          Time remaining: {timeLeft} seconds
+        <div className="flex justify-between">
+          <span className="text-sm text-gray-500">
+            {question.subject} • Grade {question.grade} • {question.topic}
+          </span>
+          <span className={`text-sm ${timeLeft <= 5 ? "text-red-500 font-semibold" : "text-gray-500"}`}>
+            Time: {timeLeft}s
+          </span>
         </div>
       </div>
       

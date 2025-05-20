@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import UserLevel from "@/components/profile/UserLevel";
 import { useUser } from "@/context/UserContext";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, TrendingUp } from "lucide-react";
+import { Clock, Users, TrendingUp, Trophy, Award, Star } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface LeaderboardEntry {
@@ -19,6 +19,7 @@ interface LeaderboardEntry {
   rank: number;
   score: number;
   role: string;
+  lastActive: Date;
 }
 
 const Leaderboard: React.FC = () => {
@@ -44,18 +45,36 @@ const Leaderboard: React.FC = () => {
       .map(u => ({
         id: u.id,
         name: u.name,
-        avatar: u.avatar || "avatar-1",
+        avatar: u.avatar || "👤",
         level: u.level || 1,
         xp: u.xp || 0,
         rank: 0, // Will be calculated after sorting
         score: calculateScore(u.xp || 0, u.level || 1),
-        role: u.role
+        role: u.role,
+        lastActive: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)) // Random activity in the last week
       }))
       // Sort by score descending
       .sort((a, b) => b.score - a.score);
     
+    // Filter by time frame if needed
+    let filteredEntries = [...entries];
+    
+    if (timeFrame === "day") {
+      const oneDayAgo = new Date();
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+      filteredEntries = entries.filter(entry => entry.lastActive >= oneDayAgo);
+    } else if (timeFrame === "week") {
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      filteredEntries = entries.filter(entry => entry.lastActive >= oneWeekAgo);
+    } else if (timeFrame === "month") {
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      filteredEntries = entries.filter(entry => entry.lastActive >= oneMonthAgo);
+    }
+    
     // Assign ranks
-    entries.forEach((entry, index) => {
+    filteredEntries.forEach((entry, index) => {
       entry.rank = index + 1;
       
       // Find current user's rank
@@ -64,7 +83,7 @@ const Leaderboard: React.FC = () => {
       }
     });
     
-    setLeaderboard(entries);
+    setLeaderboard(filteredEntries);
     
     // Calculate simulated active users based on time of day
     const hour = new Date().getHours();
@@ -137,10 +156,13 @@ const Leaderboard: React.FC = () => {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-center">Top Players</CardTitle>
+            <CardTitle className="text-center flex items-center justify-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" />
+              Top Players
+            </CardTitle>
             <div className="text-xs text-center text-gray-500 flex items-center justify-center gap-1">
               <TrendingUp className="h-3 w-3" />
-              <span>Live rankings based on score</span>
+              <span>Live rankings based on performance</span>
             </div>
           </CardHeader>
           <CardContent>
@@ -174,7 +196,10 @@ const Leaderboard: React.FC = () => {
             transition={{ delay: 0.3 }}
             className="mt-6 p-4 bg-gray-100 rounded-lg"
           >
-            <div className="text-center font-medium text-gray-700 mb-2">Your Position</div>
+            <div className="text-center font-medium text-gray-700 mb-2 flex items-center justify-center">
+              <Star className="h-4 w-4 mr-1 text-yellow-500" />
+              Your Position
+            </div>
             {userRank ? (
               <div className="flex items-center gap-3 p-3 bg-white rounded-md shadow-sm">
                 <div className="font-semibold w-6 text-center text-gray-500">{userRank}</div>
@@ -182,7 +207,19 @@ const Leaderboard: React.FC = () => {
                   {user.avatar?.startsWith('avatar') ? '👤' : user.avatar}
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium">{user.name} <Badge variant="outline" className="ml-1">{user.role}</Badge></div>
+                  <div className="font-medium flex items-center">
+                    {user.name} 
+                    <Badge variant="outline" className="ml-1">
+                      {user.role === "teacher" ? "Teacher" : 
+                       user.role === "admin" ? "Admin" : "Student"}
+                    </Badge>
+                    {userRank <= 3 && (
+                      <Award className={`h-4 w-4 ml-1 ${
+                        userRank === 1 ? "text-yellow-500" : 
+                        userRank === 2 ? "text-gray-400" : "text-amber-700"
+                      }`} />
+                    )}
+                  </div>
                   <UserLevel level={user.level} xp={user.xp} className="w-full mt-1" />
                 </div>
                 <div className="font-semibold">{calculateScore(user.xp, user.level)} pts</div>
@@ -236,6 +273,12 @@ const renderLeaderboard = (entries: LeaderboardEntry[]) => {
             <Badge variant="outline" className="ml-1 text-xs">
               {entry.role === "teacher" ? "Teacher" : "Admin"}
             </Badge>
+          )}
+          {entry.rank <= 3 && (
+            <Award className={`h-4 w-4 ml-1 ${
+              entry.rank === 1 ? "text-yellow-500" : 
+              entry.rank === 2 ? "text-gray-400" : "text-amber-700"
+            }`} />
           )}
         </div>
         <UserLevel level={entry.level} xp={entry.xp} className="w-full mt-1" />
