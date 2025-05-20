@@ -156,6 +156,23 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
       <div className="absolute inset-0 bg-black opacity-30 z-10"></div>
       
       <div className="relative z-20 flex flex-col items-center justify-center min-h-screen p-6 text-white">
+        {/* About Creator - moved to top */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 1 }}
+          className="mb-8 px-6"
+        >
+          <div className="text-center max-w-md mx-auto bg-black bg-opacity-30 p-4 rounded-lg">
+            <p className="text-sm text-white">
+              Created by Biniam Bogale, a passionate student from Ethiopia who envisions a smarter world where learning is engaging, challenging, and accessible to all.
+            </p>
+            <p className="text-xs mt-2 text-white opacity-70">
+              Contact: +251713445505
+            </p>
+          </div>
+        </motion.div>
+        
         {/* App Logo */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
@@ -202,7 +219,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: activeIndex >= 3 ? 1 : 0 }}
           transition={{ delay: 1, duration: 0.5 }}
-          className="flex flex-col space-y-4 w-full max-w-md mb-8"
+          className="flex flex-col space-y-4 w-full max-w-md"
         >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -251,23 +268,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
               Log In as Admin
             </Button>
           </motion.div>
-        </motion.div>
-        
-        {/* About Creator - shown at the very end */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: activeIndex >= 3 ? 0.8 : 0 }}
-          transition={{ delay: 2.5, duration: 1 }}
-          className="absolute bottom-8 left-0 right-0 px-6"
-        >
-          <div className="text-center max-w-md mx-auto bg-black bg-opacity-30 p-4 rounded-lg">
-            <p className="text-sm text-white">
-              Created by Biniam Bogale, a passionate student from Ethiopia who envisions a smarter world where learning is engaging, challenging, and accessible to all.
-            </p>
-            <p className="text-xs mt-2 text-white opacity-70">
-              Contact: +251713445505
-            </p>
-          </div>
         </motion.div>
       </div>
     </div>
