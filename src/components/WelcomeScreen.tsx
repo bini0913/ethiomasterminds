@@ -6,7 +6,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { BookOpen, Users, ShieldCheck, GraduationCap } from "lucide-react";
 
 interface WelcomeScreenProps {
-  onContinue: () => void;
+  onContinue: (userType?: "student" | "teacher" | "admin") => void;
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
@@ -228,7 +228,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
             whileHover={{ scale: 1.05 }}
           >
             <Button 
-              onClick={onContinue}
+              onClick={() => onContinue("student")}
               className="w-full bg-white text-primary hover:bg-blue-100 transition-all duration-300 py-6 rounded-xl text-lg font-semibold"
               size="lg"
             >
@@ -244,7 +244,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
             whileHover={{ scale: 1.05 }}
           >
             <Button 
-              onClick={onContinue}
+              onClick={() => onContinue("teacher")}
               className="w-full bg-green-500 text-white hover:bg-green-600 transition-all duration-300 py-6 rounded-xl text-lg font-semibold"
               size="lg"
             >
@@ -260,7 +260,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
             whileHover={{ scale: 1.05 }}
           >
             <Button 
-              onClick={onContinue}
+              onClick={() => onContinue("admin")}
               className="w-full bg-amber-500 text-white hover:bg-amber-600 transition-all duration-300 py-6 rounded-xl text-lg font-semibold"
               size="lg"
             >

@@ -7,6 +7,7 @@ import { Question, Quiz } from "@/context/QuizContext";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import GainXPButton from "../profile/GainXPButton";
+import QuestionCard from "./QuestionCard";
 
 interface QuizViewProps {
   quiz: Quiz;
@@ -17,7 +18,6 @@ interface QuizViewProps {
 const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const { addXP, user } = useUser();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(20);
@@ -25,6 +25,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const [earnedXP, setEarnedXP] = useState(0);
   const [userAnswers, setUserAnswers] = useState<{[key: string]: string}>({});
   const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
+  const [answeredCorrectly, setAnsweredCorrectly] = useState(0);
 
   // Get the current question from the quiz
   const currentQuestion = quiz.questions[currentQuestionIndex];
@@ -50,6 +51,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   // Reset timer when moving to next question
   useEffect(() => {
     setTimeLeft(20);
+    setIsAnswered(false);
   }, [currentQuestionIndex]);
   
   const handleTimeout = () => {
@@ -68,24 +70,22 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
     }
   };
   
-  const handleOptionSelect = (option: string) => {
-    if (isAnswered) return;
-    
-    setSelectedOption(option);
+  const handleAnswerSubmit = (answer: string, isCorrect: boolean) => {
     setIsAnswered(true);
     
     // Record user's answer
     setUserAnswers(prev => ({
       ...prev,
-      [currentQuestion.id]: option
+      [currentQuestion.id]: answer
     }));
     
     // Add to completed questions
     setCompletedQuestionIds(prev => [...prev, currentQuestion.id]);
     
-    if (option === currentQuestion.correctAnswer) {
+    if (isCorrect) {
       const pointsEarned = calculatePoints(timeLeft);
       setScore(score + pointsEarned);
+      setAnsweredCorrectly(prev => prev + 1);
       toast.success(`Correct! +${pointsEarned} points`);
     } else {
       toast.error("Incorrect answer!");
@@ -94,25 +94,27 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   
   const calculatePoints = (timeRemaining: number) => {
     // Base points for correct answer
-    const basePoints = 10;
-    // Bonus points based on remaining time (max 10 bonus points)
-    const timeBonus = Math.floor((timeRemaining / 20) * 10);
+    const basePoints = currentQuestion.points || 10;
+    // Bonus points based on remaining time (max 50% bonus)
+    const timeBonus = Math.floor((timeRemaining / 20) * (basePoints * 0.5));
     return basePoints + timeBonus;
   };
   
   const handleNextQuestion = () => {
     if (currentQuestionIndex < quiz.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setSelectedOption(null);
-      setIsAnswered(false);
     } else {
       // Quiz completed
       const finalScore = score;
       setQuizCompleted(true);
       
-      // Calculate XP to award based on score
-      const xpToEarn = Math.floor(finalScore / 2);
-      setEarnedXP(xpToEarn);
+      // Calculate XP to award based on score and performance
+      const accuracyPercentage = calculateAccuracy();
+      const baseXP = Math.floor(finalScore / 2); 
+      const accuracyBonus = Math.floor(baseXP * (accuracyPercentage / 100));
+      const totalXP = baseXP + accuracyBonus;
+      
+      setEarnedXP(totalXP);
       
       // Call the onComplete callback with completed question IDs
       onComplete(finalScore, completedQuestionIds);
@@ -122,7 +124,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const handleClaimXP = () => {
     if (earnedXP > 0) {
       addXP(earnedXP);
-      toast.success(`You've claimed ${earnedXP} XP!`, {
+      toast.success(`You've gained ${earnedXP} XP!`, {
         description: "Keep playing to level up faster!"
       });
       setEarnedXP(0);
@@ -131,12 +133,12 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   
   const handlePlayAgain = () => {
     setCurrentQuestionIndex(0);
-    setSelectedOption(null);
     setIsAnswered(false);
     setScore(0);
     setUserAnswers({});
     setQuizCompleted(false);
     setCompletedQuestionIds([]);
+    setAnsweredCorrectly(0);
   };
   
   // Calculate accuracy percentage
@@ -144,14 +146,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
     const totalAnswered = Object.keys(userAnswers).length;
     if (totalAnswered === 0) return 0;
     
-    const correctAnswers = Object.entries(userAnswers).filter(
-      ([questionId, answer]) => {
-        const question = quiz.questions.find(q => q.id === questionId);
-        return question && answer === question.correctAnswer;
-      }
-    ).length;
-    
-    return Math.floor((correctAnswers / totalAnswered) * 100);
+    return Math.floor((answeredCorrectly / totalAnswered) * 100);
   };
   
   return (
@@ -177,10 +172,10 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="text-lg leading-tight">
-                {currentQuestion.text}
+                Question {currentQuestionIndex + 1}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentQuestion.id}
@@ -188,25 +183,12 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
-                  className="space-y-3"
                 >
-                  {currentQuestion.options.map((option) => (
-                    <div
-                      key={option}
-                      onClick={() => handleOptionSelect(option)}
-                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        isAnswered && option === currentQuestion.correctAnswer
-                          ? "border-green-500 bg-green-50"
-                          : isAnswered && option === selectedOption
-                          ? "border-red-500 bg-red-50"
-                          : selectedOption === option
-                          ? "border-primary bg-primary-light"
-                          : "border-gray-200 hover:border-primary-light"
-                      }`}
-                    >
-                      {option}
-                    </div>
-                  ))}
+                  <QuestionCard 
+                    question={currentQuestion}
+                    onAnswer={handleAnswerSubmit}
+                    timeLeft={timeLeft}
+                  />
                 </motion.div>
               </AnimatePresence>
             </CardContent>
@@ -252,8 +234,12 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
                   <div className="text-sm text-gray-500">Accuracy</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-green-500">+{earnedXP}</div>
-                  <div className="text-sm text-gray-500">XP Available</div>
+                  <div className="text-2xl font-bold text-green-500">{answeredCorrectly}/{quiz.questions.length}</div>
+                  <div className="text-sm text-gray-500">Correct Answers</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-blue-500">+{earnedXP}</div>
+                  <div className="text-sm text-gray-500">XP Earned</div>
                 </div>
               </div>
               

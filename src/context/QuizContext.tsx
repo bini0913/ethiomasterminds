@@ -1,7 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { initializeRealQuizData } from '@/utils/quizData';
 
-// Define the Question and Quiz types that were missing
+// Define the Question and Quiz types
 export interface Question {
   id: string;
   text: string;
@@ -33,7 +34,7 @@ export interface Quiz {
   gradeLevel: number;
 }
 
-// Define the context type that's used throughout the application
+// Define the context type
 export interface QuizContextType {
   quizzes: Quiz[];
   currentQuiz: Quiz | null;
@@ -55,79 +56,13 @@ export interface QuizContextType {
     difficulty?: string;
     questionType?: string;
   }) => void;
+  getAvailableSubjects: () => string[];
+  getAvailableTopics: (subject?: string) => string[];
+  getAvailableGrades: () => number[];
 }
 
-// Create a dummy quiz generator function
-const generateRandomQuiz = (
-  category: string,
-  count: number, 
-  grade?: number, 
-  difficulty?: 'easy' | 'medium' | 'hard',
-  topic?: string
-): Quiz => {
-  // Convert difficulty from lowercase to proper case for internal use
-  const difficultyMapping: Record<string, 'Easy' | 'Medium' | 'Hard'> = {
-    'easy': 'Easy',
-    'medium': 'Medium',
-    'hard': 'Hard'
-  };
-  
-  const properDifficulty = difficulty ? difficultyMapping[difficulty] : 'Medium';
-  
-  const questions = [];
-  const types = ['Multiple Choice', 'True/False', 'Fill in the blank'] as const;
-  
-  for (let i = 0; i < count; i++) {
-    const questionType = types[Math.floor(Math.random() * types.length)] as 'Multiple Choice' | 'True/False' | 'Fill in the blank';
-    const options = questionType === 'Multiple Choice' 
-      ? ['Option A', 'Option B', 'Option C', 'Option D'] 
-      : questionType === 'True/False' 
-        ? ['True', 'False'] 
-        : [];
-    
-    questions.push({
-      id: `q-${Math.random().toString(36).substr(2, 9)}`,
-      text: `Sample ${category} question #${i+1} for grade ${grade} (${properDifficulty})`,
-      options,
-      correctAnswer: options.length > 0 ? options[Math.floor(Math.random() * options.length)] : '',
-      difficulty: properDifficulty,
-      subject: category,
-      grade: grade || 5,
-      topic: topic || 'General',
-      type: questionType,
-      points: properDifficulty === 'Easy' ? 5 : properDifficulty === 'Medium' ? 10 : 15,
-      timeLimit: 30,
-      explanation: 'This is a sample explanation for this question.'
-    });
-  }
-  
-  return {
-    id: `quiz-${Math.random().toString(36).substr(2, 9)}`,
-    title: `${category} Quiz - Grade ${grade || 5} - ${topic || 'General'}`,
-    description: `A ${properDifficulty} quiz about ${category} for Grade ${grade || 5} students focusing on ${topic || 'General'}.`,
-    questions,
-    subject: category,
-    grade: grade || 5,
-    difficulty: properDifficulty,
-    timeLimit: count * 30,
-    createdAt: new Date(),
-    topics: [topic || 'General'],
-    category,
-    gradeLevel: grade || 5
-  };
-};
-
-// Generate some initial quizzes for different subjects and grades
-const initialQuizzes: Quiz[] = [
-  generateRandomQuiz('Mathematics', 10, 5, 'medium', 'Algebra'),
-  generateRandomQuiz('Science', 10, 6, 'medium', 'Biology'),
-  generateRandomQuiz('English', 10, 4, 'easy', 'Grammar'),
-  generateRandomQuiz('General Knowledge', 10, 7, 'hard', 'History'),
-  generateRandomQuiz('Mathematics', 10, 3, 'easy', 'Geometry'),
-  generateRandomQuiz('Science', 10, 8, 'hard', 'Chemistry'),
-  generateRandomQuiz('English', 10, 5, 'medium', 'Literature'),
-  generateRandomQuiz('General Knowledge', 10, 4, 'easy', 'Geography'),
-];
+// Initialize with real quiz data
+const initialQuizzes: Quiz[] = initializeRealQuizData();
 
 // Create the context with a default undefined value
 const QuizContext = createContext<QuizContextType | undefined>(undefined);
@@ -138,6 +73,66 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>(initialQuizzes);
   const [askedQuestions, setAskedQuestions] = useState<string[]>([]);
+
+  // Create a dummy quiz generator function (will be replaced with improved version)
+  const generateRandomQuiz = (
+    category: string,
+    count: number, 
+    grade?: number, 
+    difficulty?: 'easy' | 'medium' | 'hard',
+    topic?: string
+  ): Quiz => {
+    // Convert difficulty from lowercase to proper case for internal use
+    const difficultyMapping: Record<string, 'Easy' | 'Medium' | 'Hard'> = {
+      'easy': 'Easy',
+      'medium': 'Medium',
+      'hard': 'Hard'
+    };
+    
+    const properDifficulty = difficulty ? difficultyMapping[difficulty] : 'Medium';
+    
+    const questions = [];
+    const types = ['Multiple Choice', 'True/False', 'Fill in the blank'] as const;
+    
+    for (let i = 0; i < count; i++) {
+      const questionType = types[Math.floor(Math.random() * types.length)] as 'Multiple Choice' | 'True/False' | 'Fill in the blank';
+      const options = questionType === 'Multiple Choice' 
+        ? ['Option A', 'Option B', 'Option C', 'Option D'] 
+        : questionType === 'True/False' 
+          ? ['True', 'False'] 
+          : [];
+      
+      questions.push({
+        id: `q-${Math.random().toString(36).substr(2, 9)}`,
+        text: `Sample ${category} question #${i+1} for grade ${grade} (${properDifficulty})`,
+        options,
+        correctAnswer: options.length > 0 ? options[Math.floor(Math.random() * options.length)] : '',
+        difficulty: properDifficulty,
+        subject: category,
+        grade: grade || 5,
+        topic: topic || 'General',
+        type: questionType,
+        points: properDifficulty === 'Easy' ? 5 : properDifficulty === 'Medium' ? 10 : 15,
+        timeLimit: 30,
+        explanation: 'This is a sample explanation for this question.'
+      });
+    }
+    
+    return {
+      id: `quiz-${Math.random().toString(36).substring(2, 9)}`,
+      title: `${category} Quiz - Grade ${grade || 5} - ${topic || 'General'}`,
+      description: `A ${properDifficulty} quiz about ${category} for Grade ${grade || 5} students focusing on ${topic || 'General'}.`,
+      questions,
+      subject: category,
+      grade: grade || 5,
+      difficulty: properDifficulty,
+      timeLimit: count * 30,
+      createdAt: new Date(),
+      topics: [topic || 'General'],
+      category,
+      gradeLevel: grade || 5
+    };
+  };
 
   const createQuiz = (quiz: Quiz) => {
     setQuizzes(prev => [...prev, quiz]);
@@ -158,6 +153,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     count: number, 
     grade?: number, 
     difficulty?: 'easy' | 'medium' | 'hard',
+    topic?: string
   ): Quiz => {
     // Convert difficulty from lowercase to proper case for internal use
     const difficultyMapping: Record<string, 'Easy' | 'Medium' | 'Hard'> = {
@@ -167,7 +163,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     
     const properDifficulty = difficulty ? difficultyMapping[difficulty] : 'Medium';
-    const topic = 'General';
+    const topicValue = topic || 'General';
     
     // Filter out questions that have been asked before
     const newQuiz = generateRandomQuiz(
@@ -175,7 +171,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       count, 
       grade || 5, 
       difficulty,
-      topic
+      topicValue
     );
     
     // Ensure no repeated questions by filtering out previously asked ones
@@ -190,7 +186,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         count - newQuiz.questions.length, 
         grade || 5, 
         difficulty,
-        topic
+        topicValue
       ).questions;
       
       // Add only questions that haven't been asked before
@@ -213,7 +209,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchQuizzes = () => {
     // In a real app, this would be an API call
     console.log("Fetching quizzes...");
-    // For now, we're just using the initial data
+    // For now, we're using the initial data
   };
 
   const addAskedQuestion = (questionId: string) => {
@@ -281,6 +277,31 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     setFilteredQuizzes(filtered);
   };
+  
+  // Get available subjects from quizzes
+  const getAvailableSubjects = () => {
+    const subjects = new Set<string>();
+    quizzes.forEach(quiz => subjects.add(quiz.subject));
+    return Array.from(subjects);
+  };
+  
+  // Get available topics from quizzes, filtered by subject if provided
+  const getAvailableTopics = (subject?: string) => {
+    const topics = new Set<string>();
+    quizzes.forEach(quiz => {
+      if (!subject || quiz.subject === subject) {
+        quiz.topics?.forEach(topic => topics.add(topic));
+      }
+    });
+    return Array.from(topics);
+  };
+  
+  // Get available grades from quizzes
+  const getAvailableGrades = () => {
+    const grades = new Set<number>();
+    quizzes.forEach(quiz => grades.add(quiz.grade));
+    return Array.from(grades).sort((a, b) => a - b);
+  };
 
   useEffect(() => {
     fetchQuizzes();
@@ -305,7 +326,10 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     filteredQuizzes,
     setFilteredQuizzes,
     filterQuizzes,
-    setQuizFilters
+    setQuizFilters,
+    getAvailableSubjects,
+    getAvailableTopics,
+    getAvailableGrades
   };
 
   return <QuizContext.Provider value={value}>{children}</QuizContext.Provider>;

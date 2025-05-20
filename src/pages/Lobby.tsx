@@ -8,15 +8,43 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
+import { useQuiz } from "@/context/QuizContext";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Users, MessageSquare, Trophy, User, Circle, Clock } from "lucide-react";
+import { 
+  Users, 
+  MessageSquare, 
+  Trophy, 
+  User, 
+  Circle, 
+  Clock, 
+  Plus,
+  Search,
+  X
+} from "lucide-react";
 import { avatarToEmoji } from "@/utils/avatarUtils";
+import RoomCard, { Room } from "@/components/multiplayer/RoomCard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const Lobby: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
+  const { getAvailableSubjects } = useQuiz();
+  
+  // States
   const [chatMessage, setChatMessage] = useState("");
+  const [createRoomOpen, setCreateRoomOpen] = useState(false);
+  const [newRoomData, setNewRoomData] = useState({
+    name: "",
+    maxPlayers: "2",
+    subject: "Mathematics",
+    difficulty: "Medium",
+    gameMode: "1v1"
+  });
+  
+  // Chat messages
   const [chatMessages, setChatMessages] = useState<Array<{
     id: string;
     userId: string;
@@ -60,12 +88,12 @@ const Lobby: React.FC = () => {
     { id: "5", name: "Michael", avatar: "avatar-5", grade: "6", status: "away", xp: 510 },
   ]);
 
-  // Mock active rooms
-  const [activeRooms] = useState([
-    { id: "r1", name: "Math Duel", players: 2, maxPlayers: 2, status: "in-progress", subject: "math" },
-    { id: "r2", name: "Science Battle", players: 1, maxPlayers: 2, status: "waiting", subject: "science" },
-    { id: "r3", name: "Team Challenge", players: 2, maxPlayers: 4, status: "waiting", subject: "mixed" },
-    { id: "r4", name: "English Quiz", players: 3, maxPlayers: 3, status: "in-progress", subject: "english" },
+  // Active rooms
+  const [activeRooms, setActiveRooms] = useState<Room[]>([
+    { id: "r1", name: "Math Duel", players: 2, maxPlayers: 2, status: "in-progress", subject: "Mathematics", difficulty: "Medium", gameMode: "1v1" },
+    { id: "r2", name: "Science Battle", players: 1, maxPlayers: 2, status: "waiting", subject: "Science", difficulty: "Easy", gameMode: "1v1" },
+    { id: "r3", name: "Team Challenge", players: 2, maxPlayers: 4, status: "waiting", subject: "Mixed", difficulty: "Hard", gameMode: "2v2" },
+    { id: "r4", name: "English Quiz", players: 3, maxPlayers: 3, status: "in-progress", subject: "English", difficulty: "Medium", gameMode: "Battle Royale" },
   ]);
 
   // Mock tournaments
@@ -96,6 +124,16 @@ const Lobby: React.FC = () => {
     },
   ]);
 
+  // Check if user is authenticated
+  useEffect(() => {
+    if (!user) {
+      toast.error("Please log in to access the lobby", { 
+        description: "You'll be redirected to the login page" 
+      });
+      setTimeout(() => navigate("/"), 2000);
+    }
+  }, [user, navigate]);
+
   // Handle chat submission
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,30 +155,117 @@ const Lobby: React.FC = () => {
 
   // Create a game room
   const createRoom = () => {
-    toast.info("Creating a new game room...", {
-      description: "This feature will be available soon!"
+    if (!newRoomData.name.trim()) {
+      toast.error("Please enter a room name");
+      return;
+    }
+
+    const newRoom: Room = {
+      id: `room-${Date.now()}`,
+      name: newRoomData.name,
+      players: 1, // Creator joins automatically
+      maxPlayers: parseInt(newRoomData.maxPlayers),
+      status: "waiting",
+      subject: newRoomData.subject,
+      difficulty: newRoomData.difficulty,
+      gameMode: newRoomData.gameMode,
+      createdBy: user?.id
+    };
+    
+    setActiveRooms(prev => [newRoom, ...prev]);
+    setCreateRoomOpen(false);
+    
+    toast.success("Room created successfully!", {
+      description: "Others can now join your game room"
+    });
+    
+    // Reset form
+    setNewRoomData({
+      name: "",
+      maxPlayers: "2",
+      subject: "Mathematics",
+      difficulty: "Medium",
+      gameMode: "1v1"
     });
   };
 
   // Join a game room
-  const joinRoom = (roomId: string) => {
-    toast.info(`Joining room ${roomId}...`, {
-      description: "This feature will be available soon!"
+  const joinRoom = (room: Room) => {
+    if (room.status !== "waiting" || room.players >= room.maxPlayers) {
+      toast.error("Cannot join this room", {
+        description: room.status === "in-progress" ? "Game is already in progress" : "Room is full"
+      });
+      return;
+    }
+    
+    // Update the room's player count
+    setActiveRooms(prev => 
+      prev.map(r => 
+        r.id === room.id 
+          ? { ...r, players: r.players + 1 } 
+          : r
+      )
+    );
+    
+    toast.success(`Joined ${room.name}!`, {
+      description: "Game will start soon"
     });
+    
+    // In a real app, this would redirect to the game room
+    // For now, we'll just simulate that with a timeout
+    setTimeout(() => {
+      navigate("/quiz");
+    }, 2000);
   };
 
   // Register for a tournament
   const joinTournament = (tournamentId: string) => {
-    toast.info(`Registering for tournament...`, {
-      description: "This feature will be available soon!"
+    const tournament = tournaments.find(t => t.id === tournamentId);
+    
+    if (!tournament) {
+      toast.error("Tournament not found");
+      return;
+    }
+    
+    toast.success(`Registered for ${tournament.name}!`, {
+      description: "You'll be notified when the tournament begins"
     });
   };
 
   // Challenge a player
   const challengePlayer = (playerId: string, playerName: string) => {
-    toast.info(`Challenging ${playerName}...`, {
-      description: "This feature will be available soon!"
+    const player = onlinePlayers.find(p => p.id === playerId);
+    
+    if (!player) {
+      toast.error("Player not found");
+      return;
+    }
+    
+    if (player.status !== "online") {
+      toast.error(`${playerName} is ${player.status === "in-game" ? "already in a game" : "away"}`);
+      return;
+    }
+    
+    toast.success(`Challenge sent to ${playerName}!`, {
+      description: "Waiting for them to accept..."
     });
+    
+    // Simulate response after a few seconds
+    setTimeout(() => {
+      const accepted = Math.random() > 0.3; // 70% chance to accept
+      
+      if (accepted) {
+        toast.success(`${playerName} accepted your challenge!`, {
+          description: "Redirecting to game..."
+        });
+        
+        setTimeout(() => {
+          navigate("/quiz");
+        }, 2000);
+      } else {
+        toast.error(`${playerName} declined your challenge`);
+      }
+    }, 3000);
   };
 
   // Format time remaining for tournaments
@@ -224,6 +349,7 @@ const Lobby: React.FC = () => {
                             size="sm"
                             className="text-xs mt-1 h-7 px-2"
                             onClick={() => challengePlayer(player.id, player.name)}
+                            disabled={player.status !== "online"}
                           >
                             Challenge
                           </Button>
@@ -252,42 +378,17 @@ const Lobby: React.FC = () => {
                   <TabsContent value="rooms" className="space-y-4 mt-4">
                     <Button 
                       className="w-full bg-primary"
-                      onClick={createRoom}
+                      onClick={() => setCreateRoomOpen(true)}
                     >
-                      Create New Room
+                      <Plus className="mr-2 h-4 w-4" /> Create New Room
                     </Button>
                     
                     <div className="space-y-3">
                       <h3 className="text-sm font-medium text-gray-500">Active Rooms</h3>
                       <ScrollArea className="h-[450px]">
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-1 gap-4 pr-4">
                           {activeRooms.map((room) => (
-                            <motion.div 
-                              key={room.id}
-                              whileHover={{ scale: 1.02 }}
-                              className="border rounded-lg p-3 hover:border-primary cursor-pointer"
-                              onClick={() => joinRoom(room.id)}
-                            >
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <h3 className="font-medium">{room.name}</h3>
-                                  <div className="flex items-center text-xs text-gray-500 mt-1">
-                                    <Users className="h-3 w-3 mr-1" />
-                                    <span>{room.players}/{room.maxPlayers} players</span>
-                                  </div>
-                                </div>
-                                <div className="flex flex-col items-end">
-                                  <Badge className={
-                                    room.status === 'waiting' 
-                                      ? 'bg-green-100 text-green-800 hover:bg-green-100' 
-                                      : 'bg-blue-100 text-blue-800 hover:bg-blue-100'
-                                  }>
-                                    {room.status === 'waiting' ? 'Join Now' : 'In Progress'}
-                                  </Badge>
-                                  <span className="text-xs mt-1 capitalize">{room.subject}</span>
-                                </div>
-                              </div>
-                            </motion.div>
+                            <RoomCard key={room.id} room={room} onJoin={joinRoom} />
                           ))}
                         </div>
                       </ScrollArea>
@@ -395,6 +496,101 @@ const Lobby: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Create Room Dialog */}
+      <Dialog open={createRoomOpen} onOpenChange={setCreateRoomOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create a Game Room</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="room-name">Room Name</Label>
+              <Input
+                id="room-name"
+                value={newRoomData.name}
+                onChange={(e) => setNewRoomData({...newRoomData, name: e.target.value})}
+                placeholder="Enter a name for your room"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="subject">Subject</Label>
+              <Select
+                value={newRoomData.subject}
+                onValueChange={(value) => setNewRoomData({...newRoomData, subject: value})}
+              >
+                <SelectTrigger id="subject">
+                  <SelectValue placeholder="Select a subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAvailableSubjects().map((subject) => (
+                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                  ))}
+                  <SelectItem value="Mixed">Mixed Subjects</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="difficulty">Difficulty</Label>
+              <Select
+                value={newRoomData.difficulty}
+                onValueChange={(value) => setNewRoomData({...newRoomData, difficulty: value})}
+              >
+                <SelectTrigger id="difficulty">
+                  <SelectValue placeholder="Select difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Easy">Easy</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="game-mode">Game Mode</Label>
+              <Select
+                value={newRoomData.gameMode}
+                onValueChange={(value) => setNewRoomData({...newRoomData, gameMode: value})}
+              >
+                <SelectTrigger id="game-mode">
+                  <SelectValue placeholder="Select game mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1v1">1v1 Duel</SelectItem>
+                  <SelectItem value="2v2">2v2 Team Battle</SelectItem>
+                  <SelectItem value="Battle Royale">Battle Royale</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="max-players">Maximum Players</Label>
+              <Select
+                value={newRoomData.maxPlayers}
+                onValueChange={(value) => setNewRoomData({...newRoomData, maxPlayers: value})}
+              >
+                <SelectTrigger id="max-players">
+                  <SelectValue placeholder="Select max players" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2">2 Players</SelectItem>
+                  <SelectItem value="4">4 Players</SelectItem>
+                  <SelectItem value="8">8 Players</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateRoomOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={createRoom}>Create Room</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
