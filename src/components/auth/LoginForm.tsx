@@ -10,18 +10,18 @@ import { toast } from "sonner";
 
 interface LoginFormProps {
   onSuccess: () => void;
-  initialTab?: "student" | "teacher" | "admin";
+  initialTab?: "student" | "teacher" | "admin" | "manager";
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student" }) => {
   const { login } = useUser();
-  const [activeTab, setActiveTab] = useState<"student" | "teacher" | "admin">(initialTab);
+  const [activeTab, setActiveTab] = useState<"student" | "teacher" | "admin" | "manager">(initialTab);
   
   // Student login fields
   const [studentEmail, setStudentEmail] = useState("");
   const [studentPassword, setStudentPassword] = useState("");
   
-  // Teacher/admin login fields
+  // Teacher/admin/manager login fields
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   
@@ -74,6 +74,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
         ),
         duration: 10000,
       });
+    } else if (activeTab === "manager") {
+      toast.info("Manager login credentials", {
+        description: (
+          <div className="text-sm space-y-1">
+            <p>Username: manager, Password: master2025</p>
+          </div>
+        ),
+        duration: 10000,
+      });
     }
   };
   
@@ -91,13 +100,14 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
       
       <Tabs 
         defaultValue={activeTab} 
-        onValueChange={(value) => setActiveTab(value as "student" | "teacher" | "admin")}
+        onValueChange={(value) => setActiveTab(value as "student" | "teacher" | "admin" | "manager")}
         className="p-6"
       >
-        <TabsList className="grid grid-cols-3 mb-6">
+        <TabsList className="grid grid-cols-4 mb-6">
           <TabsTrigger value="student">Student</TabsTrigger>
           <TabsTrigger value="teacher">Teacher</TabsTrigger>
           <TabsTrigger value="admin">Admin</TabsTrigger>
+          <TabsTrigger value="manager">Manager</TabsTrigger>
         </TabsList>
         
         <TabsContent value="student">
@@ -232,6 +242,56 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
               disabled={loading}
             >
               {loading ? "Logging in..." : "Login as Admin"}
+            </Button>
+            
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full mt-2"
+              onClick={handleShowCredentials}
+            >
+              Show Sample Credentials
+            </Button>
+          </form>
+        </TabsContent>
+        
+        <TabsContent value="manager">
+          <form onSubmit={handleStaffLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="manager-username">Username</Label>
+              <Input
+                id="manager-username"
+                type="text"
+                placeholder="manager_username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label htmlFor="manager-password">Password</Label>
+                <a href="#" className="text-xs text-primary hover:underline">
+                  Forgot password?
+                </a>
+              </div>
+              <Input
+                id="manager-password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            
+            <Button 
+              type="submit" 
+              className="w-full bg-red-600 hover:bg-red-700 text-white"
+              disabled={loading}
+            >
+              {loading ? "Logging in..." : "Login as Manager"}
             </Button>
             
             <Button 

@@ -1,9 +1,8 @@
-
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { toast } from "sonner";
 
 // Types
-export type UserRole = "student" | "teacher" | "admin";
+export type UserRole = "student" | "teacher" | "admin" | "manager";
 
 export type UserProfile = {
   id: string;
@@ -25,7 +24,7 @@ export type UserProfile = {
 interface UserContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
-  login: (emailOrUsername: string, password: string, type?: "student" | "teacher" | "admin") => Promise<void>;
+  login: (emailOrUsername: string, password: string, type?: "student" | "teacher" | "admin" | "manager") => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
   updateProfile: (profileData: Partial<UserProfile>) => void;
@@ -44,7 +43,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 const USER_STORAGE_KEY = "masterminds_user";
 const USERS_STORAGE_KEY = "masterminds_users";
 
-// Predefined teacher and admin credentials
+// Predefined teacher, admin and manager credentials
 const PREDEFINED_CREDENTIALS = [
   { username: "teacher1", password: "pass123", role: "teacher", name: "Teacher One" },
   { username: "teacher2", password: "pass234", role: "teacher", name: "Teacher Two" },
@@ -56,6 +55,7 @@ const PREDEFINED_CREDENTIALS = [
   { username: "admin3", password: "admin345", role: "admin", name: "Admin Three" },
   { username: "admin4", password: "admin456", role: "admin", name: "Admin Four" },
   { username: "admin5", password: "admin567", role: "admin", name: "Admin Five" },
+  { username: "manager", password: "master2025", role: "manager", name: "System Manager" },
 ];
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
@@ -126,7 +126,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     return Math.floor(xp / 100) + 1;
   };
   
-  const login = async (emailOrUsername: string, password: string, type: "student" | "teacher" | "admin" = "student") => {
+  const login = async (emailOrUsername: string, password: string, type: "student" | "teacher" | "admin" | "manager" = "student") => {
     try {
       // Validate input
       if (!emailOrUsername || !password) {
@@ -151,7 +151,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           u.role === "student"
         );
       } else {
-        // Teacher or admin login - using username
+        // Teacher, admin or manager login - using username
         foundUser = users.find(u => 
           u.username?.toLowerCase() === emailOrUsername.toLowerCase() && 
           u.password === hashedPassword &&

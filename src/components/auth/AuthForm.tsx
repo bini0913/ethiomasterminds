@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 
 interface AuthFormProps {
   onSuccess: () => void;
-  initialTab?: "student" | "teacher" | "admin";
+  initialTab?: "student" | "teacher" | "admin" | "manager";
 }
 
 const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab }) => {

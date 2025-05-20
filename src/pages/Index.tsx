@@ -17,7 +17,7 @@ enum AppStage {
 const Index: React.FC = () => {
   const { user, isAuthenticated } = useUser();
   const [appStage, setAppStage] = useState<AppStage>(AppStage.Welcome);
-  const [userType, setUserType] = useState<"student" | "teacher" | "admin">("student");
+  const [userType, setUserType] = useState<"student" | "teacher" | "admin" | "manager">("student");
   
   // Determine the current stage based on authentication and profile completion
   React.useEffect(() => {
@@ -35,7 +35,7 @@ const Index: React.FC = () => {
   }, [isAuthenticated, user, appStage]);
   
   // Handle welcome screen continue button
-  const handleWelcomeContinue = (type: "student" | "teacher" | "admin" = "student") => {
+  const handleWelcomeContinue = (type: "student" | "teacher" | "admin" | "manager" = "student") => {
     setUserType(type);
     setAppStage(AppStage.Auth);
   };
