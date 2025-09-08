@@ -5,12 +5,16 @@ import { Coins, Gem } from 'lucide-react';
 
 interface CurrencyDisplayProps {
   variant?: 'compact' | 'full';
+  showBoth?: boolean;
 }
 
-const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({ variant = 'compact' }) => {
+const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({ variant = 'compact', showBoth = false }) => {
   const { coins, gems } = useCurrency();
 
-  if (variant === 'compact') {
+  // If showBoth is true, force full variant
+  const displayVariant = showBoth ? 'full' : variant;
+
+  if (displayVariant === 'compact') {
     return (
       <div className="flex items-center space-x-3">
         <div className="flex items-center space-x-1 px-2 py-1 bg-yellow-500/20 rounded-lg">

@@ -6,12 +6,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Quiz from "./pages/Quiz";
+import QuizFilter from "./pages/QuizFilter";
 import Multiplayer from "./pages/Multiplayer";
 import Lobby from "./pages/Lobby";
 import Leaderboard from "./pages/Leaderboard";
 import Friends from "./pages/Friends";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import TeacherDashboard from "./pages/TeacherDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
+import StudentDashboard from "./pages/StudentDashboard";
+import ManagerDashboard from "./pages/ManagerDashboard";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
 import { AIHelperProvider } from "./context/AIHelperContext";
@@ -21,9 +26,6 @@ import { CurrencyProvider } from "./context/CurrencyContext";
 import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
 import AIHelper from "./components/ai/AIHelper";
-import TeacherDashboard from "./pages/TeacherDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import QuizFilter from "./pages/QuizFilter";
 
 const queryClient = new QueryClient();
 
@@ -52,9 +54,11 @@ const App = () => (
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/teacher" element={<TeacherDashboard />} />
                     <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/store" element={<div>Avatar Store Coming Soon</div>} />
-                <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="/student-dashboard" element={<StudentDashboard />} />
+                    <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+                    <Route path="/store" element={<div>Avatar Store Coming Soon</div>} />
+                    <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                   <AIHelper />
