@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import WelcomeScreen from "@/components/WelcomeScreen";
+import EnhancedWelcomeScreen from "@/components/welcome/EnhancedWelcomeScreen";
 import AuthForm from "@/components/auth/AuthForm";
 import ProfileSetup from "@/components/profile/ProfileSetup";
 import MainMenu from "@/components/dashboard/MainMenu";
@@ -44,7 +44,7 @@ const Index: React.FC = () => {
   const renderContent = () => {
     switch (appStage) {
       case AppStage.Welcome:
-        return <WelcomeScreen onContinue={handleWelcomeContinue} />;
+        return <EnhancedWelcomeScreen onContinue={handleWelcomeContinue} />;
       case AppStage.Auth:
         return <AuthForm onSuccess={() => setAppStage(AppStage.ProfileSetup)} initialTab={userType} />;
       case AppStage.ProfileSetup:
@@ -57,7 +57,7 @@ const Index: React.FC = () => {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {renderContent()}
     </div>
   );
