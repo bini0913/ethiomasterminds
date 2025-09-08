@@ -1,7 +1,10 @@
 
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
+import { useCurrency } from "@/context/CurrencyContext";
+import { useAchievements } from "@/context/AchievementsContext";
 import { Link } from "react-router-dom";
 import UserLevel from "../profile/UserLevel";
 import { motion } from "framer-motion";
@@ -18,18 +21,26 @@ import {
   GraduationCap,
   School,
   MessageSquare,
-  Gamepad
+  Gamepad,
+  Store,
+  Award
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { avatarToEmoji } from "@/utils/avatarUtils";
 import LevelUpModal from "../profile/LevelUpModal";
 import GainXPButton from "../profile/GainXPButton";
+import CurrencyDisplay from "@/components/currency/CurrencyDisplay";
 
 const MainMenu: React.FC = () => {
   const { user, logout, showLevelUp, setShowLevelUp, previousLevel } = useUser();
+  const { coins, gems } = useCurrency();
+  const { getRecentBadges } = useAchievements();
   const { openHelper } = useAIHelper();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = React.useState("all");
+
+  const recentBadges = getRecentBadges();
 
   // Define subject categories
   const categories = [
@@ -77,6 +88,24 @@ const MainMenu: React.FC = () => {
       category: "all",
       color: "bg-gradient-to-r from-green-500 to-teal-600",
       description: "See who's on top"
+    },
+    { 
+      title: "Avatar Store",
+      icon: <Store className="h-6 w-6 text-white" />,
+      emoji: "🛍️",
+      path: "/store",
+      category: "all",
+      color: "bg-gradient-to-r from-purple-500 to-pink-600",
+      description: "Customize your avatar with amazing items"
+    },
+    { 
+      title: "Tournament Hub",
+      icon: <Award className="h-6 w-6 text-white" />,
+      emoji: "🏟️",
+      path: "/tournaments",
+      category: "all",
+      color: "bg-gradient-to-r from-orange-500 to-red-600",
+      description: "Compete in global tournaments"
     },
     { 
       title: "Mathematics",

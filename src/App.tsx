@@ -17,6 +17,9 @@ import { QuizProvider } from "./context/QuizContext";
 import { AIHelperProvider } from "./context/AIHelperContext";
 import { FriendsProvider } from "./context/FriendsContext";
 import { LanguageProvider } from "./context/LanguageContext";
+import { CurrencyProvider } from "./context/CurrencyContext";
+import { AchievementsProvider } from "./context/AchievementsContext";
+import { RoomProvider } from "./context/RoomContext";
 import AIHelper from "./components/ai/AIHelper";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -28,10 +31,13 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <UserProvider>
       <LanguageProvider>
-        <QuizProvider>
-          <AIHelperProvider>
-            <FriendsProvider>
-              <TooltipProvider>
+        <CurrencyProvider>
+          <AchievementsProvider>
+            <QuizProvider>
+              <RoomProvider>
+                <AIHelperProvider>
+                  <FriendsProvider>
+                    <TooltipProvider>
                 <Toaster />
                 <Sonner />
                 <BrowserRouter>
@@ -46,15 +52,20 @@ const App = () => (
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/teacher" element={<TeacherDashboard />} />
                     <Route path="/admin" element={<AdminDashboard />} />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="/store" element={<div>Avatar Store Coming Soon</div>} />
+                <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                   <AIHelper />
                 </BrowserRouter>
-              </TooltipProvider>
-            </FriendsProvider>
-          </AIHelperProvider>
-        </QuizProvider>
+                    </TooltipProvider>
+                  </FriendsProvider>
+                </AIHelperProvider>
+              </RoomProvider>
+            </QuizProvider>
+          </AchievementsProvider>
+        </CurrencyProvider>
       </LanguageProvider>
     </UserProvider>
   </QueryClientProvider>
