@@ -114,7 +114,7 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
               Master Minds
             </h4>
             <p className="text-sm text-white/80">
-              Created by Biniam Bogale, 14 years old, Ethiopia
+              Created by Biniam Bogale, Ethiopia
             </p>
             <p className="text-xs text-white/60 mt-1">
               "Turning Learning Into Adventure"

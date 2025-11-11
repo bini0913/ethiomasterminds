@@ -32,7 +32,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
     setLoading(true);
     
     try {
-      await login(studentEmail, studentPassword, "student");
+      // For now, allow login without credentials
+      await login("student@demo.com", "demo123", "student");
       onSuccess();
     } finally {
       setLoading(false);
@@ -44,7 +45,14 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
     setLoading(true);
     
     try {
-      await login(username, password, activeTab);
+      // For now, allow login without credentials - use demo accounts
+      if (activeTab === "teacher") {
+        await login("teacher1", "pass123", activeTab);
+      } else if (activeTab === "admin") {
+        await login("admin1", "admin123", activeTab);
+      } else {
+        await login("manager", "master2025", activeTab);
+      }
       onSuccess();
     } finally {
       setLoading(false);
@@ -112,33 +120,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
         
         <TabsContent value="student">
           <form onSubmit={handleStudentLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="student-email">Email</Label>
-              <Input
-                id="student-email"
-                type="email"
-                placeholder="student@example.com"
-                value={studentEmail}
-                onChange={(e) => setStudentEmail(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label htmlFor="student-password">Password</Label>
-                <a href="#" className="text-xs text-primary hover:underline">
-                  Forgot password?
-                </a>
-              </div>
-              <Input
-                id="student-password"
-                type="password"
-                placeholder="••••••••"
-                value={studentPassword}
-                onChange={(e) => setStudentPassword(e.target.value)}
-                required
-              />
+            <div className="text-center py-6">
+              <p className="text-gray-600 mb-4">Click below to enter as a student</p>
             </div>
             
             <Button 
@@ -146,44 +129,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
               className="w-full bg-primary hover:bg-primary-dark"
               disabled={loading}
             >
-              {loading ? "Logging in..." : "Login"}
+              {loading ? "Logging in..." : "Enter as Student"}
             </Button>
-            
-            <div className="text-center text-sm text-gray-500 mt-4">
-              Don't have an account? <a href="#" className="text-primary hover:underline">Sign up</a>
-            </div>
           </form>
         </TabsContent>
         
         <TabsContent value="teacher">
           <form onSubmit={handleStaffLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="teacher-username">Username</Label>
-              <Input
-                id="teacher-username"
-                type="text"
-                placeholder="teacher_username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label htmlFor="teacher-password">Password</Label>
-                <a href="#" className="text-xs text-primary hover:underline">
-                  Forgot password?
-                </a>
-              </div>
-              <Input
-                id="teacher-password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+            <div className="text-center py-6">
+              <p className="text-gray-600 mb-4">Click below to enter as a teacher</p>
             </div>
             
             <Button 
@@ -191,49 +145,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
               className="w-full bg-primary hover:bg-primary-dark"
               disabled={loading}
             >
-              {loading ? "Logging in..." : "Login as Teacher"}
-            </Button>
-            
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full mt-2"
-              onClick={handleShowCredentials}
-            >
-              Show Sample Credentials
+              {loading ? "Logging in..." : "Enter as Teacher"}
             </Button>
           </form>
         </TabsContent>
         
         <TabsContent value="admin">
           <form onSubmit={handleStaffLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="admin-username">Username</Label>
-              <Input
-                id="admin-username"
-                type="text"
-                placeholder="admin_username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label htmlFor="admin-password">Password</Label>
-                <a href="#" className="text-xs text-primary hover:underline">
-                  Forgot password?
-                </a>
-              </div>
-              <Input
-                id="admin-password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+            <div className="text-center py-6">
+              <p className="text-gray-600 mb-4">Click below to enter as an admin</p>
             </div>
             
             <Button 
@@ -241,49 +161,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
               className="w-full bg-purple-600 hover:bg-purple-700"
               disabled={loading}
             >
-              {loading ? "Logging in..." : "Login as Admin"}
-            </Button>
-            
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full mt-2"
-              onClick={handleShowCredentials}
-            >
-              Show Sample Credentials
+              {loading ? "Logging in..." : "Enter as Admin"}
             </Button>
           </form>
         </TabsContent>
         
         <TabsContent value="manager">
           <form onSubmit={handleStaffLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="manager-username">Username</Label>
-              <Input
-                id="manager-username"
-                type="text"
-                placeholder="manager_username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label htmlFor="manager-password">Password</Label>
-                <a href="#" className="text-xs text-primary hover:underline">
-                  Forgot password?
-                </a>
-              </div>
-              <Input
-                id="manager-password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+            <div className="text-center py-6">
+              <p className="text-gray-600 mb-4">Click below to enter as a manager</p>
             </div>
             
             <Button 
@@ -291,16 +177,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
               className="w-full bg-red-600 hover:bg-red-700 text-white"
               disabled={loading}
             >
-              {loading ? "Logging in..." : "Login as Manager"}
-            </Button>
-            
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full mt-2"
-              onClick={handleShowCredentials}
-            >
-              Show Sample Credentials
+              {loading ? "Logging in..." : "Enter as Manager"}
             </Button>
           </form>
         </TabsContent>

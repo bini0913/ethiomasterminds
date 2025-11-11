@@ -65,10 +65,11 @@ const EnhancedSettings: React.FC = () => {
     toast.success("Settings saved successfully!");
   };
 
-  const handleLanguageChange = (newLanguage: "English" | "Amharic" | "Afaan Oromoo") => {
+  const handleLanguageChange = (newLanguage: "english" | "amharic" | "afaan-oromoo") => {
     setLanguage(newLanguage);
     handleSettingChange('language', newLanguage);
-    toast.success(`Language changed to ${newLanguage}`);
+    const displayName = newLanguage === "english" ? "English" : newLanguage === "amharic" ? "Amharic" : "Afaan Oromoo";
+    toast.success(`Language changed to ${displayName}`);
   };
 
   const handleLogout = () => {
@@ -344,9 +345,9 @@ const EnhancedSettings: React.FC = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="English">🇺🇸 English</SelectItem>
-                    <SelectItem value="Amharic">🇪🇹 Amharic (አማርኛ)</SelectItem>
-                    <SelectItem value="Afaan Oromoo">🇪🇹 Afaan Oromoo</SelectItem>
+                    <SelectItem value="english">🇺🇸 English</SelectItem>
+                    <SelectItem value="amharic">🇪🇹 Amharic (አማርኛ)</SelectItem>
+                    <SelectItem value="afaan-oromoo">🇪🇹 Afaan Oromoo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
