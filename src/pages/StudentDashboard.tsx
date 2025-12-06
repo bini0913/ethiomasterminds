@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
   Trophy, 
   BookOpen, 
@@ -17,295 +18,393 @@ import {
   TrendingUp,
   Calendar,
   Play,
-  Brain
+  Brain,
+  Zap,
+  Gamepad2,
+  Crown,
+  Flame,
+  MessageCircle,
+  Settings,
+  LogOut
 } from 'lucide-react';
+import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import CurrencyDisplay from '@/components/currency/CurrencyDisplay';
-import UserLevel from '@/components/profile/UserLevel';
-import XPProgressBar from '@/components/profile/XPProgressBar';
 
 const StudentDashboard: React.FC = () => {
-  const { user } = useUser();
+  const { user, logout } = useUser();
   const { coins, gems } = useCurrency();
-  const { achievements, unlockedBadges } = useAchievements();
+  const { unlockedBadges } = useAchievements();
   const navigate = useNavigate();
 
-  const getRankTitle = (level: number) => {
-    if (level < 3) return { title: "Rookie", color: "bg-gray-500" };
-    if (level < 6) return { title: "Learner", color: "bg-blue-500" };
-    if (level < 10) return { title: "Quizzer", color: "bg-green-500" };
-    if (level < 15) return { title: "Thinker", color: "bg-purple-500" };
-    if (level < 20) return { title: "Genius", color: "bg-orange-500" };
-    return { title: "Master Mind", color: "bg-gradient-to-r from-yellow-400 to-yellow-600" };
+  const getRankInfo = (level: number) => {
+    if (level < 5) return { title: "Rookie", icon: "🌱", color: "from-slate-500 to-slate-600" };
+    if (level < 10) return { title: "Thinker", icon: "💭", color: "from-blue-500 to-blue-600" };
+    if (level < 20) return { title: "Master", icon: "🎓", color: "from-purple-500 to-purple-600" };
+    if (level < 35) return { title: "Grand Master", icon: "👑", color: "from-amber-500 to-orange-600" };
+    return { title: "Legend", icon: "⚡", color: "from-pink-500 to-rose-600" };
   };
 
-  const weeklyGoal = 500; // XP goal for the week
-  const currentWeeklyXP = 347; // Current progress
+  const rank = getRankInfo(user?.level || 1);
+  const xpForNextLevel = (user?.level || 1) * 100;
+  const currentXP = user?.xp || 0;
+  const xpProgress = (currentXP / xpForNextLevel) * 100;
 
   const todayStats = {
     quizzesCompleted: 3,
     correctAnswers: 28,
     totalQuestions: 35,
-    xpEarned: 140
+    xpEarned: 140,
+    streak: 5
   };
 
-  const recentAchievements = unlockedBadges.slice(0, 3);
-  const rank = getRankTitle(user?.level || 1);
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="relative min-h-screen overflow-hidden">
+      <AnimatedBackground variant="minimal" showIcons={false} />
+
+      <div className="relative z-10">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">
-              Welcome back, {user?.name}! 🌟
-            </h1>
-            <p className="text-gray-600">Ready to continue your learning journey?</p>
+        <header className="glass border-b border-border/50 sticky top-0 z-20">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              {/* Logo & User */}
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                  <span className="text-xl font-display font-bold text-white">MM</span>
+                </div>
+                <div>
+                  <h1 className="text-lg font-display font-bold text-foreground">
+                    Welcome, {user?.name || "Student"}!
+                  </h1>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{rank.icon}</span>
+                    <span className="text-sm text-muted-foreground">{rank.title}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Currency & Actions */}
+              <div className="flex items-center gap-3">
+                <CurrencyDisplay showBoth />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate('/settings')}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Settings className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={logout}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <LogOut className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <CurrencyDisplay showBoth />
-            <Badge variant="secondary" className={`${rank.color} text-white px-3 py-1`}>
-              {rank.title}
-            </Badge>
-          </div>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100">Level</p>
-                  <p className="text-2xl font-bold">{user?.level || 1}</p>
-                </div>
-                <Star className="h-8 w-8 text-blue-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100">Today's XP</p>
-                  <p className="text-2xl font-bold">{todayStats.xpEarned}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-green-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100">Accuracy</p>
-                  <p className="text-2xl font-bold">
-                    {Math.round((todayStats.correctAnswers / todayStats.totalQuestions) * 100)}%
-                  </p>
-                </div>
-                <Target className="h-8 w-8 text-purple-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100">Badges</p>
-                  <p className="text-2xl font-bold">{unlockedBadges.length}</p>
-                </div>
-                <Award className="h-8 w-8 text-orange-200" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        </header>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Play className="h-5 w-5" />
+        <motion.main
+          className="container mx-auto px-4 py-6 space-y-6"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* XP Progress Section */}
+          <motion.div variants={itemVariants}>
+            <Card className="glass border-primary/20 overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${rank.color} flex items-center justify-center shadow-lg`}>
+                      <span className="text-3xl">{rank.icon}</span>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-display font-bold text-foreground">
+                          Level {user?.level || 1}
+                        </span>
+                        <Badge className={`bg-gradient-to-r ${rank.color} text-white border-0`}>
+                          {rank.title}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {currentXP} / {xpForNextLevel} XP to next level
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 bg-orange-500/20 px-4 py-2 rounded-xl">
+                    <Flame className="h-5 w-5 text-orange-500" />
+                    <span className="font-display font-bold text-orange-500">{todayStats.streak} Day Streak</span>
+                  </div>
+                </div>
+                <div className="relative h-4 rounded-full bg-muted overflow-hidden">
+                  <motion.div
+                    className="absolute inset-y-0 left-0 xp-bar rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${xpProgress}%` }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Quick Stats */}
+          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { icon: Star, label: "Level", value: user?.level || 1, color: "from-primary to-accent" },
+              { icon: Zap, label: "Today's XP", value: `+${todayStats.xpEarned}`, color: "from-secondary to-glow-cyan" },
+              { icon: Target, label: "Accuracy", value: `${Math.round((todayStats.correctAnswers / todayStats.totalQuestions) * 100)}%`, color: "from-glow-green to-emerald-500" },
+              { icon: Award, label: "Badges", value: unlockedBadges.length, color: "from-accent to-glow-pink" }
+            ].map((stat, i) => (
+              <Card key={i} className="glass border-border/30 card-hover">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
+                      <stat.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">{stat.label}</p>
+                      <p className="text-xl font-display font-bold text-foreground">{stat.value}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </motion.div>
+
+          {/* Quick Actions */}
+          <motion.div variants={itemVariants}>
+            <Card className="glass border-border/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="font-display text-lg flex items-center gap-2">
+                  <Play className="h-5 w-5 text-primary" />
                   Quick Start
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Button 
-                    onClick={() => navigate('/quiz')}
-                    className="flex flex-col items-center gap-2 h-auto py-4"
-                  >
-                    <BookOpen className="h-6 w-6" />
-                    <span className="text-sm">Practice Quiz</span>
-                  </Button>
-                  <Button 
-                    onClick={() => navigate('/multiplayer')}
-                    variant="outline"
-                    className="flex flex-col items-center gap-2 h-auto py-4"
-                  >
-                    <Users className="h-6 w-6" />
-                    <span className="text-sm">Multiplayer</span>
-                  </Button>
-                  <Button 
-                    onClick={() => navigate('/tournaments')}
-                    variant="outline"
-                    className="flex flex-col items-center gap-2 h-auto py-4"
-                  >
-                    <Trophy className="h-6 w-6" />
-                    <span className="text-sm">Tournaments</span>
-                  </Button>
-                  <Button 
-                    onClick={() => navigate('/leaderboard')}
-                    variant="outline"
-                    className="flex flex-col items-center gap-2 h-auto py-4"
-                  >
-                    <TrendingUp className="h-6 w-6" />
-                    <span className="text-sm">Leaderboard</span>
-                  </Button>
+                  {[
+                    { icon: BookOpen, label: "Start Quiz", path: "/quiz", gradient: "from-primary to-accent" },
+                    { icon: Users, label: "Multiplayer", path: "/multiplayer", gradient: "from-secondary to-glow-cyan" },
+                    { icon: Trophy, label: "Tournaments", path: "/tournaments", gradient: "from-accent to-glow-pink" },
+                    { icon: TrendingUp, label: "Leaderboard", path: "/leaderboard", gradient: "from-glow-yellow to-orange-500" }
+                  ].map((action, i) => (
+                    <motion.div key={i} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                      <Button
+                        onClick={() => navigate(action.path)}
+                        className={`w-full h-20 flex-col gap-2 bg-gradient-to-br ${action.gradient} border-0 rounded-xl shadow-lg hover:shadow-xl transition-shadow`}
+                      >
+                        <action.icon className="h-6 w-6" />
+                        <span className="text-sm font-display">{action.label}</span>
+                      </Button>
+                    </motion.div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
+          </motion.div>
 
-            {/* Progress Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  Weekly Goal
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span>XP Progress</span>
-                    <span>{currentWeeklyXP} / {weeklyGoal} XP</span>
-                  </div>
-                  <Progress 
-                    value={(currentWeeklyXP / weeklyGoal) * 100} 
-                    className="h-3"
-                  />
-                  <p className="text-sm text-gray-600">
-                    You're {Math.round((currentWeeklyXP / weeklyGoal) * 100)}% towards your weekly goal! 
-                    Keep it up! 🎯
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Performance */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="h-5 w-5" />
-                  Today's Performance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">{todayStats.quizzesCompleted}</p>
-                    <p className="text-sm text-gray-600">Quizzes Completed</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">
-                      {todayStats.correctAnswers}/{todayStats.totalQuestions}
-                    </p>
-                    <p className="text-sm text-gray-600">Correct Answers</p>
-                  </div>
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
-                    <p className="text-2xl font-bold text-purple-600">+{todayStats.xpEarned}</p>
-                    <p className="text-sm text-gray-600">XP Earned</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* Level Progress */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="h-5 w-5" />
-                  Level Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <UserLevel level={user?.level || 1} xp={user?.xp || 0} />
-                <div className="mt-4">
-                  <XPProgressBar level={user?.level || 1} xp={user?.xp || 0} />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Achievements */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Recent Achievements
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentAchievements.length > 0 ? (
-                    recentAchievements.map((badge, index) => (
-                      <div key={index} className="flex items-center gap-3 p-2 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg">
-                        <div className="text-2xl">{badge.icon}</div>
-                        <div>
-                          <p className="font-medium text-sm">{badge.name}</p>
-                          <p className="text-xs text-gray-600">{badge.description}</p>
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Daily Missions */}
+              <motion.div variants={itemVariants}>
+                <Card className="glass border-border/30">
+                  <CardHeader>
+                    <CardTitle className="font-display flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-primary" />
+                      Daily Missions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {[
+                      { title: "Complete 3 Quizzes", progress: 2, total: 3, reward: "+50 XP" },
+                      { title: "Win 1 Multiplayer Match", progress: 0, total: 1, reward: "+100 XP" },
+                      { title: "Score 90%+ on any quiz", progress: 1, total: 1, reward: "+30 XP", completed: true }
+                    ].map((mission, i) => (
+                      <div key={i} className={`p-4 rounded-xl ${mission.completed ? 'bg-glow-green/10 border border-glow-green/30' : 'bg-muted/30'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-foreground">{mission.title}</span>
+                          <Badge variant={mission.completed ? "default" : "secondary"} className={mission.completed ? "bg-glow-green text-background" : ""}>
+                            {mission.reward}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Progress value={(mission.progress / mission.total) * 100} className="h-2 flex-1" />
+                          <span className="text-xs text-muted-foreground">
+                            {mission.progress}/{mission.total}
+                          </span>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-500 text-center py-4">
-                      Complete more quizzes to earn achievements! 🏆
-                    </p>
-                  )}
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full mt-3"
-                  onClick={() => navigate('/profile')}
-                >
-                  View All Achievements
-                </Button>
-              </CardContent>
-            </Card>
+                    ))}
+                  </CardContent>
+                </Card>
+              </motion.div>
 
-            {/* Daily Challenge */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Daily Challenge
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center p-4 border-2 border-dashed border-primary/20 rounded-lg">
-                  <Trophy className="h-8 w-8 text-primary mx-auto mb-2" />
-                  <p className="font-medium text-sm mb-1">Math Sprint Challenge</p>
-                  <p className="text-xs text-gray-600 mb-3">Answer 10 math questions in under 5 minutes</p>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    +100 XP • +50 Coins
-                  </Badge>
-                </div>
-                <Button className="w-full mt-3" onClick={() => navigate('/quiz')}>
-                  Start Challenge
-                </Button>
-              </CardContent>
-            </Card>
+              {/* Today's Performance */}
+              <motion.div variants={itemVariants}>
+                <Card className="glass border-border/30">
+                  <CardHeader>
+                    <CardTitle className="font-display flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-accent" />
+                      Today's Performance
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4">
+                      {[
+                        { label: "Quizzes", value: todayStats.quizzesCompleted, icon: "📚" },
+                        { label: "Correct", value: `${todayStats.correctAnswers}/${todayStats.totalQuestions}`, icon: "✅" },
+                        { label: "XP Earned", value: `+${todayStats.xpEarned}`, icon: "⚡" }
+                      ].map((stat, i) => (
+                        <div key={i} className="text-center p-4 bg-muted/30 rounded-xl">
+                          <span className="text-2xl mb-2 block">{stat.icon}</span>
+                          <p className="text-xl font-display font-bold text-foreground">{stat.value}</p>
+                          <p className="text-xs text-muted-foreground">{stat.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Avatar Card */}
+              <motion.div variants={itemVariants}>
+                <Card className="glass border-border/30 overflow-hidden">
+                  <div className="bg-gradient-to-br from-primary/20 to-accent/20 p-6 text-center">
+                    <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-primary to-accent p-1">
+                      <div className="w-full h-full rounded-full bg-card flex items-center justify-center text-4xl">
+                        {user?.avatar || "🧑‍🎓"}
+                      </div>
+                    </div>
+                    <h3 className="mt-3 font-display font-bold text-lg text-foreground">
+                      {user?.name || "Student"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Grade {user?.grade || 5}</p>
+                  </div>
+                  <CardContent className="p-4">
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-primary/30 hover:bg-primary/10"
+                      onClick={() => navigate('/profile')}
+                    >
+                      Customize Avatar
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Recent Achievements */}
+              <motion.div variants={itemVariants}>
+                <Card className="glass border-border/30">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="font-display text-lg flex items-center gap-2">
+                      <Award className="h-5 w-5 text-glow-yellow" />
+                      Recent Badges
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {unlockedBadges.length > 0 ? (
+                      <div className="space-y-2">
+                        {unlockedBadges.slice(0, 3).map((badge, i) => (
+                          <div key={i} className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+                            <span className="text-2xl">{badge.icon}</span>
+                            <div className="flex-1">
+                              <p className="font-medium text-sm text-foreground">{badge.name}</p>
+                              <p className="text-xs text-muted-foreground">{badge.description}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-6">
+                        Complete quizzes to earn badges! 🏆
+                      </p>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      className="w-full mt-3 text-primary"
+                      onClick={() => navigate('/profile')}
+                    >
+                      View All Achievements
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Friends Online */}
+              <motion.div variants={itemVariants}>
+                <Card className="glass border-border/30">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="font-display text-lg flex items-center gap-2">
+                      <MessageCircle className="h-5 w-5 text-secondary" />
+                      Friends Online
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {[
+                        { name: "Abebe K.", level: 12, online: true },
+                        { name: "Tigist A.", level: 15, online: true },
+                        { name: "Dawit H.", level: 8, online: false }
+                      ].map((friend, i) => (
+                        <div key={i} className="flex items-center gap-3 p-2">
+                          <div className="relative">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
+                              <span className="text-lg">👤</span>
+                            </div>
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${friend.online ? 'bg-glow-green' : 'bg-muted'}`} />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-sm text-foreground">{friend.name}</p>
+                            <p className="text-xs text-muted-foreground">Level {friend.level}</p>
+                          </div>
+                          <Button size="sm" variant="ghost" className="text-primary">
+                            <Gamepad2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full mt-3 text-primary"
+                      onClick={() => navigate('/friends')}
+                    >
+                      View All Friends
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
           </div>
-        </div>
+        </motion.main>
+
+        {/* Footer */}
+        <footer className="text-center py-4 text-xs text-muted-foreground">
+          Created by Biniam Bogale • Master Minds
+        </footer>
       </div>
     </div>
   );
