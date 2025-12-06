@@ -8,7 +8,7 @@ export type UserProfile = {
   id: string;
   name: string;
   email?: string;
-  username?: string;
+  username: string;
   role: UserRole;
   gender?: string;
   grade?: string;
@@ -16,7 +16,6 @@ export type UserProfile = {
   xp: number;
   level: number;
   avatar: string;
-  // New fields for enhanced leveling system
   rank?: string;
   badges?: string[];
 };
@@ -24,8 +23,8 @@ export type UserProfile = {
 interface UserContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
-  login: (emailOrUsername: string, password: string, type?: "student" | "teacher" | "admin" | "manager") => Promise<void>;
-  signup: (email: string, password: string, name: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<boolean>;
+  signup: (username: string, password: string, name: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (profileData: Partial<UserProfile>) => void;
   addXP: (amount: number) => void;
@@ -39,25 +38,68 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// User storage key
 const USER_STORAGE_KEY = "masterminds_user";
 const USERS_STORAGE_KEY = "masterminds_users";
 
-// Predefined credentials as requested by Master Minds specifications
-const PREDEFINED_CREDENTIALS = [
-  { username: "biniam", password: "2004", role: "manager", name: "Biniam Bogale - Master Manager" },
-  { username: "teacher1", password: "pass123", role: "teacher", name: "Teacher One" },
-  { username: "teacher2", password: "pass123", role: "teacher", name: "Teacher Two" },
-  { username: "teacher3", password: "pass345", role: "teacher", name: "Teacher Three" },
-  { username: "admin1", password: "pass123", role: "admin", name: "Admin One" },
-  { username: "admin2", password: "pass123", role: "admin", name: "Admin Two" },
-  { username: "admin3", password: "pass345", role: "admin", name: "Admin Three" },
+// Test accounts - username/password only, no codes required
+const TEST_ACCOUNTS = [
+  { username: "student1", password: "pass123", role: "student" as UserRole, name: "Student One" },
+  { username: "teacher1", password: "pass123", role: "teacher" as UserRole, name: "Teacher One" },
+  { username: "teacher2", password: "pass123", role: "teacher" as UserRole, name: "Teacher Two" },
+  { username: "admin1", password: "pass123", role: "admin" as UserRole, name: "Admin One" },
+  { username: "admin2", password: "pass123", role: "admin" as UserRole, name: "Admin Two" },
+  { username: "biniam", password: "2004", role: "manager" as UserRole, name: "Biniam Bogale - Master Manager" },
 ];
+
+// Simple hash function for demo purposes
+const hashPassword = async (password: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+};
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [showLevelUp, setShowLevelUp] = useState<boolean>(false);
   const [previousLevel, setPreviousLevel] = useState<number>(1);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize test accounts
+  useEffect(() => {
+    const initializeAccounts = async () => {
+      const usersStr = localStorage.getItem(USERS_STORAGE_KEY);
+      let users: Array<any> = usersStr ? JSON.parse(usersStr) : [];
+      
+      // Add test accounts if they don't exist
+      for (const account of TEST_ACCOUNTS) {
+        const exists = users.some(u => u.username === account.username);
+        if (!exists) {
+          const hashedPassword = await hashPassword(account.password);
+          users.push({
+            id: `user-${account.username}-${Date.now()}`,
+            username: account.username,
+            password: hashedPassword,
+            name: account.name,
+            role: account.role,
+            xp: 0,
+            level: 1,
+            avatar: "avatar-1",
+            grade: account.role === "student" ? "5" : undefined,
+            gender: "other",
+            educationLevel: "primary"
+          });
+        }
+      }
+      
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+      setIsInitialized(true);
+    };
+
+    initializeAccounts();
+  }, []);
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -80,252 +122,168 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
-  // Ensure predefined credentials are stored in localStorage
-  useEffect(() => {
-    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-    let users: Array<any> = JSON.parse(usersStr);
-    
-    // Check if we need to add predefined credentials
-    let needsUpdate = false;
-    
-    for (const cred of PREDEFINED_CREDENTIALS) {
-      const exists = users.some(u => 
-        u.username === cred.username && 
-        u.role === cred.role
-      );
-      
-      if (!exists) {
-        needsUpdate = true;
-        // Generate hashed password for the predefined credential
-        hashPassword(cred.password).then(hashedPassword => {
-          users.push({
-            id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-            username: cred.username,
-            password: hashedPassword,
-            name: cred.name,
-            role: cred.role,
-            xp: 0,
-            level: 1,
-            avatar: "avatar-1",
-          });
-        });
-      }
-    }
-    
-    if (needsUpdate) {
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-    }
-  }, []);
-
   const calculateLevel = (xp: number) => {
-    // Simple level calculation: each level requires 100 XP
     return Math.floor(xp / 100) + 1;
   };
-  
-  const login = async (emailOrUsername: string, password: string, type: "student" | "teacher" | "admin" | "manager" = "student") => {
+
+  const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      // Validate input
-      if (!emailOrUsername || !password) {
-        toast.error("Please enter both email/username and password");
-        return;
+      if (!username.trim() || !password.trim()) {
+        toast.error("Please enter both username and password");
+        return false;
       }
 
-      // Create a hash of the password (for demo purposes only - NOT secure)
       const hashedPassword = await hashPassword(password);
-      
-      // Check if user exists in localStorage
       const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
       const users: Array<any> = JSON.parse(usersStr);
-      
-      let foundUser;
-      
-      if (type === "student") {
-        // Student login - using email
-        foundUser = users.find(u => 
-          u.email?.toLowerCase() === emailOrUsername.toLowerCase() && 
-          u.password === hashedPassword &&
-          u.role === "student"
-        );
-      } else {
-        // Teacher, admin or manager login - using username
-        foundUser = users.find(u => 
-          u.username?.toLowerCase() === emailOrUsername.toLowerCase() && 
-          u.password === hashedPassword &&
-          u.role === type
-        );
-      }
-      
+
+      const foundUser = users.find(u => 
+        u.username?.toLowerCase() === username.toLowerCase() && 
+        u.password === hashedPassword
+      );
+
       if (foundUser) {
-        // Remove password before setting in state
-        const { password, ...userWithoutPassword } = foundUser;
+        const { password: _, ...userWithoutPassword } = foundUser;
         setUser(userWithoutPassword);
-        toast.success("Logged in successfully!");
-        return;
+        toast.success(`Welcome back, ${foundUser.name}!`, {
+          description: `Logged in as ${foundUser.role}`
+        });
+        return true;
       }
-      
-      if (type === "student") {
-        toast.error("Invalid email or password");
-      } else {
-        toast.error(`Invalid ${type} credentials`);
-      }
+
+      toast.error("Invalid username or password", {
+        description: "Please check your credentials and try again"
+      });
+      return false;
     } catch (error) {
       toast.error("Login failed. Please try again.");
       console.error("Login error:", error);
+      return false;
     }
   };
-  
-  const signup = async (email: string, password: string, name: string) => {
+
+  const signup = async (username: string, password: string, name: string): Promise<boolean> => {
     try {
-      // Validate input
-      if (!email || !password || !name) {
+      if (!username.trim() || !password.trim() || !name.trim()) {
         toast.error("Please fill all required fields");
-        return;
+        return false;
       }
 
-      // Check if user already exists
       const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-      const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
-      
-      if (users.some(u => u.email?.toLowerCase() === email.toLowerCase())) {
-        toast.error("User with this email already exists");
-        return;
+      const users: Array<any> = JSON.parse(usersStr);
+
+      if (users.some(u => u.username?.toLowerCase() === username.toLowerCase())) {
+        toast.error("Username already exists");
+        return false;
       }
-      
-      // Create hashed password (demo only - NOT secure)
+
       const hashedPassword = await hashPassword(password);
       
-      // Create new user
-      const newUser: UserProfile & { password: string } = {
+      const newUser = {
         id: `user-${Date.now()}`,
         name,
-        email,
+        username,
         password: hashedPassword,
-        role: "student", // Default role
+        role: "student" as UserRole,
         xp: 0,
         level: 1,
-        avatar: "avatar-1", // Default avatar
+        avatar: "avatar-1",
       };
-      
-      // Save to "database" (localStorage)
+
       users.push(newUser);
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-      
-      // Login the user (without password in state)
+
       const { password: _, ...userWithoutPassword } = newUser;
       setUser(userWithoutPassword);
       toast.success("Account created successfully!");
+      return true;
     } catch (error) {
       toast.error("Signup failed. Please try again.");
       console.error("Signup error:", error);
+      return false;
     }
   };
-  
+
   const logout = () => {
     setUser(null);
     toast.info("Logged out successfully");
   };
-  
+
   const updateProfile = (profileData: Partial<UserProfile>) => {
     if (!user) return;
-    
-    // Update user in state
+
     const updatedUser = { ...user, ...profileData };
     setUser(updatedUser);
-    
-    // Update user in storage
+
     const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-    const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
-    
+    const users: Array<any> = JSON.parse(usersStr);
+
     const updatedUsers = users.map(u => {
       if (u.id === user.id) {
-        // Preserve the password field which isn't in the state
         return { ...u, ...profileData };
       }
       return u;
     });
-    
+
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
     toast.success("Profile updated successfully!");
   };
-  
+
   const addXP = (amount: number) => {
     if (!user) return;
-    
+
     const newXP = user.xp + amount;
     const newLevel = calculateLevel(newXP);
-    
-    // If the user is leveling up, show the level up modal
+
     if (newLevel > user.level) {
       setPreviousLevel(user.level);
       setTimeout(() => {
         setShowLevelUp(true);
       }, 500);
     }
-    
-    // Update user with new XP and possibly new level
+
     const updatedUser = { ...user, xp: newXP, level: newLevel };
     updateProfile(updatedUser);
-    
-    // We'll let the LevelUpModal handle the level up notification now
+
     if (newLevel <= user.level) {
       toast.success(`+${amount} XP gained!`);
     }
   };
 
-  // Delete the currently logged-in user's account
   const deleteAccount = () => {
     if (!user) return;
-    
-    // Remove from storage
+
     const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-    const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
-    
+    const users: Array<any> = JSON.parse(usersStr);
+
     const updatedUsers = users.filter(u => u.id !== user.id);
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
-    
-    // Clear current user
+
     setUser(null);
     toast.success("Your account has been deleted");
   };
 
-  // Get all users (for admin functions)
   const getAllUsers = () => {
     const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-    const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
-    
-    // Remove passwords from the returned data
-    return users.map(({password, ...user}) => user);
+    const users: Array<any> = JSON.parse(usersStr);
+    return users.map(({ password, ...user }) => user);
   };
 
-  // Delete any user by ID (admin function)
   const deleteUserById = (id: string) => {
     const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-    const users: Array<UserProfile & { password: string }> = JSON.parse(usersStr);
-    
-    // If attempting to delete the current user, use deleteAccount instead
+    const users: Array<any> = JSON.parse(usersStr);
+
     if (user?.id === id) {
       deleteAccount();
       return;
     }
-    
+
     const updatedUsers = users.filter(u => u.id !== id);
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
-    
+
     toast.success("User account deleted successfully");
   };
 
-  // Simple password hashing function (NOT secure - just for demo)
-  const hashPassword = async (password: string): Promise<string> => {
-    // In a real app, use a proper hashing algorithm like bcrypt
-    // This is just a simple demo hash
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hash))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  };
-  
   return (
     <UserContext.Provider
       value={{
