@@ -49,9 +49,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
       if (activeTab === "teacher") {
         await login("teacher1", "pass123", activeTab);
       } else if (activeTab === "admin") {
-        await login("admin1", "admin123", activeTab);
+        await login("admin1", "pass123", activeTab);
       } else {
-        await login("manager", "master2025", activeTab);
+        await login("biniam", "2004", activeTab);
       }
       onSuccess();
     } finally {
@@ -65,7 +65,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
         description: (
           <div className="text-sm space-y-1">
             <p>Username: teacher1, Password: pass123</p>
-            <p>Username: teacher2, Password: pass234</p>
+            <p>Username: teacher2, Password: pass123</p>
             <p>Username: teacher3, Password: pass345</p>
           </div>
         ),
@@ -75,9 +75,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
       toast.info("Admin login credentials", {
         description: (
           <div className="text-sm space-y-1">
-            <p>Username: admin1, Password: admin123</p>
-            <p>Username: admin2, Password: admin234</p>
-            <p>Username: admin3, Password: admin345</p>
+            <p>Username: admin1, Password: pass123</p>
+            <p>Username: admin2, Password: pass123</p>
+            <p>Username: admin3, Password: pass345</p>
           </div>
         ),
         duration: 10000,
@@ -86,7 +86,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
       toast.info("Manager login credentials", {
         description: (
           <div className="text-sm space-y-1">
-            <p>Username: manager, Password: master2025</p>
+            <p>Username: biniam, Password: 2004</p>
           </div>
         ),
         duration: 10000,
