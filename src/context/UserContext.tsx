@@ -46,14 +46,12 @@ const USERS_STORAGE_KEY = "masterminds_users";
 // Predefined credentials as requested by Master Minds specifications
 const PREDEFINED_CREDENTIALS = [
   { username: "biniam", password: "2004", role: "manager", name: "Biniam Bogale - Master Manager" },
-  { username: "teacher1", password: "111", role: "teacher", name: "Teacher One" },
-  { username: "teacher2", password: "111", role: "teacher", name: "Teacher Two" },
-  { username: "teacher3", password: "111", role: "teacher", name: "Teacher Three" },
-  { username: "teacher4", password: "111", role: "teacher", name: "Teacher Four" },
-  { username: "teacher5", password: "111", role: "teacher", name: "Teacher Five" },
-  { username: "admin1", password: "222", role: "admin", name: "Admin One" },
-  { username: "admin2", password: "222", role: "admin", name: "Admin Two" },
-  { username: "admin3", password: "222", role: "admin", name: "Admin Three" },
+  { username: "teacher1", password: "pass123", role: "teacher", name: "Teacher One" },
+  { username: "teacher2", password: "pass123", role: "teacher", name: "Teacher Two" },
+  { username: "teacher3", password: "pass345", role: "teacher", name: "Teacher Three" },
+  { username: "admin1", password: "pass123", role: "admin", name: "Admin One" },
+  { username: "admin2", password: "pass123", role: "admin", name: "Admin Two" },
+  { username: "admin3", password: "pass345", role: "admin", name: "Admin Three" },
 ];
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
