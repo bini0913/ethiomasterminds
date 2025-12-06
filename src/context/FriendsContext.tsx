@@ -1,9 +1,7 @@
-
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { toast } from "sonner";
 import { useUser, UserProfile } from "@/context/UserContext";
 
-// Types
 export type FriendStatus = "pending" | "accepted" | "declined";
 
 export interface FriendRequest {
@@ -44,6 +42,7 @@ const mockUsers: UserProfile[] = [
   {
     id: "3",
     name: "Alex Johnson",
+    username: "alex",
     email: "alex@example.com",
     role: "student",
     gender: "male",
@@ -56,6 +55,7 @@ const mockUsers: UserProfile[] = [
   {
     id: "4",
     name: "Sarah Williams",
+    username: "sarah",
     email: "sarah@example.com",
     role: "student",
     gender: "female",
@@ -68,6 +68,7 @@ const mockUsers: UserProfile[] = [
   {
     id: "5",
     name: "Michael Brown",
+    username: "michael",
     email: "michael@example.com",
     role: "student",
     gender: "male",
@@ -82,27 +83,19 @@ const mockUsers: UserProfile[] = [
 export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
   const [friends, setFriends] = useState<UserProfile[]>([mockUsers[0]]);
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([
-    {
-      id: "req1",
-      sender: mockUsers[1],
-      receiver: { ...user! },
-      status: "pending",
-      timestamp: new Date(),
-    },
-  ]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "msg1",
       sender: mockUsers[0].id,
-      receiver: user?.id || "",
+      receiver: "user-student1",
       content: "Hey there! How are you doing?",
       read: false,
-      timestamp: new Date(Date.now() - 3600000), // 1 hour ago
+      timestamp: new Date(Date.now() - 3600000),
     },
     {
       id: "msg2",
-      sender: user?.id || "",
+      sender: "user-student1",
       receiver: mockUsers[0].id,
       content: "I'm doing well, thanks! Just finished a quiz.",
       read: true,
@@ -111,10 +104,10 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     {
       id: "msg3",
       sender: mockUsers[0].id,
-      receiver: user?.id || "",
+      receiver: "user-student1",
       content: "That's great! What score did you get?",
       read: false,
-      timestamp: new Date(Date.now() - 1800000), // 30 minutes ago
+      timestamp: new Date(Date.now() - 1800000),
     },
   ]);
 
@@ -122,7 +115,6 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     const targetUser = mockUsers.find(u => u.id === userId);
     if (!targetUser || !user) return;
     
-    // Check if request already exists
     const existingRequest = friendRequests.find(
       req => 
         (req.sender.id === user.id && req.receiver.id === userId) || 
@@ -150,14 +142,12 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     const request = friendRequests.find(req => req.id === requestId);
     if (!request) return;
     
-    // Update request status
     setFriendRequests(prev => 
       prev.map(req => 
         req.id === requestId ? { ...req, status: "accepted" } : req
       )
     );
     
-    // Add to friends list
     if (request.sender.id === user?.id) {
       setFriends(prev => [...prev, request.receiver]);
     } else {
@@ -171,7 +161,6 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     const request = friendRequests.find(req => req.id === requestId);
     if (!request) return;
     
-    // Update request status
     setFriendRequests(prev => 
       prev.map(req => 
         req.id === requestId ? { ...req, status: "declined" } : req

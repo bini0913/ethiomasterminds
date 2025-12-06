@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
-import { toast } from "sonner";
 import { 
   GraduationCap, 
   Users, 
@@ -23,17 +22,14 @@ interface AuthFormProps {
   initialTab?: "student" | "teacher" | "admin" | "manager";
 }
 
-const TEACHER_CODE = "TEACH2025";
-const ADMIN_CODE = "ADMIN2025";
-
 const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }) => {
-  const { login } = useUser();
+  const { login, signup } = useUser();
   const [role, setRole] = useState<"student" | "teacher" | "admin">(
     initialTab === "manager" ? "admin" : initialTab
   );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [specialCode, setSpecialCode] = useState("");
+  const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
@@ -42,36 +38,27 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
     e.preventDefault();
     
     if (!username.trim() || !password.trim()) {
-      toast.error("Please enter username and password");
       return;
     }
 
-    if (role === "teacher" && specialCode !== TEACHER_CODE) {
-      toast.error("Invalid Teacher Code", {
-        description: "Please enter the correct Teacher Code to continue."
-      });
-      return;
-    }
-
-    if (role === "admin" && specialCode !== ADMIN_CODE) {
-      toast.error("Invalid Admin Code", {
-        description: "Please enter the correct Admin Code to continue."
-      });
+    if (isSignup && !name.trim()) {
       return;
     }
 
     setLoading(true);
 
     try {
-      await login(username, password, role);
-      toast.success(`Welcome to Master Minds!`, {
-        description: `Logged in as ${role}`
-      });
-      onSuccess();
-    } catch (error) {
-      toast.error("Login failed", {
-        description: "Please check your credentials"
-      });
+      let success = false;
+      
+      if (isSignup) {
+        success = await signup(username, password, name);
+      } else {
+        success = await login(username, password);
+      }
+      
+      if (success) {
+        onSuccess();
+      }
     } finally {
       setLoading(false);
     }
@@ -100,6 +87,18 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
 
   const config = roleConfig[role];
   const Icon = config.icon;
+
+  // Demo credentials hint
+  const getCredentialsHint = () => {
+    switch (role) {
+      case "student":
+        return "Demo: student1 / pass123";
+      case "teacher":
+        return "Demo: teacher1 / pass123";
+      case "admin":
+        return "Demo: admin1 / pass123";
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -151,7 +150,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
                   <Icon className="h-10 w-10 text-white" />
                 </motion.div>
                 <h1 className="text-2xl font-display font-bold text-white">
-                  {config.title}
+                  {isSignup ? "Create Account" : config.title}
                 </h1>
                 <p className="text-white/80 text-sm mt-1">{config.description}</p>
               </div>
@@ -180,6 +179,34 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {/* Name (signup only) */}
+              <AnimatePresence mode="wait">
+                {isSignup && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-2 overflow-hidden"
+                  >
+                    <Label htmlFor="name" className="text-foreground/80 font-medium">
+                      Full Name
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <Input
+                        id="name"
+                        type="text"
+                        placeholder="Enter your full name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="pl-10 h-12 bg-muted/50 border-border/50 rounded-xl focus:border-primary focus:ring-primary"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Username */}
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-foreground/80 font-medium">
@@ -223,36 +250,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
                 </div>
               </div>
 
-              {/* Special Code for Teacher/Admin */}
-              <AnimatePresence mode="wait">
-                {(role === "teacher" || role === "admin") && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-2 overflow-hidden"
-                  >
-                    <Label htmlFor="code" className="text-foreground/80 font-medium">
-                      {role === "teacher" ? "Teacher Code" : "Admin Code"}
-                    </Label>
-                    <div className="relative">
-                      <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input
-                        id="code"
-                        type="password"
-                        placeholder={`Enter ${role} code`}
-                        value={specialCode}
-                        onChange={(e) => setSpecialCode(e.target.value)}
-                        className="pl-10 h-12 bg-muted/50 border-border/50 rounded-xl focus:border-primary focus:ring-primary"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      * Required for {role} access
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* Demo credentials hint */}
+              {!isSignup && (
+                <div className="text-center text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg">
+                  {getCredentialsHint()}
+                </div>
+              )}
 
               {/* Submit Button */}
               <Button
@@ -274,16 +277,18 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
                 )}
               </Button>
 
-              {/* Toggle Signup/Login */}
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsSignup(!isSignup)}
-                  className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                >
-                  {isSignup ? "Already have an account? Login" : "Don't have an account? Sign up"}
-                </button>
-              </div>
+              {/* Toggle Signup/Login - only for students */}
+              {role === "student" && (
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSignup(!isSignup)}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {isSignup ? "Already have an account? Login" : "Don't have an account? Sign up"}
+                  </button>
+                </div>
+              )}
             </form>
 
             {/* Footer */}

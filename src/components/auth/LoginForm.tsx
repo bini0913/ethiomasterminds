@@ -1,12 +1,7 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/context/UserContext";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
 
 interface LoginFormProps {
   onSuccess: () => void;
@@ -16,81 +11,26 @@ interface LoginFormProps {
 const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student" }) => {
   const { login } = useUser();
   const [activeTab, setActiveTab] = useState<"student" | "teacher" | "admin" | "manager">(initialTab);
-  
-  // Student login fields
-  const [studentEmail, setStudentEmail] = useState("");
-  const [studentPassword, setStudentPassword] = useState("");
-  
-  // Teacher/admin/manager login fields
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  
   const [loading, setLoading] = useState(false);
   
-  const handleStudentLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (username: string, password: string) => {
     setLoading(true);
-    
     try {
-      // For now, allow login without credentials
-      await login("student@demo.com", "demo123", "student");
-      onSuccess();
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleStaffLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    try {
-      // For now, allow login without credentials - use demo accounts
-      if (activeTab === "teacher") {
-        await login("teacher1", "pass123", activeTab);
-      } else if (activeTab === "admin") {
-        await login("admin1", "pass123", activeTab);
-      } else {
-        await login("biniam", "2004", activeTab);
+      const success = await login(username, password);
+      if (success) {
+        onSuccess();
       }
-      onSuccess();
     } finally {
       setLoading(false);
     }
   };
-  
-  const handleShowCredentials = () => {
-    if (activeTab === "teacher") {
-      toast.info("Teacher login credentials", {
-        description: (
-          <div className="text-sm space-y-1">
-            <p>Username: teacher1, Password: pass123</p>
-            <p>Username: teacher2, Password: pass123</p>
-            <p>Username: teacher3, Password: pass345</p>
-          </div>
-        ),
-        duration: 10000,
-      });
-    } else if (activeTab === "admin") {
-      toast.info("Admin login credentials", {
-        description: (
-          <div className="text-sm space-y-1">
-            <p>Username: admin1, Password: pass123</p>
-            <p>Username: admin2, Password: pass123</p>
-            <p>Username: admin3, Password: pass345</p>
-          </div>
-        ),
-        duration: 10000,
-      });
-    } else if (activeTab === "manager") {
-      toast.info("Manager login credentials", {
-        description: (
-          <div className="text-sm space-y-1">
-            <p>Username: biniam, Password: 2004</p>
-          </div>
-        ),
-        duration: 10000,
-      });
+
+  const getCredentials = () => {
+    switch (activeTab) {
+      case "student": return { username: "student1", password: "pass123" };
+      case "teacher": return { username: "teacher1", password: "pass123" };
+      case "admin": return { username: "admin1", password: "pass123" };
+      case "manager": return { username: "biniam", password: "2004" };
     }
   };
   
@@ -106,82 +46,39 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
         <p className="opacity-90">Learn. Challenge. Grow.</p>
       </div>
       
-      <Tabs 
-        defaultValue={activeTab} 
-        onValueChange={(value) => setActiveTab(value as "student" | "teacher" | "admin" | "manager")}
-        className="p-6"
-      >
-        <TabsList className="grid grid-cols-4 mb-6">
-          <TabsTrigger value="student">Student</TabsTrigger>
-          <TabsTrigger value="teacher">Teacher</TabsTrigger>
-          <TabsTrigger value="admin">Admin</TabsTrigger>
-          <TabsTrigger value="manager">Manager</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="student">
-          <form onSubmit={handleStudentLogin} className="space-y-4">
-            <div className="text-center py-6">
-              <p className="text-gray-600 mb-4">Click below to enter as a student</p>
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full bg-primary hover:bg-primary-dark"
-              disabled={loading}
+      <div className="p-6">
+        <div className="grid grid-cols-4 mb-6 gap-1">
+          {(["student", "teacher", "admin", "manager"] as const).map((tab) => (
+            <Button
+              key={tab}
+              variant={activeTab === tab ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveTab(tab)}
+              className="capitalize"
             >
-              {loading ? "Logging in..." : "Enter as Student"}
+              {tab}
             </Button>
-          </form>
-        </TabsContent>
+          ))}
+        </div>
         
-        <TabsContent value="teacher">
-          <form onSubmit={handleStaffLogin} className="space-y-4">
-            <div className="text-center py-6">
-              <p className="text-gray-600 mb-4">Click below to enter as a teacher</p>
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full bg-primary hover:bg-primary-dark"
-              disabled={loading}
-            >
-              {loading ? "Logging in..." : "Enter as Teacher"}
-            </Button>
-          </form>
-        </TabsContent>
+        <div className="text-center py-6">
+          <p className="text-gray-600 mb-4">Click below to enter as {activeTab}</p>
+          <p className="text-xs text-gray-400 mb-2">
+            Demo: {getCredentials().username} / {getCredentials().password}
+          </p>
+        </div>
         
-        <TabsContent value="admin">
-          <form onSubmit={handleStaffLogin} className="space-y-4">
-            <div className="text-center py-6">
-              <p className="text-gray-600 mb-4">Click below to enter as an admin</p>
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full bg-purple-600 hover:bg-purple-700"
-              disabled={loading}
-            >
-              {loading ? "Logging in..." : "Enter as Admin"}
-            </Button>
-          </form>
-        </TabsContent>
-        
-        <TabsContent value="manager">
-          <form onSubmit={handleStaffLogin} className="space-y-4">
-            <div className="text-center py-6">
-              <p className="text-gray-600 mb-4">Click below to enter as a manager</p>
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full bg-red-600 hover:bg-red-700 text-white"
-              disabled={loading}
-            >
-              {loading ? "Logging in..." : "Enter as Manager"}
-            </Button>
-          </form>
-        </TabsContent>
-      </Tabs>
+        <Button 
+          onClick={() => {
+            const creds = getCredentials();
+            handleLogin(creds.username, creds.password);
+          }}
+          className="w-full bg-primary hover:bg-primary/90"
+          disabled={loading}
+        >
+          {loading ? "Logging in..." : `Enter as ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
+        </Button>
+      </div>
     </motion.div>
   );
 };
