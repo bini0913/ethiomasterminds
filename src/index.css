@@ -1,3 +1,6 @@
+@import url("https://fonts.googleapis.com/css2?family=Raleway&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Crimson+Pro&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Mono&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,24 +12,24 @@
     --foreground: 240 10% 3.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 180 11.1111% 3.5294%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
 
     /* Enhanced Primary - Purple/Blue gradient feel */
-    --primary: 262 83% 58%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 220 83.1776% 58.0392%;
+    --primary-foreground: 204 45.4545% 97.8431%;
     --primary-glow: 280 100% 70%;
 
     /* Enhanced Secondary - Complementary colors */
-    --secondary: 200 98% 39%;
+    --secondary: 156 97.9798% 38.8235%;
     --secondary-foreground: 0 0% 98%;
 
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 45%;
 
-    --accent: 240 4.8% 95.9%;
+    --accent: 0 0% 96.0784%;
     --accent-foreground: 240 5.9% 10%;
 
     --destructive: 0 84.2% 60.2%;
@@ -34,16 +37,16 @@
 
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 262 83% 58%;
+    --ring: 265 81.9095% 39.0196%;
 
     /* Enhanced Design Elements */
     --radius: 0.75rem;
-    
+
     /* Brand Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
     --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(200 100% 70%));
     --gradient-accent: linear-gradient(45deg, hsl(var(--primary)), hsl(var(--secondary)));
-    
+
     /* Enhanced Shadows */
     --shadow-primary: 0 10px 30px -10px hsl(var(--primary) / 0.3);
     --shadow-secondary: 0 4px 20px -2px hsl(var(--secondary) / 0.25);
@@ -64,6 +67,12 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --font-sans: Raleway, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+
+    --font-serif: "Crimson Pro", ui-serif, Georgia, Cambria, Times New Roman, Times, serif;
+
+    --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   }
 
   .dark {
@@ -102,6 +111,9 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --font-sans: Raleway, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+    --font-serif: "Crimson Pro", ui-serif, Georgia, Cambria, Times New Roman, Times, serif;
+    --font-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   }
 }
 
