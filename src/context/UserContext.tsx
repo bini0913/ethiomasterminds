@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { User, Session } from "@supabase/supabase-js";
 
 // Types
 export type UserRole = "student" | "teacher" | "admin" | "manager";
@@ -8,7 +10,7 @@ export type UserProfile = {
   id: string;
   name: string;
   email?: string;
-  username: string;
+  username?: string;
   role: UserRole;
   gender?: string;
   grade?: string;
@@ -22,215 +24,258 @@ export type UserProfile = {
 
 interface UserContextType {
   user: UserProfile | null;
+  session: Session | null;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
-  signup: (username: string, password: string, name: string) => Promise<boolean>;
-  logout: () => void;
-  updateProfile: (profileData: Partial<UserProfile>) => void;
-  addXP: (amount: number) => void;
-  deleteAccount: () => void;
-  getAllUsers: () => Array<Omit<UserProfile, 'password'>>;
-  deleteUserById: (id: string) => void;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  signup: (email: string, password: string, name: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  updateProfile: (profileData: Partial<UserProfile>) => Promise<void>;
+  addXP: (amount: number) => Promise<void>;
+  deleteAccount: () => Promise<void>;
+  getAllUsers: () => Promise<Array<Omit<UserProfile, 'password'>>>;
+  deleteUserById: (id: string) => Promise<void>;
   showLevelUp: boolean;
   setShowLevelUp: (show: boolean) => void;
   previousLevel: number;
+  refreshProfile: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-const USER_STORAGE_KEY = "masterminds_user";
-const USERS_STORAGE_KEY = "masterminds_users";
-
-// Test accounts - username/password only, no codes required
-const TEST_ACCOUNTS = [
-  { username: "student1", password: "pass123", role: "student" as UserRole, name: "Student One" },
-  { username: "teacher1", password: "pass123", role: "teacher" as UserRole, name: "Teacher One" },
-  { username: "teacher2", password: "pass123", role: "teacher" as UserRole, name: "Teacher Two" },
-  { username: "admin1", password: "pass123", role: "admin" as UserRole, name: "Admin One" },
-  { username: "admin2", password: "pass123", role: "admin" as UserRole, name: "Admin Two" },
-  { username: "biniam", password: "2004", role: "manager" as UserRole, name: "Biniam Bogale - Master Manager" },
-];
-
-// Simple hash function for demo purposes
-const hashPassword = async (password: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-};
-
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [showLevelUp, setShowLevelUp] = useState<boolean>(false);
   const [previousLevel, setPreviousLevel] = useState<number>(1);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Initialize test accounts
-  useEffect(() => {
-    const initializeAccounts = async () => {
-      const usersStr = localStorage.getItem(USERS_STORAGE_KEY);
-      let users: Array<any> = usersStr ? JSON.parse(usersStr) : [];
-      
-      // Add test accounts if they don't exist
-      for (const account of TEST_ACCOUNTS) {
-        const exists = users.some(u => u.username === account.username);
-        if (!exists) {
-          const hashedPassword = await hashPassword(account.password);
-          users.push({
-            id: `user-${account.username}-${Date.now()}`,
-            username: account.username,
-            password: hashedPassword,
-            name: account.name,
-            role: account.role,
-            xp: 0,
-            level: 1,
-            avatar: "avatar-1",
-            grade: account.role === "student" ? "5" : undefined,
-            gender: "other",
-            educationLevel: "primary"
-          });
-        }
-      }
-      
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-      setIsInitialized(true);
-    };
-
-    initializeAccounts();
-  }, []);
-
-  // Load user from localStorage on mount
-  useEffect(() => {
-    const storedUser = localStorage.getItem(USER_STORAGE_KEY);
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error("Failed to parse stored user data:", error);
-      }
-    }
-  }, []);
-
-  // Save user to localStorage when it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(USER_STORAGE_KEY);
-    }
-  }, [user]);
 
   const calculateLevel = (xp: number) => {
     return Math.floor(xp / 100) + 1;
   };
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  // Fetch user profile and role from database
+  const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
-      if (!username.trim() || !password.trim()) {
-        toast.error("Please enter both username and password");
+      // Fetch profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        return null;
+      }
+
+      // Fetch role using the secure function
+      const { data: roleData, error: roleError } = await supabase
+        .rpc('get_user_role', { _user_id: userId });
+
+      if (roleError) {
+        console.error('Error fetching role:', roleError);
+      }
+
+      const role = (roleData as UserRole) || 'student';
+
+      return {
+        id: profile.id,
+        name: profile.name,
+        username: profile.username || undefined,
+        email: session?.user?.email,
+        role,
+        gender: profile.gender || undefined,
+        grade: profile.grade || undefined,
+        educationLevel: profile.education_level || undefined,
+        xp: profile.xp || 0,
+        level: profile.level || 1,
+        avatar: profile.avatar || 'avatar-1',
+        rank: profile.rank || undefined,
+        badges: profile.badges || [],
+      };
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      return null;
+    }
+  };
+
+  // Set up auth state listener
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        setSession(newSession);
+        
+        if (newSession?.user) {
+          // Use setTimeout to prevent deadlock
+          setTimeout(() => {
+            fetchUserProfile(newSession.user.id).then(profile => {
+              setUser(profile);
+              setIsLoading(false);
+            });
+          }, 0);
+        } else {
+          setUser(null);
+          setIsLoading(false);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      setSession(existingSession);
+      if (existingSession?.user) {
+        fetchUserProfile(existingSession.user.id).then(profile => {
+          setUser(profile);
+          setIsLoading(false);
+        });
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const refreshProfile = async () => {
+    if (session?.user) {
+      const profile = await fetchUserProfile(session.user.id);
+      setUser(profile);
+    }
+  };
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      if (!email.trim() || !password.trim()) {
+        toast.error("Please enter both email and password");
         return false;
       }
 
-      const hashedPassword = await hashPassword(password);
-      const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-      const users: Array<any> = JSON.parse(usersStr);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim(),
+      });
 
-      const foundUser = users.find(u => 
-        u.username?.toLowerCase() === username.toLowerCase() && 
-        u.password === hashedPassword
-      );
+      if (error) {
+        console.error('Login error:', error);
+        toast.error(error.message || "Invalid email or password");
+        return false;
+      }
 
-      if (foundUser) {
-        const { password: _, ...userWithoutPassword } = foundUser;
-        setUser(userWithoutPassword);
-        toast.success(`Welcome back, ${foundUser.name}!`, {
-          description: `Logged in as ${foundUser.role}`
-        });
+      if (data.user) {
+        toast.success(`Welcome back!`);
         return true;
       }
 
-      toast.error("Invalid username or password", {
-        description: "Please check your credentials and try again"
-      });
       return false;
     } catch (error) {
+      console.error('Login error:', error);
       toast.error("Login failed. Please try again.");
-      console.error("Login error:", error);
       return false;
     }
   };
 
-  const signup = async (username: string, password: string, name: string): Promise<boolean> => {
+  const signup = async (email: string, password: string, name: string): Promise<boolean> => {
     try {
-      if (!username.trim() || !password.trim() || !name.trim()) {
+      if (!email.trim() || !password.trim() || !name.trim()) {
         toast.error("Please fill all required fields");
         return false;
       }
 
-      const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-      const users: Array<any> = JSON.parse(usersStr);
-
-      if (users.some(u => u.username?.toLowerCase() === username.toLowerCase())) {
-        toast.error("Username already exists");
+      if (password.length < 6) {
+        toast.error("Password must be at least 6 characters");
         return false;
       }
 
-      const hashedPassword = await hashPassword(password);
-      
-      const newUser = {
-        id: `user-${Date.now()}`,
-        name,
-        username,
-        password: hashedPassword,
-        role: "student" as UserRole,
-        xp: 0,
-        level: 1,
-        avatar: "avatar-1",
-      };
+      const redirectUrl = `${window.location.origin}/`;
 
-      users.push(newUser);
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password.trim(),
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            name: name.trim(),
+            username: email.split('@')[0],
+          }
+        }
+      });
 
-      const { password: _, ...userWithoutPassword } = newUser;
-      setUser(userWithoutPassword);
-      toast.success("Account created successfully!");
-      return true;
+      if (error) {
+        console.error('Signup error:', error);
+        if (error.message.includes('already registered')) {
+          toast.error("This email is already registered. Please log in instead.");
+        } else {
+          toast.error(error.message || "Signup failed");
+        }
+        return false;
+      }
+
+      if (data.user) {
+        toast.success("Account created successfully!");
+        return true;
+      }
+
+      return false;
     } catch (error) {
+      console.error('Signup error:', error);
       toast.error("Signup failed. Please try again.");
-      console.error("Signup error:", error);
       return false;
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    toast.info("Logged out successfully");
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+      toast.info("Logged out successfully");
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error("Logout failed");
+    }
   };
 
-  const updateProfile = (profileData: Partial<UserProfile>) => {
-    if (!user) return;
+  const updateProfile = async (profileData: Partial<UserProfile>) => {
+    if (!user || !session?.user) return;
 
-    const updatedUser = { ...user, ...profileData };
-    setUser(updatedUser);
+    try {
+      const updateData: Record<string, unknown> = {};
+      
+      if (profileData.name !== undefined) updateData.name = profileData.name;
+      if (profileData.username !== undefined) updateData.username = profileData.username;
+      if (profileData.gender !== undefined) updateData.gender = profileData.gender;
+      if (profileData.grade !== undefined) updateData.grade = profileData.grade;
+      if (profileData.educationLevel !== undefined) updateData.education_level = profileData.educationLevel;
+      if (profileData.xp !== undefined) updateData.xp = profileData.xp;
+      if (profileData.level !== undefined) updateData.level = profileData.level;
+      if (profileData.avatar !== undefined) updateData.avatar = profileData.avatar;
+      if (profileData.rank !== undefined) updateData.rank = profileData.rank;
+      if (profileData.badges !== undefined) updateData.badges = profileData.badges;
 
-    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-    const users: Array<any> = JSON.parse(usersStr);
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', session.user.id);
 
-    const updatedUsers = users.map(u => {
-      if (u.id === user.id) {
-        return { ...u, ...profileData };
+      if (error) {
+        console.error('Update profile error:', error);
+        toast.error("Failed to update profile");
+        return;
       }
-      return u;
-    });
 
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
-    toast.success("Profile updated successfully!");
+      // Update local state
+      setUser(prev => prev ? { ...prev, ...profileData } : null);
+      toast.success("Profile updated successfully!");
+    } catch (error) {
+      console.error('Update profile error:', error);
+      toast.error("Failed to update profile");
+    }
   };
 
-  const addXP = (amount: number) => {
-    if (!user) return;
+  const addXP = async (amount: number) => {
+    if (!user || !session?.user) return;
 
     const newXP = user.xp + amount;
     const newLevel = calculateLevel(newXP);
@@ -242,53 +287,110 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }, 500);
     }
 
-    const updatedUser = { ...user, xp: newXP, level: newLevel };
-    updateProfile(updatedUser);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ xp: newXP, level: newLevel })
+        .eq('id', session.user.id);
 
-    if (newLevel <= user.level) {
-      toast.success(`+${amount} XP gained!`);
+      if (error) {
+        console.error('Add XP error:', error);
+        return;
+      }
+
+      setUser(prev => prev ? { ...prev, xp: newXP, level: newLevel } : null);
+
+      if (newLevel <= user.level) {
+        toast.success(`+${amount} XP gained!`);
+      }
+    } catch (error) {
+      console.error('Add XP error:', error);
     }
   };
 
-  const deleteAccount = () => {
-    if (!user) return;
+  const deleteAccount = async () => {
+    if (!session?.user) return;
 
-    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-    const users: Array<any> = JSON.parse(usersStr);
-
-    const updatedUsers = users.filter(u => u.id !== user.id);
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
-
-    setUser(null);
-    toast.success("Your account has been deleted");
+    try {
+      // Note: Full account deletion requires admin privileges
+      // For now, we sign out the user
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+      toast.success("You have been logged out. Contact support to fully delete your account.");
+    } catch (error) {
+      console.error('Delete account error:', error);
+      toast.error("Failed to delete account");
+    }
   };
 
-  const getAllUsers = () => {
-    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-    const users: Array<any> = JSON.parse(usersStr);
-    return users.map(({ password, ...user }) => user);
+  const getAllUsers = async (): Promise<Array<Omit<UserProfile, 'password'>>> => {
+    if (!user || (user.role !== 'admin' && user.role !== 'manager')) {
+      return [];
+    }
+
+    try {
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*');
+
+      if (error) {
+        console.error('Get all users error:', error);
+        return [];
+      }
+
+      // Fetch roles for all users
+      const usersWithRoles = await Promise.all(
+        (profiles || []).map(async (profile) => {
+          const { data: roleData } = await supabase
+            .rpc('get_user_role', { _user_id: profile.id });
+
+          return {
+            id: profile.id,
+            name: profile.name,
+            username: profile.username || undefined,
+            role: (roleData as UserRole) || 'student',
+            gender: profile.gender || undefined,
+            grade: profile.grade || undefined,
+            educationLevel: profile.education_level || undefined,
+            xp: profile.xp || 0,
+            level: profile.level || 1,
+            avatar: profile.avatar || 'avatar-1',
+            rank: profile.rank || undefined,
+            badges: profile.badges || [],
+          };
+        })
+      );
+
+      return usersWithRoles;
+    } catch (error) {
+      console.error('Get all users error:', error);
+      return [];
+    }
   };
 
-  const deleteUserById = (id: string) => {
-    const usersStr = localStorage.getItem(USERS_STORAGE_KEY) || "[]";
-    const users: Array<any> = JSON.parse(usersStr);
-
-    if (user?.id === id) {
-      deleteAccount();
+  const deleteUserById = async (id: string) => {
+    if (!user || (user.role !== 'admin' && user.role !== 'manager')) {
+      toast.error("You don't have permission to delete users");
       return;
     }
 
-    const updatedUsers = users.filter(u => u.id !== id);
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
+    if (user.id === id) {
+      await deleteAccount();
+      return;
+    }
 
-    toast.success("User account deleted successfully");
+    // Note: Deleting other users requires admin API access
+    toast.info("User deletion requires admin privileges. Contact system administrator.");
   };
 
   return (
     <UserContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        session,
+        isAuthenticated: !!session?.user,
+        isLoading,
         login,
         signup,
         logout,
@@ -299,7 +401,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         deleteUserById,
         showLevelUp,
         setShowLevelUp,
-        previousLevel
+        previousLevel,
+        refreshProfile,
       }}
     >
       {children}

@@ -37,6 +37,7 @@ const AdminDashboard: React.FC = () => {
   const { user, logout, getAllUsers, deleteUserById } = useUser();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [allUsers, setAllUsers] = useState<Array<{ id: string; name: string; username?: string; role: string; level: number }>>([]);
 
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([
     { id: '1', type: 'question', title: "What planet is closest to the sun?", teacher: "Teacher One", subject: "Science", submittedAt: new Date() },
@@ -46,14 +47,14 @@ const AdminDashboard: React.FC = () => {
 
   const [generatedCodes, setGeneratedCodes] = useState<Array<{ code: string; type: string; createdAt: Date }>>([]);
 
+  // Fetch users on mount
   React.useEffect(() => {
-    if (user && user.role !== "admin" && user.role !== "manager") {
-      toast.error("Access denied - Admin account required");
-      navigate("/");
-    }
-  }, [user, navigate]);
-
-  const allUsers = getAllUsers();
+    const fetchUsers = async () => {
+      const users = await getAllUsers();
+      setAllUsers(users);
+    };
+    fetchUsers();
+  }, [getAllUsers]);
   
   const stats = [
     { label: "Total Users", value: allUsers.length, icon: Users, color: "from-primary to-accent" },
