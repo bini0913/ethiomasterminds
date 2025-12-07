@@ -36,68 +36,71 @@ const Leaderboard: React.FC = () => {
   };
   
   useEffect(() => {
-    // Get all users from the system
-    const users = getAllUsers();
-    
-    // Transform users to leaderboard entries
-    const entries: LeaderboardEntry[] = users
-      .filter(u => u.xp !== undefined) // Filter out users without XP
-      .map(u => ({
-        id: u.id,
-        name: u.name,
-        avatar: u.avatar || "👤",
-        level: u.level || 1,
-        xp: u.xp || 0,
-        rank: 0, // Will be calculated after sorting
-        score: calculateScore(u.xp || 0, u.level || 1),
-        role: u.role,
-        lastActive: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)) // Random activity in the last week
-      }))
-      // Sort by score descending
-      .sort((a, b) => b.score - a.score);
-    
-    // Filter by time frame if needed
-    let filteredEntries = [...entries];
-    
-    if (timeFrame === "day") {
-      const oneDayAgo = new Date();
-      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-      filteredEntries = entries.filter(entry => entry.lastActive >= oneDayAgo);
-    } else if (timeFrame === "week") {
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      filteredEntries = entries.filter(entry => entry.lastActive >= oneWeekAgo);
-    } else if (timeFrame === "month") {
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-      filteredEntries = entries.filter(entry => entry.lastActive >= oneMonthAgo);
-    }
-    
-    // Assign ranks
-    filteredEntries.forEach((entry, index) => {
-      entry.rank = index + 1;
+    const fetchUsers = async () => {
+      // Get all users from the system
+      const users = await getAllUsers();
       
-      // Find current user's rank
-      if (user && entry.id === user.id) {
-        setUserRank(index + 1);
+      // Transform users to leaderboard entries
+      const entries: LeaderboardEntry[] = users
+        .filter(u => u.xp !== undefined) // Filter out users without XP
+        .map(u => ({
+          id: u.id,
+          name: u.name,
+          avatar: u.avatar || "👤",
+          level: u.level || 1,
+          xp: u.xp || 0,
+          rank: 0, // Will be calculated after sorting
+          score: calculateScore(u.xp || 0, u.level || 1),
+          role: u.role,
+          lastActive: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)) // Random activity in the last week
+        }))
+        // Sort by score descending
+        .sort((a, b) => b.score - a.score);
+      
+      // Filter by time frame if needed
+      let filteredEntries = [...entries];
+      
+      if (timeFrame === "day") {
+        const oneDayAgo = new Date();
+        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+        filteredEntries = entries.filter(entry => entry.lastActive >= oneDayAgo);
+      } else if (timeFrame === "week") {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        filteredEntries = entries.filter(entry => entry.lastActive >= oneWeekAgo);
+      } else if (timeFrame === "month") {
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        filteredEntries = entries.filter(entry => entry.lastActive >= oneMonthAgo);
       }
-    });
-    
-    setLeaderboard(filteredEntries);
-    
-    // Calculate simulated active users based on time of day
-    const hour = new Date().getHours();
-    let baseActiveUsers = 15; // Base number
-    
-    // More users during peak hours (8am-10pm)
-    if (hour >= 8 && hour <= 22) {
-      baseActiveUsers = 25 + Math.floor(Math.random() * 15);
-    } else {
-      baseActiveUsers = 5 + Math.floor(Math.random() * 10);
-    }
-    
-    setActiveUsers(baseActiveUsers);
-    
+      
+      // Assign ranks
+      filteredEntries.forEach((entry, index) => {
+        entry.rank = index + 1;
+        
+        // Find current user's rank
+        if (user && entry.id === user.id) {
+          setUserRank(index + 1);
+        }
+      });
+      
+      setLeaderboard(filteredEntries);
+      
+      // Calculate simulated active users based on time of day
+      const hour = new Date().getHours();
+      let baseActiveUsers = 15; // Base number
+      
+      // More users during peak hours (8am-10pm)
+      if (hour >= 8 && hour <= 22) {
+        baseActiveUsers = 25 + Math.floor(Math.random() * 15);
+      } else {
+        baseActiveUsers = 5 + Math.floor(Math.random() * 10);
+      }
+      
+      setActiveUsers(baseActiveUsers);
+    };
+
+    fetchUsers();
   }, [user, timeFrame, getAllUsers]);
 
   return (

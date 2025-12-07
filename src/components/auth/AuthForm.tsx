@@ -13,7 +13,8 @@ import {
   ArrowLeft,
   Sparkles,
   Lock,
-  User
+  User,
+  Mail
 } from "lucide-react";
 import AnimatedBackground from "@/components/ui/AnimatedBackground";
 
@@ -23,11 +24,11 @@ interface AuthFormProps {
 }
 
 const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }) => {
-  const { login, signup } = useUser();
+  const { login, signup, isLoading: authLoading } = useUser();
   const [role, setRole] = useState<"student" | "teacher" | "admin">(
     initialTab === "manager" ? "admin" : initialTab
   );
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -37,7 +38,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!username.trim() || !password.trim()) {
+    if (!email.trim() || !password.trim()) {
       return;
     }
 
@@ -51,9 +52,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
       let success = false;
       
       if (isSignup) {
-        success = await signup(username, password, name);
+        success = await signup(email, password, name);
       } else {
-        success = await login(username, password);
+        success = await login(email, password);
       }
       
       if (success) {
@@ -87,18 +88,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
 
   const config = roleConfig[role];
   const Icon = config.icon;
-
-  // Demo credentials hint
-  const getCredentialsHint = () => {
-    switch (role) {
-      case "student":
-        return "Demo: student1 / pass123";
-      case "teacher":
-        return "Demo: teacher1 / pass123";
-      case "admin":
-        return "Demo: admin1 / pass123";
-    }
-  };
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -207,19 +196,19 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
                 )}
               </AnimatePresence>
 
-              {/* Username */}
+              {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-foreground/80 font-medium">
-                  Username
+                <Label htmlFor="email" className="text-foreground/80 font-medium">
+                  Email
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="pl-10 h-12 bg-muted/50 border-border/50 rounded-xl focus:border-primary focus:ring-primary"
                   />
                 </div>
@@ -248,22 +237,18 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
+                {isSignup && (
+                  <p className="text-xs text-muted-foreground">Password must be at least 6 characters</p>
+                )}
               </div>
-
-              {/* Demo credentials hint */}
-              {!isSignup && (
-                <div className="text-center text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg">
-                  {getCredentialsHint()}
-                </div>
-              )}
 
               {/* Submit Button */}
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || authLoading}
                 className={`w-full h-14 text-lg font-display font-bold bg-gradient-to-r ${config.gradient} bg-[length:200%_100%] hover:bg-[position:100%_0] transition-all duration-500 rounded-xl shadow-lg`}
               >
-                {loading ? (
+                {loading || authLoading ? (
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -277,18 +262,16 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
                 )}
               </Button>
 
-              {/* Toggle Signup/Login - only for students */}
-              {role === "student" && (
-                <div className="text-center pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsSignup(!isSignup)}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {isSignup ? "Already have an account? Login" : "Don't have an account? Sign up"}
-                  </button>
-                </div>
-              )}
+              {/* Toggle Signup/Login */}
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSignup(!isSignup)}
+                  className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {isSignup ? "Already have an account? Login" : "Don't have an account? Sign up"}
+                </button>
+              </div>
             </form>
 
             {/* Footer */}

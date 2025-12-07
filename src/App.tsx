@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +16,7 @@ import TeacherDashboard from "./pages/TeacherDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
 import { AIHelperProvider } from "./context/AIHelperContext";
@@ -52,10 +52,31 @@ const App = () => (
                     <Route path="/leaderboard" element={<Leaderboard />} />
                     <Route path="/friends" element={<Friends />} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="/teacher" element={<TeacherDashboard />} />
-                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route 
+                      path="/teacher" 
+                      element={
+                        <ProtectedRoute allowedRoles={['teacher', 'admin', 'manager']}>
+                          <TeacherDashboard />
+                        </ProtectedRoute>
+                      } 
+                    />
+                    <Route 
+                      path="/admin" 
+                      element={
+                        <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                          <AdminDashboard />
+                        </ProtectedRoute>
+                      } 
+                    />
                     <Route path="/student-dashboard" element={<StudentDashboard />} />
-                    <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+                    <Route 
+                      path="/manager-dashboard" 
+                      element={
+                        <ProtectedRoute allowedRoles={['manager']}>
+                          <ManagerDashboard />
+                        </ProtectedRoute>
+                      } 
+                    />
                     <Route path="/store" element={<div>Avatar Store Coming Soon</div>} />
                     <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
