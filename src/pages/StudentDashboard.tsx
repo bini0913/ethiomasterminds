@@ -25,7 +25,8 @@ import {
   Flame,
   MessageCircle,
   Settings,
-  LogOut
+  LogOut,
+  Sparkles
 } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import CurrencyDisplay from '@/components/currency/CurrencyDisplay';
@@ -200,12 +201,13 @@ const StudentDashboard: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {[
                     { icon: BookOpen, label: "Start Quiz", path: "/quiz", gradient: "from-primary to-accent" },
                     { icon: Users, label: "Multiplayer", path: "/multiplayer", gradient: "from-secondary to-glow-cyan" },
                     { icon: Trophy, label: "Tournaments", path: "/tournaments", gradient: "from-accent to-glow-pink" },
-                    { icon: TrendingUp, label: "Leaderboard", path: "/leaderboard", gradient: "from-glow-yellow to-orange-500" }
+                    { icon: TrendingUp, label: "Leaderboard", path: "/leaderboard", gradient: "from-glow-yellow to-orange-500" },
+                    { icon: MessageCircle, label: "Chat", path: "/friends", gradient: "from-pink-500 to-rose-500" }
                   ].map((action, i) => (
                     <motion.div key={i} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                       <Button
