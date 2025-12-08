@@ -29,7 +29,8 @@ const VoiceAnswerInput: React.FC<VoiceAnswerInputProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<{ isCorrect: boolean; matchedOption: string } | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
