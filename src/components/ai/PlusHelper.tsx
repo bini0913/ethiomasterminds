@@ -86,7 +86,7 @@ const PlusHelper: React.FC<PlusHelperProps> = ({ isOpen, onClose, context }) => 
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
 
-      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+      recognitionRef.current.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         setInput(transcript);
         setIsListening(false);

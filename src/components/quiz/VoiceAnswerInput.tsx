@@ -39,7 +39,7 @@ const VoiceAnswerInput: React.FC<VoiceAnswerInputProps> = ({
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
 
-      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+      recognitionRef.current.onresult = (event) => {
         const current = event.resultIndex;
         const result = event.results[current];
         const transcriptText = result[0].transcript;
