@@ -1,9 +1,8 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
-import { ChevronLeft, Languages, Volume2, Bell } from "lucide-react";
+import { ChevronLeft, Languages, Volume2, Bell, UserCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -45,6 +44,15 @@ const Settings: React.FC = () => {
             </Button>
             <h1 className="text-2xl font-bold text-white">{t("settings")}</h1>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/enhanced-settings")}
+            className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
+          >
+            <UserCircle className="h-4 w-4 mr-2" />
+            Avatar Editor
+          </Button>
         </div>
       </header>
 

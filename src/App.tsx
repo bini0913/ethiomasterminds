@@ -11,6 +11,7 @@ import Lobby from "./pages/Lobby";
 import Leaderboard from "./pages/Leaderboard";
 import Friends from "./pages/Friends";
 import Settings from "./pages/Settings";
+import EnhancedSettings from "./pages/EnhancedSettings";
 import NotFound from "./pages/NotFound";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -26,6 +27,7 @@ import { CurrencyProvider } from "./context/CurrencyContext";
 import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
 import AIHelper from "./components/ai/AIHelper";
+import PlusButton from "./components/ai/PlusButton";
 
 const queryClient = new QueryClient();
 
@@ -79,10 +81,12 @@ const App = () => (
                     />
                     <Route path="/store" element={<div>Avatar Store Coming Soon</div>} />
                     <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
+                    <Route path="/enhanced-settings" element={<EnhancedSettings />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                   <AIHelper />
+                  <PlusButton />
                 </BrowserRouter>
                     </TooltipProvider>
                   </FriendsProvider>

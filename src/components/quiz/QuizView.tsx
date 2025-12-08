@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +7,10 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import GainXPButton from "../profile/GainXPButton";
 import QuestionCard from "./QuestionCard";
+import VoiceAnswerInput from "./VoiceAnswerInput";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Mic } from "lucide-react";
 
 interface QuizViewProps {
   quiz: Quiz;
@@ -26,6 +29,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const [userAnswers, setUserAnswers] = useState<{[key: string]: string}>({});
   const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
   const [answeredCorrectly, setAnsweredCorrectly] = useState(0);
+  const [voiceMode, setVoiceMode] = useState(false);
 
   // Get the current question from the quiz
   const currentQuestion = quiz.questions[currentQuestionIndex];
@@ -160,6 +164,12 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
                 Question {currentQuestionIndex + 1} of {quiz.questions.length}
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              <Switch id="voice-mode" checked={voiceMode} onCheckedChange={setVoiceMode} />
+              <Label htmlFor="voice-mode" className="flex items-center gap-1 text-sm cursor-pointer">
+                <Mic className="h-4 w-4" /> Voice
+              </Label>
+            </div>
             <div className="text-right">
               <div className="text-lg font-semibold">{score} pts</div>
               <div className={`text-sm ${timeLeft <= 5 ? "text-red-500 font-semibold" : "text-gray-500"}`}>
@@ -189,6 +199,22 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
                     onAnswer={handleAnswerSubmit}
                     timeLeft={timeLeft}
                   />
+                  
+                  {/* Voice Answer Input */}
+                  {voiceMode && !isAnswered && (
+                    <div className="mt-4">
+                      <VoiceAnswerInput
+                        questionType={
+                          currentQuestion.type === 'True/False' ? 'true_false' :
+                          currentQuestion.type === 'Fill in the blank' ? 'fill_blank' : 'multiple_choice'
+                        }
+                        options={currentQuestion.options}
+                        correctAnswer={currentQuestion.correctAnswer}
+                        onAnswer={handleAnswerSubmit}
+                        disabled={isAnswered}
+                      />
+                    </div>
+                  )}
                 </motion.div>
               </AnimatePresence>
             </CardContent>

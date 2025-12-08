@@ -27,7 +27,7 @@ interface PUBGAvatarEditorProps {
   initialConfig?: Partial<AvatarConfig>;
   unlockedItems?: string[];
   userLevel?: number;
-  onSave: (config: AvatarConfig) => void;
+  onSave?: (config: AvatarConfig) => void;
 }
 
 const bodyTypes = [

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings, 
@@ -24,9 +25,13 @@ import {
   LogOut,
   Save,
   Trash2,
-  Download
+  Download,
+  UserCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import PUBGAvatarEditor from '@/components/avatar/PUBGAvatarEditor';
+import AnimatedBackground from '@/components/ui/AnimatedBackground';
+import BackButton from '@/components/ui/BackButton';
 
 const EnhancedSettings: React.FC = () => {
   const { user, logout } = useUser();
@@ -88,23 +93,56 @@ const EnhancedSettings: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-              <Settings className="h-8 w-8" />
-              Settings
-            </h1>
-            <p className="text-gray-600">Customize your Master Minds experience</p>
+    <div className="relative min-h-screen overflow-hidden">
+      <AnimatedBackground variant="minimal" showIcons={false} />
+      
+      <div className="relative z-10">
+        <header className="glass border-b border-border/50 sticky top-0 z-20">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <BackButton to="/" />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                  <Settings className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-display font-bold text-foreground">Settings</h1>
+                  <p className="text-xs text-muted-foreground">Customize your experience</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <Button variant="outline" onClick={() => navigate('/')}>
-            Back to Menu
-          </Button>
-        </div>
+        </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="container max-w-4xl mx-auto py-6 px-4">
+          <Tabs defaultValue="profile" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4 glass border-border/30">
+              <TabsTrigger value="profile" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <User className="h-4 w-4 mr-2" />
+                Profile
+              </TabsTrigger>
+              <TabsTrigger value="avatar" className="data-[state=active]:bg-accent data-[state=active]:text-white">
+                <UserCircle className="h-4 w-4 mr-2" />
+                Avatar
+              </TabsTrigger>
+              <TabsTrigger value="general" className="data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground">
+                <Settings className="h-4 w-4 mr-2" />
+                General
+              </TabsTrigger>
+              <TabsTrigger value="language" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Globe className="h-4 w-4 mr-2" />
+                Language
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* Avatar Tab */}
+            <TabsContent value="avatar">
+              <PUBGAvatarEditor />
+            </TabsContent>
+            
+            {/* Profile Tab */}
+            <TabsContent value="profile" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Profile Settings */}
           <Card className="lg:col-span-2">
             <CardHeader>
@@ -415,6 +453,85 @@ const EnhancedSettings: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+            </TabsContent>
+            
+            {/* General Tab */}
+            <TabsContent value="general" className="space-y-6">
+              <Card className="glass border-border/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    General Settings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="notifications2">Push Notifications</Label>
+                      <p className="text-sm text-muted-foreground">Receive quiz reminders and updates</p>
+                    </div>
+                    <Switch
+                      id="notifications2"
+                      checked={settings.notifications}
+                      onCheckedChange={(checked) => handleSettingChange('notifications', checked)}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="sound2">Sound Effects</Label>
+                      <p className="text-sm text-muted-foreground">Play sounds during quizzes</p>
+                    </div>
+                    <Switch
+                      id="sound2"
+                      checked={settings.soundEffects}
+                      onCheckedChange={(checked) => handleSettingChange('soundEffects', checked)}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="darkmode2">Dark Mode</Label>
+                      <p className="text-sm text-muted-foreground">Use dark theme</p>
+                    </div>
+                    <Switch
+                      id="darkmode2"
+                      checked={settings.darkMode}
+                      onCheckedChange={(checked) => handleSettingChange('darkMode', checked)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            {/* Language Tab */}
+            <TabsContent value="language" className="space-y-6">
+              <Card className="glass border-border/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    Language & Region
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Interface Language</Label>
+                    <Select value={language} onValueChange={handleLanguageChange}>
+                      <SelectTrigger className="glass border-border/50">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="english">🇺🇸 English</SelectItem>
+                        <SelectItem value="amharic">🇪🇹 Amharic (አማርኛ)</SelectItem>
+                        <SelectItem value="afaan-oromoo">🇪🇹 Afaan Oromoo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
