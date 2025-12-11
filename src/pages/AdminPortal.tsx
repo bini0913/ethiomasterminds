@@ -662,7 +662,7 @@ const AdminPortal: React.FC = () => {
                             <td className="p-4">
                               <Select 
                                 value={u.role} 
-                                onValueChange={(v) => handleUpdateUserRole(u.id, v)}
+                                onValueChange={(v) => handleUpdateUserRole(u.id, v as 'student' | 'teacher' | 'admin' | 'manager')}
                               >
                                 <SelectTrigger className="w-28">
                                   <SelectValue />

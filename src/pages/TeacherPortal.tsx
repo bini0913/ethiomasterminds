@@ -79,6 +79,7 @@ const TeacherPortal: React.FC = () => {
   const { user, logout } = useUser();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
+  const [profile, setProfile] = useState<{ name: string; username: string } | null>(null);
   
   // Quiz state
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -135,12 +136,22 @@ const TeacherPortal: React.FC = () => {
 
   useEffect(() => {
     if (user) {
+      fetchProfile();
       fetchQuizzes();
       fetchClasses();
       fetchResults();
       fetchAnnouncements();
     }
   }, [user]);
+
+  const fetchProfile = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('name, username')
+      .eq('id', user?.id)
+      .single();
+    if (data) setProfile(data);
+  };
 
   const fetchQuizzes = async () => {
     const { data, error } = await supabase
