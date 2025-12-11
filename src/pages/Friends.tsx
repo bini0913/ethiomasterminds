@@ -1,10 +1,9 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Send, UserPlus, Check, X } from "lucide-react";
+import { Send, UserPlus, Check, X, Users, Home, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useFriends, FriendRequest } from "@/context/FriendsContext";
 import { useUser, UserProfile } from "@/context/UserContext";
@@ -12,6 +11,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { avatarToEmoji } from "@/utils/avatarUtils";
+import BackButton from "@/components/ui/BackButton";
+import { motion } from "framer-motion";
 
 const Friends: React.FC = () => {
   const { user } = useUser();
@@ -79,19 +80,23 @@ const Friends: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Header */}
-      <header className="bg-primary px-4 py-3 shadow-md">
-        <div className="flex items-center">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate("/")}
-            className="mr-2 text-white"
-          >
-            <ArrowLeft className="h-5 w-5" />
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 px-4 py-3 shadow-xl">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <BackButton to="/" className="text-white hover:bg-white/20" />
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
+              <Users className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Friends & Messages</h1>
+              <p className="text-xs text-white/70">{friends.length} friends online</p>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2">
+            <Home className="h-4 w-4" /> Menu
           </Button>
-          <h1 className="text-xl font-bold text-white">Friends & Messages</h1>
         </div>
       </header>
 
