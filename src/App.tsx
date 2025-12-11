@@ -13,8 +13,8 @@ import Friends from "./pages/Friends";
 import Settings from "./pages/Settings";
 import EnhancedSettings from "./pages/EnhancedSettings";
 import NotFound from "./pages/NotFound";
-import TeacherDashboard from "./pages/TeacherDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
+import TeacherPortal from "./pages/TeacherPortal";
+import AdminPortal from "./pages/AdminPortal";
 import StudentDashboard from "./pages/StudentDashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -58,7 +58,7 @@ const App = () => (
                       path="/teacher" 
                       element={
                         <ProtectedRoute allowedRoles={['teacher', 'admin', 'manager']}>
-                          <TeacherDashboard />
+                          <TeacherPortal />
                         </ProtectedRoute>
                       } 
                     />
@@ -66,7 +66,7 @@ const App = () => (
                       path="/admin" 
                       element={
                         <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                          <AdminDashboard />
+                          <AdminPortal />
                         </ProtectedRoute>
                       } 
                     />
