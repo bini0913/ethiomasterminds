@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,25 +14,29 @@ import {
   Users, 
   MessageSquare, 
   Trophy, 
-  User, 
-  Circle, 
   Clock, 
   Plus,
-  Search,
-  X
+  Send,
+  ArrowLeft,
+  Home,
+  Gamepad,
+  Zap,
+  Crown,
+  Star,
+  Swords
 } from "lucide-react";
 import { avatarToEmoji } from "@/utils/avatarUtils";
 import RoomCard, { Room } from "@/components/multiplayer/RoomCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import BackButton from "@/components/ui/BackButton";
 
 const Lobby: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
   const { getAvailableSubjects } = useQuiz();
   
-  // States
   const [chatMessage, setChatMessage] = useState("");
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [newRoomData, setNewRoomData] = useState({
@@ -44,7 +47,6 @@ const Lobby: React.FC = () => {
     gameMode: "1v1"
   });
   
-  // Chat messages
   const [chatMessages, setChatMessages] = useState<Array<{
     id: string;
     userId: string;
@@ -58,7 +60,7 @@ const Lobby: React.FC = () => {
       userId: "system",
       userName: "System",
       userAvatar: "avatar-1",
-      message: "Welcome to the Master Minds Lobby! Challenge other players or join a tournament.",
+      message: "Welcome to the Master Minds Lobby! 🎮",
       timestamp: new Date(),
     },
     {
@@ -79,7 +81,6 @@ const Lobby: React.FC = () => {
     },
   ]);
 
-  // Mock online players
   const [onlinePlayers] = useState([
     { id: "1", name: "Alex", avatar: "avatar-1", grade: "5", status: "online", xp: 450 },
     { id: "2", name: "Maria", avatar: "avatar-2", grade: "6", status: "in-game", xp: 720 },
@@ -88,7 +89,6 @@ const Lobby: React.FC = () => {
     { id: "5", name: "Michael", avatar: "avatar-5", grade: "6", status: "away", xp: 510 },
   ]);
 
-  // Active rooms
   const [activeRooms, setActiveRooms] = useState<Room[]>([
     { id: "r1", name: "Math Duel", players: 2, maxPlayers: 2, status: "in-progress", subject: "Mathematics", difficulty: "Medium", gameMode: "1v1" },
     { id: "r2", name: "Science Battle", players: 1, maxPlayers: 2, status: "waiting", subject: "Science", difficulty: "Easy", gameMode: "1v1" },
@@ -96,48 +96,21 @@ const Lobby: React.FC = () => {
     { id: "r4", name: "English Quiz", players: 3, maxPlayers: 3, status: "in-progress", subject: "English", difficulty: "Medium", gameMode: "Battle Royale" },
   ]);
 
-  // Mock tournaments
   const [tournaments] = useState([
-    { 
-      id: "t1", 
-      name: "Daily Math Championship", 
-      startTime: new Date(Date.now() + 30 * 60000), 
-      players: 12, 
-      maxPlayers: 16,
-      prize: "500 XP + Gold Badge"
-    },
-    { 
-      id: "t2", 
-      name: "Science Weekly Tournament", 
-      startTime: new Date(Date.now() + 120 * 60000), 
-      players: 8, 
-      maxPlayers: 32,
-      prize: "1000 XP + Special Avatar"
-    },
-    { 
-      id: "t3", 
-      name: "Master Minds World Cup", 
-      startTime: new Date(Date.now() + 24 * 60 * 60000), 
-      players: 64, 
-      maxPlayers: 128,
-      prize: "5000 XP + Champion Title + Rare Avatar"
-    },
+    { id: "t1", name: "Daily Math Championship", startTime: new Date(Date.now() + 30 * 60000), players: 12, maxPlayers: 16, prize: "500 XP + Gold Badge" },
+    { id: "t2", name: "Science Weekly Tournament", startTime: new Date(Date.now() + 120 * 60000), players: 8, maxPlayers: 32, prize: "1000 XP + Special Avatar" },
+    { id: "t3", name: "Master Minds World Cup", startTime: new Date(Date.now() + 24 * 60 * 60000), players: 64, maxPlayers: 128, prize: "5000 XP + Champion Title" },
   ]);
 
-  // Check if user is authenticated
   useEffect(() => {
     if (!user) {
-      toast.error("Please log in to access the lobby", { 
-        description: "You'll be redirected to the login page" 
-      });
+      toast.error("Please log in to access the lobby");
       setTimeout(() => navigate("/"), 2000);
     }
   }, [user, navigate]);
 
-  // Handle chat submission
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!chatMessage.trim() || !user) return;
     
     const newMessage = {
@@ -153,7 +126,6 @@ const Lobby: React.FC = () => {
     setChatMessage("");
   };
 
-  // Create a game room
   const createRoom = () => {
     if (!newRoomData.name.trim()) {
       toast.error("Please enter a room name");
@@ -163,7 +135,7 @@ const Lobby: React.FC = () => {
     const newRoom: Room = {
       id: `room-${Date.now()}`,
       name: newRoomData.name,
-      players: 1, // Creator joins automatically
+      players: 1,
       maxPlayers: parseInt(newRoomData.maxPlayers),
       status: "waiting",
       subject: newRoomData.subject,
@@ -174,420 +146,337 @@ const Lobby: React.FC = () => {
     
     setActiveRooms(prev => [newRoom, ...prev]);
     setCreateRoomOpen(false);
-    
-    toast.success("Room created successfully!", {
-      description: "Others can now join your game room"
-    });
-    
-    // Reset form
-    setNewRoomData({
-      name: "",
-      maxPlayers: "2",
-      subject: "Mathematics",
-      difficulty: "Medium",
-      gameMode: "1v1"
-    });
+    toast.success("Room created!");
+    setNewRoomData({ name: "", maxPlayers: "2", subject: "Mathematics", difficulty: "Medium", gameMode: "1v1" });
   };
 
-  // Join a game room
   const joinRoom = (room: Room) => {
     if (room.status !== "waiting" || room.players >= room.maxPlayers) {
-      toast.error("Cannot join this room", {
-        description: room.status === "in-progress" ? "Game is already in progress" : "Room is full"
-      });
+      toast.error("Cannot join this room");
       return;
     }
     
-    // Update the room's player count
-    setActiveRooms(prev => 
-      prev.map(r => 
-        r.id === room.id 
-          ? { ...r, players: r.players + 1 } 
-          : r
-      )
-    );
-    
-    toast.success(`Joined ${room.name}!`, {
-      description: "Game will start soon"
-    });
-    
-    // In a real app, this would redirect to the game room
-    // For now, we'll just simulate that with a timeout
-    setTimeout(() => {
-      navigate("/quiz");
-    }, 2000);
+    setActiveRooms(prev => prev.map(r => r.id === room.id ? { ...r, players: r.players + 1 } : r));
+    toast.success(`Joined ${room.name}!`);
+    setTimeout(() => navigate("/quiz"), 2000);
   };
 
-  // Register for a tournament
   const joinTournament = (tournamentId: string) => {
     const tournament = tournaments.find(t => t.id === tournamentId);
-    
-    if (!tournament) {
-      toast.error("Tournament not found");
-      return;
+    if (tournament) {
+      toast.success(`Registered for ${tournament.name}!`);
     }
-    
-    toast.success(`Registered for ${tournament.name}!`, {
-      description: "You'll be notified when the tournament begins"
-    });
   };
 
-  // Challenge a player
   const challengePlayer = (playerId: string, playerName: string) => {
     const player = onlinePlayers.find(p => p.id === playerId);
-    
-    if (!player) {
-      toast.error("Player not found");
+    if (!player || player.status !== "online") {
+      toast.error(`${playerName} is not available`);
       return;
     }
-    
-    if (player.status !== "online") {
-      toast.error(`${playerName} is ${player.status === "in-game" ? "already in a game" : "away"}`);
-      return;
-    }
-    
-    toast.success(`Challenge sent to ${playerName}!`, {
-      description: "Waiting for them to accept..."
-    });
-    
-    // Simulate response after a few seconds
-    setTimeout(() => {
-      const accepted = Math.random() > 0.3; // 70% chance to accept
-      
-      if (accepted) {
-        toast.success(`${playerName} accepted your challenge!`, {
-          description: "Redirecting to game..."
-        });
-        
-        setTimeout(() => {
-          navigate("/quiz");
-        }, 2000);
-      } else {
-        toast.error(`${playerName} declined your challenge`);
-      }
-    }, 3000);
+    toast.success(`Challenge sent to ${playerName}!`);
   };
 
-  // Format time remaining for tournaments
   const formatTimeRemaining = (startTime: Date) => {
-    const now = new Date();
-    const diff = startTime.getTime() - now.getTime();
-    
+    const diff = startTime.getTime() - Date.now();
     if (diff < 0) return "Starting now";
-    
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'online': return 'bg-green-500';
+      case 'in-game': return 'bg-blue-500';
+      default: return 'bg-yellow-500';
     }
-    return `${minutes}m`;
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-gradient-to-r from-primary to-indigo-600 px-4 py-4 shadow-lg">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center">
-            <motion.div 
-              className="bg-white rounded-full p-2 mr-2"
-              whileHover={{ rotate: 360 }}
-              transition={{ duration: 1 }}
-            >
-              <span className="text-2xl">🎮</span>
-            </motion.div>
-            <h1 className="text-2xl font-bold text-white">Multiplayer Lobby</h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 px-4 py-3 shadow-xl">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <BackButton to="/" className="text-white hover:bg-white/20" />
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
+              <Gamepad className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Game Lobby</h1>
+              <p className="text-xs text-white/70">{onlinePlayers.length} players online</p>
+            </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/")}
-            className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
-          >
-            Back to Menu
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate("/")}
+              className="gap-2"
+            >
+              <Home className="h-4 w-4" />
+              Menu
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="container mx-auto py-6 px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column - Online Players */}
-          <div className="lg:col-span-1">
-            <Card className="shadow-md h-full">
-              <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg">
-                <div className="flex items-center">
-                  <Users className="mr-2 h-5 w-5" />
-                  <CardTitle>Online Players</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[600px]">
-                  <div className="p-4 space-y-4">
-                    {onlinePlayers.map((player) => (
-                      <motion.div 
-                        key={player.id}
-                        whileHover={{ scale: 1.02 }}
-                        className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-md border"
-                      >
-                        <div className="h-10 w-10 rounded-full bg-primary-light flex items-center justify-center text-lg">
+      {/* Quick Actions Bar */}
+      <div className="bg-card/80 backdrop-blur-sm border-b border-border/50 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto scrollbar-none">
+          <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 bg-gradient-to-r from-green-500 to-emerald-600 whitespace-nowrap">
+            <Plus className="h-4 w-4" /> Create Room
+          </Button>
+          <Button variant="outline" className="gap-2 whitespace-nowrap" onClick={() => navigate("/multiplayer")}>
+            <Zap className="h-4 w-4" /> Quick Match
+          </Button>
+          <Button variant="outline" className="gap-2 whitespace-nowrap">
+            <Swords className="h-4 w-4" /> Ranked
+          </Button>
+          <Button variant="outline" className="gap-2 whitespace-nowrap">
+            <Crown className="h-4 w-4" /> Tournament
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto py-4 px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Left - Online Players */}
+          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-xl py-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Users className="h-5 w-5" />
+                Online Players
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[500px]">
+                <div className="p-3 space-y-2">
+                  {onlinePlayers.map((player) => (
+                    <motion.div 
+                      key={player.id}
+                      whileHover={{ scale: 1.02 }}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <div className="relative">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-lg">
                           {avatarToEmoji(player.avatar)}
                         </div>
-                        <div className="flex-1">
-                          <div className="font-medium">{player.name}</div>
-                          <div className="text-xs text-gray-500">Grade {player.grade} • {player.xp} XP</div>
+                        <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${getStatusColor(player.status)} border-2 border-card`}></div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{player.name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Star className="h-3 w-3 text-yellow-500" />
+                          {player.xp} XP
                         </div>
-                        <div className="flex flex-col items-end">
-                          <div className="flex items-center">
-                            <div className={`h-2 w-2 rounded-full mr-1 ${
-                              player.status === 'online' ? 'bg-green-500' : 
-                              player.status === 'in-game' ? 'bg-blue-500' : 'bg-yellow-500'
-                            }`}></div>
-                            <span className="text-xs capitalize">{player.status}</span>
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="text-xs mt-1 h-7 px-2"
-                            onClick={() => challengePlayer(player.id, player.name)}
-                            disabled={player.status !== "online"}
-                          >
-                            Challenge
-                          </Button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* Middle column - Tabs for Rooms and Tournaments */}
-          <div className="lg:col-span-1">
-            <Card className="shadow-md h-full">
-              <CardHeader className="bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-t-lg pb-3">
-                <CardTitle>Play & Compete</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <Tabs defaultValue="rooms">
-                  <TabsList className="w-full">
-                    <TabsTrigger value="rooms">Game Rooms</TabsTrigger>
-                    <TabsTrigger value="tournaments">Tournaments</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="rooms" className="space-y-4 mt-4">
-                    <Button 
-                      className="w-full bg-primary"
-                      onClick={() => setCreateRoomOpen(true)}
-                    >
-                      <Plus className="mr-2 h-4 w-4" /> Create New Room
-                    </Button>
-                    
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-medium text-gray-500">Active Rooms</h3>
-                      <ScrollArea className="h-[450px]">
-                        <div className="grid grid-cols-1 gap-4 pr-4">
-                          {activeRooms.map((room) => (
-                            <RoomCard key={room.id} room={room} onJoin={joinRoom} />
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="tournaments" className="space-y-4 mt-4">
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-medium text-gray-500">Upcoming Tournaments</h3>
-                      <ScrollArea className="h-[480px]">
-                        <div className="space-y-4">
-                          {tournaments.map((tournament) => (
-                            <motion.div 
-                              key={tournament.id}
-                              whileHover={{ scale: 1.02 }}
-                              className="border rounded-lg p-4 hover:border-primary"
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <h3 className="font-medium">{tournament.name}</h3>
-                                  <div className="text-xs text-gray-500 mt-1 flex items-center">
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    <span>Starts in: {formatTimeRemaining(tournament.startTime)}</span>
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1 flex items-center">
-                                    <Users className="h-3 w-3 mr-1" />
-                                    <span>{tournament.players}/{tournament.maxPlayers} players registered</span>
-                                  </div>
-                                  <div className="mt-2 text-xs">
-                                    <span className="font-medium">Prize:</span> {tournament.prize}
-                                  </div>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  onClick={() => joinTournament(tournament.id)}
-                                >
-                                  Register
-                                </Button>
-                              </div>
-                              <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
-                                <div 
-                                  className="bg-primary h-1.5 rounded-full" 
-                                  style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }}
-                                ></div>
-                              </div>
-                            </motion.div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* Right column - Chat */}
-          <div className="lg:col-span-1">
-            <Card className="shadow-md h-full">
-              <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-lg">
-                <div className="flex items-center">
-                  <MessageSquare className="mr-2 h-5 w-5" />
-                  <CardTitle>Lobby Chat</CardTitle>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => challengePlayer(player.id, player.name)}
+                        disabled={player.status !== "online"}
+                      >
+                        <Swords className="h-3 w-3 mr-1" />
+                        Fight
+                      </Button>
+                    </motion.div>
+                  ))}
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="flex flex-col h-[600px]">
-                  <ScrollArea className="flex-1 p-4">
-                    <div className="space-y-4">
-                      {chatMessages.map((msg) => (
-                        <div key={msg.id} className="flex items-start gap-2">
-                          <div className="h-8 w-8 rounded-full bg-primary-light flex items-center justify-center text-sm">
-                            {msg.userId === "system" ? "🤖" : avatarToEmoji(msg.userAvatar)}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-baseline">
-                              <span className={`font-medium ${msg.userId === "system" ? "text-primary" : ""}`}>
-                                {msg.userName}
-                              </span>
-                              <span className="text-xs text-gray-500 ml-2">
-                                {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                              </span>
-                            </div>
-                            <p className="text-sm">{msg.message}</p>
-                          </div>
-                        </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+          
+          {/* Middle - Rooms & Tournaments */}
+          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+            <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-xl py-3">
+              <CardTitle className="text-base">Play & Compete</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-3">
+              <Tabs defaultValue="rooms">
+                <TabsList className="w-full grid grid-cols-2">
+                  <TabsTrigger value="rooms" className="gap-1">
+                    <Gamepad className="h-3 w-3" /> Rooms
+                  </TabsTrigger>
+                  <TabsTrigger value="tournaments" className="gap-1">
+                    <Trophy className="h-3 w-3" /> Tournaments
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="rooms" className="mt-3">
+                  <ScrollArea className="h-[400px]">
+                    <div className="space-y-3 pr-2">
+                      {activeRooms.map((room) => (
+                        <RoomCard key={room.id} room={room} onJoin={joinRoom} />
                       ))}
                     </div>
                   </ScrollArea>
-                  
-                  <div className="p-4 border-t">
-                    <form onSubmit={handleSendMessage} className="flex gap-2">
-                      <Input
-                        placeholder="Type a message..."
-                        value={chatMessage}
-                        onChange={(e) => setChatMessage(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button type="submit">Send</Button>
-                    </form>
-                  </div>
+                </TabsContent>
+                
+                <TabsContent value="tournaments" className="mt-3">
+                  <ScrollArea className="h-[400px]">
+                    <div className="space-y-3">
+                      {tournaments.map((tournament) => (
+                        <motion.div 
+                          key={tournament.id}
+                          whileHover={{ scale: 1.02 }}
+                          className="border border-border/50 rounded-xl p-4 bg-muted/30 hover:border-primary/50 transition-colors"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h3 className="font-semibold text-sm">{tournament.name}</h3>
+                              <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                <Clock className="h-3 w-3" />
+                                Starts in: {formatTimeRemaining(tournament.startTime)}
+                              </div>
+                            </div>
+                            <Badge variant="secondary" className="text-xs">
+                              {tournament.players}/{tournament.maxPlayers}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mb-2">
+                            <span className="text-yellow-500 font-medium">🏆 Prize:</span> {tournament.prize}
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-1.5 mb-2">
+                            <div 
+                              className="bg-gradient-to-r from-primary to-purple-500 h-1.5 rounded-full transition-all" 
+                              style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }}
+                            />
+                          </div>
+                          <Button size="sm" className="w-full" onClick={() => joinTournament(tournament.id)}>
+                            Register
+                          </Button>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+          
+          {/* Right - Chat */}
+          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+            <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-t-xl py-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MessageSquare className="h-5 w-5" />
+                Lobby Chat
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 flex flex-col h-[500px]">
+              <ScrollArea className="flex-1 p-3">
+                <div className="space-y-3">
+                  {chatMessages.map((msg) => (
+                    <div key={msg.id} className="flex items-start gap-2">
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-sm flex-shrink-0">
+                        {msg.userId === "system" ? "🤖" : avatarToEmoji(msg.userAvatar)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-medium text-sm">{msg.userName}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground break-words">{msg.message}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </ScrollArea>
+              <form onSubmit={handleSendMessage} className="p-3 border-t border-border/50">
+                <div className="flex gap-2">
+                  <Input
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1"
+                  />
+                  <Button type="submit" size="icon" className="flex-shrink-0">
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </div>
-      
+
       {/* Create Room Dialog */}
       <Dialog open={createRoomOpen} onOpenChange={setCreateRoomOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Create a Game Room</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Gamepad className="h-5 w-5" /> Create Game Room
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="room-name">Room Name</Label>
+          <div className="space-y-4">
+            <div>
+              <Label>Room Name</Label>
               <Input
-                id="room-name"
                 value={newRoomData.name}
                 onChange={(e) => setNewRoomData({...newRoomData, name: e.target.value})}
-                placeholder="Enter a name for your room"
+                placeholder="e.g., Math Champions"
               />
             </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="subject">Subject</Label>
-              <Select
-                value={newRoomData.subject}
-                onValueChange={(value) => setNewRoomData({...newRoomData, subject: value})}
-              >
-                <SelectTrigger id="subject">
-                  <SelectValue placeholder="Select a subject" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAvailableSubjects().map((subject) => (
-                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                  ))}
-                  <SelectItem value="Mixed">Mixed Subjects</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Game Mode</Label>
+                <Select value={newRoomData.gameMode} onValueChange={(v) => setNewRoomData({...newRoomData, gameMode: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1v1">1v1 Duel</SelectItem>
+                    <SelectItem value="2v2">2v2 Team</SelectItem>
+                    <SelectItem value="Battle Royale">Battle Royale</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Max Players</Label>
+                <Select value={newRoomData.maxPlayers} onValueChange={(v) => setNewRoomData({...newRoomData, maxPlayers: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 Players</SelectItem>
+                    <SelectItem value="4">4 Players</SelectItem>
+                    <SelectItem value="8">8 Players</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="difficulty">Difficulty</Label>
-              <Select
-                value={newRoomData.difficulty}
-                onValueChange={(value) => setNewRoomData({...newRoomData, difficulty: value})}
-              >
-                <SelectTrigger id="difficulty">
-                  <SelectValue placeholder="Select difficulty" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Easy">Easy</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Hard">Hard</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="game-mode">Game Mode</Label>
-              <Select
-                value={newRoomData.gameMode}
-                onValueChange={(value) => setNewRoomData({...newRoomData, gameMode: value})}
-              >
-                <SelectTrigger id="game-mode">
-                  <SelectValue placeholder="Select game mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1v1">1v1 Duel</SelectItem>
-                  <SelectItem value="2v2">2v2 Team Battle</SelectItem>
-                  <SelectItem value="Battle Royale">Battle Royale</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="max-players">Maximum Players</Label>
-              <Select
-                value={newRoomData.maxPlayers}
-                onValueChange={(value) => setNewRoomData({...newRoomData, maxPlayers: value})}
-              >
-                <SelectTrigger id="max-players">
-                  <SelectValue placeholder="Select max players" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2">2 Players</SelectItem>
-                  <SelectItem value="4">4 Players</SelectItem>
-                  <SelectItem value="8">8 Players</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Subject</Label>
+                <Select value={newRoomData.subject} onValueChange={(v) => setNewRoomData({...newRoomData, subject: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Mathematics">Mathematics</SelectItem>
+                    <SelectItem value="Science">Science</SelectItem>
+                    <SelectItem value="English">English</SelectItem>
+                    <SelectItem value="Mixed">Mixed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Difficulty</Label>
+                <Select value={newRoomData.difficulty} onValueChange={(v) => setNewRoomData({...newRoomData, difficulty: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Easy">Easy</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="Hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateRoomOpen(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => setCreateRoomOpen(false)}>Cancel</Button>
+            <Button onClick={createRoom} className="gap-2">
+              <Plus className="h-4 w-4" /> Create Room
             </Button>
-            <Button onClick={createRoom}>Create Room</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

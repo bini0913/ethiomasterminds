@@ -1,5 +1,5 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import EnhancedWelcomeScreen from "@/components/welcome/EnhancedWelcomeScreen";
 import AuthForm from "@/components/auth/AuthForm";
 import ProfileSetup from "@/components/profile/ProfileSetup";
@@ -15,24 +15,40 @@ enum AppStage {
 }
 
 const Index: React.FC = () => {
-  const { user, isAuthenticated } = useUser();
+  const { user, isAuthenticated, isLoading } = useUser();
   const [appStage, setAppStage] = useState<AppStage>(AppStage.Welcome);
   const [userType, setUserType] = useState<"student" | "teacher" | "admin" | "manager">("student");
+  const navigate = useNavigate();
   
-  // Determine the current stage based on authentication and profile completion
-  React.useEffect(() => {
-    if (appStage === AppStage.Welcome) {
-      return; // Stay on welcome screen until user continues
-    }
+  // Redirect based on role when authenticated
+  useEffect(() => {
+    if (isLoading) return;
     
-    if (!isAuthenticated) {
+    if (isAuthenticated && user) {
+      // Redirect teachers and admins to their portals
+      if (user.role === 'teacher') {
+        navigate('/teacher');
+        return;
+      }
+      if (user.role === 'admin') {
+        navigate('/admin');
+        return;
+      }
+      if (user.role === 'manager') {
+        navigate('/manager-dashboard');
+        return;
+      }
+      
+      // For students, check if profile is complete
+      if (!user.gender || !user.grade || !user.educationLevel) {
+        setAppStage(AppStage.ProfileSetup);
+      } else {
+        setAppStage(AppStage.MainMenu);
+      }
+    } else if (!isAuthenticated && appStage !== AppStage.Welcome) {
       setAppStage(AppStage.Auth);
-    } else if (!user?.gender || !user?.grade || !user?.educationLevel) {
-      setAppStage(AppStage.ProfileSetup);
-    } else {
-      setAppStage(AppStage.MainMenu);
     }
-  }, [isAuthenticated, user, appStage]);
+  }, [isAuthenticated, user, isLoading, navigate, appStage]);
   
   // Handle welcome screen continue button
   const handleWelcomeContinue = (type: "student" | "teacher" | "admin" | "manager" = "student") => {
@@ -40,13 +56,30 @@ const Index: React.FC = () => {
     setAppStage(AppStage.Auth);
   };
   
+  // Handle successful authentication
+  const handleAuthSuccess = () => {
+    // The useEffect will handle redirection based on role
+    setAppStage(AppStage.ProfileSetup);
+  };
+  
   // Render content based on the current app stage
   const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-background to-secondary/20">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+    
     switch (appStage) {
       case AppStage.Welcome:
         return <EnhancedWelcomeScreen onContinue={handleWelcomeContinue} />;
       case AppStage.Auth:
-        return <AuthForm onSuccess={() => setAppStage(AppStage.ProfileSetup)} initialTab={userType} />;
+        return <AuthForm onSuccess={handleAuthSuccess} initialTab={userType} />;
       case AppStage.ProfileSetup:
         return <ProfileSetup onComplete={() => setAppStage(AppStage.MainMenu)} />;
       case AppStage.MainMenu:

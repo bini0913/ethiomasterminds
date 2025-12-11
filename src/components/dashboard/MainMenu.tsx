@@ -1,11 +1,10 @@
-
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAchievements } from "@/context/AchievementsContext";
-import { Link } from "react-router-dom";
 import UserLevel from "../profile/UserLevel";
 import { motion } from "framer-motion";
 import DailyChallenge from "../challenges/DailyChallenge";
@@ -20,10 +19,15 @@ import {
   Settings, 
   GraduationCap,
   School,
-  MessageSquare,
   Gamepad,
   Store,
-  Award
+  Award,
+  Zap,
+  Target,
+  Medal,
+  Home,
+  LogOut,
+  Sparkles
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { avatarToEmoji } from "@/utils/avatarUtils";
@@ -44,297 +48,322 @@ const MainMenu: React.FC = () => {
 
   // Define subject categories
   const categories = [
-    { id: "all", name: "All" },
-    { id: "math", name: "Mathematics" },
-    { id: "science", name: "Science" },
-    { id: "english", name: "English" },
-    { id: "gk", name: "General Knowledge" }
+    { id: "all", name: "All", icon: <Sparkles className="h-3 w-3" /> },
+    { id: "play", name: "Play", icon: <Gamepad className="h-3 w-3" /> },
+    { id: "learn", name: "Learn", icon: <BookOpen className="h-3 w-3" /> },
+    { id: "compete", name: "Compete", icon: <Trophy className="h-3 w-3" /> },
+    { id: "social", name: "Social", icon: <Users className="h-3 w-3" /> }
+  ];
+
+  // Quick action items (always visible at top)
+  const quickActions = [
+    { 
+      title: "Quick Play", 
+      icon: <Zap className="h-5 w-5" />,
+      path: "/quiz",
+      color: "from-yellow-500 to-orange-500",
+      description: "Jump into a random quiz"
+    },
+    { 
+      title: "1v1 Battle", 
+      icon: <Target className="h-5 w-5" />,
+      path: "/multiplayer",
+      color: "from-red-500 to-pink-500",
+      description: "Challenge a player"
+    },
+    { 
+      title: "Join Lobby", 
+      icon: <Users className="h-5 w-5" />,
+      path: "/lobby",
+      color: "from-green-500 to-emerald-500",
+      description: "Find matches"
+    },
   ];
 
   // Common menu items with enhanced visual elements
-  const commonMenuItems = [
+  const menuItems = [
     { 
       title: t("quiz"), 
-      icon: <GraduationCap className="h-6 w-6 text-white" />,
-      emoji: "🎯", 
+      icon: <GraduationCap className="h-6 w-6" />,
       path: "/quiz",
-      category: "all",
-      color: "bg-gradient-to-r from-indigo-500 to-purple-600",
-      description: "Test your knowledge across subjects"
+      category: "learn",
+      color: "from-indigo-500 to-purple-600",
+      description: "Test your knowledge"
     },
     { 
       title: t("multiplayer"), 
-      icon: <Users className="h-6 w-6 text-white" />,
-      emoji: "👥", 
+      icon: <Users className="h-6 w-6" />,
       path: "/multiplayer",
-      category: "all",
-      color: "bg-gradient-to-r from-blue-500 to-cyan-600",
-      description: "Compete with friends in real-time"
+      category: "play",
+      color: "from-blue-500 to-cyan-600",
+      description: "Compete with friends"
     },
     { 
-      title: "Multiplayer Lobby", 
-      icon: <Gamepad className="h-6 w-6 text-white" />,
-      emoji: "🎮", 
+      title: "Game Lobby", 
+      icon: <Gamepad className="h-6 w-6" />,
       path: "/lobby",
-      category: "all",
-      color: "bg-gradient-to-r from-green-400 to-emerald-500",
-      description: "Join the lobby to find matches and chat"
+      category: "play",
+      color: "from-green-400 to-emerald-500",
+      description: "Join matches & chat"
     },
     { 
       title: t("leaderboard"), 
-      icon: <Trophy className="h-6 w-6 text-white" />,
-      emoji: "🏆", 
+      icon: <Trophy className="h-6 w-6" />,
       path: "/leaderboard",
-      category: "all",
-      color: "bg-gradient-to-r from-green-500 to-teal-600",
+      category: "compete",
+      color: "from-yellow-500 to-amber-600",
       description: "See who's on top"
     },
     { 
       title: "Avatar Store",
-      icon: <Store className="h-6 w-6 text-white" />,
-      emoji: "🛍️",
+      icon: <Store className="h-6 w-6" />,
       path: "/store",
-      category: "all",
-      color: "bg-gradient-to-r from-purple-500 to-pink-600",
-      description: "Customize your avatar with amazing items"
+      category: "social",
+      color: "from-purple-500 to-pink-600",
+      description: "Customize your look"
     },
     { 
-      title: "Tournament Hub",
-      icon: <Award className="h-6 w-6 text-white" />,
-      emoji: "🏟️",
+      title: "Tournaments",
+      icon: <Award className="h-6 w-6" />,
       path: "/tournaments",
-      category: "all",
-      color: "bg-gradient-to-r from-orange-500 to-red-600",
-      description: "Compete in global tournaments"
+      category: "compete",
+      color: "from-orange-500 to-red-600",
+      description: "Global competitions"
     },
     { 
       title: "Mathematics",
-      icon: <Calculator className="h-6 w-6 text-white" />,
-      emoji: "🧮",
-      path: "/quiz/math",
-      category: "math",
-      color: "bg-gradient-to-r from-red-500 to-pink-600",
-      description: "Numbers, algebra, geometry and more"
+      icon: <Calculator className="h-6 w-6" />,
+      path: "/quiz?subject=math",
+      category: "learn",
+      color: "from-red-500 to-pink-600",
+      description: "Numbers & algebra"
     },
     { 
       title: "Science",
-      icon: <Atom className="h-6 w-6 text-white" />,
-      emoji: "🔬",
-      path: "/quiz/science",
-      category: "science",
-      color: "bg-gradient-to-r from-green-500 to-emerald-600",
-      description: "Physics, chemistry, biology and more"
+      icon: <Atom className="h-6 w-6" />,
+      path: "/quiz?subject=science",
+      category: "learn",
+      color: "from-green-500 to-emerald-600",
+      description: "Physics & chemistry"
     },
     { 
       title: "English",
-      icon: <BookOpen className="h-6 w-6 text-white" />,
-      emoji: "📚",
-      path: "/quiz/english",
-      category: "english",
-      color: "bg-gradient-to-r from-blue-500 to-indigo-600",
-      description: "Grammar, vocabulary, reading and more"
+      icon: <BookOpen className="h-6 w-6" />,
+      path: "/quiz?subject=english",
+      category: "learn",
+      color: "from-blue-500 to-indigo-600",
+      description: "Grammar & vocabulary"
     },
     { 
       title: "General Knowledge",
-      icon: <School className="h-6 w-6 text-white" />,
-      emoji: "🌍",
-      path: "/quiz/gk",
-      category: "gk",
-      color: "bg-gradient-to-r from-amber-500 to-orange-600",
-      description: "History, geography, current affairs and more"
+      icon: <School className="h-6 w-6" />,
+      path: "/quiz?subject=gk",
+      category: "learn",
+      color: "from-amber-500 to-orange-600",
+      description: "History & geography"
     },
     { 
       title: t("friends"), 
-      icon: <Users className="h-6 w-6 text-white" />,
-      emoji: "👋", 
+      icon: <Users className="h-6 w-6" />,
       path: "/friends",
-      category: "all",
-      color: "bg-gradient-to-r from-yellow-500 to-amber-600",
-      description: "Connect with friends and classmates"
+      category: "social",
+      color: "from-teal-500 to-cyan-600",
+      description: "Connect & chat"
     },
     { 
       title: t("settings"), 
-      icon: <Settings className="h-6 w-6 text-white" />,
-      emoji: "⚙️", 
+      icon: <Settings className="h-6 w-6" />,
       path: "/settings",
       category: "all",
-      color: "bg-gradient-to-r from-pink-500 to-rose-600",
-      description: "Customize your experience"
+      color: "from-gray-500 to-slate-600",
+      description: "Preferences"
     },
   ];
 
-  // Add role-specific menu items
-  const menuItems = React.useMemo(() => {
-    if (!user) return commonMenuItems;
-
-    let items = [...commonMenuItems];
-    
-    if (user.role === "teacher") {
-      items.push({
-        title: "Teacher Dashboard",
-        icon: <School className="h-6 w-6 text-white" />,
-        emoji: "📚",
-        path: "/teacher",
-        category: "all",
-        color: "bg-gradient-to-r from-purple-500 to-indigo-600",
-        description: "Manage your classes and create quizzes"
-      });
-    } 
-    
-    if (user.role === "admin") {
-      items.push({
-        title: "Admin Dashboard",
-        icon: <Settings className="h-6 w-6 text-white" />,
-        emoji: "🔑",
-        path: "/admin",
-        category: "all",
-        color: "bg-gradient-to-r from-red-500 to-orange-600",
-        description: "Full system management"
-      });
-    }
-    
-    return items;
-  }, [user, commonMenuItems]);
-
   // Filter items by active category
   const filteredItems = menuItems.filter(item => 
-    activeCategory === "all" || item.category === activeCategory || item.category === "all"
+    activeCategory === "all" || item.category === activeCategory
   );
 
-  // Define the container animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
+      transition: { staggerChildren: 0.05 }
     }
   };
 
-  // Define the item animation variants
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
     show: { y: 0, opacity: 1 }
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Header with gradient */}
-      <header className="bg-gradient-to-r from-primary to-indigo-600 px-4 py-4 shadow-lg">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-primary via-primary to-indigo-600 px-4 py-3 shadow-xl">
+        <div className="flex justify-between items-center max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
             <motion.div 
-              className="bg-white rounded-full p-2 mr-2"
+              className="bg-white/20 backdrop-blur-sm rounded-xl p-2"
               whileHover={{ rotate: 360 }}
-              transition={{ duration: 1 }}
+              transition={{ duration: 0.8 }}
             >
               <span className="text-2xl">🧠</span>
             </motion.div>
-            <h1 className="text-2xl font-bold text-white">Master Minds</h1>
-          </div>
-          {user && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={openHelper}
-                className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
-              >
-                <Bot className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={logout}
-                className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
-              >
-                {t("logout")}
-              </Button>
+            <div>
+              <h1 className="text-xl font-bold text-white">Master Minds</h1>
+              <p className="text-xs text-white/70">Learn. Play. Win.</p>
             </div>
-          )}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <CurrencyDisplay />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={openHelper}
+              className="text-white hover:bg-white/20"
+            >
+              <Bot className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={logout}
+              className="text-white hover:bg-white/20"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* User Profile Summary with Card Design */}
-      <div className="px-4 py-6">
-        {user && (
+      {/* User Profile Card */}
+      {user && (
+        <div className="px-4 py-4 max-w-7xl mx-auto w-full">
           <motion.div 
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="flex items-center space-x-4 bg-white rounded-xl p-4 shadow-md"
+            className="bg-card/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-border/50"
           >
-            <div className="h-16 w-16 flex items-center justify-center text-3xl bg-primary-light rounded-full shadow-inner">
-              {user.avatar.startsWith("avatar") ? avatarToEmoji(user.avatar) : "👤"}
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="h-16 w-16 flex items-center justify-center text-3xl bg-gradient-to-br from-primary/20 to-secondary/20 rounded-2xl shadow-inner">
+                  {user.avatar?.startsWith("avatar") ? avatarToEmoji(user.avatar) : "👤"}
+                </div>
+                <div className="absolute -bottom-1 -right-1 bg-primary text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                  Lv.{user.level}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold truncate">{user.name}</h2>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="capitalize">{user.role}</span>
+                  <span>•</span>
+                  <span>Grade {user.grade || 'N/A'}</span>
+                </div>
+                <div className="mt-1">
+                  <UserLevel level={user.level} xp={user.xp} showBadge={false} />
+                </div>
+              </div>
+              <div className="hidden sm:flex flex-col items-end gap-1">
+                {recentBadges.slice(0, 3).map((badge, i) => (
+                  <span key={i} className="text-xl">{badge.icon}</span>
+                ))}
+              </div>
             </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-semibold">{user.name}</h2>
-              <div className="text-sm text-gray-500 capitalize">{user.role}</div>
-            </div>
-            <UserLevel level={user.level} xp={user.xp} showBadge={true} />
           </motion.div>
-        )}
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="px-4 max-w-7xl mx-auto w-full">
+        <div className="grid grid-cols-3 gap-3">
+          {quickActions.map((action, index) => (
+            <motion.div
+              key={action.path}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Link to={action.path}>
+                <Card className={`bg-gradient-to-br ${action.color} border-0 overflow-hidden group cursor-pointer`}>
+                  <CardContent className="p-3 text-center text-white">
+                    <div className="mx-auto mb-1 group-hover:scale-110 transition-transform">
+                      {action.icon}
+                    </div>
+                    <div className="text-xs font-semibold">{action.title}</div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
       </div>
 
       {/* Daily Challenge */}
-      <div className="px-4 py-2">
+      <div className="px-4 py-4 max-w-7xl mx-auto w-full">
         <DailyChallenge />
-        {/* For testing, we'll add the XP button here */}
-        {user && <GainXPButton className="mt-4 mx-auto" variant="secondary" />}
       </div>
 
-      {/* Category filters */}
-      <div className="px-4 py-3">
-        <div className="flex overflow-x-auto scrollbar-none gap-2 pb-2">
+      {/* Category Filters */}
+      <div className="px-4 pb-2 max-w-7xl mx-auto w-full">
+        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2">
           {categories.map(category => (
             <Button
               key={category.id}
               variant={activeCategory === category.id ? "default" : "outline"}
               size="sm"
               onClick={() => setActiveCategory(category.id)}
-              className={`${activeCategory === category.id ? "bg-primary text-white" : ""} whitespace-nowrap`}
+              className={`whitespace-nowrap gap-1.5 ${
+                activeCategory === category.id 
+                  ? "bg-primary text-primary-foreground shadow-lg" 
+                  : "bg-card/50 hover:bg-card"
+              }`}
             >
+              {category.icon}
               {category.name}
             </Button>
           ))}
         </div>
       </div>
 
-      {/* Subject and Menu Grid with Enhanced Cards */}
+      {/* Menu Grid */}
       <motion.div 
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="flex-1 px-4 py-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
+        className="flex-1 px-4 pb-6 max-w-7xl mx-auto w-full"
       >
-        {filteredItems.map((item) => (
-          <motion.div key={item.path} variants={itemVariants}>
-            <Link to={item.path} className="block">
-              <motion.div 
-                whileHover={{ 
-                  scale: 1.05,
-                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)"
-                }}
-                className={`${item.color} rounded-xl shadow-md overflow-hidden relative`}
-              >
-                <div className="absolute top-0 left-0 w-full h-full bg-black opacity-10"></div>
-                <div className="relative p-6 flex flex-col items-center text-white">
-                  <div className="mb-3 flex items-center justify-center">
-                    {item.icon}
-                  </div>
-                  <h3 className="font-bold text-lg mb-1">{item.title}</h3>
-                  <p className="text-xs opacity-90 text-center">{item.description}</p>
-                </div>
-              </motion.div>
-            </Link>
-          </motion.div>
-        ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {filteredItems.map((item) => (
+            <motion.div key={item.path + item.title} variants={itemVariants}>
+              <Link to={item.path}>
+                <Card className="h-full bg-card/80 backdrop-blur-sm border-border/50 overflow-hidden group cursor-pointer hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                  <CardContent className="p-4">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform shadow-lg`}>
+                      {item.icon}
+                    </div>
+                    <h3 className="font-semibold text-sm mb-1">{item.title}</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
       </motion.div>
       
-      <div className="p-4 text-center text-xs text-gray-500">
-        <p>Master Minds v1.0 - Created by Biniam Bogale, 14 years old, Ethiopia</p>
-        <p>Contact: +251713445505</p>
-      </div>
+      {/* Footer */}
+      <footer className="px-4 py-4 text-center border-t border-border/50 bg-card/30">
+        <p className="text-xs text-muted-foreground">
+          Master Minds v1.0 • Created by Biniam Bogale, Ethiopia
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Contact: +251713445505
+        </p>
+      </footer>
 
       {/* Level Up Modal */}
       {showLevelUp && user && (

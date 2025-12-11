@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,8 +6,9 @@ import { useNavigate } from "react-router-dom";
 import UserLevel from "@/components/profile/UserLevel";
 import { useUser } from "@/context/UserContext";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, TrendingUp, Trophy, Award, Star } from "lucide-react";
+import { Clock, Users, TrendingUp, Trophy, Award, Star, Home, Medal, Crown, Zap } from "lucide-react";
 import { motion } from "framer-motion";
+import BackButton from "@/components/ui/BackButton";
 
 interface LeaderboardEntry {
   id: string;
@@ -104,17 +104,21 @@ const Leaderboard: React.FC = () => {
   }, [user, timeFrame, getAllUsers]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-gradient-to-r from-primary to-indigo-600 px-4 py-3 shadow-md">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/")}
-            className="bg-transparent border-white text-white hover:bg-white hover:text-primary"
-          >
-            Back to Menu
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-yellow-500/5">
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-yellow-600 via-amber-600 to-orange-600 px-4 py-3 shadow-xl">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <BackButton to="/" className="text-white hover:bg-white/20" />
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
+              <Trophy className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Leaderboard</h1>
+              <p className="text-xs text-white/70">Top players worldwide</p>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2">
+            <Home className="h-4 w-4" /> Menu
           </Button>
         </div>
       </header>
