@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import EnhancedWelcomeScreen from "@/components/welcome/EnhancedWelcomeScreen";
-import AuthForm from "@/components/auth/AuthForm";
+import UnifiedAuthForm from "@/components/auth/UnifiedAuthForm";
 import ProfileSetup from "@/components/profile/ProfileSetup";
 import MainMenu from "@/components/dashboard/MainMenu";
+import StudentBottomNav from "@/components/layout/StudentBottomNav";
 import { useUser } from "@/context/UserContext";
 
 // App stages
@@ -15,7 +16,7 @@ enum AppStage {
 }
 
 const Index: React.FC = () => {
-  const { user, isAuthenticated, isLoading } = useUser();
+  const { user, isAuthenticated, isLoading, refreshProfile } = useUser();
   const [appStage, setAppStage] = useState<AppStage>(AppStage.Welcome);
   const [userType, setUserType] = useState<"student" | "teacher" | "admin" | "manager">("student");
   const navigate = useNavigate();
@@ -57,9 +58,15 @@ const Index: React.FC = () => {
   };
   
   // Handle successful authentication
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = async () => {
+    // Refresh profile to get latest role
+    await refreshProfile();
     // The useEffect will handle redirection based on role
-    setAppStage(AppStage.ProfileSetup);
+  };
+
+  // Handle back to welcome
+  const handleBackToWelcome = () => {
+    setAppStage(AppStage.Welcome);
   };
   
   // Render content based on the current app stage
@@ -79,18 +86,29 @@ const Index: React.FC = () => {
       case AppStage.Welcome:
         return <EnhancedWelcomeScreen onContinue={handleWelcomeContinue} />;
       case AppStage.Auth:
-        return <AuthForm onSuccess={handleAuthSuccess} initialTab={userType} />;
+        return (
+          <UnifiedAuthForm 
+            onSuccess={handleAuthSuccess} 
+            onBack={handleBackToWelcome}
+            initialTab={userType} 
+          />
+        );
       case AppStage.ProfileSetup:
         return <ProfileSetup onComplete={() => setAppStage(AppStage.MainMenu)} />;
       case AppStage.MainMenu:
-        return <MainMenu />;
+        return (
+          <>
+            <MainMenu />
+            <StudentBottomNav />
+          </>
+        );
       default:
         return <div>Something went wrong</div>;
     }
   };
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       {renderContent()}
     </div>
   );
