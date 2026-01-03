@@ -133,6 +133,12 @@ const TeacherPortal: React.FC = () => {
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Student search state
+  const [showStudentSearch, setShowStudentSearch] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [studentSearchResults, setStudentSearchResults] = useState<Student[]>([]);
+  const [searchingStudents, setSearchingStudents] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -209,27 +215,84 @@ const TeacherPortal: React.FC = () => {
   };
 
   const fetchClassStudents = async (classId: string) => {
-    const { data, error } = await supabase
-      .from('class_students')
-      .select('student_id')
-      .eq('class_id', classId);
-    
-    if (error) {
-      toast.error('Failed to fetch students');
+    try {
+      // Use the secure RPC function to get class students
+      const { data, error } = await supabase.rpc('get_class_students', {
+        class_uuid: classId
+      });
+      
+      if (error) {
+        console.error('Failed to fetch students:', error);
+        toast.error('Failed to fetch students');
+        return;
+      }
+
+      setClassStudents(data || []);
+    } catch (err) {
+      console.error('Error fetching class students:', err);
+      setClassStudents([]);
+    }
+  };
+
+  const searchStudents = async (query: string) => {
+    if (!query.trim()) {
+      setStudentSearchResults([]);
       return;
     }
 
-    if (data && data.length > 0) {
-      const studentIds = data.map(d => d.student_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', studentIds);
-      
-      setClassStudents(profiles || []);
-    } else {
-      setClassStudents([]);
+    setSearchingStudents(true);
+    try {
+      const { data, error } = await supabase.rpc('find_student_by_username', {
+        search_username: query.trim()
+      });
+
+      if (error) {
+        console.error('Student search error:', error);
+        toast.error('Search failed');
+        return;
+      }
+
+      setStudentSearchResults(data || []);
+    } catch (err) {
+      console.error('Error searching students:', err);
+    } finally {
+      setSearchingStudents(false);
     }
+  };
+
+  const handleAddStudentToClass = async (studentId: string) => {
+    if (!selectedClass) {
+      toast.error('Please select a class first');
+      return;
+    }
+
+    // Check if student is already in the class
+    const existingStudent = classStudents.find(s => s.id === studentId);
+    if (existingStudent) {
+      toast.info('Student is already in this class');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase
+      .from('class_students')
+      .insert({
+        class_id: selectedClass.id,
+        student_id: studentId
+      });
+
+    setLoading(false);
+    if (error) {
+      console.error('Add student error:', error);
+      toast.error('Failed to add student');
+      return;
+    }
+
+    toast.success('Student added to class!');
+    fetchClassStudents(selectedClass.id);
+    setShowStudentSearch(false);
+    setStudentSearchQuery('');
+    setStudentSearchResults([]);
   };
 
   const fetchQuizQuestions = async (quizId: string) => {
@@ -971,7 +1034,82 @@ const TeacherPortal: React.FC = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       <span>{selectedClass.name} - Students</span>
-                      <Badge variant="outline">{classStudents.length} students</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{classStudents.length} students</Badge>
+                        <Dialog open={showStudentSearch} onOpenChange={setShowStudentSearch}>
+                          <DialogTrigger asChild>
+                            <Button size="sm">
+                              <UserPlus className="w-4 h-4 mr-1" />
+                              Add Student
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Add Student to {selectedClass.name}</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                  <Input 
+                                    placeholder="Search by name or username..." 
+                                    className="pl-10"
+                                    value={studentSearchQuery}
+                                    onChange={(e) => setStudentSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        searchStudents(studentSearchQuery);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <Button onClick={() => searchStudents(studentSearchQuery)} disabled={searchingStudents}>
+                                  {searchingStudents ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+                                </Button>
+                              </div>
+                              
+                              <ScrollArea className="h-64">
+                                {studentSearchResults.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {studentSearchResults.map((student) => (
+                                      <div key={student.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                                            {student.avatar?.startsWith('avatar') ? student.name?.charAt(0) || 'S' : student.avatar || student.name?.charAt(0)}
+                                          </div>
+                                          <div>
+                                            <p className="font-medium">{student.name}</p>
+                                            <p className="text-sm text-muted-foreground">@{student.username} • Level {student.level}</p>
+                                          </div>
+                                        </div>
+                                        <Button 
+                                          size="sm" 
+                                          onClick={() => handleAddStudentToClass(student.id)}
+                                          disabled={loading || classStudents.some(s => s.id === student.id)}
+                                        >
+                                          {classStudents.some(s => s.id === student.id) ? 'Added' : 'Add'}
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : studentSearchQuery && !searchingStudents ? (
+                                  <p className="text-center text-muted-foreground py-8">
+                                    No students found matching "{studentSearchQuery}"
+                                  </p>
+                                ) : (
+                                  <p className="text-center text-muted-foreground py-8">
+                                    Search for students by name or username
+                                  </p>
+                                )}
+                              </ScrollArea>
+                              
+                              <div className="text-center text-sm text-muted-foreground border-t pt-4">
+                                Or share class code: <span className="font-mono font-bold">{selectedClass.class_code}</span>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -984,7 +1122,7 @@ const TeacherPortal: React.FC = () => {
                             </div>
                             <div>
                               <p className="font-medium">{student.name}</p>
-                              <p className="text-sm text-muted-foreground">Level {student.level} • {student.xp} XP</p>
+                              <p className="text-sm text-muted-foreground">@{student.username} • Level {student.level} • {student.xp} XP</p>
                             </div>
                           </div>
                           <Button variant="ghost" size="sm" onClick={() => handleRemoveStudent(student.id)}>
@@ -993,9 +1131,20 @@ const TeacherPortal: React.FC = () => {
                         </div>
                       ))}
                       {classStudents.length === 0 && (
-                        <p className="text-center text-muted-foreground py-8">
-                          No students in this class yet. Share the class code: <span className="font-mono font-bold">{selectedClass.class_code}</span>
-                        </p>
+                        <div className="text-center py-8">
+                          <p className="text-muted-foreground mb-2">No students in this class yet.</p>
+                          <p className="text-sm text-muted-foreground">
+                            Share the class code: <span className="font-mono font-bold">{selectedClass.class_code}</span>
+                          </p>
+                          <Button 
+                            className="mt-4" 
+                            variant="outline"
+                            onClick={() => setShowStudentSearch(true)}
+                          >
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            Search & Add Students
+                          </Button>
+                        </div>
                       )}
                     </ScrollArea>
                   </CardContent>

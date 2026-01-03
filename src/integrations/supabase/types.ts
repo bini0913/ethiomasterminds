@@ -442,6 +442,41 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      find_student_by_username: {
+        Args: { search_username: string }
+        Returns: {
+          avatar: string
+          id: string
+          level: number
+          name: string
+          username: string
+          xp: number
+        }[]
+      }
+      get_class_students: {
+        Args: { class_uuid: string }
+        Returns: {
+          avatar: string
+          id: string
+          joined_at: string
+          level: number
+          name: string
+          username: string
+          xp: number
+        }[]
+      }
+      get_public_leaderboard: {
+        Args: { limit_count?: number; timeframe?: string }
+        Returns: {
+          avatar: string
+          id: string
+          level: number
+          name: string
+          rank: string
+          username: string
+          xp: number
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
