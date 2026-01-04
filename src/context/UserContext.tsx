@@ -28,7 +28,9 @@ interface UserContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  loginWithUsername: (username: string, password: string) => Promise<boolean>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
+  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<void>;
   addXP: (amount: number) => Promise<void>;
@@ -145,6 +147,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Login with email (legacy)
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       if (!email.trim() || !password.trim()) {
@@ -176,9 +179,73 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signup = async (email: string, password: string, name: string): Promise<boolean> => {
+  // Login with username (new)
+  const loginWithUsername = async (username: string, password: string): Promise<boolean> => {
     try {
-      if (!email.trim() || !password.trim() || !name.trim()) {
+      if (!username.trim() || !password.trim()) {
+        toast.error("Please enter both username and password");
+        return false;
+      }
+
+      // Get email from username using RPC
+      const { data: email, error: lookupError } = await supabase
+        .rpc('get_email_by_username', { p_username: username.trim() });
+
+      if (lookupError) {
+        console.error('Username lookup error:', lookupError);
+        toast.error("Failed to find user. Please try again.");
+        return false;
+      }
+
+      if (!email) {
+        toast.error("Username not found");
+        return false;
+      }
+
+      // Login with email/password
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password.trim(),
+      });
+
+      if (error) {
+        console.error('Login error:', error);
+        if (error.message.includes('Invalid login')) {
+          toast.error("Invalid username or password");
+        } else {
+          toast.error(error.message || "Login failed");
+        }
+        return false;
+      }
+
+      if (data.user) {
+        toast.success(`Welcome back!`);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error("Login failed. Please try again.");
+      return false;
+    }
+  };
+
+  // Legacy signup (creates as student)
+  const signup = async (email: string, password: string, name: string): Promise<boolean> => {
+    return signupWithRole(email, password, name, email.split('@')[0], 'student');
+  };
+
+  // New signup with role selection
+  const signupWithRole = async (
+    email: string, 
+    password: string, 
+    name: string, 
+    username: string, 
+    role: UserRole
+  ): Promise<boolean> => {
+    try {
+      if (!email.trim() || !password.trim() || !name.trim() || !username.trim()) {
         toast.error("Please fill all required fields");
         return false;
       }
@@ -188,8 +255,18 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
+      // Check if username is already taken
+      const { data: existingEmail } = await supabase
+        .rpc('get_email_by_username', { p_username: username.trim() });
+
+      if (existingEmail) {
+        toast.error("Username is already taken");
+        return false;
+      }
+
       const redirectUrl = `${window.location.origin}/`;
 
+      // Create auth user
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password.trim(),
@@ -197,7 +274,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           emailRedirectTo: redirectUrl,
           data: {
             name: name.trim(),
-            username: email.split('@')[0],
+            username: username.trim().toLowerCase(),
           }
         }
       });
@@ -213,7 +290,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.user) {
-        toast.success("Account created successfully!");
+        // Wait for profile to be created by trigger
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Assign role via edge function
+        const { data: roleData, error: roleError } = await supabase.functions.invoke('assign-role', {
+          body: { role }
+        });
+
+        if (roleError || !roleData?.ok) {
+          console.error('Role assignment error:', roleError || roleData?.error);
+          // Role assignment failed, but account was created - they'll be without a role
+          // This shouldn't happen but we handle it gracefully
+          toast.warning("Account created but role assignment failed. Please contact support.");
+        } else {
+          toast.success(`Welcome to Master Minds, ${name}!`);
+        }
+
+        // Refresh profile to get updated role
+        await refreshProfile();
         return true;
       }
 
@@ -392,7 +487,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         isAuthenticated: !!session?.user,
         isLoading,
         login,
+        loginWithUsername,
         signup,
+        signupWithRole,
         logout,
         updateProfile,
         addXP,

@@ -442,6 +442,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       find_student_by_username: {
         Args: { search_username: string }
         Returns: {
@@ -465,6 +472,7 @@ export type Database = {
           xp: number
         }[]
       }
+      get_email_by_username: { Args: { p_username: string }; Returns: string }
       get_public_leaderboard: {
         Args: { limit_count?: number; timeframe?: string }
         Returns: {
