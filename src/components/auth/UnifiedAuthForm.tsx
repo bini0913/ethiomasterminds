@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
   GraduationCap, 
@@ -18,7 +17,7 @@ import {
   Lock,
   User,
   Mail,
-  Key
+  AtSign
 } from "lucide-react";
 import AnimatedBackground from "@/components/ui/AnimatedBackground";
 
@@ -33,34 +32,55 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   onBack,
   initialTab = "student" 
 }) => {
-  const { login, signup, refreshProfile, isLoading: authLoading } = useUser();
+  const { loginWithUsername, signupWithRole, isLoading: authLoading } = useUser();
   const [role, setRole] = useState<"student" | "teacher" | "admin" | "manager">(initialTab);
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [accessCode, setAccessCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
 
-  const needsAccessCode = role !== "student";
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email.trim() || !password.trim()) {
-      toast.error("Please enter email and password");
-      return;
-    }
-
-    if (isSignup && !name.trim()) {
-      toast.error("Please enter your name");
-      return;
-    }
-
-    if (isSignup && needsAccessCode && !accessCode.trim()) {
-      toast.error(`Please enter your ${role} access code`);
-      return;
+    if (isSignup) {
+      // Signup validation
+      if (!name.trim()) {
+        toast.error("Please enter your full name");
+        return;
+      }
+      if (!email.trim()) {
+        toast.error("Please enter your email");
+        return;
+      }
+      if (!username.trim()) {
+        toast.error("Please enter a username");
+        return;
+      }
+      if (username.includes(" ")) {
+        toast.error("Username cannot contain spaces");
+        return;
+      }
+      if (!password.trim()) {
+        toast.error("Please enter a password");
+        return;
+      }
+      if (password.length < 6) {
+        toast.error("Password must be at least 6 characters");
+        return;
+      }
+    } else {
+      // Login validation
+      if (!username.trim()) {
+        toast.error("Please enter your username");
+        return;
+      }
+      if (!password.trim()) {
+        toast.error("Please enter your password");
+        return;
+      }
     }
 
     setLoading(true);
@@ -69,34 +89,9 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
       let success = false;
       
       if (isSignup) {
-        // First signup the user (creates as student by default)
-        success = await signup(email, password, name);
-        
-        if (success && needsAccessCode) {
-          // Wait a bit for the session to be established
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Now redeem the access code to upgrade role
-          const { data, error } = await supabase.functions.invoke('redeem-access-code', {
-            body: { 
-              code: accessCode.toUpperCase().trim(), 
-              code_type: role 
-            }
-          });
-          
-          if (error || !data?.ok) {
-            console.error('Access code error:', error || data?.error);
-            toast.error(data?.error || "Invalid access code. Account created as student.");
-            // Still successful signup, just as student
-          } else {
-            toast.success(`Welcome ${role}! Role assigned successfully.`);
-          }
-          
-          // Refresh profile to get updated role
-          await refreshProfile();
-        }
+        success = await signupWithRole(email, password, name, username, role);
       } else {
-        success = await login(email, password);
+        success = await loginWithUsername(username, password);
       }
       
       if (success) {
@@ -196,26 +191,28 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
               </div>
             </div>
 
-            {/* Role Selector Tabs */}
-            <div className="flex border-b border-border/50">
-              {(['student', 'teacher', 'admin', 'manager'] as const).map((r) => {
-                const RoleIcon = roleConfig[r].icon;
-                return (
-                  <button
-                    key={r}
-                    onClick={() => setRole(r)}
-                    className={`flex-1 py-3 px-2 flex items-center justify-center gap-1 transition-all ${
-                      role === r 
-                        ? 'bg-primary/20 text-primary border-b-2 border-primary' 
-                        : 'text-muted-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    <RoleIcon className="h-4 w-4" />
-                    <span className="text-xs font-medium capitalize hidden sm:inline">{r}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {/* Role Selector Tabs - Only show for signup */}
+            {isSignup && (
+              <div className="flex border-b border-border/50">
+                {(['student', 'teacher', 'admin', 'manager'] as const).map((r) => {
+                  const RoleIcon = roleConfig[r].icon;
+                  return (
+                    <button
+                      key={r}
+                      onClick={() => setRole(r)}
+                      className={`flex-1 py-3 px-2 flex items-center justify-center gap-1 transition-all ${
+                        role === r 
+                          ? 'bg-primary/20 text-primary border-b-2 border-primary' 
+                          : 'text-muted-foreground hover:bg-muted/50'
+                      }`}
+                    >
+                      <RoleIcon className="h-4 w-4" />
+                      <span className="text-xs font-medium capitalize hidden sm:inline">{r}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -247,22 +244,53 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                 )}
               </AnimatePresence>
 
-              {/* Email */}
+              {/* Email (signup only) */}
+              <AnimatePresence mode="wait">
+                {isSignup && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-2 overflow-hidden"
+                  >
+                    <Label htmlFor="email" className="text-foreground/80 font-medium">
+                      Email
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email (for recovery)"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10 h-12 bg-muted/50 border-border/50 rounded-xl"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Username */}
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground/80 font-medium">
-                  Email
+                <Label htmlFor="username" className="text-foreground/80 font-medium">
+                  Username
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="username"
+                    type="text"
+                    placeholder={isSignup ? "Choose a username" : "Enter your username"}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
                     className="pl-10 h-12 bg-muted/50 border-border/50 rounded-xl"
                   />
                 </div>
+                {isSignup && (
+                  <p className="text-xs text-muted-foreground">This will be used for login</p>
+                )}
               </div>
 
               {/* Password */}
@@ -292,37 +320,6 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                   <p className="text-xs text-muted-foreground">Minimum 6 characters</p>
                 )}
               </div>
-
-              {/* Access Code (for non-students signing up) */}
-              <AnimatePresence mode="wait">
-                {isSignup && needsAccessCode && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-2 overflow-hidden"
-                  >
-                    <Label htmlFor="accessCode" className="text-foreground/80 font-medium">
-                      {role.charAt(0).toUpperCase() + role.slice(1)} Access Code
-                    </Label>
-                    <div className="relative">
-                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input
-                        id="accessCode"
-                        type="text"
-                        placeholder={`Enter ${role} access code`}
-                        value={accessCode}
-                        onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-                        className="pl-10 h-12 bg-muted/50 border-border/50 rounded-xl font-mono uppercase"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Contact your administrator for an access code
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               {/* Submit Button */}
               <Button
