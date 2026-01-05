@@ -68,9 +68,9 @@ const AchievementList: React.FC = () => {
                       </Badge>
                     )}
                     
-                    {achievement.reward.gems && (
+                    {achievement.reward.xp && (
                       <Badge variant="outline" className="text-xs">
-                        💎 {achievement.reward.gems}
+                        ⚡ {achievement.reward.xp} XP
                       </Badge>
                     )}
                   </div>
