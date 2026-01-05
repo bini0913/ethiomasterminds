@@ -1,140 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCurrency } from '@/context/CurrencyContext';
+import { useUser } from '@/context/UserContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Coins, Gem, Lock, Check } from 'lucide-react';
+import { Coins, Gem, Lock, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StoreItem {
   id: string;
   name: string;
   category: 'clothing' | 'accessories' | 'backgrounds' | 'effects';
-  price: { coins?: number; gems?: number };
+  price_coins: number;
+  price_gems: number;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   preview: string;
+  description: string;
   owned: boolean;
   equipped: boolean;
 }
 
 const AvatarStore: React.FC = () => {
-  const { coins, gems, spendCoins, spendGems } = useCurrency();
-  const [ownedItems, setOwnedItems] = useState<string[]>(['basic_outfit']);
+  const { user } = useUser();
+  const { coins, gems, spendCoins, spendGems, refreshCurrency } = useCurrency();
+  const [storeItems, setStoreItems] = useState<StoreItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [purchasing, setPurchasing] = useState<string | null>(null);
 
-  const storeItems: StoreItem[] = [
-    // Clothing
-    {
-      id: 'basic_outfit',
-      name: 'Basic Outfit',
-      category: 'clothing' as const,
-      price: {},
-      rarity: 'common' as const,
-      preview: '👕',
-      owned: true,
-      equipped: true
-    },
-    {
-      id: 'smart_uniform',
-      name: 'Smart Uniform',
-      category: 'clothing' as const,
-      price: { coins: 50 },
-      rarity: 'common' as const,
-      preview: '🎓',
-      owned: false,
-      equipped: false
-    },
-    {
-      id: 'lab_coat',
-      name: 'Lab Coat',
-      category: 'clothing' as const,
-      price: { coins: 150 },
-      rarity: 'rare' as const,
-      preview: '🥼',
-      owned: false,
-      equipped: false
-    },
-    {
-      id: 'royal_robe',
-      name: 'Royal Robe',
-      category: 'clothing' as const,
-      price: { gems: 25 },
-      rarity: 'legendary' as const,
-      preview: '👑',
-      owned: false,
-      equipped: false
-    },
-    
-    // Accessories
-    {
-      id: 'glasses',
-      name: 'Smart Glasses',
-      category: 'accessories' as const,
-      price: { coins: 75 },
-      rarity: 'common' as const,
-      preview: '👓',
-      owned: false,
-      equipped: false
-    },
-    {
-      id: 'crown',
-      name: 'Champion Crown',
-      category: 'accessories' as const,
-      price: { gems: 50 },
-      rarity: 'legendary' as const,
-      preview: '👑',
-      owned: false,
-      equipped: false
-    },
-    
-    // Backgrounds
-    {
-      id: 'library',
-      name: 'Grand Library',
-      category: 'backgrounds' as const,
-      price: { coins: 200 },
-      rarity: 'rare' as const,
-      preview: '📚',
-      owned: false,
-      equipped: false
-    },
-    {
-      id: 'space',
-      name: 'Space Station',
-      category: 'backgrounds' as const,
-      price: { gems: 30 },
-      rarity: 'epic' as const,
-      preview: '🚀',
-      owned: false,
-      equipped: false
-    },
-    
-    // Effects
-    {
-      id: 'sparkles',
-      name: 'Sparkle Effect',
-      category: 'effects' as const,
-      price: { gems: 15 },
-      rarity: 'rare' as const,
-      preview: '✨',
-      owned: false,
-      equipped: false
-    },
-    {
-      id: 'glow',
-      name: 'Master Glow',
-      category: 'effects' as const,
-      price: { gems: 40 },
-      rarity: 'legendary' as const,
-      preview: '🌟',
-      owned: false,
-      equipped: false
+  useEffect(() => {
+    fetchStoreItems();
+  }, [user?.id]);
+
+  const fetchStoreItems = async () => {
+    try {
+      // Fetch all avatar items
+      const { data: items, error: itemsError } = await supabase
+        .from('avatar_items')
+        .select('*');
+
+      if (itemsError) throw itemsError;
+
+      // Fetch user's inventory if logged in
+      let ownedItemIds: string[] = [];
+      let equippedItemIds: string[] = [];
+      
+      if (user?.id) {
+        const { data: inventory } = await supabase
+          .from('user_inventory')
+          .select('item_id, equipped')
+          .eq('user_id', user.id);
+
+        ownedItemIds = (inventory || []).map(i => i.item_id);
+        equippedItemIds = (inventory || []).filter(i => i.equipped).map(i => i.item_id);
+      }
+
+      const mappedItems: StoreItem[] = (items || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        category: item.category as StoreItem['category'],
+        price_coins: item.price_coins || 0,
+        price_gems: item.price_gems || 0,
+        rarity: item.rarity as StoreItem['rarity'],
+        preview: item.preview,
+        description: item.description || '',
+        owned: ownedItemIds.includes(item.id),
+        equipped: equippedItemIds.includes(item.id)
+      }));
+
+      setStoreItems(mappedItems);
+    } catch (err) {
+      console.error('Error fetching store items:', err);
+    } finally {
+      setLoading(false);
     }
-  ].map(item => ({
-    ...item,
-    owned: ownedItems.includes(item.id) || item.owned,
-    equipped: item.id === 'basic_outfit' // Default equipped item
-  }));
+  };
 
   const rarityColors = {
     common: 'bg-gray-500',
@@ -150,32 +91,91 @@ const AvatarStore: React.FC = () => {
     effects: storeItems.filter(item => item.category === 'effects')
   };
 
-  const handlePurchase = (item: StoreItem) => {
+  const handlePurchase = async (item: StoreItem) => {
+    if (!user?.id) {
+      toast.error('Please log in to purchase items');
+      return;
+    }
+
     if (item.owned) {
       toast.info('You already own this item!');
       return;
     }
 
-    let canPurchase = false;
-    
-    if (item.price.coins && item.price.gems) {
-      // Both currencies required
-      if (coins >= item.price.coins && gems >= item.price.gems) {
-        spendCoins(item.price.coins);
-        spendGems(item.price.gems);
+    setPurchasing(item.id);
+
+    try {
+      let canPurchase = false;
+      
+      if (item.price_gems > 0) {
+        canPurchase = await spendGems(item.price_gems);
+      } else if (item.price_coins > 0) {
+        canPurchase = await spendCoins(item.price_coins);
+      } else {
+        // Free item
         canPurchase = true;
       }
-    } else if (item.price.coins) {
-      canPurchase = spendCoins(item.price.coins);
-    } else if (item.price.gems) {
-      canPurchase = spendGems(item.price.gems);
-    }
 
-    if (canPurchase) {
-      setOwnedItems(prev => [...prev, item.id]);
-      toast.success(`Purchased ${item.name}!`);
-    } else {
-      toast.error('Insufficient funds!');
+      if (canPurchase) {
+        // Add to inventory
+        const { error } = await supabase
+          .from('user_inventory')
+          .insert({
+            user_id: user.id,
+            item_id: item.id,
+            equipped: false
+          });
+
+        if (error) throw error;
+
+        toast.success(`Purchased ${item.name}!`);
+        await fetchStoreItems();
+        await refreshCurrency();
+      } else {
+        toast.error('Insufficient funds!');
+      }
+    } catch (err) {
+      console.error('Error purchasing item:', err);
+      toast.error('Failed to purchase item');
+    } finally {
+      setPurchasing(null);
+    }
+  };
+
+  const handleEquip = async (item: StoreItem) => {
+    if (!user?.id) return;
+
+    try {
+      // Unequip all items in the same category
+      const { data: categoryInventory } = await supabase
+        .from('user_inventory')
+        .select('id, item_id')
+        .eq('user_id', user.id);
+
+      const sameCategoryItems = storeItems.filter(si => si.category === item.category);
+      const sameCategoryInventory = (categoryInventory || []).filter(inv => 
+        sameCategoryItems.some(sci => sci.id === inv.item_id)
+      );
+
+      for (const inv of sameCategoryInventory) {
+        await supabase
+          .from('user_inventory')
+          .update({ equipped: false })
+          .eq('id', inv.id);
+      }
+
+      // Equip this item
+      await supabase
+        .from('user_inventory')
+        .update({ equipped: true })
+        .eq('user_id', user.id)
+        .eq('item_id', item.id);
+
+      toast.success(`Equipped ${item.name}!`);
+      await fetchStoreItems();
+    } catch (err) {
+      console.error('Error equipping item:', err);
+      toast.error('Failed to equip item');
     }
   };
 
@@ -209,17 +209,20 @@ const AvatarStore: React.FC = () => {
         {!item.owned && (
           <div className="space-y-2">
             <div className="flex items-center justify-center space-x-2">
-              {item.price.coins && (
+              {item.price_coins > 0 && (
                 <div className="flex items-center space-x-1">
                   <Coins className="w-4 h-4 text-yellow-500" />
-                  <span className="text-sm">{item.price.coins}</span>
+                  <span className="text-sm">{item.price_coins}</span>
                 </div>
               )}
-              {item.price.gems && (
+              {item.price_gems > 0 && (
                 <div className="flex items-center space-x-1">
                   <Gem className="w-4 h-4 text-purple-500" />
-                  <span className="text-sm">{item.price.gems}</span>
+                  <span className="text-sm">{item.price_gems}</span>
                 </div>
+              )}
+              {item.price_coins === 0 && item.price_gems === 0 && (
+                <span className="text-sm text-green-500">Free</span>
               )}
             </div>
             
@@ -228,12 +231,15 @@ const AvatarStore: React.FC = () => {
               className="w-full"
               onClick={() => handlePurchase(item)}
               disabled={
-                (item.price.coins && coins < item.price.coins) ||
-                (item.price.gems && gems < item.price.gems)
+                purchasing === item.id ||
+                (item.price_coins > 0 && coins < item.price_coins) ||
+                (item.price_gems > 0 && gems < item.price_gems)
               }
             >
-              {(item.price.coins && coins < item.price.coins) ||
-               (item.price.gems && gems < item.price.gems) ? (
+              {purchasing === item.id ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (item.price_coins > 0 && coins < item.price_coins) ||
+                 (item.price_gems > 0 && gems < item.price_gems) ? (
                 <>
                   <Lock className="w-3 h-3 mr-1" />
                   Locked
@@ -246,13 +252,21 @@ const AvatarStore: React.FC = () => {
         )}
 
         {item.owned && !item.equipped && (
-          <Button size="sm" variant="outline" className="w-full">
+          <Button size="sm" variant="outline" className="w-full" onClick={() => handleEquip(item)}>
             Equip
           </Button>
         )}
       </div>
     </Card>
   );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -284,9 +298,15 @@ const AvatarStore: React.FC = () => {
 
         {Object.entries(categoryItems).map(([category, items]) => (
           <TabsContent key={category} value={category}>
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {items.map(renderStoreItem)}
-            </div>
+            {items.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {items.map(renderStoreItem)}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No items available in this category
+              </div>
+            )}
           </TabsContent>
         ))}
       </Tabs>
