@@ -7,9 +7,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
-import { useQuiz } from "@/context/QuizContext";
+import { useRoom } from "@/context/RoomContext";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Users, 
   MessageSquare, 
@@ -17,13 +18,13 @@ import {
   Clock, 
   Plus,
   Send,
-  ArrowLeft,
   Home,
   Gamepad,
   Zap,
   Crown,
   Star,
-  Swords
+  Swords,
+  RefreshCw
 } from "lucide-react";
 import { avatarToEmoji } from "@/utils/avatarUtils";
 import RoomCard, { Room } from "@/components/multiplayer/RoomCard";
@@ -32,13 +33,42 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import BackButton from "@/components/ui/BackButton";
 
+interface OnlinePlayer {
+  id: string;
+  name: string;
+  avatar: string;
+  level: number;
+  xp: number;
+  status: string;
+}
+
+interface ChatMessage {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  message: string;
+  timestamp: Date;
+}
+
+interface Tournament {
+  id: string;
+  name: string;
+  startTime: Date;
+  players: number;
+  maxPlayers: number;
+  prize: string;
+  status: string;
+}
+
 const Lobby: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
-  const { getAvailableSubjects } = useQuiz();
+  const { rooms, createRoom: contextCreateRoom, joinRoom: contextJoinRoom, fetchRooms } = useRoom();
   
   const [chatMessage, setChatMessage] = useState("");
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [newRoomData, setNewRoomData] = useState({
     name: "",
     maxPlayers: "2",
@@ -47,134 +77,255 @@ const Lobby: React.FC = () => {
     gameMode: "1v1"
   });
   
-  const [chatMessages, setChatMessages] = useState<Array<{
-    id: string;
-    userId: string;
-    userName: string;
-    userAvatar: string;
-    message: string;
-    timestamp: Date;
-  }>>([
-    {
-      id: "msg1",
-      userId: "system",
-      userName: "System",
-      userAvatar: "avatar-1",
-      message: "Welcome to the Master Minds Lobby! 🎮",
-      timestamp: new Date(),
-    },
-    {
-      id: "msg2",
-      userId: "user1",
-      userName: "Alex",
-      userAvatar: "avatar-2",
-      message: "Anyone up for a math challenge?",
-      timestamp: new Date(Date.now() - 5 * 60000),
-    },
-    {
-      id: "msg3",
-      userId: "user2",
-      userName: "Maria",
-      userAvatar: "avatar-3",
-      message: "Just finished a science quiz, got 95%! 🎉",
-      timestamp: new Date(Date.now() - 2 * 60000),
-    },
-  ]);
-
-  const [onlinePlayers] = useState([
-    { id: "1", name: "Alex", avatar: "avatar-1", grade: "5", status: "online", xp: 450 },
-    { id: "2", name: "Maria", avatar: "avatar-2", grade: "6", status: "in-game", xp: 720 },
-    { id: "3", name: "David", avatar: "avatar-3", grade: "5", status: "online", xp: 380 },
-    { id: "4", name: "Sophie", avatar: "avatar-4", grade: "7", status: "online", xp: 890 },
-    { id: "5", name: "Michael", avatar: "avatar-5", grade: "6", status: "away", xp: 510 },
-  ]);
-
-  const [activeRooms, setActiveRooms] = useState<Room[]>([
-    { id: "r1", name: "Math Duel", players: 2, maxPlayers: 2, status: "in-progress", subject: "Mathematics", difficulty: "Medium", gameMode: "1v1" },
-    { id: "r2", name: "Science Battle", players: 1, maxPlayers: 2, status: "waiting", subject: "Science", difficulty: "Easy", gameMode: "1v1" },
-    { id: "r3", name: "Team Challenge", players: 2, maxPlayers: 4, status: "waiting", subject: "Mixed", difficulty: "Hard", gameMode: "2v2" },
-    { id: "r4", name: "English Quiz", players: 3, maxPlayers: 3, status: "in-progress", subject: "English", difficulty: "Medium", gameMode: "Battle Royale" },
-  ]);
-
-  const [tournaments] = useState([
-    { id: "t1", name: "Daily Math Championship", startTime: new Date(Date.now() + 30 * 60000), players: 12, maxPlayers: 16, prize: "500 XP + Gold Badge" },
-    { id: "t2", name: "Science Weekly Tournament", startTime: new Date(Date.now() + 120 * 60000), players: 8, maxPlayers: 32, prize: "1000 XP + Special Avatar" },
-    { id: "t3", name: "Master Minds World Cup", startTime: new Date(Date.now() + 24 * 60 * 60000), players: 64, maxPlayers: 128, prize: "5000 XP + Champion Title" },
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
 
   useEffect(() => {
     if (!user) {
       toast.error("Please log in to access the lobby");
       setTimeout(() => navigate("/"), 2000);
+      return;
     }
+
+    loadLobbyData();
+    setupRealtimeSubscriptions();
+
+    return () => {
+      supabase.removeAllChannels();
+    };
   }, [user, navigate]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const loadLobbyData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchRooms(),
+        fetchOnlinePlayers(),
+        fetchChatMessages(),
+        fetchTournaments()
+      ]);
+    } catch (error) {
+      console.error('Error loading lobby data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchOnlinePlayers = async () => {
+    const { data, error } = await supabase
+      .from('user_presence')
+      .select(`
+        user_id,
+        status,
+        last_seen,
+        profiles!inner(id, name, avatar, level, xp)
+      `)
+      .eq('status', 'online')
+      .gte('last_seen', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+      .limit(20);
+
+    if (!error && data) {
+      const players = data.map((p: any) => ({
+        id: p.profiles.id,
+        name: p.profiles.name,
+        avatar: p.profiles.avatar || 'avatar-1',
+        level: p.profiles.level || 1,
+        xp: p.profiles.xp || 0,
+        status: p.status
+      }));
+      setOnlinePlayers(players);
+    }
+
+    // Update own presence
+    if (user) {
+      await supabase
+        .from('user_presence')
+        .upsert({
+          user_id: user.id,
+          status: 'online',
+          last_seen: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+    }
+  };
+
+  const fetchChatMessages = async () => {
+    const { data, error } = await supabase
+      .from('lobby_messages')
+      .select(`
+        id,
+        content,
+        created_at,
+        user_id,
+        profiles!inner(name, avatar)
+      `)
+      .order('created_at', { ascending: true })
+      .limit(50);
+
+    if (!error && data) {
+      const messages = data.map((m: any) => ({
+        id: m.id,
+        userId: m.user_id,
+        userName: m.profiles.name,
+        userAvatar: m.profiles.avatar || 'avatar-1',
+        message: m.content,
+        timestamp: new Date(m.created_at)
+      }));
+      setChatMessages(messages);
+    }
+  };
+
+  const fetchTournaments = async () => {
+    const { data, error } = await supabase
+      .from('tournaments')
+      .select(`
+        *,
+        tournament_participants(count)
+      `)
+      .in('status', ['upcoming', 'active'])
+      .order('start_time', { ascending: true })
+      .limit(10);
+
+    if (!error && data) {
+      const tourns = data.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        startTime: new Date(t.start_time),
+        players: t.tournament_participants?.[0]?.count || 0,
+        maxPlayers: t.max_participants || 128,
+        prize: t.prize_description || `${t.prize_coins || 0} coins + ${t.prize_gems || 0} gems`,
+        status: t.status
+      }));
+      setTournaments(tourns);
+    }
+  };
+
+  const setupRealtimeSubscriptions = () => {
+    // Subscribe to lobby chat
+    const chatChannel = supabase
+      .channel('lobby-chat')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'lobby_messages'
+      }, async (payload) => {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name, avatar')
+          .eq('id', payload.new.user_id)
+          .single();
+        
+        if (profile) {
+          const newMsg: ChatMessage = {
+            id: payload.new.id,
+            userId: payload.new.user_id,
+            userName: profile.name,
+            userAvatar: profile.avatar || 'avatar-1',
+            message: payload.new.content,
+            timestamp: new Date(payload.new.created_at)
+          };
+          setChatMessages(prev => [...prev, newMsg]);
+        }
+      })
+      .subscribe();
+
+    // Subscribe to room changes
+    const roomChannel = supabase
+      .channel('lobby-rooms')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'multiplayer_rooms'
+      }, () => {
+        fetchRooms();
+      })
+      .subscribe();
+
+    // Subscribe to presence changes
+    const presenceChannel = supabase
+      .channel('lobby-presence')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_presence'
+      }, () => {
+        fetchOnlinePlayers();
+      })
+      .subscribe();
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() || !user) return;
     
-    const newMessage = {
-      id: `msg-${Date.now()}`,
-      userId: user.id,
-      userName: user.name,
-      userAvatar: user.avatar,
-      message: chatMessage,
-      timestamp: new Date(),
-    };
-    
-    setChatMessages(prev => [...prev, newMessage]);
-    setChatMessage("");
+    const { error } = await supabase
+      .from('lobby_messages')
+      .insert({
+        user_id: user.id,
+        content: chatMessage.trim()
+      });
+
+    if (error) {
+      toast.error('Failed to send message');
+    } else {
+      setChatMessage("");
+    }
   };
 
-  const createRoom = () => {
+  const createRoom = async () => {
     if (!newRoomData.name.trim()) {
       toast.error("Please enter a room name");
       return;
     }
 
-    const newRoom: Room = {
-      id: `room-${Date.now()}`,
-      name: newRoomData.name,
-      players: 1,
-      maxPlayers: parseInt(newRoomData.maxPlayers),
-      status: "waiting",
-      subject: newRoomData.subject,
-      difficulty: newRoomData.difficulty,
-      gameMode: newRoomData.gameMode,
-      createdBy: user?.id
-    };
-    
-    setActiveRooms(prev => [newRoom, ...prev]);
-    setCreateRoomOpen(false);
-    toast.success("Room created!");
-    setNewRoomData({ name: "", maxPlayers: "2", subject: "Mathematics", difficulty: "Medium", gameMode: "1v1" });
-  };
+    const success = await contextCreateRoom(
+      newRoomData.name,
+      parseInt(newRoomData.maxPlayers),
+      undefined,
+      newRoomData.subject,
+      newRoomData.difficulty,
+      newRoomData.gameMode
+    );
 
-  const joinRoom = (room: Room) => {
-    if (room.status !== "waiting" || room.players >= room.maxPlayers) {
-      toast.error("Cannot join this room");
-      return;
-    }
-    
-    setActiveRooms(prev => prev.map(r => r.id === room.id ? { ...r, players: r.players + 1 } : r));
-    toast.success(`Joined ${room.name}!`);
-    setTimeout(() => navigate("/quiz"), 2000);
-  };
-
-  const joinTournament = (tournamentId: string) => {
-    const tournament = tournaments.find(t => t.id === tournamentId);
-    if (tournament) {
-      toast.success(`Registered for ${tournament.name}!`);
+    if (success) {
+      setCreateRoomOpen(false);
+      setNewRoomData({ name: "", maxPlayers: "2", subject: "Mathematics", difficulty: "Medium", gameMode: "1v1" });
     }
   };
 
-  const challengePlayer = (playerId: string, playerName: string) => {
-    const player = onlinePlayers.find(p => p.id === playerId);
-    if (!player || player.status !== "online") {
-      toast.error(`${playerName} is not available`);
-      return;
+  const handleJoinRoom = async (room: Room) => {
+    const success = await contextJoinRoom(room.id);
+    if (success) {
+      navigate(`/multiplayer?room=${room.id}`);
     }
+  };
+
+  const joinTournament = async (tournamentId: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('tournament_participants')
+      .insert({
+        tournament_id: tournamentId,
+        user_id: user.id
+      });
+
+    if (error) {
+      if (error.code === '23505') {
+        toast.error('Already registered for this tournament');
+      } else {
+        toast.error('Failed to register');
+      }
+    } else {
+      toast.success('Registered for tournament!');
+      fetchTournaments();
+    }
+  };
+
+  const challengePlayer = async (playerId: string, playerName: string) => {
+    // Create a private room and invite the player
     toast.success(`Challenge sent to ${playerName}!`);
+    // TODO: Implement challenge system with notifications
   };
 
   const formatTimeRemaining = (startTime: Date) => {
@@ -193,6 +344,19 @@ const Lobby: React.FC = () => {
     }
   };
 
+  // Convert context rooms to Room type
+  const activeRooms: Room[] = rooms.map(r => ({
+    id: r.id,
+    name: r.name,
+    players: r.players?.length || 0,
+    maxPlayers: r.maxPlayers,
+    status: r.status as 'waiting' | 'in-progress' | 'finished',
+    subject: r.subject || 'Mixed',
+    difficulty: r.difficulty || 'Medium',
+    gameMode: r.gameMode || '1v1',
+    createdBy: r.hostId
+  }));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10">
       {/* Header */}
@@ -209,6 +373,14 @@ const Lobby: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={loadLobbyData}
+              className="text-white hover:bg-white/20"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
             <Button
               variant="secondary"
               size="sm"
@@ -248,43 +420,48 @@ const Lobby: React.FC = () => {
             <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-xl py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="h-5 w-5" />
-                Online Players
+                Online Players ({onlinePlayers.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[500px]">
                 <div className="p-3 space-y-2">
-                  {onlinePlayers.map((player) => (
-                    <motion.div 
-                      key={player.id}
-                      whileHover={{ scale: 1.02 }}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
-                    >
-                      <div className="relative">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-lg">
-                          {avatarToEmoji(player.avatar)}
-                        </div>
-                        <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${getStatusColor(player.status)} border-2 border-card`}></div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">{player.name}</div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Star className="h-3 w-3 text-yellow-500" />
-                          {player.xp} XP
-                        </div>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="h-8 px-3 text-xs"
-                        onClick={() => challengePlayer(player.id, player.name)}
-                        disabled={player.status !== "online"}
+                  {onlinePlayers.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No players online</p>
+                  ) : (
+                    onlinePlayers.map((player) => (
+                      <motion.div 
+                        key={player.id}
+                        whileHover={{ scale: 1.02 }}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
                       >
-                        <Swords className="h-3 w-3 mr-1" />
-                        Fight
-                      </Button>
-                    </motion.div>
-                  ))}
+                        <div className="relative">
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-lg">
+                            {avatarToEmoji(player.avatar)}
+                          </div>
+                          <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${getStatusColor(player.status)} border-2 border-card`}></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">{player.name}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Star className="h-3 w-3 text-yellow-500" />
+                            Lv.{player.level} • {player.xp} XP
+                          </div>
+                        </div>
+                        {player.id !== user?.id && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => challengePlayer(player.id, player.name)}
+                          >
+                            <Swords className="h-3 w-3 mr-1" />
+                            Fight
+                          </Button>
+                        )}
+                      </motion.div>
+                    ))
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -299,19 +476,23 @@ const Lobby: React.FC = () => {
               <Tabs defaultValue="rooms">
                 <TabsList className="w-full grid grid-cols-2">
                   <TabsTrigger value="rooms" className="gap-1">
-                    <Gamepad className="h-3 w-3" /> Rooms
+                    <Gamepad className="h-3 w-3" /> Rooms ({activeRooms.length})
                   </TabsTrigger>
                   <TabsTrigger value="tournaments" className="gap-1">
-                    <Trophy className="h-3 w-3" /> Tournaments
+                    <Trophy className="h-3 w-3" /> Tournaments ({tournaments.length})
                   </TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="rooms" className="mt-3">
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-3 pr-2">
-                      {activeRooms.map((room) => (
-                        <RoomCard key={room.id} room={room} onJoin={joinRoom} />
-                      ))}
+                      {activeRooms.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">No active rooms. Create one!</p>
+                      ) : (
+                        activeRooms.map((room) => (
+                          <RoomCard key={room.id} room={room} onJoin={handleJoinRoom} />
+                        ))
+                      )}
                     </div>
                   </ScrollArea>
                 </TabsContent>
@@ -319,38 +500,47 @@ const Lobby: React.FC = () => {
                 <TabsContent value="tournaments" className="mt-3">
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-3">
-                      {tournaments.map((tournament) => (
-                        <motion.div 
-                          key={tournament.id}
-                          whileHover={{ scale: 1.02 }}
-                          className="border border-border/50 rounded-xl p-4 bg-muted/30 hover:border-primary/50 transition-colors"
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <h3 className="font-semibold text-sm">{tournament.name}</h3>
-                              <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                                <Clock className="h-3 w-3" />
-                                Starts in: {formatTimeRemaining(tournament.startTime)}
+                      {tournaments.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">No upcoming tournaments</p>
+                      ) : (
+                        tournaments.map((tournament) => (
+                          <motion.div 
+                            key={tournament.id}
+                            whileHover={{ scale: 1.02 }}
+                            className="border border-border/50 rounded-xl p-4 bg-muted/30 hover:border-primary/50 transition-colors"
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h3 className="font-semibold text-sm">{tournament.name}</h3>
+                                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  {tournament.status === 'active' ? 'In Progress' : `Starts in: ${formatTimeRemaining(tournament.startTime)}`}
+                                </div>
                               </div>
+                              <Badge variant="secondary" className="text-xs">
+                                {tournament.players}/{tournament.maxPlayers}
+                              </Badge>
                             </div>
-                            <Badge variant="secondary" className="text-xs">
-                              {tournament.players}/{tournament.maxPlayers}
-                            </Badge>
-                          </div>
-                          <div className="text-xs text-muted-foreground mb-2">
-                            <span className="text-yellow-500 font-medium">🏆 Prize:</span> {tournament.prize}
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-1.5 mb-2">
-                            <div 
-                              className="bg-gradient-to-r from-primary to-purple-500 h-1.5 rounded-full transition-all" 
-                              style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }}
-                            />
-                          </div>
-                          <Button size="sm" className="w-full" onClick={() => joinTournament(tournament.id)}>
-                            Register
-                          </Button>
-                        </motion.div>
-                      ))}
+                            <div className="text-xs text-muted-foreground mb-2">
+                              <span className="text-yellow-500 font-medium">🏆 Prize:</span> {tournament.prize}
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-1.5 mb-2">
+                              <div 
+                                className="bg-gradient-to-r from-primary to-purple-500 h-1.5 rounded-full transition-all" 
+                                style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }}
+                              />
+                            </div>
+                            <Button 
+                              size="sm" 
+                              className="w-full" 
+                              onClick={() => joinTournament(tournament.id)}
+                              disabled={tournament.status === 'active'}
+                            >
+                              {tournament.status === 'active' ? 'In Progress' : 'Register'}
+                            </Button>
+                          </motion.div>
+                        ))
+                      )}
                     </div>
                   </ScrollArea>
                 </TabsContent>
@@ -369,22 +559,26 @@ const Lobby: React.FC = () => {
             <CardContent className="p-0 flex flex-col h-[500px]">
               <ScrollArea className="flex-1 p-3">
                 <div className="space-y-3">
-                  {chatMessages.map((msg) => (
-                    <div key={msg.id} className="flex items-start gap-2">
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-sm flex-shrink-0">
-                        {msg.userId === "system" ? "🤖" : avatarToEmoji(msg.userAvatar)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
-                          <span className="font-medium text-sm">{msg.userName}</span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                  {chatMessages.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No messages yet. Say hi!</p>
+                  ) : (
+                    chatMessages.map((msg) => (
+                      <div key={msg.id} className="flex items-start gap-2">
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-sm flex-shrink-0">
+                          {avatarToEmoji(msg.userAvatar)}
                         </div>
-                        <p className="text-sm text-muted-foreground break-words">{msg.message}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2">
+                            <span className="font-medium text-sm">{msg.userName}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground break-words">{msg.message}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </ScrollArea>
               <form onSubmit={handleSendMessage} className="p-3 border-t border-border/50">
