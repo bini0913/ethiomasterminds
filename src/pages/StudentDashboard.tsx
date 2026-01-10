@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useAchievements } from '@/context/AchievementsContext';
+import { useFriends } from '@/context/FriendsContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Trophy, 
   BookOpen, 
@@ -21,21 +23,247 @@ import {
   Brain,
   Zap,
   Gamepad2,
-  Crown,
   Flame,
   MessageCircle,
   Settings,
   LogOut,
-  Sparkles
+  CheckCircle,
+  Gift
 } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import CurrencyDisplay from '@/components/currency/CurrencyDisplay';
+import { toast } from 'sonner';
+
+interface DailyMission {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  targetValue: number;
+  rewardXp: number;
+  rewardCoins: number;
+  completed: boolean;
+  claimed: boolean;
+}
+
+interface TodayStats {
+  quizzesCompleted: number;
+  correctAnswers: number;
+  totalQuestions: number;
+  xpEarned: number;
+}
+
+interface OnlineFriend {
+  id: string;
+  name: string;
+  avatar: string;
+  level: number;
+  online: boolean;
+}
 
 const StudentDashboard: React.FC = () => {
   const { user, logout } = useUser();
-  const { coins, gems } = useCurrency();
+  const { coins, gems, addCoins, addGems } = useCurrency();
   const { unlockedBadges } = useAchievements();
+  const { friends } = useFriends();
   const navigate = useNavigate();
+
+  const [dailyMissions, setDailyMissions] = useState<DailyMission[]>([]);
+  const [todayStats, setTodayStats] = useState<TodayStats>({
+    quizzesCompleted: 0,
+    correctAnswers: 0,
+    totalQuestions: 0,
+    xpEarned: 0
+  });
+  const [streak, setStreak] = useState(0);
+  const [onlineFriends, setOnlineFriends] = useState<OnlineFriend[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
+
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchTodayStats(),
+        fetchDailyMissions(),
+        fetchStreak(),
+        fetchOnlineFriends()
+      ]);
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTodayStats = async () => {
+    if (!user) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from('quiz_results')
+      .select('score, correct_answers, total_questions, xp_earned')
+      .eq('student_id', user.id)
+      .gte('completed_at', today.toISOString());
+
+    if (!error && data) {
+      const stats = data.reduce((acc, result) => ({
+        quizzesCompleted: acc.quizzesCompleted + 1,
+        correctAnswers: acc.correctAnswers + result.correct_answers,
+        totalQuestions: acc.totalQuestions + result.total_questions,
+        xpEarned: acc.xpEarned + (result.xp_earned || 0)
+      }), { quizzesCompleted: 0, correctAnswers: 0, totalQuestions: 0, xpEarned: 0 });
+
+      setTodayStats(stats);
+    }
+  };
+
+  const fetchDailyMissions = async () => {
+    if (!user) return;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Fetch user's daily missions
+    const { data: userMissions, error } = await supabase
+      .from('user_missions')
+      .select(`
+        id,
+        progress,
+        completed,
+        claimed,
+        daily_missions!inner(
+          id,
+          title,
+          description,
+          target_value,
+          reward_xp,
+          reward_coins,
+          mission_type
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('mission_date', today);
+
+    if (!error && userMissions) {
+      const missions: DailyMission[] = userMissions.map((um: any) => ({
+        id: um.id,
+        title: um.daily_missions.title,
+        description: um.daily_missions.description,
+        progress: um.progress,
+        targetValue: um.daily_missions.target_value,
+        rewardXp: um.daily_missions.reward_xp || 0,
+        rewardCoins: um.daily_missions.reward_coins || 0,
+        completed: um.completed || false,
+        claimed: um.claimed || false
+      }));
+      setDailyMissions(missions);
+    } else {
+      // No missions assigned yet, fetch available missions and assign
+      const { data: availableMissions } = await supabase
+        .from('daily_missions')
+        .select('*')
+        .eq('is_active', true)
+        .limit(3);
+
+      if (availableMissions && availableMissions.length > 0) {
+        const inserts = availableMissions.map(m => ({
+          user_id: user.id,
+          mission_id: m.id,
+          mission_date: today,
+          progress: 0,
+          completed: false,
+          claimed: false
+        }));
+
+        await supabase.from('user_missions').insert(inserts);
+        
+        // Re-fetch
+        fetchDailyMissions();
+      }
+    }
+  };
+
+  const fetchStreak = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('user_streaks')
+      .select('current_streak, longest_streak')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!error && data) {
+      setStreak(data.current_streak || 0);
+    }
+  };
+
+  const fetchOnlineFriends = async () => {
+    if (!user) return;
+
+    // Get accepted friends
+    const { data: friendsList, error } = await supabase
+      .from('friends')
+      .select('friend_id')
+      .eq('user_id', user.id)
+      .eq('status', 'accepted');
+
+    if (!error && friendsList) {
+      const friendIds = friendsList.map(f => f.friend_id);
+      
+      if (friendIds.length > 0) {
+        // Get profiles with online status
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            name,
+            avatar,
+            level,
+            user_presence!inner(status, last_seen)
+          `)
+          .in('id', friendIds);
+
+        if (profiles) {
+          const onlineList = profiles.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            avatar: p.avatar || 'avatar-1',
+            level: p.level || 1,
+            online: p.user_presence?.status === 'online' && 
+              new Date(p.user_presence?.last_seen).getTime() > Date.now() - 5 * 60 * 1000
+          })).sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
+          
+          setOnlineFriends(onlineList.slice(0, 5));
+        }
+      }
+    }
+  };
+
+  const claimMissionReward = async (mission: DailyMission) => {
+    if (!mission.completed || mission.claimed) return;
+
+    const { error } = await supabase
+      .from('user_missions')
+      .update({ claimed: true })
+      .eq('id', mission.id);
+
+    if (!error) {
+      // Award rewards
+      if (mission.rewardCoins > 0) {
+        await addCoins(mission.rewardCoins);
+      }
+      // XP is handled separately through profiles update
+      toast.success(`Claimed ${mission.rewardXp} XP + ${mission.rewardCoins} coins!`);
+      fetchDailyMissions();
+    }
+  };
 
   const getRankInfo = (level: number) => {
     if (level < 5) return { title: "Rookie", icon: "🌱", color: "from-slate-500 to-slate-600" };
@@ -48,15 +276,10 @@ const StudentDashboard: React.FC = () => {
   const rank = getRankInfo(user?.level || 1);
   const xpForNextLevel = (user?.level || 1) * 100;
   const currentXP = user?.xp || 0;
-  const xpProgress = (currentXP / xpForNextLevel) * 100;
-
-  const todayStats = {
-    quizzesCompleted: 3,
-    correctAnswers: 28,
-    totalQuestions: 35,
-    xpEarned: 140,
-    streak: 5
-  };
+  const xpProgress = Math.min((currentXP / xpForNextLevel) * 100, 100);
+  const accuracy = todayStats.totalQuestions > 0 
+    ? Math.round((todayStats.correctAnswers / todayStats.totalQuestions) * 100) 
+    : 0;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -152,7 +375,7 @@ const StudentDashboard: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 bg-orange-500/20 px-4 py-2 rounded-xl">
                     <Flame className="h-5 w-5 text-orange-500" />
-                    <span className="font-display font-bold text-orange-500">{todayStats.streak} Day Streak</span>
+                    <span className="font-display font-bold text-orange-500">{streak} Day Streak</span>
                   </div>
                 </div>
                 <div className="relative h-4 rounded-full bg-muted overflow-hidden">
@@ -172,7 +395,7 @@ const StudentDashboard: React.FC = () => {
             {[
               { icon: Star, label: "Level", value: user?.level || 1, color: "from-primary to-accent" },
               { icon: Zap, label: "Today's XP", value: `+${todayStats.xpEarned}`, color: "from-secondary to-glow-cyan" },
-              { icon: Target, label: "Accuracy", value: `${Math.round((todayStats.correctAnswers / todayStats.totalQuestions) * 100)}%`, color: "from-glow-green to-emerald-500" },
+              { icon: Target, label: "Accuracy", value: `${accuracy}%`, color: "from-glow-green to-emerald-500" },
               { icon: Award, label: "Badges", value: unlockedBadges.length, color: "from-accent to-glow-pink" }
             ].map((stat, i) => (
               <Card key={i} className="glass border-border/30 card-hover">
@@ -204,7 +427,7 @@ const StudentDashboard: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {[
                     { icon: BookOpen, label: "Start Quiz", path: "/quiz", gradient: "from-primary to-accent" },
-                    { icon: Users, label: "Multiplayer", path: "/multiplayer", gradient: "from-secondary to-glow-cyan" },
+                    { icon: Users, label: "Multiplayer", path: "/lobby", gradient: "from-secondary to-glow-cyan" },
                     { icon: Trophy, label: "Tournaments", path: "/tournaments", gradient: "from-accent to-glow-pink" },
                     { icon: TrendingUp, label: "Leaderboard", path: "/leaderboard", gradient: "from-glow-yellow to-orange-500" },
                     { icon: MessageCircle, label: "Chat", path: "/friends", gradient: "from-pink-500 to-rose-500" }
@@ -238,26 +461,44 @@ const StudentDashboard: React.FC = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {[
-                      { title: "Complete 3 Quizzes", progress: 2, total: 3, reward: "+50 XP" },
-                      { title: "Win 1 Multiplayer Match", progress: 0, total: 1, reward: "+100 XP" },
-                      { title: "Score 90%+ on any quiz", progress: 1, total: 1, reward: "+30 XP", completed: true }
-                    ].map((mission, i) => (
-                      <div key={i} className={`p-4 rounded-xl ${mission.completed ? 'bg-glow-green/10 border border-glow-green/30' : 'bg-muted/30'}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-foreground">{mission.title}</span>
-                          <Badge variant={mission.completed ? "default" : "secondary"} className={mission.completed ? "bg-glow-green text-background" : ""}>
-                            {mission.reward}
-                          </Badge>
+                    {dailyMissions.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-6">
+                        No daily missions yet. Complete quizzes to unlock missions!
+                      </p>
+                    ) : (
+                      dailyMissions.map((mission) => (
+                        <div key={mission.id} className={`p-4 rounded-xl ${mission.completed ? 'bg-glow-green/10 border border-glow-green/30' : 'bg-muted/30'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-foreground">{mission.title}</span>
+                            {mission.completed && !mission.claimed ? (
+                              <Button 
+                                size="sm" 
+                                onClick={() => claimMissionReward(mission)}
+                                className="bg-glow-green hover:bg-glow-green/80 text-background gap-1"
+                              >
+                                <Gift className="h-3 w-3" />
+                                Claim
+                              </Button>
+                            ) : mission.claimed ? (
+                              <Badge className="bg-glow-green/20 text-glow-green border-0">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Claimed
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                +{mission.rewardXp} XP, +{mission.rewardCoins} 🪙
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Progress value={(mission.progress / mission.targetValue) * 100} className="h-2 flex-1" />
+                            <span className="text-xs text-muted-foreground">
+                              {mission.progress}/{mission.targetValue}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Progress value={(mission.progress / mission.total) * 100} className="h-2 flex-1" />
-                          <span className="text-xs text-muted-foreground">
-                            {mission.progress}/{mission.total}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -310,7 +551,7 @@ const StudentDashboard: React.FC = () => {
                     <Button 
                       variant="outline" 
                       className="w-full border-primary/30 hover:bg-primary/10"
-                      onClick={() => navigate('/profile')}
+                      onClick={() => navigate('/store')}
                     >
                       Customize Avatar
                     </Button>
@@ -366,29 +607,31 @@ const StudentDashboard: React.FC = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2">
-                      {[
-                        { name: "Abebe K.", level: 12, online: true },
-                        { name: "Tigist A.", level: 15, online: true },
-                        { name: "Dawit H.", level: 8, online: false }
-                      ].map((friend, i) => (
-                        <div key={i} className="flex items-center gap-3 p-2">
-                          <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
-                              <span className="text-lg">👤</span>
+                    {onlineFriends.length > 0 ? (
+                      <div className="space-y-2">
+                        {onlineFriends.map((friend) => (
+                          <div key={friend.id} className="flex items-center gap-3 p-2">
+                            <div className="relative">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
+                                <span className="text-lg">{friend.avatar || '👤'}</span>
+                              </div>
+                              <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${friend.online ? 'bg-glow-green' : 'bg-muted'}`} />
                             </div>
-                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${friend.online ? 'bg-glow-green' : 'bg-muted'}`} />
+                            <div className="flex-1">
+                              <p className="font-medium text-sm text-foreground">{friend.name}</p>
+                              <p className="text-xs text-muted-foreground">Level {friend.level}</p>
+                            </div>
+                            <Button size="sm" variant="ghost" className="text-primary">
+                              <Gamepad2 className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-sm text-foreground">{friend.name}</p>
-                            <p className="text-xs text-muted-foreground">Level {friend.level}</p>
-                          </div>
-                          <Button size="sm" variant="ghost" className="text-primary">
-                            <Gamepad2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-6">
+                        Add friends to see them here!
+                      </p>
+                    )}
                     <Button 
                       variant="ghost" 
                       className="w-full mt-3 text-primary"
