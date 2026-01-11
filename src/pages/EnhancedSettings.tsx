@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -26,15 +27,30 @@ import {
   Save,
   Trash2,
   Download,
-  UserCircle
+  UserCircle,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import PUBGAvatarEditor from '@/components/avatar/PUBGAvatarEditor';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 
+interface AvatarConfig {
+  bodyType: string;
+  skinTone: string;
+  faceShape: string;
+  hairstyle: string;
+  hairColor: string;
+  eyeStyle: string;
+  eyebrows: string;
+  outfit: string;
+  outfitColor: string;
+  accessory: string;
+  background: string;
+}
+
 const EnhancedSettings: React.FC = () => {
-  const { user, logout } = useUser();
+  const { user, logout, updateProfile } = useUser();
   const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
 
@@ -59,6 +75,24 @@ const EnhancedSettings: React.FC = () => {
     bio: ''
   });
 
+  const [avatarConfig, setAvatarConfig] = useState<Partial<AvatarConfig>>({});
+  const [savingAvatar, setSavingAvatar] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Load user's avatar config from database
+  useEffect(() => {
+    if (user?.avatar) {
+      try {
+        // Try to parse as JSON (custom avatar config)
+        const config = JSON.parse(user.avatar);
+        setAvatarConfig(config);
+      } catch {
+        // It's a simple avatar ID like "avatar-1"
+        setAvatarConfig({});
+      }
+    }
+  }, [user?.avatar]);
+
   const handleSettingChange = (key: string, value: boolean | string) => {
     setSettings(prev => ({
       ...prev,
@@ -66,8 +100,62 @@ const EnhancedSettings: React.FC = () => {
     }));
   };
 
-  const handleSaveSettings = () => {
-    toast.success("Settings saved successfully!");
+  const handleSaveProfile = async () => {
+    if (!user?.id) return;
+    
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: profileData.name,
+          grade: profileData.grade
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Update local user state
+      if (updateProfile) {
+        updateProfile({ name: profileData.name, grade: profileData.grade });
+      }
+
+      toast.success("Profile saved successfully!");
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      toast.error("Failed to save profile");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleSaveAvatar = async (config: AvatarConfig) => {
+    if (!user?.id) return;
+    
+    setSavingAvatar(true);
+    try {
+      const avatarJson = JSON.stringify(config);
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar: avatarJson })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Update local user state
+      if (updateProfile) {
+        updateProfile({ avatar: avatarJson });
+      }
+
+      setAvatarConfig(config);
+      toast.success("Avatar saved successfully!");
+    } catch (err) {
+      console.error('Error saving avatar:', err);
+      toast.error("Failed to save avatar");
+    } finally {
+      setSavingAvatar(false);
+    }
   };
 
   const handleLanguageChange = (newLanguage: "english" | "amharic" | "afaan-oromoo") => {
@@ -84,12 +172,41 @@ const EnhancedSettings: React.FC = () => {
   };
 
   const handleDeleteAccount = () => {
-    // In a real app, this would show a confirmation dialog
     toast.error("Account deletion requires confirmation. Contact support for assistance.");
   };
 
-  const handleExportData = () => {
-    toast.success("Data export will be sent to your email address");
+  const handleExportData = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Fetch user data
+      const [profileRes, resultsRes, achievementsRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('quiz_results').select('*').eq('student_id', user.id),
+        supabase.from('user_achievements').select('*').eq('user_id', user.id)
+      ]);
+
+      const exportData = {
+        profile: profileRes.data,
+        quizResults: resultsRes.data,
+        achievements: achievementsRes.data,
+        exportedAt: new Date().toISOString()
+      };
+
+      // Download as JSON
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `masterminds-data-${user.id}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast.success("Data exported successfully!");
+    } catch (err) {
+      console.error('Error exporting data:', err);
+      toast.error("Failed to export data");
+    }
   };
 
   return (
@@ -137,7 +254,19 @@ const EnhancedSettings: React.FC = () => {
             
             {/* Avatar Tab */}
             <TabsContent value="avatar">
-              <PUBGAvatarEditor />
+              <PUBGAvatarEditor 
+                initialConfig={avatarConfig}
+                userLevel={user?.level || 1}
+                onSave={handleSaveAvatar}
+              />
+              {savingAvatar && (
+                <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
+                  <div className="flex items-center gap-2 bg-card p-4 rounded-lg shadow-lg">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Saving avatar...</span>
+                  </div>
+                </div>
+              )}
             </TabsContent>
             
             {/* Profile Tab */}
@@ -170,6 +299,7 @@ const EnhancedSettings: React.FC = () => {
                     value={profileData.email}
                     onChange={(e) => setProfileData({...profileData, email: e.target.value})}
                     placeholder="your.email@example.com"
+                    disabled
                   />
                 </div>
                 <div className="space-y-2">
@@ -179,7 +309,7 @@ const EnhancedSettings: React.FC = () => {
                       <SelectValue placeholder="Select your grade" />
                     </SelectTrigger>
                     <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((grade) => (
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
                         <SelectItem key={grade} value={grade.toString()}>
                           Grade {grade}
                         </SelectItem>
@@ -215,9 +345,9 @@ const EnhancedSettings: React.FC = () => {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button onClick={handleSaveSettings} className="w-full">
-                <Save className="h-4 w-4 mr-2" />
-                Save Settings
+              <Button onClick={handleSaveProfile} className="w-full" disabled={savingProfile}>
+                {savingProfile ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Save Profile
               </Button>
               <Button onClick={handleExportData} variant="outline" className="w-full">
                 <Download className="h-4 w-4 mr-2" />
@@ -245,7 +375,7 @@ const EnhancedSettings: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="notifications">Push Notifications</Label>
-                  <p className="text-sm text-gray-500">Receive quiz reminders and updates</p>
+                  <p className="text-sm text-muted-foreground">Receive quiz reminders and updates</p>
                 </div>
                 <Switch
                   id="notifications"
@@ -259,7 +389,7 @@ const EnhancedSettings: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="sound">Sound Effects</Label>
-                  <p className="text-sm text-gray-500">Play sounds during quizzes</p>
+                  <p className="text-sm text-muted-foreground">Play sounds during quizzes</p>
                 </div>
                 <Switch
                   id="sound"
@@ -273,7 +403,7 @@ const EnhancedSettings: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="autosave">Auto-save Progress</Label>
-                  <p className="text-sm text-gray-500">Automatically save quiz progress</p>
+                  <p className="text-sm text-muted-foreground">Automatically save quiz progress</p>
                 </div>
                 <Switch
                   id="autosave"
@@ -312,7 +442,7 @@ const EnhancedSettings: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="show-avatar">Show Avatar</Label>
-                  <p className="text-sm text-gray-500">Display your avatar to others</p>
+                  <p className="text-sm text-muted-foreground">Display your avatar to others</p>
                 </div>
                 <Switch
                   id="show-avatar"
@@ -326,7 +456,7 @@ const EnhancedSettings: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="show-rank">Show Rank</Label>
-                  <p className="text-sm text-gray-500">Display your rank publicly</p>
+                  <p className="text-sm text-muted-foreground">Display your rank publicly</p>
                 </div>
                 <Switch
                   id="show-rank"
@@ -340,7 +470,7 @@ const EnhancedSettings: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="friend-requests">Allow Friend Requests</Label>
-                  <p className="text-sm text-gray-500">Let others send you friend requests</p>
+                  <p className="text-sm text-muted-foreground">Let others send you friend requests</p>
                 </div>
                 <Switch
                   id="friend-requests"
@@ -354,7 +484,7 @@ const EnhancedSettings: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="online-status">Show Online Status</Label>
-                  <p className="text-sm text-gray-500">Let friends see when you're online</p>
+                  <p className="text-sm text-muted-foreground">Let friends see when you're online</p>
                 </div>
                 <Switch
                   id="online-status"
@@ -403,7 +533,7 @@ const EnhancedSettings: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="dark-mode">Dark Mode</Label>
-                  <p className="text-sm text-gray-500">Use dark theme</p>
+                  <p className="text-sm text-muted-foreground">Use dark theme</p>
                 </div>
                 <Switch
                   id="dark-mode"
@@ -433,17 +563,17 @@ const EnhancedSettings: React.FC = () => {
         </div>
 
         {/* Danger Zone */}
-        <Card className="border-red-200">
+        <Card className="border-destructive/30">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
+            <CardTitle className="flex items-center gap-2 text-destructive">
               <Trash2 className="h-5 w-5" />
               Danger Zone
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-4 bg-red-50 rounded-lg">
-              <h4 className="font-medium text-red-800 mb-2">Delete Account</h4>
-              <p className="text-sm text-red-600 mb-3">
+            <div className="p-4 bg-destructive/10 rounded-lg">
+              <h4 className="font-medium text-destructive mb-2">Delete Account</h4>
+              <p className="text-sm text-muted-foreground mb-3">
                 This action cannot be undone. All your progress, achievements, and data will be permanently deleted.
               </p>
               <Button onClick={handleDeleteAccount} variant="destructive" size="sm">
