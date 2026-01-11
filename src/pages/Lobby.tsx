@@ -64,7 +64,7 @@ interface Tournament {
 const Lobby: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
-  const { rooms, createRoom: contextCreateRoom, joinRoom: contextJoinRoom, fetchRooms } = useRoom();
+  const { rooms, createRoom: contextCreateRoom, joinRoom: contextJoinRoom, refreshRooms } = useRoom();
   
   const [chatMessage, setChatMessage] = useState("");
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
@@ -100,7 +100,7 @@ const Lobby: React.FC = () => {
     setLoading(true);
     try {
       await Promise.all([
-        fetchRooms(),
+        refreshRooms(),
         fetchOnlinePlayers(),
         fetchChatMessages(),
         fetchTournaments()
@@ -237,7 +237,7 @@ const Lobby: React.FC = () => {
         schema: 'public',
         table: 'multiplayer_rooms'
       }, () => {
-        fetchRooms();
+        refreshRooms();
       })
       .subscribe();
 
@@ -278,23 +278,29 @@ const Lobby: React.FC = () => {
       return;
     }
 
-    const success = await contextCreateRoom(
+    const gameSettings = {
+      subject: newRoomData.subject,
+      difficulty: newRoomData.difficulty as 'Easy' | 'Medium' | 'Hard',
+      questionCount: 10,
+      timePerQuestion: 30
+    };
+
+    const room = await contextCreateRoom(
       newRoomData.name,
+      gameSettings,
       parseInt(newRoomData.maxPlayers),
-      undefined,
-      newRoomData.subject,
-      newRoomData.difficulty,
-      newRoomData.gameMode
+      undefined
     );
 
-    if (success) {
+    if (room) {
       setCreateRoomOpen(false);
       setNewRoomData({ name: "", maxPlayers: "2", subject: "Mathematics", difficulty: "Medium", gameMode: "1v1" });
+      navigate(`/multiplayer?room=${room.id}`);
     }
   };
 
   const handleJoinRoom = async (room: Room) => {
-    const success = await contextJoinRoom(room.id);
+    const success = await contextJoinRoom(room.id, user?.name || 'Player');
     if (success) {
       navigate(`/multiplayer?room=${room.id}`);
     }
@@ -351,10 +357,10 @@ const Lobby: React.FC = () => {
     players: r.players?.length || 0,
     maxPlayers: r.maxPlayers,
     status: r.status as 'waiting' | 'in-progress' | 'finished',
-    subject: r.subject || 'Mixed',
-    difficulty: r.difficulty || 'Medium',
-    gameMode: r.gameMode || '1v1',
-    createdBy: r.hostId
+    subject: r.gameSettings?.subject || 'Mixed',
+    difficulty: r.gameSettings?.difficulty || 'Medium',
+    gameMode: '1v1',
+    createdBy: r.host
   }));
 
   return (
