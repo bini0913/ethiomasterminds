@@ -1,6 +1,6 @@
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { initializeRealQuizData } from '@/utils/quizData';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useUser } from './UserContext';
 
 // Define the Question and Quiz types
 export interface Question {
@@ -43,7 +43,7 @@ export interface QuizContextType {
   createQuiz: (quiz: Quiz) => void;
   updateQuiz: (quiz: Quiz) => void;
   deleteQuiz: (id: string) => void;
-  fetchQuizzes: () => void;
+  fetchQuizzes: () => Promise<void>;
   askedQuestions: string[];
   addAskedQuestion: (questionId: string) => void;
   filteredQuizzes: Quiz[];
@@ -59,22 +59,118 @@ export interface QuizContextType {
   getAvailableSubjects: () => string[];
   getAvailableTopics: (subject?: string) => string[];
   getAvailableGrades: () => number[];
+  loading: boolean;
 }
-
-// Initialize with real quiz data
-const initialQuizzes: Quiz[] = initializeRealQuizData();
 
 // Create the context with a default undefined value
 const QuizContext = createContext<QuizContextType | undefined>(undefined);
 
 // Provider component
 export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [quizzes, setQuizzes] = useState<Quiz[]>(initialQuizzes);
+  const { user } = useUser();
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
-  const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>(initialQuizzes);
+  const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>([]);
   const [askedQuestions, setAskedQuestions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Create a dummy quiz generator function (will be replaced with improved version)
+  // Fetch quizzes from database - approved quizzes only
+  const fetchQuizzes = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Fetch approved quizzes with their questions
+      const { data: quizzesData, error: quizzesError } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false });
+
+      if (quizzesError) {
+        console.error('Error fetching quizzes:', quizzesError);
+        setLoading(false);
+        return;
+      }
+
+      if (!quizzesData || quizzesData.length === 0) {
+        setQuizzes([]);
+        setFilteredQuizzes([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch questions for all quizzes
+      const quizIds = quizzesData.map(q => q.id);
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('questions')
+        .select('*')
+        .in('quiz_id', quizIds)
+        .order('order_index');
+
+      if (questionsError) {
+        console.error('Error fetching questions:', questionsError);
+      }
+
+      // Group questions by quiz_id
+      const questionsByQuiz: Record<string, Question[]> = {};
+      (questionsData || []).forEach((q: any) => {
+        if (!questionsByQuiz[q.quiz_id]) {
+          questionsByQuiz[q.quiz_id] = [];
+        }
+        const options = Array.isArray(q.options) ? q.options as string[] : [];
+        questionsByQuiz[q.quiz_id].push({
+          id: q.id,
+          text: q.question_text,
+          options,
+          correctAnswer: q.correct_answer,
+          difficulty: (q.points >= 15 ? 'Hard' : q.points >= 10 ? 'Medium' : 'Easy') as 'Easy' | 'Medium' | 'Hard',
+          subject: '', // Will be set from quiz
+          grade: 0, // Will be set from quiz
+          topic: 'General',
+          type: options.length === 2 ? 'True/False' : 'Multiple Choice',
+          points: q.points || 10,
+          timeLimit: 30,
+          explanation: q.explanation || ''
+        });
+      });
+
+      // Map database quizzes to our Quiz format
+      const mappedQuizzes: Quiz[] = quizzesData.map((q: any) => {
+        const questions = questionsByQuiz[q.id] || [];
+        const gradeNum = parseInt(q.grade) || 5;
+        
+        // Set subject and grade on each question
+        questions.forEach(question => {
+          question.subject = q.subject;
+          question.grade = gradeNum;
+        });
+
+        return {
+          id: q.id,
+          title: q.title,
+          description: q.description || '',
+          questions,
+          subject: q.subject,
+          grade: gradeNum,
+          difficulty: (q.difficulty === 'easy' ? 'Easy' : q.difficulty === 'hard' ? 'Hard' : 'Medium') as 'Easy' | 'Medium' | 'Hard',
+          timeLimit: q.time_limit || questions.length * 30,
+          createdBy: q.created_by,
+          createdAt: new Date(q.created_at),
+          topics: ['General'],
+          category: q.subject,
+          gradeLevel: gradeNum
+        };
+      });
+
+      setQuizzes(mappedQuizzes);
+      setFilteredQuizzes(mappedQuizzes);
+    } catch (err) {
+      console.error('Error in fetchQuizzes:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Create a random quiz from available questions
   const generateRandomQuiz = (
     category: string,
     count: number, 
@@ -82,7 +178,6 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     difficulty?: 'easy' | 'medium' | 'hard',
     topic?: string
   ): Quiz => {
-    // Convert difficulty from lowercase to proper case for internal use
     const difficultyMapping: Record<string, 'Easy' | 'Medium' | 'Hard'> = {
       'easy': 'Easy',
       'medium': 'Medium',
@@ -91,22 +186,38 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     const properDifficulty = difficulty ? difficultyMapping[difficulty] : 'Medium';
     
-    const questions = [];
-    const types = ['Multiple Choice', 'True/False', 'Fill in the blank'] as const;
-    
-    for (let i = 0; i < count; i++) {
-      const questionType = types[Math.floor(Math.random() * types.length)] as 'Multiple Choice' | 'True/False' | 'Fill in the blank';
+    // Filter available questions from existing quizzes
+    let availableQuestions: Question[] = [];
+    quizzes.forEach(quiz => {
+      if (category === 'all' || quiz.subject.toLowerCase() === category.toLowerCase()) {
+        if (!grade || quiz.grade === grade) {
+          if (!difficulty || quiz.difficulty === properDifficulty) {
+            availableQuestions.push(...quiz.questions);
+          }
+        }
+      }
+    });
+
+    // Filter out already asked questions
+    availableQuestions = availableQuestions.filter(q => !askedQuestions.includes(q.id));
+
+    // Shuffle and pick
+    const shuffled = availableQuestions.sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, Math.min(count, shuffled.length));
+
+    // If not enough questions, generate placeholders
+    while (selected.length < count) {
+      const types = ['Multiple Choice', 'True/False'] as const;
+      const questionType = types[Math.floor(Math.random() * types.length)];
       const options = questionType === 'Multiple Choice' 
         ? ['Option A', 'Option B', 'Option C', 'Option D'] 
-        : questionType === 'True/False' 
-          ? ['True', 'False'] 
-          : [];
+        : ['True', 'False'];
       
-      questions.push({
+      selected.push({
         id: `q-${Math.random().toString(36).substr(2, 9)}`,
-        text: `Sample ${category} question #${i+1} for grade ${grade} (${properDifficulty})`,
+        text: `${category} question for grade ${grade || 5} (${properDifficulty})`,
         options,
-        correctAnswer: options.length > 0 ? options[Math.floor(Math.random() * options.length)] : '',
+        correctAnswer: options[0],
         difficulty: properDifficulty,
         subject: category,
         grade: grade || 5,
@@ -114,15 +225,15 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         type: questionType,
         points: properDifficulty === 'Easy' ? 5 : properDifficulty === 'Medium' ? 10 : 15,
         timeLimit: 30,
-        explanation: 'This is a sample explanation for this question.'
+        explanation: ''
       });
     }
     
     return {
       id: `quiz-${Math.random().toString(36).substring(2, 9)}`,
-      title: `${category} Quiz - Grade ${grade || 5} - ${topic || 'General'}`,
-      description: `A ${properDifficulty} quiz about ${category} for Grade ${grade || 5} students focusing on ${topic || 'General'}.`,
-      questions,
+      title: `${category} Quiz - Grade ${grade || 5}`,
+      description: `A ${properDifficulty} quiz about ${category}`,
+      questions: selected,
       subject: category,
       grade: grade || 5,
       difficulty: properDifficulty,
@@ -155,61 +266,13 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     difficulty?: 'easy' | 'medium' | 'hard',
     topic?: string
   ): Quiz => {
-    // Convert difficulty from lowercase to proper case for internal use
-    const difficultyMapping: Record<string, 'Easy' | 'Medium' | 'Hard'> = {
-      'easy': 'Easy',
-      'medium': 'Medium',
-      'hard': 'Hard'
-    };
+    const newQuiz = generateRandomQuiz(category, count, grade, difficulty, topic);
     
-    const properDifficulty = difficulty ? difficultyMapping[difficulty] : 'Medium';
-    const topicValue = topic || 'General';
-    
-    // Filter out questions that have been asked before
-    const newQuiz = generateRandomQuiz(
-      category, 
-      count, 
-      grade || 5, 
-      difficulty,
-      topicValue
-    );
-    
-    // Ensure no repeated questions by filtering out previously asked ones
-    newQuiz.questions = newQuiz.questions.filter(
-      q => !askedQuestions.includes(q.id)
-    );
-    
-    // If we have filtered out too many questions, generate new ones
-    while (newQuiz.questions.length < count) {
-      const additionalQ = generateRandomQuiz(
-        category, 
-        count - newQuiz.questions.length, 
-        grade || 5, 
-        difficulty,
-        topicValue
-      ).questions;
-      
-      // Add only questions that haven't been asked before
-      newQuiz.questions.push(
-        ...additionalQ.filter(q => !askedQuestions.includes(q.id))
-      );
-    }
-    
-    // Mark all questions in this quiz as "asked"
-    const newAskedQuestions = [
-      ...askedQuestions,
-      ...newQuiz.questions.map(q => q.id)
-    ];
+    // Mark questions as asked
+    const newAskedQuestions = [...askedQuestions, ...newQuiz.questions.map(q => q.id)];
     setAskedQuestions(newAskedQuestions);
     
-    createQuiz(newQuiz);
     return newQuiz;
-  };
-
-  const fetchQuizzes = () => {
-    // In a real app, this would be an API call
-    console.log("Fetching quizzes...");
-    // For now, we're using the initial data
   };
 
   const addAskedQuestion = (questionId: string) => {
@@ -278,14 +341,12 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setFilteredQuizzes(filtered);
   };
   
-  // Get available subjects from quizzes
   const getAvailableSubjects = () => {
     const subjects = new Set<string>();
     quizzes.forEach(quiz => subjects.add(quiz.subject));
     return Array.from(subjects);
   };
   
-  // Get available topics from quizzes, filtered by subject if provided
   const getAvailableTopics = (subject?: string) => {
     const topics = new Set<string>();
     quizzes.forEach(quiz => {
@@ -296,7 +357,6 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return Array.from(topics);
   };
   
-  // Get available grades from quizzes
   const getAvailableGrades = () => {
     const grades = new Set<number>();
     quizzes.forEach(quiz => grades.add(quiz.grade));
@@ -305,9 +365,27 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     fetchQuizzes();
-  }, []);
+  }, [fetchQuizzes]);
 
-  // Make sure filterQuizzes gets called when quizzes change
+  // Set up realtime subscription for new approved quizzes
+  useEffect(() => {
+    const channel = supabase
+      .channel('quiz-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'quizzes',
+        filter: 'is_approved=eq.true'
+      }, () => {
+        fetchQuizzes();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchQuizzes]);
+
   useEffect(() => {
     setFilteredQuizzes(quizzes);
   }, [quizzes]);
@@ -329,7 +407,8 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setQuizFilters,
     getAvailableSubjects,
     getAvailableTopics,
-    getAvailableGrades
+    getAvailableGrades,
+    loading
   };
 
   return <QuizContext.Provider value={value}>{children}</QuizContext.Provider>;
