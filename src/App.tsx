@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import EnhancedSettings from "./pages/EnhancedSettings";
 import NotFound from "./pages/NotFound";
 import TeacherPortal from "./pages/TeacherPortal";
+import Social from "./pages/Social";
 import AdminPortal from "./pages/AdminPortal";
 import StudentDashboard from "./pages/StudentDashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
@@ -82,6 +83,7 @@ const App = () => (
                     <Route path="/store" element={<div>Avatar Store Coming Soon</div>} />
                     <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
                     <Route path="/enhanced-settings" element={<EnhancedSettings />} />
+                    <Route path="/social" element={<Social />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>

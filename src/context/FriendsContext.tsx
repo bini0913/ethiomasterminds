@@ -11,6 +11,7 @@ export interface FriendRequest {
   receiver: UserProfile;
   status: FriendStatus;
   timestamp: Date;
+  isOutgoing: boolean;
 }
 
 export interface Message {
@@ -25,6 +26,7 @@ export interface Message {
 interface FriendsContextType {
   friends: UserProfile[];
   friendRequests: FriendRequest[];
+  outgoingRequests: FriendRequest[];
   messages: Message[];
   loading: boolean;
   sendFriendRequest: (userId: string) => Promise<void>;
@@ -38,6 +40,7 @@ interface FriendsContextType {
   searchUsers: (query: string) => Promise<UserProfile[]>;
   onlineFriends: UserProfile[];
   refreshFriends: () => Promise<void>;
+  isPendingRequest: (userId: string) => boolean;
 }
 
 const FriendsContext = createContext<FriendsContextType | undefined>(undefined);
@@ -46,6 +49,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
   const [friends, setFriends] = useState<UserProfile[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([]);
@@ -54,104 +58,120 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) {
       setFriends([]);
       setFriendRequests([]);
+      setOutgoingRequests([]);
       setLoading(false);
       return;
     }
 
     try {
-      // Fetch accepted friendships
-      const { data: friendships, error: friendshipsError } = await supabase
+      // Fetch ALL friendships involving this user
+      const { data: allFriendships, error: friendshipsError } = await supabase
         .from('friends')
         .select('*')
-        .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`)
-        .eq('status', 'accepted');
+        .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
 
       if (friendshipsError) throw friendshipsError;
 
-      // Get friend IDs
-      const friendIds = (friendships || []).map(f => 
+      // Separate accepted, incoming pending, and outgoing pending
+      const acceptedFriendships = (allFriendships || []).filter(f => f.status === 'accepted');
+      const incomingPending = (allFriendships || []).filter(f => f.status === 'pending' && f.friend_id === user.id);
+      const outgoingPending = (allFriendships || []).filter(f => f.status === 'pending' && f.user_id === user.id);
+
+      // Get all user IDs we need to fetch profiles for
+      const friendIdsFromAccepted = acceptedFriendships.map(f => 
         f.user_id === user.id ? f.friend_id : f.user_id
       );
+      const senderIds = incomingPending.map(r => r.user_id);
+      const receiverIds = outgoingPending.map(r => r.friend_id);
+      
+      const allUserIds = [...new Set([...friendIdsFromAccepted, ...senderIds, ...receiverIds])];
 
-      if (friendIds.length > 0) {
-        // Fetch friend profiles
-        const { data: profiles, error: profilesError } = await supabase
+      let profilesMap = new Map<string, any>();
+      let presenceMap = new Map<string, string>();
+
+      if (allUserIds.length > 0) {
+        // Fetch all profiles at once
+        const { data: profiles } = await supabase
           .from('profiles')
           .select('id, name, username, avatar, level, xp')
-          .in('id', friendIds);
+          .in('id', allUserIds);
 
-        if (profilesError) throw profilesError;
+        profiles?.forEach(p => profilesMap.set(p.id, p));
 
         // Fetch presence
         const { data: presenceData } = await supabase
           .from('user_presence')
           .select('user_id, status')
-          .in('user_id', friendIds);
+          .in('user_id', friendIdsFromAccepted);
 
-        const presenceMap = new Map(presenceData?.map(p => [p.user_id, p.status]) || []);
+        presenceData?.forEach(p => presenceMap.set(p.user_id, p.status));
+      }
 
-        const mappedFriends: UserProfile[] = (profiles || []).map(p => {
-          const friendship = friendships?.find(f => f.user_id === p.id || f.friend_id === p.id);
-          return {
-            id: p.id,
-            name: p.name || 'Unknown',
-            username: p.username || '',
+      // Map accepted friends
+      const mappedFriends: UserProfile[] = acceptedFriendships.map(f => {
+        const friendId = f.user_id === user.id ? f.friend_id : f.user_id;
+        const profile = profilesMap.get(friendId);
+        return {
+          id: friendId,
+          name: profile?.name || 'Unknown',
+          username: profile?.username || '',
+          email: '',
+          role: 'student',
+          xp: profile?.xp || 0,
+          level: profile?.level || 1,
+          avatar: profile?.avatar || 'avatar-1',
+          friendshipId: f.id
+        } as UserProfile & { friendshipId?: string };
+      });
+
+      setFriends(mappedFriends);
+      setOnlineFriends(mappedFriends.filter(f => presenceMap.get(f.id) === 'online'));
+
+      // Map incoming pending requests
+      const mappedIncoming: FriendRequest[] = incomingPending.map(r => {
+        const sender = profilesMap.get(r.user_id);
+        return {
+          id: r.id,
+          sender: {
+            id: r.user_id,
+            name: sender?.name || 'Unknown',
+            username: sender?.username || '',
             email: '',
             role: 'student',
-            xp: p.xp || 0,
-            level: p.level || 1,
-            avatar: p.avatar || 'avatar-1',
-            friendshipId: friendship?.id
-          } as UserProfile & { friendshipId?: string };
-        });
+            avatar: sender?.avatar || 'avatar-1',
+            level: sender?.level || 1,
+            xp: sender?.xp || 0
+          } as UserProfile,
+          receiver: user as UserProfile,
+          status: r.status as FriendStatus,
+          timestamp: new Date(r.created_at),
+          isOutgoing: false
+        };
+      });
+      setFriendRequests(mappedIncoming);
 
-        setFriends(mappedFriends);
-        setOnlineFriends(mappedFriends.filter(f => presenceMap.get(f.id) === 'online'));
-      } else {
-        setFriends([]);
-        setOnlineFriends([]);
-      }
-
-      // Fetch pending friend requests (where user is the receiver)
-      const { data: requests, error: requestsError } = await supabase
-        .from('friends')
-        .select('*')
-        .eq('friend_id', user.id)
-        .eq('status', 'pending');
-
-      if (requestsError) throw requestsError;
-
-      if (requests && requests.length > 0) {
-        const senderIds = requests.map(r => r.user_id);
-        const { data: senderProfiles } = await supabase
-          .from('profiles')
-          .select('id, name, username, avatar, level, xp')
-          .in('id', senderIds);
-
-        const mappedRequests: FriendRequest[] = requests.map(r => {
-          const sender = senderProfiles?.find(p => p.id === r.user_id);
-          return {
-            id: r.id,
-            sender: {
-              id: r.user_id,
-              name: sender?.name || 'Unknown',
-              username: sender?.username || '',
-              email: '',
-              role: 'student',
-              avatar: sender?.avatar || 'avatar-1',
-              level: sender?.level || 1,
-              xp: sender?.xp || 0
-            } as UserProfile,
-            receiver: user as UserProfile,
-            status: r.status as FriendStatus,
-            timestamp: new Date(r.created_at)
-          };
-        });
-
-        setFriendRequests(mappedRequests);
-      } else {
-        setFriendRequests([]);
-      }
+      // Map outgoing pending requests
+      const mappedOutgoing: FriendRequest[] = outgoingPending.map(r => {
+        const receiver = profilesMap.get(r.friend_id);
+        return {
+          id: r.id,
+          sender: user as UserProfile,
+          receiver: {
+            id: r.friend_id,
+            name: receiver?.name || 'Unknown',
+            username: receiver?.username || '',
+            email: '',
+            role: 'student',
+            avatar: receiver?.avatar || 'avatar-1',
+            level: receiver?.level || 1,
+            xp: receiver?.xp || 0
+          } as UserProfile,
+          status: r.status as FriendStatus,
+          timestamp: new Date(r.created_at),
+          isOutgoing: true
+        };
+      });
+      setOutgoingRequests(mappedOutgoing);
 
       // Fetch messages
       const { data: messagesData, error: messagesError } = await supabase
@@ -181,32 +201,39 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     fetchFriends();
 
-    // Set up realtime subscription
+    // Set up realtime subscription for both directions
     if (user?.id) {
       const channel = supabase
-        .channel('friends-realtime')
+        .channel('friends-realtime-full')
         .on('postgres_changes', {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${user.id}`
+          table: 'messages'
         }, (payload) => {
-          const newMsg = payload.new as any;
-          setMessages(prev => [...prev, {
-            id: newMsg.id,
-            sender: newMsg.sender_id,
-            receiver: newMsg.receiver_id,
-            content: newMsg.content,
-            read: newMsg.read || false,
-            timestamp: new Date(newMsg.created_at)
-          }]);
+          const msg = payload.new as any;
+          if (msg && (msg.sender_id === user.id || msg.receiver_id === user.id)) {
+            if (payload.eventType === 'INSERT') {
+              setMessages(prev => {
+                // Avoid duplicates
+                if (prev.some(m => m.id === msg.id)) return prev;
+                return [...prev, {
+                  id: msg.id,
+                  sender: msg.sender_id,
+                  receiver: msg.receiver_id,
+                  content: msg.content,
+                  read: msg.read || false,
+                  timestamp: new Date(msg.created_at)
+                }];
+              });
+            }
+          }
         })
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
-          table: 'friends',
-          filter: `friend_id=eq.${user.id}`
+          table: 'friends'
         }, () => {
+          // Refresh on any friends table change
           fetchFriends();
         })
         .subscribe();
@@ -216,6 +243,11 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       };
     }
   }, [fetchFriends, user?.id]);
+
+  const isPendingRequest = (userId: string): boolean => {
+    return outgoingRequests.some(r => r.receiver.id === userId) ||
+           friendRequests.some(r => r.sender.id === userId);
+  };
 
   const searchUsers = async (query: string): Promise<UserProfile[]> => {
     if (!query.trim()) return [];
@@ -248,6 +280,22 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return;
 
     try {
+      // Check if friendship already exists
+      const { data: existing } = await supabase
+        .from('friends')
+        .select('id, status')
+        .or(`and(user_id.eq.${user.id},friend_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},friend_id.eq.${user.id})`)
+        .single();
+
+      if (existing) {
+        if (existing.status === 'accepted') {
+          toast.info('You are already friends!');
+        } else {
+          toast.info('Friend request already exists');
+        }
+        return;
+      }
+
       const { error } = await supabase
         .from('friends')
         .insert({
@@ -272,6 +320,20 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const acceptFriendRequest = async (requestId: string) => {
     try {
+      // Verify this request is for the current user (they are the receiver)
+      const { data: request, error: fetchError } = await supabase
+        .from('friends')
+        .select('*')
+        .eq('id', requestId)
+        .eq('friend_id', user?.id)
+        .eq('status', 'pending')
+        .single();
+
+      if (fetchError || !request) {
+        toast.error('Invalid request or already processed');
+        return;
+      }
+
       const { error } = await supabase
         .from('friends')
         .update({ status: 'accepted', updated_at: new Date().toISOString() })
@@ -323,26 +385,29 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id || !content.trim()) return;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
           receiver_id: receiverId,
           content: content.trim()
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      // Optimistically add to local state
-      const newMessage: Message = {
-        id: `temp-${Date.now()}`,
-        sender: user.id,
-        receiver: receiverId,
-        content: content.trim(),
-        read: false,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, newMessage]);
+      // Add to local state immediately
+      if (data) {
+        setMessages(prev => [...prev, {
+          id: data.id,
+          sender: data.sender_id,
+          receiver: data.receiver_id,
+          content: data.content,
+          read: false,
+          timestamp: new Date(data.created_at)
+        }]);
+      }
     } catch (err) {
       console.error('Error sending message:', err);
       toast.error('Failed to send message');
@@ -383,6 +448,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       value={{
         friends,
         friendRequests,
+        outgoingRequests,
         messages,
         loading,
         sendFriendRequest,
@@ -395,7 +461,8 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         getFriendById,
         searchUsers,
         onlineFriends,
-        refreshFriends
+        refreshFriends,
+        isPendingRequest
       }}
     >
       {children}
