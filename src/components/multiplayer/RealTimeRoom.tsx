@@ -8,17 +8,18 @@ import { Progress } from '@/components/ui/progress';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Crown, Play, Clock, MessageCircle, Send, 
-  Bot, UserPlus, LogOut, Trophy, Zap 
+  Bot, LogOut, Trophy, Zap, Loader2, CheckCircle, XCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import AvatarRenderer from '@/components/avatar/AvatarRenderer';
 
 interface Player {
   id: string;
   name: string;
   avatar: string;
   score: number;
-  isNPC: boolean;
   isReady: boolean;
   isHost: boolean;
   level: number;
@@ -27,21 +28,24 @@ interface Player {
 interface ChatMessage {
   id: string;
   sender: string;
+  senderId: string;
   content: string;
   timestamp: Date;
-  isNPC: boolean;
 }
 
-interface GameState {
+interface Question {
+  id: string;
+  question_text: string;
+  options: string[];
+  points: number;
+}
+
+interface RoomState {
   status: 'waiting' | 'countdown' | 'playing' | 'finished';
-  currentQuestion: number;
-  totalQuestions: number;
-  timeRemaining: number;
-  question?: {
-    text: string;
-    options: string[];
-    timeLimit: number;
-  };
+  question_index: number;
+  current_question_id: string | null;
+  question_started_at: string | null;
+  question_ends_at: string | null;
 }
 
 interface RealTimeRoomProps {
@@ -54,23 +58,6 @@ interface RealTimeRoomProps {
   onGameEnd: (results: Player[]) => void;
 }
 
-// NPC names for auto-fill
-const NPC_NAMES = [
-  'QuizBot Alpha', 'BrainMaster', 'SmartBot', 'LearnBot', 'QuizWhiz',
-  'ThinkFast', 'BrainStorm', 'QuizMaster', 'KnowledgeBot', 'WisdomAI'
-];
-
-const NPC_CHAT_RESPONSES = [
-  "Good luck everyone! 🎯",
-  "Let's have a fair game! 🤝",
-  "I'm ready to learn!",
-  "May the best mind win! 🧠",
-  "This is exciting!",
-  "Great question!",
-  "That was tricky!",
-  "Well played!",
-];
-
 const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   roomId,
   roomName,
@@ -80,206 +67,352 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   onLeave,
   onGameEnd,
 }) => {
-  const [players, setPlayers] = useState<Player[]>([
-    {
-      id: currentUserId,
-      name: currentUserName,
-      avatar: '👦',
-      score: 0,
-      isNPC: false,
-      isReady: false,
-      isHost: true,
-      level: 5,
-    },
-  ]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
-  const [gameState, setGameState] = useState<GameState>({
+  const [roomState, setRoomState] = useState<RoomState>({
     status: 'waiting',
-    currentQuestion: 0,
-    totalQuestions: 10,
-    timeRemaining: 0,
+    question_index: 0,
+    current_question_id: null,
+    question_started_at: null,
+    question_ends_at: null
   });
+  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [answerResult, setAnswerResult] = useState<{ correct: boolean; points: number } | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState(0);
   const [showChat, setShowChat] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [totalQuestions, setTotalQuestions] = useState(10);
+  const [isHost, setIsHost] = useState(false);
+  const [countdownValue, setCountdownValue] = useState(3);
 
-  // Add NPC players to fill the room
-  const addNPCPlayer = useCallback(() => {
-    if (players.length >= maxPlayers) return;
-
-    const availableNames = NPC_NAMES.filter(
-      (name) => !players.some((p) => p.name === name)
-    );
-    if (availableNames.length === 0) return;
-
-    const npcName = availableNames[Math.floor(Math.random() * availableNames.length)];
-    const newNPC: Player = {
-      id: `npc-${Date.now()}-${Math.random()}`,
-      name: npcName,
-      avatar: '🤖',
-      score: 0,
-      isNPC: true,
-      isReady: true,
-      isHost: false,
-      level: Math.floor(Math.random() * 10) + 1,
-    };
-
-    setPlayers((prev) => [...prev, newNPC]);
-    
-    // NPC sends a greeting
-    setTimeout(() => {
-      const greeting = NPC_CHAT_RESPONSES[Math.floor(Math.random() * 3)];
-      addChatMessage(npcName, greeting, true);
-    }, 1000);
-  }, [players, maxPlayers]);
-
-  const addChatMessage = (sender: string, content: string, isNPC: boolean = false) => {
-    const newMessage: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      sender,
-      content,
-      timestamp: new Date(),
-      isNPC,
-    };
-    setMessages((prev) => [...prev, newMessage]);
-  };
-
-  const sendChatMessage = () => {
-    if (!chatInput.trim()) return;
-    addChatMessage(currentUserName, chatInput, false);
-    setChatInput('');
-
-    // NPCs might respond
-    setTimeout(() => {
-      const respondingNPC = players.find((p) => p.isNPC && Math.random() > 0.7);
-      if (respondingNPC) {
-        const response = NPC_CHAT_RESPONSES[Math.floor(Math.random() * NPC_CHAT_RESPONSES.length)];
-        addChatMessage(respondingNPC.name, response, true);
-      }
-    }, 2000);
-  };
-
-  const toggleReady = () => {
-    setPlayers((prev) =>
-      prev.map((p) =>
-        p.id === currentUserId ? { ...p, isReady: !p.isReady } : p
-      )
-    );
-  };
-
-  const startGame = () => {
-    if (players.filter((p) => p.isReady || p.isNPC).length < 2) {
-      toast.error('Need at least 2 ready players to start');
-      return;
-    }
-
-    setGameState({ ...gameState, status: 'countdown', timeRemaining: 3 });
-
-    // Countdown
-    let count = 3;
-    const countdownInterval = setInterval(() => {
-      count--;
-      setGameState((prev) => ({ ...prev, timeRemaining: count }));
-      if (count <= 0) {
-        clearInterval(countdownInterval);
-        startQuestion();
-      }
-    }, 1000);
-  };
-
-  const startQuestion = () => {
-    setSelectedAnswer(null);
-    setGameState((prev) => ({
-      ...prev,
-      status: 'playing',
-      currentQuestion: prev.currentQuestion + 1,
-      timeRemaining: 15,
-      question: {
-        text: `Sample Question ${prev.currentQuestion + 1}: What is 5 × ${prev.currentQuestion + 1}?`,
-        options: [
-          `${5 * (prev.currentQuestion + 1)}`,
-          `${5 * (prev.currentQuestion + 1) + 1}`,
-          `${5 * (prev.currentQuestion + 1) - 1}`,
-          `${5 * (prev.currentQuestion + 1) + 2}`,
-        ],
-        timeLimit: 15,
-      },
-    }));
-
-    // Timer
-    const timerInterval = setInterval(() => {
-      setGameState((prev) => {
-        if (prev.timeRemaining <= 1) {
-          clearInterval(timerInterval);
-          // NPCs answer
-          simulateNPCAnswers();
-          // Next question or end
-          if (prev.currentQuestion >= prev.totalQuestions) {
-            endGame();
-          } else {
-            setTimeout(startQuestion, 2000);
-          }
-        }
-        return { ...prev, timeRemaining: prev.timeRemaining - 1 };
-      });
-    }, 1000);
-  };
-
-  const simulateNPCAnswers = () => {
-    setPlayers((prev) =>
-      prev.map((p) => {
-        if (p.isNPC) {
-          // NPCs have varying accuracy based on their "level"
-          const isCorrect = Math.random() < 0.5 + p.level * 0.05;
-          const points = isCorrect ? Math.floor(Math.random() * 50) + 50 : 0;
-          return { ...p, score: p.score + points };
-        }
-        return p;
-      })
-    );
-  };
-
-  const handleAnswer = (answerIndex: number) => {
-    if (selectedAnswer !== null) return;
-    setSelectedAnswer(answerIndex);
-
-    // Check if correct (first option is always correct in this demo)
-    const isCorrect = answerIndex === 0;
-    const basePoints = 100;
-    const timeBonus = gameState.timeRemaining * 5;
-    const points = isCorrect ? basePoints + timeBonus : 0;
-
-    setPlayers((prev) =>
-      prev.map((p) =>
-        p.id === currentUserId ? { ...p, score: p.score + points } : p
-      )
-    );
-
-    if (isCorrect) {
-      toast.success(`Correct! +${points} points`);
-    } else {
-      toast.error('Wrong answer!');
-    }
-  };
-
-  const endGame = () => {
-    setGameState((prev) => ({ ...prev, status: 'finished' }));
-    const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
-    onGameEnd(sortedPlayers);
-  };
-
-  // Auto-add NPCs after a delay
+  // Fetch initial data and set up subscriptions
   useEffect(() => {
-    if (gameState.status === 'waiting' && players.length < maxPlayers) {
-      const timeout = setTimeout(() => {
-        addNPCPlayer();
-      }, 3000);
-      return () => clearTimeout(timeout);
-    }
-  }, [players.length, maxPlayers, gameState.status, addNPCPlayer]);
+    loadRoomData();
+    const cleanup = setupRealtimeSubscriptions();
+    return cleanup;
+  }, [roomId]);
 
-  const isHost = players.find((p) => p.id === currentUserId)?.isHost;
-  const allReady = players.every((p) => p.isReady || p.isNPC);
+  // Timer effect
+  useEffect(() => {
+    if (roomState.status === 'playing' && roomState.question_ends_at) {
+      const interval = setInterval(() => {
+        const now = new Date().getTime();
+        const endTime = new Date(roomState.question_ends_at!).getTime();
+        const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+        setTimeRemaining(remaining);
+
+        if (remaining <= 0) {
+          clearInterval(interval);
+        }
+      }, 100);
+
+      return () => clearInterval(interval);
+    }
+  }, [roomState.status, roomState.question_ends_at]);
+
+  const loadRoomData = async () => {
+    try {
+      // Check if current user is host
+      const { data: room } = await supabase
+        .from('multiplayer_rooms')
+        .select('host_id, question_count')
+        .eq('id', roomId)
+        .single();
+
+      setIsHost(room?.host_id === currentUserId);
+      setTotalQuestions(room?.question_count || 10);
+
+      // Fetch players
+      await fetchPlayers();
+
+      // Fetch room state
+      const { data: state } = await supabase
+        .from('room_state')
+        .select('*')
+        .eq('room_id', roomId)
+        .single();
+
+      if (state) {
+        setRoomState(state as RoomState);
+        if (state.current_question_id) {
+          await fetchCurrentQuestion(state.current_question_id);
+        }
+      }
+
+      // Fetch chat messages
+      await fetchChatMessages();
+
+    } catch (err) {
+      console.error('Error loading room data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPlayers = async () => {
+    const { data: roomData } = await supabase
+      .from('multiplayer_rooms')
+      .select('host_id')
+      .eq('id', roomId)
+      .single();
+
+    const { data: playersData } = await supabase
+      .from('room_players')
+      .select('user_id, score, is_ready')
+      .eq('room_id', roomId);
+
+    if (playersData) {
+      const userIds = playersData.map(p => p.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, avatar, level')
+        .in('id', userIds);
+
+      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+      const mappedPlayers: Player[] = playersData.map(p => {
+        const profile = profileMap.get(p.user_id);
+        return {
+          id: p.user_id,
+          name: profile?.name || 'Unknown',
+          avatar: profile?.avatar || 'avatar-1',
+          score: p.score || 0,
+          isReady: p.is_ready || false,
+          isHost: p.user_id === roomData?.host_id,
+          level: profile?.level || 1
+        };
+      });
+
+      setPlayers(mappedPlayers);
+    }
+  };
+
+  const fetchCurrentQuestion = async (questionId: string) => {
+    const { data } = await supabase
+      .from('questions')
+      .select('id, question_text, options, points')
+      .eq('id', questionId)
+      .single();
+
+    if (data) {
+      setCurrentQuestion({
+        ...data,
+        options: Array.isArray(data.options) ? data.options as string[] : []
+      });
+    }
+  };
+
+  const fetchChatMessages = async () => {
+    const { data } = await supabase
+      .from('room_chat_messages')
+      .select('*')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: true })
+      .limit(50);
+
+    if (data) {
+      const userIds = [...new Set(data.map(m => m.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', userIds);
+
+      const profileMap = new Map((profiles || []).map(p => [p.id, p.name]));
+
+      const mappedMessages: ChatMessage[] = data.map(m => ({
+        id: m.id,
+        sender: profileMap.get(m.user_id) || 'Unknown',
+        senderId: m.user_id,
+        content: m.content,
+        timestamp: new Date(m.created_at)
+      }));
+
+      setMessages(mappedMessages);
+    }
+  };
+
+  const setupRealtimeSubscriptions = () => {
+    const channel = supabase
+      .channel(`room-${roomId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'room_players',
+        filter: `room_id=eq.${roomId}`
+      }, () => {
+        fetchPlayers();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'room_state',
+        filter: `room_id=eq.${roomId}`
+      }, async (payload) => {
+        const newState = payload.new as RoomState;
+        setRoomState(newState);
+        
+        if (newState.current_question_id) {
+          await fetchCurrentQuestion(newState.current_question_id);
+          setSelectedAnswer(null);
+          setAnswerResult(null);
+        }
+
+        if (newState.status === 'finished') {
+          // Fetch final scores and end game
+          await fetchPlayers();
+          const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+          onGameEnd(sortedPlayers);
+        }
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'room_chat_messages',
+        filter: `room_id=eq.${roomId}`
+      }, async (payload) => {
+        const newMsg = payload.new as any;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', newMsg.user_id)
+          .single();
+
+        setMessages(prev => [...prev, {
+          id: newMsg.id,
+          sender: profile?.name || 'Unknown',
+          senderId: newMsg.user_id,
+          content: newMsg.content,
+          timestamp: new Date(newMsg.created_at)
+        }]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const toggleReady = async () => {
+    const currentPlayer = players.find(p => p.id === currentUserId);
+    if (!currentPlayer) return;
+
+    await supabase
+      .from('room_players')
+      .update({ is_ready: !currentPlayer.isReady })
+      .eq('room_id', roomId)
+      .eq('user_id', currentUserId);
+  };
+
+  const startGame = async () => {
+    if (!isHost) return;
+
+    try {
+      // Call the database function to start the game
+      const { error } = await supabase.rpc('multiplayer_start_game', {
+        p_room_id: roomId
+      });
+
+      if (error) throw error;
+
+      // Start countdown
+      setRoomState(prev => ({ ...prev, status: 'countdown' }));
+      setCountdownValue(3);
+
+      let count = 3;
+      const countdownInterval = setInterval(async () => {
+        count--;
+        setCountdownValue(count);
+        if (count <= 0) {
+          clearInterval(countdownInterval);
+          // Advance to first question
+          await supabase.rpc('multiplayer_next_question', { p_room_id: roomId });
+        }
+      }, 1000);
+
+    } catch (err) {
+      console.error('Error starting game:', err);
+      toast.error('Failed to start game');
+    }
+  };
+
+  const handleAnswer = async (answerIndex: number) => {
+    if (selectedAnswer !== null || !currentQuestion) return;
+
+    setSelectedAnswer(answerIndex);
+    const timeUsed = 30 - timeRemaining;
+
+    try {
+      const { data, error } = await supabase.rpc('multiplayer_submit_answer', {
+        p_room_id: roomId,
+        p_question_id: currentQuestion.id,
+        p_answer: currentQuestion.options[answerIndex],
+        p_time_used: timeUsed
+      });
+
+      if (error) throw error;
+
+      const result = data as { is_correct: boolean; points: number; correct_answer: string };
+      setAnswerResult({ correct: result.is_correct, points: result.points });
+
+      if (result.is_correct) {
+        toast.success(`Correct! +${result.points} points`);
+      } else {
+        toast.error(`Wrong! Correct answer: ${result.correct_answer}`);
+      }
+
+      // Refresh player scores
+      fetchPlayers();
+
+    } catch (err) {
+      console.error('Error submitting answer:', err);
+    }
+  };
+
+  const nextQuestion = async () => {
+    if (!isHost) return;
+
+    try {
+      const { data, error } = await supabase.rpc('multiplayer_next_question', {
+        p_room_id: roomId
+      });
+
+      if (error) throw error;
+
+      const result = data as { status: string };
+      if (result.status === 'finished') {
+        // Game will end via realtime subscription
+      }
+    } catch (err) {
+      console.error('Error advancing question:', err);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim()) return;
+
+    await supabase
+      .from('room_chat_messages')
+      .insert({
+        room_id: roomId,
+        user_id: currentUserId,
+        content: chatInput.trim()
+      });
+
+    setChatInput('');
+  };
+
+  const allReady = players.every(p => p.isReady);
+  const currentPlayer = players.find(p => p.id === currentUserId);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -288,7 +421,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">{roomName}</h1>
-            <p className="text-sm text-muted-foreground">Room ID: {roomId}</p>
+            <p className="text-sm text-muted-foreground">Room ID: {roomId.slice(0, 8)}...</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowChat(!showChat)}>
@@ -305,7 +438,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Main Game Area */}
           <div className="lg:col-span-2 space-y-4">
-            {gameState.status === 'waiting' && (
+            {roomState.status === 'waiting' && (
               <Card className="p-6 glass neon-border">
                 <div className="text-center space-y-4">
                   <h2 className="text-xl font-bold text-foreground">Waiting for Players</h2>
@@ -315,15 +448,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                   <Progress value={(players.length / maxPlayers) * 100} className="h-2" />
                   
                   <div className="flex justify-center gap-2 flex-wrap">
-                    <Button variant="outline" onClick={addNPCPlayer}>
-                      <Bot className="h-4 w-4 mr-2" />
-                      Add Bot
-                    </Button>
                     <Button
-                      variant={players.find((p) => p.id === currentUserId)?.isReady ? 'default' : 'outline'}
+                      variant={currentPlayer?.isReady ? 'default' : 'outline'}
                       onClick={toggleReady}
                     >
-                      {players.find((p) => p.id === currentUserId)?.isReady ? 'Ready!' : 'Click to Ready'}
+                      {currentPlayer?.isReady ? '✓ Ready!' : 'Click to Ready'}
                     </Button>
                     {isHost && allReady && players.length >= 2 && (
                       <Button onClick={startGame} className="bg-green-500 hover:bg-green-600">
@@ -332,83 +461,123 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                       </Button>
                     )}
                   </div>
+
+                  {isHost && !allReady && (
+                    <p className="text-sm text-muted-foreground">
+                      Waiting for all players to ready up...
+                    </p>
+                  )}
                 </div>
               </Card>
             )}
 
-            {gameState.status === 'countdown' && (
+            {roomState.status === 'countdown' && (
               <Card className="p-12 glass neon-border text-center">
                 <motion.div
-                  key={gameState.timeRemaining}
+                  key={countdownValue}
                   initial={{ scale: 2, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   className="text-8xl font-display font-bold text-primary"
                 >
-                  {gameState.timeRemaining}
+                  {countdownValue}
                 </motion.div>
                 <p className="text-xl mt-4 text-foreground">Get Ready!</p>
               </Card>
             )}
 
-            {gameState.status === 'playing' && gameState.question && (
+            {roomState.status === 'playing' && currentQuestion && (
               <Card className="p-6 glass neon-border">
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <Badge variant="secondary">
-                      Question {gameState.currentQuestion}/{gameState.totalQuestions}
+                      Question {roomState.question_index + 1}/{totalQuestions}
                     </Badge>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <span
                         className={cn(
                           'font-mono font-bold',
-                          gameState.timeRemaining <= 5 ? 'text-destructive' : 'text-foreground'
+                          timeRemaining <= 5 ? 'text-destructive' : 'text-foreground'
                         )}
                       >
-                        {gameState.timeRemaining}s
+                        {timeRemaining}s
                       </span>
                     </div>
                   </div>
 
                   <Progress
-                    value={(gameState.timeRemaining / 15) * 100}
+                    value={(timeRemaining / 30) * 100}
                     className="h-2"
                   />
 
                   <h3 className="text-xl font-bold text-center py-4 text-foreground">
-                    {gameState.question.text}
+                    {currentQuestion.question_text}
                   </h3>
 
                   <div className="grid grid-cols-2 gap-3">
-                    {gameState.question.options.map((option, index) => (
-                      <motion.button
-                        key={index}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleAnswer(index)}
-                        disabled={selectedAnswer !== null}
-                        className={cn(
-                          'p-4 rounded-xl border-2 text-left transition-all',
-                          selectedAnswer === null
-                            ? 'border-border hover:border-primary bg-card'
-                            : selectedAnswer === index
-                            ? index === 0
-                              ? 'border-green-500 bg-green-500/20'
-                              : 'border-destructive bg-destructive/20'
-                            : 'border-border bg-card opacity-50'
-                        )}
-                      >
-                        <span className="font-medium">
-                          {String.fromCharCode(65 + index)}. {option}
-                        </span>
-                      </motion.button>
-                    ))}
+                    {currentQuestion.options.map((option, index) => {
+                      let buttonClass = 'border-border hover:border-primary bg-card';
+                      
+                      if (selectedAnswer !== null) {
+                        if (answerResult?.correct && selectedAnswer === index) {
+                          buttonClass = 'border-green-500 bg-green-500/20';
+                        } else if (!answerResult?.correct && selectedAnswer === index) {
+                          buttonClass = 'border-destructive bg-destructive/20';
+                        } else {
+                          buttonClass = 'border-border bg-card opacity-50';
+                        }
+                      }
+
+                      return (
+                        <motion.button
+                          key={index}
+                          whileHover={{ scale: selectedAnswer === null ? 1.02 : 1 }}
+                          whileTap={{ scale: selectedAnswer === null ? 0.98 : 1 }}
+                          onClick={() => handleAnswer(index)}
+                          disabled={selectedAnswer !== null}
+                          className={cn(
+                            'p-4 rounded-xl border-2 text-left transition-all',
+                            buttonClass
+                          )}
+                        >
+                          <span className="font-medium">
+                            {String.fromCharCode(65 + index)}. {option}
+                          </span>
+                        </motion.button>
+                      );
+                    })}
                   </div>
+
+                  {selectedAnswer !== null && answerResult && (
+                    <div className={cn(
+                      'p-4 rounded-lg text-center',
+                      answerResult.correct ? 'bg-green-500/20' : 'bg-destructive/20'
+                    )}>
+                      <div className="flex items-center justify-center gap-2">
+                        {answerResult.correct ? (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-destructive" />
+                        )}
+                        <span className="font-bold">
+                          {answerResult.correct ? `+${answerResult.points} points!` : 'Wrong answer!'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {isHost && timeRemaining <= 0 && (
+                    <div className="text-center">
+                      <Button onClick={nextQuestion} className="bg-primary">
+                        Next Question
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </Card>
             )}
 
-            {gameState.status === 'finished' && (
+            {roomState.status === 'finished' && (
               <Card className="p-6 glass neon-border text-center">
                 <Trophy className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold mb-4 text-foreground">Game Over!</h2>
@@ -423,9 +592,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     >
                       <div className="flex items-center gap-2">
                         <span className="font-bold">#{index + 1}</span>
-                        <span>{player.avatar}</span>
+                        <AvatarRenderer avatar={player.avatar} size="sm" />
                         <span className="text-foreground">{player.name}</span>
-                        {player.isNPC && <Badge variant="secondary">Bot</Badge>}
+                        {player.isHost && <Crown className="h-4 w-4 text-yellow-500" />}
                       </div>
                       <span className="font-bold text-primary">{player.score} pts</span>
                     </div>
@@ -448,19 +617,18 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     animate={{ scale: 1 }}
                     className={cn(
                       'p-3 rounded-xl border text-center',
-                      player.isReady || player.isNPC
+                      player.isReady
                         ? 'border-green-500/50 bg-green-500/10'
                         : 'border-border bg-card'
                     )}
                   >
-                    <div className="text-2xl mb-1">{player.avatar}</div>
+                    <AvatarRenderer avatar={player.avatar} size="md" className="mx-auto mb-1" />
                     <div className="text-sm font-medium truncate text-foreground">{player.name}</div>
                     <div className="flex items-center justify-center gap-1 mt-1">
                       {player.isHost && <Crown className="h-3 w-3 text-yellow-500" />}
-                      {player.isNPC && <Bot className="h-3 w-3 text-muted-foreground" />}
                       <span className="text-xs text-muted-foreground">Lv.{player.level}</span>
                     </div>
-                    {gameState.status !== 'waiting' && (
+                    {roomState.status !== 'waiting' && (
                       <div className="text-sm font-bold text-primary mt-1">{player.score} pts</div>
                     )}
                   </motion.div>
@@ -492,37 +660,36 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                           key={msg.id}
                           className={cn(
                             'p-2 rounded-lg text-sm',
-                            msg.isNPC ? 'bg-muted' : 'bg-primary/10'
+                            msg.senderId === currentUserId ? 'bg-primary/10' : 'bg-muted'
                           )}
                         >
                           <div className="flex items-center gap-1 mb-1">
-                            <span className="font-medium text-foreground">{msg.sender}</span>
-                            {msg.isNPC && <Bot className="h-3 w-3 text-muted-foreground" />}
+                            <span className="font-medium text-xs">{msg.sender}</span>
                           </div>
-                          <p className="text-muted-foreground">{msg.content}</p>
+                          <p className="text-foreground">{msg.content}</p>
                         </div>
                       ))}
                     </div>
                   </ScrollArea>
 
                   <div className="p-3 border-t border-border">
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        sendChatMessage();
-                      }}
-                      className="flex gap-2"
-                    >
+                    <div className="flex gap-2">
                       <Input
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
                         placeholder="Type a message..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendChatMessage();
+                          }
+                        }}
                         className="flex-1"
                       />
-                      <Button type="submit" size="icon">
+                      <Button size="icon" onClick={sendChatMessage}>
                         <Send className="h-4 w-4" />
                       </Button>
-                    </form>
+                    </div>
                   </div>
                 </Card>
               </motion.div>

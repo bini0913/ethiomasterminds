@@ -89,6 +89,35 @@ export type Database = {
         }
         Relationships: []
       }
+      announcement_reads: {
+        Row: {
+          announcement_id: string
+          id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          id?: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcements: {
         Row: {
           author_id: string
@@ -421,6 +450,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar: string | null
+          avatar_config: Json | null
           badges: string[] | null
           created_at: string
           education_level: string | null
@@ -436,6 +466,7 @@ export type Database = {
         }
         Insert: {
           avatar?: string | null
+          avatar_config?: Json | null
           badges?: string[] | null
           created_at?: string
           education_level?: string | null
@@ -451,6 +482,7 @@ export type Database = {
         }
         Update: {
           avatar?: string | null
+          avatar_config?: Json | null
           badges?: string[] | null
           created_at?: string
           education_level?: string | null
@@ -659,6 +691,89 @@ export type Database = {
         }
         Relationships: []
       }
+      room_answers: {
+        Row: {
+          answer: string
+          created_at: string
+          id: string
+          is_correct: boolean
+          points: number
+          question_id: string
+          room_id: string
+          time_used: number
+          user_id: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          points?: number
+          question_id: string
+          room_id: string
+          time_used?: number
+          user_id: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          points?: number
+          question_id?: string
+          room_id?: string
+          time_used?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_answers_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_chat_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_players: {
         Row: {
           id: string
@@ -693,6 +808,171 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      room_questions: {
+        Row: {
+          id: string
+          order_index: number
+          question_id: string
+          room_id: string
+        }
+        Insert: {
+          id?: string
+          order_index?: number
+          question_id: string
+          room_id: string
+        }
+        Update: {
+          id?: string
+          order_index?: number
+          question_id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_questions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_state: {
+        Row: {
+          current_question_id: string | null
+          question_ends_at: string | null
+          question_index: number
+          question_started_at: string | null
+          room_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          current_question_id?: string | null
+          question_ends_at?: string | null
+          question_index?: number
+          question_started_at?: string | null
+          room_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          current_question_id?: string | null
+          question_ends_at?: string | null
+          question_index?: number
+          question_started_at?: string | null
+          room_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_state_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: true
+            referencedRelation: "multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_post_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_post_likes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_posts: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          post_type: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          post_type?: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          post_type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       tournament_participants: {
         Row: {
@@ -1060,6 +1340,17 @@ export type Database = {
       is_teacher_of_student: {
         Args: { p_student_id: string; p_teacher_id: string }
         Returns: boolean
+      }
+      multiplayer_next_question: { Args: { p_room_id: string }; Returns: Json }
+      multiplayer_start_game: { Args: { p_room_id: string }; Returns: boolean }
+      multiplayer_submit_answer: {
+        Args: {
+          p_answer: string
+          p_question_id: string
+          p_room_id: string
+          p_time_used: number
+        }
+        Returns: Json
       }
     }
     Enums: {
