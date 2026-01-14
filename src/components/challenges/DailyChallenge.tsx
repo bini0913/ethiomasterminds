@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
 import { useQuiz, Question } from "@/context/QuizContext";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 const DailyChallenge: React.FC = () => {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -13,16 +14,16 @@ const DailyChallenge: React.FC = () => {
   const { addXP } = useUser();
   
   // Get a random question for the daily challenge
-  const { quizzes } = useQuiz();
+  const { quizzes, loading } = useQuiz();
   const allQuestions: Question[] = quizzes.flatMap(quiz => quiz.questions);
   
   // Use a fixed seed for the day to ensure all users get the same daily question
   const today = new Date();
   const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-  const dailyQuestion = allQuestions[seed % allQuestions.length];
+  const dailyQuestion = allQuestions.length > 0 ? allQuestions[seed % allQuestions.length] : null;
   
   const handleOptionSelect = (option: string) => {
-    if (isAnswered) return;
+    if (isAnswered || !dailyQuestion) return;
     
     setIsLoading(true);
     setSelectedOption(option);
@@ -40,6 +41,46 @@ const DailyChallenge: React.FC = () => {
       }
     }, 1000);
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <Card className="shadow-md">
+        <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+          <CardTitle className="flex items-center justify-between">
+            <span>Daily Challenge</span>
+            <div className="text-sm bg-white text-blue-600 px-2 py-1 rounded-full">
+              +15 XP
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4 flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show empty state if no questions available
+  if (!dailyQuestion) {
+    return (
+      <Card className="shadow-md">
+        <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+          <CardTitle className="flex items-center justify-between">
+            <span>Daily Challenge</span>
+            <div className="text-sm bg-white text-blue-600 px-2 py-1 rounded-full">
+              +15 XP
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <p className="text-muted-foreground text-center py-4">
+            No challenges available yet. Check back later!
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
   
   return (
     <Card className="shadow-md">
