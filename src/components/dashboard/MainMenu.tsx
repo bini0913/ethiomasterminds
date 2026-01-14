@@ -30,7 +30,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { avatarToEmoji } from "@/utils/avatarUtils";
+import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import LevelUpModal from "../profile/LevelUpModal";
 import GainXPButton from "../profile/GainXPButton";
 import CurrencyDisplay from "@/components/currency/CurrencyDisplay";
@@ -249,9 +249,12 @@ const MainMenu: React.FC = () => {
           >
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="h-16 w-16 flex items-center justify-center text-3xl bg-gradient-to-br from-primary/20 to-secondary/20 rounded-2xl shadow-inner">
-                  {user.avatar?.startsWith("avatar") ? avatarToEmoji(user.avatar) : "👤"}
-                </div>
+                <AvatarRenderer 
+                  avatar={user.avatar} 
+                  avatarConfig={user.avatarConfig} 
+                  size="lg"
+                  className="rounded-2xl"
+                />
                 <div className="absolute -bottom-1 -right-1 bg-primary text-white text-xs px-2 py-0.5 rounded-full font-bold">
                   Lv.{user.level}
                 </div>

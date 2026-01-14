@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -35,19 +36,7 @@ import PUBGAvatarEditor from '@/components/avatar/PUBGAvatarEditor';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 
-interface AvatarConfig {
-  bodyType: string;
-  skinTone: string;
-  faceShape: string;
-  hairstyle: string;
-  hairColor: string;
-  eyeStyle: string;
-  eyebrows: string;
-  outfit: string;
-  outfitColor: string;
-  accessory: string;
-  background: string;
-}
+import { AvatarConfig } from '@/context/UserContext';
 
 const EnhancedSettings: React.FC = () => {
   const { user, logout, updateProfile } = useUser();
@@ -81,17 +70,10 @@ const EnhancedSettings: React.FC = () => {
 
   // Load user's avatar config from database
   useEffect(() => {
-    if (user?.avatar) {
-      try {
-        // Try to parse as JSON (custom avatar config)
-        const config = JSON.parse(user.avatar);
-        setAvatarConfig(config);
-      } catch {
-        // It's a simple avatar ID like "avatar-1"
-        setAvatarConfig({});
-      }
+    if (user?.avatarConfig) {
+      setAvatarConfig(user.avatarConfig);
     }
-  }, [user?.avatar]);
+  }, [user?.avatarConfig]);
 
   const handleSettingChange = (key: string, value: boolean | string) => {
     setSettings(prev => ({
@@ -134,18 +116,16 @@ const EnhancedSettings: React.FC = () => {
     
     setSavingAvatar(true);
     try {
-      const avatarJson = JSON.stringify(config);
-      
       const { error } = await supabase
         .from('profiles')
-        .update({ avatar: avatarJson })
+        .update({ avatar_config: config as Json })
         .eq('id', user.id);
 
       if (error) throw error;
 
       // Update local user state
       if (updateProfile) {
-        updateProfile({ avatar: avatarJson });
+        updateProfile({ avatarConfig: config });
       }
 
       setAvatarConfig(config);

@@ -6,6 +6,18 @@ import { User, Session } from "@supabase/supabase-js";
 // Types
 export type UserRole = "student" | "teacher" | "admin" | "manager";
 
+export interface AvatarConfig {
+  bodyType?: string;
+  skinTone?: string;
+  hairstyle?: string;
+  hairColor?: string;
+  outfit?: string;
+  outfitColor?: string;
+  accessory?: string;
+  background?: string;
+  expression?: string;
+}
+
 export type UserProfile = {
   id: string;
   name: string;
@@ -18,6 +30,7 @@ export type UserProfile = {
   xp: number;
   level: number;
   avatar: string;
+  avatarConfig?: AvatarConfig | null;
   rank?: string;
   badges?: string[];
 };
@@ -93,6 +106,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         xp: profile.xp || 0,
         level: profile.level || 1,
         avatar: profile.avatar || 'avatar-1',
+        avatarConfig: profile.avatar_config as AvatarConfig | null,
         rank: profile.rank || undefined,
         badges: profile.badges || [],
       };
@@ -346,6 +360,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (profileData.xp !== undefined) updateData.xp = profileData.xp;
       if (profileData.level !== undefined) updateData.level = profileData.level;
       if (profileData.avatar !== undefined) updateData.avatar = profileData.avatar;
+      if (profileData.avatarConfig !== undefined) updateData.avatar_config = profileData.avatarConfig;
       if (profileData.rank !== undefined) updateData.rank = profileData.rank;
       if (profileData.badges !== undefined) updateData.badges = profileData.badges;
 
