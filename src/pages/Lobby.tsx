@@ -26,7 +26,7 @@ import {
   Swords,
   RefreshCw
 } from "lucide-react";
-import { avatarToEmoji } from "@/utils/avatarUtils";
+import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import RoomCard, { Room } from "@/components/multiplayer/RoomCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -442,9 +442,7 @@ const Lobby: React.FC = () => {
                         className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
                       >
                         <div className="relative">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-lg">
-                            {avatarToEmoji(player.avatar)}
-                          </div>
+                          <AvatarRenderer avatar={player.avatar} size="md" />
                           <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${getStatusColor(player.status)} border-2 border-card`}></div>
                         </div>
                         <div className="flex-1 min-w-0">
@@ -570,9 +568,7 @@ const Lobby: React.FC = () => {
                   ) : (
                     chatMessages.map((msg) => (
                       <div key={msg.id} className="flex items-start gap-2">
-                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-sm flex-shrink-0">
-                          {avatarToEmoji(msg.userAvatar)}
-                        </div>
+                        <AvatarRenderer avatar={msg.userAvatar} size="sm" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2">
                             <span className="font-medium text-sm">{msg.userName}</span>

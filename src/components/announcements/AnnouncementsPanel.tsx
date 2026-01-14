@@ -124,12 +124,18 @@ const AnnouncementsPanel: React.FC<AnnouncementsPanelProps> = ({
     if (!user) return;
 
     try {
-      await supabase
+      // Use insert with onConflict handling - if already read, do nothing
+      const { error } = await supabase
         .from('announcement_reads')
-        .upsert({
+        .insert({
           announcement_id: announcementId,
           user_id: user.id
-        }, { onConflict: 'announcement_id,user_id' });
+        });
+      
+      // Ignore unique constraint violations - means it's already read
+      if (error && error.code !== '23505') {
+        throw error;
+      }
 
       setAnnouncements(prev => 
         prev.map(a => a.id === announcementId ? { ...a, is_read: true } : a)

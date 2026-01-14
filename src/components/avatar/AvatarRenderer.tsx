@@ -1,18 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-
-// Avatar config interface matching PUBGAvatarEditor
-export interface AvatarConfig {
-  bodyType: string;
-  skinTone: string;
-  hairstyle: string;
-  hairColor: string;
-  outfit: string;
-  outfitColor: string;
-  accessory: string;
-  background: string;
-  expression: string;
-}
+import { AvatarConfig } from '@/context/UserContext';
 
 interface AvatarRendererProps {
   avatar?: string; // Simple avatar ID like 'avatar-1'
@@ -102,10 +90,10 @@ const AvatarRenderer: React.FC<AvatarRendererProps> = ({
   const sizeClass = sizeClasses[size];
 
   // If we have a complex avatar config, render it
-  if (avatarConfig && typeof avatarConfig === 'object') {
-    const bgClass = backgroundColors[avatarConfig.background] || backgroundColors.sky;
-    const expression = expressionEmojis[avatarConfig.expression] || '😊';
-    const accessory = accessoryEmojis[avatarConfig.accessory] || '';
+  if (avatarConfig && typeof avatarConfig === 'object' && Object.keys(avatarConfig).length > 0) {
+    const bgClass = backgroundColors[avatarConfig.background || 'sky'] || backgroundColors.sky;
+    const expression = expressionEmojis[avatarConfig.expression || 'happy'] || '😊';
+    const accessory = accessoryEmojis[avatarConfig.accessory || 'none'] || '';
 
     return (
       <div

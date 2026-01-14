@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, Users, TrendingUp, Trophy, Award, Star, Home } from "lucide-react";
 import { motion } from "framer-motion";
 import BackButton from "@/components/ui/BackButton";
+import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 
 interface LeaderboardEntry {
   id: string;
@@ -254,9 +255,7 @@ const Leaderboard: React.FC = () => {
             {userRank ? (
               <div className="flex items-center gap-3 p-3 bg-background rounded-md shadow-sm">
                 <div className="font-semibold w-6 text-center text-muted-foreground">{userRank}</div>
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  {user.avatar?.startsWith('avatar') ? '👤' : user.avatar}
-                </div>
+                <AvatarRenderer avatar={user.avatar} avatarConfig={user.avatarConfig} size="sm" />
                 <div className="flex-1">
                   <div className="font-medium flex items-center">
                     {user.name} 

@@ -10,7 +10,7 @@ import { useUser, UserProfile } from "@/context/UserContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { avatarToEmoji } from "@/utils/avatarUtils";
+import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import BackButton from "@/components/ui/BackButton";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -216,11 +216,11 @@ const Friends: React.FC = () => {
                           selectedFriend?.id === friend.id ? 'bg-muted' : ''
                         }`}
                       >
-                        <Avatar className="h-10 w-10 mr-3">
-                          <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
-                            {avatarToEmoji(friend.avatar)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <AvatarRenderer 
+                          avatar={friend.avatar} 
+                          size="md" 
+                          className="mr-3"
+                        />
                         <div className="flex-1">
                           <div className="font-medium text-foreground">{friend.name}</div>
                           <div className="text-xs text-muted-foreground">
@@ -292,11 +292,11 @@ const Friends: React.FC = () => {
                         animate={{ opacity: 1, y: 0 }}
                         className="flex items-center p-3 hover:bg-muted/50"
                       >
-                        <Avatar className="h-10 w-10 mr-3">
-                          <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white">
-                            {avatarToEmoji(resultUser.avatar)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <AvatarRenderer 
+                          avatar={resultUser.avatar} 
+                          size="md" 
+                          className="mr-3"
+                        />
                         <div className="flex-1">
                           <div className="font-medium text-foreground">{resultUser.name}</div>
                           <div className="text-xs text-muted-foreground">
@@ -344,11 +344,11 @@ const Friends: React.FC = () => {
             <>
               {/* Chat Header */}
               <div className="flex items-center p-3 border-b bg-card">
-                <Avatar className="h-10 w-10 mr-3">
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
-                    {avatarToEmoji(selectedFriend.avatar)}
-                  </AvatarFallback>
-                </Avatar>
+                <AvatarRenderer 
+                  avatar={selectedFriend.avatar} 
+                  size="md" 
+                  className="mr-3"
+                />
                 <div>
                   <div className="font-medium text-foreground">{selectedFriend.name}</div>
                   <div className="text-xs text-muted-foreground">
@@ -456,11 +456,11 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
 }) => {
   return (
     <div className="flex items-center p-3">
-      <Avatar className="h-10 w-10 mr-3">
-        <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
-          {avatarToEmoji(request.sender.avatar)}
-        </AvatarFallback>
-      </Avatar>
+      <AvatarRenderer 
+        avatar={request.sender.avatar} 
+        size="md" 
+        className="mr-3"
+      />
       <div className="flex-1">
         <div className="font-medium text-foreground">{request.sender.name}</div>
         <div className="text-xs text-muted-foreground">
