@@ -255,7 +255,7 @@ const PUBGAvatarEditor: React.FC<PUBGAvatarEditorProps> = ({
               <RotateCcw className="h-4 w-4 mr-2" />
               Reset
             </Button>
-            <Button size="sm" onClick={() => onSave(config)} className="bg-primary">
+            <Button size="sm" onClick={() => onSave?.(config)} className="bg-primary">
               <Check className="h-4 w-4 mr-2" />
               Save Avatar
             </Button>
