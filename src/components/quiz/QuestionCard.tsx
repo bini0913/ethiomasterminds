@@ -57,31 +57,47 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLef
       </div>
       
       <div className="space-y-3 mb-6">
-        {question.options.map((option) => (
-          <div
-            key={option}
-            onClick={() => handleOptionSelect(option)}
-            className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-              answered && option === question.correctAnswer
-                ? "border-green-500 bg-green-50"
-                : answered && option === selectedOption && option !== question.correctAnswer
-                ? "border-red-500 bg-red-50"
-                : selectedOption === option
-                ? "border-primary bg-primary/10"
-                : "border-gray-200 hover:border-primary/50 hover:bg-gray-50"
-            }`}
-          >
-            <div className="flex justify-between items-center">
-              <span>{option}</span>
-              {answered && option === question.correctAnswer && (
-                <Check className="text-green-500 h-5 w-5" />
-              )}
-              {answered && option === selectedOption && option !== question.correctAnswer && (
-                <X className="text-red-500 h-5 w-5" />
-              )}
+        {question.options.map((option, index) => {
+          const optionLabel = String.fromCharCode(65 + index); // A, B, C, D
+          return (
+            <div
+              key={option}
+              onClick={() => handleOptionSelect(option)}
+              className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                answered && option === question.correctAnswer
+                  ? "border-green-500 bg-green-500/10 dark:bg-green-500/20"
+                  : answered && option === selectedOption && option !== question.correctAnswer
+                  ? "border-red-500 bg-red-500/10 dark:bg-red-500/20"
+                  : selectedOption === option
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:border-primary/50 hover:bg-muted/50"
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                    answered && option === question.correctAnswer
+                      ? "bg-green-500 text-white"
+                      : answered && option === selectedOption && option !== question.correctAnswer
+                      ? "bg-red-500 text-white"
+                      : selectedOption === option
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {optionLabel}
+                  </span>
+                  <span className="text-foreground">{option}</span>
+                </div>
+                {answered && option === question.correctAnswer && (
+                  <Check className="text-green-500 h-5 w-5" />
+                )}
+                {answered && option === selectedOption && option !== question.correctAnswer && (
+                  <X className="text-red-500 h-5 w-5" />
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       
       {!answered && (

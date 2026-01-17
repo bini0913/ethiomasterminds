@@ -19,6 +19,7 @@ import Social from "./pages/Social";
 import AdminPortal from "./pages/AdminPortal";
 import StudentDashboard from "./pages/StudentDashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
+import Chat from "./pages/Chat";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -28,6 +29,8 @@ import { LanguageProvider } from "./context/LanguageContext";
 import { CurrencyProvider } from "./context/CurrencyContext";
 import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
+import { ThemeProvider } from "./context/ThemeContext";
+import { ChatProvider } from "./context/ChatContext";
 import AIHelper from "./components/ai/AIHelper";
 import PlusButton from "./components/ai/PlusButton";
 
@@ -35,71 +38,75 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <UserProvider>
-      <LanguageProvider>
-        <CurrencyProvider>
-          <AchievementsProvider>
-            <QuizProvider>
-              <RoomProvider>
-                <AIHelperProvider>
-                  <FriendsProvider>
-                    <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/quiz" element={<Quiz />} />
-                    <Route path="/quiz/filter" element={<QuizFilter />} />
-                    <Route path="/multiplayer" element={<Multiplayer />} />
-                    <Route path="/lobby" element={<Lobby />} />
-                    <Route path="/leaderboard" element={<Leaderboard />} />
-                    <Route path="/friends" element={<Friends />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route 
-                      path="/teacher" 
-                      element={
-                        <ProtectedRoute allowedRoles={['teacher', 'admin', 'manager']}>
-                          <TeacherPortal />
-                        </ProtectedRoute>
-                      } 
-                    />
-                    <Route 
-                      path="/admin" 
-                      element={
-                        <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                          <AdminPortal />
-                        </ProtectedRoute>
-                      } 
-                    />
-                    <Route path="/student-dashboard" element={<StudentDashboard />} />
-                    <Route 
-                      path="/manager-dashboard" 
-                      element={
-                        <ProtectedRoute allowedRoles={['manager']}>
-                          <ManagerDashboard />
-                        </ProtectedRoute>
-                      } 
-                    />
-                    <Route path="/store" element={<StorePage />} />
-                    <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
-                    <Route path="/enhanced-settings" element={<EnhancedSettings />} />
-                    <Route path="/social" element={<Social />} />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                  <AIHelper />
-                  <PlusButton />
-                </BrowserRouter>
-                    </TooltipProvider>
-                  </FriendsProvider>
-                </AIHelperProvider>
-              </RoomProvider>
-            </QuizProvider>
-          </AchievementsProvider>
-        </CurrencyProvider>
-      </LanguageProvider>
-    </UserProvider>
+    <ThemeProvider>
+      <UserProvider>
+        <LanguageProvider>
+          <CurrencyProvider>
+            <AchievementsProvider>
+              <QuizProvider>
+                <RoomProvider>
+                  <AIHelperProvider>
+                    <FriendsProvider>
+                      <ChatProvider>
+                        <TooltipProvider>
+                          <Toaster />
+                          <Sonner />
+                          <BrowserRouter>
+                            <Routes>
+                              <Route path="/" element={<Index />} />
+                              <Route path="/quiz" element={<Quiz />} />
+                              <Route path="/quiz/filter" element={<QuizFilter />} />
+                              <Route path="/multiplayer" element={<Multiplayer />} />
+                              <Route path="/lobby" element={<Lobby />} />
+                              <Route path="/leaderboard" element={<Leaderboard />} />
+                              <Route path="/friends" element={<Friends />} />
+                              <Route path="/settings" element={<Settings />} />
+                              <Route path="/chat" element={<Chat />} />
+                              <Route 
+                                path="/teacher" 
+                                element={
+                                  <ProtectedRoute allowedRoles={['teacher', 'admin', 'manager']}>
+                                    <TeacherPortal />
+                                  </ProtectedRoute>
+                                } 
+                              />
+                              <Route 
+                                path="/admin" 
+                                element={
+                                  <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                                    <AdminPortal />
+                                  </ProtectedRoute>
+                                } 
+                              />
+                              <Route path="/student-dashboard" element={<StudentDashboard />} />
+                              <Route 
+                                path="/manager-dashboard" 
+                                element={
+                                  <ProtectedRoute allowedRoles={['manager']}>
+                                    <ManagerDashboard />
+                                  </ProtectedRoute>
+                                } 
+                              />
+                              <Route path="/store" element={<StorePage />} />
+                              <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
+                              <Route path="/enhanced-settings" element={<EnhancedSettings />} />
+                              <Route path="/social" element={<Social />} />
+                              <Route path="*" element={<NotFound />} />
+                            </Routes>
+                            <AIHelper />
+                            <PlusButton />
+                          </BrowserRouter>
+                        </TooltipProvider>
+                      </ChatProvider>
+                    </FriendsProvider>
+                  </AIHelperProvider>
+                </RoomProvider>
+              </QuizProvider>
+            </AchievementsProvider>
+          </CurrencyProvider>
+        </LanguageProvider>
+      </UserProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
