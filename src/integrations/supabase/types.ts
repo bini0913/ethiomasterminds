@@ -89,6 +89,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_tutor_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json | null
+          subject: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json | null
+          subject?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json | null
+          subject?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       announcement_reads: {
         Row: {
           announcement_id: string
@@ -184,6 +211,71 @@ export type Database = {
           price_coins?: number | null
           price_gems?: number | null
           rarity?: string | null
+        }
+        Relationships: []
+      }
+      chat_group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "chat_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_groups: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          group_type: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          group_type?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          group_type?: string
+          id?: string
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -318,6 +410,93 @@ export type Database = {
         }
         Relationships: []
       }
+      group_messages: {
+        Row: {
+          attachment_url: string | null
+          content: string
+          created_at: string
+          group_id: string
+          id: string
+          message_type: string
+          reply_to_id: string | null
+          sender_id: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          content: string
+          created_at?: string
+          group_id: string
+          id?: string
+          message_type?: string
+          reply_to_id?: string | null
+          sender_id: string
+        }
+        Update: {
+          attachment_url?: string | null
+          content?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+          message_type?: string
+          reply_to_id?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "chat_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "group_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learning_dna: {
+        Row: {
+          created_at: string
+          id: string
+          last_analyzed_at: string | null
+          learning_style: string | null
+          predicted_path: Json | null
+          strengths: Json | null
+          topic_mastery: Json | null
+          updated_at: string
+          user_id: string
+          weaknesses: Json | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_analyzed_at?: string | null
+          learning_style?: string | null
+          predicted_path?: Json | null
+          strengths?: Json | null
+          topic_mastery?: Json | null
+          updated_at?: string
+          user_id: string
+          weaknesses?: Json | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_analyzed_at?: string | null
+          learning_style?: string | null
+          predicted_path?: Json | null
+          strengths?: Json | null
+          topic_mastery?: Json | null
+          updated_at?: string
+          user_id?: string
+          weaknesses?: Json | null
+        }
+        Relationships: []
+      }
       lobby_messages: {
         Row: {
           content: string
@@ -447,6 +626,69 @@ export type Database = {
         }
         Relationships: []
       }
+      parent_links: {
+        Row: {
+          created_at: string
+          id: string
+          link_code: string
+          linked_at: string | null
+          parent_id: string
+          status: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          link_code: string
+          linked_at?: string | null
+          parent_id: string
+          status?: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          link_code?: string
+          linked_at?: string | null
+          parent_id?: string
+          status?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
+      parent_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          notification_type: string
+          parent_id: string
+          read: boolean | null
+          student_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          notification_type: string
+          parent_id: string
+          read?: boolean | null
+          student_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          notification_type?: string
+          parent_id?: string
+          read?: boolean | null
+          student_id?: string
+          title?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar: string | null
@@ -497,6 +739,60 @@ export type Database = {
           xp?: number
         }
         Relationships: []
+      }
+      question_attempts: {
+        Row: {
+          attempt_number: number
+          confidence_level: number | null
+          created_at: string
+          id: string
+          is_correct: boolean
+          question_id: string
+          quiz_id: string
+          selected_answer: string
+          time_taken_seconds: number
+          user_id: string
+        }
+        Insert: {
+          attempt_number?: number
+          confidence_level?: number | null
+          created_at?: string
+          id?: string
+          is_correct: boolean
+          question_id: string
+          quiz_id: string
+          selected_answer: string
+          time_taken_seconds: number
+          user_id: string
+        }
+        Update: {
+          attempt_number?: number
+          confidence_level?: number | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          question_id?: string
+          quiz_id?: string
+          selected_answer?: string
+          time_taken_seconds?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_attempts_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_attempts_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       questions: {
         Row: {
@@ -691,6 +987,89 @@ export type Database = {
         }
         Relationships: []
       }
+      reports: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          reason: string
+          reported_id: string
+          reported_type: string
+          reporter_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          reason: string
+          reported_id: string
+          reported_type: string
+          reporter_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          reason?: string
+          reported_id?: string
+          reported_type?: string
+          reporter_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      revision_schedule: {
+        Row: {
+          created_at: string
+          difficulty_rating: number | null
+          id: string
+          last_reviewed_at: string | null
+          question_id: string
+          scheduled_for: string
+          status: string
+          times_reviewed: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          difficulty_rating?: number | null
+          id?: string
+          last_reviewed_at?: string | null
+          question_id: string
+          scheduled_for: string
+          status?: string
+          times_reviewed?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          difficulty_rating?: number | null
+          id?: string
+          last_reviewed_at?: string | null
+          question_id?: string
+          scheduled_for?: string
+          status?: string
+          times_reviewed?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revision_schedule_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_answers: {
         Row: {
           answer: string
@@ -883,6 +1262,35 @@ export type Database = {
           },
         ]
       }
+      saved_posts: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_post_comments: {
         Row: {
           content: string
@@ -944,14 +1352,48 @@ export type Database = {
           },
         ]
       }
+      social_post_reactions: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          reaction_type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_post_reactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_posts: {
         Row: {
           author_id: string
           content: string
           created_at: string
           id: string
+          image_url: string | null
           metadata: Json | null
           post_type: string
+          shared_post_id: string | null
           updated_at: string
         }
         Insert: {
@@ -959,8 +1401,10 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          image_url?: string | null
           metadata?: Json | null
           post_type?: string
+          shared_post_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -968,11 +1412,21 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          image_url?: string | null
           metadata?: Json | null
           post_type?: string
+          shared_post_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "social_posts_shared_post_id_fkey"
+            columns: ["shared_post_id"]
+            isOneToOne: false
+            referencedRelation: "social_posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tournament_participants: {
         Row: {
