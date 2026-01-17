@@ -13,6 +13,7 @@ import Friends from "./pages/Friends";
 import Settings from "./pages/Settings";
 import EnhancedSettings from "./pages/EnhancedSettings";
 import NotFound from "./pages/NotFound";
+import StorePage from "./pages/StorePage";
 import TeacherPortal from "./pages/TeacherPortal";
 import Social from "./pages/Social";
 import AdminPortal from "./pages/AdminPortal";
@@ -80,7 +81,7 @@ const App = () => (
                         </ProtectedRoute>
                       } 
                     />
-                    <Route path="/store" element={<div>Avatar Store Coming Soon</div>} />
+                    <Route path="/store" element={<StorePage />} />
                     <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
                     <Route path="/enhanced-settings" element={<EnhancedSettings />} />
                     <Route path="/social" element={<Social />} />
