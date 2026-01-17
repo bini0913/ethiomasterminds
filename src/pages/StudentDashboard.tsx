@@ -424,13 +424,14 @@ const StudentDashboard: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                   {[
                     { icon: BookOpen, label: "Start Quiz", path: "/quiz", gradient: "from-primary to-accent" },
                     { icon: Users, label: "Multiplayer", path: "/lobby", gradient: "from-secondary to-glow-cyan" },
                     { icon: Trophy, label: "Tournaments", path: "/tournaments", gradient: "from-accent to-glow-pink" },
                     { icon: TrendingUp, label: "Leaderboard", path: "/leaderboard", gradient: "from-glow-yellow to-orange-500" },
-                    { icon: MessageCircle, label: "Chat", path: "/friends", gradient: "from-pink-500 to-rose-500" }
+                    { icon: MessageCircle, label: "Chat", path: "/friends", gradient: "from-pink-500 to-rose-500" },
+                    { icon: Gift, label: "Store", path: "/store", gradient: "from-purple-500 to-indigo-500" }
                   ].map((action, i) => (
                     <motion.div key={i} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                       <Button
