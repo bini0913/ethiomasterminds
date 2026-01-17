@@ -1,19 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
+import { useRoom } from "@/context/RoomContext";
 import { toast } from "sonner";
-import { motion, AnimatePresence } from "framer-motion";
-import { Users, MessageSquare, Trophy, Gamepad, Clock, Star, Shield, Swords, Crown, Zap, Target, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
+import { Users, Trophy, Gamepad, Clock, Shield, Swords, Crown, Zap, Target, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import BackButton from "@/components/ui/BackButton";
+import RealTimeRoom from "@/components/multiplayer/RealTimeRoom";
 
 const Multiplayer: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useUser();
+  const { currentRoom, leaveRoom } = useRoom();
   const [hoveredMode, setHoveredMode] = useState<string | null>(null);
+  
+  const roomId = searchParams.get('room');
   
   useEffect(() => {
     if (!user) {
@@ -26,6 +32,33 @@ const Multiplayer: React.FC = () => {
     navigate("/lobby");
     toast.success(`Joining ${mode} mode... redirecting to lobby`);
   };
+
+  const handleLeaveRoom = () => {
+    if (roomId && user) {
+      leaveRoom(roomId, user.name || 'Player');
+    }
+    navigate('/lobby');
+  };
+
+  const handleGameEnd = (results: any[]) => {
+    toast.success('Game finished!');
+    // Could show a results modal here
+  };
+
+  // If we have a room ID, show the RealTimeRoom component
+  if (roomId && user) {
+    return (
+      <RealTimeRoom
+        roomId={roomId}
+        roomName={currentRoom?.name || 'Game Room'}
+        maxPlayers={currentRoom?.maxPlayers || 4}
+        currentUserId={user.id}
+        currentUserName={user.name || 'Player'}
+        onLeave={handleLeaveRoom}
+        onGameEnd={handleGameEnd}
+      />
+    );
+  }
 
   const gameModes = [
     {

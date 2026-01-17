@@ -6,7 +6,7 @@ import { Home, Store } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import AvatarStore from '@/components/store/AvatarStore';
-import { CurrencyProvider } from '@/context/CurrencyContext';
+
 
 const StorePage: React.FC = () => {
   const navigate = useNavigate();
