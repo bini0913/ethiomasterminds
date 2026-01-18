@@ -92,6 +92,9 @@ const App = () => (
                               <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
                               <Route path="/enhanced-settings" element={<EnhancedSettings />} />
                               <Route path="/social" element={<Social />} />
+                              <Route path="/ai-tutor" element={<AITutor />} />
+                              <Route path="/learning-dna" element={<LearningDNA />} />
+                              <Route path="/parent-dashboard" element={<ParentDashboard />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             <AIHelper />

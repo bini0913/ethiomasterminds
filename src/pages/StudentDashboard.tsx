@@ -28,7 +28,8 @@ import {
   Settings,
   LogOut,
   CheckCircle,
-  Gift
+  Gift,
+  Bot
 } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import CurrencyDisplay from '@/components/currency/CurrencyDisplay';
@@ -428,9 +429,9 @@ const StudentDashboard: React.FC = () => {
                   {[
                     { icon: BookOpen, label: "Start Quiz", path: "/quiz", gradient: "from-primary to-accent" },
                     { icon: Users, label: "Multiplayer", path: "/lobby", gradient: "from-secondary to-glow-cyan" },
-                    { icon: Trophy, label: "Tournaments", path: "/tournaments", gradient: "from-accent to-glow-pink" },
-                    { icon: TrendingUp, label: "Leaderboard", path: "/leaderboard", gradient: "from-glow-yellow to-orange-500" },
-                    { icon: MessageCircle, label: "Chat", path: "/friends", gradient: "from-pink-500 to-rose-500" },
+                    { icon: Bot, label: "AI Tutor", path: "/ai-tutor", gradient: "from-violet-500 to-purple-600" },
+                    { icon: Brain, label: "My Learning", path: "/learning-dna", gradient: "from-pink-500 to-rose-500" },
+                    { icon: Trophy, label: "Leaderboard", path: "/leaderboard", gradient: "from-glow-yellow to-orange-500" },
                     { icon: Gift, label: "Store", path: "/store", gradient: "from-purple-500 to-indigo-500" }
                   ].map((action, i) => (
                     <motion.div key={i} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
