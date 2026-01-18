@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
 import { 
   ChevronLeft, Languages, Volume2, Bell, UserCircle, 
-  Moon, Sun, Palette, Shield, Info, LogOut, Trash2,
+  Palette, Shield, Info, LogOut, Trash2,
   Smartphone, Globe, Lock, Eye, EyeOff
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -29,7 +29,7 @@ const Settings: React.FC = () => {
   const [notifications, setNotifications] = useState(true);
   const [soundEffects, setSoundEffects] = useState(true);
   const [vibration, setVibration] = useState(true);
-  const [darkMode, setDarkMode] = useState(true);
+  
   const [showPassword, setShowPassword] = useState(false);
   
   const handleLanguageChange = (value: string) => {
@@ -140,36 +140,6 @@ const Settings: React.FC = () => {
                 </CardContent>
               </Card>
               
-              {/* Theme */}
-              <Card className="glass neon-border">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                      <Palette className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <span className="text-foreground">Appearance</span>
-                      <p className="text-sm text-muted-foreground font-normal">Customize the look and feel</p>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-border/50">
-                    <div className="flex items-center gap-3">
-                      {darkMode ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-yellow-500" />}
-                      <div>
-                        <Label htmlFor="dark-mode" className="text-foreground">Dark Mode</Label>
-                        <p className="text-sm text-muted-foreground">Easier on the eyes at night</p>
-                      </div>
-                    </div>
-                    <Switch
-                      id="dark-mode"
-                      checked={darkMode}
-                      onCheckedChange={setDarkMode}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
             </motion.div>
           </TabsContent>
           

@@ -20,6 +20,9 @@ import AdminPortal from "./pages/AdminPortal";
 import StudentDashboard from "./pages/StudentDashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import Chat from "./pages/Chat";
+import AITutor from "./pages/AITutor";
+import LearningDNA from "./pages/LearningDNA";
+import ParentDashboard from "./pages/ParentDashboard";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -29,7 +32,6 @@ import { LanguageProvider } from "./context/LanguageContext";
 import { CurrencyProvider } from "./context/CurrencyContext";
 import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
-import { ThemeProvider } from "./context/ThemeContext";
 import { ChatProvider } from "./context/ChatContext";
 import AIHelper from "./components/ai/AIHelper";
 import PlusButton from "./components/ai/PlusButton";
@@ -38,8 +40,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <UserProvider>
+    <UserProvider>
         <LanguageProvider>
           <CurrencyProvider>
             <AchievementsProvider>
@@ -104,9 +105,8 @@ const App = () => (
               </QuizProvider>
             </AchievementsProvider>
           </CurrencyProvider>
-        </LanguageProvider>
-      </UserProvider>
-    </ThemeProvider>
+      </LanguageProvider>
+    </UserProvider>
   </QueryClientProvider>
 );
 

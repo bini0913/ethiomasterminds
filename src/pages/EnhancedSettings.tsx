@@ -22,8 +22,6 @@ import {
   Palette,
   Volume2,
   Eye,
-  Moon,
-  Sun,
   LogOut,
   Save,
   Trash2,
@@ -46,7 +44,6 @@ const EnhancedSettings: React.FC = () => {
   const [settings, setSettings] = useState({
     notifications: true,
     soundEffects: true,
-    darkMode: false,
     autoSave: true,
     showAvatar: true,
     showRank: true,
@@ -510,20 +507,6 @@ const EnhancedSettings: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="dark-mode">Dark Mode</Label>
-                  <p className="text-sm text-muted-foreground">Use dark theme</p>
-                </div>
-                <Switch
-                  id="dark-mode"
-                  checked={settings.darkMode}
-                  onCheckedChange={(checked) => handleSettingChange('darkMode', checked)}
-                />
-              </div>
-              
-              <Separator />
-              
               <div className="space-y-2">
                 <Label>App Theme</Label>
                 <Select value={settings.theme} onValueChange={(value) => handleSettingChange('theme', value)}>
@@ -596,18 +579,6 @@ const EnhancedSettings: React.FC = () => {
                       id="sound2"
                       checked={settings.soundEffects}
                       onCheckedChange={(checked) => handleSettingChange('soundEffects', checked)}
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="darkmode2">Dark Mode</Label>
-                      <p className="text-sm text-muted-foreground">Use dark theme</p>
-                    </div>
-                    <Switch
-                      id="darkmode2"
-                      checked={settings.darkMode}
-                      onCheckedChange={(checked) => handleSettingChange('darkMode', checked)}
                     />
                   </div>
                 </CardContent>
