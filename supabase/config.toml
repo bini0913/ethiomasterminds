@@ -11,3 +11,18 @@ verify_jwt = false
 
 [functions.assign-role]
 verify_jwt = false
+
+[functions.award-rewards]
+verify_jwt = false
+
+[functions.daily-missions]
+verify_jwt = false
+
+[functions.analyze-learning-dna]
+verify_jwt = false
+
+[functions.ai-tutor]
+verify_jwt = false
+
+[functions.generate-parent-insights]
+verify_jwt = false
