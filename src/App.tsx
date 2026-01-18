@@ -23,6 +23,8 @@ import Chat from "./pages/Chat";
 import AITutor from "./pages/AITutor";
 import LearningDNA from "./pages/LearningDNA";
 import ParentDashboard from "./pages/ParentDashboard";
+import TimeTravelRevision from "./pages/TimeTravelRevision";
+import EnhancedSocial from "./pages/EnhancedSocial";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -91,10 +93,11 @@ const App = () => (
                               <Route path="/store" element={<StorePage />} />
                               <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
                               <Route path="/enhanced-settings" element={<EnhancedSettings />} />
-                              <Route path="/social" element={<Social />} />
+                              <Route path="/social" element={<EnhancedSocial />} />
                               <Route path="/ai-tutor" element={<AITutor />} />
                               <Route path="/learning-dna" element={<LearningDNA />} />
                               <Route path="/parent-dashboard" element={<ParentDashboard />} />
+                              <Route path="/revision" element={<TimeTravelRevision />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             <AIHelper />
