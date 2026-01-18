@@ -25,6 +25,7 @@ import LearningDNA from "./pages/LearningDNA";
 import ParentDashboard from "./pages/ParentDashboard";
 import TimeTravelRevision from "./pages/TimeTravelRevision";
 import EnhancedSocial from "./pages/EnhancedSocial";
+import AvatarCreator from "./pages/AvatarCreator";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -98,6 +99,7 @@ const App = () => (
                               <Route path="/learning-dna" element={<LearningDNA />} />
                               <Route path="/parent-dashboard" element={<ParentDashboard />} />
                               <Route path="/revision" element={<TimeTravelRevision />} />
+                              <Route path="/avatar-creator" element={<AvatarCreator />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             <AIHelper />
