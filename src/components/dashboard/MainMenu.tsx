@@ -27,7 +27,9 @@ import {
   Medal,
   Home,
   LogOut,
-  Sparkles
+  Sparkles,
+  Brain,
+  Compass
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
@@ -163,12 +165,36 @@ const MainMenu: React.FC = () => {
       description: "History & geography"
     },
     { 
+      title: "AI Tutor",
+      icon: <Bot className="h-6 w-6" />,
+      path: "/ai-tutor",
+      category: "learn",
+      color: "from-violet-500 to-purple-600",
+      description: "24/7 AI helper"
+    },
+    { 
+      title: "Learning DNA",
+      icon: <Brain className="h-6 w-6" />,
+      path: "/learning-dna",
+      category: "learn",
+      color: "from-pink-500 to-rose-600",
+      description: "Your brain map"
+    },
+    { 
       title: t("friends"), 
       icon: <Users className="h-6 w-6" />,
       path: "/friends",
       category: "social",
       color: "from-teal-500 to-cyan-600",
       description: "Connect & chat"
+    },
+    { 
+      title: "Social Feed",
+      icon: <Compass className="h-6 w-6" />,
+      path: "/social",
+      category: "social",
+      color: "from-sky-500 to-blue-600",
+      description: "Posts & updates"
     },
     { 
       title: t("settings"), 
