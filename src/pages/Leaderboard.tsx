@@ -129,7 +129,7 @@ const Leaderboard: React.FC = () => {
           {entry.rank}
         </div>
         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-lg">
-          {entry.avatar?.startsWith('avatar') ? '👤' : entry.avatar || '👤'}
+          👤
         </div>
         <div className="flex-1">
           <div className="font-medium flex items-center">

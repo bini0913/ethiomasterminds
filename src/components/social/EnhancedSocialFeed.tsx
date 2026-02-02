@@ -67,24 +67,32 @@ const EnhancedSocialFeed: React.FC = () => {
 
   const loadPosts = async () => {
     try {
+      // First get posts
       const { data: postsData, error } = await supabase
         .from('social_posts')
-        .select(`
-          id,
-          content,
-          image_url,
-          author_id,
-          created_at,
-          profiles!social_posts_author_id_fkey(name, avatar, level)
-        `)
+        .select('id, content, image_url, author_id, created_at')
         .eq('post_type', 'post')
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
 
+      // Then get author profiles separately
+      const authorIds = [...new Set((postsData || []).map((p: any) => p.author_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, avatar, level')
+        .in('id', authorIds);
+
+      const profileMap: Record<string, any> = {};
+      (profiles || []).forEach((p: any) => {
+        profileMap[p.id] = p;
+      });
+
       // Get likes, reactions, saves for each post
       const postsWithData = await Promise.all((postsData || []).map(async (post: any) => {
+        const authorProfile = profileMap[post.author_id];
+        
         const [likesRes, reactionsRes, savedRes, commentsRes] = await Promise.all([
           supabase.from('social_post_likes').select('id', { count: 'exact' }).eq('post_id', post.id),
           supabase.from('social_post_reactions').select('reaction_type').eq('post_id', post.id),
@@ -101,7 +109,7 @@ const EnhancedSocialFeed: React.FC = () => {
             .select('id')
             .eq('post_id', post.id)
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
           isLiked = !!userLike;
 
           const { data: userReact } = await supabase
@@ -109,7 +117,7 @@ const EnhancedSocialFeed: React.FC = () => {
             .select('reaction_type')
             .eq('post_id', post.id)
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
           userReaction = userReact?.reaction_type || null;
         }
 
@@ -124,9 +132,9 @@ const EnhancedSocialFeed: React.FC = () => {
           content: post.content,
           imageUrl: post.image_url,
           authorId: post.author_id,
-          authorName: post.profiles?.name || 'Unknown',
-          authorAvatar: post.profiles?.avatar,
-          authorLevel: post.profiles?.level || 1,
+          authorName: authorProfile?.name || 'User',
+          authorAvatar: authorProfile?.avatar,
+          authorLevel: authorProfile?.level || 1,
           createdAt: post.created_at,
           likesCount: likesRes.count || 0,
           commentsCount: commentsRes.count || 0,
@@ -258,30 +266,40 @@ const EnhancedSocialFeed: React.FC = () => {
   };
 
   const loadComments = async (postId: string) => {
-    const { data, error } = await supabase
+    // First get comments
+    const { data: commentsData, error } = await supabase
       .from('social_post_comments')
-      .select(`
-        id,
-        content,
-        user_id,
-        created_at,
-        profiles!social_post_comments_user_id_fkey(name)
-      `)
+      .select('id, content, user_id, created_at')
       .eq('post_id', postId)
       .order('created_at', { ascending: true });
 
-    if (!error && data) {
-      setComments(prev => ({
-        ...prev,
-        [postId]: data.map((c: any) => ({
-          id: c.id,
-          content: c.content,
-          userId: c.user_id,
-          userName: c.profiles?.name || 'Unknown',
-          createdAt: c.created_at,
-        })),
-      }));
+    if (error) {
+      console.error('Error loading comments:', error);
+      return;
     }
+
+    // Then get user profiles
+    const userIds = [...new Set((commentsData || []).map((c: any) => c.user_id))];
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .in('id', userIds);
+
+    const profileMap: Record<string, any> = {};
+    (profiles || []).forEach((p: any) => {
+      profileMap[p.id] = p;
+    });
+
+    setComments(prev => ({
+      ...prev,
+      [postId]: (commentsData || []).map((c: any) => ({
+        id: c.id,
+        content: c.content,
+        userId: c.user_id,
+        userName: profileMap[c.user_id]?.name || 'User',
+        createdAt: c.created_at,
+      })),
+    }));
   };
 
   const toggleComments = (postId: string) => {

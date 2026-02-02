@@ -41,7 +41,9 @@ const backgroundColors: Record<string, string> = {
   galaxy: 'bg-gradient-to-br from-purple-500 to-indigo-700',
   fire: 'bg-gradient-to-br from-red-500 to-orange-500',
   mint: 'bg-gradient-to-br from-green-300 to-teal-400',
-  rose: 'bg-gradient-to-br from-pink-400 to-rose-500'
+  rose: 'bg-gradient-to-br from-pink-400 to-rose-500',
+  aurora: 'bg-gradient-to-br from-green-400 via-purple-500 to-pink-500',
+  gold: 'bg-gradient-to-br from-yellow-400 to-amber-600'
 };
 
 // Expression emojis
@@ -53,19 +55,10 @@ const expressionEmojis: Record<string, string> = {
   wink: '😉',
   confident: '😏',
   surprised: '😲',
-  determined: '😤'
-};
-
-// Hairstyle emojis
-const hairstyleEmojis: Record<string, string> = {
-  short: '👦',
-  long: '👧',
-  spiky: '🧑',
-  curly: '👩‍🦱',
-  mohawk: '🧑‍🎤',
-  bald: '👨‍🦲',
-  ponytail: '👩',
-  braids: '👩‍🦱'
+  determined: '😤',
+  party: '🥳',
+  genius: '🧠',
+  legend: '🌟'
 };
 
 // Accessory emojis
@@ -73,11 +66,11 @@ const accessoryEmojis: Record<string, string> = {
   none: '',
   glasses: '👓',
   sunglasses: '🕶️',
-  headphones: '🎧',
   cap: '🧢',
+  headphones: '🎧',
+  trophy: '🏆',
   crown: '👑',
-  mask: '😷',
-  earrings: '💎'
+  halo: '😇'
 };
 
 const AvatarRenderer: React.FC<AvatarRendererProps> = ({
@@ -106,8 +99,8 @@ const AvatarRenderer: React.FC<AvatarRendererProps> = ({
         )}
       >
         <span className="relative z-10">{expression}</span>
-        {accessory && (
-          <span className="absolute top-0 right-0 text-xs transform translate-x-1 -translate-y-1">
+        {accessory && size !== 'xs' && size !== 'sm' && (
+          <span className="absolute -top-1 -right-1 text-xs">
             {accessory}
           </span>
         )}

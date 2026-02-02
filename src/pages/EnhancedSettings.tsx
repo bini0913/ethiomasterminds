@@ -30,7 +30,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import PUBGAvatarEditor from '@/components/avatar/PUBGAvatarEditor';
+import SimpleAvatarEditor, { SimpleAvatarConfig } from '@/components/avatar/SimpleAvatarEditor';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 
@@ -61,7 +61,7 @@ const EnhancedSettings: React.FC = () => {
     bio: ''
   });
 
-  const [avatarConfig, setAvatarConfig] = useState<Partial<AvatarConfig>>({});
+  const [avatarConfig, setAvatarConfig] = useState<Partial<SimpleAvatarConfig>>({});
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
@@ -108,21 +108,21 @@ const EnhancedSettings: React.FC = () => {
     }
   };
 
-  const handleSaveAvatar = async (config: AvatarConfig) => {
+  const handleSaveAvatar = async (config: SimpleAvatarConfig) => {
     if (!user?.id) return;
     
     setSavingAvatar(true);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ avatar_config: config as Json })
+        .update({ avatar_config: config as unknown as Json })
         .eq('id', user.id);
 
       if (error) throw error;
 
       // Update local user state
       if (updateProfile) {
-        updateProfile({ avatarConfig: config });
+        updateProfile({ avatarConfig: config as any });
       }
 
       setAvatarConfig(config);
@@ -231,11 +231,15 @@ const EnhancedSettings: React.FC = () => {
             
             {/* Avatar Tab */}
             <TabsContent value="avatar">
-              <PUBGAvatarEditor 
-                initialConfig={avatarConfig}
-                userLevel={user?.level || 1}
-                onSave={handleSaveAvatar}
-              />
+              <Card className="glass border-border/50">
+                <CardContent className="p-6">
+                  <SimpleAvatarEditor 
+                    initialConfig={avatarConfig as Partial<SimpleAvatarConfig>}
+                    userLevel={user?.level || 1}
+                    onSave={handleSaveAvatar}
+                  />
+                </CardContent>
+              </Card>
               {savingAvatar && (
                 <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
                   <div className="flex items-center gap-2 bg-card p-4 rounded-lg shadow-lg">
