@@ -1321,6 +1321,13 @@ export type Database = {
             referencedRelation: "social_posts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "social_post_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       social_post_likes: {
@@ -1419,6 +1426,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "social_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "social_posts_shared_post_id_fkey"
             columns: ["shared_post_id"]

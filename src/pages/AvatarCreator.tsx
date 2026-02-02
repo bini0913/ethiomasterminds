@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Sparkles, Trophy, Star, Brain, Zap, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { useUser } from '@/context/UserContext';
-import GameAvatarEditor from '@/components/avatar/GameAvatarEditor';
-import type { GameAvatarConfig } from '@/components/avatar/GameAvatarRenderer';
+import SimpleAvatarEditor, { SimpleAvatarConfig } from '@/components/avatar/SimpleAvatarEditor';
+import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 const AvatarCreator: React.FC = () => {
   const navigate = useNavigate();
@@ -20,11 +22,18 @@ const AvatarCreator: React.FC = () => {
     }
   }, [user, navigate]);
 
-  const handleSave = async (config: GameAvatarConfig) => {
+  const handleSave = async (config: SimpleAvatarConfig) => {
     if (!user) return;
     
     setIsSaving(true);
     try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_config: config as unknown as Json })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
       await updateProfile({
         avatarConfig: config as any,
       });
@@ -45,23 +54,21 @@ const AvatarCreator: React.FC = () => {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Animated background */}
-      <div className="absolute inset-0 animated-gradient opacity-50" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
       
       {/* Floating particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
+        {[...Array(15)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-2 h-2 rounded-full"
+            className="absolute w-2 h-2 rounded-full bg-primary/20"
             style={{
-              background: `hsl(${Math.random() * 360}, 70%, 60%)`,
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
             }}
             animate={{
-              y: [0, -30, 0],
-              opacity: [0.3, 0.7, 0.3],
-              scale: [1, 1.5, 1],
+              y: [0, -20, 0],
+              opacity: [0.3, 0.6, 0.3],
             }}
             transition={{
               duration: 3 + Math.random() * 2,
@@ -74,45 +81,35 @@ const AvatarCreator: React.FC = () => {
 
       {/* Floating icons */}
       <motion.div
-        className="absolute top-20 left-10 text-yellow-400"
-        animate={{ 
-          y: [0, -20, 0],
-          rotate: [0, 10, -10, 0],
-        }}
+        className="absolute top-20 left-10 text-yellow-400/50"
+        animate={{ y: [0, -15, 0] }}
         transition={{ duration: 4, repeat: Infinity }}
       >
-        <Star className="w-8 h-8" />
+        <Star className="w-6 h-6" />
       </motion.div>
       
       <motion.div
-        className="absolute top-40 right-20 text-purple-400"
-        animate={{ 
-          y: [0, 15, 0],
-          scale: [1, 1.2, 1],
-        }}
+        className="absolute top-40 right-20 text-purple-400/50"
+        animate={{ y: [0, 10, 0] }}
         transition={{ duration: 3, repeat: Infinity, delay: 0.5 }}
       >
-        <Brain className="w-10 h-10" />
+        <Brain className="w-8 h-8" />
       </motion.div>
       
       <motion.div
-        className="absolute bottom-40 left-20 text-cyan-400"
-        animate={{ 
-          rotate: 360,
-        }}
+        className="absolute bottom-40 left-20 text-cyan-400/50"
+        animate={{ rotate: 360 }}
         transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
       >
-        <Zap className="w-8 h-8" />
+        <Zap className="w-6 h-6" />
       </motion.div>
       
       <motion.div
-        className="absolute bottom-20 right-40 text-amber-400"
-        animate={{ 
-          y: [0, -10, 0],
-        }}
+        className="absolute bottom-20 right-40 text-amber-400/50"
+        animate={{ y: [0, -8, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
-        <Crown className="w-12 h-12" />
+        <Crown className="w-8 h-8" />
       </motion.div>
 
       {/* Header */}
@@ -127,7 +124,7 @@ const AvatarCreator: React.FC = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-display font-bold text-gradient flex items-center gap-2">
+            <h1 className="text-xl font-bold flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
               Avatar Studio
             </h1>
@@ -148,15 +145,17 @@ const AvatarCreator: React.FC = () => {
       </header>
 
       {/* Main content */}
-      <main className="relative z-10 h-[calc(100vh-73px)]">
-        <GameAvatarEditor
-          initialConfig={user.avatarConfig as Partial<GameAvatarConfig> | undefined}
-          userLevel={user.level || 1}
-          userXP={user.xp || 0}
-          unlockedItems={[]}
-          onSave={handleSave}
-          onClose={() => navigate(-1)}
-        />
+      <main className="relative z-10 container max-w-5xl mx-auto py-6">
+        <Card className="glass border-border/50">
+          <CardContent className="p-6">
+            <SimpleAvatarEditor
+              initialConfig={user.avatarConfig as Partial<SimpleAvatarConfig> | undefined}
+              userLevel={user.level || 1}
+              onSave={handleSave}
+              onCancel={() => navigate(-1)}
+            />
+          </CardContent>
+        </Card>
       </main>
 
       {/* Save loading overlay */}
@@ -174,7 +173,7 @@ const AvatarCreator: React.FC = () => {
               transition={{ duration: 1, repeat: Infinity }}
             >
               <Sparkles className="w-16 h-16 text-primary mx-auto mb-4" />
-              <p className="text-xl font-display font-bold">Saving your avatar...</p>
+              <p className="text-xl font-bold">Saving your avatar...</p>
             </motion.div>
           </motion.div>
         )}
