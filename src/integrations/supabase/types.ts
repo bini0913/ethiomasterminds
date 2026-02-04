@@ -116,6 +116,51 @@ export type Database = {
         }
         Relationships: []
       }
+      analytics: {
+        Row: {
+          accuracy: number | null
+          average_time_per_question: number | null
+          created_at: string | null
+          id: string
+          last_updated: string | null
+          speed: number | null
+          strong_topics: Json | null
+          subject: string
+          total_correct: number | null
+          total_questions_attempted: number | null
+          user_id: string
+          weak_topics: Json | null
+        }
+        Insert: {
+          accuracy?: number | null
+          average_time_per_question?: number | null
+          created_at?: string | null
+          id?: string
+          last_updated?: string | null
+          speed?: number | null
+          strong_topics?: Json | null
+          subject: string
+          total_correct?: number | null
+          total_questions_attempted?: number | null
+          user_id: string
+          weak_topics?: Json | null
+        }
+        Update: {
+          accuracy?: number | null
+          average_time_per_question?: number | null
+          created_at?: string | null
+          id?: string
+          last_updated?: string | null
+          speed?: number | null
+          strong_topics?: Json | null
+          subject?: string
+          total_correct?: number | null
+          total_questions_attempted?: number | null
+          user_id?: string
+          weak_topics?: Json | null
+        }
+        Relationships: []
+      }
       announcement_reads: {
         Row: {
           announcement_id: string
@@ -1746,6 +1791,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_xp: { Args: { p_amount: number; p_user_id: string }; Returns: Json }
       assign_user_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]
@@ -1753,6 +1799,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      calculate_rank: { Args: { p_xp: number }; Returns: string }
+      finalize_match: { Args: { p_room_id: string }; Returns: Json }
       find_student_by_username: {
         Args: { search_username: string }
         Returns: {
@@ -1793,6 +1841,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_user_stats: { Args: { p_user_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1822,6 +1871,16 @@ export type Database = {
           p_time_used: number
         }
         Returns: Json
+      }
+      update_analytics: {
+        Args: {
+          p_avg_time: number
+          p_correct: number
+          p_subject: string
+          p_total: number
+          p_user_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
