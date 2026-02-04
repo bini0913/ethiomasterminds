@@ -699,6 +699,7 @@ export type Database = {
           gender: string | null
           grade: string | null
           id: string
+          language: string | null
           level: number
           name: string
           rank: string | null
@@ -715,6 +716,7 @@ export type Database = {
           gender?: string | null
           grade?: string | null
           id: string
+          language?: string | null
           level?: number
           name: string
           rank?: string | null
@@ -731,6 +733,7 @@ export type Database = {
           gender?: string | null
           grade?: string | null
           id?: string
+          language?: string | null
           level?: number
           name?: string
           rank?: string | null
