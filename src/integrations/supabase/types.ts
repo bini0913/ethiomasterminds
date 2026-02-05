@@ -1800,6 +1800,7 @@ export type Database = {
         Returns: boolean
       }
       calculate_rank: { Args: { p_xp: number }; Returns: string }
+      check_achievements: { Args: { p_user_id: string }; Returns: Json }
       finalize_match: { Args: { p_room_id: string }; Returns: Json }
       find_student_by_username: {
         Args: { search_username: string }
@@ -1824,6 +1825,7 @@ export type Database = {
           xp: number
         }[]
       }
+      get_dashboard_data: { Args: { p_user_id: string }; Returns: Json }
       get_email_by_username: { Args: { p_username: string }; Returns: string }
       get_public_leaderboard: {
         Args: { limit_count?: number; timeframe?: string }
@@ -1882,6 +1884,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_user_streak: { Args: { p_user_id: string }; Returns: Json }
     }
     Enums: {
       app_role: "student" | "teacher" | "admin" | "manager"
