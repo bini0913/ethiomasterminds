@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useRoom } from "@/context/RoomContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Users, Trophy, Gamepad, Clock, Shield, Swords, Crown, Zap, Target, Sparkles } from "lucide-react";
@@ -18,8 +19,51 @@ const Multiplayer: React.FC = () => {
   const { user } = useUser();
   const { currentRoom, leaveRoom } = useRoom();
   const [hoveredMode, setHoveredMode] = useState<string | null>(null);
+  const [onlineCount, setOnlineCount] = useState(0);
   
   const roomId = searchParams.get('room');
+  
+  // Fetch real online users count
+  const fetchOnlineCount = useCallback(async () => {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    
+    const { count, error } = await supabase
+      .from('user_presence')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'online')
+      .gte('last_seen', fiveMinutesAgo);
+
+    if (!error && count !== null) {
+      setOnlineCount(count);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOnlineCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchOnlineCount, 30000);
+    return () => clearInterval(interval);
+  }, [fetchOnlineCount]);
+
+  // Update user presence when on this page
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const updatePresence = async () => {
+      await supabase
+        .from('user_presence')
+        .upsert({
+          user_id: user.id,
+          status: 'online',
+          last_seen: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+    };
+
+    updatePresence();
+    const interval = setInterval(updatePresence, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [user?.id]);
   
   useEffect(() => {
     if (!user) {
@@ -125,7 +169,7 @@ const Multiplayer: React.FC = () => {
           <div className="flex items-center gap-3">
             <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
               <span className="w-2 h-2 rounded-full bg-green-400 mr-2 animate-pulse" />
-              1,247 Online
+              {onlineCount} Online
             </Badge>
           </div>
         </div>
