@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUser } from "@/context/UserContext";
@@ -11,6 +11,7 @@ import VoiceAnswerInput from "./VoiceAnswerInput";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Mic } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface QuizViewProps {
   quiz: Quiz;
@@ -30,6 +31,8 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
   const [answeredCorrectly, setAnsweredCorrectly] = useState(0);
   const [voiceMode, setVoiceMode] = useState(false);
+  const questionStartTime = useRef(Date.now());
+  const questionTimes = useRef<{[key: string]: number}>({});
 
   // Get the current question from the quiz
   const currentQuestion = quiz.questions[currentQuestionIndex];
@@ -56,6 +59,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   useEffect(() => {
     setTimeLeft(20);
     setIsAnswered(false);
+    questionStartTime.current = Date.now();
   }, [currentQuestionIndex]);
   
   const handleTimeout = () => {
@@ -76,6 +80,10 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   
   const handleAnswerSubmit = (answer: string, isCorrect: boolean) => {
     setIsAnswered(true);
+    
+    // Track time spent on this question
+    const timeTaken = Math.round((Date.now() - questionStartTime.current) / 1000);
+    questionTimes.current[currentQuestion.id] = timeTaken;
     
     // Record user's answer
     setUserAnswers(prev => ({
@@ -104,6 +112,52 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
     return basePoints + timeBonus;
   };
   
+  const saveQuizResults = async (finalScore: number, totalXP: number) => {
+    try {
+      const totalTimeTaken = Object.values(questionTimes.current).reduce((a, b) => a + b, 0);
+      
+      // Save quiz result
+      await supabase.from('quiz_results').insert({
+        quiz_id: quiz.id,
+        student_id: user!.id,
+        score: finalScore,
+        total_questions: quiz.questions.length,
+        correct_answers: answeredCorrectly,
+        time_taken: totalTimeTaken,
+        xp_earned: totalXP,
+        answers: userAnswers as any
+      });
+
+      // Save individual question attempts
+      const attempts = quiz.questions.map((q, idx) => ({
+        quiz_id: quiz.id,
+        question_id: q.id,
+        user_id: user!.id,
+        selected_answer: userAnswers[q.id] || 'no_answer',
+        is_correct: userAnswers[q.id] === q.correctAnswer,
+        time_taken_seconds: questionTimes.current[q.id] || 20
+      }));
+      
+      await supabase.from('question_attempts').insert(attempts);
+
+      // Update analytics, streak, and achievements
+      const avgTime = totalTimeTaken / quiz.questions.length;
+      await Promise.all([
+        supabase.rpc('update_analytics', {
+          p_user_id: user!.id,
+          p_subject: quiz.subject,
+          p_correct: answeredCorrectly,
+          p_total: quiz.questions.length,
+          p_avg_time: avgTime
+        }),
+        supabase.rpc('update_user_streak', { p_user_id: user!.id }),
+        supabase.rpc('check_achievements', { p_user_id: user!.id })
+      ]);
+    } catch (err) {
+      console.error('Failed to save quiz results:', err);
+    }
+  };
+
   const handleNextQuestion = () => {
     if (currentQuestionIndex < quiz.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -119,6 +173,11 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
       const totalXP = baseXP + accuracyBonus;
       
       setEarnedXP(totalXP);
+      
+      // Save results to database
+      if (user?.id) {
+        saveQuizResults(finalScore, totalXP);
+      }
       
       // Call the onComplete callback with completed question IDs
       onComplete(finalScore, completedQuestionIds);

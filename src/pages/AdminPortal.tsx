@@ -323,18 +323,31 @@ const AdminPortal: React.FC = () => {
   };
 
   const handleUpdateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin' | 'manager') => {
-    const { error } = await supabase
-      .from('user_roles')
-      .update({ role: newRole })
-      .eq('user_id', userId);
+    try {
+      // Use the assign-role edge function which bypasses RLS with service role
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      if (!token) {
+        toast.error('Not authenticated');
+        return;
+      }
 
-    if (error) {
+      const response = await supabase.functions.invoke('assign-role', {
+        body: { role: newRole, target_user_id: userId },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.error) {
+        toast.error('Failed to update role');
+        return;
+      }
+
+      toast.success('Role updated!');
+      fetchUsers();
+    } catch (err) {
       toast.error('Failed to update role');
-      return;
     }
-
-    toast.success('Role updated!');
-    fetchUsers();
   };
 
   const handleUpdateNPCSettings = async () => {

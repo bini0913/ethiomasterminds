@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { role } = await req.json();
+    const { role, target_user_id } = await req.json();
     
     if (!role || !["student", "teacher", "admin", "manager"].includes(role)) {
       console.log("Invalid role provided:", role);
@@ -61,9 +61,23 @@ Deno.serve(async (req) => {
     // Create admin client to bypass RLS
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Determine target user: if target_user_id provided (admin changing another user), use it; otherwise self-assign
+    const targetUserId = target_user_id || user.id;
+
+    // If assigning to another user, verify caller is admin/manager
+    if (target_user_id && target_user_id !== user.id) {
+      const { data: callerRole } = await supabaseAdmin.rpc("get_user_role", { _user_id: user.id });
+      if (callerRole !== 'admin' && callerRole !== 'manager') {
+        return new Response(
+          JSON.stringify({ ok: false, error: "Not authorized to change other users' roles" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Call the assign_user_role function
     const { data, error } = await supabaseAdmin.rpc("assign_user_role", {
-      p_user_id: user.id,
+      p_user_id: targetUserId,
       p_role: role,
     });
 
