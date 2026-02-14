@@ -10,8 +10,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  DialogDescription } from
+"@/components/ui/dialog";
 
 interface EnhancedWelcomeScreenProps {
   onContinue: (userType?: "student" | "teacher" | "admin" | "manager") => void;
@@ -51,49 +51,49 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
 
       {/* Intro Animation */}
       <AnimatePresence>
-        {showIntro && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1 }}
-          >
+        {showIntro &&
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1 }}>
+
             <div className="relative">
               {/* Animated Logo */}
               <motion.div
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ duration: 1, type: "spring", bounce: 0.4 }}
-                className="relative"
-              >
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ duration: 1, type: "spring", bounce: 0.4 }}
+              className="relative">
+
                 {/* Outer Glow Ring */}
                 <motion.div
-                  className="absolute inset-0 rounded-full"
-                  style={{
-                    background: 'linear-gradient(135deg, hsl(250 89% 67%), hsl(320 100% 60%))',
-                    filter: 'blur(30px)',
-                  }}
-                  animate={{
-                    scale: [1, 1.5, 1],
-                    opacity: [0.5, 0.8, 0.5]
-                  }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                />
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: 'linear-gradient(135deg, hsl(250 89% 67%), hsl(320 100% 60%))',
+                  filter: 'blur(30px)'
+                }}
+                animate={{
+                  scale: [1, 1.5, 1],
+                  opacity: [0.5, 0.8, 0.5]
+                }}
+                transition={{ duration: 2, repeat: Infinity }} />
+
                 
                 {/* Logo Circle */}
                 <div className="relative w-40 h-40 rounded-full neon-border p-1">
                   <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
                     <motion.span
-                      className="text-5xl font-display font-black text-gradient"
-                      animate={{ 
-                        textShadow: [
-                          '0 0 20px hsl(250 89% 67%)',
-                          '0 0 40px hsl(320 100% 60%)',
-                          '0 0 20px hsl(250 89% 67%)'
-                        ]
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
+                    className="text-5xl font-display font-black text-gradient"
+                    animate={{
+                      textShadow: [
+                      '0 0 20px hsl(250 89% 67%)',
+                      '0 0 40px hsl(320 100% 60%)',
+                      '0 0 20px hsl(250 89% 67%)']
+
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}>
+
                       MM
                     </motion.span>
                   </div>
@@ -101,10 +101,10 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
 
                 {/* Orbiting Icons */}
                 <motion.div
-                  className="absolute inset-0"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                >
+                className="absolute inset-0"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}>
+
                   <BookOpen className="absolute -top-6 left-1/2 -translate-x-1/2 w-8 h-8 text-primary" />
                   <Trophy className="absolute top-1/2 -right-6 -translate-y-1/2 w-8 h-8 text-accent" />
                   <Sparkles className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-8 h-8 text-secondary" />
@@ -113,40 +113,40 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
               </motion.div>
 
               {/* Light Streaks */}
-              {[...Array(6)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent"
-                  style={{
-                    width: '200px',
-                    top: '50%',
-                    left: '50%',
-                    transformOrigin: 'center',
-                    rotate: `${i * 60}deg`
-                  }}
-                  initial={{ scaleX: 0, opacity: 0 }}
-                  animate={{ scaleX: [0, 1, 0], opacity: [0, 1, 0] }}
-                  transition={{
-                    duration: 1.5,
-                    delay: 0.5 + i * 0.1,
-                    repeat: Infinity,
-                    repeatDelay: 1
-                  }}
-                />
-              ))}
+              {[...Array(6)].map((_, i) =>
+            <motion.div
+              key={i}
+              className="absolute h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent"
+              style={{
+                width: '200px',
+                top: '50%',
+                left: '50%',
+                transformOrigin: 'center',
+                rotate: `${i * 60}deg`
+              }}
+              initial={{ scaleX: 0, opacity: 0 }}
+              animate={{ scaleX: [0, 1, 0], opacity: [0, 1, 0] }}
+              transition={{
+                duration: 1.5,
+                delay: 0.5 + i * 0.1,
+                repeat: Infinity,
+                repeatDelay: 1
+              }} />
+
+            )}
 
               {/* Title */}
               <motion.h1
-                className="text-center mt-8 text-4xl font-display font-black text-gradient"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.5 }}
-              >
+              className="text-center mt-8 text-4xl font-display font-black text-gradient"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.5 }}>
+
                 MASTER MINDS
               </motion.h1>
             </div>
           </motion.div>
-        )}
+        }
       </AnimatePresence>
 
       {/* Main Content */}
@@ -156,8 +156,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="mb-6"
-        >
+          className="mb-6">
+
           <div className="text-center glass rounded-2xl p-4 border border-primary/30">
             <h4 className="text-xl font-display font-bold text-gradient">
               A Smart Multiplayer Quiz World
@@ -173,8 +173,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.8, type: "spring" }}
-          className="mb-10"
-        >
+          className="mb-10">
+
           <div className="relative">
             {/* Glow Effect */}
             <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary via-accent to-secondary blur-2xl opacity-50 animate-pulse-glow" />
@@ -185,8 +185,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
                 <motion.div
                   animate={{ rotateY: [0, 360] }}
                   transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                  className="text-6xl font-display font-black text-gradient"
-                >
+                  className="text-6xl font-display font-black text-gradient">
+
                   MM
                 </motion.div>
               </div>
@@ -196,8 +196,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-[-20px]"
-            >
+              className="absolute inset-[-20px]">
+
               <BookOpen className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-6 text-primary drop-shadow-lg" />
               <Trophy className="absolute top-1/2 -right-2 -translate-y-1/2 w-6 h-6 text-accent drop-shadow-lg" />
               <Sparkles className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 text-secondary drop-shadow-lg" />
@@ -211,8 +211,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="text-center mb-10"
-        >
+          className="text-center mb-10">
+
           <h1 className="text-5xl md:text-6xl font-display font-black text-gradient mb-3">
             MASTER MINDS
           </h1>
@@ -226,15 +226,15 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.9 }}
-          className="w-full max-w-sm space-y-4"
-        >
+          className="w-full max-w-sm space-y-4">
+
           {/* Start Button */}
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button
               onClick={handleStart}
               className="w-full h-16 text-xl font-display font-bold bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_100%] hover:bg-[position:100%_0] transition-all duration-500 border-0 rounded-2xl shadow-lg pulse-glow"
-              size="lg"
-            >
+              size="lg">
+
               <Play className="mr-3 h-7 w-7" />
               START
             </Button>
@@ -247,8 +247,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
                 onClick={() => setShowAbout(true)}
                 variant="outline"
                 className="w-full h-14 text-lg font-display glass border-primary/30 hover:bg-primary/20 rounded-xl"
-                size="lg"
-              >
+                size="lg">
+
                 <Info className="mr-2 h-5 w-5" />
                 About
               </Button>
@@ -263,8 +263,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
                   const langs = ['english', 'amharic', 'afaan-oromoo'] as const;
                   const currentIndex = langs.indexOf(language as any);
                   setLanguage(langs[(currentIndex + 1) % langs.length]);
-                }}
-              >
+                }}>
+
                 <Globe className="mr-2 h-5 w-5" />
                 {language === 'english' ? 'EN' : language === 'amharic' ? 'አማ' : 'AF'}
               </Button>
@@ -277,10 +277,10 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
-          className="absolute bottom-4 text-center"
-        >
-          <p className="text-xs text-foreground/50 font-display">
-            Created by Biniam Bogale • Master Minds v2.0
+          className="absolute bottom-4 text-center">
+
+          <p className="text-xs text-foreground/50 font-display">Created by Biniam Bogale • Master Minds v2.0
+
           </p>
         </motion.div>
       </div>
@@ -341,8 +341,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
             <motion.div whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }}>
               <button
                 onClick={() => handleRoleSelect("student")}
-                className="w-full p-4 glass rounded-xl border border-primary/30 hover:border-primary transition-all flex items-center gap-4 group"
-              >
+                className="w-full p-4 glass rounded-xl border border-primary/30 hover:border-primary transition-all flex items-center gap-4 group">
+
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg group-hover:shadow-primary/50 transition-shadow">
                   <GraduationCap className="h-7 w-7 text-white" />
                 </div>
@@ -358,8 +358,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
             <motion.div whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }}>
               <button
                 onClick={() => handleRoleSelect("teacher")}
-                className="w-full p-4 glass rounded-xl border border-secondary/30 hover:border-secondary transition-all flex items-center gap-4 group"
-              >
+                className="w-full p-4 glass rounded-xl border border-secondary/30 hover:border-secondary transition-all flex items-center gap-4 group">
+
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-secondary to-glow-cyan flex items-center justify-center shadow-lg group-hover:shadow-secondary/50 transition-shadow">
                   <Users className="h-7 w-7 text-background" />
                 </div>
@@ -375,8 +375,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
             <motion.div whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }}>
               <button
                 onClick={() => handleRoleSelect("admin")}
-                className="w-full p-4 glass rounded-xl border border-accent/30 hover:border-accent transition-all flex items-center gap-4 group"
-              >
+                className="w-full p-4 glass rounded-xl border border-accent/30 hover:border-accent transition-all flex items-center gap-4 group">
+
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent to-glow-pink flex items-center justify-center shadow-lg group-hover:shadow-accent/50 transition-shadow">
                   <ShieldCheck className="h-7 w-7 text-white" />
                 </div>
@@ -390,8 +390,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>);
+
 };
 
 export default EnhancedWelcomeScreen;
