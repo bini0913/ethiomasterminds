@@ -26,6 +26,12 @@ import ParentDashboard from "./pages/ParentDashboard";
 import TimeTravelRevision from "./pages/TimeTravelRevision";
 import EnhancedSocial from "./pages/EnhancedSocial";
 import AvatarCreator from "./pages/AvatarCreator";
+import AcademicMode from "./pages/AcademicMode";
+import FlashcardsPage from "./pages/FlashcardsPage";
+import TopicCoveragePage from "./pages/TopicCoveragePage";
+import ExamModePage from "./pages/ExamModePage";
+import StudyPlannerPage from "./pages/StudyPlannerPage";
+import AcademicInsightsPage from "./pages/AcademicInsightsPage";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -100,6 +106,12 @@ const App = () => (
                               <Route path="/parent-dashboard" element={<ParentDashboard />} />
                               <Route path="/revision" element={<TimeTravelRevision />} />
                               <Route path="/avatar-creator" element={<AvatarCreator />} />
+                              <Route path="/academic" element={<AcademicMode />} />
+                              <Route path="/academic/flashcards" element={<FlashcardsPage />} />
+                              <Route path="/academic/topics" element={<TopicCoveragePage />} />
+                              <Route path="/academic/exam" element={<ExamModePage />} />
+                              <Route path="/academic/planner" element={<StudyPlannerPage />} />
+                              <Route path="/academic/insights" element={<AcademicInsightsPage />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             <AIHelper />
