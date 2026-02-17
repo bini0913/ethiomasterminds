@@ -331,6 +331,33 @@ const MainMenu: React.FC = () => {
         </div>
       </div>
 
+      {/* Academic Mode Section - Grade 9-12 Only */}
+      {user && parseInt(user.grade || "0") >= 9 && parseInt(user.grade || "0") <= 12 && (
+        <div className="px-4 py-4 max-w-7xl mx-auto w-full">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Link to="/academic">
+              <Card className="bg-gradient-to-r from-slate-800 via-slate-900 to-gray-900 border-0 overflow-hidden group cursor-pointer hover:shadow-2xl transition-all">
+                <CardContent className="p-4 flex items-center gap-4 text-white">
+                  <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                    📘
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-base">Academic Mode</h3>
+                    <p className="text-xs text-white/60">Flashcards • Topic Coverage • Exam Mode • Study Planner</p>
+                  </div>
+                  <div className="bg-white/10 rounded-full p-2">
+                    <GraduationCap className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </motion.div>
+        </div>
+      )}
+
       {/* Daily Challenge */}
       <div className="px-4 py-4 max-w-7xl mx-auto w-full">
         <DailyChallenge />

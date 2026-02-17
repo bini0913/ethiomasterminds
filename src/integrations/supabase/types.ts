@@ -428,6 +428,42 @@ export type Database = {
         }
         Relationships: []
       }
+      flashcards: {
+        Row: {
+          answer: string
+          created_at: string
+          created_by: string
+          difficulty: string
+          grade_level: number
+          id: string
+          question: string
+          subject: string
+          topic: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          created_by?: string
+          difficulty?: string
+          grade_level?: number
+          id?: string
+          question: string
+          subject: string
+          topic: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          created_by?: string
+          difficulty?: string
+          grade_level?: number
+          id?: string
+          question?: string
+          subject?: string
+          topic?: string
+        }
+        Relationships: []
+      }
       friends: {
         Row: {
           created_at: string
@@ -1490,6 +1526,87 @@ export type Database = {
           },
         ]
       }
+      study_plans: {
+        Row: {
+          completed: boolean
+          created_at: string
+          id: string
+          notes: string | null
+          priority: string
+          scheduled_date: string
+          subject: string
+          topic: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          notes?: string | null
+          priority?: string
+          scheduled_date: string
+          subject: string
+          topic: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          notes?: string | null
+          priority?: string
+          scheduled_date?: string
+          subject?: string
+          topic?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      topic_progress: {
+        Row: {
+          accuracy_percentage: number
+          completion_percentage: number
+          created_at: string
+          id: string
+          last_practiced: string | null
+          questions_attempted: number
+          questions_correct: number
+          subject: string
+          topic: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accuracy_percentage?: number
+          completion_percentage?: number
+          created_at?: string
+          id?: string
+          last_practiced?: string | null
+          questions_attempted?: number
+          questions_correct?: number
+          subject: string
+          topic: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accuracy_percentage?: number
+          completion_percentage?: number
+          created_at?: string
+          id?: string
+          last_practiced?: string | null
+          questions_attempted?: number
+          questions_correct?: number
+          subject?: string
+          topic?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tournament_participants: {
         Row: {
           id: string
@@ -1643,6 +1760,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_flashcard_progress: {
+        Row: {
+          created_at: string
+          ease_factor: number
+          flashcard_id: string
+          id: string
+          interval_days: number
+          last_reviewed_at: string | null
+          next_review_date: string
+          repetition_count: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ease_factor?: number
+          flashcard_id: string
+          id?: string
+          interval_days?: number
+          last_reviewed_at?: string | null
+          next_review_date?: string
+          repetition_count?: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ease_factor?: number
+          flashcard_id?: string
+          id?: string
+          interval_days?: number
+          last_reviewed_at?: string | null
+          next_review_date?: string
+          repetition_count?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_flashcard_progress_flashcard_id_fkey"
+            columns: ["flashcard_id"]
+            isOneToOne: false
+            referencedRelation: "flashcards"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_inventory: {
         Row: {
