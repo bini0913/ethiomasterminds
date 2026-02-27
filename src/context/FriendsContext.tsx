@@ -86,8 +86,8 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       
       const allUserIds = [...new Set([...friendIdsFromAccepted, ...senderIds, ...receiverIds])];
 
-      let profilesMap = new Map<string, any>();
-      let presenceMap = new Map<string, string>();
+      const profilesMap = new Map<string, any>();
+      const presenceMap = new Map<string, string>();
 
       if (allUserIds.length > 0) {
         // Fetch all profiles at once
