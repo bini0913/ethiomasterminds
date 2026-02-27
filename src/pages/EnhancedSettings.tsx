@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 import SimpleAvatarEditor, { SimpleAvatarConfig } from '@/components/avatar/SimpleAvatarEditor';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
+import { getMindForgeSettings, saveMindForgeSettings } from '@/lib/mindforge';
 
 import { AvatarConfig } from '@/context/UserContext';
 
@@ -41,9 +42,11 @@ const EnhancedSettings: React.FC = () => {
   const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
 
+  const mindForge = getMindForgeSettings();
+
   const [settings, setSettings] = useState({
     notifications: true,
-    soundEffects: true,
+    soundEffects: mindForge.soundEnabled,
     autoSave: true,
     showAvatar: true,
     showRank: true,
@@ -51,7 +54,9 @@ const EnhancedSettings: React.FC = () => {
     showOnlineStatus: true,
     difficulty: 'medium',
     language: language,
-    theme: 'default'
+    theme: 'default',
+    reactionAnimations: mindForge.reactionsEnabled,
+    reducedMotion: mindForge.reducedMotion
   });
 
   const [profileData, setProfileData] = useState({
@@ -64,6 +69,15 @@ const EnhancedSettings: React.FC = () => {
   const [avatarConfig, setAvatarConfig] = useState<Partial<SimpleAvatarConfig>>({});
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+
+
+  useEffect(() => {
+    saveMindForgeSettings({
+      reactionsEnabled: settings.reactionAnimations,
+      soundEnabled: settings.soundEffects,
+      reducedMotion: settings.reducedMotion
+    });
+  }, [settings.reactionAnimations, settings.soundEffects, settings.reducedMotion]);
 
   // Load user's avatar config from database
   useEffect(() => {
@@ -383,6 +397,34 @@ const EnhancedSettings: React.FC = () => {
 
               <div className="flex items-center justify-between">
                 <div>
+                  <Label htmlFor="mindforge-reactions">MindForge Reactions™</Label>
+                  <p className="text-sm text-muted-foreground">Show cinematic answer reactions</p>
+                </div>
+                <Switch
+                  id="mindforge-reactions"
+                  checked={settings.reactionAnimations}
+                  onCheckedChange={(checked) => handleSettingChange('reactionAnimations', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="reduced-motion">Reduced Motion Mode</Label>
+                  <p className="text-sm text-muted-foreground">Limit movement-heavy effects for accessibility</p>
+                </div>
+                <Switch
+                  id="reduced-motion"
+                  checked={settings.reducedMotion}
+                  onCheckedChange={(checked) => handleSettingChange('reducedMotion', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div>
                   <Label htmlFor="autosave">Auto-save Progress</Label>
                   <p className="text-sm text-muted-foreground">Automatically save quiz progress</p>
                 </div>
@@ -583,6 +625,30 @@ const EnhancedSettings: React.FC = () => {
                       id="sound2"
                       checked={settings.soundEffects}
                       onCheckedChange={(checked) => handleSettingChange('soundEffects', checked)}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="mindforge2">MindForge Reactions™</Label>
+                      <p className="text-sm text-muted-foreground">Cinematic correct/wrong overlays during quiz</p>
+                    </div>
+                    <Switch
+                      id="mindforge2"
+                      checked={settings.reactionAnimations}
+                      onCheckedChange={(checked) => handleSettingChange('reactionAnimations', checked)}
+                    />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="reduced-motion2">Reduced Motion</Label>
+                      <p className="text-sm text-muted-foreground">Lower animation intensity</p>
+                    </div>
+                    <Switch
+                      id="reduced-motion2"
+                      checked={settings.reducedMotion}
+                      onCheckedChange={(checked) => handleSettingChange('reducedMotion', checked)}
                     />
                   </div>
                 </CardContent>
