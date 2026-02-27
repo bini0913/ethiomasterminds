@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Mic } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import MindForgeReactionOverlay from "./MindForgeReactionOverlay";
+import { getMindForgeSettings, MindForgeReactionType } from "@/lib/mindforge";
 
 interface QuizViewProps {
   quiz: Quiz;
@@ -31,6 +33,12 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
   const [answeredCorrectly, setAnsweredCorrectly] = useState(0);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [activeReaction, setActiveReaction] = useState<MindForgeReactionType | null>(null);
+  const [reactionTip, setReactionTip] = useState<string | undefined>();
+  const [wrongByTopic, setWrongByTopic] = useState<Record<string, number>>({});
+  const reactionTimeoutRef = useRef<number | null>(null);
+  const mindForgeSettings = getMindForgeSettings();
   const questionStartTime = useRef(Date.now());
   const questionTimes = useRef<{[key: string]: number}>({});
 
@@ -98,11 +106,52 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
       const pointsEarned = calculatePoints(timeLeft);
       setScore(score + pointsEarned);
       setAnsweredCorrectly(prev => prev + 1);
+      const newStreak = streak + 1;
+      setStreak(newStreak);
+
+      if (mindForgeSettings.reactionsEnabled) {
+        const reactionType: MindForgeReactionType = newStreak >= 10
+          ? "correct_power"
+          : newStreak >= 3
+          ? "correct_combo"
+          : "correct_basic";
+        triggerReaction(reactionType);
+      }
+
       toast.success(`Correct! +${pointsEarned} points`);
     } else {
+      setStreak(0);
+      const nextWrongCount = (wrongByTopic[currentQuestion.topic] || 0) + 1;
+      setWrongByTopic((prev) => ({ ...prev, [currentQuestion.topic]: nextWrongCount }));
+
+      if (mindForgeSettings.reactionsEnabled) {
+        const tip = currentQuestion.explanation || `Remember the key concept for ${currentQuestion.topic}.`;
+        setReactionTip(tip);
+        triggerReaction(nextWrongCount >= 3 ? "focus_boost" : "wrong_growth", 3200);
+      }
+
       toast.error("Incorrect answer!");
     }
   };
+
+  const triggerReaction = (reaction: MindForgeReactionType, duration = 2300) => {
+    setActiveReaction(reaction);
+    if (reactionTimeoutRef.current) {
+      window.clearTimeout(reactionTimeoutRef.current);
+    }
+    reactionTimeoutRef.current = window.setTimeout(() => {
+      setActiveReaction(null);
+      setReactionTip(undefined);
+    }, duration);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (reactionTimeoutRef.current) {
+        window.clearTimeout(reactionTimeoutRef.current);
+      }
+    };
+  }, []);
   
   const calculatePoints = (timeRemaining: number) => {
     // Base points for correct answer
@@ -213,7 +262,13 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   };
   
   return (
-    <div className="container max-w-xl mx-auto py-6">
+    <div className="container relative max-w-xl mx-auto py-6">
+      <MindForgeReactionOverlay
+        activeReaction={activeReaction}
+        streak={streak}
+        reducedMotion={mindForgeSettings.reducedMotion}
+        tip={reactionTip}
+      />
       {!quizCompleted ? (
         <>
           <div className="flex justify-between items-center mb-6">
