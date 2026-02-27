@@ -52,7 +52,7 @@ const AnnouncementsPanel: React.FC<AnnouncementsPanelProps> = ({
 
     try {
       // Build query based on target types the user should see
-      let query = supabase
+      const query = supabase
         .from('announcements')
         .select('*')
         .order('created_at', { ascending: false })
