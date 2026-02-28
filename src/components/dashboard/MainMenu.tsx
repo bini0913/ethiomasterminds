@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAchievements } from "@/context/AchievementsContext";
 import UserLevel from "../profile/UserLevel";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import DailyChallenge from "../challenges/DailyChallenge";
 import { useAIHelper } from "@/context/AIHelperContext";
 import { 
@@ -29,9 +29,7 @@ import {
   LogOut,
   Sparkles,
   Brain,
-  Compass,
-  Volume2,
-  VolumeX
+  Compass
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
@@ -41,78 +39,13 @@ import CurrencyDisplay from "@/components/currency/CurrencyDisplay";
 
 const MainMenu: React.FC = () => {
   const { user, logout, showLevelUp, setShowLevelUp, previousLevel } = useUser();
-  const { coins, gems } = useCurrency();
+  useCurrency();
   const { getRecentBadges } = useAchievements();
   const { openHelper } = useAIHelper();
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
-  const [dailyImageIndex, setDailyImageIndex] = useState(0);
-  const [soundOn, setSoundOn] = useState(true);
 
   const recentBadges = getRecentBadges();
-
-
-  const dailyMotivationImages = useMemo(() => [
-    { src: "/daily-pictures/01-work-hard.svg", alt: "Work so hard that they think you are crazy" },
-    { src: "/daily-pictures/02-finish-what-you-started.svg", alt: "Finish what you started" },
-    { src: "/daily-pictures/03-road-to-success.svg", alt: "Road to success" },
-    { src: "/daily-pictures/04-success-on-the-way.svg", alt: "Success on the way" },
-    { src: "/daily-pictures/05-study-hard.svg", alt: "Study hard. Become a legend" },
-    { src: "/daily-pictures/06-consistency.svg", alt: "Consistency turns dreams into reality" },
-    { src: "/daily-pictures/07-keep-going.svg", alt: "Keep going and trust the universe" },
-    { src: "/daily-pictures/08-you-can-do-it.svg", alt: "If you can dream it, you can do it" },
-    { src: "/daily-pictures/09-focus-on-goals.svg", alt: "Focus on your goals not distractions" }
-  ], []);
-
-  const playDuolingoStylePing = () => {
-    if (!soundOn) return;
-
-    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    const audioContext = new AudioContextClass();
-    const now = audioContext.currentTime;
-
-    const createTone = (frequency: number, start: number, duration: number) => {
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-
-      oscillator.type = "triangle";
-      oscillator.frequency.setValueAtTime(frequency, start);
-
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-
-      oscillator.connect(gain);
-      gain.connect(audioContext.destination);
-
-      oscillator.start(start);
-      oscillator.stop(start + duration);
-    };
-
-    createTone(520, now, 0.16);
-    createTone(720, now + 0.12, 0.22);
-
-    window.setTimeout(() => {
-      void audioContext.close();
-    }, 600);
-  };
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setDailyImageIndex((prev) => {
-        const next = (prev + 1) % dailyMotivationImages.length;
-        playDuolingoStylePing();
-        return next;
-      });
-    }, 2000);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [dailyMotivationImages.length, soundOn]);
 
   // Define subject categories
   const categories = [
@@ -427,69 +360,6 @@ const MainMenu: React.FC = () => {
       {/* Daily Challenge */}
       <div className="px-4 py-4 max-w-7xl mx-auto w-full">
         <DailyChallenge />
-      </div>
-
-
-
-      {/* Daily Picture */}
-      <div className="px-4 pb-4 max-w-7xl mx-auto w-full">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-3xl overflow-hidden border border-primary/20 bg-card/60 backdrop-blur-sm shadow-xl"
-        >
-          <div className="flex items-center justify-between p-3 border-b border-border/50">
-            <div>
-              <h3 className="font-bold text-base">Daily Motivation Picture</h3>
-              <p className="text-xs text-muted-foreground">Auto-animates every 2 seconds</p>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setSoundOn((prev) => !prev)}
-              aria-label={soundOn ? "Mute daily picture sound" : "Enable daily picture sound"}
-            >
-              {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            </Button>
-          </div>
-
-          <div className="relative aspect-[9/14] w-full max-h-[520px] mx-auto bg-muted">
-            <AnimatePresence mode="wait">
-              <motion.img
-                key={dailyMotivationImages[dailyImageIndex].src}
-                src={dailyMotivationImages[dailyImageIndex].src}
-                alt={dailyMotivationImages[dailyImageIndex].alt}
-                className="absolute inset-0 h-full w-full object-cover"
-                initial={{ opacity: 0, scale: 1.05 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.45, ease: "easeOut" }}
-              />
-            </AnimatePresence>
-          </div>
-
-          <div className="p-3">
-            <p className="text-sm font-medium text-foreground/90">
-              {dailyMotivationImages[dailyImageIndex].alt}
-            </p>
-            <div className="mt-3 flex gap-1.5">
-              {dailyMotivationImages.map((image, index) => (
-                <button
-                  key={image.src}
-                  onClick={() => {
-                    setDailyImageIndex(index);
-                    playDuolingoStylePing();
-                  }}
-                  className={`h-1.5 rounded-full transition-all ${
-                    dailyImageIndex === index ? "w-6 bg-primary" : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/60"
-                  }`}
-                  aria-label={`Show daily picture ${index + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        </motion.div>
       </div>
 
       {/* Category Filters */}
