@@ -3,114 +3,80 @@ import { cn } from '@/lib/utils';
 import { AvatarConfig } from '@/context/UserContext';
 
 interface AvatarRendererProps {
-  avatar?: string; // Simple avatar ID like 'avatar-1'
-  avatarConfig?: AvatarConfig | null; // Complex avatar config
+  avatar?: string;
+  avatarConfig?: AvatarConfig | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   showBorder?: boolean;
 }
 
-// Map simple avatar IDs to emojis
 const avatarToEmoji = (avatarId: string): string => {
-  const map: {[key: string]: string} = {
-    "avatar-1": "👦",
-    "avatar-2": "👧",
-    "avatar-3": "🧑",
-    "avatar-4": "👩‍🎓",
-    "avatar-5": "🧠",
-    "avatar-6": "🦸",
+  const map: { [key: string]: string } = {
+    'avatar-1': '👦',
+    'avatar-2': '👧',
+    'avatar-3': '🧑',
+    'avatar-4': '👩‍🎓',
+    'avatar-5': '🧠',
+    'avatar-6': '🦸',
   };
-  return map[avatarId] || "👤";
+  return map[avatarId] || '👤';
 };
 
-// Size configurations
 const sizeClasses = {
-  xs: 'w-6 h-6 text-xs',
-  sm: 'w-8 h-8 text-sm',
-  md: 'w-12 h-12 text-xl',
-  lg: 'w-16 h-16 text-2xl',
-  xl: 'w-24 h-24 text-4xl'
+  xs: 'w-6 h-6',
+  sm: 'w-8 h-8',
+  md: 'w-12 h-12',
+  lg: 'w-16 h-16',
+  xl: 'w-24 h-24',
 };
 
-// Background colors
-const backgroundColors: Record<string, string> = {
-  sky: 'bg-gradient-to-br from-sky-400 to-blue-500',
-  sunset: 'bg-gradient-to-br from-orange-400 to-pink-500',
-  forest: 'bg-gradient-to-br from-green-400 to-emerald-600',
-  ocean: 'bg-gradient-to-br from-cyan-400 to-blue-600',
-  galaxy: 'bg-gradient-to-br from-purple-500 to-indigo-700',
-  fire: 'bg-gradient-to-br from-red-500 to-orange-500',
-  mint: 'bg-gradient-to-br from-green-300 to-teal-400',
-  rose: 'bg-gradient-to-br from-pink-400 to-rose-500',
-  aurora: 'bg-gradient-to-br from-green-400 via-purple-500 to-pink-500',
-  gold: 'bg-gradient-to-br from-yellow-400 to-amber-600'
-};
-
-// Expression emojis
 const expressionEmojis: Record<string, string> = {
+  smile: '😊',
   happy: '😊',
+  focused: '🧐',
   cool: '😎',
-  excited: '🤩',
-  thinking: '🤔',
-  wink: '😉',
-  confident: '😏',
-  surprised: '😲',
   determined: '😤',
-  party: '🥳',
   genius: '🧠',
-  legend: '🌟'
 };
 
-// Accessory emojis
-const accessoryEmojis: Record<string, string> = {
-  none: '',
-  glasses: '👓',
-  sunglasses: '🕶️',
-  cap: '🧢',
-  headphones: '🎧',
-  trophy: '🏆',
-  crown: '👑',
-  halo: '😇'
+const bgClassFor = (background?: string) => {
+  if (background === 'library') return 'from-amber-100 to-orange-300';
+  if (background === 'galaxy') return 'from-purple-500 to-indigo-800';
+  if (background === 'ocean') return 'from-cyan-400 to-blue-600';
+  return 'from-sky-200 to-blue-400';
 };
 
-const AvatarRenderer: React.FC<AvatarRendererProps> = ({
-  avatar,
-  avatarConfig,
-  size = 'md',
-  className,
-  showBorder = true
-}) => {
+const AvatarRenderer: React.FC<AvatarRendererProps> = ({ avatar, avatarConfig, size = 'md', className, showBorder = true }) => {
   const sizeClass = sizeClasses[size];
 
-  // If we have a complex avatar config, render it
   if (avatarConfig && typeof avatarConfig === 'object' && Object.keys(avatarConfig).length > 0) {
-    const bgClass = backgroundColors[avatarConfig.background || 'sky'] || backgroundColors.sky;
-    const expression = expressionEmojis[avatarConfig.expression || 'happy'] || '😊';
-    const accessory = accessoryEmojis[avatarConfig.accessory || 'none'] || '';
+    const skinTone = avatarConfig.skinTone || '#D4A574';
+    const expression = expressionEmojis[avatarConfig.mouth || avatarConfig.expression || 'smile'] || '😊';
+    const hairColor = avatarConfig.hairColor || '#2B1D0E';
 
     return (
       <div
         className={cn(
-          'rounded-full flex items-center justify-center relative overflow-hidden',
+          'rounded-full relative overflow-hidden bg-gradient-to-br flex items-center justify-center',
           sizeClass,
-          bgClass,
+          bgClassFor(avatarConfig.background),
           showBorder && 'ring-2 ring-background shadow-md',
           className
         )}
       >
-        <span className="relative z-10">{expression}</span>
-        {accessory && size !== 'xs' && size !== 'sm' && (
-          <span className="absolute -top-1 -right-1 text-xs">
-            {accessory}
-          </span>
-        )}
+        {avatarConfig.aura && avatarConfig.aura !== 'none' && <div className="absolute inset-0 animate-pulse bg-primary/20" />}
+        <div className="absolute inset-[20%] rounded-full" style={{ backgroundColor: skinTone }} />
+        <div className="absolute top-[18%] left-[24%] right-[24%] h-[22%] rounded-t-full" style={{ backgroundColor: hairColor }} />
+        <span className="relative z-10 text-[55%]">{expression}</span>
+        {avatarConfig.glasses && avatarConfig.glasses !== 'none' && <span className="absolute z-20 text-[35%]">👓</span>}
+        {avatarConfig.accessories === 'backpack' && <span className="absolute -right-1 bottom-0 text-[35%]">🎒</span>}
+        {avatarConfig.clothes === 'golden-hoodie' && <span className="absolute bottom-0 text-[30%]">✨</span>}
+        {avatarConfig.clothes === 'education-cape' && <span className="absolute -left-1 bottom-0 text-[35%]">🎓</span>}
       </div>
     );
   }
 
-  // Fallback to simple emoji avatar
   const emoji = avatarToEmoji(avatar || 'avatar-1');
-
   return (
     <div
       className={cn(
@@ -120,12 +86,10 @@ const AvatarRenderer: React.FC<AvatarRendererProps> = ({
         className
       )}
     >
-      <span>{emoji}</span>
+      <span className="text-[55%]">{emoji}</span>
     </div>
   );
 };
 
 export default AvatarRenderer;
-
-// Export the utility function for backward compatibility
 export { avatarToEmoji };

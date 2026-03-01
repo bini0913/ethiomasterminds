@@ -30,7 +30,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import SimpleAvatarEditor, { SimpleAvatarConfig } from '@/components/avatar/SimpleAvatarEditor';
+import AvatarStudio, { UltimateAvatarConfig } from '@/components/avatar/AvatarStudio';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { getMindForgeSettings, saveMindForgeSettings } from '@/lib/mindforge';
@@ -66,7 +66,7 @@ const EnhancedSettings: React.FC = () => {
     bio: ''
   });
 
-  const [avatarConfig, setAvatarConfig] = useState<Partial<SimpleAvatarConfig>>({});
+  const [avatarConfig, setAvatarConfig] = useState<Partial<UltimateAvatarConfig>>({});
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
@@ -122,7 +122,7 @@ const EnhancedSettings: React.FC = () => {
     }
   };
 
-  const handleSaveAvatar = async (config: SimpleAvatarConfig) => {
+  const handleSaveAvatar = async (config: UltimateAvatarConfig) => {
     if (!user?.id) return;
     
     setSavingAvatar(true);
@@ -133,6 +133,19 @@ const EnhancedSettings: React.FC = () => {
         .eq('id', user.id);
 
       if (error) throw error;
+
+      const avatarClient = supabase as any;
+      await avatarClient.from('avatars').upsert({
+        user_id: user.id,
+        skin_tone: config.skinTone,
+        hair_style: config.hair,
+        hair_color: config.hairColor,
+        eye_type: config.eyes,
+        mouth_type: config.mouth,
+        accessories: config.accessories,
+        outfit: config.clothes,
+        background: config.background,
+      });
 
       // Update local user state
       if (updateProfile) {
@@ -247,9 +260,10 @@ const EnhancedSettings: React.FC = () => {
             <TabsContent value="avatar">
               <Card className="glass border-border/50">
                 <CardContent className="p-6">
-                  <SimpleAvatarEditor 
-                    initialConfig={avatarConfig as Partial<SimpleAvatarConfig>}
-                    userLevel={user?.level || 1}
+                  <AvatarStudio 
+                    userId={user?.id || ''}
+                    userXp={user?.xp || 0}
+                    initialConfig={avatarConfig as Partial<UltimateAvatarConfig>}
                     onSave={handleSaveAvatar}
                   />
                 </CardContent>

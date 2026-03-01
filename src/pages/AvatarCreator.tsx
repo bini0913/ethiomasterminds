@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { useUser } from '@/context/UserContext';
-import SimpleAvatarEditor, { SimpleAvatarConfig } from '@/components/avatar/SimpleAvatarEditor';
+import AvatarStudio, { UltimateAvatarConfig } from '@/components/avatar/AvatarStudio';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -22,7 +22,7 @@ const AvatarCreator: React.FC = () => {
     }
   }, [user, navigate]);
 
-  const handleSave = async (config: SimpleAvatarConfig) => {
+  const handleSave = async (config: UltimateAvatarConfig) => {
     if (!user) return;
     
     setIsSaving(true);
@@ -33,6 +33,19 @@ const AvatarCreator: React.FC = () => {
         .eq('id', user.id);
 
       if (error) throw error;
+
+      const avatarClient = supabase as any;
+      await avatarClient.from('avatars').upsert({
+        user_id: user.id,
+        skin_tone: config.skinTone,
+        hair_style: config.hair,
+        hair_color: config.hairColor,
+        eye_type: config.eyes,
+        mouth_type: config.mouth,
+        accessories: config.accessories,
+        outfit: config.clothes,
+        background: config.background,
+      });
 
       await updateProfile({
         avatarConfig: config as any,
@@ -148,11 +161,11 @@ const AvatarCreator: React.FC = () => {
       <main className="relative z-10 container max-w-5xl mx-auto py-6">
         <Card className="glass border-border/50">
           <CardContent className="p-6">
-            <SimpleAvatarEditor
-              initialConfig={user.avatarConfig as Partial<SimpleAvatarConfig> | undefined}
-              userLevel={user.level || 1}
+            <AvatarStudio
+              userId={user.id}
+              userXp={user.xp || 0}
+              initialConfig={user.avatarConfig as Partial<UltimateAvatarConfig> | undefined}
               onSave={handleSave}
-              onCancel={() => navigate(-1)}
             />
           </CardContent>
         </Card>

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import ReportButton from './ReportButton';
+import AvatarRenderer from '@/components/avatar/AvatarRenderer';
 import ImageUploader from './ImageUploader';
 
 interface Post {
@@ -378,11 +378,7 @@ const EnhancedSocialFeed: React.FC = () => {
       <Card className="glass border-border/50">
         <CardContent className="pt-4">
           <div className="flex gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
-                {user?.name?.charAt(0) || 'U'}
-              </AvatarFallback>
-            </Avatar>
+            <AvatarRenderer avatar={user?.avatar} avatarConfig={user?.avatarConfig} size="md" />
               <div className="flex-1 space-y-3">
               <Textarea
                 value={newPostContent}
@@ -445,11 +441,7 @@ const EnhancedSocialFeed: React.FC = () => {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white">
-                      {post.authorName.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <AvatarRenderer avatar={post.authorAvatar || undefined} size="md" />
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{post.authorName}</span>
@@ -567,11 +559,7 @@ const EnhancedSocialFeed: React.FC = () => {
                 <div className="space-y-3 pt-3 border-t border-border/50">
                   {(comments[post.id] || []).map((comment) => (
                     <div key={comment.id} className="flex gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs">
-                          {comment.userName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <AvatarRenderer size="sm" />
                       <div className="flex-1 bg-muted/50 rounded-lg p-2">
                         <p className="text-sm font-medium">{comment.userName}</p>
                         <p className="text-sm">{comment.content}</p>
@@ -580,11 +568,7 @@ const EnhancedSocialFeed: React.FC = () => {
                   ))}
                   
                   <div className="flex gap-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs">
-                        {user?.name?.charAt(0) || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
+                    <AvatarRenderer avatar={user?.avatar} avatarConfig={user?.avatarConfig} size="sm" />
                     <div className="flex-1 flex gap-2">
                       <input
                         type="text"

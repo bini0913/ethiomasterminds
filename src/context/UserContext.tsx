@@ -10,12 +10,22 @@ export interface AvatarConfig {
   bodyType?: string;
   skinTone?: string;
   hairstyle?: string;
+  hair?: string;
   hairColor?: string;
   outfit?: string;
   outfitColor?: string;
   accessory?: string;
+  accessories?: string;
   background?: string;
   expression?: string;
+  face?: string;
+  eyes?: string;
+  eyebrows?: string;
+  nose?: string;
+  mouth?: string;
+  glasses?: string;
+  clothes?: string;
+  aura?: string;
 }
 
 export type UserProfile = {
