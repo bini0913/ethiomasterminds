@@ -107,8 +107,15 @@ const EnhancedSocialFeed: React.FC = () => {
       const postsWithData = await Promise.all((postsData || []).map(async (post: any) => {
         let imageUrl: string | null = null;
         if (post.image_url) {
-          const { data: signedData } = await supabase.storage.from('user-uploads').createSignedUrl(post.image_url, 3600);
-          imageUrl = signedData?.signedUrl || null;
+          if (post.image_url.startsWith('http://') || post.image_url.startsWith('https://')) {
+            imageUrl = post.image_url;
+          } else {
+            const { data: signedData, error: signedError } = await supabase.storage.from('user-uploads').createSignedUrl(post.image_url, 3600);
+            if (signedError) {
+              console.error('Error creating signed URL for post image:', signedError);
+            }
+            imageUrl = signedData?.signedUrl || null;
+          }
         }
         const authorProfile = profileMap[post.author_id];
         
