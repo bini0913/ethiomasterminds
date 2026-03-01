@@ -28,8 +28,6 @@ interface FlashcardProgress {
   interval_days: number;
 }
 
-const SUBJECTS = ["math", "science", "english", "history"];
-
 const FlashcardsPage: React.FC = () => {
   const { user } = useUser();
   const navigate = useNavigate();
@@ -40,30 +38,62 @@ const FlashcardsPage: React.FC = () => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [studyMode, setStudyMode] = useState<"browse" | "review">("browse");
+  const [subjects, setSubjects] = useState<string[]>([]);
 
   const gradeNum = parseInt(user?.grade || "9");
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
-
-  const fetchData = async () => {
-    if (!user) return;
+  const fetchData = useCallback(async () => {
+    const auth = await supabase.auth.getUser();
+    if (!user || !auth.data.user?.id) return;
     setIsLoading(true);
 
     const [cardsRes, progressRes] = await Promise.all([
-      supabase.from("flashcards").select("*").lte("grade_level", gradeNum),
-      supabase.from("user_flashcard_progress").select("*").eq("user_id", user.id),
+      supabase
+        .from("flashcards")
+        .select("*")
+        .lte("grade_level", gradeNum)
+        .or(`created_by.eq.${auth.data.user.id},is_public.eq.true`),
+      supabase.from("user_flashcard_progress").select("*").eq("user_id", auth.data.user.id),
     ]);
 
-    if (cardsRes.data) setFlashcards(cardsRes.data);
+    if (cardsRes.error) {
+      console.error(cardsRes.error);
+      toast.error("Failed to load flashcards");
+    }
+
+    if (cardsRes.data) {
+      setFlashcards(cardsRes.data);
+      setSubjects(Array.from(new Set(cardsRes.data.map((card) => card.subject))).sort());
+    }
+    if (progressRes.error) {
+      console.error(progressRes.error);
+      toast.error("Failed to load flashcard progress");
+    }
+
     if (progressRes.data) {
       const map: Record<string, FlashcardProgress> = {};
       progressRes.data.forEach((p: any) => { map[p.flashcard_id] = p; });
       setProgress(map);
     }
     setIsLoading(false);
-  };
+  }, [gradeNum, user]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`flashcards-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'flashcards' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_flashcard_progress', filter: `user_id=eq.${user.id}` }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchData, user?.id]);
 
   const filteredCards = selectedSubject
     ? flashcards.filter(f => f.subject === selectedSubject)
@@ -212,7 +242,7 @@ const FlashcardsPage: React.FC = () => {
 
         {/* Subject List */}
         <div className="px-4 pb-24 max-w-4xl mx-auto space-y-3">
-          {SUBJECTS.map(subject => {
+          {subjects.map(subject => {
             const subjectCards = flashcards.filter(f => f.subject === subject);
             const masteredCount = subjectCards.filter(f => progress[f.id]?.status === "mastered").length;
             const pct = subjectCards.length > 0 ? (masteredCount / subjectCards.length) * 100 : 0;
