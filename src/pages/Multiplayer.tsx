@@ -336,7 +336,11 @@ const Multiplayer: React.FC = () => {
                 className="glass h-full overflow-hidden cursor-pointer border-border/50 hover:neon-border transition-all"
                 onClick={() => {
                   playClickFeedback();
-                  toast.info(`${card.label.replace(/[⚔️👥🔐🏆📊]/g, "").trim()} selected`);
+                  const normalizedLabel = ["⚔️", "👥", "🔐", "🏆", "📊"].reduce(
+                    (label, icon) => label.replace(icon, ""),
+                    card.label,
+                  ).trim();
+                  toast.info(`${normalizedLabel} selected`);
                 }}
               >
                 <div className={`absolute inset-0 opacity-15 bg-gradient-to-br ${card.gradient}`} />
