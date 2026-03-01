@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -44,6 +44,8 @@ interface Comment {
   user_avatar?: string;
 }
 
+const SOCIAL_REALTIME_CHANNEL = 'social-feed-realtime';
+
 const Social: React.FC = () => {
   const { user } = useUser();
   const navigate = useNavigate();
@@ -56,17 +58,10 @@ const Social: React.FC = () => {
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [commentInput, setCommentInput] = useState<Record<string, string>>({});
   const [loadingComments, setLoadingComments] = useState<string | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const fetchPostsRef = useRef<() => Promise<void>>(async () => {});
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/');
-      return;
-    }
-    fetchPosts();
-    setupRealtime();
-  }, [user]);
-
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       // Fetch posts
       const { data: postsData, error } = await supabase
@@ -146,24 +141,81 @@ const Social: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  const setupRealtime = () => {
+  useEffect(() => {
+    fetchPostsRef.current = fetchPosts;
+  }, [fetchPosts]);
+
+  const handleSocialPostsChange = useCallback(() => {
+    void fetchPostsRef.current();
+  }, []);
+
+  const removeSocialRealtimeChannels = useCallback(() => {
+    const channels = supabase
+      .getChannels()
+      .filter((channel) => channel.topic.includes(SOCIAL_REALTIME_CHANNEL));
+
+    channels.forEach((channel) => {
+      void supabase.removeChannel(channel);
+    });
+
+    channelRef.current = null;
+
+    if (import.meta.env.DEV) {
+      console.debug('[Social] Active realtime channels:', supabase.getChannels().length);
+    }
+  }, []);
+
+  useEffect(() => {
+    removeSocialRealtimeChannels();
+
+    if (channelRef.current) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
     const channel = supabase
-      .channel('social-realtime')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'social_posts'
-      }, () => {
-        fetchPosts();
-      })
+      .channel(SOCIAL_REALTIME_CHANNEL)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'social_posts',
+        },
+        handleSocialPostsChange,
+      )
       .subscribe();
 
+    channelRef.current = channel;
+
+    if (import.meta.env.DEV) {
+      const activeSocialChannels = supabase
+        .getChannels()
+        .filter((activeChannel) => activeChannel.topic.includes(SOCIAL_REALTIME_CHANNEL)).length;
+
+      console.debug('[Social] social-feed realtime channel count:', activeSocialChannels);
+    }
+
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+
+      removeSocialRealtimeChannels();
     };
-  };
+  }, [handleSocialPostsChange, removeSocialRealtimeChannels]);
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/');
+      return;
+    }
+
+    void fetchPosts();
+  }, [user, navigate, fetchPosts]);
 
   const createPost = async () => {
     if (!user || !newPostContent.trim()) return;
