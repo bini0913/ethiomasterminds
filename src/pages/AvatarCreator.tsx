@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Sparkles, Trophy, Star, Brain, Zap, Crown } from 'lucide-react';
+import { ArrowLeft, Sparkles, Trophy, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { useUser } from '@/context/UserContext';
-import SimpleAvatarEditor, { SimpleAvatarConfig } from '@/components/avatar/SimpleAvatarEditor';
+import FullAvatarEditor from '@/components/avatar/FullAvatarEditor';
+import { FullAvatarConfig } from '@/components/avatar/SVGAvatarParts';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -17,14 +18,11 @@ const AvatarCreator: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/');
-    }
+    if (!user) navigate('/');
   }, [user, navigate]);
 
-  const handleSave = async (config: SimpleAvatarConfig) => {
+  const handleSave = async (config: FullAvatarConfig) => {
     if (!user) return;
-    
     setIsSaving(true);
     try {
       const { error } = await supabase
@@ -34,12 +32,8 @@ const AvatarCreator: React.FC = () => {
 
       if (error) throw error;
 
-      await updateProfile({
-        avatarConfig: config as any,
-      });
-      toast.success('Avatar saved successfully! 🎉', {
-        description: '+10 XP earned for customizing your avatar!',
-      });
+      await updateProfile({ avatarConfig: config as any });
+      toast.success('Avatar saved! 🎉', { description: '+10 XP earned!' });
       navigate(-1);
     } catch (error) {
       console.error('Error saving avatar:', error);
@@ -53,74 +47,12 @@ const AvatarCreator: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Animated background */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
-      
-      {/* Floating particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(15)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-2 h-2 rounded-full bg-primary/20"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              y: [0, -20, 0],
-              opacity: [0.3, 0.6, 0.3],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Floating icons */}
-      <motion.div
-        className="absolute top-20 left-10 text-yellow-400/50"
-        animate={{ y: [0, -15, 0] }}
-        transition={{ duration: 4, repeat: Infinity }}
-      >
-        <Star className="w-6 h-6" />
-      </motion.div>
-      
-      <motion.div
-        className="absolute top-40 right-20 text-purple-400/50"
-        animate={{ y: [0, 10, 0] }}
-        transition={{ duration: 3, repeat: Infinity, delay: 0.5 }}
-      >
-        <Brain className="w-8 h-8" />
-      </motion.div>
-      
-      <motion.div
-        className="absolute bottom-40 left-20 text-cyan-400/50"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-      >
-        <Zap className="w-6 h-6" />
-      </motion.div>
-      
-      <motion.div
-        className="absolute bottom-20 right-40 text-amber-400/50"
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        <Crown className="w-8 h-8" />
-      </motion.div>
 
       {/* Header */}
       <header className="relative z-10 p-4 flex items-center justify-between border-b border-border/30 bg-background/80 backdrop-blur-md">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-            className="rounded-full"
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
@@ -131,7 +63,6 @@ const AvatarCreator: React.FC = () => {
             <p className="text-sm text-muted-foreground">Create your unique character</p>
           </div>
         </div>
-
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="gap-1">
             <Star className="w-3 h-3 text-yellow-400" />
@@ -144,12 +75,12 @@ const AvatarCreator: React.FC = () => {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="relative z-10 container max-w-5xl mx-auto py-6">
-        <Card className="glass border-border/50">
-          <CardContent className="p-6">
-            <SimpleAvatarEditor
-              initialConfig={user.avatarConfig as Partial<SimpleAvatarConfig> | undefined}
+      {/* Main */}
+      <main className="relative z-10 container max-w-6xl mx-auto py-6 px-4">
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
+          <CardContent className="p-4 md:p-6">
+            <FullAvatarEditor
+              initialConfig={user.avatarConfig as Partial<FullAvatarConfig> | undefined}
               userLevel={user.level || 1}
               onSave={handleSave}
               onCancel={() => navigate(-1)}
@@ -158,7 +89,7 @@ const AvatarCreator: React.FC = () => {
         </Card>
       </main>
 
-      {/* Save loading overlay */}
+      {/* Loading overlay */}
       <AnimatePresence>
         {isSaving && (
           <motion.div
@@ -167,11 +98,7 @@ const AvatarCreator: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <motion.div
-              className="text-center"
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            >
+            <motion.div className="text-center" animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 1, repeat: Infinity }}>
               <Sparkles className="w-16 h-16 text-primary mx-auto mb-4" />
               <p className="text-xl font-bold">Saving your avatar...</p>
             </motion.div>

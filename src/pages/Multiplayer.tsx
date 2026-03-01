@@ -239,9 +239,9 @@ const Multiplayer: React.FC = () => {
       level: user?.level ?? 1,
       xp: user?.xp ?? 0,
       rank: user?.rank ?? "Rookie",
-      streak: user?.streak ?? 0,
+      streak: 0,
     }),
-    [user?.level, user?.rank, user?.streak, user?.xp]
+    [user?.level, user?.rank, user?.xp]
   );
 
   const joinMode = (mode: HubMode) => {
