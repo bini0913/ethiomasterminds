@@ -284,9 +284,12 @@ const Chat: React.FC = () => {
     const auth = await supabase.auth.getUser();
     if (!selectedConversationId || !auth.data.user?.id) return;
     const client = supabase as any;
-    await client
+    const { error } = await client
       .from('typing_status')
       .upsert({ conversation_id: selectedConversationId, user_id: auth.data.user.id, is_typing: state, updated_at: new Date().toISOString() }, { onConflict: 'conversation_id,user_id' });
+    if (error) {
+      console.error(error);
+    }
   };
 
   const askAiTutor = async () => {
@@ -323,9 +326,10 @@ const Chat: React.FC = () => {
   };
 
   const deleteMessage = async (messageId: string) => {
-    if (!user?.id) return;
+    const auth = await supabase.auth.getUser();
+    if (!auth.data.user?.id) return;
     const client = supabase as any;
-    const { error } = await client.from('messages').update({ is_deleted: true }).eq('id', messageId).eq('sender_id', user.id);
+    const { error } = await client.from('messages').update({ is_deleted: true }).eq('id', messageId).eq('sender_id', auth.data.user.id);
     if (error) {
       console.error(error);
       toast.error('Unable to delete message');

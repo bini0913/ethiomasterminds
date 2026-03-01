@@ -42,24 +42,7 @@ const FlashcardsPage: React.FC = () => {
 
   const gradeNum = parseInt(user?.grade || "9");
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase
-      .channel(`flashcards-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'flashcards' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_flashcard_progress', filter: `user_id=eq.${user.id}` }, () => fetchData())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const auth = await supabase.auth.getUser();
     if (!user || !auth.data.user?.id) return;
     setIsLoading(true);
@@ -93,7 +76,24 @@ const FlashcardsPage: React.FC = () => {
       setProgress(map);
     }
     setIsLoading(false);
-  };
+  }, [gradeNum, user]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`flashcards-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'flashcards' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_flashcard_progress', filter: `user_id=eq.${user.id}` }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchData, user?.id]);
 
   const filteredCards = selectedSubject
     ? flashcards.filter(f => f.subject === selectedSubject)

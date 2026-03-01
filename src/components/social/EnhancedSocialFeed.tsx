@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -62,24 +62,7 @@ const EnhancedSocialFeed: React.FC = () => {
   const [newComments, setNewComments] = useState<Record<string, string>>({});
   const [showReactions, setShowReactions] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadPosts();
-  }, [user?.id]);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('social-feed-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => loadPosts())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_post_comments' }, () => loadPosts())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_post_likes' }, () => loadPosts())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
-
-  const loadPosts = async () => {
+  const loadPosts = useCallback(async () => {
     try {
       // First get posts
       const { data: postsData, error } = await supabase
@@ -178,7 +161,24 @@ const EnhancedSocialFeed: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('social-feed-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => loadPosts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_post_comments' }, () => loadPosts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_post_likes' }, () => loadPosts())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadPosts]);
 
   const createPost = async () => {
     const auth = await supabase.auth.getUser();

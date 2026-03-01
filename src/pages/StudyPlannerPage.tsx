@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,24 +33,7 @@ const StudyPlannerPage: React.FC = () => {
   const [newPriority, setNewPriority] = useState("medium");
   const [subjects, setSubjects] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (!user) return;
-    fetchPlans();
-  }, [user]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase
-      .channel(`study-plans-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'study_plans', filter: `user_id=eq.${user.id}` }, () => fetchPlans())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
-
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     const auth = await supabase.auth.getUser();
     if (!user || !auth.data.user?.id) return;
     const weekStart = format(startOfWeek(new Date()), "yyyy-MM-dd");
@@ -77,12 +60,29 @@ const StudyPlannerPage: React.FC = () => {
         dbSubjects = Array.from(new Set((flashcardSubjects || []).map((card) => card.subject))).sort();
       }
       setSubjects(dbSubjects);
-      if (!newSubject && dbSubjects.length > 0) {
+      if ((!newSubject || !dbSubjects.includes(newSubject)) && dbSubjects.length > 0) {
         setNewSubject(dbSubjects[0]);
       }
     }
     setIsLoading(false);
-  };
+  }, [newSubject, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchPlans();
+  }, [fetchPlans, user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`study-plans-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'study_plans', filter: `user_id=eq.${user.id}` }, () => fetchPlans())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchPlans, user?.id]);
 
   const addPlan = async () => {
     const auth = await supabase.auth.getUser();
