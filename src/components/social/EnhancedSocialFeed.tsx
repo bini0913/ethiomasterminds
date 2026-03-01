@@ -55,6 +55,7 @@ const EnhancedSocialFeed: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostImage, setNewPostImage] = useState<string | null>(null);
+  const [newPostImagePath, setNewPostImagePath] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
@@ -63,6 +64,19 @@ const EnhancedSocialFeed: React.FC = () => {
 
   useEffect(() => {
     loadPosts();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('social-feed-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, () => loadPosts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_post_comments' }, () => loadPosts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'social_post_likes' }, () => loadPosts())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   const loadPosts = async () => {
@@ -91,6 +105,11 @@ const EnhancedSocialFeed: React.FC = () => {
 
       // Get likes, reactions, saves for each post
       const postsWithData = await Promise.all((postsData || []).map(async (post: any) => {
+        let imageUrl: string | null = null;
+        if (post.image_url) {
+          const { data: signedData } = await supabase.storage.from('user-uploads').createSignedUrl(post.image_url, 3600);
+          imageUrl = signedData?.signedUrl || null;
+        }
         const authorProfile = profileMap[post.author_id];
         
         const [likesRes, reactionsRes, savedRes, commentsRes] = await Promise.all([
@@ -130,7 +149,7 @@ const EnhancedSocialFeed: React.FC = () => {
         return {
           id: post.id,
           content: post.content,
-          imageUrl: post.image_url,
+          imageUrl,
           authorId: post.author_id,
           authorName: authorProfile?.name || 'User',
           authorAvatar: authorProfile?.avatar,
@@ -155,14 +174,15 @@ const EnhancedSocialFeed: React.FC = () => {
   };
 
   const createPost = async () => {
-    if (!newPostContent.trim() || !user?.id) return;
+    const auth = await supabase.auth.getUser();
+    if (!newPostContent.trim() || !auth.data.user?.id) return;
 
     setIsPosting(true);
     try {
       const { error } = await supabase.from('social_posts').insert({
-        author_id: user.id,
+        author_id: auth.data.user.id,
         content: newPostContent.trim(),
-        image_url: newPostImage,
+        image_url: newPostImagePath,
         post_type: 'post',
       });
 
@@ -171,6 +191,7 @@ const EnhancedSocialFeed: React.FC = () => {
       toast.success('Post created!');
       setNewPostContent('');
       setNewPostImage(null);
+      setNewPostImagePath(null);
       loadPosts();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -181,7 +202,8 @@ const EnhancedSocialFeed: React.FC = () => {
   };
 
   const toggleLike = async (postId: string) => {
-    if (!user?.id) return;
+    const auth = await supabase.auth.getUser();
+    if (!auth.data.user?.id) return;
 
     const post = posts.find(p => p.id === postId);
     if (!post) return;
@@ -192,26 +214,25 @@ const EnhancedSocialFeed: React.FC = () => {
           .from('social_post_likes')
           .delete()
           .eq('post_id', postId)
-          .eq('user_id', user.id);
+          .eq('user_id', auth.data.user.id);
       } else {
-        await supabase.from('social_post_likes').insert({
+        const { error } = await supabase.from('social_post_likes').insert({
           post_id: postId,
-          user_id: user.id,
+          user_id: auth.data.user.id,
         });
+        if (error) throw error;
       }
 
-      setPosts(prev => prev.map(p => 
-        p.id === postId 
-          ? { ...p, isLiked: !p.isLiked, likesCount: p.isLiked ? p.likesCount - 1 : p.likesCount + 1 }
-          : p
-      ));
+      await loadPosts();
     } catch (error) {
       console.error('Error toggling like:', error);
+      toast.error('Could not update like status');
     }
   };
 
   const addReaction = async (postId: string, reactionType: string) => {
-    if (!user?.id) return;
+    const auth = await supabase.auth.getUser();
+    if (!auth.data.user?.id) return;
 
     try {
       // Remove existing reaction if any
@@ -219,12 +240,12 @@ const EnhancedSocialFeed: React.FC = () => {
         .from('social_post_reactions')
         .delete()
         .eq('post_id', postId)
-        .eq('user_id', user.id);
+        .eq('user_id', auth.data.user.id);
 
       // Add new reaction
       await supabase.from('social_post_reactions').insert({
         post_id: postId,
-        user_id: user.id,
+        user_id: auth.data.user.id,
         reaction_type: reactionType,
       });
 
@@ -236,7 +257,8 @@ const EnhancedSocialFeed: React.FC = () => {
   };
 
   const toggleSave = async (postId: string) => {
-    if (!user?.id) return;
+    const auth = await supabase.auth.getUser();
+    if (!auth.data.user?.id) return;
 
     const post = posts.find(p => p.id === postId);
     if (!post) return;
@@ -247,21 +269,20 @@ const EnhancedSocialFeed: React.FC = () => {
           .from('saved_posts')
           .delete()
           .eq('post_id', postId)
-          .eq('user_id', user.id);
+          .eq('user_id', auth.data.user.id);
       } else {
         await supabase.from('saved_posts').insert({
           post_id: postId,
-          user_id: user.id,
+          user_id: auth.data.user.id,
         });
       }
 
-      setPosts(prev => prev.map(p => 
-        p.id === postId ? { ...p, isSaved: !p.isSaved } : p
-      ));
+      await loadPosts();
 
       toast.success(post.isSaved ? 'Removed from saved' : 'Saved!');
     } catch (error) {
       console.error('Error toggling save:', error);
+      toast.error('Could not update saved posts');
     }
   };
 
@@ -317,20 +338,19 @@ const EnhancedSocialFeed: React.FC = () => {
 
   const addComment = async (postId: string) => {
     const commentText = newComments[postId];
-    if (!commentText?.trim() || !user?.id) return;
+    const auth = await supabase.auth.getUser();
+    if (!commentText?.trim() || !auth.data.user?.id) return;
 
     try {
       await supabase.from('social_post_comments').insert({
         post_id: postId,
-        user_id: user.id,
+        user_id: auth.data.user.id,
         content: commentText.trim(),
       });
 
       setNewComments(prev => ({ ...prev, [postId]: '' }));
       loadComments(postId);
-      setPosts(prev => prev.map(p => 
-        p.id === postId ? { ...p, commentsCount: p.commentsCount + 1 } : p
-      ));
+      loadPosts();
     } catch (error) {
       console.error('Error adding comment:', error);
       toast.error('Failed to add comment');
@@ -370,7 +390,7 @@ const EnhancedSocialFeed: React.FC = () => {
                     variant="destructive"
                     size="sm"
                     className="absolute top-2 right-2"
-                    onClick={() => setNewPostImage(null)}
+                    onClick={() => { setNewPostImage(null); setNewPostImagePath(null); }}
                   >
                     Remove
                   </Button>
@@ -380,8 +400,14 @@ const EnhancedSocialFeed: React.FC = () => {
                 {user?.id && (
                   <ImageUploader 
                     userId={user.id} 
-                    onUpload={(url) => setNewPostImage(url)}
-                    onRemove={() => setNewPostImage(null)}
+                    onUpload={({ path, previewUrl }) => {
+                      setNewPostImagePath(path);
+                      setNewPostImage(previewUrl);
+                    }}
+                    onRemove={() => {
+                      setNewPostImage(null);
+                      setNewPostImagePath(null);
+                    }}
                     imageUrl={newPostImage || undefined}
                   />
                 )}

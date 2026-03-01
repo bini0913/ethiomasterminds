@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 
 interface ImageUploaderProps {
   userId: string;
-  onUpload: (url: string) => void;
+  onUpload: (payload: { path: string; previewUrl: string }) => void;
   onRemove: () => void;
   imageUrl?: string;
   disabled?: boolean;
@@ -38,19 +38,21 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+      const fileName = `${userId}/social/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('social-images')
-        .upload(fileName, file);
+        .from('user-uploads')
+        .upload(fileName, file, { upsert: false });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('social-images')
-        .getPublicUrl(fileName);
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from('user-uploads')
+        .createSignedUrl(fileName, 3600);
 
-      onUpload(publicUrl);
+      if (signedError || !signedData?.signedUrl) throw signedError || new Error('Unable to generate signed URL');
+
+      onUpload({ path: fileName, previewUrl: signedData.signedUrl });
       toast.success('Image uploaded!');
     } catch (err) {
       console.error('Upload error:', err);

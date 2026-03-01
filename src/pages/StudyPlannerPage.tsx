@@ -21,48 +21,77 @@ interface StudyPlan {
   priority: string;
 }
 
-const SUBJECTS = ["math", "science", "english", "history"];
-
 const StudyPlannerPage: React.FC = () => {
   const { user } = useUser();
   const navigate = useNavigate();
   const [plans, setPlans] = useState<StudyPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [newSubject, setNewSubject] = useState("math");
+  const [newSubject, setNewSubject] = useState("");
   const [newTopic, setNewTopic] = useState("");
   const [newDate, setNewDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [newPriority, setNewPriority] = useState("medium");
+  const [subjects, setSubjects] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) return;
     fetchPlans();
   }, [user]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`study-plans-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'study_plans', filter: `user_id=eq.${user.id}` }, () => fetchPlans())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const fetchPlans = async () => {
-    if (!user) return;
+    const auth = await supabase.auth.getUser();
+    if (!user || !auth.data.user?.id) return;
     const weekStart = format(startOfWeek(new Date()), "yyyy-MM-dd");
     const weekEnd = format(addDays(startOfWeek(new Date()), 13), "yyyy-MM-dd");
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("study_plans")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", auth.data.user.id)
       .gte("scheduled_date", weekStart)
       .lte("scheduled_date", weekEnd)
       .order("scheduled_date");
 
-    if (data) setPlans(data);
+    if (error) {
+      console.error(error);
+      toast.error("Failed to load study plans");
+    }
+
+    if (data) {
+      setPlans(data);
+      let dbSubjects = Array.from(new Set(data.map((plan) => plan.subject))).sort();
+      if (dbSubjects.length === 0) {
+        const { data: flashcardSubjects } = await supabase.from('flashcards').select('subject');
+        dbSubjects = Array.from(new Set((flashcardSubjects || []).map((card) => card.subject))).sort();
+      }
+      setSubjects(dbSubjects);
+      if (!newSubject && dbSubjects.length > 0) {
+        setNewSubject(dbSubjects[0]);
+      }
+    }
     setIsLoading(false);
   };
 
   const addPlan = async () => {
-    if (!user || !newTopic.trim()) {
+    const auth = await supabase.auth.getUser();
+    if (!user || !auth.data.user?.id || !newTopic.trim() || !newSubject) {
       toast.error("Please enter a topic");
       return;
     }
     const { error } = await supabase.from("study_plans").insert({
-      user_id: user.id,
+      user_id: auth.data.user.id,
       subject: newSubject,
       topic: newTopic.trim(),
       scheduled_date: newDate,
@@ -85,8 +114,13 @@ const StudyPlannerPage: React.FC = () => {
   };
 
   const deletePlan = async (id: string) => {
-    await supabase.from("study_plans").delete().eq("id", id);
-    setPlans(prev => prev.filter(p => p.id !== id));
+    const { error } = await supabase.from("study_plans").delete().eq("id", id);
+    if (error) {
+      console.error(error);
+      toast.error("Failed to delete plan");
+      return;
+    }
+    await fetchPlans();
   };
 
   const todayPlans = plans.filter(p => isSameDay(new Date(p.scheduled_date), new Date()));
@@ -158,7 +192,7 @@ const StudyPlannerPage: React.FC = () => {
                 <Select value={newSubject} onValueChange={setNewSubject}>
                   <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {SUBJECTS.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+                    {subjects.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Input placeholder="Topic (e.g., Algebra)" value={newTopic} onChange={e => setNewTopic(e.target.value)} />

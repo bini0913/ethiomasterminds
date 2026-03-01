@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { motion } from 'framer-motion';
-import { Bot, MessageCircle, Plus, Send, ShieldAlert, Sparkles, Users } from 'lucide-react';
+import { Bot, MessageCircle, Plus, Send, ShieldAlert, Sparkles, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 import BackButton from '@/components/ui/BackButton';
@@ -212,7 +212,8 @@ const Chat: React.FC = () => {
   }, [fetchMessages, fetchProfiles, selectedConversationId, user?.id]);
 
   const createConversation = async () => {
-    if (!user?.id || !newConversationName.trim()) return;
+    const auth = await supabase.auth.getUser();
+    if (!auth.data.user?.id || !newConversationName.trim()) return;
 
     if (isJunior && ['group', 'study_room'].includes(newConversationType)) {
       toast.error('Grades 1-8 can only use direct/classrooms managed by teachers.');
@@ -231,7 +232,7 @@ const Chat: React.FC = () => {
         type: newConversationType,
         name: newConversationName,
         grade_restriction: grades,
-        created_by: user.id,
+        created_by: auth.data.user.id,
       })
       .select('*')
       .single();
@@ -241,7 +242,7 @@ const Chat: React.FC = () => {
       return;
     }
 
-    await client.from('conversation_members').insert({ conversation_id: data.id, user_id: user.id, role: isAdmin ? 'admin' : 'moderator' });
+    await client.from('conversation_members').insert({ conversation_id: data.id, user_id: auth.data.user.id, role: isAdmin ? 'admin' : 'moderator' });
     toast.success('Conversation created');
     setCreateOpen(false);
     setNewConversationName('');
@@ -252,7 +253,8 @@ const Chat: React.FC = () => {
   };
 
   const sendMessage = async () => {
-    if (!messageInput.trim() || !selectedConversationId || !user?.id) return;
+    const auth = await supabase.auth.getUser();
+    if (!messageInput.trim() || !selectedConversationId || !auth.data.user?.id) return;
 
     const text = messageInput.trim();
     setMessageInput('');
@@ -261,7 +263,7 @@ const Chat: React.FC = () => {
 
     const payload = {
       conversation_id: selectedConversationId,
-      sender_id: user.id,
+      sender_id: auth.data.user.id,
       message_type: 'text' as MessageType,
       content: text,
       metadata: {
@@ -273,27 +275,30 @@ const Chat: React.FC = () => {
     const client = supabase as any;
     const { error } = await client.from('messages').insert(payload);
     if (error) {
+      console.error(error);
       toast.error('Message failed to send');
     }
   };
 
   const setTyping = async (state: boolean) => {
-    if (!selectedConversationId || !user?.id) return;
+    const auth = await supabase.auth.getUser();
+    if (!selectedConversationId || !auth.data.user?.id) return;
     const client = supabase as any;
     await client
       .from('typing_status')
-      .upsert({ conversation_id: selectedConversationId, user_id: user.id, is_typing: state, updated_at: new Date().toISOString() }, { onConflict: 'conversation_id,user_id' });
+      .upsert({ conversation_id: selectedConversationId, user_id: auth.data.user.id, is_typing: state, updated_at: new Date().toISOString() }, { onConflict: 'conversation_id,user_id' });
   };
 
   const askAiTutor = async () => {
-    if (!messageInput.trim() || !user?.id || !selectedConversationId) return;
+    const auth = await supabase.auth.getUser();
+    if (!messageInput.trim() || !auth.data.user?.id || !selectedConversationId) return;
     const question = messageInput.trim();
     setMessageInput('');
 
     const client = supabase as any;
     await client.from('messages').insert({
       conversation_id: selectedConversationId,
-      sender_id: user.id,
+      sender_id: auth.data.user.id,
       message_type: 'text',
       content: question,
       metadata: { aiQuestion: true },
@@ -315,6 +320,18 @@ const Chat: React.FC = () => {
       content: data.message,
       metadata: { source: 'ai-tutor', saveToFlashcard: true },
     });
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!user?.id) return;
+    const client = supabase as any;
+    const { error } = await client.from('messages').update({ is_deleted: true }).eq('id', messageId).eq('sender_id', user.id);
+    if (error) {
+      console.error(error);
+      toast.error('Unable to delete message');
+      return;
+    }
+    await fetchMessages();
   };
 
   const sharedContent = messages.filter((item) => ['file', 'flashcard', 'quiz'].includes(item.message_type));
@@ -420,6 +437,11 @@ const Chat: React.FC = () => {
                             <div className="mt-1 text-[10px] opacity-70 flex items-center gap-2 justify-end">
                               <span>{formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}</span>
                               {isMe && <span>{reads[msg.id] ? `Read by ${reads[msg.id] - 1}` : 'Sent'}</span>}
+                              {isMe && !msg.is_deleted && (
+                                <button type="button" onClick={() => deleteMessage(msg.id)} className="hover:text-destructive">
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </motion.div>
