@@ -1,19 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { 
+import {
   User, Palette, Shirt, Sparkles, Crown, Check, RotateCcw, Save, Lock,
-  Eye, Scissors, CircleDot, SmilePlus, Glasses
+  Eye, Scissors, CircleDot, SmilePlus, Glasses, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import {
   FullAvatarConfig, DEFAULT_AVATAR_CONFIG, AvatarSVG,
-  SKIN_TONES, HAIR_STYLES, HAIR_COLORS, EYE_TYPES, EYE_COLORS,
-  EYEBROW_TYPES, NOSE_TYPES, MOUTH_TYPES, ACCESSORIES, OUTFITS,
-  OUTFIT_COLORS, BACKGROUNDS,
+  SKIN_TONES, FACE_SHAPES, HAIR_STYLES, HAIR_COLORS, EYE_TYPES, EYE_COLORS,
+  EYEBROW_TYPES, NOSE_TYPES, MOUTH_TYPES, FACIAL_HAIR_TYPES, ACCESSORIES,
+  OUTFITS, OUTFIT_COLORS, BACKGROUNDS,
 } from './SVGAvatarParts';
 
 interface FullAvatarEditorProps {
@@ -23,17 +22,128 @@ interface FullAvatarEditorProps {
   onCancel?: () => void;
 }
 
-const categories = [
+type CategoryId = 'skin' | 'face' | 'hair' | 'eyes' | 'brows' | 'nose' | 'mouth' | 'facial' | 'accessory' | 'outfit' | 'background';
+
+const categories: { id: CategoryId; label: string; icon: React.ElementType }[] = [
   { id: 'skin', label: 'Skin', icon: User },
+  { id: 'face', label: 'Face', icon: CircleDot },
   { id: 'hair', label: 'Hair', icon: Scissors },
   { id: 'eyes', label: 'Eyes', icon: Eye },
-  { id: 'eyebrows', label: 'Brows', icon: CircleDot },
+  { id: 'brows', label: 'Brows', icon: CircleDot },
   { id: 'nose', label: 'Nose', icon: CircleDot },
   { id: 'mouth', label: 'Mouth', icon: SmilePlus },
+  { id: 'facial', label: 'Facial', icon: User },
   { id: 'accessory', label: 'Gear', icon: Glasses },
   { id: 'outfit', label: 'Outfit', icon: Shirt },
   { id: 'background', label: 'BG', icon: Palette },
 ];
+
+// Horizontal scrollable option selector
+const OptionSlider: React.FC<{
+  items: { id: string; label: string; color?: string; emoji?: string; gradient?: string[]; level?: number }[];
+  selected: string;
+  onSelect: (id: string) => void;
+  userLevel: number;
+  type: 'color' | 'label' | 'gradient';
+}> = ({ items, selected, onSelect, userLevel, type }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (dir: number) => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: dir * 160, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="relative group">
+      <button
+        onClick={() => scroll(-1)}
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-background/90 border border-border shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+      <div
+        ref={scrollRef}
+        className="flex gap-2.5 overflow-x-auto pb-2 px-1 scrollbar-hide"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {items.map((item) => {
+          const locked = item.level ? userLevel < item.level : false;
+          const isSelected = selected === item.id;
+
+          return (
+            <motion.button
+              key={item.id}
+              onClick={() => !locked && onSelect(item.id)}
+              disabled={locked}
+              className={cn(
+                'relative flex flex-col items-center justify-center gap-1.5 shrink-0 rounded-2xl border-2 transition-all',
+                type === 'color' ? 'w-16 h-16' : 'w-20 h-20',
+                isSelected
+                  ? 'border-primary bg-primary/15 shadow-lg shadow-primary/20 scale-105'
+                  : locked
+                  ? 'border-border/30 opacity-40 cursor-not-allowed'
+                  : 'border-border/60 hover:border-primary/40 hover:bg-accent/30'
+              )}
+              whileHover={!locked ? { y: -2 } : undefined}
+              whileTap={!locked ? { scale: 0.93 } : undefined}
+            >
+              {type === 'color' && item.color && (
+                <div
+                  className="w-9 h-9 rounded-full shadow-inner"
+                  style={{
+                    backgroundColor: item.color,
+                    boxShadow: `inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -2px 4px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1)`,
+                  }}
+                />
+              )}
+              {type === 'gradient' && item.gradient && (
+                <div
+                  className="w-10 h-10 rounded-full shadow-inner"
+                  style={{
+                    background: `linear-gradient(135deg, ${item.gradient[0]}, ${item.gradient[1]})`,
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                  }}
+                />
+              )}
+              {type === 'label' && (
+                <>
+                  {item.emoji && <span className="text-xl leading-none">{item.emoji}</span>}
+                  <span className="text-[10px] font-medium leading-tight text-center px-0.5">{item.label}</span>
+                </>
+              )}
+              {type === 'color' && <span className="text-[9px] font-medium">{item.label}</span>}
+              {isSelected && (
+                <motion.div
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-primary rounded-full flex items-center justify-center shadow-md"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                >
+                  <Check className="w-3 h-3 text-primary-foreground" />
+                </motion.div>
+              )}
+              {locked && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/85 rounded-2xl backdrop-blur-sm">
+                  <Lock className="w-3.5 h-3.5 text-muted-foreground mb-0.5" />
+                  <span className="text-[8px] text-muted-foreground font-medium">Lv.{item.level}</span>
+                </div>
+              )}
+            </motion.button>
+          );
+        })}
+      </div>
+      <button
+        onClick={() => scroll(1)}
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-background/90 border border-border shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
+
+// Section header
+const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-4 first:mt-0">{children}</h4>
+);
 
 const FullAvatarEditor: React.FC<FullAvatarEditorProps> = ({
   initialConfig = {},
@@ -42,202 +152,198 @@ const FullAvatarEditor: React.FC<FullAvatarEditorProps> = ({
   onCancel,
 }) => {
   const [config, setConfig] = useState<FullAvatarConfig>({ ...DEFAULT_AVATAR_CONFIG, ...initialConfig });
-  const [activeCategory, setActiveCategory] = useState('skin');
+  const [activeCategory, setActiveCategory] = useState<CategoryId>('skin');
 
-  const isLocked = (level?: number) => level ? userLevel < level : false;
-
-  const updateConfig = (key: keyof FullAvatarConfig, value: string) => {
+  const updateConfig = useCallback((key: keyof FullAvatarConfig, value: string) => {
     setConfig(prev => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
-  const renderColorOption = (
-    item: { id: string; color?: string; label: string; level?: number },
-    configKey: keyof FullAvatarConfig,
-  ) => {
-    const isSelected = config[configKey] === item.id;
-    const locked = isLocked(item.level);
-    return (
-      <motion.button
-        key={item.id}
-        onClick={() => !locked && updateConfig(configKey, item.id)}
-        disabled={locked}
-        className={cn(
-          'relative flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all',
-          isSelected ? 'border-primary bg-primary/20 ring-2 ring-primary/50' :
-          locked ? 'border-border/30 opacity-40 cursor-not-allowed' :
-          'border-border hover:border-primary/50'
-        )}
-        whileHover={!locked ? { scale: 1.08 } : undefined}
-        whileTap={!locked ? { scale: 0.92 } : undefined}
-      >
-        <div className="w-8 h-8 rounded-full border-2 border-white/50 shadow-inner" style={{ backgroundColor: item.color }} />
-        <span className="text-[10px] font-medium">{item.label}</span>
-        {isSelected && <motion.div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center" initial={{ scale: 0 }} animate={{ scale: 1 }}><Check className="w-2.5 h-2.5 text-primary-foreground" /></motion.div>}
-        {locked && <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-xl backdrop-blur-sm"><Lock className="w-3 h-3 text-muted-foreground" /><span className="text-[8px] ml-0.5">Lv.{item.level}</span></div>}
-      </motion.button>
-    );
-  };
-
-  const renderLabelOption = (
-    item: { id: string; label: string; emoji?: string; level?: number },
-    configKey: keyof FullAvatarConfig,
-  ) => {
-    const isSelected = config[configKey] === item.id;
-    const locked = isLocked(item.level);
-    return (
-      <motion.button
-        key={item.id}
-        onClick={() => !locked && updateConfig(configKey, item.id)}
-        disabled={locked}
-        className={cn(
-          'relative flex flex-col items-center justify-center gap-1 p-3 rounded-xl border-2 transition-all min-h-[64px]',
-          isSelected ? 'border-primary bg-primary/20 ring-2 ring-primary/50' :
-          locked ? 'border-border/30 opacity-40 cursor-not-allowed' :
-          'border-border hover:border-primary/50'
-        )}
-        whileHover={!locked ? { scale: 1.08 } : undefined}
-        whileTap={!locked ? { scale: 0.92 } : undefined}
-      >
-        {item.emoji && <span className="text-xl">{item.emoji}</span>}
-        <span className="text-[10px] font-medium">{item.label}</span>
-        {isSelected && <motion.div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center" initial={{ scale: 0 }} animate={{ scale: 1 }}><Check className="w-2.5 h-2.5 text-primary-foreground" /></motion.div>}
-        {locked && <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-xl backdrop-blur-sm"><Lock className="w-3 h-3 text-muted-foreground" /><span className="text-[8px] ml-0.5">Lv.{item.level}</span></div>}
-      </motion.button>
-    );
-  };
+  const catScrollRef = useRef<HTMLDivElement>(null);
 
   const renderCategoryContent = () => {
     switch (activeCategory) {
       case 'skin':
-        return <div className="grid grid-cols-4 gap-2">{SKIN_TONES.map(s => renderColorOption(s, 'skinTone'))}</div>;
+        return (
+          <>
+            <SectionTitle>Skin Tone</SectionTitle>
+            <OptionSlider items={SKIN_TONES} selected={config.skinTone} onSelect={v => updateConfig('skinTone', v)} userLevel={userLevel} type="color" />
+          </>
+        );
+      case 'face':
+        return (
+          <>
+            <SectionTitle>Face Shape</SectionTitle>
+            <OptionSlider items={FACE_SHAPES} selected={config.faceShape} onSelect={v => updateConfig('faceShape', v)} userLevel={userLevel} type="label" />
+          </>
+        );
       case 'hair':
         return (
-          <div className="space-y-4">
-            <div><h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Style</h4><div className="grid grid-cols-3 gap-2">{HAIR_STYLES.map(h => renderLabelOption(h, 'hairStyle'))}</div></div>
-            <div><h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Color</h4><div className="grid grid-cols-5 gap-2">{HAIR_COLORS.map(h => renderColorOption(h, 'hairColor'))}</div></div>
-          </div>
+          <>
+            <SectionTitle>Style</SectionTitle>
+            <OptionSlider items={HAIR_STYLES} selected={config.hairStyle} onSelect={v => updateConfig('hairStyle', v)} userLevel={userLevel} type="label" />
+            <SectionTitle>Color</SectionTitle>
+            <OptionSlider items={HAIR_COLORS} selected={config.hairColor} onSelect={v => updateConfig('hairColor', v)} userLevel={userLevel} type="color" />
+          </>
         );
       case 'eyes':
         return (
-          <div className="space-y-4">
-            <div><h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Shape</h4><div className="grid grid-cols-3 gap-2">{EYE_TYPES.map(e => renderLabelOption(e, 'eyeType'))}</div></div>
-            <div><h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Color</h4><div className="grid grid-cols-4 gap-2">{EYE_COLORS.map(e => renderColorOption(e, 'eyeColor'))}</div></div>
-          </div>
+          <>
+            <SectionTitle>Shape</SectionTitle>
+            <OptionSlider items={EYE_TYPES} selected={config.eyeType} onSelect={v => updateConfig('eyeType', v)} userLevel={userLevel} type="label" />
+            <SectionTitle>Color</SectionTitle>
+            <OptionSlider items={EYE_COLORS} selected={config.eyeColor} onSelect={v => updateConfig('eyeColor', v)} userLevel={userLevel} type="color" />
+          </>
         );
-      case 'eyebrows':
-        return <div className="grid grid-cols-3 gap-2">{EYEBROW_TYPES.map(b => renderLabelOption(b, 'eyebrowType'))}</div>;
+      case 'brows':
+        return (
+          <>
+            <SectionTitle>Eyebrow Style</SectionTitle>
+            <OptionSlider items={EYEBROW_TYPES} selected={config.eyebrowType} onSelect={v => updateConfig('eyebrowType', v)} userLevel={userLevel} type="label" />
+          </>
+        );
       case 'nose':
-        return <div className="grid grid-cols-3 gap-2">{NOSE_TYPES.map(n => renderLabelOption(n, 'noseType'))}</div>;
+        return (
+          <>
+            <SectionTitle>Nose Shape</SectionTitle>
+            <OptionSlider items={NOSE_TYPES} selected={config.noseType} onSelect={v => updateConfig('noseType', v)} userLevel={userLevel} type="label" />
+          </>
+        );
       case 'mouth':
-        return <div className="grid grid-cols-3 gap-2">{MOUTH_TYPES.map(m => renderLabelOption(m, 'mouthType'))}</div>;
+        return (
+          <>
+            <SectionTitle>Mouth Style</SectionTitle>
+            <OptionSlider items={MOUTH_TYPES} selected={config.mouthType} onSelect={v => updateConfig('mouthType', v)} userLevel={userLevel} type="label" />
+          </>
+        );
+      case 'facial':
+        return (
+          <>
+            <SectionTitle>Facial Hair</SectionTitle>
+            <OptionSlider items={FACIAL_HAIR_TYPES} selected={config.facialHair} onSelect={v => updateConfig('facialHair', v)} userLevel={userLevel} type="label" />
+          </>
+        );
       case 'accessory':
-        return <div className="grid grid-cols-3 gap-2">{ACCESSORIES.map(a => renderLabelOption(a, 'accessory'))}</div>;
+        return (
+          <>
+            <SectionTitle>Accessories</SectionTitle>
+            <OptionSlider items={ACCESSORIES} selected={config.accessory} onSelect={v => updateConfig('accessory', v)} userLevel={userLevel} type="label" />
+          </>
+        );
       case 'outfit':
         return (
-          <div className="space-y-4">
-            <div><h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Style</h4><div className="grid grid-cols-3 gap-2">{OUTFITS.map(o => renderLabelOption(o, 'outfit'))}</div></div>
-            <div><h4 className="text-xs font-semibold mb-2 text-muted-foreground uppercase">Color</h4><div className="grid grid-cols-5 gap-2">{OUTFIT_COLORS.map(c => renderColorOption(c, 'outfitColor'))}</div></div>
-          </div>
+          <>
+            <SectionTitle>Style</SectionTitle>
+            <OptionSlider items={OUTFITS} selected={config.outfit} onSelect={v => updateConfig('outfit', v)} userLevel={userLevel} type="label" />
+            <SectionTitle>Color</SectionTitle>
+            <OptionSlider items={OUTFIT_COLORS} selected={config.outfitColor} onSelect={v => updateConfig('outfitColor', v)} userLevel={userLevel} type="color" />
+          </>
         );
       case 'background':
-        return <div className="grid grid-cols-3 gap-2">{BACKGROUNDS.map(b => {
-          const isSelected = config.background === b.id;
-          const locked = isLocked(b.level);
-          return (
-            <motion.button
-              key={b.id}
-              onClick={() => !locked && updateConfig('background', b.id)}
-              disabled={locked}
-              className={cn(
-                'relative flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all',
-                isSelected ? 'border-primary ring-2 ring-primary/50' :
-                locked ? 'border-border/30 opacity-40 cursor-not-allowed' :
-                'border-border hover:border-primary/50'
-              )}
-              whileHover={!locked ? { scale: 1.08 } : undefined}
-            >
-              <div className="w-10 h-10 rounded-full" style={{ background: `linear-gradient(135deg, ${b.gradient[0]}, ${b.gradient[1]})` }} />
-              <span className="text-[10px] font-medium">{b.label}</span>
-              {isSelected && <motion.div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center" initial={{ scale: 0 }} animate={{ scale: 1 }}><Check className="w-2.5 h-2.5 text-primary-foreground" /></motion.div>}
-              {locked && <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-xl backdrop-blur-sm"><Lock className="w-3 h-3" /><span className="text-[8px] ml-0.5">Lv.{b.level}</span></div>}
-            </motion.button>
-          );
-        })}</div>;
+        return (
+          <>
+            <SectionTitle>Background</SectionTitle>
+            <OptionSlider items={BACKGROUNDS} selected={config.background} onSelect={v => updateConfig('background', v)} userLevel={userLevel} type="gradient" />
+          </>
+        );
       default:
         return null;
     }
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 w-full">
-      {/* Category sidebar - horizontal on mobile */}
-      <div className="flex lg:flex-col gap-1.5 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 lg:w-16 shrink-0">
-        {categories.map((cat) => {
-          const Icon = cat.icon;
-          const isActive = activeCategory === cat.id;
-          return (
-            <motion.button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={cn(
-                'flex flex-col items-center justify-center p-2 rounded-xl transition-all min-w-[56px] lg:min-w-0',
-                isActive ? 'bg-primary text-primary-foreground shadow-lg' : 'bg-card hover:bg-accent text-muted-foreground'
-              )}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Icon className="w-4 h-4 mb-0.5" />
-              <span className="text-[9px] font-medium">{cat.label}</span>
-            </motion.button>
-          );
-        })}
-      </div>
-
-      {/* Preview */}
-      <div className="flex flex-col items-center justify-center lg:flex-1">
-        <div className="relative mb-4">
-          <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl scale-150" />
+    <div className="flex flex-col gap-4 w-full max-w-2xl mx-auto">
+      {/* Avatar Preview - Large */}
+      <div className="flex flex-col items-center py-6">
+        <div className="relative">
+          <div className="absolute inset-0 bg-primary/10 rounded-full blur-3xl scale-150 -z-10" />
           <motion.div
             className="relative"
-            animate={{ y: [0, -4, 0] }}
-            transition={{ duration: 3, repeat: Infinity }}
+            animate={{ y: [0, -6, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+            style={{
+              filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.15))',
+            }}
           >
-            <AvatarSVG config={config} size={160} />
+            <AvatarSVG config={config} size={180} />
           </motion.div>
         </div>
-        <Badge className="bg-gradient-to-r from-primary to-accent text-white mb-3">
-          Level {userLevel}
-        </Badge>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setConfig(DEFAULT_AVATAR_CONFIG)} className="gap-1">
-            <RotateCcw className="w-3.5 h-3.5" /> Reset
-          </Button>
-          {onCancel && <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>}
-          <Button size="sm" onClick={() => onSave(config)} className="gap-1 bg-gradient-to-r from-primary to-accent">
-            <Save className="w-3.5 h-3.5" /> Save
-          </Button>
+        <div className="flex items-center gap-2 mt-4">
+          <Badge className="bg-gradient-to-r from-primary to-accent text-white border-0 shadow-md">
+            <Sparkles className="w-3 h-3 mr-1" />
+            Level {userLevel}
+          </Badge>
         </div>
       </div>
 
-      {/* Options panel */}
-      <Card className="flex-1 lg:max-w-sm">
-        <CardContent className="p-4">
-          <h3 className="font-semibold mb-3 capitalize text-sm">{activeCategory}</h3>
-          <ScrollArea className="h-[280px] lg:h-[380px]">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeCategory}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                transition={{ duration: 0.15 }}
+      {/* Category Navigation - Horizontal Scrolling Tabs */}
+      <div className="relative border-b border-border/30">
+        <div
+          ref={catScrollRef}
+          className="flex gap-1 overflow-x-auto pb-2 px-1 scrollbar-hide"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {categories.map((cat) => {
+            const Icon = cat.icon;
+            const isActive = activeCategory === cat.id;
+            return (
+              <motion.button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all whitespace-nowrap shrink-0',
+                  isActive
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                )}
+                whileTap={{ scale: 0.95 }}
               >
-                {renderCategoryContent()}
-              </motion.div>
-            </AnimatePresence>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+                <Icon className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">{cat.label}</span>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Options Panel */}
+      <div className="min-h-[200px]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeCategory}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15 }}
+            className="px-1"
+          >
+            {renderCategoryContent()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3 pt-2 border-t border-border/30">
+        <Button
+          variant="outline"
+          onClick={() => setConfig(DEFAULT_AVATAR_CONFIG)}
+          className="flex-1 gap-2 rounded-xl h-11"
+        >
+          <RotateCcw className="w-4 h-4" />
+          Reset
+        </Button>
+        {onCancel && (
+          <Button variant="ghost" onClick={onCancel} className="rounded-xl h-11">
+            Cancel
+          </Button>
+        )}
+        <Button
+          onClick={() => onSave(config)}
+          className="flex-1 gap-2 rounded-xl h-11 bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow"
+        >
+          <Save className="w-4 h-4" />
+          Save Avatar
+        </Button>
+      </div>
     </div>
   );
 };
