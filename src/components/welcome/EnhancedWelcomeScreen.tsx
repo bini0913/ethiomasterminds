@@ -23,7 +23,6 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
   const [showRoleSelect, setShowRoleSelect] = useState(false);
   const { t, language, setLanguage } = useLanguage();
 
-  // Auto-hide intro after logo animation
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowIntro(false);
@@ -59,14 +58,12 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           transition={{ duration: 1 }}>
 
             <div className="relative">
-              {/* Animated Logo */}
               <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ duration: 1, type: "spring", bounce: 0.4 }}
               className="relative">
 
-                {/* Outer Glow Ring */}
                 <motion.div
                 className="absolute inset-0 rounded-full"
                 style={{
@@ -79,8 +76,6 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
                 }}
                 transition={{ duration: 2, repeat: Infinity }} />
 
-                
-                {/* Logo Circle */}
                 <div className="relative w-40 h-40 rounded-full neon-border p-1">
                   <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
                     <motion.span
@@ -90,21 +85,17 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
                       '0 0 20px hsl(250 89% 67%)',
                       '0 0 40px hsl(320 100% 60%)',
                       '0 0 20px hsl(250 89% 67%)']
-
                     }}
                     transition={{ duration: 2, repeat: Infinity }}>
-
                       MM
                     </motion.span>
                   </div>
                 </div>
 
-                {/* Orbiting Icons */}
                 <motion.div
                 className="absolute inset-0"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 10, repeat: Infinity, ease: "linear" }}>
-
                   <BookOpen className="absolute -top-6 left-1/2 -translate-x-1/2 w-8 h-8 text-primary" />
                   <Trophy className="absolute top-1/2 -right-6 -translate-y-1/2 w-8 h-8 text-accent" />
                   <Sparkles className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-8 h-8 text-secondary" />
@@ -112,7 +103,6 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
                 </motion.div>
               </motion.div>
 
-              {/* Light Streaks */}
               {[...Array(6)].map((_, i) =>
             <motion.div
               key={i}
@@ -132,17 +122,14 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
                 repeat: Infinity,
                 repeatDelay: 1
               }} />
-
             )}
 
-              {/* Title */}
               <motion.h1
               className="text-center mt-8 text-4xl font-display font-black text-gradient"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.5 }}>
-
-                MASTER MINDS
+                {t("app-name")}
               </motion.h1>
             </div>
           </motion.div>
@@ -157,13 +144,12 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="mb-6">
-
           <div className="text-center glass rounded-2xl p-4 border border-primary/30">
             <h4 className="text-xl font-display font-bold text-gradient">
-              A Smart Multiplayer Quiz World
+              {t("smart-quiz-world")}
             </h4>
             <p className="text-sm text-foreground/80 mt-1">
-              Created by <span className="text-primary font-semibold">Biniam Bogale</span>, from Ethiopia 🇪🇹
+              {t("created-by")} <span className="text-primary font-semibold">Biniam Bogale</span>, from Ethiopia 🇪🇹
             </p>
           </div>
         </motion.div>
@@ -174,30 +160,22 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.8, type: "spring" }}
           className="mb-10">
-
           <div className="relative">
-            {/* Glow Effect */}
             <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary via-accent to-secondary blur-2xl opacity-50 animate-pulse-glow" />
-            
-            {/* Logo */}
             <div className="relative w-36 h-36 rounded-full neon-border p-1 pulse-glow">
               <div className="w-full h-full rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center">
                 <motion.div
                   animate={{ rotateY: [0, 360] }}
                   transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
                   className="text-6xl font-display font-black text-gradient">
-
                   MM
                 </motion.div>
               </div>
             </div>
-
-            {/* Orbiting Elements */}
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
               className="absolute inset-[-20px]">
-
               <BookOpen className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-6 text-primary drop-shadow-lg" />
               <Trophy className="absolute top-1/2 -right-2 -translate-y-1/2 w-6 h-6 text-accent drop-shadow-lg" />
               <Sparkles className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 text-secondary drop-shadow-lg" />
@@ -212,12 +190,11 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
           className="text-center mb-10">
-
           <h1 className="text-5xl md:text-6xl font-display font-black text-gradient mb-3">
-            MASTER MINDS
+            {t("app-name")}
           </h1>
           <p className="text-lg text-foreground/70 max-w-md">
-            Where Learning Meets Adventure • Battle • Win
+            {t("app-tagline")}
           </p>
         </motion.div>
 
@@ -227,20 +204,16 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.9 }}
           className="w-full max-w-sm space-y-4">
-
-          {/* Start Button */}
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button
               onClick={handleStart}
               className="w-full h-16 text-xl font-display font-bold bg-gradient-to-r from-primary via-accent to-primary bg-[length:200%_100%] hover:bg-[position:100%_0] transition-all duration-500 border-0 rounded-2xl shadow-lg pulse-glow"
               size="lg">
-
               <Play className="mr-3 h-7 w-7" />
-              START
+              {t("start")}
             </Button>
           </motion.div>
 
-          {/* About & Language Row */}
           <div className="flex gap-3">
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex-1">
               <Button
@@ -248,9 +221,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
                 variant="outline"
                 className="w-full h-14 text-lg font-display glass border-primary/30 hover:bg-primary/20 rounded-xl"
                 size="lg">
-
                 <Info className="mr-2 h-5 w-5" />
-                About
+                {t("about")}
               </Button>
             </motion.div>
 
@@ -264,7 +236,6 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
                   const currentIndex = langs.indexOf(language as any);
                   setLanguage(langs[(currentIndex + 1) % langs.length]);
                 }}>
-
                 <Globe className="mr-2 h-5 w-5" />
                 {language === 'english' ? 'EN' : language === 'amharic' ? 'አማ' : 'AF'}
               </Button>
@@ -278,10 +249,7 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
           className="absolute bottom-4 text-center">
-
-          <p className="text-xs text-foreground/50 font-display">Created by Biniam Bogale • Master Minds v2.0
-
-          </p>
+          <p className="text-xs text-foreground/50 font-display">{t("created-by")} Biniam Bogale • Master Minds v2.0</p>
         </motion.div>
       </div>
 
@@ -290,34 +258,34 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
         <DialogContent className="glass border-primary/30 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl font-display text-gradient text-center">
-              About Master Minds
+              {t("about-master-minds")}
             </DialogTitle>
           </DialogHeader>
           <DialogDescription asChild>
             <div className="space-y-4 text-foreground/80">
               <p className="text-center">
-                Master Minds is a revolutionary educational platform combining the thrill of gaming with powerful learning tools.
+                {t("about-description")}
               </p>
               <div className="space-y-2">
                 <div className="flex items-center gap-3 p-3 glass rounded-lg">
                   <Trophy className="h-6 w-6 text-accent" />
-                  <span>Real-time multiplayer quiz battles</span>
+                  <span>{t("realtime-battles")}</span>
                 </div>
                 <div className="flex items-center gap-3 p-3 glass rounded-lg">
                   <Zap className="h-6 w-6 text-primary" />
-                  <span>Adaptive difficulty & XP progression</span>
+                  <span>{t("adaptive-difficulty")}</span>
                 </div>
                 <div className="flex items-center gap-3 p-3 glass rounded-lg">
                   <Users className="h-6 w-6 text-secondary" />
-                  <span>Tournaments & global leaderboards</span>
+                  <span>{t("tournaments-leaderboards")}</span>
                 </div>
                 <div className="flex items-center gap-3 p-3 glass rounded-lg">
                   <Globe className="h-6 w-6 text-glow-cyan" />
-                  <span>English, Amharic & Afaan Oromoo</span>
+                  <span>{t("multi-language")}</span>
                 </div>
               </div>
               <p className="text-center text-sm text-foreground/60 pt-2">
-                Inspired by PUBG, Duolingo & 99math
+                {t("inspired-by")}
               </p>
             </div>
           </DialogDescription>
@@ -329,60 +297,54 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
         <DialogContent className="glass border-primary/30 max-w-lg p-0 overflow-hidden">
           <div className="bg-gradient-to-r from-primary/20 via-accent/20 to-secondary/20 p-6">
             <DialogTitle className="text-2xl font-display text-gradient text-center">
-              Choose Your Role
+              {t("choose-role")}
             </DialogTitle>
             <p className="text-center text-sm text-foreground/70 mt-2">
-              Select how you want to use Master Minds
+              {t("select-role-desc")}
             </p>
           </div>
           
           <div className="p-6 space-y-4">
-            {/* Student */}
             <motion.div whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }}>
               <button
                 onClick={() => handleRoleSelect("student")}
                 className="w-full p-4 glass rounded-xl border border-primary/30 hover:border-primary transition-all flex items-center gap-4 group">
-
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg group-hover:shadow-primary/50 transition-shadow">
                   <GraduationCap className="h-7 w-7 text-white" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-display font-bold text-foreground">Student</h3>
-                  <p className="text-sm text-foreground/60">Learn, compete & earn rewards</p>
+                  <h3 className="text-lg font-display font-bold text-foreground">{t("student")}</h3>
+                  <p className="text-sm text-foreground/60">{t("student-desc")}</p>
                 </div>
                 <Sparkles className="h-5 w-5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             </motion.div>
 
-            {/* Teacher */}
             <motion.div whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }}>
               <button
                 onClick={() => handleRoleSelect("teacher")}
                 className="w-full p-4 glass rounded-xl border border-secondary/30 hover:border-secondary transition-all flex items-center gap-4 group">
-
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-secondary to-glow-cyan flex items-center justify-center shadow-lg group-hover:shadow-secondary/50 transition-shadow">
                   <Users className="h-7 w-7 text-background" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-display font-bold text-foreground">Teacher</h3>
-                  <p className="text-sm text-foreground/60">Create exams & monitor students</p>
+                  <h3 className="text-lg font-display font-bold text-foreground">{t("teacher")}</h3>
+                  <p className="text-sm text-foreground/60">{t("teacher-desc")}</p>
                 </div>
                 <Sparkles className="h-5 w-5 text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             </motion.div>
 
-            {/* Admin */}
             <motion.div whileHover={{ scale: 1.02, x: 5 }} whileTap={{ scale: 0.98 }}>
               <button
                 onClick={() => handleRoleSelect("admin")}
                 className="w-full p-4 glass rounded-xl border border-accent/30 hover:border-accent transition-all flex items-center gap-4 group">
-
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent to-glow-pink flex items-center justify-center shadow-lg group-hover:shadow-accent/50 transition-shadow">
                   <ShieldCheck className="h-7 w-7 text-white" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="text-lg font-display font-bold text-foreground">Admin</h3>
-                  <p className="text-sm text-foreground/60">Full system control & management</p>
+                  <h3 className="text-lg font-display font-bold text-foreground">{t("admin")}</h3>
+                  <p className="text-sm text-foreground/60">{t("admin-desc")}</p>
                 </div>
                 <Crown className="h-5 w-5 text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
@@ -391,7 +353,6 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
         </DialogContent>
       </Dialog>
     </div>);
-
 };
 
 export default EnhancedWelcomeScreen;
