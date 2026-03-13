@@ -33,7 +33,7 @@ const ExamModePage: React.FC = () => {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
   const [results, setResults] = useState<{ correct: number; total: number; details: Array<{ q: Question; answer: string; correct: boolean }> } | null>(null);
-  const timerRef = useRef<NodeJS.Timeout>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (examState !== "running" || timeLeft <= 0) return;

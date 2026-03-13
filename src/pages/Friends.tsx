@@ -43,7 +43,7 @@ const Friends: React.FC = () => {
   const [pendingSentRequests, setPendingSentRequests] = useState<Set<string>>(new Set());
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Auto-scroll to bottom of messages
   useEffect(() => {
