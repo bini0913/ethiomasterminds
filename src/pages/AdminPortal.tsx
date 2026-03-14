@@ -108,6 +108,7 @@ const AdminPortal: React.FC = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [npcSettings, setNPCSettings] = useState<NPCSettings | null>(null);
+  const [reports, setReports] = useState<Report[]>([]);
   const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
     totalStudents: 0,
@@ -116,7 +117,9 @@ const AdminPortal: React.FC = () => {
     totalQuizzes: 0,
     totalQuestions: 0,
     approvedQuizzes: 0,
-    pendingQuizzes: 0
+    pendingQuizzes: 0,
+    totalReports: 0,
+    pendingReports: 0
   });
 
   // Dialog states
