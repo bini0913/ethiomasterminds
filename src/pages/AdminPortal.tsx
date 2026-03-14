@@ -22,7 +22,7 @@ import {
   Shield, Users, BookOpen, Trophy, Bell, Settings, LogOut,
   Plus, Trash2, Edit, Send, UserCheck, UserX, Key, Database,
   Activity, Server, BarChart3, Bot, Search, RefreshCw, Check,
-  X, AlertTriangle, Loader2, Crown, Zap
+  X, AlertTriangle, Loader2, Crown, Zap, Flag, Eye, Ban
 } from 'lucide-react';
 
 interface SystemUser {
@@ -76,6 +76,23 @@ interface SystemStats {
   totalQuestions: number;
   approvedQuizzes: number;
   pendingQuizzes: number;
+  totalReports: number;
+  pendingReports: number;
+}
+
+interface Report {
+  id: string;
+  reporter_id: string;
+  reported_type: string;
+  reported_id: string;
+  reason: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reporter_name?: string;
+  reported_content?: string;
 }
 
 const AdminPortal: React.FC = () => {
@@ -91,6 +108,7 @@ const AdminPortal: React.FC = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [npcSettings, setNPCSettings] = useState<NPCSettings | null>(null);
+  const [reports, setReports] = useState<Report[]>([]);
   const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
     totalStudents: 0,
@@ -99,7 +117,9 @@ const AdminPortal: React.FC = () => {
     totalQuizzes: 0,
     totalQuestions: 0,
     approvedQuizzes: 0,
-    pendingQuizzes: 0
+    pendingQuizzes: 0,
+    totalReports: 0,
+    pendingReports: 0
   });
 
   // Dialog states
@@ -123,7 +143,8 @@ const AdminPortal: React.FC = () => {
       fetchQuizzes(),
       fetchAnnouncements(),
       fetchNPCSettings(),
-      fetchStats()
+      fetchStats(),
+      fetchReports()
     ]);
   };
 
@@ -201,16 +222,62 @@ const AdminPortal: React.FC = () => {
     }
   };
 
+  const fetchReports = async () => {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      // Enrich with reporter names
+      const enriched = await Promise.all(
+        data.map(async (report) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', report.reporter_id)
+            .single();
+
+          let reported_content = '';
+          if (report.reported_type === 'post') {
+            const { data: post } = await supabase
+              .from('social_posts')
+              .select('content')
+              .eq('id', report.reported_id)
+              .single();
+            reported_content = post?.content || '[Deleted]';
+          } else if (report.reported_type === 'comment') {
+            const { data: comment } = await supabase
+              .from('social_post_comments')
+              .select('content')
+              .eq('id', report.reported_id)
+              .single();
+            reported_content = comment?.content || '[Deleted]';
+          }
+
+          return {
+            ...report,
+            reporter_name: profile?.name || 'Unknown',
+            reported_content
+          };
+        })
+      );
+      setReports(enriched);
+    }
+  };
+
   const fetchStats = async () => {
-    const [profilesRes, quizzesRes, questionsRes, rolesRes] = await Promise.all([
+    const [profilesRes, quizzesRes, questionsRes, rolesRes, reportsRes] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact' }),
       supabase.from('quizzes').select('id, is_approved', { count: 'exact' }),
       supabase.from('questions').select('id', { count: 'exact' }),
-      supabase.from('user_roles').select('role')
+      supabase.from('user_roles').select('role'),
+      supabase.from('reports').select('id, status', { count: 'exact' })
     ]);
 
     const roles = rolesRes.data || [];
     const quizzesData = quizzesRes.data || [];
+    const reportsData = reportsRes.data || [];
 
     setStats({
       totalUsers: profilesRes.count || 0,
@@ -220,7 +287,9 @@ const AdminPortal: React.FC = () => {
       totalQuizzes: quizzesRes.count || 0,
       totalQuestions: questionsRes.count || 0,
       approvedQuizzes: quizzesData.filter(q => q.is_approved).length,
-      pendingQuizzes: quizzesData.filter(q => !q.is_approved).length
+      pendingQuizzes: quizzesData.filter(q => !q.is_approved).length,
+      totalReports: reportsRes.count || 0,
+      pendingReports: reportsData.filter(r => r.status === 'pending').length
     });
   };
 
@@ -405,6 +474,53 @@ const AdminPortal: React.FC = () => {
     navigate('/');
   };
 
+  const handleReviewReport = async (reportId: string, action: 'resolved' | 'dismissed') => {
+    const { error } = await supabase
+      .from('reports')
+      .update({
+        status: action,
+        reviewed_by: user?.id,
+        reviewed_at: new Date().toISOString()
+      })
+      .eq('id', reportId);
+
+    if (error) {
+      toast.error('Failed to update report');
+      return;
+    }
+
+    toast.success(`Report ${action}`);
+    fetchReports();
+    fetchStats();
+  };
+
+  const handleDeleteReportedContent = async (report: Report) => {
+    let error = null;
+    if (report.reported_type === 'post') {
+      // Delete likes, reactions, comments, saved_posts first, then post
+      await supabase.from('social_post_likes').delete().eq('post_id', report.reported_id);
+      await supabase.from('social_post_reactions').delete().eq('post_id', report.reported_id);
+      await supabase.from('social_post_comments').delete().eq('post_id', report.reported_id);
+      await supabase.from('saved_posts').delete().eq('post_id', report.reported_id);
+      const res = await supabase.from('social_posts').delete().eq('id', report.reported_id);
+      error = res.error;
+    } else if (report.reported_type === 'comment') {
+      const res = await supabase.from('social_post_comments').delete().eq('id', report.reported_id);
+      error = res.error;
+    } else if (report.reported_type === 'message') {
+      // Can't delete messages per RLS, just mark report resolved
+    }
+
+    if (error) {
+      toast.error('Failed to delete content');
+      return;
+    }
+
+    toast.success('Content deleted');
+    // Auto-resolve the report
+    await handleReviewReport(report.id, 'resolved');
+  };
+
   const filteredUsers = users.filter(u => 
     u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.username?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -450,7 +566,7 @@ const AdminPortal: React.FC = () => {
 
         <main className="container mx-auto px-4 py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid grid-cols-7 gap-2 bg-muted/50 p-1 rounded-xl">
+            <TabsList className="grid grid-cols-8 gap-2 bg-muted/50 p-1 rounded-xl">
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -458,6 +574,15 @@ const AdminPortal: React.FC = () => {
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 <span className="hidden sm:inline">Users</span>
+              </TabsTrigger>
+              <TabsTrigger value="reports" className="flex items-center gap-2 relative">
+                <Flag className="w-4 h-4" />
+                <span className="hidden sm:inline">Reports</span>
+                {stats.pendingReports > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
+                    {stats.pendingReports}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger value="codes" className="flex items-center gap-2">
                 <Key className="w-4 h-4" />
@@ -1022,6 +1147,116 @@ const AdminPortal: React.FC = () => {
                   </Card>
                 ))}
               </div>
+            </TabsContent>
+
+            {/* Reports Tab */}
+            <TabsContent value="reports" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Flag className="w-5 h-5 text-destructive" />
+                    User Reports
+                  </CardTitle>
+                  <CardDescription>
+                    Review and moderate reported content from users
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {reports.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Flag className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                      <p>No reports yet. The community is behaving well! 🎉</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[600px]">
+                      <div className="space-y-4">
+                        {reports.map((report) => (
+                          <motion.div
+                            key={report.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`p-4 rounded-xl border ${
+                              report.status === 'pending' 
+                                ? 'border-destructive/30 bg-destructive/5' 
+                                : report.status === 'resolved'
+                                ? 'border-green-500/30 bg-green-500/5'
+                                : 'border-muted bg-muted/30'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant={
+                                    report.status === 'pending' ? 'destructive' :
+                                    report.status === 'resolved' ? 'default' : 'secondary'
+                                  }>
+                                    {report.status}
+                                  </Badge>
+                                  <Badge variant="outline">{report.reported_type}</Badge>
+                                  <Badge variant="outline" className="bg-muted/50">{report.reason}</Badge>
+                                </div>
+
+                                <div className="text-sm">
+                                  <span className="text-muted-foreground">Reported by: </span>
+                                  <span className="font-medium">{report.reporter_name}</span>
+                                  <span className="text-muted-foreground ml-2">
+                                    {new Date(report.created_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+
+                                {report.reported_content && (
+                                  <div className="bg-muted/50 rounded-lg p-3 text-sm border border-border/50">
+                                    <p className="text-muted-foreground text-xs mb-1">Reported Content:</p>
+                                    <p className="line-clamp-3">{report.reported_content}</p>
+                                  </div>
+                                )}
+
+                                {report.description && (
+                                  <p className="text-sm text-muted-foreground italic">
+                                    "{report.description}"
+                                  </p>
+                                )}
+                              </div>
+
+                              {report.status === 'pending' && (
+                                <div className="flex flex-col gap-2 shrink-0">
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleDeleteReportedContent(report)}
+                                    className="gap-1"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    Delete Content
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleReviewReport(report.id, 'resolved')}
+                                    className="gap-1"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                    Resolve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleReviewReport(report.id, 'dismissed')}
+                                    className="gap-1 text-muted-foreground"
+                                  >
+                                    <X className="w-3 h-3" />
+                                    Dismiss
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Global Leaderboard Tab */}
