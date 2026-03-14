@@ -566,7 +566,7 @@ const AdminPortal: React.FC = () => {
 
         <main className="container mx-auto px-4 py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid grid-cols-7 gap-2 bg-muted/50 p-1 rounded-xl">
+            <TabsList className="grid grid-cols-8 gap-2 bg-muted/50 p-1 rounded-xl">
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -574,6 +574,15 @@ const AdminPortal: React.FC = () => {
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 <span className="hidden sm:inline">Users</span>
+              </TabsTrigger>
+              <TabsTrigger value="reports" className="flex items-center gap-2 relative">
+                <Flag className="w-4 h-4" />
+                <span className="hidden sm:inline">Reports</span>
+                {stats.pendingReports > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
+                    {stats.pendingReports}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger value="codes" className="flex items-center gap-2">
                 <Key className="w-4 h-4" />
