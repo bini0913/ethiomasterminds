@@ -222,16 +222,62 @@ const AdminPortal: React.FC = () => {
     }
   };
 
+  const fetchReports = async () => {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      // Enrich with reporter names
+      const enriched = await Promise.all(
+        data.map(async (report) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', report.reporter_id)
+            .single();
+
+          let reported_content = '';
+          if (report.reported_type === 'post') {
+            const { data: post } = await supabase
+              .from('social_posts')
+              .select('content')
+              .eq('id', report.reported_id)
+              .single();
+            reported_content = post?.content || '[Deleted]';
+          } else if (report.reported_type === 'comment') {
+            const { data: comment } = await supabase
+              .from('social_post_comments')
+              .select('content')
+              .eq('id', report.reported_id)
+              .single();
+            reported_content = comment?.content || '[Deleted]';
+          }
+
+          return {
+            ...report,
+            reporter_name: profile?.name || 'Unknown',
+            reported_content
+          };
+        })
+      );
+      setReports(enriched);
+    }
+  };
+
   const fetchStats = async () => {
-    const [profilesRes, quizzesRes, questionsRes, rolesRes] = await Promise.all([
+    const [profilesRes, quizzesRes, questionsRes, rolesRes, reportsRes] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact' }),
       supabase.from('quizzes').select('id, is_approved', { count: 'exact' }),
       supabase.from('questions').select('id', { count: 'exact' }),
-      supabase.from('user_roles').select('role')
+      supabase.from('user_roles').select('role'),
+      supabase.from('reports').select('id, status', { count: 'exact' })
     ]);
 
     const roles = rolesRes.data || [];
     const quizzesData = quizzesRes.data || [];
+    const reportsData = reportsRes.data || [];
 
     setStats({
       totalUsers: profilesRes.count || 0,
@@ -241,7 +287,9 @@ const AdminPortal: React.FC = () => {
       totalQuizzes: quizzesRes.count || 0,
       totalQuestions: questionsRes.count || 0,
       approvedQuizzes: quizzesData.filter(q => q.is_approved).length,
-      pendingQuizzes: quizzesData.filter(q => !q.is_approved).length
+      pendingQuizzes: quizzesData.filter(q => !q.is_approved).length,
+      totalReports: reportsRes.count || 0,
+      pendingReports: reportsData.filter(r => r.status === 'pending').length
     });
   };
 
