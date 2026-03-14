@@ -22,7 +22,7 @@ import {
   Shield, Users, BookOpen, Trophy, Bell, Settings, LogOut,
   Plus, Trash2, Edit, Send, UserCheck, UserX, Key, Database,
   Activity, Server, BarChart3, Bot, Search, RefreshCw, Check,
-  X, AlertTriangle, Loader2, Crown, Zap
+  X, AlertTriangle, Loader2, Crown, Zap, Flag, Eye, Ban
 } from 'lucide-react';
 
 interface SystemUser {
