@@ -143,7 +143,8 @@ const AdminPortal: React.FC = () => {
       fetchQuizzes(),
       fetchAnnouncements(),
       fetchNPCSettings(),
-      fetchStats()
+      fetchStats(),
+      fetchReports()
     ]);
   };
 
