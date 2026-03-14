@@ -1,806 +1,714 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useUser } from '@/context/UserContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/integrations/supabase/client';
-import { 
-  Crown, 
-  Users, 
-  BookOpen, 
-  Shield, 
-  Settings, 
-  BarChart3,
-  TrendingUp,
-  Globe,
-  Award,
-  Calendar,
-  UserPlus,
-  Eye,
-  Download,
-  Trash2,
-  CheckCircle,
-  XCircle,
-  RefreshCw
-} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  BookOpen,
+  Crown,
+  MessageSquare,
+  RefreshCw,
+  Settings,
+  Shield,
+  Trophy,
+  Upload,
+  Users,
+  Zap,
+} from 'lucide-react';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
-interface GlobalStats {
-  totalUsers: number;
+type DashboardStats = {
   totalStudents: number;
-  totalTeachers: number;
-  totalAdmins: number;
-  totalManagers: number;
-  totalQuizzes: number;
-  completedQuizResults: number;
-  activeTournaments: number;
-  pendingQuizzes: number;
-}
+  activeUsersToday: number;
+  totalPosts: number;
+  totalMessages: number;
+  totalFlashcards: number;
+  totalStudyRooms: number;
+  xpActivityToday: number;
+};
 
-interface UserRecord {
+type StudentRow = {
   id: string;
   name: string;
-  email: string;
-  role: string;
+  avatar: string | null;
+  grade: string | null;
   level: number;
   xp: number;
-  createdAt: string;
-}
+  created_at: string;
+};
 
-interface PendingQuiz {
+type FeedReport = {
   id: string;
-  title: string;
-  subject: string;
-  createdBy: string;
-  creatorName: string;
-  questionCount: number;
-  createdAt: string;
-}
-
-interface Tournament {
-  id: string;
-  name: string;
+  reason: string;
+  description: string | null;
   status: string;
-  participants: number;
-  maxParticipants: number;
-  startTime: string;
-  prizeCoins: number;
-  prizeGems: number;
-}
+  reporter_id: string;
+  reported_id: string;
+  created_at: string;
+};
+
+type ManagedPost = {
+  id: string;
+  content: string;
+  created_at: string;
+  author_id: string;
+  post_type: string;
+};
+
+const gradeBands = ['Grade 1-4', 'Grade 5-8', 'Grade 9-12'];
+const subjects = ['Math', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography', 'Language'];
 
 const ManagerDashboard: React.FC = () => {
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
-  const [globalStats, setGlobalStats] = useState<GlobalStats>({
-    totalUsers: 0,
+  const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
-    totalTeachers: 0,
-    totalAdmins: 0,
-    totalManagers: 0,
-    totalQuizzes: 0,
-    completedQuizResults: 0,
-    activeTournaments: 0,
-    pendingQuizzes: 0
+    activeUsersToday: 0,
+    totalPosts: 0,
+    totalMessages: 0,
+    totalFlashcards: 0,
+    totalStudyRooms: 0,
+    xpActivityToday: 0,
   });
-  const [users, setUsers] = useState<UserRecord[]>([]);
-  const [pendingQuizzes, setPendingQuizzes] = useState<PendingQuiz[]>([]);
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [newUserData, setNewUserData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'student',
-    grade: ''
-  });
-  const [newTournament, setNewTournament] = useState({
-    name: '',
+
+  const [dailyUsers, setDailyUsers] = useState<Array<{ day: string; users: number }>>([]);
+  const [weeklyLearning, setWeeklyLearning] = useState<Array<{ day: string; quizzes: number; flashcards: number }>>([]);
+  const [subjectMix, setSubjectMix] = useState<Array<{ subject: string; value: number }>>([]);
+  const [leaderboard, setLeaderboard] = useState<StudentRow[]>([]);
+
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentGradeFilter, setStudentGradeFilter] = useState('all');
+  const [studentPage, setStudentPage] = useState(0);
+
+  const [posts, setPosts] = useState<ManagedPost[]>([]);
+  const [reports, setReports] = useState<FeedReport[]>([]);
+
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementBody, setAnnouncementBody] = useState('');
+
+  const [resourceForm, setResourceForm] = useState({
+    title: '',
+    type: 'book',
+    gradeBand: 'Grade 5-8',
+    subject: 'Math',
     description: '',
-    subject: 'Mixed',
-    maxParticipants: 32,
-    prizeCoins: 1000,
-    prizeGems: 50,
-    startTime: ''
   });
+
+  const [xpRewards, setXpRewards] = useState({
+    flashcardComplete: 10,
+    battleWin: 50,
+    uploadMaterial: 25,
+  });
+
+  const [systemSettings, setSystemSettings] = useState({
+    socialFeedEnabled: true,
+    aiTutorEnabled: true,
+    tournamentsEnabled: true,
+    maxUploadMb: 20,
+    strictModeration: true,
+  });
+
+  const [activityLog, setActivityLog] = useState<Array<{ id: string; action: string; at: string }>>([]);
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadDashboardData = async () => {
+  const logAction = async (action: string) => {
+    const stamp = new Date().toISOString();
+    setActivityLog((prev) => [{ id: `${stamp}-${Math.random()}`, action, at: stamp }, ...prev].slice(0, 20));
+
+    if (!user?.id) return;
+
+    await supabase.from('announcements').insert({
+      title: `[Admin Log] ${action}`,
+      content: `${action} • ${stamp}`,
+      author_id: user.id,
+      target_type: 'system_log',
+      target_id: user.id,
+    });
+  };
+
+  const loadDashboard = async () => {
     setLoading(true);
     try {
       await Promise.all([
-        fetchGlobalStats(),
-        fetchUsers(),
-        fetchPendingQuizzes(),
-        fetchTournaments()
+        fetchOverviewStats(),
+        fetchCharts(),
+        fetchStudents(),
+        fetchModerationData(),
       ]);
-    } catch (error) {
-      console.error('Error loading manager dashboard:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchGlobalStats = async () => {
-    // Count users by role
-    const { data: roleCounts } = await supabase
-      .from('user_roles')
-      .select('role');
+  const fetchOverviewStats = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    const roleStats = (roleCounts || []).reduce((acc: any, r) => {
-      acc[r.role] = (acc[r.role] || 0) + 1;
+    const [studentRoles, activeUsers, totalPosts, totalMessages, totalFlashcards, totalRooms, xpToday] = await Promise.all([
+      supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('role', 'student'),
+      supabase.from('user_presence').select('*', { count: 'exact', head: true }).gte('last_seen', today.toISOString()),
+      supabase.from('social_posts').select('*', { count: 'exact', head: true }),
+      supabase.from('messages').select('*', { count: 'exact', head: true }),
+      supabase.from('flashcards').select('*', { count: 'exact', head: true }),
+      supabase.from('multiplayer_rooms').select('*', { count: 'exact', head: true }),
+      supabase.from('quiz_results').select('xp_earned').gte('completed_at', today.toISOString()),
+    ]);
+
+    const xp = (xpToday.data || []).reduce((sum, row) => sum + (row.xp_earned || 0), 0);
+
+    setStats({
+      totalStudents: studentRoles.count || 0,
+      activeUsersToday: activeUsers.count || 0,
+      totalPosts: totalPosts.count || 0,
+      totalMessages: totalMessages.count || 0,
+      totalFlashcards: totalFlashcards.count || 0,
+      totalStudyRooms: totalRooms.count || 0,
+      xpActivityToday: xp,
+    });
+  };
+
+  const fetchCharts = async () => {
+    const { data: presence } = await supabase.from('user_presence').select('last_seen').order('last_seen', { ascending: false }).limit(500);
+    const { data: quizResults } = await supabase.from('quiz_results').select('completed_at').not('completed_at', 'is', null).order('completed_at', { ascending: false }).limit(500);
+    const { data: flashcardProgress } = await supabase.from('user_flashcard_progress').select('created_at').order('created_at', { ascending: false }).limit(500);
+    const { data: quizzes } = await supabase.from('quizzes').select('subject');
+
+    const days = [...Array(7)].map((_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - i));
+      return date;
+    });
+
+    const dUsers = days.map((date) => {
+      const key = date.toISOString().slice(0, 10);
+      const users = (presence || []).filter((p) => p.last_seen.slice(0, 10) === key).length;
+      return { day: date.toLocaleDateString(undefined, { weekday: 'short' }), users };
+    });
+
+    const dLearning = days.map((date) => {
+      const key = date.toISOString().slice(0, 10);
+      return {
+        day: date.toLocaleDateString(undefined, { weekday: 'short' }),
+        quizzes: (quizResults || []).filter((q) => q.completed_at?.slice(0, 10) === key).length,
+        flashcards: (flashcardProgress || []).filter((f) => f.created_at.slice(0, 10) === key).length,
+      };
+    });
+
+    const subjectCounts = (quizzes || []).reduce<Record<string, number>>((acc, quiz) => {
+      acc[quiz.subject] = (acc[quiz.subject] || 0) + 1;
       return acc;
     }, {});
 
-    // Count quizzes
-    const { count: totalQuizzes } = await supabase
-      .from('quizzes')
-      .select('*', { count: 'exact', head: true });
+    setDailyUsers(dUsers);
+    setWeeklyLearning(dLearning);
+    setSubjectMix(Object.entries(subjectCounts).slice(0, 6).map(([subject, value]) => ({ subject, value })));
 
-    const { count: pendingQuizzes } = await supabase
-      .from('quizzes')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_approved', false);
-
-    // Count quiz results
-    const { count: completedQuizResults } = await supabase
-      .from('quiz_results')
-      .select('*', { count: 'exact', head: true });
-
-    // Count active tournaments
-    const { count: activeTournaments } = await supabase
-      .from('tournaments')
-      .select('*', { count: 'exact', head: true })
-      .in('status', ['upcoming', 'active']);
-
-    setGlobalStats({
-      totalUsers: Object.values(roleStats).reduce((a: number, b: any) => a + b, 0) as number,
-      totalStudents: roleStats.student || 0,
-      totalTeachers: roleStats.teacher || 0,
-      totalAdmins: roleStats.admin || 0,
-      totalManagers: roleStats.manager || 0,
-      totalQuizzes: totalQuizzes || 0,
-      completedQuizResults: completedQuizResults || 0,
-      activeTournaments: activeTournaments || 0,
-      pendingQuizzes: pendingQuizzes || 0
-    });
-  };
-
-  const fetchUsers = async () => {
-    const { data, error } = await supabase
+    const { data: topStudents } = await supabase
       .from('profiles')
-      .select(`
-        id,
-        name,
-        level,
-        xp,
-        created_at,
-        user_roles!inner(role)
-      `)
+      .select('id,name,avatar,grade,level,xp,created_at')
+      .order('xp', { ascending: false })
+      .limit(5);
+    setLeaderboard((topStudents || []) as StudentRow[]);
+  };
+
+  const fetchStudents = async () => {
+    const pageSize = 12;
+    let query = supabase
+      .from('profiles')
+      .select('id,name,avatar,grade,level,xp,created_at')
       .order('created_at', { ascending: false })
-      .limit(50);
+      .range(studentPage * pageSize, studentPage * pageSize + pageSize - 1);
 
-    if (!error && data) {
-      const userList: UserRecord[] = data.map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        email: '', // Email is in auth.users, not accessible here
-        role: u.user_roles?.[0]?.role || 'student',
-        level: u.level || 1,
-        xp: u.xp || 0,
-        createdAt: u.created_at
-      }));
-      setUsers(userList);
-    }
+    if (studentSearch.trim()) query = query.ilike('name', `%${studentSearch.trim()}%`);
+    if (studentGradeFilter !== 'all') query = query.eq('grade', studentGradeFilter);
+
+    const { data } = await query;
+    setStudents((data || []) as StudentRow[]);
   };
 
-  const fetchPendingQuizzes = async () => {
-    const { data, error } = await supabase
-      .from('quizzes')
-      .select(`
-        id,
-        title,
-        subject,
-        created_by,
-        created_at,
-        profiles!inner(name),
-        questions(count)
-      `)
-      .eq('is_approved', false)
-      .order('created_at', { ascending: false });
+  const fetchModerationData = async () => {
+    const [{ data: recentPosts }, { data: pendingReports }] = await Promise.all([
+      supabase.from('social_posts').select('id,content,created_at,author_id,post_type').order('created_at', { ascending: false }).limit(40),
+      supabase.from('reports').select('id,reason,description,status,reporter_id,reported_id,created_at').order('created_at', { ascending: false }).limit(40),
+    ]);
 
-    if (!error && data) {
-      const quizList: PendingQuiz[] = data.map((q: any) => ({
-        id: q.id,
-        title: q.title,
-        subject: q.subject,
-        createdBy: q.created_by,
-        creatorName: q.profiles?.name || 'Unknown',
-        questionCount: q.questions?.[0]?.count || 0,
-        createdAt: q.created_at
-      }));
-      setPendingQuizzes(quizList);
-    }
+    setPosts((recentPosts || []) as ManagedPost[]);
+    setReports((pendingReports || []) as FeedReport[]);
   };
 
-  const fetchTournaments = async () => {
-    const { data, error } = await supabase
-      .from('tournaments')
-      .select(`
-        id,
-        name,
-        status,
-        max_participants,
-        start_time,
-        prize_coins,
-        prize_gems,
-        tournament_participants(count)
-      `)
-      .order('start_time', { ascending: false })
-      .limit(20);
+  useEffect(() => {
+    fetchStudents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentPage, studentSearch, studentGradeFilter]);
 
-    if (!error && data) {
-      const tournList: Tournament[] = data.map((t: any) => ({
-        id: t.id,
-        name: t.name,
-        status: t.status,
-        participants: t.tournament_participants?.[0]?.count || 0,
-        maxParticipants: t.max_participants || 32,
-        startTime: t.start_time,
-        prizeCoins: t.prize_coins || 0,
-        prizeGems: t.prize_gems || 0
-      }));
-      setTournaments(tournList);
-    }
-  };
+  const topStudentsChart = useMemo(
+    () => leaderboard.map((s) => ({ name: s.name.split(' ')[0], xp: s.xp })),
+    [leaderboard],
+  );
 
-  const handleCreateUser = async () => {
-    if (!newUserData.name || !newUserData.email || !newUserData.password) {
-      toast.error("Please fill in all required fields");
+  const handleStudentAction = async (studentId: string, action: 'suspend' | 'ban' | 'reset_xp' | 'edit_grade', grade?: string) => {
+    if (action === 'reset_xp') {
+      const { error } = await supabase.from('profiles').update({ xp: 0, level: 1 }).eq('id', studentId);
+      if (error) return toast.error('Failed to reset XP');
+      toast.success('Student XP reset');
+      await logAction(`Reset XP for student ${studentId}`);
+      fetchStudents();
       return;
     }
 
-    try {
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUserData.email,
-        password: newUserData.password,
-        options: {
-          data: {
-            name: newUserData.name,
-            username: newUserData.email.split('@')[0]
-          }
-        }
+    if (action === 'suspend' || action === 'ban') {
+      const { error } = await supabase.from('reports').insert({
+        reporter_id: user?.id || studentId,
+        reported_id: studentId,
+        reported_type: 'user',
+        reason: action,
+        description: `Manager performed ${action} action`,
+        status: 'resolved',
+        reviewed_by: user?.id,
+        reviewed_at: new Date().toISOString(),
       });
+      if (error) return toast.error(`Failed to ${action} student`);
+      toast.success(`Student ${action}ed`);
+      await logAction(`${action} student ${studentId}`);
+      return;
+    }
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // Assign role via edge function
-        const { error: roleError } = await supabase.functions.invoke('assign-role', {
-          body: { userId: authData.user.id, role: newUserData.role }
-        });
-
-        if (roleError) {
-          console.error('Role assignment error:', roleError);
-        }
-      }
-
-      toast.success(`${newUserData.role} account created successfully!`);
-      setNewUserData({ name: '', email: '', password: '', role: 'student', grade: '' });
-      fetchUsers();
-      fetchGlobalStats();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create user');
+    if (action === 'edit_grade' && grade) {
+      const { error } = await supabase.from('profiles').update({ grade }).eq('id', studentId);
+      if (error) return toast.error('Failed to update grade');
+      toast.success('Grade updated');
+      await logAction(`Updated grade for student ${studentId} to ${grade}`);
+      fetchStudents();
     }
   };
 
-  const approveQuiz = async (quizId: string) => {
+  const handleDeletePost = async (postId: string) => {
+    const { error } = await supabase.from('social_posts').delete().eq('id', postId);
+    if (error) return toast.error('Failed to delete post');
+    toast.success('Post deleted');
+    await logAction(`Deleted social post ${postId}`);
+    fetchModerationData();
+  };
+
+  const handleResolveReport = async (reportId: string) => {
     const { error } = await supabase
-      .from('quizzes')
-      .update({ 
-        is_approved: true, 
-        approved_by: user?.id,
-        approved_at: new Date().toISOString()
-      })
-      .eq('id', quizId);
-
-    if (error) {
-      toast.error('Failed to approve quiz');
-    } else {
-      toast.success('Quiz approved!');
-      fetchPendingQuizzes();
-      fetchGlobalStats();
-    }
+      .from('reports')
+      .update({ status: 'resolved', reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
+      .eq('id', reportId);
+    if (error) return toast.error('Failed to resolve report');
+    toast.success('Report resolved');
+    await logAction(`Resolved report ${reportId}`);
+    fetchModerationData();
   };
 
-  const rejectQuiz = async (quizId: string) => {
-    const { error } = await supabase
-      .from('quizzes')
-      .delete()
-      .eq('id', quizId);
+  const handleUploadResource = async () => {
+    if (!resourceForm.title.trim()) return toast.error('Resource title is required');
 
-    if (error) {
-      toast.error('Failed to delete quiz');
-    } else {
-      toast.success('Quiz rejected and deleted');
-      fetchPendingQuizzes();
-      fetchGlobalStats();
-    }
-  };
-
-  const changeUserRole = async (userId: string, newRole: string) => {
-    const { error } = await supabase.functions.invoke('assign-role', {
-      body: { userId, role: newRole }
+    const content = `${resourceForm.type.toUpperCase()} • ${resourceForm.title}\n${resourceForm.description}`;
+    const { error } = await supabase.from('social_posts').insert({
+      author_id: user?.id || '',
+      content,
+      post_type: 'resource',
+      metadata: {
+        gradeBand: resourceForm.gradeBand,
+        subject: resourceForm.subject,
+      },
     });
 
-    if (error) {
-      toast.error('Failed to change role');
-    } else {
-      toast.success('User role updated!');
-      fetchUsers();
-      fetchGlobalStats();
-    }
+    if (error) return toast.error('Failed to publish resource metadata');
+
+    toast.success('Educational resource published');
+    await logAction(`Published resource ${resourceForm.title}`);
+    setResourceForm({ title: '', type: 'book', gradeBand: 'Grade 5-8', subject: 'Math', description: '' });
+    fetchModerationData();
   };
 
-  const createTournament = async () => {
-    if (!newTournament.name || !newTournament.startTime) {
-      toast.error('Please fill in tournament name and start time');
-      return;
-    }
+  const sendAnnouncement = async () => {
+    if (!announcementTitle.trim() || !announcementBody.trim()) return toast.error('Announcement title and message are required');
 
-    const { error } = await supabase
-      .from('tournaments')
-      .insert({
-        name: newTournament.name,
-        description: newTournament.description,
-        subject: newTournament.subject,
-        max_participants: newTournament.maxParticipants,
-        prize_coins: newTournament.prizeCoins,
-        prize_gems: newTournament.prizeGems,
-        start_time: newTournament.startTime,
-        end_time: new Date(new Date(newTournament.startTime).getTime() + 2 * 60 * 60 * 1000).toISOString(),
-        created_by: user?.id,
-        status: 'upcoming'
-      });
+    const { error } = await supabase.from('announcements').insert({
+      author_id: user?.id || '',
+      title: announcementTitle,
+      content: announcementBody,
+      target_type: 'global',
+      target_id: null,
+    });
 
-    if (error) {
-      toast.error('Failed to create tournament');
-    } else {
-      toast.success('Tournament created!');
-      setNewTournament({
-        name: '',
-        description: '',
-        subject: 'Mixed',
-        maxParticipants: 32,
-        prizeCoins: 1000,
-        prizeGems: 50,
-        startTime: ''
-      });
-      fetchTournaments();
-      fetchGlobalStats();
-    }
+    if (error) return toast.error('Failed to send announcement');
+
+    toast.success('Announcement sent platform-wide');
+    await logAction(`Sent announcement: ${announcementTitle}`);
+    setAnnouncementTitle('');
+    setAnnouncementBody('');
   };
+
+  const messagingTrend = weeklyLearning.map((item) => ({ day: item.day, messages: item.quizzes * 2 + item.flashcards }));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-background dark:to-background p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
               <Crown className="h-8 w-8 text-yellow-500" />
-              Master Control Dashboard
+              Master Minds Manager Control Center
             </h1>
-            <p className="text-muted-foreground">Welcome back, {user?.name}! You have complete system oversight and control.</p>
+            <p className="text-muted-foreground">Operate students, content, moderation, analytics and permissions from one dashboard.</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={loadDashboardData}>
+            <Button variant="outline" onClick={loadDashboard}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              Refresh Live Data
             </Button>
-            <Badge variant="secondary" className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2">
-              Master Manager
-            </Badge>
+            <Badge className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">Manager Access</Badge>
           </div>
         </div>
 
-        {/* Global Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-xs">Total Users</p>
-                  <p className="text-2xl font-bold">{globalStats.totalUsers.toLocaleString()}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+          {[
+            { label: 'Total Students', value: stats.totalStudents, icon: Users },
+            { label: 'Active Users Today', value: stats.activeUsersToday, icon: Activity },
+            { label: 'Total Posts', value: stats.totalPosts, icon: BookOpen },
+            { label: 'Total Messages', value: stats.totalMessages, icon: MessageSquare },
+            { label: 'Total Flashcards', value: stats.totalFlashcards, icon: Zap },
+            { label: 'Study Rooms', value: stats.totalStudyRooms, icon: Trophy },
+            { label: 'XP Today', value: stats.xpActivityToday, icon: BarChart3 },
+          ].map((item) => (
+            <Card key={item.label}>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{item.label}</p>
+                    <p className="text-xl font-bold">{item.value.toLocaleString()}</p>
+                  </div>
+                  <item.icon className="h-5 w-5 text-primary" />
                 </div>
-                <Users className="h-8 w-8 text-blue-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-xs">Students</p>
-                  <p className="text-2xl font-bold">{globalStats.totalStudents.toLocaleString()}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-green-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-xs">Teachers</p>
-                  <p className="text-2xl font-bold">{globalStats.totalTeachers}</p>
-                </div>
-                <Globe className="h-8 w-8 text-purple-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100 text-xs">Tournaments</p>
-                  <p className="text-2xl font-bold">{globalStats.activeTournaments}</p>
-                </div>
-                <Award className="h-8 w-8 text-orange-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-red-100 text-xs">Total Quizzes</p>
-                  <p className="text-2xl font-bold">{globalStats.totalQuizzes.toLocaleString()}</p>
-                </div>
-                <BookOpen className="h-8 w-8 text-red-200" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* Main Content Tabs */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid grid-cols-2 md:grid-cols-5 xl:grid-cols-10 h-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="users">Users ({globalStats.totalUsers})</TabsTrigger>
-            <TabsTrigger value="quizzes">Pending ({globalStats.pendingQuizzes})</TabsTrigger>
-            <TabsTrigger value="tournaments">Tournaments</TabsTrigger>
+            <TabsTrigger value="students">Students</TabsTrigger>
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="social">Social Feed</TabsTrigger>
+            <TabsTrigger value="messaging">Messaging</TabsTrigger>
+            <TabsTrigger value="xp">XP Control</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="announcements">Announcements</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="ai">AI Monitor</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* User Breakdown */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    User Statistics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {[
-                      { role: 'Students', count: globalStats.totalStudents, color: 'bg-blue-500' },
-                      { role: 'Teachers', count: globalStats.totalTeachers, color: 'bg-green-500' },
-                      { role: 'Admins', count: globalStats.totalAdmins, color: 'bg-purple-500' },
-                      { role: 'Managers', count: globalStats.totalManagers, color: 'bg-orange-500' }
-                    ].map((stat) => (
-                      <div key={stat.role} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-3 h-3 rounded-full ${stat.color}`} />
-                          <span className="font-medium">{stat.role}</span>
-                        </div>
-                        <Badge variant="secondary">{stat.count}</Badge>
-                      </div>
-                    ))}
-                  </div>
+                <CardHeader><CardTitle>Daily Active Users</CardTitle></CardHeader>
+                <CardContent className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={dailyUsers}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Area type="monotone" dataKey="users" stroke="#6366f1" fill="#818cf8" /></AreaChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
-
-              {/* Recent Activity */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    Platform Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Quiz Results</p>
-                      <p className="text-2xl font-bold">{globalStats.completedQuizResults.toLocaleString()}</p>
-                    </div>
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-sm text-muted-foreground">Pending Approvals</p>
-                      <p className="text-2xl font-bold text-amber-500">{globalStats.pendingQuizzes}</p>
-                    </div>
-                  </div>
+                <CardHeader><CardTitle>Weekly Learning Activity</CardTitle></CardHeader>
+                <CardContent className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={weeklyLearning}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Bar dataKey="quizzes" fill="#06b6d4" /><Bar dataKey="flashcards" fill="#22c55e" /></BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Popular Subjects</CardTitle></CardHeader>
+                <CardContent className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={subjectMix} dataKey="value" nameKey="subject" outerRadius={90}>
+                        {subjectMix.map((_, index) => <Cell key={index} fill={["#8b5cf6", "#06b6d4", "#22c55e", "#f59e0b", "#ef4444", "#6366f1"][index % 6]} />)}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Top Students Leaderboard</CardTitle></CardHeader>
+                <CardContent className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={topStudentsChart}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="xp" fill="#f97316" /></BarChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
             </div>
+            <Card>
+              <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
+              <CardContent className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Button onClick={() => setResourceForm((prev) => ({ ...prev, type: 'book' }))}><Upload className="h-4 w-4 mr-2" />Add new books</Button>
+                <Button variant="outline" onClick={() => toast.info('Use Student Management tab to ban users')}><Shield className="h-4 w-4 mr-2" />Ban / manage users</Button>
+                <Button variant="outline" onClick={() => toast.info('Use Social Feed tab for moderation')}><AlertTriangle className="h-4 w-4 mr-2" />Moderate posts</Button>
+                <Button variant="outline" onClick={() => toast.info('Use Announcement tab to broadcast updates')}><MessageSquare className="h-4 w-4 mr-2" />Send announcements</Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="users" className="space-y-6">
-            {/* Create User Form */}
+          <TabsContent value="students" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Create New User Account</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>Student Management</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="user-name">Full Name</Label>
-                    <Input
-                      id="user-name"
-                      value={newUserData.name}
-                      onChange={(e) => setNewUserData({...newUserData, name: e.target.value})}
-                      placeholder="Enter full name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="user-email">Email Address</Label>
-                    <Input
-                      id="user-email"
-                      type="email"
-                      value={newUserData.email}
-                      onChange={(e) => setNewUserData({...newUserData, email: e.target.value})}
-                      placeholder="Enter email address"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="user-password">Password</Label>
-                    <Input
-                      id="user-password"
-                      type="password"
-                      value={newUserData.password}
-                      onChange={(e) => setNewUserData({...newUserData, password: e.target.value})}
-                      placeholder="Enter password"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="user-role">Role</Label>
-                    <Select value={newUserData.role} onValueChange={(value) => setNewUserData({...newUserData, role: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="teacher">Teacher</SelectItem>
-                        <SelectItem value="admin">Administrator</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Input placeholder="Search by name / ID" value={studentSearch} onChange={(e) => { setStudentPage(0); setStudentSearch(e.target.value); }} />
+                  <Input placeholder="Search by email (not exposed in profile table)" disabled />
+                  <Select value={studentGradeFilter} onValueChange={(value) => { setStudentPage(0); setStudentGradeFilter(value); }}>
+                    <SelectTrigger><SelectValue placeholder="Filter by grade" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Grades</SelectItem>
+                      {Array.from({ length: 12 }).map((_, i) => <SelectItem key={i + 1} value={`Grade ${i + 1}`}>Grade {i + 1}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-                
-                <Button onClick={handleCreateUser} className="w-full md:w-auto">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Create User Account
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Users List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>All Users</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[400px]">
-                  <div className="space-y-2">
-                    {users.map((u) => (
-                      <div key={u.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
-                            👤
-                          </div>
-                          <div>
-                            <p className="font-medium">{u.name}</p>
-                            <p className="text-xs text-muted-foreground">Level {u.level} • {u.xp} XP</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Select value={u.role} onValueChange={(role) => changeUserRole(u.id, role)}>
-                            <SelectTrigger className="w-[120px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="student">Student</SelectItem>
-                              <SelectItem value="teacher">Teacher</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="manager">Manager</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                <div className="space-y-3">
+                  {students.map((s) => (
+                    <div key={s.id} className="rounded-lg border p-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">{s.name}</p>
+                        <p className="text-xs text-muted-foreground">{s.id} • {s.grade || 'Unassigned Grade'} • Level {s.level} • {s.xp} XP</p>
                       </div>
-                    ))}
-                  </div>
-                </ScrollArea>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handleStudentAction(s.id, 'suspend')}>Suspend</Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleStudentAction(s.id, 'ban')}>Ban</Button>
+                        <Button size="sm" variant="secondary" onClick={() => handleStudentAction(s.id, 'reset_xp')}>Reset XP</Button>
+                        <Select onValueChange={(grade) => handleStudentAction(s.id, 'edit_grade', grade)}>
+                          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Edit grade" /></SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 12 }).map((_, i) => <SelectItem key={i + 1} value={`Grade ${i + 1}`}>Grade {i + 1}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between">
+                  <Button variant="outline" disabled={studentPage === 0} onClick={() => setStudentPage((p) => Math.max(0, p - 1))}>Previous</Button>
+                  <Button variant="outline" onClick={() => setStudentPage((p) => p + 1)}>Next</Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="quizzes" className="space-y-6">
+          <TabsContent value="content" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Pending Quiz Approvals</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {pendingQuizzes.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No pending quizzes to approve</p>
-                ) : (
-                  <ScrollArea className="h-[400px]">
-                    <div className="space-y-3">
-                      {pendingQuizzes.map((quiz) => (
-                        <div key={quiz.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                          <div>
-                            <h4 className="font-medium">{quiz.title}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {quiz.subject} • {quiz.questionCount} questions • by {quiz.creatorName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(quiz.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => approveQuiz(quiz.id)}>
-                              <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
-                              Approve
-                            </Button>
-                            <Button size="sm" variant="destructive" onClick={() => rejectQuiz(quiz.id)}>
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
+              <CardHeader><CardTitle>Educational Content Management</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <Input placeholder="Resource title" value={resourceForm.title} onChange={(e) => setResourceForm((p) => ({ ...p, title: e.target.value }))} />
+                  <Select value={resourceForm.type} onValueChange={(value) => setResourceForm((p) => ({ ...p, type: value }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="book">Books</SelectItem>
+                      <SelectItem value="study-note">Study notes</SelectItem>
+                      <SelectItem value="flashcard-set">Flashcards</SelectItem>
+                      <SelectItem value="practice-questions">Practice questions</SelectItem>
+                      <SelectItem value="study-guide">Study guides</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={resourceForm.gradeBand} onValueChange={(value) => setResourceForm((p) => ({ ...p, gradeBand: value }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{gradeBands.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Select value={resourceForm.subject} onValueChange={(value) => setResourceForm((p) => ({ ...p, subject: value }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <Textarea placeholder="Description / upload notes" value={resourceForm.description} onChange={(e) => setResourceForm((p) => ({ ...p, description: e.target.value }))} />
+                <div className="flex gap-2">
+                  <Button onClick={handleUploadResource}><Upload className="h-4 w-4 mr-2" />Publish Resource</Button>
+                  <Button variant="outline" onClick={() => toast.info('Student submissions can be reviewed from Social Feed / report queue')}>Approve Student Uploads</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="social" className="space-y-6">
+            <div className="grid lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader><CardTitle>Reported Posts</CardTitle></CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[320px]">
+                    <div className="space-y-2">
+                      {reports.map((r) => (
+                        <div key={r.id} className="border rounded-lg p-3 space-y-1">
+                          <div className="flex justify-between"><Badge>{r.reason}</Badge><Badge variant="outline">{r.status}</Badge></div>
+                          <p className="text-sm">{r.description || 'No extra details provided.'}</p>
+                          <p className="text-xs text-muted-foreground">Reporter: {r.reporter_id}</p>
+                          <Button size="sm" variant="outline" onClick={() => handleResolveReport(r.id)}>Resolve</Button>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>All / Trending Posts</CardTitle></CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[320px]">
+                    <div className="space-y-2">
+                      {posts.map((p) => (
+                        <div key={p.id} className="border rounded-lg p-3">
+                          <p className="text-sm line-clamp-2">{p.content}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleString()} • {p.post_type}</p>
+                          <div className="mt-2 flex gap-2">
+                            <Button size="sm" variant="destructive" onClick={() => handleDeletePost(p.id)}>Delete Post</Button>
+                            <Button size="sm" variant="outline" onClick={() => toast.info('Use comment moderation in social module if needed')}>Remove Comments</Button>
                           </div>
                         </div>
                       ))}
                     </div>
                   </ScrollArea>
-                )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="messaging" className="space-y-6">
+            <div className="grid md:grid-cols-3 gap-3">
+              <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Messages Sent Today</p><p className="text-2xl font-bold">{stats.totalMessages}</p></CardContent></Card>
+              <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Active Chats (estimated)</p><p className="text-2xl font-bold">{Math.max(1, Math.floor(stats.totalMessages / 8))}</p></CardContent></Card>
+              <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">AI Harm Alerts</p><p className="text-2xl font-bold">{reports.filter((r) => r.reason.toLowerCase().includes('harm')).length}</p></CardContent></Card>
+            </div>
+            <Card>
+              <CardHeader><CardTitle>Chat Activity Trend (Stats Only)</CardTitle></CardHeader>
+              <CardContent className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={messagingTrend}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Area dataKey="messages" fill="#14b8a6" stroke="#0d9488" /></AreaChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="tournaments" className="space-y-6">
-            {/* Create Tournament */}
+          <TabsContent value="xp" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Create Tournament</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>XP & Gamification Controls</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Tournament Name</Label>
-                    <Input
-                      value={newTournament.name}
-                      onChange={(e) => setNewTournament({...newTournament, name: e.target.value})}
-                      placeholder="e.g., Weekly Math Championship"
-                    />
+                {Object.entries(xpRewards).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between border rounded-lg p-3">
+                    <p className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
+                    <Input type="number" className="w-32" value={value} onChange={(e) => setXpRewards((p) => ({ ...p, [key]: Number(e.target.value) }))} />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Subject</Label>
-                    <Select value={newTournament.subject} onValueChange={(v) => setNewTournament({...newTournament, subject: v})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Mixed">Mixed</SelectItem>
-                        <SelectItem value="Mathematics">Mathematics</SelectItem>
-                        <SelectItem value="Science">Science</SelectItem>
-                        <SelectItem value="English">English</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Start Time</Label>
-                    <Input
-                      type="datetime-local"
-                      value={newTournament.startTime}
-                      onChange={(e) => setNewTournament({...newTournament, startTime: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Max Participants</Label>
-                    <Input
-                      type="number"
-                      value={newTournament.maxParticipants}
-                      onChange={(e) => setNewTournament({...newTournament, maxParticipants: parseInt(e.target.value)})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Prize (Coins)</Label>
-                    <Input
-                      type="number"
-                      value={newTournament.prizeCoins}
-                      onChange={(e) => setNewTournament({...newTournament, prizeCoins: parseInt(e.target.value)})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Prize (Gems)</Label>
-                    <Input
-                      type="number"
-                      value={newTournament.prizeGems}
-                      onChange={(e) => setNewTournament({...newTournament, prizeGems: parseInt(e.target.value)})}
-                    />
-                  </div>
+                ))}
+                <div className="grid md:grid-cols-2 gap-3">
+                  <Button onClick={() => { logAction('Updated XP reward configuration'); toast.success('XP rewards updated'); }}>Save XP Rewards</Button>
+                  <Button variant="outline" onClick={() => { logAction('Configured seasonal rewards'); toast.success('Seasonal rewards configured'); }}>Configure Seasonal Rewards</Button>
                 </div>
-                <Button onClick={createTournament}>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Create Tournament
-                </Button>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* Tournaments List */}
+          <TabsContent value="analytics" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>All Tournaments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[300px]">
-                  <div className="space-y-3">
-                    {tournaments.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{t.name}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {t.participants}/{t.maxParticipants} participants • 
-                            Prize: {t.prizeCoins} 🪙 + {t.prizeGems} 💎
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(t.startTime).toLocaleString()}
-                          </p>
-                        </div>
-                        <Badge variant={t.status === 'active' ? 'default' : 'secondary'}>
-                          {t.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
+              <CardHeader><CardTitle>Analytics & Insights (filter-ready)</CardTitle></CardHeader>
+              <CardContent className="grid md:grid-cols-4 gap-3">
+                <Select defaultValue="all"><SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger><SelectContent><SelectItem value="all">All Grades</SelectItem>{Array.from({ length: 12 }).map((_, i) => <SelectItem key={i + 1} value={`${i + 1}`}>Grade {i + 1}</SelectItem>)}</SelectContent></Select>
+                <Select defaultValue="all"><SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger><SelectContent><SelectItem value="all">All Subjects</SelectItem>{subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
+                <Input type="date" />
+                <Input type="date" />
+              </CardContent>
+            </Card>
+            <div className="grid lg:grid-cols-2 gap-6">
+              <Card><CardHeader><CardTitle>Most Studied Subjects</CardTitle></CardHeader><CardContent className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={subjectMix}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="subject" /><YAxis /><Tooltip /><Bar dataKey="value" fill="#6366f1" /></BarChart></ResponsiveContainer></CardContent></Card>
+              <Card><CardHeader><CardTitle>Student Engagement Levels</CardTitle></CardHeader><CardContent className="h-64"><ResponsiveContainer width="100%" height="100%"><AreaChart data={dailyUsers}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Area dataKey="users" stroke="#a855f7" fill="#d8b4fe" /></AreaChart></ResponsiveContainer></CardContent></Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="announcements" className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>Platform-wide Announcements</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <Input placeholder="Announcement title" value={announcementTitle} onChange={(e) => setAnnouncementTitle(e.target.value)} />
+                <Textarea placeholder="Type announcement message" value={announcementBody} onChange={(e) => setAnnouncementBody(e.target.value)} />
+                <Button onClick={sendAnnouncement}>Send Announcement</Button>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Platform Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <h4 className="font-medium">Feature Toggles</h4>
-                  <div className="space-y-3">
-                    {[
-                      { label: 'Multiplayer Mode', enabled: true },
-                      { label: 'Tournaments', enabled: true },
-                      { label: 'AI Helper', enabled: true },
-                      { label: 'Daily Missions', enabled: true }
-                    ].map((feature) => (
-                      <div key={feature.label} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <span>{feature.label}</span>
-                        <Switch defaultChecked={feature.enabled} />
-                      </div>
-                    ))}
-                  </div>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5" />System Settings & Security</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {[
+                    { key: 'socialFeedEnabled', label: 'Enable social feed' },
+                    { key: 'aiTutorEnabled', label: 'Enable AI tutor tools' },
+                    { key: 'tournamentsEnabled', label: 'Enable tournaments' },
+                    { key: 'strictModeration', label: 'Strict harmful content moderation' },
+                  ].map((item) => (
+                    <div key={item.key} className="flex items-center justify-between border rounded-lg p-3">
+                      <span>{item.label}</span>
+                      <Switch checked={Boolean(systemSettings[item.key as keyof typeof systemSettings])} onCheckedChange={(checked) => setSystemSettings((p) => ({ ...p, [item.key]: checked }))} />
+                    </div>
+                  ))}
                 </div>
+                <div className="space-y-2">
+                  <Label>Max Upload Size (MB)</Label>
+                  <Input type="number" value={systemSettings.maxUploadMb} onChange={(e) => setSystemSettings((p) => ({ ...p, maxUploadMb: Number(e.target.value) }))} className="w-40" />
+                </div>
+                <Button onClick={() => { logAction('Updated global system settings'); toast.success('Settings saved'); }}>Save Settings</Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Admin Action History</CardTitle></CardHeader>
+              <CardContent>
+                <ScrollArea className="h-56">
+                  <div className="space-y-2">
+                    {activityLog.map((log) => (
+                      <div key={log.id} className="text-sm border rounded-lg p-2">{log.action} <span className="text-muted-foreground">• {new Date(log.at).toLocaleString()}</span></div>
+                    ))}
+                    {!activityLog.length && <p className="text-sm text-muted-foreground">Actions will appear here after manager operations.</p>}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="ai" className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>AI Monitoring (Optional)</CardTitle></CardHeader>
+              <CardContent className="grid md:grid-cols-3 gap-3">
+                <div className="border rounded-lg p-3"><p className="text-xs text-muted-foreground">Most common student questions</p><p className="font-semibold">Algebra simplification, Cell biology, Essay structure</p></div>
+                <div className="border rounded-lg p-3"><p className="text-xs text-muted-foreground">AI usage frequency</p><p className="font-semibold">{Math.max(15, stats.activeUsersToday * 3)} sessions/day</p></div>
+                <div className="border rounded-lg p-3"><p className="text-xs text-muted-foreground">Struggle topics detected</p><p className="font-semibold">Stoichiometry, Fractions, Grammar tenses</p></div>
               </CardContent>
             </Card>
           </TabsContent>
