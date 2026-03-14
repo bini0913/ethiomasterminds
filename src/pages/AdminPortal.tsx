@@ -76,6 +76,23 @@ interface SystemStats {
   totalQuestions: number;
   approvedQuizzes: number;
   pendingQuizzes: number;
+  totalReports: number;
+  pendingReports: number;
+}
+
+interface Report {
+  id: string;
+  reporter_id: string;
+  reported_type: string;
+  reported_id: string;
+  reason: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reporter_name?: string;
+  reported_content?: string;
 }
 
 const AdminPortal: React.FC = () => {
