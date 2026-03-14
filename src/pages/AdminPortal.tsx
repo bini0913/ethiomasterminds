@@ -474,6 +474,53 @@ const AdminPortal: React.FC = () => {
     navigate('/');
   };
 
+  const handleReviewReport = async (reportId: string, action: 'resolved' | 'dismissed') => {
+    const { error } = await supabase
+      .from('reports')
+      .update({
+        status: action,
+        reviewed_by: user?.id,
+        reviewed_at: new Date().toISOString()
+      })
+      .eq('id', reportId);
+
+    if (error) {
+      toast.error('Failed to update report');
+      return;
+    }
+
+    toast.success(`Report ${action}`);
+    fetchReports();
+    fetchStats();
+  };
+
+  const handleDeleteReportedContent = async (report: Report) => {
+    let error = null;
+    if (report.reported_type === 'post') {
+      // Delete likes, reactions, comments, saved_posts first, then post
+      await supabase.from('social_post_likes').delete().eq('post_id', report.reported_id);
+      await supabase.from('social_post_reactions').delete().eq('post_id', report.reported_id);
+      await supabase.from('social_post_comments').delete().eq('post_id', report.reported_id);
+      await supabase.from('saved_posts').delete().eq('post_id', report.reported_id);
+      const res = await supabase.from('social_posts').delete().eq('id', report.reported_id);
+      error = res.error;
+    } else if (report.reported_type === 'comment') {
+      const res = await supabase.from('social_post_comments').delete().eq('id', report.reported_id);
+      error = res.error;
+    } else if (report.reported_type === 'message') {
+      // Can't delete messages per RLS, just mark report resolved
+    }
+
+    if (error) {
+      toast.error('Failed to delete content');
+      return;
+    }
+
+    toast.success('Content deleted');
+    // Auto-resolve the report
+    await handleReviewReport(report.id, 'resolved');
+  };
+
   const filteredUsers = users.filter(u => 
     u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.username?.toLowerCase().includes(searchQuery.toLowerCase())
