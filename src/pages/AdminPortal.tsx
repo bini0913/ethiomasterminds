@@ -1149,6 +1149,116 @@ const AdminPortal: React.FC = () => {
               </div>
             </TabsContent>
 
+            {/* Reports Tab */}
+            <TabsContent value="reports" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Flag className="w-5 h-5 text-destructive" />
+                    User Reports
+                  </CardTitle>
+                  <CardDescription>
+                    Review and moderate reported content from users
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {reports.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Flag className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                      <p>No reports yet. The community is behaving well! 🎉</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[600px]">
+                      <div className="space-y-4">
+                        {reports.map((report) => (
+                          <motion.div
+                            key={report.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`p-4 rounded-xl border ${
+                              report.status === 'pending' 
+                                ? 'border-destructive/30 bg-destructive/5' 
+                                : report.status === 'resolved'
+                                ? 'border-green-500/30 bg-green-500/5'
+                                : 'border-muted bg-muted/30'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant={
+                                    report.status === 'pending' ? 'destructive' :
+                                    report.status === 'resolved' ? 'default' : 'secondary'
+                                  }>
+                                    {report.status}
+                                  </Badge>
+                                  <Badge variant="outline">{report.reported_type}</Badge>
+                                  <Badge variant="outline" className="bg-muted/50">{report.reason}</Badge>
+                                </div>
+
+                                <div className="text-sm">
+                                  <span className="text-muted-foreground">Reported by: </span>
+                                  <span className="font-medium">{report.reporter_name}</span>
+                                  <span className="text-muted-foreground ml-2">
+                                    {new Date(report.created_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+
+                                {report.reported_content && (
+                                  <div className="bg-muted/50 rounded-lg p-3 text-sm border border-border/50">
+                                    <p className="text-muted-foreground text-xs mb-1">Reported Content:</p>
+                                    <p className="line-clamp-3">{report.reported_content}</p>
+                                  </div>
+                                )}
+
+                                {report.description && (
+                                  <p className="text-sm text-muted-foreground italic">
+                                    "{report.description}"
+                                  </p>
+                                )}
+                              </div>
+
+                              {report.status === 'pending' && (
+                                <div className="flex flex-col gap-2 shrink-0">
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleDeleteReportedContent(report)}
+                                    className="gap-1"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    Delete Content
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleReviewReport(report.id, 'resolved')}
+                                    className="gap-1"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                    Resolve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleReviewReport(report.id, 'dismissed')}
+                                    className="gap-1 text-muted-foreground"
+                                  >
+                                    <X className="w-3 h-3" />
+                                    Dismiss
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             {/* Global Leaderboard Tab */}
             <TabsContent value="leaderboard" className="space-y-6">
               <Card>
