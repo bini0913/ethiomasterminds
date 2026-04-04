@@ -287,6 +287,15 @@ const Friends: React.FC = () => {
                           </div>
                           <Badge variant="secondary">Pending</Badge>
                         </motion.div>
+                        <div key={request.id} className="flex items-center p-3 gap-3">
+                          <AvatarRenderer avatar={request.receiver.avatar} size="md" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{request.receiver.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">@{request.receiver.username || 'no-username'}</p>
+                          </div>
+                          <Badge variant="secondary">Pending</Badge>
+                        </motion.div>
+                        </div>
                       ))}
                     </>
                   )}
