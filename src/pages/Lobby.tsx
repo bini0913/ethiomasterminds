@@ -493,7 +493,6 @@ const Lobby: React.FC = () => {
     }
   };
 
-  const challengePlayer = async (_playerId: string, playerName: string) => {
   const createTournament = async () => {
     if (!user || !newTournamentData.name.trim()) {
       toast.error("Tournament name is required");
