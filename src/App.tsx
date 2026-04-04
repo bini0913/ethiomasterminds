@@ -98,7 +98,7 @@ const App = () => (
                                 } 
                               />
                               <Route path="/store" element={<StorePage />} />
-                              <Route path="/tournaments" element={<div>Tournaments Coming Soon</div>} />
+                              <Route path="/tournaments" element={<Lobby />} />
                               <Route path="/enhanced-settings" element={<EnhancedSettings />} />
                               <Route path="/social" element={<EnhancedSocial />} />
                               <Route path="/ai-tutor" element={<AITutor />} />
