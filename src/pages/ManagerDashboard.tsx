@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import BackButton from '@/components/ui/BackButton';
 import { toast } from 'sonner';
 import {
   Activity,
@@ -22,10 +23,12 @@ import {
   RefreshCw,
   Settings,
   Shield,
+  LogOut,
   Trophy,
   Upload,
   Users,
   Zap,
+  Sparkles,
 } from 'lucide-react';
 import {
   Area,
@@ -84,7 +87,7 @@ const gradeBands = ['Grade 1-4', 'Grade 5-8', 'Grade 9-12'];
 const subjects = ['Math', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography', 'Language'];
 
 const ManagerDashboard: React.FC = () => {
-  const { user } = useUser();
+  const { user, logout } = useUser();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
@@ -373,24 +376,34 @@ const ManagerDashboard: React.FC = () => {
   };
 
   const messagingTrend = weeklyLearning.map((item) => ({ day: item.day, messages: item.quizzes * 2 + item.flashcards }));
+  const panelClass = 'border border-primary/20 bg-background/70 backdrop-blur-xl shadow-[0_0_30px_rgba(99,102,241,0.12)]';
+  const subtlePanelClass = 'border border-primary/15 bg-background/60 backdrop-blur-md';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-background dark:to-background p-4">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_10%_10%,rgba(99,102,241,0.20),transparent_28%),radial-gradient(circle_at_90%_20%,rgba(14,165,233,0.15),transparent_28%),radial-gradient(circle_at_50%_100%,rgba(168,85,247,0.18),transparent_30%),hsl(var(--background))] p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-              <Crown className="h-8 w-8 text-yellow-500" />
-              Master Minds Manager Control Center
+            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2 tracking-tight">
+              <Crown className="h-8 w-8 text-cyan-400" />
+              Manager Command Grid
             </h1>
-            <p className="text-muted-foreground">Operate students, content, moderation, analytics and permissions from one dashboard.</p>
+            <p className="text-muted-foreground">Futuristic operations hub for reports, moderation, automation and platform control.</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={loadDashboard}>
+            <BackButton to="/" className={subtlePanelClass} />
+            <Button variant="outline" onClick={loadDashboard} className={subtlePanelClass}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh Live Data
             </Button>
-            <Badge className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">Manager Access</Badge>
+            <Button variant="outline" onClick={logout} className={subtlePanelClass}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+            <Badge className="bg-gradient-to-r from-cyan-500 via-indigo-500 to-fuchsia-500 text-white border-none">
+              <Sparkles className="h-3 w-3 mr-1" />
+              Manager Access
+            </Badge>
           </div>
         </div>
 
@@ -404,14 +417,14 @@ const ManagerDashboard: React.FC = () => {
             { label: 'Study Rooms', value: stats.totalStudyRooms, icon: Trophy },
             { label: 'XP Today', value: stats.xpActivityToday, icon: BarChart3 },
           ].map((item) => (
-            <Card key={item.label}>
+            <Card key={item.label} className={panelClass}>
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">{item.label}</p>
                     <p className="text-xl font-bold">{item.value.toLocaleString()}</p>
                   </div>
-                  <item.icon className="h-5 w-5 text-primary" />
+                  <item.icon className="h-5 w-5 text-cyan-400" />
                 </div>
               </CardContent>
             </Card>
@@ -419,22 +432,22 @@ const ManagerDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid grid-cols-2 md:grid-cols-5 xl:grid-cols-10 h-auto">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="students">Students</TabsTrigger>
-            <TabsTrigger value="content">Content</TabsTrigger>
-            <TabsTrigger value="social">Social Feed</TabsTrigger>
-            <TabsTrigger value="messaging">Messaging</TabsTrigger>
-            <TabsTrigger value="xp">XP Control</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="announcements">Announcements</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-            <TabsTrigger value="ai">AI Monitor</TabsTrigger>
+          <TabsList className={`grid grid-cols-2 md:grid-cols-5 xl:grid-cols-10 h-auto p-1 ${panelClass}`}>
+            <TabsTrigger value="overview" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Overview</TabsTrigger>
+            <TabsTrigger value="students" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Students</TabsTrigger>
+            <TabsTrigger value="content" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Content</TabsTrigger>
+            <TabsTrigger value="social" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Social Feed</TabsTrigger>
+            <TabsTrigger value="messaging" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Messaging</TabsTrigger>
+            <TabsTrigger value="xp" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">XP Control</TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Analytics</TabsTrigger>
+            <TabsTrigger value="announcements" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Announcements</TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Settings</TabsTrigger>
+            <TabsTrigger value="ai" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">AI Monitor</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
+              <Card className={panelClass}>
                 <CardHeader><CardTitle>Daily Active Users</CardTitle></CardHeader>
                 <CardContent className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -442,7 +455,7 @@ const ManagerDashboard: React.FC = () => {
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={panelClass}>
                 <CardHeader><CardTitle>Weekly Learning Activity</CardTitle></CardHeader>
                 <CardContent className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -450,7 +463,7 @@ const ManagerDashboard: React.FC = () => {
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={panelClass}>
                 <CardHeader><CardTitle>Popular Subjects</CardTitle></CardHeader>
                 <CardContent className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -463,7 +476,7 @@ const ManagerDashboard: React.FC = () => {
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={panelClass}>
                 <CardHeader><CardTitle>Top Students Leaderboard</CardTitle></CardHeader>
                 <CardContent className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -472,7 +485,7 @@ const ManagerDashboard: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
-            <Card>
+            <Card className={panelClass}>
               <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
               <CardContent className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <Button onClick={() => setResourceForm((prev) => ({ ...prev, type: 'book' }))}><Upload className="h-4 w-4 mr-2" />Add new books</Button>
