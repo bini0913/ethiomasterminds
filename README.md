@@ -1,22 +1,14 @@
-# Welcome to your Lovable project
+# Master Minds
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/a549e3ca-84f7-4dce-aa6b-55e5beb976b5
+This project uses Supabase for authentication, database access, storage, and edge functions.
 
 ## How can I edit this code?
 
-There are several ways of editing your application.
+Use your preferred IDE to edit the application locally.
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/a549e3ca-84f7-4dce-aa6b-55e5beb976b5) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+If you want to work locally using your own IDE, you can clone this repo and push changes normally through Git.
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
@@ -62,12 +54,4 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/a549e3ca-84f7-4dce-aa6b-55e5beb976b5) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Deploy the frontend using your preferred hosting provider and make sure the Supabase environment variables are configured in that deployment environment.
