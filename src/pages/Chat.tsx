@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Send, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 
 import BackButton from '@/components/ui/BackButton';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
@@ -27,7 +28,7 @@ const LEARNING_PROMPTS = [
   'Summarize today’s science lesson in 3 bullet points.',
   'Ask for a quick quiz on algebra fundamentals.',
   'Explain one history topic like I am 12 years old.',
-];
+] as const;
 
 const Chat: React.FC = () => {
   const { user, isLoading } = useUser();
@@ -40,11 +41,34 @@ const Chat: React.FC = () => {
   const [draft, setDraft] = useState('');
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
     [conversations, activeConversationId],
   );
+
+  const loadMessages = useCallback(async (conversationId: string) => {
+    if (!conversationId) return;
+
+    setLoadingMessages(true);
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, sender_id, content, created_at')
+      .eq('conversation_id', conversationId)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: true })
+      .limit(100);
+
+    if (error) {
+      toast.error('Could not load messages right now.');
+      setLoadingMessages(false);
+      return;
+    }
+
+    setMessages(data || []);
+    setLoadingMessages(false);
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -57,14 +81,14 @@ const Chat: React.FC = () => {
       if (!user?.id) return;
 
       setLoadingConversations(true);
-      const client = supabase;
 
-      const { data: memberships, error: membershipError } = await client
+      const { data: memberships, error: membershipError } = await supabase
         .from('conversation_members')
         .select('conversation_id')
         .eq('user_id', user.id);
 
       if (membershipError) {
+        toast.error('Could not load chat rooms right now.');
         setLoadingConversations(false);
         return;
       }
@@ -72,102 +96,99 @@ const Chat: React.FC = () => {
       const conversationIds = (memberships || []).map((row: { conversation_id: string }) => row.conversation_id);
       if (!conversationIds.length) {
         setConversations([]);
+        setActiveConversationId('');
         setLoadingConversations(false);
         return;
       }
 
-      const { data: rows } = await client
+      const { data: rows, error: conversationError } = await supabase
         .from('conversations')
         .select('id, name, type')
         .in('id', conversationIds)
         .eq('is_archived', false)
         .order('updated_at', { ascending: false });
 
-      setConversations(rows || []);
-      if (!activeConversationId && rows?.length) {
-        setActiveConversationId(rows[0].id);
+      if (conversationError) {
+        toast.error('Could not load chat rooms right now.');
+        setLoadingConversations(false);
+        return;
       }
+
+      const mappedConversations = rows || [];
+      setConversations(mappedConversations);
+
+      if (!activeConversationId && mappedConversations.length > 0) {
+        setActiveConversationId(mappedConversations[0].id);
+      }
+
       setLoadingConversations(false);
     };
 
-    loadConversations();
+    void loadConversations();
   }, [activeConversationId, user?.id]);
 
   useEffect(() => {
-    const loadMessages = async () => {
-      if (!activeConversationId) return;
+    if (!activeConversationId) {
+      setMessages([]);
+      return;
+    }
 
-      setLoadingMessages(true);
-      const client = supabase;
-
-      const { data } = await client
-        .from('messages')
-        .select('id, sender_id, content, created_at')
-        .eq('conversation_id', activeConversationId)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: true })
-        .limit(100);
-
-      setMessages(data || []);
-      setLoadingMessages(false);
-    };
-
-    loadMessages();
-  }, [activeConversationId]);
+    void loadMessages(activeConversationId);
+  }, [activeConversationId, loadMessages]);
 
   useEffect(() => {
     if (!activeConversationId) return;
 
-    const client = supabase;
-    const channel = client
+    const channel = supabase
       .channel(`simple-chat-${activeConversationId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${activeConversationId}` },
         () => {
-          void (async () => {
-            const { data } = await client
-              .from('messages')
-              .select('id, sender_id, content, created_at')
-              .eq('conversation_id', activeConversationId)
-              .eq('is_deleted', false)
-              .order('created_at', { ascending: true })
-              .limit(100);
-            setMessages(data || []);
-          })();
+          void loadMessages(activeConversationId);
         },
       )
       .subscribe();
 
     return () => {
-      client.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [activeConversationId]);
+  }, [activeConversationId, loadMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!user?.id || !activeConversationId || !draft.trim()) return;
+  const sendMessage = useCallback(async () => {
+    const sanitizedMessage = draft.trim();
+    if (!user?.id || !activeConversationId || !sanitizedMessage || isSending) return;
 
-    const client = supabase;
-    await client.from('messages').insert({
+    setIsSending(true);
+
+    const { error } = await supabase.from('messages').insert({
       conversation_id: activeConversationId,
       sender_id: user.id,
       message_type: 'text',
-      content: draft.trim(),
+      content: sanitizedMessage,
       metadata: {},
     });
 
+    if (error) {
+      toast.error('Message not sent. Please try again.');
+      setIsSending(false);
+      return;
+    }
+
     setDraft('');
-  };
+    setIsSending(false);
+  }, [activeConversationId, draft, isSending, user?.id]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <AnimatedBackground />
-      <div className="relative z-10 mx-auto flex h-screen max-w-7xl flex-col gap-4 p-4">
-        <div className="flex items-center justify-between rounded-2xl border border-cyan-400/30 bg-slate-900/70 p-4 backdrop-blur">
+
+      <main className="relative z-10 mx-auto flex h-screen max-w-7xl flex-col gap-4 p-4">
+        <header className="flex items-center justify-between rounded-2xl border border-cyan-400/30 bg-slate-900/70 p-4 backdrop-blur">
           <div className="flex items-center gap-3">
             <BackButton />
             <div>
@@ -175,8 +196,8 @@ const Chat: React.FC = () => {
               <p className="text-sm text-cyan-200/80">Simple, futuristic, and focused on learning.</p>
             </div>
           </div>
-          <Sparkles className="text-cyan-300" />
-        </div>
+          <Sparkles className="text-cyan-300" aria-hidden="true" />
+        </header>
 
         <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[280px_1fr]">
           <aside className="rounded-2xl border border-cyan-400/20 bg-slate-900/70 p-3 backdrop-blur">
@@ -192,11 +213,12 @@ const Chat: React.FC = () => {
                     key={conversation.id}
                     type="button"
                     onClick={() => setActiveConversationId(conversation.id)}
-                    className={`w-full rounded-xl border px-3 py-2 text-left transition ${
+                    className={`w-full rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
                       conversation.id === activeConversationId
                         ? 'border-cyan-300 bg-cyan-500/20 text-cyan-100'
                         : 'border-slate-700 bg-slate-900/70 text-slate-300 hover:border-cyan-400/40'
                     }`}
+                    aria-pressed={conversation.id === activeConversationId}
                   >
                     <p className="font-medium">{conversation.name || 'Untitled Room'}</p>
                     <p className="text-xs uppercase opacity-70">{conversation.type}</p>
@@ -212,7 +234,7 @@ const Chat: React.FC = () => {
                 <h2 className="font-semibold">{activeConversation?.name || 'Select a room'}</h2>
                 <p className="text-xs text-slate-400">Educational collaboration channel</p>
               </div>
-              <Bot className="text-cyan-300" />
+              <Bot className="text-cyan-300" aria-hidden="true" />
             </div>
 
             <ScrollArea className="flex-1 pr-3">
@@ -224,7 +246,7 @@ const Chat: React.FC = () => {
                 {messages.map((message) => {
                   const isOwn = message.sender_id === user?.id;
                   return (
-                    <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                    <article key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
                       <div
                         className={`max-w-[80%] rounded-2xl border px-3 py-2 text-sm ${
                           isOwn
@@ -233,11 +255,11 @@ const Chat: React.FC = () => {
                         }`}
                       >
                         <p>{message.content}</p>
-                        <p className="mt-1 text-[11px] opacity-70">
+                        <time className="mt-1 block text-[11px] opacity-70" dateTime={message.created_at}>
                           {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
+                        </time>
                       </div>
-                    </div>
+                    </article>
                   );
                 })}
                 <div ref={bottomRef} />
@@ -272,15 +294,22 @@ const Chat: React.FC = () => {
                       void sendMessage();
                     }
                   }}
+                  disabled={!activeConversationId || isSending}
+                  aria-label="Message input"
                 />
-                <Button onClick={() => void sendMessage()} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
-                  <Send className="h-4 w-4" />
+                <Button
+                  onClick={() => void sendMessage()}
+                  className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                  disabled={!draft.trim() || !activeConversationId || isSending}
+                  aria-label="Send message"
+                >
+                  <Send className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
             </div>
           </section>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
