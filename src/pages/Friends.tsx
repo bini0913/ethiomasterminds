@@ -20,6 +20,7 @@ const Friends: React.FC = () => {
   const { 
     friends, 
     friendRequests, 
+    outgoingRequests,
     messages,
     sendFriendRequest,
     acceptFriendRequest,
@@ -52,15 +53,11 @@ const Friends: React.FC = () => {
     }
   }, [selectedFriend, messages]);
 
-  // Track sent requests from friendRequests
+  // Track sent requests from outgoing requests
   useEffect(() => {
-    const sentIds = new Set(
-      friendRequests
-        .filter(r => r.sender.id === user?.id)
-        .map(r => r.receiver.id)
-    );
+    const sentIds = new Set(outgoingRequests.map(r => r.receiver.id));
     setPendingSentRequests(sentIds);
-  }, [friendRequests, user?.id]);
+  }, [outgoingRequests]);
   
   // Handle add friend search with debounce
   useEffect(() => {
@@ -102,6 +99,10 @@ const Friends: React.FC = () => {
   
   const pendingRequests = friendRequests.filter(
     req => req.status === "pending" && req.receiver.id === user?.id
+  );
+
+  const sentRequests = outgoingRequests.filter(
+    req => req.status === "pending" && req.sender.id === user?.id
   );
   
   const handleSendMessage = (e: React.FormEvent) => {
@@ -193,9 +194,9 @@ const Friends: React.FC = () => {
               </TabsTrigger>
               <TabsTrigger value="requests">
                 Requests
-                {pendingRequests.length > 0 && (
+                {(pendingRequests.length + sentRequests.length) > 0 && (
                   <Badge className="ml-2 bg-red-500">
-                    {pendingRequests.length}
+                    {pendingRequests.length + sentRequests.length}
                   </Badge>
                 )}
               </TabsTrigger>
@@ -246,16 +247,41 @@ const Friends: React.FC = () => {
             <TabsContent value="requests" className="m-0">
               <ScrollArea className="h-[calc(100vh-200px)]">
                 <div className="divide-y">
-                  {pendingRequests.length > 0 ? (
-                    pendingRequests.map((request) => (
-                      <FriendRequestItem 
-                        key={request.id}
-                        request={request}
-                        onAccept={acceptFriendRequest}
-                        onDecline={declineFriendRequest}
-                      />
-                    ))
-                  ) : (
+                  {pendingRequests.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/30">
+                        Received Requests
+                      </div>
+                      {pendingRequests.map((request) => (
+                        <FriendRequestItem 
+                          key={request.id}
+                          request={request}
+                          onAccept={acceptFriendRequest}
+                          onDecline={declineFriendRequest}
+                        />
+                      ))}
+                    </>
+                  )}
+
+                  {sentRequests.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/30 border-t">
+                        Sent Requests
+                      </div>
+                      {sentRequests.map((request) => (
+                        <div key={request.id} className="flex items-center p-3 gap-3">
+                          <AvatarRenderer avatar={request.receiver.avatar} size="md" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{request.receiver.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">@{request.receiver.username || 'no-username'}</p>
+                          </div>
+                          <Badge variant="secondary">Pending</Badge>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {pendingRequests.length === 0 && sentRequests.length === 0 && (
                     <div className="p-4 text-center text-muted-foreground">
                       No friend requests
                     </div>
