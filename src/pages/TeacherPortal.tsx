@@ -516,6 +516,7 @@ ${createdAnnouncement.content}`;
             target_id: createdAnnouncement.target_id,
             display_name: `MR. ${teacherFirstName}`,
             hide_level: true
+            target_id: createdAnnouncement.target_id
           }
         });
 
