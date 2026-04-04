@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useRoom } from "@/context/RoomContext";
+import { useFriends } from "@/context/FriendsContext";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,6 +66,7 @@ const Lobby: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
   const { rooms, createRoom: contextCreateRoom, joinRoom: contextJoinRoom, refreshRooms } = useRoom();
+  const { friends } = useFriends();
   
   const [chatMessage, setChatMessage] = useState("");
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
@@ -74,8 +76,13 @@ const Lobby: React.FC = () => {
     maxPlayers: "2",
     subject: "Mathematics",
     difficulty: "Medium",
-    gameMode: "1v1"
+    gameMode: "1v1",
+    questionCount: "10",
+    roomType: "public",
+    roomCode: "",
+    inviteFriendIds: [] as string[]
   });
+  const [joinByCode, setJoinByCode] = useState("");
   
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
@@ -281,20 +288,42 @@ const Lobby: React.FC = () => {
     const gameSettings = {
       subject: newRoomData.subject,
       difficulty: newRoomData.difficulty as 'Easy' | 'Medium' | 'Hard',
-      questionCount: 10,
+      questionCount: parseInt(newRoomData.questionCount),
       timePerQuestion: 30
     };
+
+    const roomPassword = newRoomData.roomType === "private" ? newRoomData.roomCode.trim() : undefined;
+    if (newRoomData.roomType === "private" && roomPassword && roomPassword.length < 4) {
+      toast.error("Private room code must be at least 4 characters");
+      return;
+    }
 
     const room = await contextCreateRoom(
       newRoomData.name,
       gameSettings,
       parseInt(newRoomData.maxPlayers),
-      undefined
+      roomPassword || undefined
     );
 
     if (room) {
+      const inviteCode = room.id.slice(0, 8).toUpperCase();
+      await navigator.clipboard.writeText(inviteCode).catch(() => undefined);
+
+      if (newRoomData.inviteFriendIds.length > 0 && user?.id) {
+        await Promise.all(
+          newRoomData.inviteFriendIds.map((friendId) =>
+            supabase.from("messages").insert({
+              sender_id: user.id,
+              receiver_id: friendId,
+              content: `🎮 Join my ${newRoomData.subject} room "${newRoomData.name}" with code: ${inviteCode}`
+            })
+          )
+        );
+      }
+
+      toast.success(`Room created! Invite code copied: ${inviteCode}`);
       setCreateRoomOpen(false);
-      setNewRoomData({ name: "", maxPlayers: "2", subject: "Mathematics", difficulty: "Medium", gameMode: "1v1" });
+      setNewRoomData({ name: "", maxPlayers: "2", subject: "Mathematics", difficulty: "Medium", gameMode: "1v1", questionCount: "10", roomType: "public", roomCode: "", inviteFriendIds: [] });
       navigate(`/multiplayer?room=${room.id}`);
     }
   };
@@ -303,6 +332,50 @@ const Lobby: React.FC = () => {
     const success = await contextJoinRoom(room.id, user?.name || 'Player');
     if (success) {
       navigate(`/multiplayer?room=${room.id}`);
+    }
+  };
+
+  const joinWithCode = async () => {
+    if (!joinByCode.trim() || !user) {
+      toast.error("Enter a room code");
+      return;
+    }
+
+    const normalizedCode = joinByCode.trim().toUpperCase();
+    const matchedRoom = rooms.find((room) => room.id.slice(0, 8).toUpperCase() === normalizedCode);
+
+    if (!matchedRoom) {
+      toast.error("Room not found for this code");
+      return;
+    }
+
+    const success = await contextJoinRoom(matchedRoom.id, user.name || "Player");
+    if (success) {
+      navigate(`/multiplayer?room=${matchedRoom.id}`);
+    }
+  };
+
+  const handleRandomMatch = async () => {
+    if (!user) return;
+
+    const availableRooms = rooms.filter(
+      (room) =>
+        room.status === "waiting" &&
+        !room.password &&
+        (room.players?.length || 0) < room.maxPlayers
+    );
+
+    if (availableRooms.length === 0) {
+      setCreateRoomOpen(true);
+      toast.info("No open rooms yet. Create one and invite friends!");
+      return;
+    }
+
+    const randomRoom = availableRooms[Math.floor(Math.random() * availableRooms.length)];
+    const success = await contextJoinRoom(randomRoom.id, user.name || "Player");
+    if (success) {
+      toast.success(`Matched in room: ${randomRoom.name}`);
+      navigate(`/multiplayer?room=${randomRoom.id}`);
     }
   };
 
@@ -364,9 +437,9 @@ const Lobby: React.FC = () => {
   }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_36%),radial-gradient(circle_at_80%_20%,_rgba(168,85,247,0.22),_transparent_42%),linear-gradient(to_bottom_right,_hsl(var(--background)),_hsl(var(--background)),_rgba(45,212,191,0.08))]">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 px-4 py-3 shadow-xl">
+      <header className="sticky top-0 z-50 border-b border-cyan-300/20 bg-[linear-gradient(95deg,rgba(6,182,212,0.28),rgba(99,102,241,0.26),rgba(168,85,247,0.3))] px-4 py-3 shadow-xl backdrop-blur-xl">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             <BackButton to="/" className="text-white hover:bg-white/20" />
@@ -374,8 +447,8 @@ const Lobby: React.FC = () => {
               <Gamepad className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Game Lobby</h1>
-              <p className="text-xs text-white/70">{onlinePlayers.length} players online</p>
+              <h1 className="text-xl font-bold text-white">Nexus Lobby</h1>
+              <p className="text-xs text-white/70">{onlinePlayers.length} students online</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -401,13 +474,13 @@ const Lobby: React.FC = () => {
       </header>
 
       {/* Quick Actions Bar */}
-      <div className="bg-card/80 backdrop-blur-sm border-b border-border/50 px-4 py-3">
+      <div className="bg-card/70 backdrop-blur-md border-b border-cyan-200/10 px-4 py-3">
         <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto scrollbar-none">
-          <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 bg-gradient-to-r from-green-500 to-emerald-600 whitespace-nowrap">
+          <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 whitespace-nowrap">
             <Plus className="h-4 w-4" /> Create Room
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap" onClick={() => navigate("/multiplayer")}>
-            <Zap className="h-4 w-4" /> Quick Match
+          <Button variant="outline" className="gap-2 whitespace-nowrap border-cyan-400/50" onClick={handleRandomMatch}>
+            <Zap className="h-4 w-4" /> Find Match
           </Button>
           <Button variant="outline" className="gap-2 whitespace-nowrap">
             <Swords className="h-4 w-4" /> Ranked
@@ -415,6 +488,17 @@ const Lobby: React.FC = () => {
           <Button variant="outline" className="gap-2 whitespace-nowrap">
             <Crown className="h-4 w-4" /> Tournament
           </Button>
+          <div className="flex items-center gap-2 ml-auto min-w-[280px]">
+            <Input
+              value={joinByCode}
+              onChange={(e) => setJoinByCode(e.target.value)}
+              className="h-9 bg-background/70 border-cyan-300/20"
+              placeholder="Join by room code"
+            />
+            <Button onClick={joinWithCode} className="whitespace-nowrap" variant="secondary">
+              Join
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -473,7 +557,7 @@ const Lobby: React.FC = () => {
           
           {/* Middle - Rooms & Tournaments */}
           <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-            <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-xl py-3">
+            <CardHeader className="bg-gradient-to-r from-indigo-500 to-fuchsia-600 text-white rounded-t-xl py-3">
               <CardTitle className="text-base">Play & Compete</CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
@@ -666,6 +750,71 @@ const Lobby: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Questions</Label>
+                <Select value={newRoomData.questionCount} onValueChange={(v) => setNewRoomData({...newRoomData, questionCount: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 Questions</SelectItem>
+                    <SelectItem value="10">10 Questions</SelectItem>
+                    <SelectItem value="15">15 Questions</SelectItem>
+                    <SelectItem value="20">20 Questions</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Room Privacy</Label>
+                <Select value={newRoomData.roomType} onValueChange={(v) => setNewRoomData({...newRoomData, roomType: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Public</SelectItem>
+                    <SelectItem value="private">Private</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {newRoomData.roomType === "private" && (
+              <div>
+                <Label>Private Room Code</Label>
+                <Input
+                  value={newRoomData.roomCode}
+                  onChange={(e) => setNewRoomData({...newRoomData, roomCode: e.target.value})}
+                  placeholder="Enter passcode"
+                />
+              </div>
+            )}
+            <div>
+              <Label>Invite Friends</Label>
+              {friends.length === 0 ? (
+                <p className="text-sm text-muted-foreground mt-2">No friends available yet. Add friends to invite directly.</p>
+              ) : (
+                <div className="mt-2 grid grid-cols-2 gap-2 max-h-32 overflow-auto border border-border rounded-md p-2">
+                  {friends.map((friend) => {
+                    const selected = newRoomData.inviteFriendIds.includes(friend.id);
+                    return (
+                      <Button
+                        type="button"
+                        key={friend.id}
+                        size="sm"
+                        variant={selected ? "default" : "outline"}
+                        className="justify-start"
+                        onClick={() => {
+                          setNewRoomData((prev) => ({
+                            ...prev,
+                            inviteFriendIds: selected
+                              ? prev.inviteFriendIds.filter((id) => id !== friend.id)
+                              : [...prev.inviteFriendIds, friend.id]
+                          }));
+                        }}
+                      >
+                        {friend.name}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
