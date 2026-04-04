@@ -489,7 +489,6 @@ ${createdAnnouncement.content}`;
             target_id: createdAnnouncement.target_id,
             display_name: 'Administration',
             hide_level: true
-            target_id: createdAnnouncement.target_id
           }
         });
 
