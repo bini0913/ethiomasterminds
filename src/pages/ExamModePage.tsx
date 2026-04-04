@@ -146,9 +146,9 @@ const ExamModePage: React.FC = () => {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="math">Mathematics</SelectItem>
-                    <SelectItem value="science">Science</SelectItem>
+                    <SelectItem value="science">Science (Physics/Chemistry/Biology)</SelectItem>
                     <SelectItem value="english">English</SelectItem>
-                    <SelectItem value="history">History</SelectItem>
+                    <SelectItem value="history">History & Civics</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

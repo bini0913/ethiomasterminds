@@ -51,8 +51,7 @@ const FlashcardsPage: React.FC = () => {
       supabase
         .from("flashcards")
         .select("*")
-        .lte("grade_level", gradeNum)
-        .or(`created_by.eq.${auth.data.user.id},is_public.eq.true`),
+        .lte("grade_level", gradeNum),
       supabase.from("user_flashcard_progress").select("*").eq("user_id", auth.data.user.id),
     ]);
 
