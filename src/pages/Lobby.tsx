@@ -127,10 +127,10 @@ const Lobby: React.FC = () => {
     }
 
     loadLobbyData();
-    setupRealtimeSubscriptions();
+    const cleanupRealtime = setupRealtimeSubscriptions();
 
     return () => {
-      supabase.removeAllChannels();
+      cleanupRealtime();
     };
   }, [user, navigate]);
 
@@ -330,6 +330,13 @@ const Lobby: React.FC = () => {
         fetchTournaments();
       })
       .subscribe();
+
+    return () => {
+      supabase.removeChannel(chatChannel);
+      supabase.removeChannel(roomChannel);
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(tournamentChannel);
+    };
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -493,7 +500,6 @@ const Lobby: React.FC = () => {
     }
   };
 
-  const challengePlayer = async (_playerId: string, playerName: string) => {
   const createTournament = async () => {
     if (!user || !newTournamentData.name.trim()) {
       toast.error("Tournament name is required");
