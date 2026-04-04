@@ -2,18 +2,15 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
 import { Send, UserPlus, Check, X, Users, Home, MessageCircle, Search, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useFriends, FriendRequest } from "@/context/FriendsContext";
 import { useUser, UserProfile } from "@/context/UserContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import BackButton from "@/components/ui/BackButton";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
 
 const Friends: React.FC = () => {
   const { user } = useUser();
@@ -174,17 +171,17 @@ const Friends: React.FC = () => {
             className="w-full"
             onValueChange={setActiveTab}
           >
-            <div className="p-3 border-b">
+            <div className="p-3 border-b bg-card/40 backdrop-blur-sm">
               <Input
                 placeholder="Search friends..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full"
+                className="w-full border-primary/20 focus-visible:ring-primary/40"
               />
             </div>
             
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="friends">
+            <TabsList className="grid w-full grid-cols-3 rounded-none border-b bg-muted/40 p-1">
+              <TabsTrigger value="friends" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
                 Friends
                 {filteredFriends.length > 0 && (
                   <Badge variant="secondary" className="ml-2">
@@ -192,7 +189,7 @@ const Friends: React.FC = () => {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="requests">
+              <TabsTrigger value="requests" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
                 Requests
                 {(pendingRequests.length + sentRequests.length) > 0 && (
                   <Badge className="ml-2 bg-red-500">
@@ -200,7 +197,7 @@ const Friends: React.FC = () => {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="add">
+              <TabsTrigger value="add" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
                 <UserPlus className="h-4 w-4" />
               </TabsTrigger>
             </TabsList>
@@ -210,11 +207,15 @@ const Friends: React.FC = () => {
                 <div className="divide-y">
                   {filteredFriends.length > 0 ? (
                     filteredFriends.map((friend) => (
-                      <div 
+                      <motion.div
                         key={friend.id}
+                        whileHover={{ x: 4 }}
+                        whileTap={{ scale: 0.99 }}
                         onClick={() => handleSelectFriend(friend)}
-                        className={`flex items-center p-3 hover:bg-muted/50 cursor-pointer transition-colors ${
-                          selectedFriend?.id === friend.id ? 'bg-muted' : ''
+                        className={`m-2 flex items-center rounded-xl border p-3 cursor-pointer transition-all ${
+                          selectedFriend?.id === friend.id
+                            ? "bg-primary/10 border-primary/40 shadow-sm"
+                            : "bg-card/70 hover:bg-card border-border/70 hover:border-primary/30"
                         }`}
                       >
                         <AvatarRenderer 
@@ -229,11 +230,11 @@ const Friends: React.FC = () => {
                           </div>
                         </div>
                         {getUnreadMessageCount(friend.id) > 0 && (
-                          <Badge className="bg-primary">
+                          <Badge className="bg-primary shadow-sm">
                             {getUnreadMessageCount(friend.id)}
                           </Badge>
                         )}
-                      </div>
+                      </motion.div>
                     ))
                   ) : (
                     <div className="p-4 text-center text-muted-foreground">
@@ -269,6 +270,11 @@ const Friends: React.FC = () => {
                         Sent Requests
                       </div>
                       {sentRequests.map((request) => (
+                        <motion.div
+                          key={request.id}
+                          whileHover={{ scale: 1.01 }}
+                          className="mx-2 my-2 flex items-center gap-3 rounded-xl border bg-card/70 p-3"
+                        >
                         <div key={request.id} className="flex items-center p-3 gap-3">
                           <AvatarRenderer avatar={request.receiver.avatar} size="md" />
                           <div className="flex-1 min-w-0">
@@ -276,6 +282,7 @@ const Friends: React.FC = () => {
                             <p className="text-xs text-muted-foreground truncate">@{request.receiver.username || 'no-username'}</p>
                           </div>
                           <Badge variant="secondary">Pending</Badge>
+                        </motion.div>
                         </div>
                       ))}
                     </>
@@ -316,7 +323,8 @@ const Friends: React.FC = () => {
                         key={resultUser.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center p-3 hover:bg-muted/50"
+                        whileHover={{ scale: 1.01 }}
+                        className="mx-2 my-2 flex items-center rounded-xl border bg-card/80 p-3 hover:border-primary/40"
                       >
                         <AvatarRenderer 
                           avatar={resultUser.avatar} 
@@ -337,7 +345,7 @@ const Friends: React.FC = () => {
                           <Button 
                             size="sm"
                             onClick={() => handleSendFriendRequest(resultUser)}
-                            className="gap-1"
+                            className="gap-1 shadow-sm"
                           >
                             <UserPlus className="h-4 w-4" />
                             Add
@@ -365,11 +373,11 @@ const Friends: React.FC = () => {
         </div>
         
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col bg-muted/20">
+        <div className="flex-1 flex flex-col bg-gradient-to-b from-muted/10 to-muted/30">
           {selectedFriend ? (
             <>
               {/* Chat Header */}
-              <div className="flex items-center p-3 border-b bg-card">
+              <div className="flex items-center p-3 border-b bg-card/90 backdrop-blur-sm">
                 <AvatarRenderer 
                   avatar={selectedFriend.avatar} 
                   size="md" 
@@ -393,15 +401,17 @@ const Friends: React.FC = () => {
                     </div>
                   ) : (
                     getMessagesWithUser(selectedFriend.id).map((msg) => (
-                      <div 
+                      <motion.div
                         key={msg.id}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
                         className={`flex ${msg.sender === user?.id ? 'justify-end' : 'justify-start'}`}
                       >
                         <div 
                           className={`max-w-[70%] px-3 py-2 rounded-lg ${
                             msg.sender === user?.id 
-                              ? 'bg-primary text-primary-foreground' 
-                              : 'bg-card border'
+                              ? 'bg-primary text-primary-foreground shadow-md' 
+                              : 'bg-card border shadow-sm'
                           }`}
                         >
                           <div>{msg.content}</div>
@@ -411,7 +421,7 @@ const Friends: React.FC = () => {
                             {formatTime(msg.timestamp)}
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     ))
                   )}
                   <div ref={messagesEndRef} />
@@ -419,13 +429,13 @@ const Friends: React.FC = () => {
               </ScrollArea>
               
               {/* Message Input */}
-              <div className="p-3 border-t bg-card">
+              <div className="p-3 border-t bg-card/90 backdrop-blur-sm">
                 <form onSubmit={handleSendMessage} className="flex gap-2">
                   <Input
                     placeholder="Type a message..."
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
-                    className="flex-1"
+                    className="flex-1 border-primary/20 focus-visible:ring-primary/40"
                   />
                   <Button type="submit" size="icon" disabled={!messageInput.trim()}>
                     <Send className="h-4 w-4" />
@@ -481,7 +491,10 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
   onDecline 
 }) => {
   return (
-    <div className="flex items-center p-3">
+    <motion.div
+      whileHover={{ scale: 1.01 }}
+      className="mx-2 my-2 flex items-center rounded-xl border bg-card/80 p-3"
+    >
       <AvatarRenderer 
         avatar={request.sender.avatar} 
         size="md" 
@@ -496,7 +509,7 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
       <div className="flex gap-2">
         <Button 
           size="sm" 
-          className="bg-glow-green hover:bg-glow-green/80"
+          className="bg-emerald-500 hover:bg-emerald-600 text-white"
           onClick={() => onAccept(request.id)}
         >
           <Check className="h-4 w-4" />
@@ -509,7 +522,7 @@ const FriendRequestItem: React.FC<FriendRequestItemProps> = ({
           <X className="h-4 w-4" />
         </Button>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
