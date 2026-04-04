@@ -275,6 +275,7 @@ const Friends: React.FC = () => {
                           whileHover={{ scale: 1.01 }}
                           className="mx-2 my-2 flex items-center gap-3 rounded-xl border bg-card/70 p-3"
                         >
+                        <div key={request.id} className="flex items-center p-3 gap-3">
                           <AvatarRenderer avatar={request.receiver.avatar} size="md" />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">{request.receiver.name}</p>
@@ -282,6 +283,7 @@ const Friends: React.FC = () => {
                           </div>
                           <Badge variant="secondary">Pending</Badge>
                         </motion.div>
+                        </div>
                       ))}
                     </>
                   )}
