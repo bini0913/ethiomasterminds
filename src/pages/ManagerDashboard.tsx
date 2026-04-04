@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import BackButton from '@/components/ui/BackButton';
 import { toast } from 'sonner';
 import {
   Activity,
@@ -22,6 +23,7 @@ import {
   RefreshCw,
   Settings,
   Shield,
+  LogOut,
   Trophy,
   Upload,
   Users,
@@ -85,7 +87,7 @@ const gradeBands = ['Grade 1-4', 'Grade 5-8', 'Grade 9-12'];
 const subjects = ['Math', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography', 'Language'];
 
 const ManagerDashboard: React.FC = () => {
-  const { user } = useUser();
+  const { user, logout } = useUser();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
@@ -389,9 +391,14 @@ const ManagerDashboard: React.FC = () => {
             <p className="text-muted-foreground">Futuristic operations hub for reports, moderation, automation and platform control.</p>
           </div>
           <div className="flex items-center gap-2">
+            <BackButton to="/" className={subtlePanelClass} />
             <Button variant="outline" onClick={loadDashboard} className={subtlePanelClass}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh Live Data
+            </Button>
+            <Button variant="outline" onClick={logout} className={subtlePanelClass}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
             </Button>
             <Badge className="bg-gradient-to-r from-cyan-500 via-indigo-500 to-fuchsia-500 text-white border-none">
               <Sparkles className="h-3 w-3 mr-1" />
