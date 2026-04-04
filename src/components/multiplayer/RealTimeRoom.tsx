@@ -112,6 +112,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     }
   }, [roomState.status, roomState.question_ends_at]);
 
+  useEffect(() => {
+    if (!isHost || roomState.status !== 'playing' || timeRemaining > 0) return;
+    void nextQuestion();
+  }, [isHost, roomState.status, timeRemaining]);
+
   const loadRoomData = async () => {
     try {
       // Check if current user is host
@@ -151,7 +156,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     }
   };
 
-  const fetchPlayers = async () => {
+  const fetchPlayers = async (): Promise<Player[]> => {
     const { data: roomData } = await supabase
       .from('multiplayer_rooms')
       .select('host_id')
@@ -186,7 +191,10 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       });
 
       setPlayers(mappedPlayers);
+      return mappedPlayers;
     }
+
+    return [];
   };
 
   const fetchCurrentQuestion = async (questionId: string) => {
@@ -250,7 +258,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         table: 'room_state',
         filter: `room_id=eq.${roomId}`
       }, async (payload) => {
-        const newState = payload.new as RoomState;
+        const newState = payload.new as RoomState | null;
+        if (!newState) return;
         setRoomState(newState);
         
         if (newState.current_question_id) {
@@ -261,8 +270,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
         if (newState.status === 'finished') {
           // Fetch final scores and end game
-          await fetchPlayers();
-          const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+          const finalPlayers = await fetchPlayers();
+          const sortedPlayers = [...finalPlayers].sort((a, b) => b.score - a.score);
           onGameEnd(sortedPlayers);
         }
       })
@@ -490,7 +499,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <Badge variant="secondary">
-                      Question {roomState.question_index + 1}/{totalQuestions}
+                      Question {Math.max(1, roomState.question_index)}/{totalQuestions}
                     </Badge>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
