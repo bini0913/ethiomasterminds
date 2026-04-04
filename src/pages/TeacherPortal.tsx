@@ -502,6 +502,7 @@ const TeacherPortal: React.FC = () => {
       const socialPostContent = `📢 ${createdAnnouncement.title}
 
 ${createdAnnouncement.content}`;
+      const teacherFirstName = (profile?.name || 'Teacher').trim().split(' ')[0];
       const { error: socialError } = await supabase
         .from('social_posts')
         .insert({
@@ -512,6 +513,9 @@ ${createdAnnouncement.content}`;
             source: 'announcement',
             announcement_id: createdAnnouncement.id,
             target_type: createdAnnouncement.target_type,
+            target_id: createdAnnouncement.target_id,
+            display_name: `MR. ${teacherFirstName}`,
+            hide_level: true
             target_id: createdAnnouncement.target_id
           }
         });
