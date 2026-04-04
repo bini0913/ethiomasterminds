@@ -24,6 +24,7 @@ interface Post {
   authorName: string;
   authorAvatar: string | null;
   authorLevel: number;
+  hideAuthorLevel: boolean;
   createdAt: string;
   likesCount: number;
   commentsCount: number;
@@ -67,7 +68,7 @@ const EnhancedSocialFeed: React.FC = () => {
       // First get posts
       const { data: postsData, error } = await supabase
         .from('social_posts')
-        .select('id, content, image_url, author_id, created_at')
+        .select('id, content, image_url, author_id, created_at, metadata')
         .eq('post_type', 'post')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -101,6 +102,9 @@ const EnhancedSocialFeed: React.FC = () => {
           }
         }
         const authorProfile = profileMap[post.author_id];
+        const announcementMetadata = (post.metadata && typeof post.metadata === 'object') ? post.metadata as Record<string, any> : null;
+        const customDisplayName = typeof announcementMetadata?.display_name === 'string' ? announcementMetadata.display_name : null;
+        const hideAuthorLevel = Boolean(announcementMetadata?.hide_level);
         
         const [likesRes, reactionsRes, savedRes, commentsRes] = await Promise.all([
           supabase.from('social_post_likes').select('id', { count: 'exact' }).eq('post_id', post.id),
@@ -141,9 +145,10 @@ const EnhancedSocialFeed: React.FC = () => {
           content: post.content,
           imageUrl,
           authorId: post.author_id,
-          authorName: authorProfile?.name || 'User',
+          authorName: customDisplayName || authorProfile?.name || 'User',
           authorAvatar: authorProfile?.avatar,
           authorLevel: authorProfile?.level || 1,
+          hideAuthorLevel,
           createdAt: post.created_at,
           likesCount: likesRes.count || 0,
           commentsCount: commentsRes.count || 0,
@@ -453,9 +458,11 @@ const EnhancedSocialFeed: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{post.authorName}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        Lv.{post.authorLevel}
-                      </Badge>
+                      {!post.hideAuthorLevel && (
+                        <Badge variant="secondary" className="text-xs">
+                          Lv.{post.authorLevel}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
