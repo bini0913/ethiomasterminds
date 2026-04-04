@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,13 +18,14 @@ import {
   Clock, 
   Plus,
   Send,
-  Home,
   Gamepad,
   Zap,
   Crown,
   Star,
   Swords,
-  RefreshCw
+  RefreshCw,
+  Search,
+  Filter
 } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import RoomCard, { Room } from "@/components/multiplayer/RoomCard";
@@ -69,6 +70,10 @@ const Lobby: React.FC = () => {
   const [chatMessage, setChatMessage] = useState("");
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [creatingRoom, setCreatingRoom] = useState(false);
+  const [activeTab, setActiveTab] = useState("rooms");
+  const [roomSearch, setRoomSearch] = useState("");
+  const [roomFilter, setRoomFilter] = useState<"all" | "open" | "full">("all");
   const [newRoomData, setNewRoomData] = useState({
     name: "",
     maxPlayers: "2",
@@ -89,10 +94,14 @@ const Lobby: React.FC = () => {
     }
 
     loadLobbyData();
-    setupRealtimeSubscriptions();
+    const cleanup = setupRealtimeSubscriptions();
+    const heartbeat = window.setInterval(() => {
+      fetchOnlinePlayers();
+    }, 60_000);
 
     return () => {
-      supabase.removeAllChannels();
+      cleanup();
+      window.clearInterval(heartbeat);
     };
   }, [user, navigate]);
 
@@ -252,6 +261,12 @@ const Lobby: React.FC = () => {
         fetchOnlinePlayers();
       })
       .subscribe();
+
+    return () => {
+      supabase.removeChannel(chatChannel);
+      supabase.removeChannel(roomChannel);
+      supabase.removeChannel(presenceChannel);
+    };
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -285,12 +300,9 @@ const Lobby: React.FC = () => {
       timePerQuestion: 30
     };
 
-    const room = await contextCreateRoom(
-      newRoomData.name,
-      gameSettings,
-      parseInt(newRoomData.maxPlayers),
-      undefined
-    );
+    setCreatingRoom(true);
+    const room = await contextCreateRoom(newRoomData.name, gameSettings, parseInt(newRoomData.maxPlayers), undefined);
+    setCreatingRoom(false);
 
     if (room) {
       setCreateRoomOpen(false);
@@ -356,12 +368,24 @@ const Lobby: React.FC = () => {
     name: r.name,
     players: r.players?.length || 0,
     maxPlayers: r.maxPlayers,
-    status: r.status as 'waiting' | 'in-progress' | 'finished',
+    status: r.status === "waiting" ? "waiting" : r.status === "finished" ? "finished" : "in-progress",
     subject: r.gameSettings?.subject || 'Mixed',
     difficulty: r.gameSettings?.difficulty || 'Medium',
     gameMode: '1v1',
     createdBy: r.host
   }));
+
+  const visibleRooms = useMemo(() => {
+    const q = roomSearch.trim().toLowerCase();
+    return activeRooms.filter((room) => {
+      const matchesSearch = !q || room.name.toLowerCase().includes(q) || room.subject.toLowerCase().includes(q);
+      const matchesFilter =
+        roomFilter === "all" ||
+        (roomFilter === "open" && room.players < room.maxPlayers && room.status === "waiting") ||
+        (roomFilter === "full" && room.players >= room.maxPlayers);
+      return matchesSearch && matchesFilter;
+    });
+  }, [activeRooms, roomFilter, roomSearch]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/10">
@@ -387,15 +411,6 @@ const Lobby: React.FC = () => {
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate("/")}
-              className="gap-2"
-            >
-              <Home className="h-4 w-4" />
-              Menu
-            </Button>
           </div>
         </div>
       </header>
@@ -409,10 +424,10 @@ const Lobby: React.FC = () => {
           <Button variant="outline" className="gap-2 whitespace-nowrap" onClick={() => navigate("/multiplayer")}>
             <Zap className="h-4 w-4" /> Quick Match
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap">
+          <Button variant="outline" className="gap-2 whitespace-nowrap" onClick={() => setActiveTab("rooms")}>
             <Swords className="h-4 w-4" /> Ranked
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap">
+          <Button variant="outline" className="gap-2 whitespace-nowrap" onClick={() => setActiveTab("tournaments")}>
             <Crown className="h-4 w-4" /> Tournament
           </Button>
         </div>
@@ -473,14 +488,36 @@ const Lobby: React.FC = () => {
           
           {/* Middle - Rooms & Tournaments */}
           <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-            <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-xl py-3">
+            <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-xl py-3 space-y-3">
               <CardTitle className="text-base">Play & Compete</CardTitle>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="relative">
+                  <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/70" />
+                  <Input
+                    value={roomSearch}
+                    onChange={(e) => setRoomSearch(e.target.value)}
+                    placeholder="Search room"
+                    className="h-8 pl-7 bg-white/10 border-white/20 text-white placeholder:text-white/60"
+                  />
+                </div>
+                <Select value={roomFilter} onValueChange={(v: "all" | "open" | "full") => setRoomFilter(v)}>
+                  <SelectTrigger className="h-8 bg-white/10 border-white/20 text-white">
+                    <Filter className="h-3 w-3 mr-1" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Rooms</SelectItem>
+                    <SelectItem value="open">Open Slots</SelectItem>
+                    <SelectItem value="full">Full Rooms</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="pt-3">
-              <Tabs defaultValue="rooms">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="w-full grid grid-cols-2">
                   <TabsTrigger value="rooms" className="gap-1">
-                    <Gamepad className="h-3 w-3" /> Rooms ({activeRooms.length})
+                    <Gamepad className="h-3 w-3" /> Rooms ({visibleRooms.length})
                   </TabsTrigger>
                   <TabsTrigger value="tournaments" className="gap-1">
                     <Trophy className="h-3 w-3" /> Tournaments ({tournaments.length})
@@ -490,10 +527,10 @@ const Lobby: React.FC = () => {
                 <TabsContent value="rooms" className="mt-3">
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-3 pr-2">
-                      {activeRooms.length === 0 ? (
+                      {visibleRooms.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">No active rooms. Create one!</p>
                       ) : (
-                        activeRooms.map((room) => (
+                        visibleRooms.map((room) => (
                           <RoomCard key={room.id} room={room} onJoin={handleJoinRoom} />
                         ))
                       )}
@@ -591,7 +628,7 @@ const Lobby: React.FC = () => {
                     placeholder="Type a message..."
                     className="flex-1"
                   />
-                  <Button type="submit" size="icon" className="flex-shrink-0">
+                  <Button type="submit" size="icon" className="flex-shrink-0" disabled={!chatMessage.trim()}>
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
@@ -670,7 +707,7 @@ const Lobby: React.FC = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateRoomOpen(false)}>Cancel</Button>
-            <Button onClick={createRoom} className="gap-2">
+            <Button onClick={createRoom} className="gap-2" disabled={creatingRoom}>
               <Plus className="h-4 w-4" /> Create Room
             </Button>
           </DialogFooter>
