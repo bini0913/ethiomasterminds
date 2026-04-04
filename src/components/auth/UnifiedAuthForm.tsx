@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { 
   GraduationCap, 
   Users, 
@@ -49,15 +49,15 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin + "/",
-        },
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin + "/"
       });
       
-      if (error) {
-        toast.error(t("google-signin-failed") + ": " + error.message);
+      if (result.error) {
+        toast.error(t("google-signin-failed") + ": " + result.error.message);
+      } else if (!result.redirected) {
+        toast.success(t("signed-in-google"));
+        onSuccess();
       }
     } catch (error) {
       console.error("Google sign in error:", error);
