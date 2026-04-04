@@ -119,6 +119,38 @@ const Lobby: React.FC = () => {
     durationHours: "2"
   });
 
+  useEffect(() => {
+    if (!user) {
+      toast.error("Please log in to access the lobby");
+      setTimeout(() => navigate("/"), 2000);
+      return;
+    }
+
+    loadLobbyData();
+    const cleanupRealtime = setupRealtimeSubscriptions();
+
+    return () => {
+      cleanupRealtime();
+    };
+  }, [user, navigate]);
+
+  const loadLobbyData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        refreshRooms(),
+        fetchOnlinePlayers(),
+        fetchChatMessages(),
+        fetchTournaments()
+      ]);
+    } catch (error) {
+      console.error('Error loading lobby data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchOnlinePlayers = async () => {
   const fetchOnlinePlayers = useCallback(async () => {
     const { data, error } = await supabase
       .from('user_presence')
@@ -332,6 +364,13 @@ const Lobby: React.FC = () => {
         fetchTournaments();
       })
       .subscribe();
+
+    return () => {
+      supabase.removeChannel(chatChannel);
+      supabase.removeChannel(roomChannel);
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(tournamentChannel);
+    };
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -495,7 +534,6 @@ const Lobby: React.FC = () => {
     }
   };
 
-  const challengePlayer = async (_playerId: string, playerName: string) => {
   const createTournament = async () => {
     if (!user || !newTournamentData.name.trim()) {
       toast.error("Tournament name is required");

@@ -59,8 +59,14 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const [gameSession, setGameSession] = useState<GameSession | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const cleanupExpiredRooms = useCallback(async () => {
+    await supabase.rpc('cleanup_expired_multiplayer_rooms' as any);
+  }, []);
+
   const fetchRooms = useCallback(async () => {
     try {
+      await cleanupExpiredRooms();
+
       const { data, error } = await supabase
         .from('multiplayer_rooms')
         .select('*')
@@ -121,10 +127,13 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cleanupExpiredRooms]);
 
   useEffect(() => {
     fetchRooms();
+    const cleanupInterval = setInterval(() => {
+      void cleanupExpiredRooms();
+    }, 60000);
 
     // Set up realtime subscription
     const channel = supabase
@@ -146,9 +155,10 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       .subscribe();
 
     return () => {
+      clearInterval(cleanupInterval);
       supabase.removeChannel(channel);
     };
-  }, [fetchRooms]);
+  }, [fetchRooms, cleanupExpiredRooms]);
 
   const createRoom = async (
     name: string, 
