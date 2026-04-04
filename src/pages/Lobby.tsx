@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -151,6 +151,7 @@ const Lobby: React.FC = () => {
   };
 
   const fetchOnlinePlayers = async () => {
+  const fetchOnlinePlayers = useCallback(async () => {
     const { data, error } = await supabase
       .from('user_presence')
       .select(`
@@ -185,9 +186,9 @@ const Lobby: React.FC = () => {
           last_seen: new Date().toISOString()
         }, { onConflict: 'user_id' });
     }
-  };
+  }, [user]);
 
-  const fetchChatMessages = async () => {
+  const fetchChatMessages = useCallback(async () => {
     const { data, error } = await supabase
       .from('lobby_messages')
       .select(`
@@ -211,9 +212,9 @@ const Lobby: React.FC = () => {
       }));
       setChatMessages(messages);
     }
-  };
+  }, []);
 
-  const fetchTournaments = async () => {
+  const fetchTournaments = useCallback(async () => {
     const { data, error } = await supabase
       .from('tournaments')
       .select(`
@@ -258,9 +259,25 @@ const Lobby: React.FC = () => {
       });
       setTournaments(tourns);
     }
-  };
+  }, []);
 
-  const setupRealtimeSubscriptions = () => {
+  const loadLobbyData = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        refreshRooms(),
+        fetchOnlinePlayers(),
+        fetchChatMessages(),
+        fetchTournaments()
+      ]);
+    } catch (error) {
+      console.error('Error loading lobby data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchChatMessages, fetchOnlinePlayers, fetchTournaments, refreshRooms]);
+
+  const setupRealtimeSubscriptions = useCallback(() => {
     // Subscribe to lobby chat
     const chatChannel = supabase
       .channel('lobby-chat')
@@ -313,6 +330,23 @@ const Lobby: React.FC = () => {
       })
       .subscribe();
 
+    return [chatChannel, roomChannel, presenceChannel];
+  }, [fetchOnlinePlayers, refreshRooms]);
+
+  useEffect(() => {
+    if (!user) {
+      toast.error("Please log in to access the lobby");
+      setTimeout(() => navigate("/"), 2000);
+      return;
+    }
+
+    loadLobbyData();
+    const channels = setupRealtimeSubscriptions();
+
+    return () => {
+      channels?.forEach((channel) => supabase.removeChannel(channel));
+    };
+  }, [user, navigate, loadLobbyData, setupRealtimeSubscriptions]);
     const tournamentChannel = supabase
       .channel('lobby-tournaments')
       .on('postgres_changes', {
