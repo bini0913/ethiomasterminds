@@ -54,6 +54,16 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([]);
 
+  const getDisplayName = (profile: { name?: string | null; username?: string | null } | undefined, userId: string) => {
+    const trimmedName = profile?.name?.trim();
+    if (trimmedName) return trimmedName;
+
+    const trimmedUsername = profile?.username?.trim();
+    if (trimmedUsername) return trimmedUsername;
+
+    return `User ${userId.slice(0, 8)}`;
+  };
+
   const fetchFriends = useCallback(async () => {
     if (!user?.id) {
       setFriends([]);
@@ -113,7 +123,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         const profile = profilesMap.get(friendId);
         return {
           id: friendId,
-          name: profile?.name || 'Unknown',
+          name: getDisplayName(profile, friendId),
           username: profile?.username || '',
           email: '',
           role: 'student',
@@ -134,7 +144,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
           id: r.id,
           sender: {
             id: r.user_id,
-            name: sender?.name || 'Unknown',
+            name: getDisplayName(sender, r.user_id),
             username: sender?.username || '',
             email: '',
             role: 'student',
@@ -158,7 +168,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
           sender: user as UserProfile,
           receiver: {
             id: r.friend_id,
-            name: receiver?.name || 'Unknown',
+            name: getDisplayName(receiver, r.friend_id),
             username: receiver?.username || '',
             email: '',
             role: 'student',
@@ -262,7 +272,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         .filter((u: any) => u.id !== user?.id)
         .map((u: any) => ({
           id: u.id,
-          name: u.name || 'Unknown',
+          name: getDisplayName(u, u.id),
           username: u.username || '',
           email: '',
           role: 'student',
