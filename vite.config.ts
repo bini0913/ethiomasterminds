@@ -14,6 +14,28 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+export default defineConfig(async ({ mode }) => {
+  const plugins = [react()];
+
+  if (mode === "development") {
+    try {
+      const { componentTagger } = await import("lovable-tagger");
+      plugins.push(componentTagger());
+    } catch {
+      // Ignore when lovable-tagger is unavailable (e.g. CI/Vercel install mode)
+    }
+  }
+
+  return {
+    server: {
+      host: "::",
+      port: 8080,
     },
-  },
-}));
+    plugins,
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+  };
+});

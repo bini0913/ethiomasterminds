@@ -55,11 +55,29 @@ interface ChatMessage {
 interface Tournament {
   id: string;
   name: string;
+  description: string;
   startTime: Date;
+  endTime: Date;
   players: number;
   maxPlayers: number;
   prize: string;
-  status: string;
+  status: "upcoming" | "active" | "completed";
+  format: "knockout" | "speed_knockout" | "multiplayer_draw";
+  scoreMode: "accuracy" | "speed";
+  createdBy: string;
+  isFull: boolean;
+}
+
+interface NewTournamentForm {
+  name: string;
+  description: string;
+  format: Tournament["format"];
+  scoreMode: Tournament["scoreMode"];
+  subject: string;
+  maxPlayers: string;
+  prizeCoins: string;
+  prizeGems: string;
+  durationHours: string;
 }
 
 const Lobby: React.FC = () => {
@@ -70,6 +88,7 @@ const Lobby: React.FC = () => {
   
   const [chatMessage, setChatMessage] = useState("");
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
+  const [createTournamentOpen, setCreateTournamentOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newRoomData, setNewRoomData] = useState({
     name: "",
@@ -88,6 +107,17 @@ const Lobby: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [newTournamentData, setNewTournamentData] = useState<NewTournamentForm>({
+    name: "",
+    description: "",
+    format: "knockout",
+    scoreMode: "accuracy",
+    subject: "Mixed",
+    maxPlayers: "16",
+    prizeCoins: "1000",
+    prizeGems: "20",
+    durationHours: "2"
+  });
 
   const fetchOnlinePlayers = useCallback(async () => {
     const { data, error } = await supabase
@@ -164,15 +194,37 @@ const Lobby: React.FC = () => {
       .limit(10);
 
     if (!error && data) {
-      const tourns = data.map((t: any) => ({
-        id: t.id,
-        name: t.name,
-        startTime: new Date(t.start_time),
-        players: t.tournament_participants?.[0]?.count || 0,
-        maxPlayers: t.max_participants || 128,
-        prize: t.prize_description || `${t.prize_coins || 0} coins + ${t.prize_gems || 0} gems`,
-        status: t.status
-      }));
+      const parseTournamentMode = (difficulty: string | null, description: string | null) => {
+        const lowerDifficulty = (difficulty || "").toLowerCase();
+        const format = lowerDifficulty.includes("draw")
+          ? "multiplayer_draw"
+          : lowerDifficulty.includes("speed")
+            ? "speed_knockout"
+            : "knockout";
+        return {
+          format: format as Tournament["format"],
+          scoreMode: lowerDifficulty.includes("speed") ? "speed" as Tournament["scoreMode"] : "accuracy" as Tournament["scoreMode"],
+          description: description || "Tournament challenge"
+        };
+      };
+
+      const tourns = data.map((t: any) => {
+        const playersCount = t.tournament_participants?.[0]?.count || 0;
+        const maxPlayers = t.max_participants || 128;
+        return {
+          ...parseTournamentMode(t.difficulty, t.description),
+          id: t.id,
+          name: t.name,
+          startTime: new Date(t.start_time),
+          endTime: new Date(t.end_time),
+          players: playersCount,
+          maxPlayers,
+          prize: t.prize_description || `${t.prize_coins || 0} coins + ${t.prize_gems || 0} gems`,
+          status: t.status as Tournament["status"],
+          createdBy: t.created_by,
+          isFull: playersCount >= maxPlayers
+        };
+      });
       setTournaments(tourns);
     }
   }, []);
@@ -447,6 +499,13 @@ const Lobby: React.FC = () => {
     }
   };
 
+  const canManageTournaments = user?.role === "admin" || user?.role === "manager";
+  const formatLabel: Record<Tournament["format"], string> = {
+    knockout: "Knockout",
+    speed_knockout: "Speed Knockout",
+    multiplayer_draw: "Multiplayer Draw"
+  };
+
   // Convert context rooms to Room type
   const activeRooms: Room[] = rooms.map(r => ({
     id: r.id,
@@ -630,6 +689,9 @@ const Lobby: React.FC = () => {
                             <div className="flex justify-between items-start mb-2">
                               <div>
                                 <h3 className="font-semibold text-sm">{tournament.name}</h3>
+                                <div className="text-[11px] text-muted-foreground mt-0.5">
+                                  {formatLabel[tournament.format]} • {tournament.scoreMode}
+                                </div>
                                 <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                   <Clock className="h-3 w-3" />
                                   {tournament.status === 'active' ? 'In Progress' : `Starts in: ${formatTimeRemaining(tournament.startTime)}`}
@@ -648,14 +710,27 @@ const Lobby: React.FC = () => {
                                 style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }}
                               />
                             </div>
-                            <Button 
-                              size="sm" 
-                              className="w-full" 
-                              onClick={() => joinTournament(tournament.id)}
-                              disabled={tournament.status === 'active'}
-                            >
-                              {tournament.status === 'active' ? 'In Progress' : 'Register'}
-                            </Button>
+                            <div className="space-y-2">
+                              <Button
+                                size="sm"
+                                className="w-full"
+                                onClick={() => joinTournament(tournament.id)}
+                                disabled={tournament.status === 'active' || tournament.isFull}
+                              >
+                                {tournament.status === 'active' ? 'In Progress' : tournament.isFull ? 'Full' : 'Register'}
+                              </Button>
+                              {canManageTournaments && tournament.status === "upcoming" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => startTournament(tournament)}
+                                  disabled={!tournament.isFull}
+                                >
+                                  {tournament.isFull ? 'Start Tournament' : 'Waiting for Full Capacity'}
+                                </Button>
+                              )}
+                            </div>
                           </motion.div>
                         ))
                       )}
@@ -852,6 +927,108 @@ const Lobby: React.FC = () => {
             <Button onClick={createRoom} className="gap-2">
               <Plus className="h-4 w-4" /> Create Room
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createTournamentOpen} onOpenChange={setCreateTournamentOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5" /> Create Tournament (Admin)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Tournament Name</Label>
+              <Input
+                value={newTournamentData.name}
+                onChange={(e) => setNewTournamentData({ ...newTournamentData, name: e.target.value })}
+                placeholder="e.g., Grade 8 Speed Cup"
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Input
+                value={newTournamentData.description}
+                onChange={(e) => setNewTournamentData({ ...newTournamentData, description: e.target.value })}
+                placeholder="What students will compete on"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Format</Label>
+                <Select
+                  value={newTournamentData.format}
+                  onValueChange={(value: Tournament["format"]) => setNewTournamentData({ ...newTournamentData, format: value })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="knockout">Knockout (Football style)</SelectItem>
+                    <SelectItem value="speed_knockout">Speed Knockout</SelectItem>
+                    <SelectItem value="multiplayer_draw">Competition Draw (Multiplayer)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Scoring</Label>
+                <Select
+                  value={newTournamentData.scoreMode}
+                  onValueChange={(value: Tournament["scoreMode"]) => setNewTournamentData({ ...newTournamentData, scoreMode: value })}
+                  disabled={newTournamentData.format === "multiplayer_draw"}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="accuracy">Accuracy</SelectItem>
+                    <SelectItem value="speed">Speed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Max Players</Label>
+                <Input
+                  type="number"
+                  min={2}
+                  value={newTournamentData.maxPlayers}
+                  onChange={(e) => setNewTournamentData({ ...newTournamentData, maxPlayers: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Duration (hours)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={newTournamentData.durationHours}
+                  onChange={(e) => setNewTournamentData({ ...newTournamentData, durationHours: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Prize Coins</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={newTournamentData.prizeCoins}
+                  onChange={(e) => setNewTournamentData({ ...newTournamentData, prizeCoins: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Prize Gems</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={newTournamentData.prizeGems}
+                  onChange={(e) => setNewTournamentData({ ...newTournamentData, prizeGems: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateTournamentOpen(false)}>Cancel</Button>
+            <Button onClick={createTournament}>Create Tournament</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
