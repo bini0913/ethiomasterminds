@@ -55,9 +55,11 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
       
       if (result.error) {
         toast.error(t("google-signin-failed") + ": " + result.error.message);
-      } else if (!result.redirected) {
+      } else if (!result.redirected && result.tokens) {
         toast.success(t("signed-in-google"));
         onSuccess();
+      } else if (!result.redirected) {
+        toast.error(t("google-signin-failed"));
       }
     } catch (error) {
       console.error("Google sign in error:", error);
