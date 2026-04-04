@@ -474,21 +474,58 @@ const TeacherPortal: React.FC = () => {
       return;
     }
 
+    if (!user?.id) {
+      toast.error('Not authenticated');
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase
+    const { data: createdAnnouncement, error } = await supabase
       .from('announcements')
       .insert({
         ...announcementForm,
-        author_id: user?.id,
+        author_id: user.id,
         target_id: announcementForm.target_id || null
-      });
+      })
+      .select('id, title, content, target_type, target_id')
+      .single();
 
-    setLoading(false);
     if (error) {
+      setLoading(false);
       toast.error('Failed to create announcement');
       return;
     }
 
+    const shouldShareToStudentSocial = ['all', 'students', 'class'].includes(createdAnnouncement.target_type);
+
+    if (shouldShareToStudentSocial) {
+      const socialPostContent = `📢 ${createdAnnouncement.title}
+
+${createdAnnouncement.content}`;
+      const teacherFirstName = (profile?.name || 'Teacher').trim().split(' ')[0];
+      const { error: socialError } = await supabase
+        .from('social_posts')
+        .insert({
+          author_id: user.id,
+          content: socialPostContent,
+          post_type: 'post',
+          metadata: {
+            source: 'announcement',
+            announcement_id: createdAnnouncement.id,
+            target_type: createdAnnouncement.target_type,
+            target_id: createdAnnouncement.target_id,
+            display_name: `MR. ${teacherFirstName}`,
+            hide_level: true
+          }
+        });
+
+      if (socialError) {
+        console.error('Error sharing announcement to social:', socialError);
+        toast.error('Announcement created, but failed to share to social feed');
+      }
+    }
+
+    setLoading(false);
     toast.success('Announcement sent!');
     setShowAnnouncementDialog(false);
     setAnnouncementForm({ title: '', content: '', target_type: 'class', target_id: '' });
