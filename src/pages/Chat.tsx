@@ -25,7 +25,7 @@ type ChatMessage = {
 };
 
 const LEARNING_PROMPTS = [
-  'Summarize today's science lesson in 3 bullet points.',
+  "Summarize today's science lesson in 3 bullet points.",
   'Ask for a quick quiz on algebra fundamentals.',
   'Explain one history topic like I am 12 years old.',
 ] as const;
