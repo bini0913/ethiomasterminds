@@ -224,14 +224,18 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return false;
 
     try {
-      // Check if room exists and has space
+      // Check if room exists and is still active
       const { data: roomData, error: roomError } = await supabase
         .from('multiplayer_rooms')
         .select('*')
         .eq('id', roomId)
+        .in('status', ['waiting', 'countdown', 'playing'])
         .single();
 
-      if (roomError) throw roomError;
+      if (roomError || !roomData) {
+        toast.error('Room is no longer available');
+        return false;
+      }
 
       // Check password if required
       if (roomData.password && roomData.password !== password) {
@@ -239,26 +243,36 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
-      // Check player count
-      const { count } = await supabase
+      // Allow reconnect if player is already in the room
+      const { data: existingMembership } = await supabase
         .from('room_players')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId);
+        .select('room_id, user_id')
+        .eq('room_id', roomId)
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-      if ((count || 0) >= roomData.max_players) {
-        toast.error('Room is full');
-        return false;
+      if (!existingMembership) {
+        // Check player count only for new joins
+        const { count } = await supabase
+          .from('room_players')
+          .select('*', { count: 'exact', head: true })
+          .eq('room_id', roomId);
+
+        if ((count || 0) >= roomData.max_players) {
+          toast.error('Room is full');
+          return false;
+        }
+
+        const { error: joinError } = await supabase
+          .from('room_players')
+          .insert({
+            room_id: roomId,
+            user_id: user.id,
+            is_ready: false
+          });
+
+        if (joinError) throw joinError;
       }
-
-      // Join the room
-      const { error: joinError } = await supabase
-        .from('room_players')
-        .insert({
-          room_id: roomId,
-          user_id: user.id
-        });
-
-      if (joinError) throw joinError;
 
       const room: Room = {
         id: roomData.id,
@@ -278,7 +292,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       };
 
       setCurrentRoom(room);
-      toast.success(`Joined ${roomData.name}!`);
+      toast.success(existingMembership ? `Rejoined ${roomData.name}!` : `Joined ${roomData.name}!`);
       await fetchRooms();
       
       return true;

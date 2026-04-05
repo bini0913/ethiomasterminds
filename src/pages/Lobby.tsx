@@ -440,7 +440,7 @@ const Lobby: React.FC = () => {
     const { data: roomPool, error } = await supabase
       .from("multiplayer_rooms")
       .select("id, name, password, status")
-      .in("status", ["waiting", "countdown"]);
+      .in("status", ["waiting", "countdown", "playing"]);
 
     if (error || !roomPool) {
       toast.error("Unable to look up room code");
@@ -623,12 +623,32 @@ const Lobby: React.FC = () => {
     multiplayer_draw: "Multiplayer Draw"
   };
 
-  const activeRooms: Room[] = rooms.map(r => ({
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <Card className="w-full max-w-md border-border/60">
+          <CardHeader>
+            <CardTitle>Lobby Access Required</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Please sign in to use multiplayer rooms, chat, and tournaments. Redirecting to home...
+            </p>
+            <Button className="w-full" onClick={() => navigate("/")}>Go to Home</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const activeRooms: Room[] = rooms
+    .filter((room) => room.status !== "finished")
+    .map(r => ({
     id: r.id,
     name: r.name,
     players: r.players?.length || 0,
     maxPlayers: r.maxPlayers,
-    status: r.status as 'waiting' | 'in-progress' | 'finished',
+    status: (r.status === 'countdown' ? 'waiting' : r.status) as 'waiting' | 'in-progress' | 'finished',
     subject: r.gameSettings?.subject || 'Mixed',
     difficulty: r.gameSettings?.difficulty || 'Medium',
     gameMode: '1v1',
@@ -661,7 +681,7 @@ const Lobby: React.FC = () => {
       </header>
 
       <div className="bg-card/70 backdrop-blur-md border-b border-cyan-200/10 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto scrollbar-none">
+        <div className="max-w-7xl mx-auto flex flex-wrap gap-2">
           <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 whitespace-nowrap">
             <Plus className="h-4 w-4" /> Create Room
           </Button>
@@ -674,9 +694,9 @@ const Lobby: React.FC = () => {
           <Button variant="outline" className="gap-2 whitespace-nowrap">
             <Crown className="h-4 w-4" /> Tournament
           </Button>
-          <div className="flex items-center gap-2 ml-auto min-w-[420px]">
-            <Input value={joinByCode} onChange={(e) => setJoinByCode(e.target.value)} className="h-9 bg-background/70 border-cyan-300/20" placeholder="Join by room code" />
-            <Input value={joinPasscode} onChange={(e) => setJoinPasscode(e.target.value)} className="h-9 bg-background/70 border-cyan-300/20" placeholder="Passcode (private only)" />
+          <div className="flex items-center gap-2 w-full lg:w-auto lg:ml-auto">
+            <Input value={joinByCode} onChange={(e) => setJoinByCode(e.target.value)} className="h-9 bg-background/70 border-cyan-300/20 flex-1 min-w-[150px]" placeholder="Join by room code" />
+            <Input value={joinPasscode} onChange={(e) => setJoinPasscode(e.target.value)} className="h-9 bg-background/70 border-cyan-300/20 flex-1 min-w-[170px]" placeholder="Passcode" />
             <Button onClick={joinWithCode} className="whitespace-nowrap" variant="secondary">Join</Button>
           </div>
           {canManageTournaments && (
@@ -688,6 +708,11 @@ const Lobby: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto py-4 px-4">
+        {loading && (
+          <div className="mb-4 rounded-lg border border-cyan-300/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
+            Syncing lobby data...
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="bg-card/80 backdrop-blur-sm border-border/50">
             <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-xl py-3">
