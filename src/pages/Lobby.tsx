@@ -119,6 +119,38 @@ const Lobby: React.FC = () => {
     durationHours: "2"
   });
 
+  useEffect(() => {
+    if (!user) {
+      toast.error("Please log in to access the lobby");
+      setTimeout(() => navigate("/"), 2000);
+      return;
+    }
+
+    loadLobbyData();
+    const cleanupRealtime = setupRealtimeSubscriptions();
+
+    return () => {
+      cleanupRealtime();
+    };
+  }, [user, navigate]);
+
+  const loadLobbyData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        refreshRooms(),
+        fetchOnlinePlayers(),
+        fetchChatMessages(),
+        fetchTournaments()
+      ]);
+    } catch (error) {
+      console.error('Error loading lobby data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchOnlinePlayers = async () => {
   const fetchOnlinePlayers = useCallback(async () => {
     const { data, error } = await supabase
       .from('user_presence')
@@ -315,6 +347,31 @@ const Lobby: React.FC = () => {
       channels?.forEach((channel) => supabase.removeChannel(channel));
     };
   }, [user, navigate, loadLobbyData, setupRealtimeSubscriptions]);
+    const tournamentChannel = supabase
+      .channel('lobby-tournaments')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'tournaments'
+      }, () => {
+        fetchTournaments();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'tournament_participants'
+      }, () => {
+        fetchTournaments();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(chatChannel);
+      supabase.removeChannel(roomChannel);
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(tournamentChannel);
+    };
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -478,6 +535,91 @@ const Lobby: React.FC = () => {
   };
 
   const challengePlayer = async (_playerId: string, playerName: string) => {
+  const createTournament = async () => {
+    if (!user || !newTournamentData.name.trim()) {
+      toast.error("Tournament name is required");
+      return;
+    }
+
+    const startTime = new Date();
+    const endTime = new Date(Date.now() + Number(newTournamentData.durationHours || 2) * 60 * 60 * 1000);
+    const difficultyTag =
+      newTournamentData.format === "multiplayer_draw"
+        ? "draw"
+        : newTournamentData.scoreMode === "speed"
+          ? "speed"
+          : "accuracy";
+
+    const { error } = await supabase
+      .from("tournaments")
+      .insert({
+        name: newTournamentData.name.trim(),
+        description: newTournamentData.description.trim() || `Mode: ${newTournamentData.format.replace("_", " ")}`,
+        created_by: user.id,
+        status: "upcoming",
+        subject: newTournamentData.subject,
+        difficulty: difficultyTag,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        max_participants: Math.max(2, Number(newTournamentData.maxPlayers || 16)),
+        prize_coins: Number(newTournamentData.prizeCoins || 0),
+        prize_gems: Number(newTournamentData.prizeGems || 0),
+        prize_description: `${newTournamentData.prizeCoins} coins + ${newTournamentData.prizeGems} gems`
+      });
+
+    if (error) {
+      toast.error("Failed to create tournament");
+      return;
+    }
+
+    toast.success("Tournament created. Students can now register.");
+    setCreateTournamentOpen(false);
+    setNewTournamentData({
+      name: "",
+      description: "",
+      format: "knockout",
+      scoreMode: "accuracy",
+      subject: "Mixed",
+      maxPlayers: "16",
+      prizeCoins: "1000",
+      prizeGems: "20",
+      durationHours: "2"
+    });
+    fetchTournaments();
+  };
+
+  const startTournament = async (tournament: Tournament) => {
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      toast.error("Only admins can start tournaments");
+      return;
+    }
+
+    if (!tournament.isFull) {
+      toast.error("Tournament must be full before starting");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("tournaments")
+      .update({ status: "active" })
+      .eq("id", tournament.id);
+
+    if (error) {
+      toast.error("Failed to start tournament");
+      return;
+    }
+
+    const startMessage = tournament.format === "multiplayer_draw"
+      ? "Draw generated. Players can now battle in multiplayer rounds."
+      : tournament.scoreMode === "speed"
+        ? "Speed knockout started. Fastest correct answers win."
+        : "Accuracy knockout started. Highest precision wins each round.";
+
+    toast.success(`Tournament started: ${tournament.name}`, { description: startMessage });
+    fetchTournaments();
+  };
+
+  const challengePlayer = async (playerId: string, playerName: string) => {
     // Create a private room and invite the player
     toast.success(`Challenge sent to ${playerName}!`);
     // TODO: Implement challenge system with notifications
