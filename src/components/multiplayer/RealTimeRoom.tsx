@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -86,13 +86,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [isHost, setIsHost] = useState(false);
   const [countdownValue, setCountdownValue] = useState(3);
+  const advancingQuestionRef = useRef(false);
 
   // Fetch initial data and set up subscriptions
   useEffect(() => {
     loadRoomData();
     const cleanup = setupRealtimeSubscriptions();
     return cleanup;
-  }, [roomId]);
+  }, [roomId, currentUserId, onLeave]);
 
   // Timer effect
   useEffect(() => {
@@ -126,8 +127,26 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         .eq('id', roomId)
         .single();
 
-      setIsHost(room?.host_id === currentUserId);
-      setTotalQuestions(room?.question_count || 10);
+      if (!room) {
+        toast.error('Room not found');
+        onLeave();
+        return;
+      }
+
+      setIsHost(room.host_id === currentUserId);
+      setTotalQuestions(room.question_count || 10);
+
+      // Ensure current user is connected as a room participant (supports page reload/rejoin)
+      await supabase
+        .from('room_players')
+        .upsert(
+          {
+            room_id: roomId,
+            user_id: currentUserId,
+            is_ready: false
+          },
+          { onConflict: 'room_id,user_id' }
+        );
 
       // Fetch players
       await fetchPlayers();
@@ -380,9 +399,10 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   };
 
   const nextQuestion = async () => {
-    if (!isHost) return;
+    if (!isHost || advancingQuestionRef.current) return;
 
     try {
+      advancingQuestionRef.current = true;
       const { data, error } = await supabase.rpc('multiplayer_next_question', {
         p_room_id: roomId
       });
@@ -395,6 +415,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       }
     } catch (err) {
       console.error('Error advancing question:', err);
+    } finally {
+      advancingQuestionRef.current = false;
     }
   };
 
@@ -543,7 +565,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                           whileHover={{ scale: selectedAnswer === null ? 1.02 : 1 }}
                           whileTap={{ scale: selectedAnswer === null ? 0.98 : 1 }}
                           onClick={() => handleAnswer(index)}
-                          disabled={selectedAnswer !== null}
+                          disabled={selectedAnswer !== null || timeRemaining <= 0}
                           className={cn(
                             'p-4 rounded-xl border-2 text-left transition-all',
                             buttonClass

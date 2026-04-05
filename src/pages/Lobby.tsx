@@ -440,7 +440,7 @@ const Lobby: React.FC = () => {
     const { data: roomPool, error } = await supabase
       .from("multiplayer_rooms")
       .select("id, name, password, status")
-      .in("status", ["waiting", "countdown"]);
+      .in("status", ["waiting", "countdown", "playing"]);
 
     if (error || !roomPool) {
       toast.error("Unable to look up room code");
