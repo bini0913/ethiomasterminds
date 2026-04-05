@@ -119,38 +119,6 @@ const Lobby: React.FC = () => {
     durationHours: "2"
   });
 
-  useEffect(() => {
-    if (!user) {
-      toast.error("Please log in to access the lobby");
-      setTimeout(() => navigate("/"), 2000);
-      return;
-    }
-
-    loadLobbyData();
-    const cleanupRealtime = setupRealtimeSubscriptions();
-
-    return () => {
-      cleanupRealtime();
-    };
-  }, [user, navigate]);
-
-  const loadLobbyData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        refreshRooms(),
-        fetchOnlinePlayers(),
-        fetchChatMessages(),
-        fetchTournaments()
-      ]);
-    } catch (error) {
-      console.error('Error loading lobby data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchOnlinePlayers = async () => {
   const fetchOnlinePlayers = useCallback(async () => {
     const { data, error } = await supabase
       .from('user_presence')
@@ -330,23 +298,6 @@ const Lobby: React.FC = () => {
       })
       .subscribe();
 
-    return [chatChannel, roomChannel, presenceChannel];
-  }, [fetchOnlinePlayers, refreshRooms]);
-
-  useEffect(() => {
-    if (!user) {
-      toast.error("Please log in to access the lobby");
-      setTimeout(() => navigate("/"), 2000);
-      return;
-    }
-
-    loadLobbyData();
-    const channels = setupRealtimeSubscriptions();
-
-    return () => {
-      channels?.forEach((channel) => supabase.removeChannel(channel));
-    };
-  }, [user, navigate, loadLobbyData, setupRealtimeSubscriptions]);
     const tournamentChannel = supabase
       .channel('lobby-tournaments')
       .on('postgres_changes', {
@@ -365,13 +316,23 @@ const Lobby: React.FC = () => {
       })
       .subscribe();
 
+    return [chatChannel, roomChannel, presenceChannel, tournamentChannel];
+  }, [fetchOnlinePlayers, fetchTournaments, refreshRooms]);
+
+  useEffect(() => {
+    if (!user) {
+      toast.error("Please log in to access the lobby");
+      setTimeout(() => navigate("/"), 2000);
+      return;
+    }
+
+    loadLobbyData();
+    const channels = setupRealtimeSubscriptions();
+
     return () => {
-      supabase.removeChannel(chatChannel);
-      supabase.removeChannel(roomChannel);
-      supabase.removeChannel(presenceChannel);
-      supabase.removeChannel(tournamentChannel);
+      channels?.forEach((channel) => supabase.removeChannel(channel));
     };
-  };
+  }, [user, navigate, loadLobbyData, setupRealtimeSubscriptions]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
