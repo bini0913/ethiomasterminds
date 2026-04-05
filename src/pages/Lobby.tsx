@@ -127,10 +127,14 @@ const Lobby: React.FC = () => {
     }
 
     loadLobbyData();
-    setupRealtimeSubscriptions();
+    const cleanupRealtime = setupRealtimeSubscriptions();
+    const fallbackRefreshInterval = setInterval(() => {
+      void loadLobbyData();
+    }, 20000);
 
     return () => {
-      supabase.removeAllChannels();
+      clearInterval(fallbackRefreshInterval);
+      cleanupRealtime();
     };
   }, [user, navigate]);
 
@@ -297,7 +301,14 @@ const Lobby: React.FC = () => {
         schema: 'public',
         table: 'multiplayer_rooms'
       }, () => {
-        refreshRooms();
+        void refreshRooms();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'room_players'
+      }, () => {
+        void refreshRooms();
       })
       .subscribe();
 
@@ -309,7 +320,7 @@ const Lobby: React.FC = () => {
         schema: 'public',
         table: 'user_presence'
       }, () => {
-        fetchOnlinePlayers();
+        void fetchOnlinePlayers();
       })
       .subscribe();
 
@@ -320,16 +331,23 @@ const Lobby: React.FC = () => {
         schema: 'public',
         table: 'tournaments'
       }, () => {
-        fetchTournaments();
+        void fetchTournaments();
       })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'tournament_participants'
       }, () => {
-        fetchTournaments();
+        void fetchTournaments();
       })
       .subscribe();
+
+    return () => {
+      supabase.removeChannel(chatChannel);
+      supabase.removeChannel(roomChannel);
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(tournamentChannel);
+    };
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -493,7 +511,6 @@ const Lobby: React.FC = () => {
     }
   };
 
-  const challengePlayer = async (_playerId: string, playerName: string) => {
   const createTournament = async () => {
     if (!user || !newTournamentData.name.trim()) {
       toast.error("Tournament name is required");
