@@ -11,21 +11,21 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 
-type Conversation = {
+type ChatGroup = {
   id: string;
-  name: string | null;
-  type: string;
+  name: string;
+  group_type: string;
 };
 
 type ChatMessage = {
   id: string;
-  sender_id: string | null;
+  sender_id: string;
   content: string;
   created_at: string;
 };
 
 const LEARNING_PROMPTS = [
-  'Summarize today’s science lesson in 3 bullet points.',
+  'Summarize today's science lesson in 3 bullet points.',
   'Ask for a quick quiz on algebra fundamentals.',
   'Explain one history topic like I am 12 years old.',
 ] as const;
@@ -35,28 +35,27 @@ const Chat: React.FC = () => {
   const navigate = useNavigate();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState('');
+  const [groups, setGroups] = useState<ChatGroup[]>([]);
+  const [activeGroupId, setActiveGroupId] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
-  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingGroups, setLoadingGroups] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  const activeConversation = useMemo(
-    () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
-    [conversations, activeConversationId],
+  const activeGroup = useMemo(
+    () => groups.find((g) => g.id === activeGroupId) ?? null,
+    [groups, activeGroupId],
   );
 
-  const loadMessages = useCallback(async (conversationId: string) => {
-    if (!conversationId) return;
+  const loadMessages = useCallback(async (groupId: string) => {
+    if (!groupId) return;
 
     setLoadingMessages(true);
     const { data, error } = await supabase
-      .from('messages')
+      .from('group_messages')
       .select('id, sender_id, content, created_at')
-      .eq('conversation_id', conversationId)
-      .eq('is_deleted', false)
+      .eq('group_id', groupId)
       .order('created_at', { ascending: true })
       .limit(100);
 
@@ -77,75 +76,78 @@ const Chat: React.FC = () => {
   }, [isLoading, navigate, user]);
 
   useEffect(() => {
-    const loadConversations = async () => {
+    const loadGroups = async () => {
       if (!user?.id) return;
 
-      setLoadingConversations(true);
+      setLoadingGroups(true);
 
       const { data: memberships, error: membershipError } = await supabase
-        .from('conversation_members')
-        .select('conversation_id')
+        .from('chat_group_members')
+        .select('group_id')
         .eq('user_id', user.id);
 
       if (membershipError) {
         toast.error('Could not load chat rooms right now.');
-        setLoadingConversations(false);
+        setLoadingGroups(false);
         return;
       }
 
-      const conversationIds = (memberships || []).map((row: { conversation_id: string }) => row.conversation_id);
-      if (!conversationIds.length) {
-        setConversations([]);
-        setActiveConversationId('');
-        setLoadingConversations(false);
+      const groupIds = (memberships || []).map((row) => row.group_id);
+      if (!groupIds.length) {
+        setGroups([]);
+        setActiveGroupId('');
+        setLoadingGroups(false);
         return;
       }
 
-      const { data: rows, error: conversationError } = await supabase
-        .from('conversations')
-        .select('id, name, type')
-        .in('id', conversationIds)
-        .eq('is_archived', false)
+      const { data: rows, error: groupError } = await supabase
+        .from('chat_groups')
+        .select('id, name, group_type')
+        .in('id', groupIds)
         .order('updated_at', { ascending: false });
 
-      if (conversationError) {
+      if (groupError) {
         toast.error('Could not load chat rooms right now.');
-        setLoadingConversations(false);
+        setLoadingGroups(false);
         return;
       }
 
-      const mappedConversations = rows || [];
-      setConversations(mappedConversations);
+      const mappedGroups = (rows || []).map((r) => ({
+        id: r.id,
+        name: r.name,
+        group_type: r.group_type,
+      }));
+      setGroups(mappedGroups);
 
-      if (!activeConversationId && mappedConversations.length > 0) {
-        setActiveConversationId(mappedConversations[0].id);
+      if (!activeGroupId && mappedGroups.length > 0) {
+        setActiveGroupId(mappedGroups[0].id);
       }
 
-      setLoadingConversations(false);
+      setLoadingGroups(false);
     };
 
-    void loadConversations();
-  }, [activeConversationId, user?.id]);
+    void loadGroups();
+  }, [activeGroupId, user?.id]);
 
   useEffect(() => {
-    if (!activeConversationId) {
+    if (!activeGroupId) {
       setMessages([]);
       return;
     }
 
-    void loadMessages(activeConversationId);
-  }, [activeConversationId, loadMessages]);
+    void loadMessages(activeGroupId);
+  }, [activeGroupId, loadMessages]);
 
   useEffect(() => {
-    if (!activeConversationId) return;
+    if (!activeGroupId) return;
 
     const channel = supabase
-      .channel(`simple-chat-${activeConversationId}`)
+      .channel(`simple-chat-${activeGroupId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${activeConversationId}` },
+        { event: '*', schema: 'public', table: 'group_messages', filter: `group_id=eq.${activeGroupId}` },
         () => {
-          void loadMessages(activeConversationId);
+          void loadMessages(activeGroupId);
         },
       )
       .subscribe();
@@ -153,7 +155,7 @@ const Chat: React.FC = () => {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [activeConversationId, loadMessages]);
+  }, [activeGroupId, loadMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -161,16 +163,15 @@ const Chat: React.FC = () => {
 
   const sendMessage = useCallback(async () => {
     const sanitizedMessage = draft.trim();
-    if (!user?.id || !activeConversationId || !sanitizedMessage || isSending) return;
+    if (!user?.id || !activeGroupId || !sanitizedMessage || isSending) return;
 
     setIsSending(true);
 
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: activeConversationId,
+    const { error } = await supabase.from('group_messages').insert({
+      group_id: activeGroupId,
       sender_id: user.id,
       message_type: 'text',
       content: sanitizedMessage,
-      metadata: {},
     });
 
     if (error) {
@@ -181,7 +182,7 @@ const Chat: React.FC = () => {
 
     setDraft('');
     setIsSending(false);
-  }, [activeConversationId, draft, isSending, user?.id]);
+  }, [activeGroupId, draft, isSending, user?.id]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -204,24 +205,24 @@ const Chat: React.FC = () => {
             <h2 className="mb-3 text-sm font-medium uppercase text-cyan-200">Rooms</h2>
             <ScrollArea className="h-[60vh] pr-2">
               <div className="space-y-2">
-                {loadingConversations && <p className="text-sm text-slate-400">Loading rooms...</p>}
-                {!loadingConversations && conversations.length === 0 && (
+                {loadingGroups && <p className="text-sm text-slate-400">Loading rooms...</p>}
+                {!loadingGroups && groups.length === 0 && (
                   <p className="text-sm text-slate-400">No rooms available yet.</p>
                 )}
-                {conversations.map((conversation) => (
+                {groups.map((group) => (
                   <button
-                    key={conversation.id}
+                    key={group.id}
                     type="button"
-                    onClick={() => setActiveConversationId(conversation.id)}
+                    onClick={() => setActiveGroupId(group.id)}
                     className={`w-full rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
-                      conversation.id === activeConversationId
+                      group.id === activeGroupId
                         ? 'border-cyan-300 bg-cyan-500/20 text-cyan-100'
                         : 'border-slate-700 bg-slate-900/70 text-slate-300 hover:border-cyan-400/40'
                     }`}
-                    aria-pressed={conversation.id === activeConversationId}
+                    aria-pressed={group.id === activeGroupId}
                   >
-                    <p className="font-medium">{conversation.name || 'Untitled Room'}</p>
-                    <p className="text-xs uppercase opacity-70">{conversation.type}</p>
+                    <p className="font-medium">{group.name || 'Untitled Room'}</p>
+                    <p className="text-xs uppercase opacity-70">{group.group_type}</p>
                   </button>
                 ))}
               </div>
@@ -231,7 +232,7 @@ const Chat: React.FC = () => {
           <section className="flex min-h-0 flex-col rounded-2xl border border-cyan-400/20 bg-slate-900/70 p-3 backdrop-blur">
             <div className="mb-3 flex items-center justify-between border-b border-slate-700/80 pb-3">
               <div>
-                <h2 className="font-semibold">{activeConversation?.name || 'Select a room'}</h2>
+                <h2 className="font-semibold">{activeGroup?.name || 'Select a room'}</h2>
                 <p className="text-xs text-slate-400">Educational collaboration channel</p>
               </div>
               <Bot className="text-cyan-300" aria-hidden="true" />
@@ -294,13 +295,13 @@ const Chat: React.FC = () => {
                       void sendMessage();
                     }
                   }}
-                  disabled={!activeConversationId || isSending}
+                  disabled={!activeGroupId || isSending}
                   aria-label="Message input"
                 />
                 <Button
                   onClick={() => void sendMessage()}
                   className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
-                  disabled={!draft.trim() || !activeConversationId || isSending}
+                  disabled={!draft.trim() || !activeGroupId || isSending}
                   aria-label="Send message"
                 >
                   <Send className="h-4 w-4" aria-hidden="true" />
