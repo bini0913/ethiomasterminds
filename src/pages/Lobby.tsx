@@ -119,64 +119,42 @@ const Lobby: React.FC = () => {
     durationHours: "2"
   });
 
-  useEffect(() => {
-    if (!user) {
-      toast.error("Please log in to access the lobby");
-      setTimeout(() => navigate("/"), 2000);
-      return;
-    }
-
-    loadLobbyData();
-    const cleanupRealtime = setupRealtimeSubscriptions();
-
-    return () => {
-      cleanupRealtime();
-    };
-  }, [user, navigate]);
-
-  const loadLobbyData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        refreshRooms(),
-        fetchOnlinePlayers(),
-        fetchChatMessages(),
-        fetchTournaments()
-      ]);
-    } catch (error) {
-      console.error('Error loading lobby data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchOnlinePlayers = async () => {
   const fetchOnlinePlayers = useCallback(async () => {
     const { data, error } = await supabase
       .from('user_presence')
       .select(`
         user_id,
         status,
-        last_seen,
-        profiles!inner(id, name, avatar, level, xp)
+        last_seen
       `)
       .eq('status', 'online')
       .gte('last_seen', new Date(Date.now() - 5 * 60 * 1000).toISOString())
       .limit(20);
 
     if (!error && data) {
-      const players = data.map((p: any) => ({
-        id: p.profiles.id,
-        name: p.profiles.name,
-        avatar: p.profiles.avatar || 'avatar-1',
-        level: p.profiles.level || 1,
-        xp: p.profiles.xp || 0,
-        status: p.status
-      }));
-      setOnlinePlayers(players);
+      const userIds = data.map((p: any) => p.user_id);
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, avatar, level, xp')
+          .in('id', userIds);
+
+        if (profiles) {
+          const players = profiles.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            avatar: p.avatar || 'avatar-1',
+            level: p.level || 1,
+            xp: p.xp || 0,
+            status: 'online'
+          }));
+          setOnlinePlayers(players);
+        }
+      } else {
+        setOnlinePlayers([]);
+      }
     }
 
-    // Update own presence
     if (user) {
       await supabase
         .from('user_presence')
@@ -191,22 +169,25 @@ const Lobby: React.FC = () => {
   const fetchChatMessages = useCallback(async () => {
     const { data, error } = await supabase
       .from('lobby_messages')
-      .select(`
-        id,
-        content,
-        created_at,
-        user_id,
-        profiles!inner(name, avatar)
-      `)
+      .select('id, content, created_at, user_id')
       .order('created_at', { ascending: true })
       .limit(50);
 
     if (!error && data) {
+      const userIds = [...new Set(data.map((m: any) => m.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, avatar')
+        .in('id', userIds);
+
+      const profileMap: Record<string, any> = {};
+      (profiles || []).forEach((p: any) => { profileMap[p.id] = p; });
+
       const messages = data.map((m: any) => ({
         id: m.id,
         userId: m.user_id,
-        userName: m.profiles.name,
-        userAvatar: m.profiles.avatar || 'avatar-1',
+        userName: profileMap[m.user_id]?.name || 'Unknown',
+        userAvatar: profileMap[m.user_id]?.avatar || 'avatar-1',
         message: m.content,
         timestamp: new Date(m.created_at)
       }));
@@ -217,36 +198,43 @@ const Lobby: React.FC = () => {
   const fetchTournaments = useCallback(async () => {
     const { data, error } = await supabase
       .from('tournaments')
-      .select(`
-        *,
-        tournament_participants(count)
-      `)
+      .select('*')
       .in('status', ['upcoming', 'active'])
       .order('start_time', { ascending: true })
       .limit(10);
 
     if (!error && data) {
-      const parseTournamentMode = (difficulty: string | null, description: string | null) => {
-        const lowerDifficulty = (difficulty || "").toLowerCase();
+      const tournamentIds = data.map((t: any) => t.id);
+      let participantCounts: Record<string, number> = {};
+      
+      if (tournamentIds.length > 0) {
+        const { data: participants } = await supabase
+          .from('tournament_participants')
+          .select('tournament_id')
+          .in('tournament_id', tournamentIds);
+
+        if (participants) {
+          participants.forEach((p: any) => {
+            participantCounts[p.tournament_id] = (participantCounts[p.tournament_id] || 0) + 1;
+          });
+        }
+      }
+
+      const tourns = data.map((t: any) => {
+        const playersCount = participantCounts[t.id] || 0;
+        const maxPlayers = t.max_participants || 128;
+        const lowerDifficulty = (t.difficulty || "").toLowerCase();
         const format = lowerDifficulty.includes("draw")
           ? "multiplayer_draw"
           : lowerDifficulty.includes("speed")
             ? "speed_knockout"
             : "knockout";
         return {
-          format: format as Tournament["format"],
-          scoreMode: lowerDifficulty.includes("speed") ? "speed" as Tournament["scoreMode"] : "accuracy" as Tournament["scoreMode"],
-          description: description || "Tournament challenge"
-        };
-      };
-
-      const tourns = data.map((t: any) => {
-        const playersCount = t.tournament_participants?.[0]?.count || 0;
-        const maxPlayers = t.max_participants || 128;
-        return {
-          ...parseTournamentMode(t.difficulty, t.description),
           id: t.id,
           name: t.name,
+          description: t.description || "Tournament challenge",
+          format: format as Tournament["format"],
+          scoreMode: (lowerDifficulty.includes("speed") ? "speed" : "accuracy") as Tournament["scoreMode"],
           startTime: new Date(t.start_time),
           endTime: new Date(t.end_time),
           players: playersCount,
@@ -278,7 +266,6 @@ const Lobby: React.FC = () => {
   }, [fetchChatMessages, fetchOnlinePlayers, fetchTournaments, refreshRooms]);
 
   const setupRealtimeSubscriptions = useCallback(() => {
-    // Subscribe to lobby chat
     const chatChannel = supabase
       .channel('lobby-chat')
       .on('postgres_changes', {
@@ -306,7 +293,6 @@ const Lobby: React.FC = () => {
       })
       .subscribe();
 
-    // Subscribe to room changes
     const roomChannel = supabase
       .channel('lobby-rooms')
       .on('postgres_changes', {
@@ -318,7 +304,6 @@ const Lobby: React.FC = () => {
       })
       .subscribe();
 
-    // Subscribe to presence changes
     const presenceChannel = supabase
       .channel('lobby-presence')
       .on('postgres_changes', {
@@ -330,23 +315,6 @@ const Lobby: React.FC = () => {
       })
       .subscribe();
 
-    return [chatChannel, roomChannel, presenceChannel];
-  }, [fetchOnlinePlayers, refreshRooms]);
-
-  useEffect(() => {
-    if (!user) {
-      toast.error("Please log in to access the lobby");
-      setTimeout(() => navigate("/"), 2000);
-      return;
-    }
-
-    loadLobbyData();
-    const channels = setupRealtimeSubscriptions();
-
-    return () => {
-      channels?.forEach((channel) => supabase.removeChannel(channel));
-    };
-  }, [user, navigate, loadLobbyData, setupRealtimeSubscriptions]);
     const tournamentChannel = supabase
       .channel('lobby-tournaments')
       .on('postgres_changes', {
@@ -365,13 +333,23 @@ const Lobby: React.FC = () => {
       })
       .subscribe();
 
+    return [chatChannel, roomChannel, presenceChannel, tournamentChannel];
+  }, [fetchOnlinePlayers, fetchTournaments, refreshRooms]);
+
+  useEffect(() => {
+    if (!user) {
+      toast.error("Please log in to access the lobby");
+      setTimeout(() => navigate("/"), 2000);
+      return;
+    }
+
+    loadLobbyData();
+    const channels = setupRealtimeSubscriptions();
+
     return () => {
-      supabase.removeChannel(chatChannel);
-      supabase.removeChannel(roomChannel);
-      supabase.removeChannel(presenceChannel);
-      supabase.removeChannel(tournamentChannel);
+      channels?.forEach((channel) => supabase.removeChannel(channel));
     };
-  };
+  }, [user, navigate, loadLobbyData, setupRealtimeSubscriptions]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -619,9 +597,7 @@ const Lobby: React.FC = () => {
   };
 
   const challengePlayer = async (playerId: string, playerName: string) => {
-    // Create a private room and invite the player
     toast.success(`Challenge sent to ${playerName}!`);
-    // TODO: Implement challenge system with notifications
   };
 
   const formatTimeRemaining = (startTime: Date) => {
@@ -647,7 +623,6 @@ const Lobby: React.FC = () => {
     multiplayer_draw: "Multiplayer Draw"
   };
 
-  // Convert context rooms to Room type
   const activeRooms: Room[] = rooms.map(r => ({
     id: r.id,
     name: r.name,
@@ -662,7 +637,6 @@ const Lobby: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_36%),radial-gradient(circle_at_80%_20%,_rgba(168,85,247,0.22),_transparent_42%),linear-gradient(to_bottom_right,_hsl(var(--background)),_hsl(var(--background)),_rgba(45,212,191,0.08))]">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-cyan-300/20 bg-[linear-gradient(95deg,rgba(6,182,212,0.28),rgba(99,102,241,0.26),rgba(168,85,247,0.3))] px-4 py-3 shadow-xl backdrop-blur-xl">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
@@ -676,28 +650,16 @@ const Lobby: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={loadLobbyData}
-              className="text-white hover:bg-white/20"
-            >
+            <Button variant="ghost" size="icon" onClick={loadLobbyData} className="text-white hover:bg-white/20">
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate("/")}
-              className="gap-2"
-            >
-              <Home className="h-4 w-4" />
-              Menu
+            <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2">
+              <Home className="h-4 w-4" /> Menu
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Quick Actions Bar */}
       <div className="bg-card/70 backdrop-blur-md border-b border-cyan-200/10 px-4 py-3">
         <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto scrollbar-none">
           <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 whitespace-nowrap">
@@ -713,43 +675,24 @@ const Lobby: React.FC = () => {
             <Crown className="h-4 w-4" /> Tournament
           </Button>
           <div className="flex items-center gap-2 ml-auto min-w-[420px]">
-            <Input
-              value={joinByCode}
-              onChange={(e) => setJoinByCode(e.target.value)}
-              className="h-9 bg-background/70 border-cyan-300/20"
-              placeholder="Join by room code"
-            />
-            <Input
-              value={joinPasscode}
-              onChange={(e) => setJoinPasscode(e.target.value)}
-              className="h-9 bg-background/70 border-cyan-300/20"
-              placeholder="Passcode (private only)"
-            />
-            <Button onClick={joinWithCode} className="whitespace-nowrap" variant="secondary">
-              Join
-            </Button>
+            <Input value={joinByCode} onChange={(e) => setJoinByCode(e.target.value)} className="h-9 bg-background/70 border-cyan-300/20" placeholder="Join by room code" />
+            <Input value={joinPasscode} onChange={(e) => setJoinPasscode(e.target.value)} className="h-9 bg-background/70 border-cyan-300/20" placeholder="Passcode (private only)" />
+            <Button onClick={joinWithCode} className="whitespace-nowrap" variant="secondary">Join</Button>
           </div>
           {canManageTournaments && (
-            <Button
-              variant="outline"
-              className="gap-2 whitespace-nowrap"
-              onClick={() => setCreateTournamentOpen(true)}
-            >
+            <Button variant="outline" className="gap-2 whitespace-nowrap" onClick={() => setCreateTournamentOpen(true)}>
               <Trophy className="h-4 w-4" /> Create Tournament
             </Button>
           )}
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto py-4 px-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Left - Online Players */}
           <Card className="bg-card/80 backdrop-blur-sm border-border/50">
             <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-xl py-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-5 w-5" />
-                Online Players ({onlinePlayers.length})
+                <Users className="h-5 w-5" /> Online Players ({onlinePlayers.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -759,11 +702,7 @@ const Lobby: React.FC = () => {
                     <p className="text-center text-muted-foreground py-8">No players online</p>
                   ) : (
                     onlinePlayers.map((player) => (
-                      <motion.div 
-                        key={player.id}
-                        whileHover={{ scale: 1.02 }}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
-                      >
+                      <motion.div key={player.id} whileHover={{ scale: 1.02 }} className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
                         <div className="relative">
                           <AvatarRenderer avatar={player.avatar} size="md" />
                           <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${getStatusColor(player.status)} border-2 border-card`}></div>
@@ -771,19 +710,12 @@ const Lobby: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate">{player.name}</div>
                           <div className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Star className="h-3 w-3 text-yellow-500" />
-                            Lv.{player.level} • {player.xp} XP
+                            <Star className="h-3 w-3 text-yellow-500" /> Lv.{player.level} • {player.xp} XP
                           </div>
                         </div>
                         {player.id !== user?.id && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={() => challengePlayer(player.id, player.name)}
-                          >
-                            <Swords className="h-3 w-3 mr-1" />
-                            Fight
+                          <Button variant="ghost" size="sm" className="h-8 px-3 text-xs" onClick={() => challengePlayer(player.id, player.name)}>
+                            <Swords className="h-3 w-3 mr-1" /> Fight
                           </Button>
                         )}
                       </motion.div>
@@ -794,7 +726,6 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          {/* Middle - Rooms & Tournaments */}
           <Card className="bg-card/80 backdrop-blur-sm border-border/50">
             <CardHeader className="bg-gradient-to-r from-indigo-500 to-fuchsia-600 text-white rounded-t-xl py-3">
               <CardTitle className="text-base">Play & Compete</CardTitle>
@@ -802,14 +733,9 @@ const Lobby: React.FC = () => {
             <CardContent className="pt-3">
               <Tabs defaultValue="rooms">
                 <TabsList className="w-full grid grid-cols-2">
-                  <TabsTrigger value="rooms" className="gap-1">
-                    <Gamepad className="h-3 w-3" /> Rooms ({activeRooms.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="tournaments" className="gap-1">
-                    <Trophy className="h-3 w-3" /> Tournaments ({tournaments.length})
-                  </TabsTrigger>
+                  <TabsTrigger value="rooms" className="gap-1"><Gamepad className="h-3 w-3" /> Rooms ({activeRooms.length})</TabsTrigger>
+                  <TabsTrigger value="tournaments" className="gap-1"><Trophy className="h-3 w-3" /> Tournaments ({tournaments.length})</TabsTrigger>
                 </TabsList>
-                
                 <TabsContent value="rooms" className="mt-3">
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-3 pr-2">
@@ -823,7 +749,6 @@ const Lobby: React.FC = () => {
                     </div>
                   </ScrollArea>
                 </TabsContent>
-                
                 <TabsContent value="tournaments" className="mt-3">
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-3">
@@ -831,52 +756,30 @@ const Lobby: React.FC = () => {
                         <p className="text-center text-muted-foreground py-8">No upcoming tournaments</p>
                       ) : (
                         tournaments.map((tournament) => (
-                          <motion.div 
-                            key={tournament.id}
-                            whileHover={{ scale: 1.02 }}
-                            className="border border-border/50 rounded-xl p-4 bg-muted/30 hover:border-primary/50 transition-colors"
-                          >
+                          <motion.div key={tournament.id} whileHover={{ scale: 1.02 }} className="border border-border/50 rounded-xl p-4 bg-muted/30 hover:border-primary/50 transition-colors">
                             <div className="flex justify-between items-start mb-2">
                               <div>
                                 <h3 className="font-semibold text-sm">{tournament.name}</h3>
-                                <div className="text-[11px] text-muted-foreground mt-0.5">
-                                  {formatLabel[tournament.format]} • {tournament.scoreMode}
-                                </div>
+                                <div className="text-[11px] text-muted-foreground mt-0.5">{formatLabel[tournament.format]} • {tournament.scoreMode}</div>
                                 <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                   <Clock className="h-3 w-3" />
                                   {tournament.status === 'active' ? 'In Progress' : `Starts in: ${formatTimeRemaining(tournament.startTime)}`}
                                 </div>
                               </div>
-                              <Badge variant="secondary" className="text-xs">
-                                {tournament.players}/{tournament.maxPlayers}
-                              </Badge>
+                              <Badge variant="secondary" className="text-xs">{tournament.players}/{tournament.maxPlayers}</Badge>
                             </div>
                             <div className="text-xs text-muted-foreground mb-2">
                               <span className="text-yellow-500 font-medium">🏆 Prize:</span> {tournament.prize}
                             </div>
                             <div className="w-full bg-muted rounded-full h-1.5 mb-2">
-                              <div 
-                                className="bg-gradient-to-r from-primary to-purple-500 h-1.5 rounded-full transition-all" 
-                                style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }}
-                              />
+                              <div className="bg-gradient-to-r from-primary to-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }} />
                             </div>
                             <div className="space-y-2">
-                              <Button
-                                size="sm"
-                                className="w-full"
-                                onClick={() => joinTournament(tournament.id)}
-                                disabled={tournament.status === 'active' || tournament.isFull}
-                              >
+                              <Button size="sm" className="w-full" onClick={() => joinTournament(tournament.id)} disabled={tournament.status === 'active' || tournament.isFull}>
                                 {tournament.status === 'active' ? 'In Progress' : tournament.isFull ? 'Full' : 'Register'}
                               </Button>
                               {canManageTournaments && tournament.status === "upcoming" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="w-full"
-                                  onClick={() => startTournament(tournament)}
-                                  disabled={!tournament.isFull}
-                                >
+                                <Button size="sm" variant="outline" className="w-full" onClick={() => startTournament(tournament)} disabled={!tournament.isFull}>
                                   {tournament.isFull ? 'Start Tournament' : 'Waiting for Full Capacity'}
                                 </Button>
                               )}
@@ -891,12 +794,10 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          {/* Right - Chat */}
           <Card className="bg-card/80 backdrop-blur-sm border-border/50">
             <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-t-xl py-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <MessageSquare className="h-5 w-5" />
-                Lobby Chat
+                <MessageSquare className="h-5 w-5" /> Lobby Chat
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 flex flex-col h-[500px]">
@@ -924,15 +825,8 @@ const Lobby: React.FC = () => {
               </ScrollArea>
               <form onSubmit={handleSendMessage} className="p-3 border-t border-border/50">
                 <div className="flex gap-2">
-                  <Input
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    className="flex-1"
-                  />
-                  <Button type="submit" size="icon" className="flex-shrink-0">
-                    <Send className="h-4 w-4" />
-                  </Button>
+                  <Input value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Type a message..." className="flex-1" />
+                  <Button type="submit" size="icon" className="flex-shrink-0"><Send className="h-4 w-4" /></Button>
                 </div>
               </form>
             </CardContent>
@@ -940,22 +834,15 @@ const Lobby: React.FC = () => {
         </div>
       </div>
 
-      {/* Create Room Dialog */}
       <Dialog open={createRoomOpen} onOpenChange={setCreateRoomOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Gamepad className="h-5 w-5" /> Create Game Room
-            </DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Gamepad className="h-5 w-5" /> Create Game Room</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Room Name</Label>
-              <Input
-                value={newRoomData.name}
-                onChange={(e) => setNewRoomData({...newRoomData, name: e.target.value})}
-                placeholder="e.g., Math Champions"
-              />
+              <Input value={newRoomData.name} onChange={(e) => setNewRoomData({...newRoomData, name: e.target.value})} placeholder="e.g., Math Champions" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1033,11 +920,7 @@ const Lobby: React.FC = () => {
             {newRoomData.roomType === "private" && (
               <div>
                 <Label>Private Room Code</Label>
-                <Input
-                  value={newRoomData.roomCode}
-                  onChange={(e) => setNewRoomData({...newRoomData, roomCode: e.target.value})}
-                  placeholder="Enter passcode"
-                />
+                <Input value={newRoomData.roomCode} onChange={(e) => setNewRoomData({...newRoomData, roomCode: e.target.value})} placeholder="Enter passcode" />
               </div>
             )}
             <div>
@@ -1074,9 +957,7 @@ const Lobby: React.FC = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateRoomOpen(false)}>Cancel</Button>
-            <Button onClick={createRoom} className="gap-2">
-              <Plus className="h-4 w-4" /> Create Room
-            </Button>
+            <Button onClick={createRoom} className="gap-2"><Plus className="h-4 w-4" /> Create Room</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1084,34 +965,21 @@ const Lobby: React.FC = () => {
       <Dialog open={createTournamentOpen} onOpenChange={setCreateTournamentOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5" /> Create Tournament (Admin)
-            </DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Trophy className="h-5 w-5" /> Create Tournament (Admin)</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Tournament Name</Label>
-              <Input
-                value={newTournamentData.name}
-                onChange={(e) => setNewTournamentData({ ...newTournamentData, name: e.target.value })}
-                placeholder="e.g., Grade 8 Speed Cup"
-              />
+              <Input value={newTournamentData.name} onChange={(e) => setNewTournamentData({ ...newTournamentData, name: e.target.value })} placeholder="e.g., Grade 8 Speed Cup" />
             </div>
             <div>
               <Label>Description</Label>
-              <Input
-                value={newTournamentData.description}
-                onChange={(e) => setNewTournamentData({ ...newTournamentData, description: e.target.value })}
-                placeholder="What students will compete on"
-              />
+              <Input value={newTournamentData.description} onChange={(e) => setNewTournamentData({ ...newTournamentData, description: e.target.value })} placeholder="What students will compete on" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Format</Label>
-                <Select
-                  value={newTournamentData.format}
-                  onValueChange={(value: Tournament["format"]) => setNewTournamentData({ ...newTournamentData, format: value })}
-                >
+                <Select value={newTournamentData.format} onValueChange={(value: Tournament["format"]) => setNewTournamentData({ ...newTournamentData, format: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="knockout">Knockout (Football style)</SelectItem>
@@ -1122,11 +990,7 @@ const Lobby: React.FC = () => {
               </div>
               <div>
                 <Label>Scoring</Label>
-                <Select
-                  value={newTournamentData.scoreMode}
-                  onValueChange={(value: Tournament["scoreMode"]) => setNewTournamentData({ ...newTournamentData, scoreMode: value })}
-                  disabled={newTournamentData.format === "multiplayer_draw"}
-                >
+                <Select value={newTournamentData.scoreMode} onValueChange={(value: Tournament["scoreMode"]) => setNewTournamentData({ ...newTournamentData, scoreMode: value })} disabled={newTournamentData.format === "multiplayer_draw"}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="accuracy">Accuracy</SelectItem>
@@ -1138,41 +1002,21 @@ const Lobby: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Max Players</Label>
-                <Input
-                  type="number"
-                  min={2}
-                  value={newTournamentData.maxPlayers}
-                  onChange={(e) => setNewTournamentData({ ...newTournamentData, maxPlayers: e.target.value })}
-                />
+                <Input type="number" min={2} value={newTournamentData.maxPlayers} onChange={(e) => setNewTournamentData({ ...newTournamentData, maxPlayers: e.target.value })} />
               </div>
               <div>
                 <Label>Duration (hours)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={newTournamentData.durationHours}
-                  onChange={(e) => setNewTournamentData({ ...newTournamentData, durationHours: e.target.value })}
-                />
+                <Input type="number" min={1} value={newTournamentData.durationHours} onChange={(e) => setNewTournamentData({ ...newTournamentData, durationHours: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Prize Coins</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={newTournamentData.prizeCoins}
-                  onChange={(e) => setNewTournamentData({ ...newTournamentData, prizeCoins: e.target.value })}
-                />
+                <Input type="number" min={0} value={newTournamentData.prizeCoins} onChange={(e) => setNewTournamentData({ ...newTournamentData, prizeCoins: e.target.value })} />
               </div>
               <div>
                 <Label>Prize Gems</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={newTournamentData.prizeGems}
-                  onChange={(e) => setNewTournamentData({ ...newTournamentData, prizeGems: e.target.value })}
-                />
+                <Input type="number" min={0} value={newTournamentData.prizeGems} onChange={(e) => setNewTournamentData({ ...newTournamentData, prizeGems: e.target.value })} />
               </div>
             </div>
           </div>
