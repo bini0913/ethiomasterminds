@@ -60,11 +60,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const cleanupExpiredRooms = useCallback(async () => {
-    const { error } = await supabase.rpc('cleanup_expired_multiplayer_rooms' as any);
-    if (error) {
-      // Do not block lobby/room flow if migration has not been applied yet.
-      console.warn('cleanup_expired_multiplayer_rooms RPC unavailable:', error.message);
-    }
+    await supabase.rpc('cleanup_expired_multiplayer_rooms' as any);
   }, []);
 
   const fetchRooms = useCallback(async () => {
