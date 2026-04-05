@@ -112,6 +112,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     }
   }, [roomState.status, roomState.question_ends_at]);
 
+  useEffect(() => {
+    if (!isHost || roomState.status !== 'playing' || timeRemaining > 0) return;
+    void nextQuestion();
+  }, [isHost, roomState.status, timeRemaining]);
+
   const loadRoomData = async () => {
     try {
       // Check if current user is host
@@ -151,7 +156,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     }
   };
 
-  const fetchPlayers = async () => {
+  const fetchPlayers = async (): Promise<Player[]> => {
     const { data: roomData } = await supabase
       .from('multiplayer_rooms')
       .select('host_id')
@@ -186,7 +191,10 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       });
 
       setPlayers(mappedPlayers);
+      return mappedPlayers;
     }
+
+    return [];
   };
 
   const fetchCurrentQuestion = async (questionId: string) => {
@@ -250,7 +258,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         table: 'room_state',
         filter: `room_id=eq.${roomId}`
       }, async (payload) => {
-        const newState = payload.new as RoomState;
+        const newState = payload.new as RoomState | null;
+        if (!newState) return;
         setRoomState(newState);
         
         if (newState.current_question_id) {
@@ -261,8 +270,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
         if (newState.status === 'finished') {
           // Fetch final scores and end game
-          await fetchPlayers();
-          const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+          const finalPlayers = await fetchPlayers();
+          const sortedPlayers = [...finalPlayers].sort((a, b) => b.score - a.score);
           onGameEnd(sortedPlayers);
         }
       })
@@ -415,20 +424,26 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.18),_transparent_38%),radial-gradient(circle_at_80%_20%,_rgba(236,72,153,0.16),_transparent_42%),linear-gradient(135deg,_hsl(var(--background)),_rgba(15,23,42,0.92),_rgba(30,41,59,0.9))] p-4">
+      <div className="max-w-6xl mx-auto space-y-4">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center rounded-2xl border border-cyan-400/25 bg-card/50 backdrop-blur-xl px-4 py-3 shadow-[0_0_30px_rgba(56,189,248,0.15)]">
           <div>
-            <h1 className="text-2xl font-display font-bold text-foreground">{roomName}</h1>
-            <p className="text-sm text-muted-foreground">Room ID: {roomId.slice(0, 8)}...</p>
+            <h1 className="text-2xl font-display font-bold bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-300 bg-clip-text text-transparent">
+              {roomName}
+            </h1>
+            <p className="text-sm text-cyan-100/80">Room ID: {roomId.slice(0, 8)}...</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowChat(!showChat)}>
+          <div className="flex gap-2 items-center">
+            <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+              <span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              LIVE
+            </Badge>
+            <Button variant="outline" size="sm" className="border-cyan-400/40 hover:bg-cyan-500/10" onClick={() => setShowChat(!showChat)}>
               <MessageCircle className="h-4 w-4 mr-2" />
               Chat
             </Button>
-            <Button variant="destructive" size="sm" onClick={onLeave}>
+            <Button variant="destructive" size="sm" className="bg-rose-600/90 hover:bg-rose-600" onClick={onLeave}>
               <LogOut className="h-4 w-4 mr-2" />
               Leave
             </Button>
@@ -439,7 +454,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           {/* Main Game Area */}
           <div className="lg:col-span-2 space-y-4">
             {roomState.status === 'waiting' && (
-              <Card className="p-6 glass neon-border">
+              <Card className="p-6 glass neon-border border-cyan-400/30 bg-card/70 backdrop-blur-lg">
                 <div className="text-center space-y-4">
                   <h2 className="text-xl font-bold text-foreground">Waiting for Players</h2>
                   <p className="text-muted-foreground">
@@ -472,7 +487,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             )}
 
             {roomState.status === 'countdown' && (
-              <Card className="p-12 glass neon-border text-center">
+              <Card className="p-12 glass neon-border text-center border-violet-400/40 bg-card/70 backdrop-blur-lg">
                 <motion.div
                   key={countdownValue}
                   initial={{ scale: 2, opacity: 0 }}
@@ -486,11 +501,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             )}
 
             {roomState.status === 'playing' && currentQuestion && (
-              <Card className="p-6 glass neon-border">
+              <Card className="p-6 glass neon-border border-sky-400/35 bg-card/70 backdrop-blur-lg shadow-[0_0_35px_rgba(56,189,248,0.2)]">
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <Badge variant="secondary">
-                      Question {roomState.question_index + 1}/{totalQuestions}
+                      Question {Math.max(1, roomState.question_index)}/{totalQuestions}
                     </Badge>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
@@ -516,16 +531,16 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
                   <div className="grid grid-cols-2 gap-3">
                     {currentQuestion.options.map((option, index) => {
-                      let buttonClass = 'border-border hover:border-primary bg-card';
+                          let buttonClass = 'border-border hover:border-primary bg-card/90';
                       
                       if (selectedAnswer !== null) {
                         if (answerResult?.correct && selectedAnswer === index) {
-                          buttonClass = 'border-green-500 bg-green-500/20';
-                        } else if (!answerResult?.correct && selectedAnswer === index) {
-                          buttonClass = 'border-destructive bg-destructive/20';
-                        } else {
-                          buttonClass = 'border-border bg-card opacity-50';
-                        }
+                            buttonClass = 'border-green-400 bg-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.25)]';
+                          } else if (!answerResult?.correct && selectedAnswer === index) {
+                            buttonClass = 'border-destructive bg-destructive/20 shadow-[0_0_18px_rgba(244,63,94,0.2)]';
+                          } else {
+                            buttonClass = 'border-border bg-card/70 opacity-50';
+                          }
                       }
 
                       return (
@@ -536,7 +551,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                           onClick={() => handleAnswer(index)}
                           disabled={selectedAnswer !== null}
                           className={cn(
-                            'p-4 rounded-xl border-2 text-left transition-all',
+                            'p-4 rounded-xl border-2 text-left transition-all backdrop-blur-sm',
                             buttonClass
                           )}
                         >
@@ -578,7 +593,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             )}
 
             {roomState.status === 'finished' && (
-              <Card className="p-6 glass neon-border text-center">
+              <Card className="p-6 glass neon-border text-center border-amber-400/40 bg-card/75 backdrop-blur-lg">
                 <Trophy className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold mb-4 text-foreground">Game Over!</h2>
                 <div className="space-y-2">
@@ -604,7 +619,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             )}
 
             {/* Players List */}
-            <Card className="p-4 glass">
+            <Card className="p-4 glass border-cyan-400/25 bg-card/65 backdrop-blur-lg">
               <h3 className="font-bold mb-3 flex items-center gap-2 text-foreground">
                 <Users className="h-4 w-4" />
                 Players ({players.length}/{maxPlayers})
@@ -645,7 +660,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 50 }}
               >
-                <Card className="h-[500px] flex flex-col glass">
+                <Card className="h-[500px] flex flex-col glass border-fuchsia-400/25 bg-card/70 backdrop-blur-lg">
                   <div className="p-3 border-b border-border">
                     <h3 className="font-bold flex items-center gap-2 text-foreground">
                       <MessageCircle className="h-4 w-4" />
