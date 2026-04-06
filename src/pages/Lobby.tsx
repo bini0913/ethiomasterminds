@@ -648,7 +648,7 @@ const Lobby: React.FC = () => {
     name: r.name,
     players: r.players?.length || 0,
     maxPlayers: r.maxPlayers,
-    status: (r.status === 'countdown' ? 'waiting' : r.status) as 'waiting' | 'in-progress' | 'finished',
+    status: ((r.status as string) === 'countdown' ? 'waiting' : r.status) as 'waiting' | 'in-progress' | 'finished',
     subject: r.gameSettings?.subject || 'Mixed',
     difficulty: r.gameSettings?.difficulty || 'Medium',
     gameMode: '1v1',
