@@ -189,7 +189,7 @@ const MainMenu: React.FC = () => {
       {/* Footer */}
       <footer className="px-4 py-4 text-center border-t border-border/50 bg-card/30">
         <p className="text-xs text-muted-foreground">{t("app-version")} • {t("created-by")} Biniam Bogale, Ethiopia</p>
-        <p className="text-xs text-muted-foreground mt-1">{t("contact")}: +251713445505</p>
+        <p className="text-xs text-muted-foreground mt-1">{t("contact")}: +251978744724</p>
       </footer>
 
       {showLevelUp && user && (<LevelUpModal previousLevel={previousLevel} newLevel={user.level} onClose={() => setShowLevelUp(false)} />)}
