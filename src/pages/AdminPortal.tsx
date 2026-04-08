@@ -221,6 +221,90 @@ const AdminPortal: React.FC = () => {
     setAnnouncements(data || []);
   };
 
+  };
+
+  const pushNotification = (text: string) => {
+    setNotifications((prev) => [{ id: `${Date.now()}-${Math.random()}`, text, createdAt: new Date().toISOString() }, ...prev].slice(0, 20));
+  };
+
+  const fetchAllData = async () => {
+    await Promise.all([fetchUsers(), fetchContent(), fetchReports(), fetchAnnouncements(), fetchStatsAndCharts()]);
+  };
+
+  useEffect(() => {
+    fetchAllData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-live-monitoring')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, () => {
+        pushNotification('New user joined');
+        logAction('Realtime event: new user');
+        fetchStatsAndCharts();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_posts' }, () => {
+        pushNotification('New social post published');
+        logAction('Realtime event: new post');
+        fetchStatsAndCharts();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quiz_results' }, () => {
+        pushNotification('New quiz activity');
+        logAction('Realtime event: quiz completed');
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        pushNotification('New message activity');
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchUsers = async () => {
+    const { data: profiles } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(500);
+    const usersWithRoles = await Promise.all((profiles || []).map(async (p: any) => {
+      const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', p.id).single();
+      return {
+        ...p,
+        role: (roleData?.role || 'student') as Role,
+      } as SystemUser;
+    }));
+    setUsers(usersWithRoles);
+  };
+
+  const fetchContent = async () => {
+    const [quizRes, questionRes, flashRes, postRes, bookRes] = await Promise.all([
+      supabase.from('quizzes').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('flashcards').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('social_posts').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('study_plans').select('*').order('created_at', { ascending: false }).limit(200),
+    ]);
+    setQuizzes(quizRes.data || []);
+    setQuestions(questionRes.data || []);
+    setFlashcards(flashRes.data || []);
+    setSocialPosts(postRes.data || []);
+    setBooks(bookRes.data || []);
+  };
+
+  const fetchReports = async () => {
+    const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(200);
+    const enriched = await Promise.all((data || []).map(async (report: any) => {
+      const { data: profile } = await supabase.from('profiles').select('name').eq('id', report.reporter_id).single();
+      return { ...report, reporter_name: profile?.name || 'Unknown' };
+    }));
+    setReports(enriched);
+  };
+
+  const fetchAnnouncements = async () => {
+    const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(100);
+    setAnnouncements(data || []);
+  };
+
   const fetchStatsAndCharts = async () => {
     const [profilesRes, quizzesRes, questionsRes, flashcardsRes, rolesRes, reportsRes, postsRes, presenceRes, booksRes, resultsRes] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact' }),
@@ -396,6 +480,119 @@ const AdminPortal: React.FC = () => {
       .update({ is_approved: true, approved_by: user?.id, approved_at: new Date().toISOString() })
       .eq('id', quizId);
 
+    });
+
+    const days = [...Array(7)].map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().slice(0, 10);
+    });
+
+    setDailyActivity(days.map((day) => ({
+      day: day.slice(5),
+      users: (presenceRes.data || []).filter((p: any) => p.last_seen?.slice(0, 10) === day).length,
+      quizzes: (resultsRes.data || []).filter((r: any) => r.completed_at?.slice(0, 10) === day).length,
+      posts: (postsRes.data || []).filter((p: any) => p.created_at?.slice(0, 10) === day).length,
+    })));
+  };
+
+  const handleCreateAnnouncement = async () => {
+    if (!announcementForm.title || !announcementForm.content || !user?.id) {
+      toast.error('Missing required fields');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.from('announcements').insert({ ...announcementForm, author_id: user.id });
+    setLoading(false);
+
+    if (error) {
+      toast.error('Failed to create announcement');
+      return;
+    }
+
+    toast.success('Announcement sent');
+    pushNotification(`Announcement: ${announcementForm.title}`);
+    logAction('Created announcement', announcementForm.title);
+    setAnnouncementForm({ title: '', content: '', target_type: 'all' });
+    setShowAnnouncementDialog(false);
+    fetchAnnouncements();
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    await supabase.from('user_roles').delete().eq('user_id', userId);
+    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    if (error) {
+      toast.error('Failed to delete user');
+      return;
+    }
+    toast.success('User deleted');
+    logAction('Deleted user', userId);
+    fetchUsers();
+    fetchStatsAndCharts();
+  };
+
+  const handleUpdateUserRole = async (userId: string, newRole: Role) => {
+    if (!isAdmin && (newRole === 'admin' || newRole === 'manager')) {
+      toast.error('Managers cannot assign admin/manager roles');
+      return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) {
+      toast.error('Not authenticated');
+      return;
+    }
+
+    const response = await supabase.functions.invoke('assign-role', {
+      body: { role: newRole, target_user_id: userId },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (response.error) {
+      toast.error('Failed to update role');
+      return;
+    }
+
+    toast.success('Role updated');
+    logAction(`Changed role to ${newRole}`, userId);
+    fetchUsers();
+  };
+
+  const handleBulkAction = async (action: 'delete' | 'promote_teacher' | 'suspend' | 'ban') => {
+    if (!selectedUsers.length) {
+      toast.error('Select users first');
+      return;
+    }
+
+    if (action === 'delete') await Promise.all(selectedUsers.map((id) => handleDeleteUser(id)));
+    if (action === 'promote_teacher') await Promise.all(selectedUsers.map((id) => handleUpdateUserRole(id, 'teacher')));
+    if (action === 'suspend') await Promise.all(selectedUsers.map((id) => supabase.from('profiles').update({ is_suspended: true } as never).eq('id', id)));
+    if (action === 'ban') await Promise.all(selectedUsers.map((id) => supabase.from('profiles').update({ is_banned: true } as never).eq('id', id)));
+
+    toast.success(`Bulk action executed: ${action}`);
+    logAction(`Bulk action: ${action}`, `${selectedUsers.length} users`);
+    setSelectedUsers([]);
+    fetchUsers();
+  };
+
+  const handleResetPassword = async (target: SystemUser) => {
+    if (!target.email) {
+      toast.error('No email on profile');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(target.email, { redirectTo: window.location.origin });
+    if (error) {
+      toast.error('Failed to send reset email');
+      return;
+    }
+    toast.success('Password reset email sent');
+    logAction('Triggered password reset', target.id);
+  };
+
+  const handleModerateReport = async (reportId: string, status: 'resolved' | 'dismissed') => {
+    const { error } = await supabase.from('reports').update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq('id', reportId);
     if (error) {
       toast.error('Failed to approve quiz');
       return;
@@ -404,6 +601,10 @@ const AdminPortal: React.FC = () => {
     toast.success('Quiz approved');
     logAction('Approved quiz', quizId);
     fetchContent();
+    toast.success(`Report ${status}`);
+    pushNotification(`Report ${status}`);
+    logAction(`Report ${status}`, reportId);
+    fetchReports();
     fetchStatsAndCharts();
   };
 
@@ -554,11 +755,21 @@ const AdminPortal: React.FC = () => {
                 <Button variant="destructive" size="sm" onClick={() => handleBulkAction('delete')}>Bulk Delete</Button>
               </div>
 
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction('promote_teacher')}>Bulk Promote</Button>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction('suspend')}>Bulk Suspend</Button>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction('ban')}>Bulk Ban</Button>
+                <Button variant="destructive" size="sm" onClick={() => handleBulkAction('delete')}>Bulk Delete</Button>
+              </div>
+
               <Card><CardContent className="p-0"><ScrollArea className="h-[560px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Select</th><th className="p-3 text-left">User</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Joined</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{filteredUsers.map((u) => (<tr key={u.id} className="border-b border-border/50"><td className="p-3"><input type="checkbox" checked={selectedUsers.includes(u.id)} onChange={(e) => setSelectedUsers((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))} /></td><td className="p-3"><p className="font-medium">{u.name}</p><p className="text-xs text-muted-foreground">@{u.username}</p></td><td className="p-3"><Select value={u.role} onValueChange={(v) => handleUpdateUserRole(u.id, v as Role)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></td><td className="p-3">{u.grade || '-'}</td><td className="p-3"><span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" />{u.xp}</span></td><td className="p-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)}><Key className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
 
             <TabsContent value="content" className="space-y-4">
               <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Approve, edit, or delete books, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => item.type === 'quiz' ? handleApproveQuiz(item.id) : toast.success('Approved')} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Approve, edit, or delete books, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => item.type === 'quiz' ? handleModerateReport(item.id, 'resolved') : toast.success('Approved')} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-4">
@@ -580,6 +791,13 @@ const AdminPortal: React.FC = () => {
 
             <TabsContent value="settings" className="space-y-4">
               {!isAdmin ? <Card><CardContent className="py-14 text-center"><Shield className="w-10 h-10 mx-auto mb-2 text-destructive" /><p className="font-semibold">Managers cannot access sensitive controls.</p><p className="text-sm text-muted-foreground">Only Admin can configure platform/system settings.</p></CardContent></Card> : <Card><CardHeader><CardTitle>System Settings (Admin only)</CardTitle></CardHeader><CardContent className="space-y-5"><div className="flex items-center justify-between"><Label>Enable Social Feed</Label><Switch checked={systemSettings.feature_social_enabled} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, feature_social_enabled: v })} /></div><div className="flex items-center justify-between"><Label>Enable XP System</Label><Switch checked={systemSettings.feature_xp_enabled} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, feature_xp_enabled: v })} /></div><div className="flex items-center justify-between"><Label>Enable AI Features</Label><Switch checked={systemSettings.feature_ai_enabled} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, feature_ai_enabled: v })} /></div><div className="flex items-center justify-between"><Label>Strict Moderation</Label><Switch checked={systemSettings.strict_moderation} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, strict_moderation: v })} /></div><div className="space-y-2"><Label>AI usage limit / day</Label><Input type="number" value={systemSettings.max_ai_requests_per_day} onChange={(e) => setSystemSettings({ ...systemSettings, max_ai_requests_per_day: Number(e.target.value) || 0 })} /></div><Button onClick={saveSystemSettings}>Save Settings</Button></CardContent></Card>}
+            </TabsContent>
+
+            <TabsContent value="logs" className="space-y-4">
+              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input value={logSearch} onChange={(e) => setLogSearch(e.target.value)} className="pl-10 w-96" placeholder="Search logs" /></div>
+              <Card><CardHeader><CardTitle>Activity Logs</CardTitle><CardDescription>Who did what, when, and on what target.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[600px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Who</th><th className="p-3 text-left">Action</th><th className="p-3 text-left">Target</th><th className="p-3 text-left">Time</th></tr></thead><tbody>{filteredLogs.map((entry) => (<tr key={entry.id} className="border-b border-border/50"><td className="p-3">{entry.actor}</td><td className="p-3">{entry.action}</td><td className="p-3">{entry.target}</td><td className="p-3 text-muted-foreground">{new Date(entry.at).toLocaleString()}</td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+            </TabsContent>
+
             </TabsContent>
 
             <TabsContent value="logs" className="space-y-4">
