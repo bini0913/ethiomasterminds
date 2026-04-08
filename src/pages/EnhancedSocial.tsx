@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageCircle, Users, Compass } from 'lucide-react';
+import { Users, Compass, LifeBuoy } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import EnhancedSocialFeed from '@/components/social/EnhancedSocialFeed';
 import EnhancedChatSystem from '@/components/chat/EnhancedChatSystem';
+import SocialSupportHub from '@/components/social/SocialSupportHub';
 import { useUser } from '@/context/UserContext';
 
 const EnhancedSocial: React.FC = () => {
@@ -30,7 +31,7 @@ const EnhancedSocial: React.FC = () => {
 
       <div className="container max-w-6xl mx-auto py-6 px-4 relative z-10">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+          <TabsList className="grid w-full max-w-xl mx-auto grid-cols-3">
             <TabsTrigger value="feed" className="gap-2">
               <Compass className="h-4 w-4" />
               Feed
@@ -38,6 +39,10 @@ const EnhancedSocial: React.FC = () => {
             <TabsTrigger value="groups" className="gap-2">
               <Users className="h-4 w-4" />
               Groups
+            </TabsTrigger>
+            <TabsTrigger value="support" className="gap-2">
+              <LifeBuoy className="h-4 w-4" />
+              Support
             </TabsTrigger>
           </TabsList>
 
@@ -52,6 +57,10 @@ const EnhancedSocial: React.FC = () => {
                 currentUserName={user?.name || 'Guest'}
               />
             </div>
+          </TabsContent>
+
+          <TabsContent value="support">
+            <SocialSupportHub />
           </TabsContent>
         </Tabs>
       </div>
