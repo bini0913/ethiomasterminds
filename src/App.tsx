@@ -32,6 +32,7 @@ import TopicCoveragePage from "./pages/TopicCoveragePage";
 import ExamModePage from "./pages/ExamModePage";
 import StudyPlannerPage from "./pages/StudyPlannerPage";
 import AcademicInsightsPage from "./pages/AcademicInsightsPage";
+import LibraryPage from "./pages/LibraryPage";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -112,6 +113,14 @@ const App = () => (
                               <Route path="/academic/exam" element={<ExamModePage />} />
                               <Route path="/academic/planner" element={<StudyPlannerPage />} />
                               <Route path="/academic/insights" element={<AcademicInsightsPage />} />
+                              <Route
+                                path="/library"
+                                element={
+                                  <ProtectedRoute allowedRoles={['student', 'teacher', 'admin', 'manager']}>
+                                    <LibraryPage />
+                                  </ProtectedRoute>
+                                }
+                              />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             <AIHelper />
