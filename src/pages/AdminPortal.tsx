@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,15 +15,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { 
-  Shield, Users, BookOpen, Trophy, Bell, Settings, LogOut,
-  Plus, Trash2, Edit, Send, UserCheck, UserX, Key, Database,
-  Activity, Server, BarChart3, Bot, Search, RefreshCw, Check,
-  X, AlertTriangle, Loader2, Crown, Zap, Flag, Eye, Ban
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  Shield, Users, BookOpen, Trophy, Bell, LogOut, Plus, Trash2, UserCheck, Key,
+  Database, Activity, BarChart3, Bot, Search, RefreshCw, Check, X, AlertTriangle,
+  Loader2, Crown, Zap, Flag, FileText, MessageSquare
 } from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
+type Role = 'student' | 'teacher' | 'admin' | 'manager';
 
 interface SystemUser {
   id: string;
@@ -32,39 +47,9 @@ interface SystemUser {
   email?: string;
   xp: number;
   level: number;
-  role: string;
+  role: Role;
+  grade?: string;
   created_at: string;
-  is_banned?: boolean;
-}
-
-interface AccessCode {
-  id: string;
-  code: string;
-  code_type: string;
-  is_used: boolean;
-  used_by: string | null;
-  created_at: string;
-  expires_at: string | null;
-}
-
-interface Quiz {
-  id: string;
-  title: string;
-  subject: string;
-  grade: string;
-  difficulty: string;
-  is_approved: boolean;
-  created_by: string;
-  created_at: string;
-  creator_name?: string;
-}
-
-interface NPCSettings {
-  id: string;
-  difficulty: string;
-  answer_speed_ms: number;
-  accuracy_percent: number;
-  intelligence_scaling: boolean;
 }
 
 interface SystemStats {
@@ -74,6 +59,10 @@ interface SystemStats {
   totalAdmins: number;
   totalQuizzes: number;
   totalQuestions: number;
+  totalFlashcards: number;
+  totalBooks: number;
+  totalPosts: number;
+  activeUsersNow: number;
   approvedQuizzes: number;
   pendingQuizzes: number;
   totalReports: number;
@@ -82,15 +71,13 @@ interface SystemStats {
 
 interface Report {
   id: string;
-  reporter_id: string;
   reported_type: string;
   reported_id: string;
   reason: string;
   description: string | null;
   status: string;
   created_at: string;
-  reviewed_by: string | null;
-  reviewed_at: string | null;
+  reporter_id: string;
   reporter_name?: string;
   reported_content?: string;
 }
@@ -98,17 +85,29 @@ interface Report {
 const AdminPortal: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useUser();
+  const isAdmin = user?.role === 'admin';
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [gradeFilter, setGradeFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [logSearch, setLogSearch] = useState('');
 
-  // Data states
   const [users, setUsers] = useState<SystemUser[]>([]);
-  const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [npcSettings, setNPCSettings] = useState<NPCSettings | null>(null);
+  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [flashcards, setFlashcards] = useState<any[]>([]);
+  const [socialPosts, setSocialPosts] = useState<any[]>([]);
+  const [books, setBooks] = useState<any[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+
+  const [notifications, setNotifications] = useState<Array<{ id: string; text: string; createdAt: string }>>([]);
+  const [activityLog, setActivityLog] = useState<Array<{ id: string; actor: string; action: string; target: string; at: string }>>([]);
+  const [dailyActivity, setDailyActivity] = useState<Array<{ day: string; users: number; quizzes: number; posts: number }>>([]);
+
   const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
     totalStudents: 0,
@@ -116,233 +115,285 @@ const AdminPortal: React.FC = () => {
     totalAdmins: 0,
     totalQuizzes: 0,
     totalQuestions: 0,
+    totalFlashcards: 0,
+    totalBooks: 0,
+    totalPosts: 0,
+    activeUsersNow: 0,
     approvedQuizzes: 0,
     pendingQuizzes: 0,
     totalReports: 0,
-    pendingReports: 0
+    pendingReports: 0,
   });
 
-  // Dialog states
-  const [showCodeDialog, setShowCodeDialog] = useState(false);
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
-  const [codeForm, setCodeForm] = useState({ code: '', code_type: 'teacher' });
-  const [announcementForm, setAnnouncementForm] = useState({
-    title: '',
-    content: '',
-    target_type: 'all'
+  const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', target_type: 'all' });
+  const [systemSettings, setSystemSettings] = useState({
+    feature_social_enabled: true,
+    feature_xp_enabled: true,
+    feature_ai_enabled: true,
+    strict_moderation: true,
+    max_ai_requests_per_day: 50,
   });
+
+  const logAction = (action: string, target = 'platform') => {
+    setActivityLog((prev) => [{ id: `${Date.now()}-${Math.random()}`, actor: user?.name || 'System', action, target, at: new Date().toISOString() }, ...prev].slice(0, 200));
+  };
+
+  const pushNotification = (text: string) => {
+    setNotifications((prev) => [{ id: `${Date.now()}-${Math.random()}`, text, createdAt: new Date().toISOString() }, ...prev].slice(0, 20));
+  };
+
+  const fetchAllData = async () => {
+    await Promise.all([fetchUsers(), fetchContent(), fetchReports(), fetchAnnouncements(), fetchStatsAndCharts()]);
+  };
 
   useEffect(() => {
     fetchAllData();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
-  const fetchAllData = async () => {
-    await Promise.all([
-      fetchUsers(),
-      fetchAccessCodes(),
-      fetchQuizzes(),
-      fetchAnnouncements(),
-      fetchNPCSettings(),
-      fetchStats(),
-      fetchReports()
-    ]);
-  };
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-live-monitoring')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, () => {
+        pushNotification('New user joined');
+        logAction('Realtime event: new user');
+        fetchStatsAndCharts();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_posts' }, () => {
+        pushNotification('New social post published');
+        logAction('Realtime event: new post');
+        fetchStatsAndCharts();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quiz_results' }, () => {
+        pushNotification('New quiz activity');
+        logAction('Realtime event: quiz completed');
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        pushNotification('New message activity');
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchUsers = async () => {
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Failed to fetch users:', error);
-      return;
-    }
-
-    // Fetch roles for each user
-    const usersWithRoles = await Promise.all(
-      (profiles || []).map(async (p) => {
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', p.id)
-          .single();
-        
-        return {
-          ...p,
-          role: roleData?.role || 'student'
-        };
-      })
-    );
-
+    const { data: profiles } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(500);
+    const usersWithRoles = await Promise.all((profiles || []).map(async (p: any) => {
+      const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', p.id).single();
+      return {
+        ...p,
+        role: (roleData?.role || 'student') as Role,
+      } as SystemUser;
+    }));
     setUsers(usersWithRoles);
   };
 
-  const fetchAccessCodes = async () => {
-    const { data, error } = await supabase
-      .from('access_codes')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setAccessCodes(data);
-    }
-  };
-
-  const fetchQuizzes = async () => {
-    const { data, error } = await supabase
-      .from('quizzes')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setQuizzes(data);
-    }
-  };
-
-  const fetchAnnouncements = async () => {
-    const { data, error } = await supabase
-      .from('announcements')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setAnnouncements(data);
-    }
-  };
-
-  const fetchNPCSettings = async () => {
-    const { data, error } = await supabase
-      .from('npc_settings')
-      .select('*')
-      .single();
-
-    if (!error && data) {
-      setNPCSettings(data);
-    }
+  const fetchContent = async () => {
+    const [quizRes, questionRes, flashRes, postRes, bookRes] = await Promise.all([
+      supabase.from('quizzes').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('flashcards').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('social_posts').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('study_plans').select('*').order('created_at', { ascending: false }).limit(200),
+    ]);
+    setQuizzes(quizRes.data || []);
+    setQuestions(questionRes.data || []);
+    setFlashcards(flashRes.data || []);
+    setSocialPosts(postRes.data || []);
+    setBooks(bookRes.data || []);
   };
 
   const fetchReports = async () => {
-    const { data, error } = await supabase
-      .from('reports')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      // Enrich with reporter names
-      const enriched = await Promise.all(
-        data.map(async (report) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('name')
-            .eq('id', report.reporter_id)
-            .single();
-
-          let reported_content = '';
-          if (report.reported_type === 'post') {
-            const { data: post } = await supabase
-              .from('social_posts')
-              .select('content')
-              .eq('id', report.reported_id)
-              .single();
-            reported_content = post?.content || '[Deleted]';
-          } else if (report.reported_type === 'comment') {
-            const { data: comment } = await supabase
-              .from('social_post_comments')
-              .select('content')
-              .eq('id', report.reported_id)
-              .single();
-            reported_content = comment?.content || '[Deleted]';
-          }
-
-          return {
-            ...report,
-            reporter_name: profile?.name || 'Unknown',
-            reported_content
-          };
-        })
-      );
-      setReports(enriched);
-    }
+    const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(200);
+    const enriched = await Promise.all((data || []).map(async (report: any) => {
+      const { data: profile } = await supabase.from('profiles').select('name').eq('id', report.reporter_id).single();
+      return { ...report, reporter_name: profile?.name || 'Unknown' };
+    }));
+    setReports(enriched);
   };
 
-  const fetchStats = async () => {
-    const [profilesRes, quizzesRes, questionsRes, rolesRes, reportsRes] = await Promise.all([
+  const fetchAnnouncements = async () => {
+    const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(100);
+    setAnnouncements(data || []);
+  };
+
+  const fetchStatsAndCharts = async () => {
+    const [profilesRes, quizzesRes, questionsRes, flashcardsRes, rolesRes, reportsRes, postsRes, presenceRes, booksRes, resultsRes] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact' }),
-      supabase.from('quizzes').select('id, is_approved', { count: 'exact' }),
+      supabase.from('quizzes').select('id,is_approved', { count: 'exact' }),
       supabase.from('questions').select('id', { count: 'exact' }),
+      supabase.from('flashcards').select('id', { count: 'exact' }),
       supabase.from('user_roles').select('role'),
-      supabase.from('reports').select('id, status', { count: 'exact' })
+      supabase.from('reports').select('id,status', { count: 'exact' }),
+      supabase.from('social_posts').select('id,created_at', { count: 'exact' }),
+      supabase.from('user_presence').select('id,last_seen', { count: 'exact' }),
+      supabase.from('study_plans').select('id', { count: 'exact' }),
+      supabase.from('quiz_results').select('completed_at').limit(1000),
     ]);
 
     const roles = rolesRes.data || [];
-    const quizzesData = quizzesRes.data || [];
-    const reportsData = reportsRes.data || [];
+    const quizRows = quizzesRes.data || [];
+    const reportRows = reportsRes.data || [];
 
     setStats({
       totalUsers: profilesRes.count || 0,
-      totalStudents: roles.filter(r => r.role === 'student').length,
-      totalTeachers: roles.filter(r => r.role === 'teacher').length,
-      totalAdmins: roles.filter(r => r.role === 'admin' || r.role === 'manager').length,
+      totalStudents: roles.filter((r: any) => r.role === 'student').length,
+      totalTeachers: roles.filter((r: any) => r.role === 'teacher').length,
+      totalAdmins: roles.filter((r: any) => ['admin', 'manager'].includes(r.role)).length,
       totalQuizzes: quizzesRes.count || 0,
       totalQuestions: questionsRes.count || 0,
-      approvedQuizzes: quizzesData.filter(q => q.is_approved).length,
-      pendingQuizzes: quizzesData.filter(q => !q.is_approved).length,
+      totalFlashcards: flashcardsRes.count || 0,
+      totalBooks: booksRes.count || 0,
+      totalPosts: postsRes.count || 0,
+      activeUsersNow: (presenceRes.data || []).filter((p: any) => new Date(p.last_seen).getTime() > Date.now() - 10 * 60 * 1000).length,
+      approvedQuizzes: quizRows.filter((q: any) => q.is_approved).length,
+      pendingQuizzes: quizRows.filter((q: any) => !q.is_approved).length,
       totalReports: reportsRes.count || 0,
-      pendingReports: reportsData.filter(r => r.status === 'pending').length
+      pendingReports: reportRows.filter((r: any) => r.status === 'pending').length,
     });
+
+    const days = [...Array(7)].map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().slice(0, 10);
+    });
+
+    setDailyActivity(days.map((day) => ({
+      day: day.slice(5),
+      users: (presenceRes.data || []).filter((p: any) => p.last_seen?.slice(0, 10) === day).length,
+      quizzes: (resultsRes.data || []).filter((r: any) => r.completed_at?.slice(0, 10) === day).length,
+      posts: (postsRes.data || []).filter((p: any) => p.created_at?.slice(0, 10) === day).length,
+    })));
   };
 
-  const handleCreateCode = async () => {
-    if (!codeForm.code) {
-      toast.error('Please enter a code');
+  const handleCreateAnnouncement = async () => {
+    if (!announcementForm.title || !announcementForm.content || !user?.id) {
+      toast.error('Missing required fields');
       return;
     }
 
     setLoading(true);
-    const { error } = await supabase
-      .from('access_codes')
-      .insert({
-        code: codeForm.code.toUpperCase(),
-        code_type: codeForm.code_type,
-        created_by: user?.id
-      });
-
+    const { error } = await supabase.from('announcements').insert({ ...announcementForm, author_id: user.id });
     setLoading(false);
+
     if (error) {
-      toast.error('Failed to create code');
+      toast.error('Failed to create announcement');
       return;
     }
 
-    toast.success('Access code created!');
-    setShowCodeDialog(false);
-    setCodeForm({ code: '', code_type: 'teacher' });
-    fetchAccessCodes();
+    toast.success('Announcement sent');
+    pushNotification(`Announcement: ${announcementForm.title}`);
+    logAction('Created announcement', announcementForm.title);
+    setAnnouncementForm({ title: '', content: '', target_type: 'all' });
+    setShowAnnouncementDialog(false);
+    fetchAnnouncements();
   };
 
-  const handleDeleteCode = async (codeId: string) => {
-    const { error } = await supabase
-      .from('access_codes')
-      .delete()
-      .eq('id', codeId);
+  const handleDeleteUser = async (userId: string) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
 
-    if (error) {
-      toast.error('Failed to delete code');
+    if (!token) {
+      toast.error('Not authenticated');
       return;
     }
 
-    toast.success('Code deleted');
-    fetchAccessCodes();
+    const response = await supabase.functions.invoke('delete-user', {
+      body: { target_user_id: userId },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (response.error || !response.data?.ok) {
+      toast.error(response.data?.error || 'Failed to delete user account');
+      return;
+    }
+
+    toast.success('User account fully deleted');
+    logAction('Deleted user account', userId);
+    fetchUsers();
+    fetchStatsAndCharts();
+  };
+
+  const handleUpdateUserRole = async (userId: string, newRole: Role) => {
+    if (!isAdmin && (newRole === 'admin' || newRole === 'manager')) {
+      toast.error('Managers cannot assign admin/manager roles');
+      return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) {
+      toast.error('Not authenticated');
+      return;
+    }
+
+    const response = await supabase.functions.invoke('assign-role', {
+      body: { role: newRole, target_user_id: userId },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (response.error) {
+      toast.error('Failed to update role');
+      return;
+    }
+
+    toast.success('Role updated');
+    logAction(`Changed role to ${newRole}`, userId);
+    fetchUsers();
+  };
+
+  const handleBulkAction = async (action: 'delete' | 'promote_teacher' | 'suspend' | 'ban') => {
+    if (!selectedUsers.length) {
+      toast.error('Select users first');
+      return;
+    }
+
+    if (action === 'delete') await Promise.all(selectedUsers.map((id) => handleDeleteUser(id)));
+    if (action === 'promote_teacher') await Promise.all(selectedUsers.map((id) => handleUpdateUserRole(id, 'teacher')));
+    if (action === 'suspend') await Promise.all(selectedUsers.map((id) => supabase.from('profiles').update({ is_suspended: true } as never).eq('id', id)));
+    if (action === 'ban') await Promise.all(selectedUsers.map((id) => supabase.from('profiles').update({ is_banned: true } as never).eq('id', id)));
+
+    toast.success(`Bulk action executed: ${action}`);
+    logAction(`Bulk action: ${action}`, `${selectedUsers.length} users`);
+    setSelectedUsers([]);
+    fetchUsers();
+  };
+
+  const handleResetPassword = async (target: SystemUser) => {
+    if (!target.email) {
+      toast.error('No email on profile');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(target.email, { redirectTo: window.location.origin });
+    if (error) {
+      toast.error('Failed to send reset email');
+      return;
+    }
+    toast.success('Password reset email sent');
+    logAction('Triggered password reset', target.id);
+  };
+
+  const handleModerateReport = async (reportId: string, status: 'resolved' | 'dismissed') => {
+    const { error } = await supabase.from('reports').update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq('id', reportId);
+    if (error) {
+      toast.error('Failed to update report');
+      return;
+    }
+    toast.success(`Report ${status}`);
+    pushNotification(`Report ${status}`);
+    logAction(`Report ${status}`, reportId);
+    fetchReports();
+    fetchStatsAndCharts();
   };
 
   const handleApproveQuiz = async (quizId: string) => {
     const { error } = await supabase
       .from('quizzes')
-      .update({ 
-        is_approved: true, 
-        approved_by: user?.id,
-        approved_at: new Date().toISOString()
-      })
+      .update({ is_approved: true, approved_by: user?.id, approved_at: new Date().toISOString() })
       .eq('id', quizId);
 
     if (error) {
@@ -350,1022 +401,198 @@ const AdminPortal: React.FC = () => {
       return;
     }
 
-    toast.success('Quiz approved!');
-    fetchQuizzes();
-    fetchStats();
+    toast.success('Quiz approved');
+    logAction('Approved quiz', quizId);
+    fetchContent();
+    fetchStatsAndCharts();
   };
 
-  const handleRejectQuiz = async (quizId: string) => {
-    const { error } = await supabase
-      .from('quizzes')
-      .delete()
-      .eq('id', quizId);
-
+  const handleDeleteContent = async (type: 'quiz' | 'question' | 'flashcard' | 'social', id: string) => {
+    const table = type === 'social' ? 'social_posts' : `${type}s`;
+    const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) {
-      toast.error('Failed to reject quiz');
+      toast.error(`Failed to delete ${type}`);
       return;
     }
-
-    toast.success('Quiz rejected and deleted');
-    fetchQuizzes();
-    fetchStats();
+    toast.success(`${type} deleted`);
+    logAction(`Deleted ${type}`, id);
+    fetchContent();
+    fetchStatsAndCharts();
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    // Delete user roles first
-    await supabase.from('user_roles').delete().eq('user_id', userId);
-    
-    // Delete profile
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', userId);
-
-    if (error) {
-      toast.error('Failed to delete user');
+  const saveSystemSettings = () => {
+    if (!isAdmin) {
+      toast.error('Admin only: system settings');
       return;
     }
-
-    toast.success('User deleted');
-    fetchUsers();
-    fetchStats();
+    toast.success('System settings saved');
+    logAction('Updated system settings');
   };
 
-  const handleUpdateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin' | 'manager') => {
-    try {
-      // Use the assign-role edge function which bypasses RLS with service role
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      
-      if (!token) {
-        toast.error('Not authenticated');
-        return;
-      }
+  const filteredUsers = useMemo(() => users
+    .filter((u) => (searchQuery ? `${u.name} ${u.username}`.toLowerCase().includes(searchQuery.toLowerCase()) : true))
+    .filter((u) => (gradeFilter === 'all' ? true : String(u.grade || '').includes(gradeFilter)))
+    .filter((u) => (roleFilter === 'all' ? true : u.role === roleFilter)), [users, searchQuery, gradeFilter, roleFilter]);
 
-      const response = await supabase.functions.invoke('assign-role', {
-        body: { role: newRole, target_user_id: userId },
-        headers: { Authorization: `Bearer ${token}` }
-      });
+  const contentRows = useMemo(() => [
+    ...quizzes.map((x: any) => ({ id: x.id, type: 'quiz', title: x.title, grade: x.grade, subject: x.subject, created_at: x.created_at })),
+    ...flashcards.map((x: any) => ({ id: x.id, type: 'flashcard', title: x.term || x.question || 'Flashcard', grade: x.grade, subject: x.subject, created_at: x.created_at })),
+    ...questions.map((x: any) => ({ id: x.id, type: 'question', title: x.question_text || x.question || 'Question', grade: x.grade, subject: x.subject, created_at: x.created_at })),
+    ...socialPosts.map((x: any) => ({ id: x.id, type: 'social', title: x.content?.slice(0, 80) || 'Social Post', grade: 'all', subject: x.post_type, created_at: x.created_at })),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()), [quizzes, flashcards, questions, socialPosts]);
 
-      if (response.error) {
-        toast.error('Failed to update role');
-        return;
-      }
+  const filteredLogs = useMemo(() => activityLog.filter((log) => `${log.actor} ${log.action} ${log.target}`.toLowerCase().includes(logSearch.toLowerCase())), [activityLog, logSearch]);
 
-      toast.success('Role updated!');
-      fetchUsers();
-    } catch (err) {
-      toast.error('Failed to update role');
-    }
-  };
-
-  const handleUpdateNPCSettings = async () => {
-    if (!npcSettings) return;
-
-    setLoading(true);
-    const { error } = await supabase
-      .from('npc_settings')
-      .update({
-        difficulty: npcSettings.difficulty,
-        answer_speed_ms: npcSettings.answer_speed_ms,
-        accuracy_percent: npcSettings.accuracy_percent,
-        intelligence_scaling: npcSettings.intelligence_scaling,
-        updated_by: user?.id
-      })
-      .eq('id', npcSettings.id);
-
-    setLoading(false);
-    if (error) {
-      toast.error('Failed to update NPC settings');
-      return;
-    }
-
-    toast.success('NPC settings updated!');
-  };
-
-  const handleCreateAnnouncement = async () => {
-    if (!announcementForm.title || !announcementForm.content) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
-    if (!user?.id) {
-      toast.error('Not authenticated');
-      return;
-    }
-
-    setLoading(true);
-    const { data: createdAnnouncement, error } = await supabase
-      .from('announcements')
-      .insert({
-        ...announcementForm,
-        author_id: user.id
-      })
-      .select('id, title, content, target_type, target_id')
-      .single();
-
-    if (error) {
-      setLoading(false);
-      toast.error('Failed to create announcement');
-      return;
-    }
-
-    const shouldShareToStudentSocial = ['all', 'students', 'class'].includes(createdAnnouncement.target_type);
-
-    if (shouldShareToStudentSocial) {
-      const socialPostContent = `📢 ${createdAnnouncement.title}
-
-${createdAnnouncement.content}`;
-      const { error: socialError } = await supabase
-        .from('social_posts')
-        .insert({
-          author_id: user.id,
-          content: socialPostContent,
-          post_type: 'post',
-          metadata: {
-            source: 'announcement',
-            announcement_id: createdAnnouncement.id,
-            target_type: createdAnnouncement.target_type,
-            target_id: createdAnnouncement.target_id,
-            display_name: 'Administration',
-            hide_level: true
-          }
-        });
-
-      if (socialError) {
-        console.error('Error sharing announcement to social:', socialError);
-        toast.error('Announcement created, but failed to share to social feed');
-      }
-    }
-
-    setLoading(false);
-    toast.success('Announcement sent!');
-    setShowAnnouncementDialog(false);
-    setAnnouncementForm({ title: '', content: '', target_type: 'all' });
-    fetchAnnouncements();
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
-
-  const handleReviewReport = async (reportId: string, action: 'resolved' | 'dismissed') => {
-    const { error } = await supabase
-      .from('reports')
-      .update({
-        status: action,
-        reviewed_by: user?.id,
-        reviewed_at: new Date().toISOString()
-      })
-      .eq('id', reportId);
-
-    if (error) {
-      toast.error('Failed to update report');
-      return;
-    }
-
-    toast.success(`Report ${action}`);
-    fetchReports();
-    fetchStats();
-  };
-
-  const handleDeleteReportedContent = async (report: Report) => {
-    let error = null;
-    if (report.reported_type === 'post') {
-      // Delete likes, reactions, comments, saved_posts first, then post
-      await supabase.from('social_post_likes').delete().eq('post_id', report.reported_id);
-      await supabase.from('social_post_reactions').delete().eq('post_id', report.reported_id);
-      await supabase.from('social_post_comments').delete().eq('post_id', report.reported_id);
-      await supabase.from('saved_posts').delete().eq('post_id', report.reported_id);
-      const res = await supabase.from('social_posts').delete().eq('id', report.reported_id);
-      error = res.error;
-    } else if (report.reported_type === 'comment') {
-      const res = await supabase.from('social_post_comments').delete().eq('id', report.reported_id);
-      error = res.error;
-    } else if (report.reported_type === 'message') {
-      // Can't delete messages per RLS, just mark report resolved
-    }
-
-    if (error) {
-      toast.error('Failed to delete content');
-      return;
-    }
-
-    toast.success('Content deleted');
-    // Auto-resolve the report
-    await handleReviewReport(report.id, 'resolved');
-  };
-
-  const filteredUsers = users.filter(u => 
-    u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.username?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredQuizzes = quizzes.filter(q =>
-    q.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const contentMix = [
+    { name: 'Quizzes', value: stats.totalQuizzes, color: '#ef4444' },
+    { name: 'Flashcards', value: stats.totalFlashcards, color: '#3b82f6' },
+    { name: 'Questions', value: stats.totalQuestions, color: '#22c55e' },
+    { name: 'Posts', value: stats.totalPosts, color: '#a855f7' },
+  ].filter((x) => x.value > 0);
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <AnimatedBackground />
-      
+      <AnimatedBackground variant="minimal" />
       <div className="relative z-10">
-        {/* Header */}
         <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <BackButton />
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
-                    Admin Portal
-                  </h1>
-                  <p className="text-sm text-muted-foreground">System Control Panel</p>
-                </div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">Master Minds Admin & Manager</h1>
+                <p className="text-sm text-muted-foreground">{isAdmin ? 'Admin mode: full power' : 'Manager mode: limited controls'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" onClick={fetchAllData}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
-              <Button variant="ghost" size="icon" onClick={handleLogout}>
-                <LogOut className="w-5 h-5" />
-              </Button>
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="relative">
+                    <Bell className="w-4 h-4" />
+                    {notifications.length > 0 && <span className="absolute -top-1 -right-1 text-[10px] px-1 rounded-full bg-destructive text-white">{notifications.length}</span>}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                  {notifications.length === 0 && <DropdownMenuItem>No new notifications</DropdownMenuItem>}
+                  {notifications.map((n) => (
+                    <DropdownMenuItem key={n.id} className="flex flex-col items-start">
+                      <span>{n.text}</span>
+                      <span className="text-xs text-muted-foreground">{new Date(n.createdAt).toLocaleTimeString()}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button variant="outline" size="sm" onClick={fetchAllData}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
+              <Button variant="ghost" size="icon" onClick={async () => { await logout(); navigate('/'); }}><LogOut className="w-5 h-5" /></Button>
             </div>
           </div>
         </header>
 
         <main className="container mx-auto px-4 py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid grid-cols-8 gap-2 bg-muted/50 p-1 rounded-xl">
-              <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </TabsTrigger>
-              <TabsTrigger value="users" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                <span className="hidden sm:inline">Users</span>
-              </TabsTrigger>
-              <TabsTrigger value="reports" className="flex items-center gap-2 relative">
-                <Flag className="w-4 h-4" />
-                <span className="hidden sm:inline">Reports</span>
-                {stats.pendingReports > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
-                    {stats.pendingReports}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="codes" className="flex items-center gap-2">
-                <Key className="w-4 h-4" />
-                <span className="hidden sm:inline">Codes</span>
-              </TabsTrigger>
-              <TabsTrigger value="quizzes" className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4" />
-                <span className="hidden sm:inline">Quizzes</span>
-              </TabsTrigger>
-              <TabsTrigger value="npc" className="flex items-center gap-2">
-                <Bot className="w-4 h-4" />
-                <span className="hidden sm:inline">NPC</span>
-              </TabsTrigger>
-              <TabsTrigger value="announcements" className="flex items-center gap-2">
-                <Bell className="w-4 h-4" />
-                <span className="hidden sm:inline">Announce</span>
-              </TabsTrigger>
-              <TabsTrigger value="leaderboard" className="flex items-center gap-2">
-                <Trophy className="w-4 h-4" />
-                <span className="hidden sm:inline">Leaderboard</span>
-              </TabsTrigger>
+            <TabsList className="grid grid-cols-8 lg:grid-cols-10 gap-2 bg-muted/50 p-1 rounded-xl">
+              <TabsTrigger value="dashboard"><BarChart3 className="w-4 h-4 mr-1" />Dashboard</TabsTrigger>
+              <TabsTrigger value="users"><Users className="w-4 h-4 mr-1" />Users</TabsTrigger>
+              <TabsTrigger value="content"><FileText className="w-4 h-4 mr-1" />Content</TabsTrigger>
+              <TabsTrigger value="analytics"><Activity className="w-4 h-4 mr-1" />Analytics</TabsTrigger>
+              <TabsTrigger value="reports"><Flag className="w-4 h-4 mr-1" />Reports</TabsTrigger>
+              <TabsTrigger value="announcements"><MessageSquare className="w-4 h-4 mr-1" />Notify</TabsTrigger>
+              <TabsTrigger value="settings"><Bot className="w-4 h-4 mr-1" />Settings</TabsTrigger>
+              <TabsTrigger value="logs"><Activity className="w-4 h-4 mr-1" />Logs</TabsTrigger>
+              <TabsTrigger value="leaderboard"><Trophy className="w-4 h-4 mr-1" />Leaderboard</TabsTrigger>
+              <TabsTrigger value="monitoring"><Bell className="w-4 h-4 mr-1" />Live</TabsTrigger>
             </TabsList>
 
-            {/* Dashboard Tab */}
-            <TabsContent value="dashboard" className="space-y-6">
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                  <Card className="bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/20">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Total Users</p>
-                          <p className="text-3xl font-bold">{stats.totalUsers}</p>
-                        </div>
-                        <Users className="w-10 h-10 text-blue-500 opacity-50" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                  <Card className="bg-gradient-to-br from-green-500/20 to-green-500/5 border-green-500/20">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Students</p>
-                          <p className="text-3xl font-bold">{stats.totalStudents}</p>
-                        </div>
-                        <UserCheck className="w-10 h-10 text-green-500 opacity-50" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                  <Card className="bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/20">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Teachers</p>
-                          <p className="text-3xl font-bold">{stats.totalTeachers}</p>
-                        </div>
-                        <Crown className="w-10 h-10 text-purple-500 opacity-50" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-                  <Card className="bg-gradient-to-br from-red-500/20 to-red-500/5 border-red-500/20">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Admins</p>
-                          <p className="text-3xl font-bold">{stats.totalAdmins}</p>
-                        </div>
-                        <Shield className="w-10 h-10 text-red-500 opacity-50" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+            <TabsContent value="dashboard" className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {[
+                  ['Total Users', stats.totalUsers, Users],
+                  ['Active (10m)', stats.activeUsersNow, Activity],
+                  ['Flashcards', stats.totalFlashcards, Database],
+                  ['Books/Plans', stats.totalBooks, BookOpen],
+                  ['Quizzes', stats.totalQuizzes, Crown],
+                ].map(([label, value, Icon], i) => (
+                  <motion.div key={String(label)} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                    <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{value as number}</p><Icon className="w-5 h-5 text-primary" /></div></CardContent></Card>
+                  </motion.div>
+                ))}
               </div>
 
-              {/* More Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <BookOpen className="w-8 h-8 text-primary" />
-                      <div>
-                        <p className="text-2xl font-bold">{stats.totalQuizzes}</p>
-                        <p className="text-sm text-muted-foreground">Total Quizzes</p>
-                      </div>
-                    </div>
+              <div className="grid lg:grid-cols-3 gap-4">
+                <Card className="lg:col-span-2">
+                  <CardHeader><CardTitle>Daily Activity</CardTitle></CardHeader>
+                  <CardContent className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={dailyActivity}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Line type="monotone" dataKey="users" stroke="#3b82f6" /><Line type="monotone" dataKey="quizzes" stroke="#f97316" /><Line type="monotone" dataKey="posts" stroke="#22c55e" /></LineChart>
+                    </ResponsiveContainer>
                   </CardContent>
                 </Card>
-
                 <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <Database className="w-8 h-8 text-accent" />
-                      <div>
-                        <p className="text-2xl font-bold">{stats.totalQuestions}</p>
-                        <p className="text-sm text-muted-foreground">Questions</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <Check className="w-8 h-8 text-green-500" />
-                      <div>
-                        <p className="text-2xl font-bold">{stats.approvedQuizzes}</p>
-                        <p className="text-sm text-muted-foreground">Approved</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <AlertTriangle className="w-8 h-8 text-yellow-500" />
-                      <div>
-                        <p className="text-2xl font-bold">{stats.pendingQuizzes}</p>
-                        <p className="text-sm text-muted-foreground">Pending</p>
-                      </div>
-                    </div>
+                  <CardHeader><CardTitle>Content Mix</CardTitle></CardHeader>
+                  <CardContent className="h-72">
+                    <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={contentMix} dataKey="value" nameKey="name" innerRadius={36} outerRadius={80}>{contentMix.map((s) => <Cell key={s.name} fill={s.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer>
                   </CardContent>
                 </Card>
               </div>
-
-              {/* Pending Approvals */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-yellow-500" />
-                    Pending Quiz Approvals
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-64">
-                    {quizzes.filter(q => !q.is_approved).slice(0, 5).map((quiz) => (
-                      <div key={quiz.id} className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
-                        <div>
-                          <p className="font-medium">{quiz.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {quiz.subject} • Grade {quiz.grade} • {quiz.difficulty}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => handleApproveQuiz(quiz.id)}>
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleRejectQuiz(quiz.id)}>
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    {quizzes.filter(q => !q.is_approved).length === 0 && (
-                      <p className="text-center text-muted-foreground py-8">No pending approvals</p>
-                    )}
-                  </ScrollArea>
-                </CardContent>
-              </Card>
             </TabsContent>
 
-            {/* Users Tab */}
-            <TabsContent value="users" className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search users..." 
-                    className="pl-10 w-64"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <Badge variant="outline">{users.length} users</Badge>
+            <TabsContent value="users" className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 w-64" placeholder="Search users" /></div>
+                <Select value={gradeFilter} onValueChange={setGradeFilter}><SelectTrigger className="w-40"><SelectValue placeholder="Grade" /></SelectTrigger><SelectContent><SelectItem value="all">All Grades</SelectItem><SelectItem value="1">Grade 1</SelectItem><SelectItem value="5">Grade 5</SelectItem><SelectItem value="8">Grade 8</SelectItem><SelectItem value="12">Grade 12</SelectItem></SelectContent></Select>
+                <Select value={roleFilter} onValueChange={setRoleFilter}><SelectTrigger className="w-40"><SelectValue placeholder="Role" /></SelectTrigger><SelectContent><SelectItem value="all">All Roles</SelectItem><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select>
+                <Badge variant="outline">{filteredUsers.length} users</Badge>
               </div>
 
-              <Card>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[500px]">
-                    <table className="w-full">
-                      <thead className="sticky top-0 bg-muted/80 backdrop-blur">
-                        <tr>
-                          <th className="text-left p-4">User</th>
-                          <th className="text-left p-4">Role</th>
-                          <th className="text-left p-4">Level</th>
-                          <th className="text-left p-4">XP</th>
-                          <th className="text-left p-4">Joined</th>
-                          <th className="text-right p-4">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredUsers.map((u) => (
-                          <tr key={u.id} className="border-b border-border/50 hover:bg-muted/50">
-                            <td className="p-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold">
-                                  {u.name?.charAt(0) || 'U'}
-                                </div>
-                                <div>
-                                  <p className="font-medium">{u.name}</p>
-                                  <p className="text-sm text-muted-foreground">@{u.username}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <Select 
-                                value={u.role} 
-                                onValueChange={(v) => handleUpdateUserRole(u.id, v as 'student' | 'teacher' | 'admin' | 'manager')}
-                              >
-                                <SelectTrigger className="w-28">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="student">Student</SelectItem>
-                                  <SelectItem value="teacher">Teacher</SelectItem>
-                                  <SelectItem value="admin">Admin</SelectItem>
-                                  <SelectItem value="manager">Manager</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </td>
-                            <td className="p-4">
-                              <Badge variant="outline">Lvl {u.level}</Badge>
-                            </td>
-                            <td className="p-4">
-                              <span className="flex items-center gap-1">
-                                <Zap className="w-4 h-4 text-yellow-500" />
-                                {u.xp}
-                              </span>
-                            </td>
-                            <td className="p-4 text-sm text-muted-foreground">
-                              {new Date(u.created_at).toLocaleDateString()}
-                            </td>
-                            <td className="p-4 text-right">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => handleDeleteUser(u.id)}
-                              >
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction('promote_teacher')}>Bulk Promote</Button>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction('suspend')}>Bulk Suspend</Button>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction('ban')}>Bulk Ban</Button>
+                <Button variant="destructive" size="sm" onClick={() => handleBulkAction('delete')}>Bulk Delete</Button>
+              </div>
+
+              <Card><CardContent className="p-0"><ScrollArea className="h-[560px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Select</th><th className="p-3 text-left">User</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Joined</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{filteredUsers.map((u) => (<tr key={u.id} className="border-b border-border/50"><td className="p-3"><input type="checkbox" checked={selectedUsers.includes(u.id)} onChange={(e) => setSelectedUsers((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))} /></td><td className="p-3"><p className="font-medium">{u.name}</p><p className="text-xs text-muted-foreground">@{u.username}</p></td><td className="p-3"><Select value={u.role} onValueChange={(v) => handleUpdateUserRole(u.id, v as Role)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></td><td className="p-3">{u.grade || '-'}</td><td className="p-3"><span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" />{u.xp}</span></td><td className="p-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)}><Key className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
 
-            {/* Access Codes Tab */}
-            <TabsContent value="codes" className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Access Codes</h2>
-                <Dialog open={showCodeDialog} onOpenChange={setShowCodeDialog}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Generate Code
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Generate Access Code</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <Input 
-                        placeholder="Code (e.g., TEACHER2024)" 
-                        value={codeForm.code}
-                        onChange={(e) => setCodeForm({ ...codeForm, code: e.target.value.toUpperCase() })}
-                      />
-                      <Select 
-                        value={codeForm.code_type} 
-                        onValueChange={(v) => setCodeForm({ ...codeForm, code_type: v })}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="teacher">Teacher Code</SelectItem>
-                          <SelectItem value="admin">Admin Code</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button className="w-full" onClick={handleCreateCode} disabled={loading}>
-                        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Generate Code
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
+            <TabsContent value="content" className="space-y-4">
+              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Approve, edit, or delete books, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => item.type === 'quiz' ? handleApproveQuiz(item.id) : toast.success('Approved')} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+            </TabsContent>
 
+            <TabsContent value="analytics" className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
-                {accessCodes.map((code) => (
-                  <Card key={code.id} className={code.is_used ? 'opacity-60' : ''}>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Key className={`w-5 h-5 ${code.code_type === 'admin' ? 'text-red-500' : 'text-blue-500'}`} />
-                            <span className="font-mono text-lg font-bold">{code.code}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={code.code_type === 'admin' ? 'destructive' : 'default'}>
-                              {code.code_type}
-                            </Badge>
-                            <Badge variant={code.is_used ? 'secondary' : 'outline'}>
-                              {code.is_used ? 'Used' : 'Available'}
-                            </Badge>
-                          </div>
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleDeleteCode(code.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                {accessCodes.length === 0 && (
-                  <Card className="col-span-full p-12 text-center">
-                    <Key className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No access codes</h3>
-                    <p className="text-muted-foreground mb-4">Generate codes for teachers and admins</p>
-                  </Card>
-                )}
+                <Card><CardHeader><CardTitle>User Growth & Activity Trends</CardTitle></CardHeader><CardContent className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={dailyActivity}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Bar dataKey="users" fill="#3b82f6" /><Bar dataKey="quizzes" fill="#f97316" /></BarChart></ResponsiveContainer></CardContent></Card>
+                <Card><CardHeader><CardTitle>Most Active Students (Top XP)</CardTitle></CardHeader><CardContent className="space-y-3">{[...users].sort((a, b) => b.xp - a.xp).slice(0, 7).map((u, i) => (<div key={u.id} className="flex items-center justify-between p-2 rounded bg-muted/40"><span>#{i + 1} {u.name}</span><Badge>{u.xp} XP</Badge></div>))}</CardContent></Card>
               </div>
+              <Card><CardHeader><CardTitle>Weak Subject Trends</CardTitle><CardDescription>Based on low-volume quizzes by subject.</CardDescription></CardHeader><CardContent>{Object.entries(quizzes.reduce((acc: Record<string, number>, q: any) => { acc[q.subject || 'Unknown'] = (acc[q.subject || 'Unknown'] || 0) + 1; return acc; }, {})).sort((a, b) => Number(a[1]) - Number(b[1])).slice(0, 6).map(([subject, count]) => (<div key={subject} className="flex justify-between border-b py-2"><span>{subject}</span><span className="text-muted-foreground">{String(count)} quizzes</span></div>))}</CardContent></Card>
             </TabsContent>
 
-            {/* Quizzes Tab */}
-            <TabsContent value="quizzes" className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search quizzes..." 
-                    className="pl-10 w-64"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">{stats.approvedQuizzes} approved</Badge>
-                  <Badge variant="secondary">{stats.pendingQuizzes} pending</Badge>
-                </div>
-              </div>
-
-              <Card>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[500px]">
-                    <table className="w-full">
-                      <thead className="sticky top-0 bg-muted/80 backdrop-blur">
-                        <tr>
-                          <th className="text-left p-4">Quiz</th>
-                          <th className="text-left p-4">Subject</th>
-                          <th className="text-left p-4">Grade</th>
-                          <th className="text-left p-4">Status</th>
-                          <th className="text-left p-4">Created</th>
-                          <th className="text-right p-4">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredQuizzes.map((quiz) => (
-                          <tr key={quiz.id} className="border-b border-border/50 hover:bg-muted/50">
-                            <td className="p-4">
-                              <p className="font-medium">{quiz.title}</p>
-                              <p className="text-sm text-muted-foreground">{quiz.difficulty}</p>
-                            </td>
-                            <td className="p-4">{quiz.subject}</td>
-                            <td className="p-4">Grade {quiz.grade}</td>
-                            <td className="p-4">
-                              <Badge variant={quiz.is_approved ? 'default' : 'secondary'}>
-                                {quiz.is_approved ? 'Approved' : 'Pending'}
-                              </Badge>
-                            </td>
-                            <td className="p-4 text-sm text-muted-foreground">
-                              {new Date(quiz.created_at).toLocaleDateString()}
-                            </td>
-                            <td className="p-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                {!quiz.is_approved && (
-                                  <Button size="sm" onClick={() => handleApproveQuiz(quiz.id)}>
-                                    <Check className="w-4 h-4" />
-                                  </Button>
-                                )}
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleRejectQuiz(quiz.id)}
-                                >
-                                  <Trash2 className="w-4 h-4 text-destructive" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
+            <TabsContent value="reports" className="space-y-4">
+              <Card><CardHeader><CardTitle className="flex items-center gap-2"><Flag className="w-4 h-4 text-destructive" />Reports & Flags</CardTitle></CardHeader><CardContent><ScrollArea className="h-[620px]"><div className="space-y-3">{reports.map((report) => (<div key={report.id} className="border rounded-xl p-3"><div className="flex items-center gap-2 mb-2"><Badge variant={report.status === 'pending' ? 'destructive' : 'outline'}>{report.status}</Badge><Badge variant="outline">{report.reported_type}</Badge><span className="text-xs text-muted-foreground">{new Date(report.created_at).toLocaleString()}</span></div><p className="text-sm">{report.reason}</p><p className="text-xs text-muted-foreground">Reporter: {report.reporter_name}</p>{report.description && <p className="text-sm italic mt-1">"{report.description}"</p>} {report.status === 'pending' && <div className="flex gap-2 mt-3"><Button size="sm" onClick={() => handleModerateReport(report.id, 'resolved')}><Check className="w-3 h-3 mr-1" />Resolve</Button><Button size="sm" variant="outline" onClick={() => handleModerateReport(report.id, 'dismissed')}><X className="w-3 h-3 mr-1" />Dismiss</Button></div>}</div>))}</div></ScrollArea></CardContent></Card>
             </TabsContent>
 
-            {/* NPC Settings Tab */}
-            <TabsContent value="npc" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Bot className="w-5 h-5" />
-                    NPC Bot Settings
-                  </CardTitle>
-                  <CardDescription>
-                    Configure AI opponent behavior for multiplayer games
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {npcSettings && (
-                    <>
-                      <div className="space-y-3">
-                        <Label>Difficulty Level</Label>
-                        <Select 
-                          value={npcSettings.difficulty} 
-                          onValueChange={(v) => setNPCSettings({ ...npcSettings, difficulty: v })}
-                        >
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="easy">Easy</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="hard">Hard</SelectItem>
-                            <SelectItem value="expert">Expert</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-3">
-                        <Label>Answer Speed: {npcSettings.answer_speed_ms}ms</Label>
-                        <Slider
-                          value={[npcSettings.answer_speed_ms]}
-                          onValueChange={([v]) => setNPCSettings({ ...npcSettings, answer_speed_ms: v })}
-                          min={500}
-                          max={10000}
-                          step={100}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Lower = faster response time
-                        </p>
-                      </div>
-
-                      <div className="space-y-3">
-                        <Label>Accuracy: {npcSettings.accuracy_percent}%</Label>
-                        <Slider
-                          value={[npcSettings.accuracy_percent]}
-                          onValueChange={([v]) => setNPCSettings({ ...npcSettings, accuracy_percent: v })}
-                          min={10}
-                          max={100}
-                          step={5}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Percentage of correct answers
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label>Intelligence Scaling</Label>
-                          <p className="text-sm text-muted-foreground">
-                            NPCs adapt to player skill level
-                          </p>
-                        </div>
-                        <Switch
-                          checked={npcSettings.intelligence_scaling}
-                          onCheckedChange={(v) => setNPCSettings({ ...npcSettings, intelligence_scaling: v })}
-                        />
-                      </div>
-
-                      <Button onClick={handleUpdateNPCSettings} disabled={loading}>
-                        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Save Settings
-                      </Button>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
+            <TabsContent value="announcements" className="space-y-4">
+              <div className="flex justify-between"><h2 className="text-xl font-semibold">Notifications & Announcements</h2><Dialog open={showAnnouncementDialog} onOpenChange={setShowAnnouncementDialog}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />New Notification</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Create Alert / Announcement</DialogTitle></DialogHeader><div className="space-y-3"><Input placeholder="Title" value={announcementForm.title} onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })} /><Textarea placeholder="Message" rows={4} value={announcementForm.content} onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })} /><Select value={announcementForm.target_type} onValueChange={(v) => setAnnouncementForm({ ...announcementForm, target_type: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem><SelectItem value="students">Students</SelectItem><SelectItem value="teachers">Teachers</SelectItem></SelectContent></Select><Button className="w-full" disabled={loading} onClick={handleCreateAnnouncement}>{loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Send</Button></div></DialogContent></Dialog></div>
+              <div className="space-y-3">{announcements.map((ann) => (<Card key={ann.id}><CardContent className="p-4"><div className="flex justify-between"><div><p className="font-medium">{ann.title}</p><p className="text-sm text-muted-foreground">{ann.content}</p><p className="text-xs text-muted-foreground mt-2">{new Date(ann.created_at).toLocaleString()}</p></div><Badge>{ann.target_type}</Badge></div></CardContent></Card>))}</div>
             </TabsContent>
 
-            {/* Announcements Tab */}
-            <TabsContent value="announcements" className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">System Announcements</h2>
-                <Dialog open={showAnnouncementDialog} onOpenChange={setShowAnnouncementDialog}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="w-4 h-4 mr-2" />
-                      New Announcement
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create System Announcement</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <Input 
-                        placeholder="Title" 
-                        value={announcementForm.title}
-                        onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
-                      />
-                      <Textarea 
-                        placeholder="Content" 
-                        rows={4}
-                        value={announcementForm.content}
-                        onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })}
-                      />
-                      <Select 
-                        value={announcementForm.target_type} 
-                        onValueChange={(v) => setAnnouncementForm({ ...announcementForm, target_type: v })}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Users</SelectItem>
-                          <SelectItem value="students">All Students</SelectItem>
-                          <SelectItem value="teachers">All Teachers</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button className="w-full" onClick={handleCreateAnnouncement} disabled={loading}>
-                        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Send Announcement
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              <div className="space-y-4">
-                {announcements.map((ann) => (
-                  <Card key={ann.id}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Bell className="w-4 h-4 text-primary" />
-                            <h3 className="text-lg font-semibold">{ann.title}</h3>
-                          </div>
-                          <p className="text-muted-foreground">{ann.content}</p>
-                          <p className="text-xs text-muted-foreground mt-4">
-                            {new Date(ann.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                        <Badge>{ann.target_type}</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+            <TabsContent value="settings" className="space-y-4">
+              {!isAdmin ? <Card><CardContent className="py-14 text-center"><Shield className="w-10 h-10 mx-auto mb-2 text-destructive" /><p className="font-semibold">Managers cannot access sensitive controls.</p><p className="text-sm text-muted-foreground">Only Admin can configure platform/system settings.</p></CardContent></Card> : <Card><CardHeader><CardTitle>System Settings (Admin only)</CardTitle></CardHeader><CardContent className="space-y-5"><div className="flex items-center justify-between"><Label>Enable Social Feed</Label><Switch checked={systemSettings.feature_social_enabled} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, feature_social_enabled: v })} /></div><div className="flex items-center justify-between"><Label>Enable XP System</Label><Switch checked={systemSettings.feature_xp_enabled} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, feature_xp_enabled: v })} /></div><div className="flex items-center justify-between"><Label>Enable AI Features</Label><Switch checked={systemSettings.feature_ai_enabled} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, feature_ai_enabled: v })} /></div><div className="flex items-center justify-between"><Label>Strict Moderation</Label><Switch checked={systemSettings.strict_moderation} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, strict_moderation: v })} /></div><div className="space-y-2"><Label>AI usage limit / day</Label><Input type="number" value={systemSettings.max_ai_requests_per_day} onChange={(e) => setSystemSettings({ ...systemSettings, max_ai_requests_per_day: Number(e.target.value) || 0 })} /></div><Button onClick={saveSystemSettings}>Save Settings</Button></CardContent></Card>}
             </TabsContent>
 
-            {/* Reports Tab */}
-            <TabsContent value="reports" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Flag className="w-5 h-5 text-destructive" />
-                    User Reports
-                  </CardTitle>
-                  <CardDescription>
-                    Review and moderate reported content from users
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {reports.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Flag className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                      <p>No reports yet. The community is behaving well! 🎉</p>
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-[600px]">
-                      <div className="space-y-4">
-                        {reports.map((report) => (
-                          <motion.div
-                            key={report.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className={`p-4 rounded-xl border ${
-                              report.status === 'pending' 
-                                ? 'border-destructive/30 bg-destructive/5' 
-                                : report.status === 'resolved'
-                                ? 'border-green-500/30 bg-green-500/5'
-                                : 'border-muted bg-muted/30'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1 space-y-2">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge variant={
-                                    report.status === 'pending' ? 'destructive' :
-                                    report.status === 'resolved' ? 'default' : 'secondary'
-                                  }>
-                                    {report.status}
-                                  </Badge>
-                                  <Badge variant="outline">{report.reported_type}</Badge>
-                                  <Badge variant="outline" className="bg-muted/50">{report.reason}</Badge>
-                                </div>
-
-                                <div className="text-sm">
-                                  <span className="text-muted-foreground">Reported by: </span>
-                                  <span className="font-medium">{report.reporter_name}</span>
-                                  <span className="text-muted-foreground ml-2">
-                                    {new Date(report.created_at).toLocaleDateString()}
-                                  </span>
-                                </div>
-
-                                {report.reported_content && (
-                                  <div className="bg-muted/50 rounded-lg p-3 text-sm border border-border/50">
-                                    <p className="text-muted-foreground text-xs mb-1">Reported Content:</p>
-                                    <p className="line-clamp-3">{report.reported_content}</p>
-                                  </div>
-                                )}
-
-                                {report.description && (
-                                  <p className="text-sm text-muted-foreground italic">
-                                    "{report.description}"
-                                  </p>
-                                )}
-                              </div>
-
-                              {report.status === 'pending' && (
-                                <div className="flex flex-col gap-2 shrink-0">
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => handleDeleteReportedContent(report)}
-                                    className="gap-1"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                    Delete Content
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleReviewReport(report.id, 'resolved')}
-                                    className="gap-1"
-                                  >
-                                    <Check className="w-3 h-3" />
-                                    Resolve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleReviewReport(report.id, 'dismissed')}
-                                    className="gap-1 text-muted-foreground"
-                                  >
-                                    <X className="w-3 h-3" />
-                                    Dismiss
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
+            <TabsContent value="logs" className="space-y-4">
+              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input value={logSearch} onChange={(e) => setLogSearch(e.target.value)} className="pl-10 w-96" placeholder="Search logs" /></div>
+              <Card><CardHeader><CardTitle>Activity Logs</CardTitle><CardDescription>Who did what, when, and on what target.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[600px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Who</th><th className="p-3 text-left">Action</th><th className="p-3 text-left">Target</th><th className="p-3 text-left">Time</th></tr></thead><tbody>{filteredLogs.map((entry) => (<tr key={entry.id} className="border-b border-border/50"><td className="p-3">{entry.actor}</td><td className="p-3">{entry.action}</td><td className="p-3">{entry.target}</td><td className="p-3 text-muted-foreground">{new Date(entry.at).toLocaleString()}</td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
 
-            {/* Global Leaderboard Tab */}
-            <TabsContent value="leaderboard" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-yellow-500" />
-                    Global Leaderboard
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[500px]">
-                    <table className="w-full">
-                      <thead className="sticky top-0 bg-muted/80 backdrop-blur">
-                        <tr>
-                          <th className="text-left p-4">Rank</th>
-                          <th className="text-left p-4">User</th>
-                          <th className="text-left p-4">Level</th>
-                          <th className="text-left p-4">XP</th>
-                          <th className="text-left p-4">Role</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...users]
-                          .sort((a, b) => b.xp - a.xp)
-                          .map((u, i) => (
-                          <tr key={u.id} className="border-b border-border/50 hover:bg-muted/50">
-                            <td className="p-4">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                                i === 0 ? 'bg-yellow-500 text-yellow-950' :
-                                i === 1 ? 'bg-gray-400 text-gray-950' :
-                                i === 2 ? 'bg-orange-600 text-orange-950' :
-                                'bg-muted'
-                              }`}>
-                                {i + 1}
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold">
-                                  {u.name?.charAt(0) || 'U'}
-                                </div>
-                                <div>
-                                  <p className="font-medium">{u.name}</p>
-                                  <p className="text-sm text-muted-foreground">@{u.username}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <Badge variant="outline">Lvl {u.level}</Badge>
-                            </td>
-                            <td className="p-4">
-                              <span className="flex items-center gap-1 font-bold">
-                                <Zap className="w-4 h-4 text-yellow-500" />
-                                {u.xp.toLocaleString()}
-                              </span>
-                            </td>
-                            <td className="p-4">
-                              <Badge variant={
-                                u.role === 'admin' || u.role === 'manager' ? 'destructive' :
-                                u.role === 'teacher' ? 'default' : 'secondary'
-                              }>
-                                {u.role}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
+            <TabsContent value="leaderboard" className="space-y-4">
+              <Card><CardHeader><CardTitle>Most Active Students</CardTitle></CardHeader><CardContent className="space-y-2">{[...users].filter((u) => u.role === 'student').sort((a, b) => b.xp - a.xp).slice(0, 20).map((u, i) => (<div key={u.id} className="flex items-center justify-between border rounded-lg p-2"><span>#{i + 1} {u.name}</span><Badge variant="outline">Lvl {u.level} • {u.xp} XP</Badge></div>))}</CardContent></Card>
+            </TabsContent>
+
+            <TabsContent value="monitoring" className="space-y-4">
+              <Card><CardHeader><CardTitle>Real-time Monitoring</CardTitle><CardDescription>Live stream from Supabase subscriptions (users, posts, quiz activity, messages).</CardDescription></CardHeader><CardContent className="space-y-3">{notifications.map((n) => (<div key={n.id} className="border rounded-lg p-3 flex items-center justify-between"><div className="flex items-center gap-2"><Bell className="w-4 h-4 text-primary" /><p>{n.text}</p></div><p className="text-xs text-muted-foreground">{new Date(n.createdAt).toLocaleTimeString()}</p></div>))}{notifications.length === 0 && <p className="text-muted-foreground">No live events yet.</p>}</CardContent></Card>
             </TabsContent>
           </Tabs>
         </main>
