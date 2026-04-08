@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertTriangle, ArrowBigUp, Loader2, Lightbulb } from 'lucide-react';
+import { AlertTriangle, ArrowBigUp, Loader2, Lightbulb, Search, Sparkles, TrendingUp } from 'lucide-react';
 
 type BoardPost = {
   id: string;
@@ -34,6 +34,8 @@ const SocialSupportHub: React.FC = () => {
   const [isSubmittingSupport, setIsSubmittingSupport] = useState(false);
   const [isSubmittingFeature, setIsSubmittingFeature] = useState(false);
   const [isVoting, setIsVoting] = useState<string | null>(null);
+  const [supportSearch, setSupportSearch] = useState('');
+  const [featureSearch, setFeatureSearch] = useState('');
 
   const loadBoard = useCallback(async () => {
     setIsLoading(true);
@@ -202,6 +204,30 @@ const SocialSupportHub: React.FC = () => {
     [],
   );
 
+  const filteredSupportPosts = useMemo(() => {
+    const keyword = supportSearch.trim().toLowerCase();
+    if (!keyword) return supportPosts;
+
+    return supportPosts.filter((post) => {
+      const content = post.content.toLowerCase();
+      const author = post.authorName.toLowerCase();
+      return content.includes(keyword) || author.includes(keyword);
+    });
+  }, [supportPosts, supportSearch]);
+
+  const filteredFeaturePosts = useMemo(() => {
+    const keyword = featureSearch.trim().toLowerCase();
+    if (!keyword) return featurePosts;
+
+    return featurePosts.filter((post) => {
+      const title = ((post.metadata?.title as string | undefined) || post.content.split('\n')[0]).toLowerCase();
+      const details = ((post.metadata?.details as string | undefined) || post.content).toLowerCase();
+      return title.includes(keyword) || details.includes(keyword) || post.authorName.toLowerCase().includes(keyword);
+    });
+  }, [featurePosts, featureSearch]);
+
+  const topFeature = featurePosts[0];
+
   return (
     <Card className="bg-card/80 border-border/50 backdrop-blur-sm">
       <CardHeader>
@@ -209,6 +235,20 @@ const SocialSupportHub: React.FC = () => {
         <CardDescription>
           Report problems to the support team and suggest new features. Feature requests with the most votes are prioritized.
         </CardDescription>
+        <div className="grid grid-cols-1 gap-2 pt-1 md:grid-cols-3">
+          <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Open support reports</p>
+            <p className="text-lg font-semibold">{supportPosts.length}</p>
+          </div>
+          <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Feature ideas</p>
+            <p className="text-lg font-semibold">{featurePosts.length}</p>
+          </div>
+          <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Top voted idea</p>
+            <p className="text-sm font-semibold truncate">{topFeature ? ((topFeature.metadata?.title as string | undefined) || 'Untitled idea') : '—'}</p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="support" className="space-y-4">
@@ -229,6 +269,7 @@ const SocialSupportHub: React.FC = () => {
                   onChange={(e) => setSupportText(e.target.value)}
                   className="min-h-28"
                 />
+                <p className="text-xs text-muted-foreground">{supportText.length}/500 characters</p>
                 <Button onClick={submitSupportRequest} disabled={isSubmittingSupport || !supportText.trim()}>
                   {isSubmittingSupport ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Send to support team
@@ -237,9 +278,18 @@ const SocialSupportHub: React.FC = () => {
             </Card>
 
             <div className="space-y-3">
+              <div className="relative">
+                <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  value={supportSearch}
+                  onChange={(e) => setSupportSearch(e.target.value)}
+                  placeholder="Search support requests"
+                  className="pl-9"
+                />
+              </div>
               {isLoading && <p className="text-sm text-muted-foreground">Loading support requests...</p>}
-              {!isLoading && supportPosts.length === 0 && <p className="text-sm text-muted-foreground">{emptyStateText.support}</p>}
-              {supportPosts.map((post) => (
+              {!isLoading && filteredSupportPosts.length === 0 && <p className="text-sm text-muted-foreground">{emptyStateText.support}</p>}
+              {filteredSupportPosts.map((post) => (
                 <Card key={post.id}>
                   <CardContent className="pt-5 space-y-2">
                     <div className="flex items-center justify-between">
@@ -273,6 +323,7 @@ const SocialSupportHub: React.FC = () => {
                   onChange={(e) => setFeatureDetails(e.target.value)}
                   className="min-h-24"
                 />
+                <p className="text-xs text-muted-foreground">{featureTitle.length + featureDetails.length}/600 characters</p>
                 <Button onClick={submitFeatureRequest} disabled={isSubmittingFeature || !featureTitle.trim()}>
                   {isSubmittingFeature ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Submit feature idea
@@ -281,9 +332,25 @@ const SocialSupportHub: React.FC = () => {
             </Card>
 
             <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  Ranked by votes and recency
+                </div>
+                <Badge variant="secondary" className="gap-1"><Sparkles className="h-3 w-3" />Community picks</Badge>
+              </div>
+              <div className="relative">
+                <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  value={featureSearch}
+                  onChange={(e) => setFeatureSearch(e.target.value)}
+                  placeholder="Search feature ideas"
+                  className="pl-9"
+                />
+              </div>
               {isLoading && <p className="text-sm text-muted-foreground">Loading feature requests...</p>}
-              {!isLoading && featurePosts.length === 0 && <p className="text-sm text-muted-foreground">{emptyStateText.feature}</p>}
-              {featurePosts.map((post) => {
+              {!isLoading && filteredFeaturePosts.length === 0 && <p className="text-sm text-muted-foreground">{emptyStateText.feature}</p>}
+              {filteredFeaturePosts.map((post) => {
                 const title = (post.metadata?.title as string | undefined) || post.content.split('\n')[0];
                 const details = (post.metadata?.details as string | undefined) || post.content;
 

@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Heart, MessageCircle, Share2, Bookmark, MoreHorizontal,
   Image as ImageIcon, Send, Loader2, ThumbsUp, PartyPopper, 
-  Flame, Smile, Trophy
+  Flame, Smile, Trophy, Search, SlidersHorizontal, Clock3, Sparkles, LayoutGrid
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -62,6 +64,9 @@ const EnhancedSocialFeed: React.FC = () => {
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [newComments, setNewComments] = useState<Record<string, string>>({});
   const [showReactions, setShowReactions] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [feedFilter, setFeedFilter] = useState<'all' | 'media' | 'liked' | 'saved'>('all');
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'discussed'>('recent');
 
   const loadPosts = useCallback(async () => {
     try {
@@ -369,6 +374,48 @@ const EnhancedSocialFeed: React.FC = () => {
     }
   };
 
+  const sharePost = async (postId: string) => {
+    const shareUrl = `${window.location.origin}/social#post-${postId}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('Post link copied to clipboard');
+    } catch {
+      toast.error('Could not copy link');
+    }
+  };
+
+  const filteredPosts = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+
+    let nextPosts = [...posts].filter((post) => {
+      const passesSearch = !keyword || post.content.toLowerCase().includes(keyword) || post.authorName.toLowerCase().includes(keyword);
+      if (!passesSearch) return false;
+
+      if (feedFilter === 'media') return Boolean(post.imageUrl);
+      if (feedFilter === 'liked') return post.isLiked;
+      if (feedFilter === 'saved') return post.isSaved;
+
+      return true;
+    });
+
+    if (sortBy === 'popular') {
+      nextPosts.sort((a, b) => b.likesCount - a.likesCount || +new Date(b.createdAt) - +new Date(a.createdAt));
+    } else if (sortBy === 'discussed') {
+      nextPosts.sort((a, b) => b.commentsCount - a.commentsCount || +new Date(b.createdAt) - +new Date(a.createdAt));
+    } else {
+      nextPosts.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    }
+
+    return nextPosts;
+  }, [posts, searchQuery, feedFilter, sortBy]);
+
+  const feedStats = useMemo(() => {
+    const totalPosts = posts.length;
+    const totalImages = posts.filter((post) => Boolean(post.imageUrl)).length;
+    const totalLikes = posts.reduce((sum, post) => sum + post.likesCount, 0);
+    return { totalPosts, totalImages, totalLikes };
+  }, [posts]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -378,7 +425,52 @@ const EnhancedSocialFeed: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <Card className="glass border-border/50">
+        <CardContent className="pt-5 space-y-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Social Feed</p>
+              <h2 className="text-lg font-semibold flex items-center gap-2"><LayoutGrid className="h-4 w-4" />Discover, discuss, and react</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center md:w-[360px]">
+              <div className="rounded-lg bg-muted/40 border border-border/50 py-2 px-1"><p className="text-xs text-muted-foreground">Posts</p><p className="font-semibold">{feedStats.totalPosts}</p></div>
+              <div className="rounded-lg bg-muted/40 border border-border/50 py-2 px-1"><p className="text-xs text-muted-foreground">Media</p><p className="font-semibold">{feedStats.totalImages}</p></div>
+              <div className="rounded-lg bg-muted/40 border border-border/50 py-2 px-1"><p className="text-xs text-muted-foreground">Total likes</p><p className="font-semibold">{feedStats.totalLikes}</p></div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative lg:max-w-sm w-full">
+              <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search posts or authors"
+                className="pl-9"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Tabs value={feedFilter} onValueChange={(value) => setFeedFilter(value as typeof feedFilter)}>
+                <TabsList>
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="media">Media</TabsTrigger>
+                  <TabsTrigger value="liked">Liked</TabsTrigger>
+                  <TabsTrigger value="saved">Saved</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Tabs value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
+                <TabsList>
+                  <TabsTrigger value="recent" className="gap-1"><Clock3 className="h-3 w-3" />Recent</TabsTrigger>
+                  <TabsTrigger value="popular" className="gap-1"><Sparkles className="h-3 w-3" />Popular</TabsTrigger>
+                  <TabsTrigger value="discussed" className="gap-1"><SlidersHorizontal className="h-3 w-3" />Discussed</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Create Post */}
       <Card className="glass border-border/50">
         <CardContent className="pt-4">
@@ -392,7 +484,7 @@ const EnhancedSocialFeed: React.FC = () => {
               <Textarea
                 value={newPostContent}
                 onChange={(e) => setNewPostContent(e.target.value)}
-                placeholder="What's on your mind?"
+                placeholder="What's on your mind? Share wins, ask questions, or post an update..."
                 className="min-h-[80px] resize-none"
               />
               {newPostImage && (
@@ -431,22 +523,23 @@ const EnhancedSocialFeed: React.FC = () => {
                   Post
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">Tip: posts with clear titles and images get more engagement.</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Posts Feed */}
-      {posts.length === 0 ? (
+      {filteredPosts.length === 0 ? (
         <Card className="glass border-border/50">
           <CardContent className="py-12 text-center">
             <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-            <p className="text-muted-foreground">No posts yet. Be the first to share!</p>
+            <p className="text-muted-foreground">No posts match your current filters. Try changing search or feed filters.</p>
           </CardContent>
         </Card>
       ) : (
-        posts.map((post) => (
-          <Card key={post.id} className="glass border-border/50">
+        filteredPosts.map((post) => (
+          <Card key={post.id} id={`post-${post.id}`} className="glass border-border/50">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -554,7 +647,7 @@ const EnhancedSocialFeed: React.FC = () => {
                   {post.commentsCount}
                 </Button>
                 
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => sharePost(post.id)}>
                   <Share2 className="h-4 w-4 mr-1" />
                   Share
                 </Button>
