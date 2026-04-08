@@ -550,13 +550,22 @@ const StudentDashboard: React.FC = () => {
                     <p className="text-sm text-muted-foreground">Grade {user?.grade || 5}</p>
                   </div>
                   <CardContent className="p-4">
-                    <Button 
-                      variant="outline" 
-                      className="w-full border-primary/30 hover:bg-primary/10"
-                      onClick={() => navigate('/store')}
-                    >
-                      Customize Avatar
-                    </Button>
+                    <div className="space-y-2">
+                      <Button 
+                        variant="outline" 
+                        className="w-full border-primary/30 hover:bg-primary/10"
+                        onClick={() => navigate('/store')}
+                      >
+                        Customize Avatar
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => navigate('/library')}
+                      >
+                        Open Library
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
