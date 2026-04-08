@@ -9,7 +9,7 @@ export default defineConfig(async ({ mode }) => {
   if (mode === "development") {
     try {
       const { componentTagger } = await import("lovable-tagger");
-      plugins.push(componentTagger());
+      plugins.push(componentTagger() as any);
     } catch {
       // Ignore when lovable-tagger is unavailable (e.g. CI/Vercel install mode)
     }
