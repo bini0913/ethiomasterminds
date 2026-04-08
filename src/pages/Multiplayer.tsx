@@ -250,12 +250,12 @@ const Multiplayer: React.FC = () => {
     navigate("/lobby");
   };
 
-  const handleLeaveRoom = () => {
+  const handleLeaveRoom = useCallback(() => {
     if (roomId && user) {
       leaveRoom(roomId, user.name || "Player");
     }
     navigate("/lobby");
-  };
+  }, [leaveRoom, navigate, roomId, user]);
 
   if (roomId && user) {
     return (
