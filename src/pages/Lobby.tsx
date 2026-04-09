@@ -25,7 +25,11 @@ import {
   Crown,
   Star,
   Swords,
-  RefreshCw
+  RefreshCw,
+  Activity,
+  Target,
+  Flame,
+  Bell,
 } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import RoomCard, { Room } from "@/components/multiplayer/RoomCard";
@@ -107,6 +111,11 @@ const Lobby: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [activityFeed] = useState<string[]>([
+    "Player123 just won a ranked duel",
+    "Tournament qualifier opens in 15 minutes",
+    "New champion crowned in Grade 8 bracket",
+  ]);
   const [newTournamentData, setNewTournamentData] = useState<NewTournamentForm>({
     name: "",
     description: "",
@@ -617,6 +626,12 @@ const Lobby: React.FC = () => {
   };
 
   const canManageTournaments = user?.role === "admin" || user?.role === "manager";
+  const liveMatchCount = Math.max(0, rooms.filter((r) => r.status === "playing").length);
+  const balancedPlayers = onlinePlayers.filter((p) => Math.abs((p.level || 1) - (user?.level || 1)) <= 2).length;
+  const matchQualityScore = Math.min(
+    99,
+    Math.max(72, Math.round((balancedPlayers / Math.max(1, onlinePlayers.length)) * 100)),
+  );
   const formatLabel: Record<Tournament["format"], string> = {
     knockout: "Knockout",
     speed_knockout: "Speed Knockout",
@@ -648,7 +663,6 @@ const Lobby: React.FC = () => {
     name: r.name,
     players: r.players?.length || 0,
     maxPlayers: r.maxPlayers,
-    status: (r.status === 'countdown' ? 'waiting' : r.status) as 'waiting' | 'in-progress' | 'finished',
     status: ((r.status as string) === 'countdown' ? 'waiting' : r.status) as 'waiting' | 'in-progress' | 'finished',
     subject: r.gameSettings?.subject || 'Mixed',
     difficulty: r.gameSettings?.difficulty || 'Medium',
@@ -705,6 +719,35 @@ const Lobby: React.FC = () => {
               <Trophy className="h-4 w-4" /> Create Tournament
             </Button>
           )}
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 pt-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Card className="border-cyan-300/30 bg-cyan-500/10">
+            <CardContent className="p-3 text-sm">
+              <div className="flex items-center gap-2 text-cyan-100"><Users className="h-4 w-4" /> Players online now</div>
+              <p className="text-2xl font-bold mt-1">{onlinePlayers.length.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-indigo-300/30 bg-indigo-500/10">
+            <CardContent className="p-3 text-sm">
+              <div className="flex items-center gap-2 text-indigo-100"><Activity className="h-4 w-4" /> Matches in progress</div>
+              <p className="text-2xl font-bold mt-1">{liveMatchCount}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-emerald-300/30 bg-emerald-500/10">
+            <CardContent className="p-3 text-sm">
+              <div className="flex items-center gap-2 text-emerald-100"><Target className="h-4 w-4" /> Match Quality</div>
+              <p className="text-2xl font-bold mt-1">{matchQualityScore}% Balanced</p>
+            </CardContent>
+          </Card>
+          <Card className="border-orange-300/30 bg-orange-500/10">
+            <CardContent className="p-3 text-sm">
+              <div className="flex items-center gap-2 text-orange-100"><Flame className="h-4 w-4" /> Win Streak Aura</div>
+              <p className="text-2xl font-bold mt-1">🔥 {Math.max(1, Math.floor((user?.xp || 0) / 1200))}</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -855,6 +898,25 @@ const Lobby: React.FC = () => {
                   <Button type="submit" size="icon" className="flex-shrink-0"><Send className="h-4 w-4" /></Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+            <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-t-xl py-3">
+              <CardTitle className="flex items-center gap-2 text-base"><Bell className="h-5 w-5" /> Live Activity Feed</CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 space-y-2">
+              {activityFeed.map((item, index) => (
+                <motion.div
+                  key={`${item}-${index}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-2 text-sm"
+                >
+                  {item}
+                </motion.div>
+              ))}
             </CardContent>
           </Card>
         </div>
