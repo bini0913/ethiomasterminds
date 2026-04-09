@@ -380,7 +380,7 @@ const AdminPortal: React.FC = () => {
 
   const handleDeleteContent = async (type: 'quiz' | 'question' | 'flashcard' | 'social', id: string) => {
     const table = type === 'social' ? 'social_posts' : `${type}s`;
-    const { error } = await supabase.from(table).delete().eq('id', id);
+    const { error } = await supabase.from(table as any).delete().eq('id', id);
     if (error) {
       toast.error(`Failed to delete ${type}`);
       return;
@@ -485,11 +485,14 @@ const AdminPortal: React.FC = () => {
                   ['Flashcards', stats.totalFlashcards, Database],
                   ['Books/Plans', stats.totalBooks, BookOpen],
                   ['Quizzes', stats.totalQuizzes, Crown],
-                ].map(([label, value, Icon], i) => (
+                ].map(([label, value, IconComp], i) => {
+                  const LucideIcon = IconComp as React.ComponentType<{ className?: string }>;
+                  return (
                   <motion.div key={String(label)} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                    <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{value as number}</p><Icon className="w-5 h-5 text-primary" /></div></CardContent></Card>
+                    <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{value as number}</p><LucideIcon className="w-5 h-5 text-primary" /></div></CardContent></Card>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="grid lg:grid-cols-3 gap-4">
