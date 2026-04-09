@@ -34,6 +34,7 @@ const ExamModePage: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [results, setResults] = useState<{ correct: number; total: number; details: Array<{ q: Question; answer: string; correct: boolean }> } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const userGrade = parseInt(user?.grade || "5");
 
   useEffect(() => {
     if (examState !== "running" || timeLeft <= 0) return;
@@ -49,7 +50,7 @@ const ExamModePage: React.FC = () => {
   const startExam = async () => {
     const { data: quizzes } = await supabase
       .from("quizzes")
-      .select("id")
+      .select("id, grade")
       .eq("subject", subject)
       .eq("is_approved", true);
 
@@ -58,14 +59,15 @@ const ExamModePage: React.FC = () => {
       return;
     }
 
-    const quizIds = quizzes.map(q => q.id);
+    const gradeMatchedQuizzes = quizzes.filter(q => parseInt(q.grade || "0") === userGrade);
+    const quizIds = (gradeMatchedQuizzes.length > 0 ? gradeMatchedQuizzes : quizzes).map(q => q.id);
     const { data: questionsData } = await supabase
       .from("questions")
       .select("*")
       .in("quiz_id", quizIds);
 
     if (!questionsData || questionsData.length < 5) {
-      toast.error("Not enough questions available");
+      toast.error(`Not enough Grade ${userGrade} questions available for this subject`);
       return;
     }
 

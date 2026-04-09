@@ -14,9 +14,9 @@ const AcademicMode: React.FC = () => {
   const navigate = useNavigate();
 
   const gradeNum = parseInt(user?.grade || "0");
-  const isHighSchool = gradeNum >= 9 && gradeNum <= 12;
+  const isEligibleGrade = gradeNum >= 5 && gradeNum <= 12;
 
-  if (!isHighSchool) {
+  if (!isEligibleGrade) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
@@ -24,7 +24,7 @@ const AcademicMode: React.FC = () => {
             <GraduationCap className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-bold mb-2">Academic Mode</h2>
             <p className="text-muted-foreground mb-4">
-              Academic Mode is available for Grades 9–12. Update your grade in Settings to access this feature.
+              Academic Mode is available for Grades 5–12. Update your grade in Settings to access this feature.
             </p>
             <Button onClick={() => navigate("/settings")}>Go to Settings</Button>
           </CardContent>
