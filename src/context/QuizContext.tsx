@@ -20,6 +20,7 @@ export interface Question {
 
 export interface Quiz {
   id: string;
+  sourceQuizId?: string;
   title: string;
   description: string;
   questions: Question[];
