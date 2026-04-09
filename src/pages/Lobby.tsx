@@ -318,8 +318,8 @@ const Lobby: React.FC = () => {
         .limit(4),
       supabase
         .from("tournament_participants")
-        .select("id, created_at, user_id, tournament_id")
-        .order("created_at", { ascending: false })
+        .select("id, registered_at, user_id, tournament_id")
+        .order("registered_at", { ascending: false })
         .limit(4),
     ]);
 
@@ -355,7 +355,7 @@ const Lobby: React.FC = () => {
       })),
       ...(tournRes.data || []).map((entry) => ({
         id: `tournament-${entry.id}`,
-        createdAt: entry.created_at,
+        createdAt: entry.registered_at,
         message: `${profileMap.get(entry.user_id) || "Student"} joined ${tournamentMap.get(entry.tournament_id) || "a tournament"}`,
       })),
     ]

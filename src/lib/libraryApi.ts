@@ -134,7 +134,7 @@ export async function listAssignedBooks(userId: string) {
 
 async function generatePdfThumbnail(pdfFile: File): Promise<Blob | null> {
   try {
-    const pdfjs = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs');
+    const pdfjs = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs' as any);
     (pdfjs as any).GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
 
     const bytes = await pdfFile.arrayBuffer();
