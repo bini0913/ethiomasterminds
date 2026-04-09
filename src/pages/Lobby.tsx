@@ -39,6 +39,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import BackButton from "@/components/ui/BackButton";
+import AnimatedBackground from "@/components/ui/AnimatedBackground";
 
 interface OnlinePlayer {
   id: string;
@@ -106,7 +107,7 @@ const Lobby: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
   const { rooms, createRoom: contextCreateRoom, joinRoom: contextJoinRoom, refreshRooms } = useRoom();
-  const { friends } = useFriends();
+  const { friends, onlineFriends } = useFriends();
   
   const [chatMessage, setChatMessage] = useState("");
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
@@ -129,10 +130,22 @@ const Lobby: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [activityFeed] = useState<string[]>([
-    "Player123 just won a ranked duel",
-    "Tournament qualifier opens in 15 minutes",
-    "New champion crowned in Grade 8 bracket",
+  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([
+    {
+      id: "seed-room",
+      message: "Player123 just won a ranked duel",
+      timestamp: new Date(),
+    },
+    {
+      id: "seed-tournament",
+      message: "Tournament qualifier opens in 15 minutes",
+      timestamp: new Date(Date.now() - 3 * 60 * 1000),
+    },
+    {
+      id: "seed-champion",
+      message: "New champion crowned in Grade 8 bracket",
+      timestamp: new Date(Date.now() - 8 * 60 * 1000),
+    },
   ]);
   const [newTournamentData, setNewTournamentData] = useState<NewTournamentForm>({
     name: "",
@@ -898,43 +911,59 @@ const Lobby: React.FC = () => {
     createdBy: r.host
   }));
 
+  const recentMatches = activeRooms.slice(0, 4);
+  const recentActivities = activityFeed.slice(0, 6);
+  const friendsOnline = onlineFriends;
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      <AnimatedBackground />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.24),transparent_52%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.16),transparent_44%)]" />
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/75 px-4 py-3 backdrop-blur-xl">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             <BackButton to="/" />
-            <div className="bg-primary/10 rounded-xl p-2">
-              <Gamepad className="h-6 w-6 text-primary" />
+            <div className="bg-cyan-500/15 rounded-xl p-2 border border-cyan-300/30">
+              <Gamepad className="h-6 w-6 text-cyan-300" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Multiplayer Lobby</h1>
-              <p className="text-xs text-muted-foreground">{onlinePlayers.length} students online</p>
+              <h1 className="text-xl font-bold text-white">Nexus Lobby</h1>
+              <p className="text-xs text-slate-300">{onlinePlayers.length.toLocaleString()} players online • {liveMatchCount} matches live</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 min-w-[260px]">
+              <AvatarRenderer avatar={user.avatar || "avatar-1"} size="sm" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold truncate text-white">{user.name || "Player"}</p>
+                <div className="h-1.5 rounded-full bg-slate-700 mt-1 overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-blue-400 to-violet-400 animate-pulse" style={{ width: `${Math.min(100, ((user.xp || 0) % 1000) / 10)}%` }} />
+                </div>
+              </div>
+              <Badge className="bg-violet-500/20 text-violet-200 border-violet-300/40">Lv.{user.level || 1}</Badge>
+            </div>
             <Button variant="ghost" size="icon" onClick={loadLobbyData}>
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 text-white ${loading ? 'animate-spin' : ''}`} />
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2">
+            <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2 bg-white/10 text-white hover:bg-white/20 border border-white/20">
               <Home className="h-4 w-4" /> Menu
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="bg-card border-b border-border px-4 py-3">
+      <div className="border-b border-white/10 px-4 py-3 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-wrap gap-2">
-          <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 whitespace-nowrap">
+          <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 whitespace-nowrap bg-cyan-600 hover:bg-cyan-500">
             <Plus className="h-4 w-4" /> Create Room
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap" onClick={handleRandomMatch}>
+          <Button variant="outline" className="gap-2 whitespace-nowrap border-cyan-400/40 text-cyan-100 bg-cyan-500/10 hover:bg-cyan-500/20" onClick={handleRandomMatch}>
             <Zap className="h-4 w-4" /> Find Match
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap">
+          <Button variant="outline" className="gap-2 whitespace-nowrap border-violet-400/40 text-violet-100 bg-violet-500/10 hover:bg-violet-500/20">
             <Swords className="h-4 w-4" /> Ranked
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap">
+          <Button variant="outline" className="gap-2 whitespace-nowrap border-amber-300/40 text-amber-100 bg-amber-500/10 hover:bg-amber-500/20">
             <Crown className="h-4 w-4" /> Tournament
           </Button>
           <div className="flex items-center gap-2 w-full lg:w-auto lg:ml-auto">
@@ -950,43 +979,60 @@ const Lobby: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      <div className="max-w-7xl mx-auto px-4 pt-4 relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+          {[
+            { title: "⚔️ Quick Match", desc: "Fast balanced duel queue", onClick: handleRandomMatch, style: "from-cyan-500/40 to-blue-500/30 border-cyan-300/30" },
+            { title: "👥 Team Up", desc: "Invite friends and squad", onClick: () => setCreateRoomOpen(true), style: "from-violet-500/40 to-fuchsia-500/30 border-violet-300/30" },
+            { title: "🏆 Tournaments", desc: "Join live competitive cups", onClick: () => {}, style: "from-amber-500/40 to-orange-500/30 border-amber-300/30" },
+            { title: "🔐 Private Room", desc: "Code + pass protected lobby", onClick: () => setCreateRoomOpen(true), style: "from-emerald-500/40 to-teal-500/30 border-emerald-300/30" },
+          ].map((card) => (
+            <button
+              key={card.title}
+              onClick={card.onClick}
+              className={`text-left rounded-2xl border p-4 bg-gradient-to-br ${card.style} hover:scale-[1.015] transition-transform shadow-[0_0_25px_rgba(56,189,248,0.12)]`}
+            >
+              <p className="font-semibold text-white">{card.title}</p>
+              <p className="text-xs text-slate-200 mt-1">{card.desc}</p>
+            </button>
+          ))}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <Card className="border-cyan-300/30 bg-cyan-500/10">
             <CardContent className="p-3 text-sm">
               <div className="flex items-center gap-2 text-cyan-100"><Users className="h-4 w-4" /> Players online now</div>
-              <p className="text-2xl font-bold mt-1">{onlinePlayers.length.toLocaleString()}</p>
+              <p className="text-2xl font-bold mt-1 text-white">{onlinePlayers.length.toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card className="border-indigo-300/30 bg-indigo-500/10">
             <CardContent className="p-3 text-sm">
               <div className="flex items-center gap-2 text-indigo-100"><Activity className="h-4 w-4" /> Matches in progress</div>
-              <p className="text-2xl font-bold mt-1">{liveMatchCount}</p>
+              <p className="text-2xl font-bold mt-1 text-white">{liveMatchCount}</p>
             </CardContent>
           </Card>
           <Card className="border-emerald-300/30 bg-emerald-500/10">
             <CardContent className="p-3 text-sm">
               <div className="flex items-center gap-2 text-emerald-100"><Target className="h-4 w-4" /> Match Quality</div>
-              <p className="text-2xl font-bold mt-1">{matchQualityScore}% Balanced</p>
+              <p className="text-2xl font-bold mt-1 text-white">{matchQualityScore}% Balanced</p>
             </CardContent>
           </Card>
           <Card className="border-orange-300/30 bg-orange-500/10">
             <CardContent className="p-3 text-sm">
               <div className="flex items-center gap-2 text-orange-100"><Flame className="h-4 w-4" /> Win Streak Aura</div>
-              <p className="text-2xl font-bold mt-1">🔥 {Math.max(1, Math.floor((user?.xp || 0) / 1200))}</p>
+              <p className="text-2xl font-bold mt-1 text-white">🔥 {Math.max(1, Math.floor((user?.xp || 0) / 1200))}</p>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto py-4 px-4">
+      <div className="max-w-7xl mx-auto py-4 px-4 relative z-10">
         {loading && (
           <div className="mb-4 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
             Syncing lobby data...
           </div>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="bg-card border-border/60">
+          <Card className="bg-slate-900/80 border-white/10 text-white">
             <CardHeader className="border-b py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="h-5 w-5" /> Online Players ({onlinePlayers.length})
@@ -1005,8 +1051,8 @@ const Lobby: React.FC = () => {
                           <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${getStatusColor(player.status)} border-2 border-card`}></div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">{player.name}</div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <div className="font-medium text-sm truncate text-white">{player.name}</div>
+                          <div className="text-xs text-slate-300 flex items-center gap-1">
                             <Star className="h-3 w-3 text-yellow-500" /> Lv.{player.level} • {player.xp} XP
                           </div>
                         </div>
@@ -1029,7 +1075,7 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          <Card className="bg-card border-border/60">
+          <Card className="bg-slate-900/80 border-white/10 text-white">
             <CardHeader className="border-b py-3">
               <CardTitle className="text-base">Play & Compete</CardTitle>
             </CardHeader>
@@ -1097,7 +1143,7 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          <Card className="bg-card border-border/60">
+          <Card className="bg-slate-900/80 border-white/10 text-white">
             <CardHeader className="border-b py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <MessageSquare className="h-5 w-5" /> Lobby Chat
@@ -1135,22 +1181,63 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+          <Card className="bg-slate-900/80 backdrop-blur-sm border-white/10 text-white">
             <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-t-xl py-3">
               <CardTitle className="flex items-center gap-2 text-base"><Bell className="h-5 w-5" /> Live Activity Feed</CardTitle>
             </CardHeader>
             <CardContent className="p-3 space-y-2">
-              {activityFeed.map((item, index) => (
+              {recentActivities.map((item, index) => (
                 <motion.div
-                  key={`${item}-${index}`}
+                  key={`${item.id}-${index}`}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                   className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-2 text-sm"
                 >
-                  {item}
+                  <p>{item.message}</p>
+                  <p className="text-[11px] text-emerald-200/80 mt-1">{item.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
                 </motion.div>
               ))}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-900/80 border-white/10 text-white">
+            <CardHeader className="py-3 border-b border-white/10">
+              <CardTitle className="text-base">Friends + Recent Matches</CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 space-y-3">
+              <div>
+                <p className="text-xs text-slate-300 mb-2">Online friends ({friendsOnline.length})</p>
+                <div className="space-y-2 max-h-44 overflow-auto pr-1">
+                  {friendsOnline.length === 0 ? (
+                    <p className="text-xs text-slate-400">No friends online right now.</p>
+                  ) : (
+                    friendsOnline.slice(0, 6).map((friend) => (
+                      <div key={friend.id} className="flex items-center justify-between rounded-lg bg-white/5 border border-white/10 p-2">
+                        <span className="text-sm">{friend.name}</span>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => challengePlayer(friend.id, friend.name)}>
+                          Invite
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-slate-300 mb-2">Recent active rooms</p>
+                <div className="space-y-2">
+                  {recentMatches.length === 0 ? (
+                    <p className="text-xs text-slate-400">No recent room history yet.</p>
+                  ) : (
+                    recentMatches.map((match) => (
+                      <div key={match.id} className="rounded-lg bg-white/5 border border-white/10 p-2 text-xs">
+                        <p className="font-medium text-slate-100">{match.name}</p>
+                        <p className="text-slate-300">{match.subject} • {match.players}/{match.maxPlayers} players</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
