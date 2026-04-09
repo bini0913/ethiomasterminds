@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 
 const Quiz: React.FC = () => {
-  const { quizzes, createRandomQuiz } = useQuiz();
+  const { quizzes } = useQuiz();
   const { user } = useUser();
   const [activeQuiz, setActiveQuiz] = useState<QuizType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -25,7 +25,9 @@ const Quiz: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("browse");
   const [numQuestions, setNumQuestions] = useState<number>(10);
   const [askedQuestions, setAskedQuestions] = useState<Set<string>>(new Set());
+  const [attemptedQuestionIds, setAttemptedQuestionIds] = useState<Set<string>>(new Set());
   const [completedQuizIds, setCompletedQuizIds] = useState<Set<string>>(new Set());
+  const [allowXPForActiveQuiz, setAllowXPForActiveQuiz] = useState(true);
   
   useEffect(() => {
     const preferredGrade = parseInt(user?.grade || "5", 10);
@@ -33,15 +35,26 @@ const Quiz: React.FC = () => {
     setSelectedGrade(boundedGrade.toString());
   }, [user?.grade]);
 
+  const studentGrade = useMemo(() => {
+    const preferredGrade = parseInt(user?.grade || "5", 10);
+    return Number.isNaN(preferredGrade) ? 5 : Math.min(12, Math.max(5, preferredGrade));
+  }, [user?.grade]);
+
+  const normalizeCategory = (value: string) => value.toLowerCase().trim();
+
   const categories = useMemo(
-    () => [...new Set(quizzes.filter((quiz) => quiz.gradeLevel >= 5 && quiz.gradeLevel <= 12).map((quiz) => quiz.category))],
-    [quizzes]
+    () => [...new Set(
+      quizzes
+        .filter((quiz) => quiz.gradeLevel === studentGrade)
+        .map((quiz) => quiz.category)
+    )],
+    [quizzes, studentGrade]
   );
 
   // Create rich practice sets per grade+subject:
   // 10 sets with 5 questions and 10 sets with 10 questions (20 total per subject+grade).
   const generatedPracticeQuizzes = useMemo(() => {
-    const grade = parseInt(selectedGrade, 10);
+    const grade = studentGrade;
     if (Number.isNaN(grade)) return [];
 
     const quizzesByCategory = new Map<string, QuizType[]>();
@@ -113,7 +126,7 @@ const Quiz: React.FC = () => {
     });
 
     return practiceSets;
-  }, [categories, quizzes, selectedCategory, selectedGrade]);
+  }, [categories, quizzes, selectedCategory, studentGrade]);
   
   const filteredQuizzes = generatedPracticeQuizzes;
 
@@ -127,31 +140,40 @@ const Quiz: React.FC = () => {
         .from("quiz_results")
         .select("quiz_id")
         .eq("student_id", user.id);
+      const { data: attemptsData } = await supabase
+        .from("question_attempts")
+        .select("question_id")
+        .eq("user_id", user.id);
       const dbIds = (data || []).map((entry) => entry.quiz_id).filter(Boolean);
       setCompletedQuizIds(new Set([...storedIds, ...dbIds]));
+      setAttemptedQuestionIds(new Set((attemptsData || []).map((entry) => entry.question_id)));
     };
 
     loadCompletedFromDatabase();
   }, [user?.id]);
 
   const handleStartQuiz = (quiz: QuizType) => {
-    if (completedQuizIds.has(quiz.id) || (quiz.sourceQuizId && completedQuizIds.has(quiz.sourceQuizId))) {
+    const isCompletedQuiz = completedQuizIds.has(quiz.id) || (quiz.sourceQuizId && completedQuizIds.has(quiz.sourceQuizId));
+    if (isCompletedQuiz) {
       toast.info("You already completed this quiz set before. You can retake it for more practice.");
     }
 
-    const uniqueQuestions = quiz.questions.filter(q => !askedQuestions.has(q.id));
-    
-    if (uniqueQuestions.length === 0) {
-      toast.warning("You've already completed all questions in this quiz. We'll reset and give you some new challenges!");
-      setAskedQuestions(new Set());
-      setActiveQuiz(quiz);
-    } else {
-      const modifiedQuiz = {
-        ...quiz,
-        questions: uniqueQuestions.length > 0 ? uniqueQuestions : quiz.questions,
-      };
-      setActiveQuiz(modifiedQuiz);
+    const seenQuestionIds = new Set([...attemptedQuestionIds, ...askedQuestions]);
+    const freshQuestions = quiz.questions.filter(q => !seenQuestionIds.has(q.id));
+    const repeatedQuestions = quiz.questions.filter(q => seenQuestionIds.has(q.id));
+    const nextQuestions = freshQuestions.length > 0 ? freshQuestions : repeatedQuestions;
+
+    if (nextQuestions.length === 0) {
+      toast.error("No questions available for this quiz yet.");
+      return;
     }
+
+    const modifiedQuiz = {
+      ...quiz,
+      questions: nextQuestions,
+    };
+    setAllowXPForActiveQuiz(!isCompletedQuiz && repeatedQuestions.length === 0);
+    setActiveQuiz(modifiedQuiz);
   };
   
   const handleCreateRandomQuiz = () => {
@@ -159,37 +181,61 @@ const Quiz: React.FC = () => {
       toast.error("Please select a subject first");
       return;
     }
-    
-    const randomQuiz = createRandomQuiz(
-      selectedCategory, 
-      numQuestions,
-      parseInt(selectedGrade),
-      difficulty
-    );
-    
-    if (randomQuiz) {
-      const uniqueQuestions = randomQuiz.questions.filter(q => !askedQuestions.has(q.id));
-      
-      if (uniqueQuestions.length < numQuestions / 2) {
-        toast.warning("You've seen most questions at this level! We'll add some new ones to keep it interesting.");
-      }
-      
-      const finalQuiz = {
-        ...randomQuiz,
-        questions: uniqueQuestions.length > numQuestions / 2 ? uniqueQuestions : randomQuiz.questions,
-      };
-      
-      setActiveQuiz(finalQuiz);
-      toast.success(`Created a ${difficulty} ${selectedCategory} quiz with ${finalQuiz.questions.length} questions`);
-    } else {
-      toast.error("Could not create quiz. Not enough questions available for selected criteria.");
+
+    const difficultyMap: Record<typeof difficulty, QuizType["difficulty"]> = {
+      easy: "Easy",
+      medium: "Medium",
+      hard: "Hard",
+    };
+    const targetDifficulty = difficultyMap[difficulty];
+
+    const matchingQuestions = quizzes
+      .filter((quiz) => {
+        const sameGrade = quiz.gradeLevel === studentGrade;
+        const sameSubject = normalizeCategory(quiz.category) === normalizeCategory(selectedCategory);
+        const difficultyMatch = quiz.difficulty === targetDifficulty;
+        return sameGrade && sameSubject && difficultyMatch;
+      })
+      .flatMap((quiz) => quiz.questions);
+
+    const freshPool = matchingQuestions.filter((question) => !attemptedQuestionIds.has(question.id));
+    const shuffledFreshPool = [...freshPool].sort(() => Math.random() - 0.5);
+    const selectedQuestions = shuffledFreshPool.slice(0, numQuestions);
+
+    if (selectedQuestions.length < numQuestions) {
+      toast.error(`Not enough new ${selectedCategory} questions available for Grade ${studentGrade} at ${targetDifficulty} level.`);
+      return;
     }
+
+    const randomQuiz: QuizType = {
+      id: `quick-${selectedCategory.toLowerCase().replace(/\s+/g, "-")}-g${studentGrade}-${Date.now()}`,
+      title: `Quick ${selectedCategory} Quiz - Grade ${studentGrade}`,
+      description: `${numQuestions} random ${targetDifficulty.toLowerCase()} questions from your class level`,
+      questions: selectedQuestions,
+      subject: selectedCategory,
+      grade: studentGrade,
+      difficulty: targetDifficulty,
+      timeLimit: numQuestions * 30,
+      createdAt: new Date(),
+      topics: ["General"],
+      category: selectedCategory,
+      gradeLevel: studentGrade
+    };
+
+    setAllowXPForActiveQuiz(true);
+    setActiveQuiz(randomQuiz);
+    toast.success(`Created a ${difficulty} ${selectedCategory} quiz with ${selectedQuestions.length} new questions`);
   };
   
   const handleQuizComplete = (score: number, completedQuestionIds: string[]) => {
     const newAskedQuestions = new Set(askedQuestions);
     completedQuestionIds.forEach(id => newAskedQuestions.add(id));
     setAskedQuestions(newAskedQuestions);
+    setAttemptedQuestionIds(prev => {
+      const next = new Set(prev);
+      completedQuestionIds.forEach(id => next.add(id));
+      return next;
+    });
     if (activeQuiz && user?.id) {
       const nextCompleted = new Set(completedQuizIds);
       nextCompleted.add(activeQuiz.id);
@@ -224,6 +270,7 @@ const Quiz: React.FC = () => {
         quiz={activeQuiz} 
         onComplete={handleQuizComplete} 
         onExit={handleExitQuiz} 
+        allowXP={allowXPForActiveQuiz}
       />
     );
   }
@@ -307,7 +354,7 @@ const Quiz: React.FC = () => {
                       {/* Grade Filter */}
                       <div className="flex items-center gap-2 ml-auto">
                         <span className="text-sm font-medium text-muted-foreground">Grade:</span>
-                        <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                        <Select value={selectedGrade} disabled>
                           <SelectTrigger className="w-28 glass border-border/50">
                             <SelectValue placeholder="Grade" />
                           </SelectTrigger>
@@ -376,6 +423,9 @@ const Quiz: React.FC = () => {
                               +{quiz.questions.length * 10} XP
                             </span>
                           </div>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Done before: {quiz.questions.filter((q) => attemptedQuestionIds.has(q.id)).length}/{quiz.questions.length}
+                          </p>
                           {(completedQuizIds.has(quiz.id) || (quiz.sourceQuizId && completedQuizIds.has(quiz.sourceQuizId))) && (
                             <Badge className="mb-3 bg-glow-green/20 text-glow-green border-glow-green/30">
                               <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
@@ -405,7 +455,7 @@ const Quiz: React.FC = () => {
                             className="mt-4"
                             onClick={() => {
                               setSelectedCategory(null);
-                              setSelectedGrade("5");
+                              setSelectedGrade(studentGrade.toString());
                             }}
                           >
                             Reset Filters
@@ -452,7 +502,7 @@ const Quiz: React.FC = () => {
                       
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Grade</label>
-                        <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                        <Select value={selectedGrade} disabled>
                           <SelectTrigger className="glass border-border/50">
                             <SelectValue placeholder="Select Grade" />
                           </SelectTrigger>
@@ -525,7 +575,7 @@ const Quiz: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {[
-                        { subject: "Math", reward: "+50 XP", icon: Calculator, color: "from-primary to-accent" },
+                        { subject: "Mathematics", reward: "+50 XP", icon: Calculator, color: "from-primary to-accent" },
                         { subject: "Science", reward: "+50 XP", icon: Atom, color: "from-secondary to-glow-cyan" },
                         { subject: "English", reward: "+50 XP", icon: BookOpen, color: "from-accent to-glow-pink" }
                       ].map((challenge, i) => (

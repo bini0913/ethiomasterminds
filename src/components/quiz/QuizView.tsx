@@ -19,9 +19,10 @@ interface QuizViewProps {
   quiz: Quiz;
   onComplete: (score: number, completedQuestionIds: string[]) => void;
   onExit: () => void;
+  allowXP?: boolean;
 }
 
-const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
+const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP = true }) => {
   const { addXP, user } = useUser();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -227,7 +228,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
       const accuracyPercentage = calculateAccuracy();
       const baseXP = Math.floor(finalScore / 2); 
       const accuracyBonus = Math.floor(baseXP * (accuracyPercentage / 100));
-      const totalXP = baseXP + accuracyBonus;
+      const totalXP = allowXP ? baseXP + accuracyBonus : 0;
       
       setEarnedXP(totalXP);
       
@@ -242,6 +243,11 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   };
   
   const handleClaimXP = () => {
+    if (!allowXP) {
+      toast.info("Retake detected: points are not awarded for already-attempted questions.");
+      return;
+    }
+
     if (earnedXP > 0) {
       addXP(earnedXP);
       toast.success(`You've gained ${earnedXP} XP!`, {
