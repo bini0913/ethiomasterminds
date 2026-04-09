@@ -89,6 +89,91 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_content: {
+        Row: {
+          action: string
+          book_id: string
+          created_at: string
+          id: string
+          response: string
+          source_excerpt: string
+          source_hash: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          book_id: string
+          created_at?: string
+          id?: string
+          response?: string
+          source_excerpt?: string
+          source_hash: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          book_id?: string
+          created_at?: string
+          id?: string
+          response?: string
+          source_excerpt?: string
+          source_hash?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_content_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "library_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_generated_questions: {
+        Row: {
+          answer: string
+          book_id: string
+          created_at: string
+          difficulty: string
+          id: string
+          page_number: number
+          question: string
+          source_excerpt: string
+          user_id: string
+        }
+        Insert: {
+          answer: string
+          book_id: string
+          created_at?: string
+          difficulty?: string
+          id?: string
+          page_number?: number
+          question: string
+          source_excerpt?: string
+          user_id: string
+        }
+        Update: {
+          answer?: string
+          book_id?: string
+          created_at?: string
+          difficulty?: string
+          id?: string
+          page_number?: number
+          question?: string
+          source_excerpt?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generated_questions_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "library_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_tutor_conversations: {
         Row: {
           created_at: string
@@ -258,6 +343,82 @@ export type Database = {
           rarity?: string | null
         }
         Relationships: []
+      }
+      book_permissions: {
+        Row: {
+          book_id: string
+          can_read: boolean
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          can_read?: boolean
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          can_read?: boolean
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_permissions_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "library_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      book_uploads: {
+        Row: {
+          book_id: string
+          created_at: string
+          id: string
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_note: string | null
+          status: string
+          updated_at: string
+          uploader_id: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          id?: string
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_note?: string | null
+          status?: string
+          updated_at?: string
+          uploader_id: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          id?: string
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_note?: string | null
+          status?: string
+          updated_at?: string
+          uploader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_uploads_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "library_books"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       chat_group_members: {
         Row: {
@@ -539,6 +700,47 @@ export type Database = {
           },
         ]
       }
+      highlights: {
+        Row: {
+          book_id: string
+          created_at: string
+          highlight_color: string
+          id: string
+          note: string | null
+          page_number: number
+          selected_text: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          highlight_color?: string
+          id?: string
+          note?: string | null
+          page_number?: number
+          selected_text: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          highlight_color?: string
+          id?: string
+          note?: string | null
+          page_number?: number
+          selected_text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "highlights_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "library_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_dna: {
         Row: {
           created_at: string
@@ -575,6 +777,89 @@ export type Database = {
           updated_at?: string
           user_id?: string
           weaknesses?: Json | null
+        }
+        Relationships: []
+      }
+      library_bookmarks: {
+        Row: {
+          book_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_bookmarks_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "library_books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_books: {
+        Row: {
+          author: string
+          created_at: string
+          description: string
+          download_count: number
+          grade_level: number | null
+          id: string
+          pdf_path: string
+          status: string
+          subject: string
+          thumbnail_path: string | null
+          title: string
+          type: string
+          updated_at: string
+          uploader_id: string
+          uploader_role: string
+        }
+        Insert: {
+          author: string
+          created_at?: string
+          description?: string
+          download_count?: number
+          grade_level?: number | null
+          id?: string
+          pdf_path: string
+          status?: string
+          subject: string
+          thumbnail_path?: string | null
+          title: string
+          type?: string
+          updated_at?: string
+          uploader_id: string
+          uploader_role?: string
+        }
+        Update: {
+          author?: string
+          created_at?: string
+          description?: string
+          download_count?: number
+          grade_level?: number | null
+          id?: string
+          pdf_path?: string
+          status?: string
+          subject?: string
+          thumbnail_path?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+          uploader_id?: string
+          uploader_role?: string
         }
         Relationships: []
       }
@@ -625,6 +910,47 @@ export type Database = {
           sender_id?: string
         }
         Relationships: []
+      }
+      multiplayer_invites: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          receiver_id: string
+          responded_at: string | null
+          room_id: string | null
+          sender_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          receiver_id: string
+          responded_at?: string | null
+          room_id?: string | null
+          sender_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          receiver_id?: string
+          responded_at?: string | null
+          room_id?: string | null
+          sender_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "multiplayer_invites_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "multiplayer_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       multiplayer_rooms: {
         Row: {
@@ -1070,6 +1396,44 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      reading_progress: {
+        Row: {
+          book_id: string
+          completion_percent: number
+          id: string
+          last_page: number
+          time_spent_seconds: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          completion_percent?: number
+          id?: string
+          last_page?: number
+          time_spent_seconds?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          completion_percent?: number
+          id?: string
+          last_page?: number
+          time_spent_seconds?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_progress_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "library_books"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reports: {
         Row: {
@@ -1965,6 +2329,16 @@ export type Database = {
       }
       calculate_rank: { Args: { p_xp: number }; Returns: string }
       check_achievements: { Args: { p_user_id: string }; Returns: Json }
+      create_multiplayer_invite: {
+        Args: {
+          p_difficulty?: string
+          p_max_players?: number
+          p_receiver_id: string
+          p_room_id?: string
+          p_subject?: string
+        }
+        Returns: Json
+      }
       finalize_match: { Args: { p_room_id: string }; Returns: Json }
       find_student_by_username: {
         Args: { search_username: string }
@@ -2036,6 +2410,10 @@ export type Database = {
           p_room_id: string
           p_time_used: number
         }
+        Returns: Json
+      }
+      respond_multiplayer_invite: {
+        Args: { p_invite_id: string; p_response: string }
         Returns: Json
       }
       update_analytics: {
