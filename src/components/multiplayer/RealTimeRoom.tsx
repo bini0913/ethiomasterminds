@@ -121,6 +121,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [bestStreak, setBestStreak] = useState(0);
   const [floatingXp, setFloatingXp] = useState<number | null>(null);
   const [answerShake, setAnswerShake] = useState(false);
+  const [latencyMs, setLatencyMs] = useState(42);
 
   const advancingQuestionRef = useRef(false);
   const prevPlayersRef = useRef<Player[]>([]);
@@ -203,11 +204,36 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   useEffect(() => {
     if (!isOffline) return;
-    if (offlineSeconds <= 0) return;
+    if (offlineSeconds <= 0) {
+      toast.error('Reconnect window expired. Match forfeited.');
+      onLeave();
+      return;
+    }
 
     const timer = setTimeout(() => setOfflineSeconds((prev) => prev - 1), 1000);
     return () => clearTimeout(timer);
-  }, [isOffline, offlineSeconds]);
+  }, [isOffline, offlineSeconds, onLeave]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkLatency = async () => {
+      const start = performance.now();
+      await supabase.from('multiplayer_rooms').select('id').eq('id', roomId).maybeSingle();
+      const ping = Math.round(performance.now() - start);
+      if (isMounted) {
+        setLatencyMs(ping);
+      }
+    };
+    void checkLatency();
+    const interval = setInterval(() => {
+      void checkLatency();
+    }, 9000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [roomId]);
 
   const playTone = (frequency: number, duration: number) => {
     if (!soundEnabled || typeof window === 'undefined') return;
@@ -477,7 +503,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (selectedAnswer !== null || !currentQuestion) return;
 
     setSelectedAnswer(answerIndex);
-    const timeUsed = 30 - timeRemaining;
+    const lagCompensation = Math.min(2, Math.max(0, latencyMs / 1000 / 2));
+    const timeUsed = Math.max(0, 30 - timeRemaining - lagCompensation);
 
     try {
       const { data, error } = await supabase.rpc('multiplayer_submit_answer', {
@@ -552,6 +579,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   const allReady = players.length >= 2 && players.every((p) => p.isReady);
   const currentPlayer = players.find((p) => p.id === currentUserId);
+  const connectionQuality = latencyMs <= 120 ? 'Excellent' : latencyMs <= 220 ? 'Stable' : latencyMs <= 350 ? 'Degraded' : 'Poor';
+  const connectionColor = latencyMs <= 120 ? 'text-emerald-300' : latencyMs <= 220 ? 'text-cyan-300' : latencyMs <= 350 ? 'text-amber-300' : 'text-red-300';
   const strongestOpponent = players
     .filter((p) => p.id !== currentUserId)
     .sort((a, b) => b.level - a.level)[0];
@@ -592,6 +621,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           <div>
             <h1 className="text-2xl font-display font-bold">{roomName}</h1>
             <p className="text-sm text-blue-100/75">Room ID: {roomId.slice(0, 8)}... · Topic: Mixed · Difficulty: Adaptive</p>
+          </div>
+          <div className={`text-xs rounded-md border border-white/20 bg-black/25 px-2 py-1 flex items-center gap-2 ${connectionColor}`}>
+            <Signal className="h-3 w-3" /> {connectionQuality} · {latencyMs}ms
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => setSoundEnabled((prev) => !prev)}>
@@ -767,7 +799,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     <div className="flex items-center justify-center gap-1 mt-1 text-xs text-blue-100/75">
                       {player.isHost && <Crown className="h-3 w-3 text-yellow-400" />} Lv.{player.level}
                     </div>
-                    <div className="flex justify-center items-center gap-1 mt-1 text-xs text-emerald-300"><Signal className="h-3 w-3" /> Stable</div>
+                    <div className={cn('flex justify-center items-center gap-1 mt-1 text-xs', connectionColor)}><Signal className="h-3 w-3" /> {connectionQuality}</div>
                     {roomState.status !== 'waiting' && <div className="text-sm font-bold text-cyan-300 mt-1">{player.score} pts</div>}
                   </motion.div>
                 ))}
