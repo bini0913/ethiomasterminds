@@ -19,9 +19,10 @@ interface QuizViewProps {
   quiz: Quiz;
   onComplete: (score: number, completedQuestionIds: string[]) => void;
   onExit: () => void;
+  allowXP?: boolean;
 }
 
-const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
+const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP = true }) => {
   const { addXP, user } = useUser();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -41,6 +42,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const mindForgeSettings = getMindForgeSettings();
   const questionStartTime = useRef(Date.now());
   const questionTimes = useRef<{[key: string]: number}>({});
+  const uuidLikeRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   // Get the current question from the quiz
   const currentQuestion = quiz.questions[currentQuestionIndex];
@@ -164,10 +166,17 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   const saveQuizResults = async (finalScore: number, totalXP: number) => {
     try {
       const totalTimeTaken = Object.values(questionTimes.current).reduce((a, b) => a + b, 0);
+      const persistedQuizId = quiz.sourceQuizId || quiz.id;
+
+      // Some student practice sets are generated from existing questions and use
+      // client-side ids, so we only persist if we have a valid db quiz UUID.
+      if (!uuidLikeRegex.test(persistedQuizId)) {
+        return;
+      }
       
       // Save quiz result
       await supabase.from('quiz_results').insert({
-        quiz_id: quiz.id,
+        quiz_id: persistedQuizId,
         student_id: user!.id,
         score: finalScore,
         total_questions: quiz.questions.length,
@@ -178,8 +187,8 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
       });
 
       // Save individual question attempts
-      const attempts = quiz.questions.map((q, idx) => ({
-        quiz_id: quiz.id,
+      const attempts = quiz.questions.map((q) => ({
+        quiz_id: persistedQuizId,
         question_id: q.id,
         user_id: user!.id,
         selected_answer: userAnswers[q.id] || 'no_answer',
@@ -219,7 +228,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
       const accuracyPercentage = calculateAccuracy();
       const baseXP = Math.floor(finalScore / 2); 
       const accuracyBonus = Math.floor(baseXP * (accuracyPercentage / 100));
-      const totalXP = baseXP + accuracyBonus;
+      const totalXP = allowXP ? baseXP + accuracyBonus : 0;
       
       setEarnedXP(totalXP);
       
@@ -234,6 +243,11 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit }) => {
   };
   
   const handleClaimXP = () => {
+    if (!allowXP) {
+      toast.info("Retake detected: points are not awarded for already-attempted questions.");
+      return;
+    }
+
     if (earnedXP > 0) {
       addXP(earnedXP);
       toast.success(`You've gained ${earnedXP} XP!`, {
