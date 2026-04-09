@@ -624,6 +624,13 @@ const LibraryPage: React.FC = () => {
                                             Reject
                                           </Button>
                                         </>
+                                        <Button size="sm" onClick={async () => {
+                                          await updateBook(book.id, { status: 'approved' });
+                                          toast.success('Book approved.');
+                                          await load();
+                                        }}>
+                                          Approve
+                                        </Button>
                                       )}
                                       <Button size="sm" variant="destructive" onClick={() => handleDelete(book.id)}>
                                         Delete
