@@ -58,6 +58,7 @@ const MainMenu: React.FC = () => {
     { title: t("learning-dna"), icon: <Brain className="h-6 w-6" />, path: "/learning-dna", category: "learn", color: "from-pink-500 to-rose-600", description: t("your-brain-map") },
     { title: t("friends"), icon: <Users className="h-6 w-6" />, path: "/friends", category: "social", color: "from-teal-500 to-cyan-600", description: t("connect-chat") },
     { title: t("social-feed"), icon: <Compass className="h-6 w-6" />, path: "/social", category: "social", color: "from-sky-500 to-blue-600", description: t("posts-updates") },
+    { title: "Library", icon: <BookOpen className="h-6 w-6" />, path: "/library", category: "social", color: "from-emerald-500 to-teal-600", description: "Read books with AI tools" },
     { title: t("settings"), icon: <Settings className="h-6 w-6" />, path: "/settings", category: "all", color: "from-gray-500 to-slate-600", description: t("preferences") },
   ];
 
