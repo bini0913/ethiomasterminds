@@ -29,6 +29,9 @@ import {
   Target,
   Flame,
   Bell,
+  X,
+  CheckCircle2,
+  Timer,
 } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import RoomCard, { Room } from "@/components/multiplayer/RoomCard";
@@ -77,6 +80,16 @@ interface Tournament {
   isFull: boolean;
 }
 
+interface MultiplayerInvite {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  room_id: string;
+  status: "pending" | "accepted" | "rejected" | "expired" | "cancelled";
+  created_at: string;
+  expires_at: string;
+}
+
 interface NewTournamentForm {
   name: string;
   description: string;
@@ -116,7 +129,11 @@ const Lobby: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
+  const [activityFeed] = useState<string[]>([
+    "Player123 just won a ranked duel",
+    "Tournament qualifier opens in 15 minutes",
+    "New champion crowned in Grade 8 bracket",
+  ]);
   const [newTournamentData, setNewTournamentData] = useState<NewTournamentForm>({
     name: "",
     description: "",
@@ -128,6 +145,10 @@ const Lobby: React.FC = () => {
     prizeGems: "20",
     durationHours: "2"
   });
+  const [incomingInvite, setIncomingInvite] = useState<MultiplayerInvite | null>(null);
+  const [incomingInviteSender, setIncomingInviteSender] = useState<{ name: string; avatar: string } | null>(null);
+  const [inviteSecondsLeft, setInviteSecondsLeft] = useState(0);
+  const [sendingInviteForUserId, setSendingInviteForUserId] = useState<string | null>(null);
 
   const pushActivity = useCallback((message: string) => {
     const item: ActivityItem = {
@@ -442,8 +463,73 @@ const Lobby: React.FC = () => {
       })
       .subscribe();
 
-    return [chatChannel, roomChannel, presenceChannel, tournamentChannel];
-  }, [fetchOnlinePlayers, fetchTournaments, pushActivity, refreshRooms]);
+    const invitesChannel = supabase
+      .channel("multiplayer-invites")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "multiplayer_invites",
+        },
+        async (payload: any) => {
+          const newInvite = payload.new as MultiplayerInvite | null;
+          if (!newInvite || !user?.id) return;
+
+          if (newInvite.receiver_id === user.id && newInvite.status === "pending") {
+            setIncomingInvite(newInvite);
+            const { data: senderProfile } = await supabase
+              .from("profiles")
+              .select("name, avatar")
+              .eq("id", newInvite.sender_id)
+              .single();
+
+            setIncomingInviteSender({
+              name: senderProfile?.name || "Player",
+              avatar: senderProfile?.avatar || "avatar-1",
+            });
+            const seconds = Math.max(
+              0,
+              Math.floor((new Date(newInvite.expires_at).getTime() - Date.now()) / 1000),
+            );
+            setInviteSecondsLeft(seconds);
+            toast.info(`🎮 ${senderProfile?.name || "Player"} invited you to a match`);
+            if ("vibrate" in navigator) {
+              navigator.vibrate(180);
+            }
+          }
+
+          if (newInvite.sender_id === user.id && newInvite.status !== "pending") {
+            const statusLabel = newInvite.status === "accepted" ? "accepted" : newInvite.status;
+            toast.message(`Invite ${statusLabel}`);
+          }
+        },
+      )
+      .subscribe();
+
+    return [chatChannel, roomChannel, presenceChannel, tournamentChannel, invitesChannel];
+  }, [fetchOnlinePlayers, fetchTournaments, refreshRooms, user?.id]);
+
+  useEffect(() => {
+    if (!incomingInvite) return;
+    const interval = setInterval(() => {
+      const remaining = Math.max(
+        0,
+        Math.floor((new Date(incomingInvite.expires_at).getTime() - Date.now()) / 1000),
+      );
+      setInviteSecondsLeft(remaining);
+      if (remaining <= 0) {
+        void supabase
+          .from("multiplayer_invites" as any)
+          .update({ status: "expired", responded_at: new Date().toISOString() })
+          .eq("id", incomingInvite.id)
+          .eq("receiver_id", user?.id || "");
+        setIncomingInvite(null);
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [incomingInvite, user?.id]);
 
   useEffect(() => {
     if (!user) {
@@ -706,7 +792,49 @@ const Lobby: React.FC = () => {
   };
 
   const challengePlayer = async (playerId: string, playerName: string) => {
-    toast.success(`Challenge sent to ${playerName}!`);
+    if (!user) return;
+    setSendingInviteForUserId(playerId);
+    const { data, error } = await (supabase as any).rpc("create_multiplayer_invite", {
+      p_receiver_id: playerId,
+      p_room_id: null,
+      p_max_players: 2,
+      p_subject: "Mixed",
+      p_difficulty: "Medium",
+    });
+    setSendingInviteForUserId(null);
+
+    if (error) {
+      toast.error(error.message || "Could not send invite");
+      return;
+    }
+
+    if (data?.room_id) {
+      await contextJoinRoom(data.room_id, user.name || "Player");
+    }
+    toast.success(`Invite sent to ${playerName}`);
+  };
+
+  const respondToInvite = async (response: "accepted" | "rejected") => {
+    if (!incomingInvite || !user) return;
+
+    const { data, error } = await (supabase as any).rpc("respond_multiplayer_invite", {
+      p_invite_id: incomingInvite.id,
+      p_response: response,
+    });
+
+    if (error) {
+      toast.error(error.message || "Invite response failed");
+      return;
+    }
+
+    if (response === "accepted" && data?.room_id) {
+      const success = await contextJoinRoom(data.room_id, user.name || "Player");
+      if (success) {
+        navigate(`/multiplayer?room=${data.room_id}`);
+      }
+    }
+
+    setIncomingInvite(null);
   };
 
   const formatTimeRemaining = (startTime: Date) => {
@@ -824,27 +952,27 @@ const Lobby: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 pt-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Card>
+          <Card className="border-cyan-300/30 bg-cyan-500/10">
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground"><Users className="h-4 w-4" /> Players online now</div>
+              <div className="flex items-center gap-2 text-cyan-100"><Users className="h-4 w-4" /> Players online now</div>
               <p className="text-2xl font-bold mt-1">{onlinePlayers.length.toLocaleString()}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-indigo-300/30 bg-indigo-500/10">
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground"><Activity className="h-4 w-4" /> Matches in progress</div>
+              <div className="flex items-center gap-2 text-indigo-100"><Activity className="h-4 w-4" /> Matches in progress</div>
               <p className="text-2xl font-bold mt-1">{liveMatchCount}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-emerald-300/30 bg-emerald-500/10">
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground"><Target className="h-4 w-4" /> Match Quality</div>
+              <div className="flex items-center gap-2 text-emerald-100"><Target className="h-4 w-4" /> Match Quality</div>
               <p className="text-2xl font-bold mt-1">{matchQualityScore}% Balanced</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-orange-300/30 bg-orange-500/10">
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground"><Flame className="h-4 w-4" /> Win Streak Aura</div>
+              <div className="flex items-center gap-2 text-orange-100"><Flame className="h-4 w-4" /> Win Streak Aura</div>
               <p className="text-2xl font-bold mt-1">🔥 {Math.max(1, Math.floor((user?.xp || 0) / 1200))}</p>
             </CardContent>
           </Card>
@@ -883,8 +1011,14 @@ const Lobby: React.FC = () => {
                           </div>
                         </div>
                         {player.id !== user?.id && (
-                          <Button variant="ghost" size="sm" className="h-8 px-3 text-xs" onClick={() => challengePlayer(player.id, player.name)}>
-                            <Swords className="h-3 w-3 mr-1" /> Fight
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            disabled={sendingInviteForUserId === player.id}
+                            onClick={() => challengePlayer(player.id, player.name)}
+                          >
+                            <Swords className="h-3 w-3 mr-1" /> {sendingInviteForUserId === player.id ? "Sending..." : "Invite"}
                           </Button>
                         )}
                       </div>
@@ -1001,23 +1135,22 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border/60">
-            <CardHeader className="border-b py-3">
+          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+            <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-t-xl py-3">
               <CardTitle className="flex items-center gap-2 text-base"><Bell className="h-5 w-5" /> Live Activity Feed</CardTitle>
             </CardHeader>
             <CardContent className="p-3 space-y-2">
-              {activityFeed.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-3">No live activity yet. Create a room or send a chat to start the feed.</p>
-              ) : (
-                activityFeed.map((item) => (
-                  <div key={item.id} className="rounded-lg border border-border bg-muted/40 p-2 text-sm">
-                    <p>{item.message}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {item.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  </div>
-                ))
-              )}
+              {activityFeed.map((item, index) => (
+                <motion.div
+                  key={`${item}-${index}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-2 text-sm"
+                >
+                  {item}
+                </motion.div>
+              ))}
             </CardContent>
           </Card>
         </div>
@@ -1215,6 +1348,32 @@ const Lobby: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {incomingInvite && incomingInvite.status === "pending" && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[92vw] max-w-md">
+          <Card className="border-emerald-400/40 bg-slate-950/95 backdrop-blur-xl shadow-[0_0_40px_rgba(16,185,129,0.35)]">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <AvatarRenderer avatar={incomingInviteSender?.avatar || "avatar-1"} size="md" />
+                <div className="flex-1">
+                  <p className="font-semibold">🎮 {incomingInviteSender?.name || "A player"} invited you to a match</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                    <Timer className="h-3 w-3" /> Expires in {inviteSecondsLeft}s
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => respondToInvite("accepted")}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" /> Accept
+                </Button>
+                <Button variant="outline" onClick={() => respondToInvite("rejected")}>
+                  <X className="h-4 w-4 mr-2" /> Reject
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

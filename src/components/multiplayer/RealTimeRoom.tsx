@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -122,6 +123,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [floatingXp, setFloatingXp] = useState<number | null>(null);
   const [answerShake, setAnswerShake] = useState(false);
   const [latencyMs, setLatencyMs] = useState(42);
+  const [roomConfig, setRoomConfig] = useState({
+    subject: 'Mixed',
+    difficulty: 'Medium',
+    gameMode: maxPlayers <= 2 ? '1v1' : maxPlayers <= 4 ? '2v2' : '3v3',
+  });
 
   const advancingQuestionRef = useRef(false);
   const prevPlayersRef = useRef<Player[]>([]);
@@ -255,7 +261,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     try {
       const { data: room } = await supabase
         .from('multiplayer_rooms')
-        .select('host_id, question_count')
+        .select('host_id, question_count, subject, difficulty, max_players')
         .eq('id', roomId)
         .single();
 
@@ -267,6 +273,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
       setIsHost(room.host_id === currentUserId);
       setTotalQuestions(room.question_count || 10);
+      setRoomConfig({
+        subject: room.subject || 'Mixed',
+        difficulty: room.difficulty || 'Medium',
+        gameMode: (room.max_players || maxPlayers) <= 2 ? '1v1' : (room.max_players || maxPlayers) <= 4 ? '2v2' : '3v3',
+      });
 
       await supabase.from('room_players').upsert(
         {
@@ -565,7 +576,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   };
 
   const sendChatMessage = async (message?: string) => {
-    const content = message || chatInput.trim();
+    const content = (message || chatInput.trim()).slice(0, 80);
     if (!content) return;
 
     await supabase.from('room_chat_messages').insert({
@@ -575,6 +586,28 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     });
 
     if (!message) setChatInput('');
+  };
+
+  const updateRoomConfig = async (nextConfig: Partial<typeof roomConfig>) => {
+    if (!isHost) return;
+    const merged = { ...roomConfig, ...nextConfig };
+    setRoomConfig(merged);
+    await supabase
+      .from('multiplayer_rooms')
+      .update({
+        subject: merged.subject,
+        difficulty: merged.difficulty,
+        max_players: merged.gameMode === '1v1' ? 2 : merged.gameMode === '2v2' ? 4 : 6,
+      })
+      .eq('id', roomId)
+      .eq('host_id', currentUserId);
+    toast.success('Room settings updated');
+  };
+
+  const kickPlayer = async (playerId: string, playerName: string) => {
+    if (!isHost || playerId === currentUserId) return;
+    await supabase.from('room_players').delete().eq('room_id', roomId).eq('user_id', playerId);
+    toast.info(`${playerName} was removed from the room`);
   };
 
   const allReady = players.length >= 2 && players.every((p) => p.isReady);
@@ -658,10 +691,40 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                     <div className="rounded-lg border border-white/15 p-2">Questions: {totalQuestions}</div>
-                    <div className="rounded-lg border border-white/15 p-2">Topic: Mixed</div>
-                    <div className="rounded-lg border border-white/15 p-2">Difficulty: Adaptive</div>
-                    <div className="rounded-lg border border-white/15 p-2">Mode: Speed + Accuracy</div>
+                    <div className="rounded-lg border border-white/15 p-2">Topic: {roomConfig.subject}</div>
+                    <div className="rounded-lg border border-white/15 p-2">Difficulty: {roomConfig.difficulty}</div>
+                    <div className="rounded-lg border border-white/15 p-2">Mode: {roomConfig.gameMode}</div>
                   </div>
+
+                  {isHost && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <Select value={roomConfig.gameMode} onValueChange={(value) => void updateRoomConfig({ gameMode: value })}>
+                        <SelectTrigger><SelectValue placeholder="Game mode" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1v1">1v1</SelectItem>
+                          <SelectItem value="2v2">2v2</SelectItem>
+                          <SelectItem value="3v3">3v3</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={roomConfig.subject} onValueChange={(value) => void updateRoomConfig({ subject: value })}>
+                        <SelectTrigger><SelectValue placeholder="Topic" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Mixed">Mixed</SelectItem>
+                          <SelectItem value="Mathematics">Mathematics</SelectItem>
+                          <SelectItem value="Science">Science</SelectItem>
+                          <SelectItem value="English">English</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={roomConfig.difficulty} onValueChange={(value) => void updateRoomConfig({ difficulty: value })}>
+                        <SelectTrigger><SelectValue placeholder="Difficulty" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Easy">Easy</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="Hard">Hard</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   <div className="flex justify-center gap-2 flex-wrap">
                     <Button size="lg" className="min-h-11 px-6" variant={currentPlayer?.isReady ? 'default' : 'outline'} onClick={toggleReady}>
@@ -801,6 +864,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     </div>
                     <div className={cn('flex justify-center items-center gap-1 mt-1 text-xs', connectionColor)}><Signal className="h-3 w-3" /> {connectionQuality}</div>
                     {roomState.status !== 'waiting' && <div className="text-sm font-bold text-cyan-300 mt-1">{player.score} pts</div>}
+                    {isHost && player.id !== currentUserId && roomState.status === 'waiting' && (
+                      <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => void kickPlayer(player.id, player.name)}>
+                        Kick
+                      </Button>
+                    )}
                   </motion.div>
                 ))}
               </div>

@@ -311,18 +311,42 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return;
 
     try {
+      const { data: currentRoomData } = await supabase
+        .from('multiplayer_rooms')
+        .select('host_id, status')
+        .eq('id', roomId)
+        .maybeSingle();
+
+      const wasHost = currentRoomData?.host_id === user.id;
+
       await supabase
         .from('room_players')
         .delete()
         .eq('room_id', roomId)
         .eq('user_id', user.id);
 
-      // If host leaves, delete the room
-      if (currentRoom?.host === user.id) {
-        await supabase
-          .from('multiplayer_rooms')
-          .delete()
-          .eq('id', roomId);
+      // If host leaves, transfer ownership to next player (PUBG-style continuity).
+      if (wasHost) {
+        const { data: remainingPlayers } = await supabase
+          .from('room_players')
+          .select('user_id')
+          .eq('room_id', roomId)
+          .limit(1);
+
+        const nextHostId = remainingPlayers?.[0]?.user_id;
+
+        if (nextHostId) {
+          await supabase
+            .from('multiplayer_rooms')
+            .update({ host_id: nextHostId })
+            .eq('id', roomId);
+          toast.info('Host left. New host assigned.');
+        } else {
+          await supabase
+            .from('multiplayer_rooms')
+            .delete()
+            .eq('id', roomId);
+        }
       }
 
       setCurrentRoom(null);
