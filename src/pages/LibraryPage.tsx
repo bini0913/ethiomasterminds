@@ -120,7 +120,7 @@ const LibraryPage: React.FC = () => {
     try {
       const includePending = user.role !== 'student';
       const [bookData, bookmarks, assigned, highlightRows, questionRows] = await Promise.all([
-        listBooks({ includePending }),
+        listBooks({ includePending, userId: user.id }),
         listBookmarks(user.id),
         listAssignedBooks(user.id).catch(() => []),
         listHighlights(user.id).catch(() => []),
@@ -242,7 +242,8 @@ const LibraryPage: React.FC = () => {
       resetForm();
     } catch (error) {
       console.error(error);
-      toast.error('Action failed. Try again.');
+      const message = error instanceof Error ? error.message : 'Action failed. Try again.';
+      toast.error(message);
     } finally {
       setUploading(false);
     }

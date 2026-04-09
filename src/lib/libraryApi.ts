@@ -82,15 +82,26 @@ export interface CreateBookPayload {
 
 const db = supabase as any;
 
+function getErrorCode(error: unknown): string | undefined {
+  return typeof error === 'object' && error !== null && 'code' in error ? String((error as { code?: string }).code) : undefined;
+}
+
 export async function listBooks(options?: { includePending?: boolean; userId?: string }) {
   const includePending = options?.includePending ?? false;
+  const userId = options?.userId;
 
   let query = db
     .from('library_books')
     .select('*, profiles:uploader_id(name, username)')
     .order('created_at', { ascending: false });
 
-  if (!includePending) query = query.eq('status', 'approved');
+  if (includePending) {
+    // no additional filters
+  } else if (userId) {
+    query = query.or(`status.eq.approved,uploader_id.eq.${userId}`);
+  } else {
+    query = query.eq('status', 'approved');
+  }
 
   const { data, error } = await query;
   if (error) throw error;
@@ -139,6 +150,14 @@ async function generatePdfThumbnail(pdfFile: File): Promise<Blob | null> {
 }
 
 export async function createBook(payload: CreateBookPayload) {
+  if (!payload.pdfFile) {
+    throw new Error('No file selected.');
+  }
+
+  if (payload.pdfFile.type !== 'application/pdf') {
+    throw new Error('Only PDF files are supported.');
+  }
+
   const ext = payload.pdfFile.name.split('.').pop()?.toLowerCase() || 'pdf';
   const baseName = `${Date.now()}-${crypto.randomUUID()}`;
   const pdfPath = `${payload.uploaderId}/${baseName}.${ext}`;
@@ -190,13 +209,36 @@ export async function createBook(payload: CreateBookPayload) {
 
   const createdBook = data as LibraryBook;
 
-  await db.from('book_uploads').upsert({
-    book_id: createdBook.id,
-    uploader_id: payload.uploaderId,
-    status,
-    moderated_at: status === 'approved' ? new Date().toISOString() : null,
-    moderation_note: status === 'approved' ? 'Auto-approved by role policy' : 'Awaiting teacher/admin moderation',
-  }, { onConflict: 'book_id' });
+  try {
+    const { error: insertUploadError } = await db.from('book_uploads').insert({
+      book_id: createdBook.id,
+      uploader_id: payload.uploaderId,
+      status,
+      moderated_at: status === 'approved' ? new Date().toISOString() : null,
+      moderation_note: status === 'approved' ? 'Auto-approved by role policy' : 'Awaiting teacher/admin moderation',
+    });
+
+    if (insertUploadError) {
+      const code = getErrorCode(insertUploadError);
+
+      if (code === '23505') {
+        const { error: updateUploadError } = await db
+          .from('book_uploads')
+          .update({
+            status,
+            moderated_at: status === 'approved' ? new Date().toISOString() : null,
+            moderation_note: status === 'approved' ? 'Auto-approved by role policy' : 'Awaiting teacher/admin moderation',
+          })
+          .eq('book_id', createdBook.id);
+        if (updateUploadError) throw updateUploadError;
+      } else {
+        // Do not block successful book upload if audit table isn't ready yet.
+        console.warn('book_uploads sync skipped:', insertUploadError);
+      }
+    }
+  } catch (uploadAuditError) {
+    console.warn('book_uploads sync failed:', uploadAuditError);
+  }
 
   return createdBook;
 }
@@ -233,6 +275,12 @@ export async function moderateBookUpload(payload: {
     .limit(1);
   if (existingError) throw existingError;
 
+  const { data: bookRow } = await db
+    .from('library_books')
+    .select('uploader_id')
+    .eq('id', payload.bookId)
+    .single();
+
   if (existing?.[0]?.id) {
     const { error } = await db
       .from('book_uploads')
@@ -249,7 +297,7 @@ export async function moderateBookUpload(payload: {
       .from('book_uploads')
       .insert({
         book_id: payload.bookId,
-        uploader_id: payload.moderatorId,
+        uploader_id: bookRow?.uploader_id ?? payload.moderatorId,
         status: payload.status,
         moderated_by: payload.moderatorId,
         moderated_at: new Date().toISOString(),
