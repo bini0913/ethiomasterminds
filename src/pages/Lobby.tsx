@@ -56,6 +56,12 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+interface ActivityItem {
+  id: string;
+  message: string;
+  timestamp: Date;
+}
+
 interface Tournament {
   id: string;
   name: string;
@@ -111,11 +117,7 @@ const Lobby: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [activityFeed] = useState<string[]>([
-    "Player123 just won a ranked duel",
-    "Tournament qualifier opens in 15 minutes",
-    "New champion crowned in Grade 8 bracket",
-  ]);
+  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
   const [newTournamentData, setNewTournamentData] = useState<NewTournamentForm>({
     name: "",
     description: "",
@@ -127,6 +129,15 @@ const Lobby: React.FC = () => {
     prizeGems: "20",
     durationHours: "2"
   });
+
+  const pushActivity = useCallback((message: string) => {
+    const item: ActivityItem = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      message,
+      timestamp: new Date(),
+    };
+    setActivityFeed((prev) => [item, ...prev].slice(0, 10));
+  }, []);
 
   const fetchOnlinePlayers = useCallback(async () => {
     const { data, error } = await supabase
@@ -258,6 +269,73 @@ const Lobby: React.FC = () => {
     }
   }, []);
 
+  const fetchRecentActivity = useCallback(async () => {
+    const [roomsRes, chatsRes, tournRes] = await Promise.all([
+      supabase
+        .from("multiplayer_rooms")
+        .select("id, name, created_at, host_id")
+        .in("status", ["waiting", "countdown", "playing"])
+        .order("created_at", { ascending: false })
+        .limit(4),
+      supabase
+        .from("lobby_messages")
+        .select("id, content, created_at, user_id")
+        .order("created_at", { ascending: false })
+        .limit(4),
+      supabase
+        .from("tournament_participants")
+        .select("id, created_at, user_id, tournament_id")
+        .order("created_at", { ascending: false })
+        .limit(4),
+    ]);
+
+    const hostIds = (roomsRes.data || []).map((room) => room.host_id);
+    const chatUserIds = (chatsRes.data || []).map((msg) => msg.user_id);
+    const participantUserIds = (tournRes.data || []).map((entry) => entry.user_id);
+    const userIds = [...new Set([...hostIds, ...chatUserIds, ...participantUserIds])];
+
+    const tournamentIds = [...new Set((tournRes.data || []).map((entry) => entry.tournament_id))];
+
+    const [profilesRes, tournamentMetaRes] = await Promise.all([
+      userIds.length > 0
+        ? supabase.from("profiles").select("id, name").in("id", userIds)
+        : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
+      tournamentIds.length > 0
+        ? supabase.from("tournaments").select("id, name").in("id", tournamentIds)
+        : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    ]);
+
+    const profileMap = new Map((profilesRes.data || []).map((profile) => [profile.id, profile.name || "Student"]));
+    const tournamentMap = new Map((tournamentMetaRes.data || []).map((tournament) => [tournament.id, tournament.name]));
+
+    const combined = [
+      ...(roomsRes.data || []).map((room) => ({
+        id: `room-${room.id}`,
+        createdAt: room.created_at,
+        message: `${profileMap.get(room.host_id) || "Student"} created room "${room.name}"`,
+      })),
+      ...(chatsRes.data || []).map((msg) => ({
+        id: `chat-${msg.id}`,
+        createdAt: msg.created_at,
+        message: `${profileMap.get(msg.user_id) || "Student"}: ${msg.content}`,
+      })),
+      ...(tournRes.data || []).map((entry) => ({
+        id: `tournament-${entry.id}`,
+        createdAt: entry.created_at,
+        message: `${profileMap.get(entry.user_id) || "Student"} joined ${tournamentMap.get(entry.tournament_id) || "a tournament"}`,
+      })),
+    ]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10)
+      .map((item) => ({
+        id: item.id,
+        message: item.message,
+        timestamp: new Date(item.createdAt),
+      }));
+
+    setActivityFeed(combined);
+  }, []);
+
   const loadLobbyData = useCallback(async () => {
     setLoading(true);
     try {
@@ -265,14 +343,15 @@ const Lobby: React.FC = () => {
         refreshRooms(),
         fetchOnlinePlayers(),
         fetchChatMessages(),
-        fetchTournaments()
+        fetchTournaments(),
+        fetchRecentActivity(),
       ]);
     } catch (error) {
       console.error('Error loading lobby data:', error);
     } finally {
       setLoading(false);
     }
-  }, [fetchChatMessages, fetchOnlinePlayers, fetchTournaments, refreshRooms]);
+  }, [fetchChatMessages, fetchOnlinePlayers, fetchRecentActivity, fetchTournaments, refreshRooms]);
 
   const setupRealtimeSubscriptions = useCallback(() => {
     const chatChannel = supabase
@@ -298,6 +377,7 @@ const Lobby: React.FC = () => {
             timestamp: new Date(payload.new.created_at)
           };
           setChatMessages(prev => [...prev, newMsg]);
+          pushActivity(`${profile.name}: ${payload.new.content}`);
         }
       })
       .subscribe();
@@ -310,6 +390,15 @@ const Lobby: React.FC = () => {
         table: 'multiplayer_rooms'
       }, () => {
         refreshRooms();
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'multiplayer_rooms'
+      }, async (payload) => {
+        const newRoom = payload.new as { name: string; host_id: string };
+        const { data: profile } = await supabase.from("profiles").select("name").eq("id", newRoom.host_id).single();
+        pushActivity(`${profile?.name || "Student"} created room "${newRoom.name}"`);
       })
       .subscribe();
 
@@ -340,10 +429,22 @@ const Lobby: React.FC = () => {
       }, () => {
         fetchTournaments();
       })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'tournament_participants'
+      }, async (payload) => {
+        const entry = payload.new as { user_id: string; tournament_id: string };
+        const [{ data: profile }, { data: tournament }] = await Promise.all([
+          supabase.from("profiles").select("name").eq("id", entry.user_id).single(),
+          supabase.from("tournaments").select("name").eq("id", entry.tournament_id).single(),
+        ]);
+        pushActivity(`${profile?.name || "Student"} joined ${tournament?.name || "a tournament"}`);
+      })
       .subscribe();
 
     return [chatChannel, roomChannel, presenceChannel, tournamentChannel];
-  }, [fetchOnlinePlayers, fetchTournaments, refreshRooms]);
+  }, [fetchOnlinePlayers, fetchTournaments, pushActivity, refreshRooms]);
 
   useEffect(() => {
     if (!user) {
@@ -671,21 +772,21 @@ const Lobby: React.FC = () => {
   }));
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_36%),radial-gradient(circle_at_80%_20%,_rgba(168,85,247,0.22),_transparent_42%),linear-gradient(to_bottom_right,_hsl(var(--background)),_hsl(var(--background)),_rgba(45,212,191,0.08))]">
-      <header className="sticky top-0 z-50 border-b border-cyan-300/20 bg-[linear-gradient(95deg,rgba(6,182,212,0.28),rgba(99,102,241,0.26),rgba(168,85,247,0.3))] px-4 py-3 shadow-xl backdrop-blur-xl">
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
-            <BackButton to="/" className="text-white hover:bg-white/20" />
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
-              <Gamepad className="h-6 w-6 text-white" />
+            <BackButton to="/" />
+            <div className="bg-primary/10 rounded-xl p-2">
+              <Gamepad className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Nexus Lobby</h1>
-              <p className="text-xs text-white/70">{onlinePlayers.length} students online</p>
+              <h1 className="text-xl font-bold">Multiplayer Lobby</h1>
+              <p className="text-xs text-muted-foreground">{onlinePlayers.length} students online</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" size="icon" onClick={loadLobbyData} className="text-white hover:bg-white/20">
+            <Button variant="ghost" size="icon" onClick={loadLobbyData}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2">
@@ -695,12 +796,12 @@ const Lobby: React.FC = () => {
         </div>
       </header>
 
-      <div className="bg-card/70 backdrop-blur-md border-b border-cyan-200/10 px-4 py-3">
+      <div className="bg-card border-b border-border px-4 py-3">
         <div className="max-w-7xl mx-auto flex flex-wrap gap-2">
-          <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 whitespace-nowrap">
+          <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 whitespace-nowrap">
             <Plus className="h-4 w-4" /> Create Room
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap border-cyan-400/50" onClick={handleRandomMatch}>
+          <Button variant="outline" className="gap-2 whitespace-nowrap" onClick={handleRandomMatch}>
             <Zap className="h-4 w-4" /> Find Match
           </Button>
           <Button variant="outline" className="gap-2 whitespace-nowrap">
@@ -710,8 +811,8 @@ const Lobby: React.FC = () => {
             <Crown className="h-4 w-4" /> Tournament
           </Button>
           <div className="flex items-center gap-2 w-full lg:w-auto lg:ml-auto">
-            <Input value={joinByCode} onChange={(e) => setJoinByCode(e.target.value)} className="h-9 bg-background/70 border-cyan-300/20 flex-1 min-w-[150px]" placeholder="Join by room code" />
-            <Input value={joinPasscode} onChange={(e) => setJoinPasscode(e.target.value)} className="h-9 bg-background/70 border-cyan-300/20 flex-1 min-w-[170px]" placeholder="Passcode" />
+            <Input value={joinByCode} onChange={(e) => setJoinByCode(e.target.value)} className="h-9 flex-1 min-w-[150px]" placeholder="Join by room code" />
+            <Input value={joinPasscode} onChange={(e) => setJoinPasscode(e.target.value)} className="h-9 flex-1 min-w-[170px]" placeholder="Passcode" />
             <Button onClick={joinWithCode} className="whitespace-nowrap" variant="secondary">Join</Button>
           </div>
           {canManageTournaments && (
@@ -724,27 +825,27 @@ const Lobby: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 pt-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Card className="border-cyan-300/30 bg-cyan-500/10">
+          <Card>
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-cyan-100"><Users className="h-4 w-4" /> Players online now</div>
+              <div className="flex items-center gap-2 text-muted-foreground"><Users className="h-4 w-4" /> Players online now</div>
               <p className="text-2xl font-bold mt-1">{onlinePlayers.length.toLocaleString()}</p>
             </CardContent>
           </Card>
-          <Card className="border-indigo-300/30 bg-indigo-500/10">
+          <Card>
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-indigo-100"><Activity className="h-4 w-4" /> Matches in progress</div>
+              <div className="flex items-center gap-2 text-muted-foreground"><Activity className="h-4 w-4" /> Matches in progress</div>
               <p className="text-2xl font-bold mt-1">{liveMatchCount}</p>
             </CardContent>
           </Card>
-          <Card className="border-emerald-300/30 bg-emerald-500/10">
+          <Card>
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-emerald-100"><Target className="h-4 w-4" /> Match Quality</div>
+              <div className="flex items-center gap-2 text-muted-foreground"><Target className="h-4 w-4" /> Match Quality</div>
               <p className="text-2xl font-bold mt-1">{matchQualityScore}% Balanced</p>
             </CardContent>
           </Card>
-          <Card className="border-orange-300/30 bg-orange-500/10">
+          <Card>
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-orange-100"><Flame className="h-4 w-4" /> Win Streak Aura</div>
+              <div className="flex items-center gap-2 text-muted-foreground"><Flame className="h-4 w-4" /> Win Streak Aura</div>
               <p className="text-2xl font-bold mt-1">🔥 {Math.max(1, Math.floor((user?.xp || 0) / 1200))}</p>
             </CardContent>
           </Card>
@@ -753,13 +854,13 @@ const Lobby: React.FC = () => {
 
       <div className="max-w-7xl mx-auto py-4 px-4">
         {loading && (
-          <div className="mb-4 rounded-lg border border-cyan-300/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
+          <div className="mb-4 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
             Syncing lobby data...
           </div>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-xl py-3">
+          <Card className="bg-card border-border/60">
+            <CardHeader className="border-b py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="h-5 w-5" /> Online Players ({onlinePlayers.length})
               </CardTitle>
@@ -795,8 +896,8 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-            <CardHeader className="bg-gradient-to-r from-indigo-500 to-fuchsia-600 text-white rounded-t-xl py-3">
+          <Card className="bg-card border-border/60">
+            <CardHeader className="border-b py-3">
               <CardTitle className="text-base">Play & Compete</CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
@@ -841,7 +942,7 @@ const Lobby: React.FC = () => {
                               <span className="text-yellow-500 font-medium">🏆 Prize:</span> {tournament.prize}
                             </div>
                             <div className="w-full bg-muted rounded-full h-1.5 mb-2">
-                              <div className="bg-gradient-to-r from-primary to-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }} />
+                              <div className="bg-primary h-1.5 rounded-full transition-all" style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }} />
                             </div>
                             <div className="space-y-2">
                               <Button size="sm" className="w-full" onClick={() => joinTournament(tournament.id)} disabled={tournament.status === 'active' || tournament.isFull}>
@@ -863,8 +964,8 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-            <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-t-xl py-3">
+          <Card className="bg-card border-border/60">
+            <CardHeader className="border-b py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <MessageSquare className="h-5 w-5" /> Lobby Chat
               </CardTitle>
@@ -901,22 +1002,29 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-            <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-t-xl py-3">
+          <Card className="bg-card border-border/60">
+            <CardHeader className="border-b py-3">
               <CardTitle className="flex items-center gap-2 text-base"><Bell className="h-5 w-5" /> Live Activity Feed</CardTitle>
             </CardHeader>
             <CardContent className="p-3 space-y-2">
-              {activityFeed.map((item, index) => (
-                <motion.div
-                  key={`${item}-${index}`}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-2 text-sm"
-                >
-                  {item}
-                </motion.div>
-              ))}
+              {activityFeed.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-3">No live activity yet. Create a room or send a chat to start the feed.</p>
+              ) : (
+                activityFeed.map((item, index) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="rounded-lg border border-border bg-muted/40 p-2 text-sm"
+                  >
+                    <p>{item.message}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {item.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </motion.div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>
