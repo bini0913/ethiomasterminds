@@ -9,7 +9,6 @@ import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useRoom } from "@/context/RoomContext";
 import { useFriends } from "@/context/FriendsContext";
-import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -872,7 +871,7 @@ const Lobby: React.FC = () => {
                     <p className="text-center text-muted-foreground py-8">No players online</p>
                   ) : (
                     onlinePlayers.map((player) => (
-                      <motion.div key={player.id} whileHover={{ scale: 1.02 }} className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
+                      <div key={player.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/40">
                         <div className="relative">
                           <AvatarRenderer avatar={player.avatar} size="md" />
                           <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${getStatusColor(player.status)} border-2 border-card`}></div>
@@ -888,7 +887,7 @@ const Lobby: React.FC = () => {
                             <Swords className="h-3 w-3 mr-1" /> Fight
                           </Button>
                         )}
-                      </motion.div>
+                      </div>
                     ))
                   )}
                 </div>
@@ -926,7 +925,7 @@ const Lobby: React.FC = () => {
                         <p className="text-center text-muted-foreground py-8">No upcoming tournaments</p>
                       ) : (
                         tournaments.map((tournament) => (
-                          <motion.div key={tournament.id} whileHover={{ scale: 1.02 }} className="border border-border/50 rounded-xl p-4 bg-muted/30 hover:border-primary/50 transition-colors">
+                          <div key={tournament.id} className="border border-border/50 rounded-xl p-4 bg-muted/30">
                             <div className="flex justify-between items-start mb-2">
                               <div>
                                 <h3 className="font-semibold text-sm">{tournament.name}</h3>
@@ -942,7 +941,7 @@ const Lobby: React.FC = () => {
                               <span className="text-yellow-500 font-medium">🏆 Prize:</span> {tournament.prize}
                             </div>
                             <div className="w-full bg-muted rounded-full h-1.5 mb-2">
-                              <div className="bg-primary h-1.5 rounded-full transition-all" style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }} />
+                              <div className="bg-primary h-1.5 rounded-full" style={{ width: `${(tournament.players / tournament.maxPlayers) * 100}%` }} />
                             </div>
                             <div className="space-y-2">
                               <Button size="sm" className="w-full" onClick={() => joinTournament(tournament.id)} disabled={tournament.status === 'active' || tournament.isFull}>
@@ -954,7 +953,7 @@ const Lobby: React.FC = () => {
                                 </Button>
                               )}
                             </div>
-                          </motion.div>
+                          </div>
                         ))
                       )}
                     </div>
@@ -1010,19 +1009,13 @@ const Lobby: React.FC = () => {
               {activityFeed.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-3">No live activity yet. Create a room or send a chat to start the feed.</p>
               ) : (
-                activityFeed.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="rounded-lg border border-border bg-muted/40 p-2 text-sm"
-                  >
+                activityFeed.map((item) => (
+                  <div key={item.id} className="rounded-lg border border-border bg-muted/40 p-2 text-sm">
                     <p>{item.message}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {item.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </p>
-                  </motion.div>
+                  </div>
                 ))
               )}
             </CardContent>
