@@ -47,6 +47,18 @@ export interface GeneratedQuestion {
   created_at: string;
 }
 
+export interface BookUpload {
+  id: string;
+  book_id: string;
+  uploader_id: string;
+  status: UploadStatus;
+  moderation_note: string | null;
+  moderated_by: string | null;
+  moderated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ReadingProgressEntry {
   id: string;
   user_id: string;
@@ -175,7 +187,18 @@ export async function createBook(payload: CreateBookPayload) {
     .single();
 
   if (error) throw error;
-  return data as LibraryBook;
+
+  const createdBook = data as LibraryBook;
+
+  await db.from('book_uploads').upsert({
+    book_id: createdBook.id,
+    uploader_id: payload.uploaderId,
+    status,
+    moderated_at: status === 'approved' ? new Date().toISOString() : null,
+    moderation_note: status === 'approved' ? 'Auto-approved by role policy' : 'Awaiting teacher/admin moderation',
+  }, { onConflict: 'book_id' });
+
+  return createdBook;
 }
 
 export async function updateBook(id: string, patch: Partial<Pick<LibraryBook, 'title' | 'author' | 'subject' | 'description' | 'grade_level' | 'type' | 'status'>>) {
@@ -188,6 +211,52 @@ export async function updateBook(id: string, patch: Partial<Pick<LibraryBook, 't
 
   if (error) throw error;
   return data as LibraryBook;
+}
+
+export async function moderateBookUpload(payload: {
+  bookId: string;
+  moderatorId: string;
+  status: UploadStatus;
+  note?: string;
+}) {
+  const { error: bookError } = await db
+    .from('library_books')
+    .update({ status: payload.status })
+    .eq('id', payload.bookId);
+  if (bookError) throw bookError;
+
+  const { data: existing, error: existingError } = await db
+    .from('book_uploads')
+    .select('id')
+    .eq('book_id', payload.bookId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (existingError) throw existingError;
+
+  if (existing?.[0]?.id) {
+    const { error } = await db
+      .from('book_uploads')
+      .update({
+        status: payload.status,
+        moderated_by: payload.moderatorId,
+        moderated_at: new Date().toISOString(),
+        moderation_note: payload.note || null,
+      })
+      .eq('id', existing[0].id);
+    if (error) throw error;
+  } else {
+    const { error } = await db
+      .from('book_uploads')
+      .insert({
+        book_id: payload.bookId,
+        uploader_id: payload.moderatorId,
+        status: payload.status,
+        moderated_by: payload.moderatorId,
+        moderated_at: new Date().toISOString(),
+        moderation_note: payload.note || null,
+      });
+    if (error) throw error;
+  }
 }
 
 export async function deleteBook(id: string) {

@@ -26,6 +26,7 @@ import {
   listGeneratedQuestions,
   listHighlights,
   listReadingProgress,
+  moderateBookUpload,
   saveGeneratedQuestions,
   toggleBookmark,
   updateBook,
@@ -597,13 +598,32 @@ const LibraryPage: React.FC = () => {
                                         Edit
                                       </Button>
                                       {book.status !== 'approved' && (user.role === 'teacher' || user.role === 'admin' || user.role === 'manager') && (
-                                        <Button size="sm" onClick={async () => {
-                                          await updateBook(book.id, { status: 'approved' });
-                                          toast.success('Book approved.');
-                                          await load();
-                                        }}>
-                                          Approve
-                                        </Button>
+                                        <>
+                                          <Button size="sm" onClick={async () => {
+                                            await moderateBookUpload({
+                                              bookId: book.id,
+                                              moderatorId: user.id,
+                                              status: 'approved',
+                                              note: 'Approved by moderator',
+                                            });
+                                            toast.success('Book approved.');
+                                            await load();
+                                          }}>
+                                            Approve
+                                          </Button>
+                                          <Button size="sm" variant="outline" onClick={async () => {
+                                            await moderateBookUpload({
+                                              bookId: book.id,
+                                              moderatorId: user.id,
+                                              status: 'rejected',
+                                              note: 'Rejected by moderator',
+                                            });
+                                            toast.success('Book rejected.');
+                                            await load();
+                                          }}>
+                                            Reject
+                                          </Button>
+                                        </>
                                       )}
                                       <Button size="sm" variant="destructive" onClick={() => handleDelete(book.id)}>
                                         Delete

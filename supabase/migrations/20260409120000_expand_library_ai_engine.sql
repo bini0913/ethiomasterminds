@@ -4,14 +4,35 @@ ALTER TABLE public.library_books
   ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'textbook',
   ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'approved';
 
-ALTER TABLE public.library_books
-  ADD CONSTRAINT library_books_grade_level_check CHECK (grade_level IS NULL OR (grade_level BETWEEN 1 AND 12));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'library_books_grade_level_check'
+      AND conrelid = 'public.library_books'::regclass
+  ) THEN
+    ALTER TABLE public.library_books
+      ADD CONSTRAINT library_books_grade_level_check CHECK (grade_level IS NULL OR (grade_level BETWEEN 1 AND 12));
+  END IF;
 
-ALTER TABLE public.library_books
-  ADD CONSTRAINT library_books_type_check CHECK (type IN ('textbook', 'notes', 'practice', 'reference'));
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'library_books_type_check'
+      AND conrelid = 'public.library_books'::regclass
+  ) THEN
+    ALTER TABLE public.library_books
+      ADD CONSTRAINT library_books_type_check CHECK (type IN ('textbook', 'notes', 'practice', 'reference'));
+  END IF;
 
-ALTER TABLE public.library_books
-  ADD CONSTRAINT library_books_status_check CHECK (status IN ('pending', 'approved', 'rejected'));
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'library_books_status_check'
+      AND conrelid = 'public.library_books'::regclass
+  ) THEN
+    ALTER TABLE public.library_books
+      ADD CONSTRAINT library_books_status_check CHECK (status IN ('pending', 'approved', 'rejected'));
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.book_uploads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
