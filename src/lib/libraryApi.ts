@@ -1,11 +1,16 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export type UploadStatus = 'pending' | 'approved' | 'rejected';
+
 export interface LibraryBook {
   id: string;
   title: string;
   author: string;
   subject: string;
   description: string;
+  grade_level: number | null;
+  type: 'textbook' | 'notes' | 'practice' | 'reference';
+  status: UploadStatus;
   pdf_path: string;
   thumbnail_path: string | null;
   uploader_id: string;
@@ -19,11 +24,57 @@ export interface LibraryBook {
   } | null;
 }
 
+export interface ReaderHighlight {
+  id: string;
+  user_id: string;
+  book_id: string;
+  page_number: number;
+  selected_text: string;
+  highlight_color: 'yellow' | 'blue' | 'red';
+  note: string | null;
+  created_at: string;
+}
+
+export interface GeneratedQuestion {
+  id: string;
+  user_id: string;
+  book_id: string;
+  page_number: number;
+  question: string;
+  answer: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  source_excerpt: string;
+  created_at: string;
+}
+
+export interface BookUpload {
+  id: string;
+  book_id: string;
+  uploader_id: string;
+  status: UploadStatus;
+  moderation_note: string | null;
+  moderated_by: string | null;
+  moderated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReadingProgressEntry {
+  id: string;
+  user_id: string;
+  book_id: string;
+  last_page: number;
+  completion_percent: number;
+  time_spent_seconds: number;
+}
+
 export interface CreateBookPayload {
   title: string;
   author: string;
   subject: string;
   description: string;
+  gradeLevel: number | null;
+  type: LibraryBook['type'];
   pdfFile: File;
   uploaderId: string;
   uploaderRole: LibraryBook['uploader_role'];
@@ -31,14 +82,31 @@ export interface CreateBookPayload {
 
 const db = supabase as any;
 
-export async function listBooks() {
-  const { data, error } = await db
+export async function listBooks(options?: { includePending?: boolean; userId?: string }) {
+  const includePending = options?.includePending ?? false;
+
+  let query = db
     .from('library_books')
     .select('*, profiles:uploader_id(name, username)')
     .order('created_at', { ascending: false });
 
+  if (!includePending) query = query.eq('status', 'approved');
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data || []) as LibraryBook[];
+}
+
+export async function listAssignedBooks(userId: string) {
+  const { data, error } = await db
+    .from('book_permissions')
+    .select('book_id, library_books!inner(*, profiles:uploader_id(name, username))')
+    .eq('user_id', userId)
+    .eq('can_read', true)
+    .eq('library_books.status', 'approved');
+
+  if (error) throw error;
+  return (data || []).map((row: any) => row.library_books) as LibraryBook[];
 }
 
 async function generatePdfThumbnail(pdfFile: File): Promise<Blob | null> {
@@ -96,6 +164,10 @@ export async function createBook(payload: CreateBookPayload) {
     }
   }
 
+  const status: UploadStatus = payload.uploaderRole === 'teacher' || payload.uploaderRole === 'admin' || payload.uploaderRole === 'manager'
+    ? 'approved'
+    : 'pending';
+
   const { data, error } = await db
     .from('library_books')
     .insert({
@@ -103,6 +175,9 @@ export async function createBook(payload: CreateBookPayload) {
       author: payload.author,
       subject: payload.subject,
       description: payload.description,
+      grade_level: payload.gradeLevel,
+      type: payload.type,
+      status,
       pdf_path: pdfPath,
       thumbnail_path: thumbnailPath,
       uploader_id: payload.uploaderId,
@@ -112,10 +187,21 @@ export async function createBook(payload: CreateBookPayload) {
     .single();
 
   if (error) throw error;
-  return data as LibraryBook;
+
+  const createdBook = data as LibraryBook;
+
+  await db.from('book_uploads').upsert({
+    book_id: createdBook.id,
+    uploader_id: payload.uploaderId,
+    status,
+    moderated_at: status === 'approved' ? new Date().toISOString() : null,
+    moderation_note: status === 'approved' ? 'Auto-approved by role policy' : 'Awaiting teacher/admin moderation',
+  }, { onConflict: 'book_id' });
+
+  return createdBook;
 }
 
-export async function updateBook(id: string, patch: Partial<Pick<LibraryBook, 'title' | 'author' | 'subject' | 'description'>>) {
+export async function updateBook(id: string, patch: Partial<Pick<LibraryBook, 'title' | 'author' | 'subject' | 'description' | 'grade_level' | 'type' | 'status'>>) {
   const { data, error } = await db
     .from('library_books')
     .update(patch)
@@ -125,6 +211,52 @@ export async function updateBook(id: string, patch: Partial<Pick<LibraryBook, 't
 
   if (error) throw error;
   return data as LibraryBook;
+}
+
+export async function moderateBookUpload(payload: {
+  bookId: string;
+  moderatorId: string;
+  status: UploadStatus;
+  note?: string;
+}) {
+  const { error: bookError } = await db
+    .from('library_books')
+    .update({ status: payload.status })
+    .eq('id', payload.bookId);
+  if (bookError) throw bookError;
+
+  const { data: existing, error: existingError } = await db
+    .from('book_uploads')
+    .select('id')
+    .eq('book_id', payload.bookId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (existingError) throw existingError;
+
+  if (existing?.[0]?.id) {
+    const { error } = await db
+      .from('book_uploads')
+      .update({
+        status: payload.status,
+        moderated_by: payload.moderatorId,
+        moderated_at: new Date().toISOString(),
+        moderation_note: payload.note || null,
+      })
+      .eq('id', existing[0].id);
+    if (error) throw error;
+  } else {
+    const { error } = await db
+      .from('book_uploads')
+      .insert({
+        book_id: payload.bookId,
+        uploader_id: payload.moderatorId,
+        status: payload.status,
+        moderated_by: payload.moderatorId,
+        moderated_at: new Date().toISOString(),
+        moderation_note: payload.note || null,
+      });
+    if (error) throw error;
+  }
 }
 
 export async function deleteBook(id: string) {
@@ -160,6 +292,52 @@ export async function listBookmarks(userId: string) {
 
   if (error) throw error;
   return new Set<string>((data || []).map((entry: { book_id: string }) => entry.book_id));
+}
+
+export async function listHighlights(userId: string, bookId?: string) {
+  let query = db.from('highlights').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  if (bookId) query = query.eq('book_id', bookId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as ReaderHighlight[];
+}
+
+export async function createHighlight(payload: Omit<ReaderHighlight, 'id' | 'created_at'>) {
+  const { data, error } = await db.from('highlights').insert(payload).select('*').single();
+  if (error) throw error;
+  return data as ReaderHighlight;
+}
+
+export async function listGeneratedQuestions(userId: string, bookId?: string) {
+  let query = db.from('ai_generated_questions').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  if (bookId) query = query.eq('book_id', bookId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as GeneratedQuestion[];
+}
+
+export async function saveGeneratedQuestions(entries: Omit<GeneratedQuestion, 'id' | 'created_at'>[]) {
+  if (!entries.length) return [] as GeneratedQuestion[];
+  const { data, error } = await db.from('ai_generated_questions').insert(entries).select('*');
+  if (error) throw error;
+  return (data || []) as GeneratedQuestion[];
+}
+
+export async function upsertReadingProgress(payload: Omit<ReadingProgressEntry, 'id'>) {
+  const { data, error } = await db
+    .from('reading_progress')
+    .upsert(payload, { onConflict: 'book_id,user_id' })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data as ReadingProgressEntry;
+}
+
+export async function listReadingProgress(userId: string) {
+  const { data, error } = await db.from('reading_progress').select('*').eq('user_id', userId);
+  if (error) throw error;
+  return (data || []) as ReadingProgressEntry[];
 }
 
 export function getPdfPublicUrl(path: string) {
