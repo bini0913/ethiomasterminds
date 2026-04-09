@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '@/context/UserContext';
 import { toast } from 'sonner';
@@ -12,14 +12,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { Bookmark, BookmarkCheck, BookOpen, Brain, Download, Highlighter, Loader2, Search, Upload, User } from 'lucide-react';
 import {
   createBook,
   createHighlight,
   deleteBook,
+  findCachedAIContent,
   getPdfPublicUrl,
   getThumbnailPublicUrl,
+  invokeLibraryAI,
+  isValidPublicUrl,
   LibraryBook,
+  saveAIContent,
   listAssignedBooks,
   listBookmarks,
   listBooks,
@@ -34,6 +39,8 @@ import {
 } from '@/lib/libraryApi';
 
 const PAGE_SIZE = 9;
+const MAX_UPLOAD_SIZE_MB = 50;
+const MAX_AI_TEXT_LENGTH = 3500;
 
 type SectionKey = 'my-books' | 'assigned' | 'community' | 'upload' | 'highlights' | 'notes';
 
@@ -82,6 +89,7 @@ const LibraryPage: React.FC = () => {
   const [assignedBooks, setAssignedBooks] = useState<LibraryBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'validating' | 'uploading' | 'saving' | 'done'>('idle');
   const [openUpload, setOpenUpload] = useState(false);
   const [bookmarkSet, setBookmarkSet] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -89,6 +97,10 @@ const LibraryPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionKey>('community');
   const [selectedBook, setSelectedBook] = useState<LibraryBook | null>(null);
   const [readerOpen, setReaderOpen] = useState(false);
+  const [readerUrl, setReaderUrl] = useState<string | null>(null);
+  const [readerRetry, setReaderRetry] = useState(0);
+  const [readerLoading, setReaderLoading] = useState(false);
+  const [readerError, setReaderError] = useState<string | null>(null);
   const [readerProgress, setReaderProgress] = useState(0);
   const [readerPageText, setReaderPageText] = useState('');
   const [selectedText, setSelectedText] = useState('');
@@ -98,6 +110,7 @@ const LibraryPage: React.FC = () => {
   const [savedQuestions, setSavedQuestions] = useState<any[]>([]);
   const [aiOutput, setAiOutput] = useState('');
   const [flashcards, setFlashcards] = useState<GeneratedCard[]>([]);
+  const highlightAutoSaveRef = useRef<number | null>(null);
 
   const [search, setSearch] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('all');
@@ -149,6 +162,19 @@ const LibraryPage: React.FC = () => {
     load();
   }, [user?.id]);
 
+  const userGrade = Number(user?.grade || 0);
+  const studentRestrictedToAssigned = user?.role === 'student' && userGrade > 0 && userGrade <= 8;
+  const assignedBookIds = useMemo(() => new Set(assignedBooks.map((book) => book.id)), [assignedBooks]);
+
+  const shortHash = (value: string) => {
+    let hash = 0;
+    for (let i = 0; i < value.length; i += 1) {
+      hash = (hash << 5) - hash + value.charCodeAt(i);
+      hash |= 0;
+    }
+    return String(hash);
+  };
+
   const filteredBooks = useMemo(() => {
     const query = search.toLowerCase();
 
@@ -165,12 +191,15 @@ const LibraryPage: React.FC = () => {
 
       if (activeSection === 'my-books') return inQuery && inSubject && inGrade && book.uploader_id === user?.id;
       if (activeSection === 'community') {
-        const minGrade = user?.role === 'student' ? 5 : 1;
+        if (studentRestrictedToAssigned) {
+          return false;
+        }
+        const minGrade = user?.role === 'student' ? 1 : 1;
         return inQuery && inSubject && inGrade && (book.grade_level || minGrade) >= minGrade;
       }
       return inQuery && inSubject && inGrade;
     });
-  }, [books, search, subjectFilter, gradeFilter, activeSection, user?.id, user?.role]);
+  }, [books, search, subjectFilter, gradeFilter, activeSection, user?.id, user?.role, studentRestrictedToAssigned]);
 
   const visibleBooks = filteredBooks.slice(0, visibleCount);
 
@@ -181,7 +210,7 @@ const LibraryPage: React.FC = () => {
     setEditingBookId(null);
   };
 
-  const canUpload = !!user && (user.role === 'teacher' || user.role === 'admin' || user.role === 'manager' || user.role === 'student');
+  const canUpload = !!user && (user.role === 'teacher' || user.role === 'admin' || user.role === 'manager' || (user.role === 'student' && userGrade >= 5 && userGrade <= 12));
 
   const handleUploadOrEdit = async () => {
     if (!user) return;
@@ -194,12 +223,13 @@ const LibraryPage: React.FC = () => {
     if (user.role === 'student') {
       const g = Number(form.gradeLevel);
       if (g < 5 || g > 12) {
-        toast.error('Students can upload for Grade 5 to Grade 12 only.');
+        toast.error('Students can upload/share for Grade 5 to Grade 12 only.');
         return;
       }
     }
 
     setUploading(true);
+    setUploadPhase('validating');
 
     try {
       if (editingBookId) {
@@ -222,6 +252,10 @@ const LibraryPage: React.FC = () => {
           toast.error('Only PDF files are allowed.');
           return;
         }
+        if (form.file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
+          toast.error(`File too large. Max size is ${MAX_UPLOAD_SIZE_MB}MB.`);
+          return;
+        }
 
         const created = await createBook({
           title: form.title,
@@ -233,6 +267,7 @@ const LibraryPage: React.FC = () => {
           pdfFile: form.file,
           uploaderId: user.id,
           uploaderRole: user.role,
+          onProgress: setUploadPhase,
         });
         toast.success(created.status === 'approved' ? 'Book uploaded to library.' : 'Book uploaded and waiting for approval.');
       }
@@ -242,10 +277,11 @@ const LibraryPage: React.FC = () => {
       resetForm();
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : 'Action failed. Try again.';
+      const message = error instanceof Error ? error.message : 'Upload failed, try again.';
       toast.error(message);
     } finally {
       setUploading(false);
+      setUploadPhase('idle');
     }
   };
 
@@ -266,7 +302,26 @@ const LibraryPage: React.FC = () => {
   };
 
   const openReader = (book: LibraryBook) => {
+    if (studentRestrictedToAssigned && !assignedBookIds.has(book.id)) {
+      toast.error('This book is not assigned to your class yet.');
+      return;
+    }
+
+    const url = getPdfPublicUrl(book.pdf_path);
+    if (!isValidPublicUrl(url)) {
+      toast.error('Book file URL is invalid. Please retry.');
+      return;
+    }
+
+    const cached = localStorage.getItem(`library:last-book:${user?.id}`);
+    if (cached !== book.id) {
+      localStorage.setItem(`library:last-book:${user?.id}`, book.id);
+    }
+
     setSelectedBook(book);
+    setReaderUrl(url);
+    setReaderLoading(true);
+    setReaderError(null);
     setReaderOpen(true);
     setReaderPageText('');
     setSelectedText('');
@@ -276,8 +331,46 @@ const LibraryPage: React.FC = () => {
 
   const runAi = async (action: AiAction) => {
     if (!selectedBook || !user) return;
-    const baseText = selectedText || readerPageText;
-    const output = generateAiContent(action, baseText, Number(user.grade || 9));
+    const baseText = (selectedText || readerPageText || '').trim();
+    const limitedText = baseText.slice(0, MAX_AI_TEXT_LENGTH);
+    if (!limitedText) {
+      toast.error('Select text or add page text first.');
+      return;
+    }
+    const cacheKey = shortHash(`${action}:${selectedBook.id}:${limitedText}`);
+
+    let output = '';
+    const cached = await findCachedAIContent({
+      user_id: user.id,
+      book_id: selectedBook.id,
+      action,
+      source_hash: cacheKey,
+    }).catch(() => null);
+
+    if (cached?.response) {
+      output = cached.response;
+    } else {
+      try {
+        output = await invokeLibraryAI({
+          action,
+          text: limitedText,
+          grade: Number(user.grade || 9),
+          subject: selectedBook.subject,
+        });
+      } catch {
+        output = generateAiContent(action, limitedText, Number(user.grade || 9));
+      }
+
+      await saveAIContent({
+        user_id: user.id,
+        book_id: selectedBook.id,
+        action,
+        source_hash: cacheKey,
+        source_excerpt: limitedText.slice(0, 350),
+        response: output,
+      }).catch(() => undefined);
+    }
+
     setAiOutput(output);
 
     if (action === 'questions') {
@@ -290,7 +383,7 @@ const LibraryPage: React.FC = () => {
           question: lines[0]?.replace(/^Q\d+:\s*/, '') || `Question ${idx + 1}`,
           answer: lines[1]?.replace(/^A\d+:\s*/, '') || 'See excerpt',
           difficulty: (idx % 3 === 0 ? 'easy' : idx % 3 === 1 ? 'medium' : 'hard') as 'easy' | 'medium' | 'hard',
-          source_excerpt: (baseText || '').slice(0, 250),
+          source_excerpt: limitedText.slice(0, 250),
         };
       });
 
@@ -331,6 +424,43 @@ const LibraryPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!readerOpen || !selectedBook || !user) return;
+    const trimmed = selectedText.trim();
+    if (trimmed.length < 20) return;
+
+    if (highlightAutoSaveRef.current) {
+      window.clearTimeout(highlightAutoSaveRef.current);
+    }
+
+    highlightAutoSaveRef.current = window.setTimeout(async () => {
+      const alreadySaved = highlights.some(
+        (item) => item.book_id === selectedBook.id && item.selected_text === trimmed,
+      );
+      if (alreadySaved) return;
+
+      await createHighlight({
+        user_id: user.id,
+        book_id: selectedBook.id,
+        page_number: Math.max(1, Math.round((readerProgress / 100) * 100)),
+        selected_text: trimmed,
+        highlight_color: highlightColor,
+        note: noteText.trim() || null,
+      })
+        .then((saved) => {
+          setHighlights((prev) => [saved, ...prev]);
+          toast.success('Highlight autosaved.');
+        })
+        .catch(() => undefined);
+    }, 900);
+
+    return () => {
+      if (highlightAutoSaveRef.current) {
+        window.clearTimeout(highlightAutoSaveRef.current);
+      }
+    };
+  }, [selectedText, selectedBook?.id, user?.id, readerOpen, highlights, readerProgress, highlightColor, noteText, selectedBook, user]);
+
   const markReaderProgress = async (next: number) => {
     setReaderProgress(next);
     if (!selectedBook || !user) return;
@@ -342,6 +472,18 @@ const LibraryPage: React.FC = () => {
       time_spent_seconds: Math.max(60, Math.round((next / 100) * 1800)),
     }).catch(() => undefined);
   };
+
+  useEffect(() => {
+    if (!readerUrl) return;
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.as = 'document';
+    link.href = readerUrl;
+    document.head.appendChild(link);
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, [readerUrl, readerRetry]);
 
   if (!user) return null;
 
@@ -410,6 +552,14 @@ const LibraryPage: React.FC = () => {
                     {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                     {editingBookId ? 'Save Changes' : 'Upload to Library'}
                   </Button>
+                  {uploading && (
+                    <div className="space-y-1">
+                      <Progress value={uploadPhase === 'validating' ? 20 : uploadPhase === 'uploading' ? 55 : uploadPhase === 'saving' ? 85 : 100} />
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {uploadPhase === 'uploading' ? 'Uploading…' : uploadPhase === 'saving' ? 'Saving metadata…' : `${uploadPhase}...`}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
@@ -427,7 +577,9 @@ const LibraryPage: React.FC = () => {
                 ['upload', 'Upload Book'],
                 ['highlights', 'Highlights'],
                 ['notes', 'Saved Notes'],
-              ] as [SectionKey, string][]).map(([key, label]) => (
+              ] as [SectionKey, string][])
+                .filter(([key]) => !(studentRestrictedToAssigned && key === 'community'))
+                .map(([key, label]) => (
                 <Button key={key} variant={activeSection === key ? 'default' : 'ghost'} className="w-full justify-start" onClick={() => {
                   setActiveSection(key);
                   if (key === 'upload') setOpenUpload(true);
@@ -506,6 +658,7 @@ const LibraryPage: React.FC = () => {
                       {visibleBooks.map((book) => {
                         const thumbnailUrl = getThumbnailPublicUrl(book.thumbnail_path);
                         const pdfUrl = getPdfPublicUrl(book.pdf_path);
+                        const hasValidPdfUrl = isValidPublicUrl(pdfUrl);
                         const isBookmarked = bookmarkSet.has(book.id);
 
                         return (
@@ -544,14 +697,15 @@ const LibraryPage: React.FC = () => {
                                 <p className="text-sm text-muted-foreground line-clamp-3">{book.description}</p>
 
                                 <div className="flex gap-2 flex-wrap">
-                                  <Button size="sm" className="gap-2" onClick={() => openReader(book)}>
+                                  <Button size="sm" className="gap-2" onClick={() => openReader(book)} disabled={!hasValidPdfUrl}>
                                     <BookOpen className="h-4 w-4" /> Read
                                   </Button>
-                                  <Button asChild size="sm" variant="outline" className="gap-2">
+                                  <Button asChild size="sm" variant="outline" className="gap-2" disabled={!hasValidPdfUrl}>
                                     <a href={pdfUrl} target="_blank" rel="noreferrer">
                                       <Download className="h-4 w-4" /> Download
                                     </a>
                                   </Button>
+                                  {!hasValidPdfUrl && <p className="text-xs text-destructive">Invalid file URL.</p>}
 
                                   {user.role === 'student' && (
                                     <Button
@@ -668,8 +822,41 @@ const LibraryPage: React.FC = () => {
               </div>
 
               <div className="flex-1 bg-muted/30 p-2">
-                {selectedBook && (
-                  <iframe title={selectedBook.title} src={getPdfPublicUrl(selectedBook.pdf_path)} className="w-full h-full rounded-md bg-white" />
+                {selectedBook && readerUrl && (
+                  <div className="relative h-full">
+                    {readerLoading && (
+                      <div className="absolute inset-0 rounded-md border bg-background/90 z-10 p-4 space-y-3">
+                        <div className="h-5 w-1/3 rounded bg-muted animate-pulse" />
+                        <div className="h-4 w-full rounded bg-muted animate-pulse" />
+                        <div className="h-4 w-5/6 rounded bg-muted animate-pulse" />
+                        <div className="h-[70%] w-full rounded bg-muted animate-pulse" />
+                      </div>
+                    )}
+                    {readerError ? (
+                      <div className="h-full flex items-center justify-center">
+                        <div className="text-center space-y-2">
+                          <p className="text-sm text-destructive">{readerError}</p>
+                          <Button size="sm" onClick={() => {
+                            setReaderRetry((prev) => prev + 1);
+                            setReaderLoading(true);
+                            setReaderError(null);
+                          }}>Retry</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <iframe
+                        key={`${selectedBook.id}-${readerRetry}`}
+                        title={selectedBook.title}
+                        src={readerUrl}
+                        className="w-full h-full rounded-md bg-white"
+                        onLoad={() => setReaderLoading(false)}
+                        onError={() => {
+                          setReaderLoading(false);
+                          setReaderError('Reader failed to load this file.');
+                        }}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
 
