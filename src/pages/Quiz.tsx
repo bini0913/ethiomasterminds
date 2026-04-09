@@ -1,73 +1,144 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import { useQuiz, Quiz as QuizType } from "@/context/QuizContext";
-import QuizCard from "@/components/quiz/QuizCard";
+import { useQuiz, Quiz as QuizType, Question } from "@/context/QuizContext";
 import QuizView from "@/components/quiz/QuizView";
 import { useUser } from "@/context/UserContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Book, Award, Calculator, Atom, BookOpen, Brain, Zap, Trophy, Target, Play } from "lucide-react";
+import { Book, Calculator, Atom, BookOpen, Brain, Zap, Trophy, Target, Play, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import AIHelper from "@/components/ai/AIHelper";
 import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import BackButton from "@/components/ui/BackButton";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 const Quiz: React.FC = () => {
-  const navigate = useNavigate();
   const { quizzes, createRandomQuiz } = useQuiz();
   const { user } = useUser();
   const [activeQuiz, setActiveQuiz] = useState<QuizType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedGrade, setSelectedGrade] = useState<string>(user?.grade || "5");
+  const [selectedGrade, setSelectedGrade] = useState<string>("5");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("easy");
   const [activeTab, setActiveTab] = useState<string>("browse");
   const [numQuestions, setNumQuestions] = useState<number>(10);
   const [askedQuestions, setAskedQuestions] = useState<Set<string>>(new Set());
+  const [completedQuizIds, setCompletedQuizIds] = useState<Set<string>>(new Set());
   
-  // Filter unique categories from all quizzes
-  const categories = [...new Set(quizzes.map(quiz => quiz.category))];
+  useEffect(() => {
+    const preferredGrade = parseInt(user?.grade || "5", 10);
+    const boundedGrade = Number.isNaN(preferredGrade) ? 5 : Math.min(12, Math.max(5, preferredGrade));
+    setSelectedGrade(boundedGrade.toString());
+  }, [user?.grade]);
 
-  // Split quizzes into smaller chunks of 10 questions each
-  const splitQuizzes = useMemo(() => {
-    const result: QuizType[] = [];
-    
-    quizzes.forEach(quiz => {
-      if (quiz.questions.length <= 10) {
-        result.push(quiz);
-      } else {
-        // Split large quizzes into chunks of 10
-        const chunks = Math.ceil(quiz.questions.length / 10);
-        for (let i = 0; i < chunks; i++) {
-          const startIdx = i * 10;
-          const endIdx = Math.min((i + 1) * 10, quiz.questions.length);
-          const chunkQuestions = quiz.questions.slice(startIdx, endIdx);
-          
-          result.push({
-            ...quiz,
-            id: `${quiz.id}-part${i + 1}`,
-            title: `${quiz.title} (Part ${i + 1})`,
-            description: `${quiz.description} - Questions ${startIdx + 1}-${endIdx}`,
-            questions: chunkQuestions
-          });
-        }
+  const categories = useMemo(
+    () => [...new Set(quizzes.filter((quiz) => quiz.gradeLevel >= 5 && quiz.gradeLevel <= 12).map((quiz) => quiz.category))],
+    [quizzes]
+  );
+
+  // Create rich practice sets per grade+subject:
+  // 10 sets with 5 questions and 10 sets with 10 questions (20 total per subject+grade).
+  const generatedPracticeQuizzes = useMemo(() => {
+    const grade = parseInt(selectedGrade, 10);
+    if (Number.isNaN(grade)) return [];
+
+    const quizzesByCategory = new Map<string, QuizType[]>();
+    quizzes
+      .filter((quiz) => quiz.gradeLevel === grade)
+      .forEach((quiz) => {
+        if (!quizzesByCategory.has(quiz.category)) quizzesByCategory.set(quiz.category, []);
+        quizzesByCategory.get(quiz.category)!.push(quiz);
+      });
+
+    const buildSet = (subjectQuizzes: QuizType[], category: string, questionCount: number, index: number): QuizType => {
+      const dedupedQuestions = new Map<string, Question>();
+      subjectQuizzes.forEach((quiz) => {
+        quiz.questions.forEach((question) => dedupedQuestions.set(question.id, question));
+      });
+      const pool = Array.from(dedupedQuestions.values());
+      const fallbackQuestion: Question = {
+        id: `fallback-${category.toLowerCase().replace(/\s+/g, "-")}-g${grade}-q${index + 1}`,
+        text: `Grade ${grade} ${category}: Practice question ${index + 1}`,
+        options: ["Option A", "Option B", "Option C", "Option D"],
+        correctAnswer: "Option A",
+        difficulty: "Medium",
+        subject: category,
+        grade,
+        topic: "General",
+        type: "Multiple Choice",
+        points: 10,
+        explanation: "Use this as guided practice and replace with curriculum-aligned content."
+      };
+      const offset = (index * questionCount) % Math.max(pool.length, 1);
+      const selectedQuestions = Array.from({ length: questionCount }, (_, pickIndex) => {
+        if (pool.length === 0) return fallbackQuestion;
+        const question = pool[(offset + pickIndex) % pool.length];
+        return question || fallbackQuestion;
+      });
+      const avgPoints = selectedQuestions.reduce((acc, q) => acc + (q.points || 10), 0) / Math.max(selectedQuestions.length, 1);
+      const quizDifficulty: QuizType["difficulty"] = avgPoints >= 15 ? "Hard" : avgPoints >= 10 ? "Medium" : "Easy";
+      const sourceQuizId = subjectQuizzes[0]?.id;
+      const setType = questionCount === 5 ? "Sprint" : "Mastery";
+      const setNumber = questionCount === 5 ? index + 1 : index - 9;
+
+      return {
+        id: `practice-g${grade}-${category.toLowerCase().replace(/\s+/g, "-")}-${questionCount}-${setNumber}`,
+        sourceQuizId,
+        title: `${category} Grade ${grade} ${setType} ${setNumber}`,
+        description: `${questionCount} grade-level questions for Grade ${grade} ${category}`,
+        questions: selectedQuestions,
+        subject: subjectQuizzes[0]?.subject || category,
+        grade,
+        difficulty: quizDifficulty,
+        timeLimit: questionCount * 30,
+        createdBy: sourceQuizId,
+        createdAt: new Date(),
+        topics: ["General"],
+        category,
+        gradeLevel: grade
+      };
+    };
+
+    const practiceSets: QuizType[] = [];
+    const categoriesToBuild = selectedCategory ? [selectedCategory] : categories;
+
+    categoriesToBuild.forEach((category) => {
+      const subjectQuizzes = quizzesByCategory.get(category) || [];
+      for (let i = 0; i < 20; i++) {
+        const questionCount = i < 10 ? 5 : 10;
+        practiceSets.push(buildSet(subjectQuizzes, category, questionCount, i));
       }
     });
-    
-    return result;
-  }, [quizzes]);
+
+    return practiceSets;
+  }, [categories, quizzes, selectedCategory, selectedGrade]);
   
-  // Filter quizzes by selected filters
-  const filteredQuizzes = splitQuizzes.filter(quiz => {
-    const matchesCategory = !selectedCategory || quiz.category === selectedCategory;
-    const matchesGrade = quiz.gradeLevel.toString() === selectedGrade;
-    return matchesCategory && matchesGrade;
-  });
+  const filteredQuizzes = generatedPracticeQuizzes;
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const storageKey = `completed-practice-quizzes:${user.id}`;
+    const storedIds = JSON.parse(localStorage.getItem(storageKey) || "[]") as string[];
+
+    const loadCompletedFromDatabase = async () => {
+      const { data } = await supabase
+        .from("quiz_results")
+        .select("quiz_id")
+        .eq("student_id", user.id);
+      const dbIds = (data || []).map((entry) => entry.quiz_id).filter(Boolean);
+      setCompletedQuizIds(new Set([...storedIds, ...dbIds]));
+    };
+
+    loadCompletedFromDatabase();
+  }, [user?.id]);
 
   const handleStartQuiz = (quiz: QuizType) => {
+    if (completedQuizIds.has(quiz.id) || (quiz.sourceQuizId && completedQuizIds.has(quiz.sourceQuizId))) {
+      toast.info("You already completed this quiz set before. You can retake it for more practice.");
+    }
+
     const uniqueQuestions = quiz.questions.filter(q => !askedQuestions.has(q.id));
     
     if (uniqueQuestions.length === 0) {
@@ -119,6 +190,13 @@ const Quiz: React.FC = () => {
     const newAskedQuestions = new Set(askedQuestions);
     completedQuestionIds.forEach(id => newAskedQuestions.add(id));
     setAskedQuestions(newAskedQuestions);
+    if (activeQuiz && user?.id) {
+      const nextCompleted = new Set(completedQuizIds);
+      nextCompleted.add(activeQuiz.id);
+      if (activeQuiz.sourceQuizId) nextCompleted.add(activeQuiz.sourceQuizId);
+      setCompletedQuizIds(nextCompleted);
+      localStorage.setItem(`completed-practice-quizzes:${user.id}`, JSON.stringify(Array.from(nextCompleted)));
+    }
   };
   
   const handleExitQuiz = () => {
@@ -234,7 +312,7 @@ const Quiz: React.FC = () => {
                             <SelectValue placeholder="Grade" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
+                            {[5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
                               <SelectItem key={grade} value={grade.toString()}>
                                 Grade {grade}
                               </SelectItem>
@@ -298,12 +376,18 @@ const Quiz: React.FC = () => {
                               +{quiz.questions.length * 10} XP
                             </span>
                           </div>
+                          {(completedQuizIds.has(quiz.id) || (quiz.sourceQuizId && completedQuizIds.has(quiz.sourceQuizId))) && (
+                            <Badge className="mb-3 bg-glow-green/20 text-glow-green border-glow-green/30">
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                              Completed
+                            </Badge>
+                          )}
                           <Button
                             onClick={() => handleStartQuiz(quiz)}
                             className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90"
                           >
                             <Play className="h-4 w-4 mr-2" />
-                            Start Quiz
+                            {completedQuizIds.has(quiz.id) || (quiz.sourceQuizId && completedQuizIds.has(quiz.sourceQuizId)) ? "Retake Quiz" : "Start Quiz"}
                           </Button>
                         </CardContent>
                       </Card>
@@ -315,7 +399,7 @@ const Quiz: React.FC = () => {
                       <Card className="glass border-border/30">
                         <CardContent className="py-12 text-center">
                           <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                          <p className="text-muted-foreground">No quizzes available with the selected filters.</p>
+                          <p className="text-muted-foreground">No quizzes available for this grade/subject yet.</p>
                           <Button
                             variant="outline"
                             className="mt-4"
@@ -373,7 +457,7 @@ const Quiz: React.FC = () => {
                             <SelectValue placeholder="Select Grade" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
+                            {[5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
                               <SelectItem key={grade} value={grade.toString()}>
                                 Grade {grade}
                               </SelectItem>
