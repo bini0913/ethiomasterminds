@@ -491,7 +491,8 @@ const AdminPortal: React.FC = () => {
                   <motion.div key={String(label)} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                     <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{value as number}</p><LucideIcon className="w-5 h-5 text-primary" /></div></CardContent></Card>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="grid lg:grid-cols-3 gap-4">
