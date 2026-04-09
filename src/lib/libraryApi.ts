@@ -47,6 +47,17 @@ export interface GeneratedQuestion {
   created_at: string;
 }
 
+export interface AIContentEntry {
+  id: string;
+  user_id: string;
+  book_id: string;
+  action: 'summary' | 'simple' | 'questions' | 'flashcards' | 'concepts';
+  source_hash: string;
+  source_excerpt: string;
+  response: string;
+  created_at: string;
+}
+
 export interface BookUpload {
   id: string;
   book_id: string;
@@ -78,6 +89,7 @@ export interface CreateBookPayload {
   pdfFile: File;
   uploaderId: string;
   uploaderRole: LibraryBook['uploader_role'];
+  onProgress?: (state: 'validating' | 'uploading' | 'saving' | 'done') => void;
 }
 
 const db = supabase as any;
@@ -150,6 +162,7 @@ async function generatePdfThumbnail(pdfFile: File): Promise<Blob | null> {
 }
 
 export async function createBook(payload: CreateBookPayload) {
+  payload.onProgress?.('validating');
   if (!payload.pdfFile) {
     throw new Error('No file selected.');
   }
@@ -158,15 +171,26 @@ export async function createBook(payload: CreateBookPayload) {
     throw new Error('Only PDF files are supported.');
   }
 
+  const maxPdfSizeBytes = 50 * 1024 * 1024;
+  if (payload.pdfFile.size > maxPdfSizeBytes) {
+    throw new Error('File too large. Please upload a PDF smaller than 50MB.');
+  }
+
   const ext = payload.pdfFile.name.split('.').pop()?.toLowerCase() || 'pdf';
   const baseName = `${Date.now()}-${crypto.randomUUID()}`;
   const pdfPath = `${payload.uploaderId}/${baseName}.${ext}`;
 
+  payload.onProgress?.('uploading');
   const { error: uploadError } = await supabase.storage
     .from('library-files')
     .upload(pdfPath, payload.pdfFile, { upsert: false, contentType: 'application/pdf' });
 
-  if (uploadError) throw uploadError;
+  if (uploadError) {
+    if (uploadError.message?.toLowerCase().includes('network')) {
+      throw new Error('Network error while uploading file. Please try again.');
+    }
+    throw new Error(uploadError.message || 'Upload failed, try again.');
+  }
 
   let thumbnailPath: string | null = null;
   const thumbnailBlob = await generatePdfThumbnail(payload.pdfFile);
@@ -187,6 +211,7 @@ export async function createBook(payload: CreateBookPayload) {
     ? 'approved'
     : 'pending';
 
+  payload.onProgress?.('saving');
   const { data, error } = await db
     .from('library_books')
     .insert({
@@ -240,6 +265,7 @@ export async function createBook(payload: CreateBookPayload) {
     console.warn('book_uploads sync failed:', uploadAuditError);
   }
 
+  payload.onProgress?.('done');
   return createdBook;
 }
 
@@ -388,9 +414,50 @@ export async function listReadingProgress(userId: string) {
   return (data || []) as ReadingProgressEntry[];
 }
 
+export async function findCachedAIContent(payload: Pick<AIContentEntry, 'user_id' | 'book_id' | 'action' | 'source_hash'>) {
+  const { data, error } = await db
+    .from('ai_content')
+    .select('*')
+    .match(payload)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data || null) as AIContentEntry | null;
+}
+
+export async function saveAIContent(entry: Omit<AIContentEntry, 'id' | 'created_at'>) {
+  const { data, error } = await db.from('ai_content').insert(entry).select('*').single();
+  if (error) throw error;
+  return data as AIContentEntry;
+}
+
+export async function invokeLibraryAI(payload: {
+  action: AIContentEntry['action'];
+  text: string;
+  grade: number;
+  subject?: string;
+}) {
+  const { data, error } = await supabase.functions.invoke('library-ai', { body: payload });
+  if (error) throw new Error(error.message || 'AI request failed.');
+  if (!data?.response) throw new Error('AI returned no response.');
+  return data.response as string;
+}
+
 export function getPdfPublicUrl(path: string) {
   const { data } = supabase.storage.from('library-files').getPublicUrl(path);
   return data.publicUrl;
+}
+
+export function isValidPublicUrl(url: string | null | undefined) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
 }
 
 export function getThumbnailPublicUrl(path: string | null) {
