@@ -40,7 +40,7 @@ const FlashcardsPage: React.FC = () => {
   const [studyMode, setStudyMode] = useState<"browse" | "review">("browse");
   const [subjects, setSubjects] = useState<string[]>([]);
 
-  const gradeNum = parseInt(user?.grade || "9");
+  const gradeNum = parseInt(user?.grade || "5");
 
   const fetchData = useCallback(async () => {
     const auth = await supabase.auth.getUser();

@@ -133,7 +133,7 @@ const MainMenu: React.FC = () => {
       </div>
 
       {/* Academic Mode Section */}
-      {user && parseInt(user.grade || "0") >= 9 && parseInt(user.grade || "0") <= 12 && (
+      {user && parseInt(user.grade || "0") >= 5 && parseInt(user.grade || "0") <= 12 && (
         <div className="px-4 py-4 max-w-7xl mx-auto w-full">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <Link to="/academic">
