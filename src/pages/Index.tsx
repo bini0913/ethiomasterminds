@@ -6,6 +6,7 @@ import ProfileSetup from "@/components/profile/ProfileSetup";
 import MainMenu from "@/components/dashboard/MainMenu";
 import StudentBottomNav from "@/components/layout/StudentBottomNav";
 import { useUser } from "@/context/UserContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // App stages
 enum AppStage {
@@ -17,6 +18,7 @@ enum AppStage {
 
 const Index: React.FC = () => {
   const { user, isAuthenticated, isLoading, refreshProfile } = useUser();
+  const isMobile = useIsMobile();
   const [appStage, setAppStage] = useState<AppStage>(AppStage.Welcome);
   const [userType, setUserType] = useState<"student" | "teacher" | "admin" | "manager">("student");
   const navigate = useNavigate();
@@ -108,7 +110,7 @@ const Index: React.FC = () => {
   };
   
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className={`min-h-screen bg-background ${isMobile ? "pb-20" : "pb-0"}`}>
       {renderContent()}
     </div>
   );
