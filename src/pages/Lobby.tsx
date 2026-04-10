@@ -876,7 +876,10 @@ const Lobby: React.FC = () => {
     }
 
     if (data?.room_id) {
-      await contextJoinRoom(data.room_id, user.name || "Player");
+      const joined = await contextJoinRoom(data.room_id, user.name || "Player");
+      if (joined) {
+        navigate(`/multiplayer?room=${data.room_id}`);
+      }
     }
     toast.success(`Invite sent to ${playerName}`);
   };
