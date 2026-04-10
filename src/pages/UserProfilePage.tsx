@@ -99,8 +99,8 @@ const UserProfilePage = () => {
         }),
       );
 
-      if (privacyRes.data) {
-        const p = privacyRes.data as { is_public: boolean; hide_stats: boolean };
+      if ((privacyRes as any)?.data) {
+        const p = (privacyRes as any).data as { is_public: boolean; hide_stats: boolean };
         setPrivacy({ isPublic: p.is_public, hideStats: p.hide_stats });
       }
     } catch (error) {
@@ -200,7 +200,7 @@ const UserProfilePage = () => {
   const matchesPlayed = Number(statsJson.total_games_played ?? profile?.matchesPlayed ?? 0);
   const wins = Number(statsJson.total_wins ?? profile?.wins ?? 0);
   const losses = Number(statsJson.total_losses ?? profile?.losses ?? 0);
-  const contributions = Number(statsJson.study_time_hours ?? (profile?.contributions ?? 0) / 10 ?? 0);
+  const contributions = Number(statsJson.study_time_hours ?? ((profile?.contributions ?? 0) / 10));
 
   useEffect(() => {
     if (!isSelf || !profile) return;
