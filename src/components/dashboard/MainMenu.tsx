@@ -11,11 +11,12 @@ import DailyChallenge from "../challenges/DailyChallenge";
 import { useAIHelper } from "@/context/AIHelperContext";
 import { 
   Bot, BookOpen, Calculator, Atom, Trophy, Users, Settings, GraduationCap,
-  School, Gamepad, Store, Award, Zap, Target, LogOut, Sparkles, Brain, Compass
+  School, Gamepad, Store, Award, Zap, Target, Medal, Home, LogOut, Sparkles, Brain, Compass
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import LevelUpModal from "../profile/LevelUpModal";
+import GainXPButton from "../profile/GainXPButton";
 import CurrencyDisplay from "@/components/currency/CurrencyDisplay";
 
 const MainMenu: React.FC = () => {
@@ -69,18 +70,18 @@ const MainMenu: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-primary via-primary to-indigo-600 px-3 sm:px-4 py-3 shadow-xl">
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-primary via-primary to-indigo-600 px-4 py-3 shadow-xl">
         <div className="flex justify-between items-center max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             <motion.div className="bg-white/20 backdrop-blur-sm rounded-xl p-2" whileHover={{ rotate: 360 }} transition={{ duration: 0.8 }}>
               <span className="text-2xl">🧠</span>
             </motion.div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-white">Master Minds</h1>
-              <p className="text-[11px] sm:text-xs text-white/70">{t("learn-play-win")}</p>
+              <h1 className="text-xl font-bold text-white">Master Minds</h1>
+              <p className="text-xs text-white/70">{t("learn-play-win")}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2">
             <CurrencyDisplay />
             <Button variant="ghost" size="icon" onClick={openHelper} className="text-white hover:bg-white/20"><Bot className="h-5 w-5" /></Button>
             <Button variant="ghost" size="icon" onClick={logout} className="text-white hover:bg-white/20"><LogOut className="h-5 w-5" /></Button>
@@ -88,117 +89,106 @@ const MainMenu: React.FC = () => {
         </div>
       </header>
 
-      <main className="px-3 sm:px-4 py-4 max-w-7xl mx-auto w-full flex-1">
-        {/* User Profile Card */}
-        {user && (
-          <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-card/80 backdrop-blur-sm rounded-2xl p-3 sm:p-4 shadow-lg border border-border/50">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="relative shrink-0">
+      {/* User Profile Card */}
+      {user && (
+        <div className="px-4 py-4 max-w-7xl mx-auto w-full">
+          <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-card/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-border/50">
+            <div className="flex items-center gap-4">
+              <div className="relative">
                 <AvatarRenderer avatar={user.avatar} avatarConfig={user.avatarConfig} size="lg" className="rounded-2xl" />
                 <div className="absolute -bottom-1 -right-1 bg-primary text-white text-xs px-2 py-0.5 rounded-full font-bold">Lv.{user.level}</div>
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-base sm:text-lg font-bold truncate">{user.name}</h2>
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+                <h2 className="text-lg font-bold truncate">{user.name}</h2>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span className="capitalize">{t(user.role)}</span>
                   <span>•</span>
                   <span>{t("grade")} {user.grade || 'N/A'}</span>
                 </div>
                 <div className="mt-1"><UserLevel level={user.level} xp={user.xp} showBadge={false} /></div>
               </div>
-              <div className="hidden md:flex flex-col items-end gap-1">
+              <div className="hidden sm:flex flex-col items-end gap-1">
                 {recentBadges.slice(0, 3).map((badge, i) => (<span key={i} className="text-xl">{badge.icon}</span>))}
               </div>
             </div>
           </motion.div>
-        )}
+        </div>
+      )}
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="space-y-4">
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {quickActions.map((action, index) => (
-                <motion.div key={action.path} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
-                  <Link to={action.path}>
-                    <Card className={`bg-gradient-to-br ${action.color} border-0 overflow-hidden group cursor-pointer`}>
-                      <CardContent className="p-3 sm:p-4 text-center text-white">
-                        <div className="mx-auto mb-1 group-hover:scale-110 transition-transform">{action.icon}</div>
-                        <div className="text-sm font-semibold">{action.title}</div>
-                        <p className="text-[11px] opacity-80 mt-0.5 line-clamp-1">{action.description}</p>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Academic Mode Section */}
-            {user && parseInt(user.grade || "0") >= 5 && parseInt(user.grade || "0") <= 12 && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <Link to="/academic">
-                  <Card className="bg-gradient-to-r from-slate-800 via-slate-900 to-gray-900 border-0 overflow-hidden group cursor-pointer hover:shadow-2xl transition-all">
-                    <CardContent className="p-4 flex items-center gap-3 sm:gap-4 text-white">
-                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📘</div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-sm sm:text-base">{t("academic-mode")}</h3>
-                        <p className="text-[11px] sm:text-xs text-white/60 line-clamp-2">{t("flashcards")} • {t("topic-coverage")} • {t("exam-mode")} • {t("study-planner")}</p>
-                      </div>
-                      <div className="bg-white/10 rounded-full p-2 shrink-0"><GraduationCap className="h-5 w-5" /></div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              </motion.div>
-            )}
-
-            {/* Category Filters */}
-            <div>
-              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2">
-                {categories.map(category => (
-                  <Button key={category.id} variant={activeCategory === category.id ? "default" : "outline"} size="sm" onClick={() => setActiveCategory(category.id)}
-                    className={`whitespace-nowrap gap-1.5 ${activeCategory === category.id ? "bg-primary text-primary-foreground shadow-lg" : "bg-card/50 hover:bg-card"}`}>
-                    {category.icon}{category.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Menu Grid */}
-            <motion.div variants={containerVariants} initial="hidden" animate="show">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filteredItems.map((item) => (
-                  <motion.div key={item.path + item.title} variants={itemVariants}>
-                    <Link to={item.path}>
-                      <Card className="h-full bg-card/80 backdrop-blur-sm border-border/50 overflow-hidden group cursor-pointer hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                        <CardContent className="p-4">
-                          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform shadow-lg`}>{item.icon}</div>
-                          <h3 className="font-semibold text-sm mb-1">{item.title}</h3>
-                          <p className="text-xs text-muted-foreground line-clamp-2 sm:line-clamp-1">{item.description}</p>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
+      {/* Quick Actions */}
+      <div className="px-4 max-w-7xl mx-auto w-full">
+        <div className="grid grid-cols-3 gap-3">
+          {quickActions.map((action, index) => (
+            <motion.div key={action.path} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
+              <Link to={action.path}>
+                <Card className={`bg-gradient-to-br ${action.color} border-0 overflow-hidden group cursor-pointer`}>
+                  <CardContent className="p-3 text-center text-white">
+                    <div className="mx-auto mb-1 group-hover:scale-110 transition-transform">{action.icon}</div>
+                    <div className="text-xs font-semibold">{action.title}</div>
+                  </CardContent>
+                </Card>
+              </Link>
             </motion.div>
-          </section>
-
-          <aside className="hidden xl:block space-y-4">
-            <Card className="bg-card/70 border-border/50 backdrop-blur-sm">
-              <CardContent className="p-4">
-                <h3 className="text-sm font-semibold mb-3">Daily Focus</h3>
-                <DailyChallenge />
-              </CardContent>
-            </Card>
-          </aside>
+          ))}
         </div>
+      </div>
 
-        <div className="xl:hidden mt-4">
-          <DailyChallenge />
+      {/* Academic Mode Section */}
+      {user && parseInt(user.grade || "0") >= 5 && parseInt(user.grade || "0") <= 12 && (
+        <div className="px-4 py-4 max-w-7xl mx-auto w-full">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <Link to="/academic">
+              <Card className="bg-gradient-to-r from-slate-800 via-slate-900 to-gray-900 border-0 overflow-hidden group cursor-pointer hover:shadow-2xl transition-all">
+                <CardContent className="p-4 flex items-center gap-4 text-white">
+                  <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📘</div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-base">{t("academic-mode")}</h3>
+                    <p className="text-xs text-white/60">{t("flashcards")} • {t("topic-coverage")} • {t("exam-mode")} • {t("study-planner")}</p>
+                  </div>
+                  <div className="bg-white/10 rounded-full p-2"><GraduationCap className="h-5 w-5" /></div>
+                </CardContent>
+              </Card>
+            </Link>
+          </motion.div>
         </div>
-      </main>
+      )}
+
+      {/* Daily Challenge */}
+      <div className="px-4 py-4 max-w-7xl mx-auto w-full"><DailyChallenge /></div>
+
+      {/* Category Filters */}
+      <div className="px-4 pb-2 max-w-7xl mx-auto w-full">
+        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2">
+          {categories.map(category => (
+            <Button key={category.id} variant={activeCategory === category.id ? "default" : "outline"} size="sm" onClick={() => setActiveCategory(category.id)}
+              className={`whitespace-nowrap gap-1.5 ${activeCategory === category.id ? "bg-primary text-primary-foreground shadow-lg" : "bg-card/50 hover:bg-card"}`}>
+              {category.icon}{category.name}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Menu Grid */}
+      <motion.div variants={containerVariants} initial="hidden" animate="show" className="flex-1 px-4 pb-6 max-w-7xl mx-auto w-full">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {filteredItems.map((item) => (
+            <motion.div key={item.path + item.title} variants={itemVariants}>
+              <Link to={item.path}>
+                <Card className="h-full bg-card/80 backdrop-blur-sm border-border/50 overflow-hidden group cursor-pointer hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                  <CardContent className="p-4">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform shadow-lg`}>{item.icon}</div>
+                    <h3 className="font-semibold text-sm mb-1">{item.title}</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
       
       {/* Footer */}
-      <footer className="px-4 py-4 text-center border-t border-border/50 bg-card/30 lg:pb-4 pb-24">
+      <footer className="px-4 py-4 text-center border-t border-border/50 bg-card/30">
         <p className="text-xs text-muted-foreground">{t("app-version")} • {t("created-by")} Biniam Bogale, Ethiopia</p>
         <p className="text-xs text-muted-foreground mt-1">{t("contact")}: +251978744724</p>
       </footer>
