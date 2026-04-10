@@ -1,130 +1,90 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Compass, LifeBuoy, MessageSquare, Sparkles, WandSparkles } from 'lucide-react';
-import AnimatedBackground from '@/components/ui/AnimatedBackground';
+import { Compass, Users, Flame, BookOpen, Target, Plus } from 'lucide-react';
 import BackButton from '@/components/ui/BackButton';
-import EnhancedSocialFeed from '@/components/social/EnhancedSocialFeed';
+import SocialFeedView from '@/components/social/SocialFeedView';
+import SocialChallenges from '@/components/social/SocialChallenges';
 import EnhancedChatSystem from '@/components/chat/EnhancedChatSystem';
-import SocialSupportHub from '@/components/social/SocialSupportHub';
+import CreatePostModal from '@/components/social/CreatePostModal';
 import { useUser } from '@/context/UserContext';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+
+const feedTabs = [
+  { id: 'explore', label: 'Explore', icon: Compass },
+  { id: 'following', label: 'Following', icon: Users },
+  { id: 'trending', label: 'Trending', icon: Flame },
+  { id: 'study', label: 'Study', icon: BookOpen },
+  { id: 'challenges', label: 'Challenges', icon: Target },
+] as const;
+
+type FeedTab = (typeof feedTabs)[number]['id'];
 
 const EnhancedSocial: React.FC = () => {
   const { user } = useUser();
-  const [activeTab, setActiveTab] = useState('feed');
-
-  const quickActions = [
-    {
-      id: 'feed',
-      title: 'Share an update',
-      subtitle: 'Post wins, ideas, and class highlights',
-      icon: Compass,
-    },
-    {
-      id: 'groups',
-      title: 'Jump into chat',
-      subtitle: 'Collaborate with peers in real time',
-      icon: MessageSquare,
-    },
-    {
-      id: 'support',
-      title: 'Get support fast',
-      subtitle: 'Report issues and vote on feature ideas',
-      icon: LifeBuoy,
-    },
-  ] as const;
+  const [activeTab, setActiveTab] = useState<FeedTab>('explore');
+  const [showCreatePost, setShowCreatePost] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <AnimatedBackground />
-      
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <BackButton />
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
-            <Compass className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Social Hub</h1>
-            <p className="text-sm text-muted-foreground">Connect with your community</p>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border/40">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <BackButton />
+            <h1 className="text-lg font-bold text-foreground tracking-tight">Community</h1>
           </div>
         </div>
       </header>
 
-      <div className="container max-w-6xl mx-auto py-6 px-4 relative z-10">
-        <Card className="mb-6 border-border/60 bg-card/70 backdrop-blur-sm">
-          <CardContent className="p-4 md:p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Welcome back{user?.name ? `, ${user.name}` : ''}</p>
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-400" />
-                  Your social space, upgraded
-                </h2>
-                <p className="text-sm text-muted-foreground">Use quick actions below to jump directly into the experience you need.</p>
-              </div>
-              <Button variant="outline" className="gap-2" onClick={() => setActiveTab('support')}>
-                <WandSparkles className="h-4 w-4" />
-                Open feature voting
-              </Button>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {quickActions.map((action) => {
-                const Icon = action.icon;
+      {/* Tab Navigation — horizontal scroll */}
+      <div className="sticky top-[57px] z-40 bg-background/90 backdrop-blur-xl border-b border-border/30">
+        <div className="max-w-2xl mx-auto">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as FeedTab)}>
+            <TabsList className="w-full justify-start gap-0 bg-transparent h-auto p-0 rounded-none overflow-x-auto scrollbar-hide">
+              {feedTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
                 return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => setActiveTab(action.id)}
-                    className={`text-left rounded-xl border px-4 py-3 transition-all ${activeTab === action.id ? 'border-primary bg-primary/10' : 'border-border/60 bg-background/40 hover:bg-muted/40'}`}
+                  <TabsTrigger
+                    key={tab.id}
+                    value={tab.id}
+                    className={`flex-shrink-0 rounded-none border-b-2 px-4 py-3 text-sm font-medium transition-colors data-[state=active]:shadow-none ${
+                      isActive
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Icon className="h-4 w-4" />
-                      <span className="font-medium text-sm">{action.title}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{action.subtitle}</p>
-                  </button>
+                    <Icon className="h-4 w-4 mr-1.5" />
+                    {tab.label}
+                  </TabsTrigger>
                 );
               })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-xl mx-auto grid-cols-3">
-            <TabsTrigger value="feed" className="gap-2">
-              <Compass className="h-4 w-4" />
-              Feed
-            </TabsTrigger>
-            <TabsTrigger value="groups" className="gap-2">
-              <Users className="h-4 w-4" />
-              Groups
-            </TabsTrigger>
-            <TabsTrigger value="support" className="gap-2">
-              <LifeBuoy className="h-4 w-4" />
-              Support
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="feed">
-            <EnhancedSocialFeed />
-          </TabsContent>
-
-          <TabsContent value="groups">
-            <div className="flex justify-center">
-              <EnhancedChatSystem 
-                currentUserId={user?.id || 'guest'} 
-                currentUserName={user?.name || 'Guest'}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="support">
-            <SocialSupportHub />
-          </TabsContent>
-        </Tabs>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
+
+      {/* Content */}
+      <main className="max-w-2xl mx-auto pb-24">
+        {activeTab === 'explore' && <SocialFeedView mode="explore" />}
+        {activeTab === 'following' && <SocialFeedView mode="following" />}
+        {activeTab === 'trending' && <SocialFeedView mode="trending" />}
+        {activeTab === 'study' && <SocialFeedView mode="study" />}
+        {activeTab === 'challenges' && <SocialChallenges />}
+      </main>
+
+      {/* Floating Create Post Button */}
+      <Button
+        onClick={() => setShowCreatePost(true)}
+        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg shadow-primary/30 p-0"
+        size="icon"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+
+      {showCreatePost && (
+        <CreatePostModal onClose={() => setShowCreatePost(false)} />
+      )}
     </div>
   );
 };
