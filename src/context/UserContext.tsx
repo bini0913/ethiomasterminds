@@ -350,7 +350,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     if (!user || !session?.user) return;
 
     try {
-      const updateData: Record<string, unknown> = {};
+      const updateData: any = {};
       
       if (profileData.name !== undefined) updateData.name = profileData.name;
       if (profileData.username !== undefined) updateData.username = profileData.username;

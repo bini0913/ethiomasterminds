@@ -38,7 +38,7 @@ const Leaderboard = () => {
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [visibleRows, setVisibleRows] = useState(16);
-  const [previewUser, setPreviewUser] = useState<(LeaderboardUser & { rankPos: number; score: number; tier: string }) | null>(null);
+  const [previewUser, setPreviewUser] = useState<(LeaderboardUser & { rankPos: number; score: number; tier: any }) | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchMovedRef = useRef(false);
   const longPressTriggeredRef = useRef(false);

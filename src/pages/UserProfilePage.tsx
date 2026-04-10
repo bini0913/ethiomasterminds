@@ -134,20 +134,16 @@ const UserProfilePage = () => {
   const profile = useMemo(() => ranked.find((u) => u.id === userId), [ranked, userId]);
   const profileRank = useMemo(() => ranked.findIndex((u) => u.id === userId) + 1, [ranked, userId]);
 
-  if (!profile) {
-    return <div className="p-8">Profile not found.</div>;
-  }
-
-  const isSelf = authUser?.id === profile.id;
-  const isFollowing = followingIds.includes(profile.id);
-  const xpProgress = getXpProgressInLevel(profile.xp);
+  const isSelf = authUser?.id === (profile?.id ?? "");
+  const isFollowing = profile ? followingIds.includes(profile.id) : false;
+  const xpProgress = getXpProgressInLevel(profile?.xp ?? 0);
   const xpIntoLevel = xpProgress.current;
   const progress = xpProgress.percentage;
-  const currentTier = getRankTierByLevel(profile.level);
-  const nextTier = getNextRankTier(profile.level);
+  const currentTier = getRankTierByLevel(profile?.level ?? 1);
+  const nextTier = getNextRankTier(profile?.level ?? 1);
 
   const onFollowToggle = async () => {
-    if (!authUser?.id) return;
+    if (!authUser?.id || !profile) return;
     try {
       if (isFollowing) {
         await unfollowUser(authUser.id, profile.id);
@@ -162,7 +158,7 @@ const UserProfilePage = () => {
   };
 
   const onChallenge = async () => {
-    if (!authUser?.id || isSelf) {
+    if (!authUser?.id || isSelf || !profile) {
       navigate("/multiplayer");
       return;
     }
@@ -200,14 +196,14 @@ const UserProfilePage = () => {
     } as never);
   };
 
-  const accuracy = Number(statsJson.accuracy ?? profile.accuracy ?? 0);
-  const matchesPlayed = Number(statsJson.total_games_played ?? profile.matchesPlayed ?? 0);
-  const wins = Number(statsJson.total_wins ?? profile.wins ?? 0);
-  const losses = Number(statsJson.total_losses ?? profile.losses ?? 0);
-  const contributions = Number(statsJson.study_time_hours ?? profile.contributions / 10 ?? 0);
+  const accuracy = Number(statsJson.accuracy ?? profile?.accuracy ?? 0);
+  const matchesPlayed = Number(statsJson.total_games_played ?? profile?.matchesPlayed ?? 0);
+  const wins = Number(statsJson.total_wins ?? profile?.wins ?? 0);
+  const losses = Number(statsJson.total_losses ?? profile?.losses ?? 0);
+  const contributions = Number(statsJson.study_time_hours ?? (profile?.contributions ?? 0) / 10 ?? 0);
 
   useEffect(() => {
-    if (!isSelf) return;
+    if (!isSelf || !profile) return;
 
     if (previousLevelRef.current === null) {
       previousLevelRef.current = profile.level;
@@ -229,7 +225,11 @@ const UserProfilePage = () => {
 
     previousLevelRef.current = profile.level;
     previousRankRef.current = currentTier.name;
-  }, [currentTier.name, isSelf, profile.level]);
+  }, [currentTier.name, isSelf, profile?.level]);
+
+  if (!profile) {
+    return <div className="p-8">Profile not found.</div>;
+  }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background p-4 md:p-8">
