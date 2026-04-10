@@ -86,7 +86,7 @@ interface MultiplayerInvite {
   id: string;
   sender_id: string;
   receiver_id: string;
-  room_id: string;
+  room_id: string | null;
   status: "pending" | "accepted" | "rejected" | "expired" | "cancelled";
   created_at: string;
   expires_at: string;
@@ -516,13 +516,21 @@ const Lobby: React.FC = () => {
           if (newInvite.sender_id === user.id && newInvite.status !== "pending") {
             const statusLabel = newInvite.status === "accepted" ? "accepted" : newInvite.status;
             toast.message(`Invite ${statusLabel}`);
+
+            if (newInvite.status === "accepted" && newInvite.room_id) {
+              const success = await contextJoinRoom(newInvite.room_id, user.name || "Player");
+              if (success) {
+                pushActivity("Your invite was accepted. Entering shared room...");
+                navigate(`/multiplayer?room=${newInvite.room_id}`);
+              }
+            }
           }
         },
       )
       .subscribe();
 
     return [chatChannel, roomChannel, presenceChannel, tournamentChannel, invitesChannel];
-  }, [fetchOnlinePlayers, fetchTournaments, refreshRooms, user?.id]);
+  }, [contextJoinRoom, fetchOnlinePlayers, fetchTournaments, navigate, pushActivity, refreshRooms, user?.id, user?.name]);
 
   useEffect(() => {
     if (!incomingInvite) return;

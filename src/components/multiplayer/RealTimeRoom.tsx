@@ -115,6 +115,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [isHost, setIsHost] = useState(false);
   const [countdownValue, setCountdownValue] = useState(10);
+  const [countdownEndsAt, setCountdownEndsAt] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [offlineSeconds, setOfflineSeconds] = useState(30);
   const [isOffline, setIsOffline] = useState(false);
@@ -126,7 +127,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [roomConfig, setRoomConfig] = useState({
     subject: 'Mixed',
     difficulty: 'Medium',
-    gameMode: maxPlayers <= 2 ? '1v1' : maxPlayers <= 4 ? '2v2' : '3v3',
+    gameMode: 'speed',
+    questionCount: 10,
   });
 
   const advancingQuestionRef = useRef(false);
@@ -161,31 +163,23 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }, [isHost, roomState.status, timeRemaining]);
 
   useEffect(() => {
-    if (!isHost || roomState.status !== 'waiting') return;
-    const everyoneReady = players.length >= 2 && players.length <= maxPlayers && players.every((p) => p.isReady);
-
-    if (!everyoneReady) {
-      setCountdownValue(10);
-      return;
+    if (roomState.status !== 'countdown') return;
+    if (countdownEndsAt) {
+      const remaining = Math.max(0, Math.ceil((new Date(countdownEndsAt).getTime() - Date.now()) / 1000));
+      setCountdownValue(remaining);
     }
-
-    setRoomState((prev) => ({ ...prev, status: 'countdown' }));
-  }, [players, isHost, roomState.status, maxPlayers]);
-
-  useEffect(() => {
-    if (!isHost || roomState.status !== 'countdown') return;
     if (countdownValue <= 0) {
-      void startGame();
+      if (isHost) void startGame();
       return;
     }
 
     const tick = setTimeout(() => {
-      playTone(420, 0.06);
+      if (isHost) playTone(420, 0.06);
       setCountdownValue((prev) => prev - 1);
     }, 1000);
 
     return () => clearTimeout(tick);
-  }, [roomState.status, countdownValue, isHost]);
+  }, [roomState.status, countdownEndsAt, countdownValue, isHost]);
 
   useEffect(() => {
     const handleOffline = () => {
@@ -261,7 +255,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     try {
       const { data: room } = await supabase
         .from('multiplayer_rooms')
-        .select('host_id, question_count, subject, difficulty, max_players')
+        .select('host_id, question_count, subject, difficulty, max_players, game_mode')
         .eq('id', roomId)
         .single();
 
@@ -276,7 +270,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       setRoomConfig({
         subject: room.subject || 'Mixed',
         difficulty: room.difficulty || 'Medium',
-        gameMode: (room.max_players || maxPlayers) <= 2 ? '1v1' : (room.max_players || maxPlayers) <= 4 ? '2v2' : '3v3',
+        gameMode: room.game_mode || 'speed',
+        questionCount: room.question_count || 10,
       });
 
       await supabase.from('room_players').upsert(
@@ -294,6 +289,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
       if (state) {
         setRoomState(state as RoomState);
+        if (state.status === 'countdown') {
+          setCountdownEndsAt(state.question_ends_at);
+        }
         if (state.current_question_id) {
           await fetchCurrentQuestion(state.current_question_id);
         }
@@ -400,6 +398,28 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         {
           event: '*',
           schema: 'public',
+          table: 'multiplayer_rooms',
+          filter: `id=eq.${roomId}`,
+        },
+        (payload) => {
+          const nextRoom = payload.new as any;
+          if (!nextRoom) return;
+          setIsHost(nextRoom.host_id === currentUserId);
+          setRoomConfig((prev) => ({
+            ...prev,
+            subject: nextRoom.subject || prev.subject,
+            difficulty: nextRoom.difficulty || prev.difficulty,
+            gameMode: nextRoom.game_mode || prev.gameMode,
+            questionCount: nextRoom.question_count || prev.questionCount,
+          }));
+          setTotalQuestions(nextRoom.question_count || 10);
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
           table: 'room_players',
           filter: `room_id=eq.${roomId}`,
         },
@@ -419,6 +439,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           const newState = payload.new as RoomState | null;
           if (!newState) return;
           setRoomState(newState);
+          if (newState.status === 'countdown') {
+            setCountdownEndsAt(newState.question_ends_at);
+          } else {
+            setCountdownEndsAt(null);
+          }
 
           if (newState.current_question_id) {
             await fetchCurrentQuestion(newState.current_question_id);
@@ -494,6 +519,10 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   const startGame = async () => {
     if (!isHost) return;
+    if (!allReady || players.length < 2) {
+      toast.error('All players must be ready before starting');
+      return;
+    }
 
     try {
       const { error } = await supabase.rpc('multiplayer_start_game', {
@@ -501,7 +530,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       });
 
       if (error) throw error;
-      setCountdownValue(10);
       await supabase.rpc('multiplayer_next_question', { p_room_id: roomId });
       playTone(660, 0.12);
     } catch (err) {
@@ -597,11 +625,31 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       .update({
         subject: merged.subject,
         difficulty: merged.difficulty,
-        max_players: merged.gameMode === '1v1' ? 2 : merged.gameMode === '2v2' ? 4 : 6,
+        game_mode: merged.gameMode,
+        question_count: merged.questionCount,
       })
       .eq('id', roomId)
       .eq('host_id', currentUserId);
     toast.success('Room settings updated');
+  };
+
+  const triggerCountdown = async () => {
+    if (!isHost || !allReady || players.length < 2) return;
+    const endTime = new Date(Date.now() + 5000).toISOString();
+
+    await supabase
+      .from('room_state')
+      .upsert(
+        {
+          room_id: roomId,
+          status: 'countdown',
+          question_started_at: new Date().toISOString(),
+          question_ends_at: endTime,
+        },
+        { onConflict: 'room_id' },
+      );
+
+    setCountdownEndsAt(endTime);
   };
 
   const kickPlayer = async (playerId: string, playerName: string) => {
@@ -690,20 +738,20 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                   <Progress value={(players.length / maxPlayers) * 100} className="h-2" />
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                    <div className="rounded-lg border border-white/15 p-2">Questions: {totalQuestions}</div>
+                    <div className="rounded-lg border border-white/15 p-2">Questions: {roomConfig.questionCount}</div>
                     <div className="rounded-lg border border-white/15 p-2">Topic: {roomConfig.subject}</div>
                     <div className="rounded-lg border border-white/15 p-2">Difficulty: {roomConfig.difficulty}</div>
                     <div className="rounded-lg border border-white/15 p-2">Mode: {roomConfig.gameMode}</div>
                   </div>
 
                   {isHost && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                       <Select value={roomConfig.gameMode} onValueChange={(value) => void updateRoomConfig({ gameMode: value })}>
                         <SelectTrigger><SelectValue placeholder="Game mode" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1v1">1v1</SelectItem>
-                          <SelectItem value="2v2">2v2</SelectItem>
-                          <SelectItem value="3v3">3v3</SelectItem>
+                          <SelectItem value="speed">⚡ Speed</SelectItem>
+                          <SelectItem value="accuracy">🎯 Accuracy</SelectItem>
+                          <SelectItem value="battle">🔥 Battle</SelectItem>
                         </SelectContent>
                       </Select>
                       <Select value={roomConfig.subject} onValueChange={(value) => void updateRoomConfig({ subject: value })}>
@@ -723,6 +771,15 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                           <SelectItem value="Hard">Hard</SelectItem>
                         </SelectContent>
                       </Select>
+                      <Select value={String(roomConfig.questionCount)} onValueChange={(value) => void updateRoomConfig({ questionCount: Number(value) })}>
+                        <SelectTrigger><SelectValue placeholder="Questions" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5 Questions</SelectItem>
+                          <SelectItem value="10">10 Questions</SelectItem>
+                          <SelectItem value="15">15 Questions</SelectItem>
+                          <SelectItem value="20">20 Questions</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   )}
 
@@ -731,7 +788,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                       {currentPlayer?.isReady ? '✓ Ready!' : 'Tap Ready'}
                     </Button>
                     {isHost && allReady && players.length >= 2 && (
-                      <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 min-h-11 px-6" onClick={() => setRoomState((prev) => ({ ...prev, status: 'countdown' }))}>
+                      <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 min-h-11 px-6" onClick={triggerCountdown}>
                         <Play className="h-4 w-4 mr-2" /> Start Countdown
                       </Button>
                     )}
@@ -938,3 +995,19 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 };
 
 export default RealTimeRoom;
+  const triggerCountdown = async () => {
+    if (!isHost || !allReady || players.length < 2) return;
+    const endTime = new Date(Date.now() + 5000).toISOString();
+    await supabase
+      .from('room_state')
+      .upsert(
+        {
+          room_id: roomId,
+          status: 'countdown',
+          question_started_at: new Date().toISOString(),
+          question_ends_at: endTime,
+        },
+        { onConflict: 'room_id' },
+      );
+    setCountdownEndsAt(endTime);
+  };
