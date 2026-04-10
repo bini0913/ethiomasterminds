@@ -995,19 +995,3 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 };
 
 export default RealTimeRoom;
-  const triggerCountdown = async () => {
-    if (!isHost || !allReady || players.length < 2) return;
-    const endTime = new Date(Date.now() + 5000).toISOString();
-    await supabase
-      .from('room_state')
-      .upsert(
-        {
-          room_id: roomId,
-          status: 'countdown',
-          question_started_at: new Date().toISOString(),
-          question_ends_at: endTime,
-        },
-        { onConflict: 'room_id' },
-      );
-    setCountdownEndsAt(endTime);
-  };
