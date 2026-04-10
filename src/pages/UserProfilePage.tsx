@@ -47,60 +47,68 @@ const UserProfilePage = () => {
   const refreshProfileDetails = async () => {
     if (!userId) return;
 
-    const [{ data: statsData }, analyticsRes, recentResultsRes, userAchievementsRes, privacyRes] = await Promise.all([
-      supabase.rpc("get_user_stats", { p_user_id: userId }),
-      supabase.from("analytics").select("strong_topics,weak_topics").eq("user_id", userId),
-      supabase
-        .from("quiz_results")
-        .select("id,score,xp_earned,completed_at")
-        .eq("student_id", userId)
-        .order("completed_at", { ascending: false })
-        .limit(5),
-      supabase
-        .from("user_achievements")
-        .select("id,achievement_id,unlocked_at")
-        .eq("user_id", userId)
-        .eq("completed", true)
-        .order("unlocked_at", { ascending: false })
-        .limit(6),
-      supabase.from("profile_privacy_settings" as never).select("is_public,hide_stats").eq("user_id", userId).maybeSingle(),
-    ]);
+    try {
+      const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, privacyRes] = await Promise.all([
+        supabase.rpc("get_user_stats", { p_user_id: userId }),
+        supabase.from("analytics").select("strong_topics,weak_topics").eq("user_id", userId),
+        supabase
+          .from("quiz_results")
+          .select("id,score,xp_earned,completed_at")
+          .eq("student_id", userId)
+          .order("completed_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("user_achievements")
+          .select("id,achievement_id,unlocked_at")
+          .eq("user_id", userId)
+          .eq("completed", true)
+          .order("unlocked_at", { ascending: false })
+          .limit(6),
+        supabase.from("profile_privacy_settings" as never).select("is_public,hide_stats").eq("user_id", userId).maybeSingle(),
+      ]);
 
-    setStatsJson((statsData ?? {}) as Record<string, any>);
+      setStatsJson((statsRes.data ?? {}) as Record<string, any>);
 
-    const strong = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.strong_topics) ? item.strong_topics : []));
-    const weak = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.weak_topics) ? item.weak_topics : []));
-    setInsights({ strong: strong.slice(0, 3), weak: weak.slice(0, 3), recommended: [...new Set(weak)].slice(0, 3) });
+      const strong = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.strong_topics) ? item.strong_topics : []));
+      const weak = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.weak_topics) ? item.weak_topics : []));
+      setInsights({ strong: strong.slice(0, 3), weak: weak.slice(0, 3), recommended: [...new Set(weak)].slice(0, 3) });
 
-    setActivities(
-      (recentResultsRes.data ?? []).map((row) => ({
-        id: row.id,
-        text: `Completed quiz with ${Math.round(row.score)}% score and +${row.xp_earned ?? 0} XP`,
-        time: row.completed_at ? new Date(row.completed_at).toLocaleString() : "recently",
-      })),
-    );
-
-    const achievementIds = (userAchievementsRes.data ?? []).map((x) => x.achievement_id);
-    const { data: defs } = achievementIds.length
-      ? await supabase.from("achievements").select("id,name,icon").in("id", achievementIds)
-      : { data: [] as Array<{ id: string; name: string; icon: string }> };
-
-    const byId = new Map((defs ?? []).map((d) => [d.id, d]));
-    setAchievements(
-      (userAchievementsRes.data ?? []).map((row) => {
-        const def = byId.get(row.achievement_id);
-        return {
+      setActivities(
+        (recentResultsRes.data ?? []).map((row) => ({
           id: row.id,
-          name: def?.name ?? "Achievement",
-          icon: def?.icon ?? "🏅",
-          date: row.unlocked_at ? new Date(row.unlocked_at).toLocaleDateString() : "",
-        };
-      }),
-    );
+          text: `Completed quiz with ${Math.round(row.score)}% score and +${row.xp_earned ?? 0} XP`,
+          time: row.completed_at ? new Date(row.completed_at).toLocaleString() : "recently",
+        })),
+      );
 
-    if (privacyRes.data) {
-      const p = privacyRes.data as { is_public: boolean; hide_stats: boolean };
-      setPrivacy({ isPublic: p.is_public, hideStats: p.hide_stats });
+      const achievementIds = (userAchievementsRes.data ?? []).map((x) => x.achievement_id);
+      const { data: defs } = achievementIds.length
+        ? await supabase.from("achievements").select("id,name,icon").in("id", achievementIds)
+        : { data: [] as Array<{ id: string; name: string; icon: string }> };
+
+      const byId = new Map((defs ?? []).map((d) => [d.id, d]));
+      setAchievements(
+        (userAchievementsRes.data ?? []).map((row) => {
+          const def = byId.get(row.achievement_id);
+          return {
+            id: row.id,
+            name: def?.name ?? "Achievement",
+            icon: def?.icon ?? "🏅",
+            date: row.unlocked_at ? new Date(row.unlocked_at).toLocaleDateString() : "",
+          };
+        }),
+      );
+
+      if (privacyRes.data) {
+        const p = privacyRes.data as { is_public: boolean; hide_stats: boolean };
+        setPrivacy({ isPublic: p.is_public, hideStats: p.hide_stats });
+      }
+    } catch (error) {
+      console.error("Failed to load full profile details. Falling back to basic profile.", error);
+      setStatsJson({});
+      setInsights({ strong: [], weak: [], recommended: [] });
+      setActivities([]);
+      setAchievements([]);
     }
   };
 
