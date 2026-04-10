@@ -40,6 +40,8 @@ const Leaderboard = () => {
   const [visibleRows, setVisibleRows] = useState(16);
   const [previewUser, setPreviewUser] = useState<(LeaderboardUser & { rankPos: number; score: number; tier: string }) | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchMovedRef = useRef(false);
+  const longPressTriggeredRef = useRef(false);
 
   const loadLeaderboard = async () => {
     setLoading(true);
@@ -95,7 +97,7 @@ const Leaderboard = () => {
     rankPos: index + 1,
     score: activeTab === "weekly" ? entry.weeklyScore : rankScore(entry),
     tier: tierFromUser(entry),
-  }));
+  })).slice(0, 15);
 
   const topThree = withRank.slice(0, 3);
   const mobilePodium = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : topThree;
@@ -112,16 +114,34 @@ const Leaderboard = () => {
     }
   };
 
+  const openProfile = (entry: (typeof withRank)[number]) => {
+    navigate(`/profile/${entry.id}`);
+  };
+
+  const getDisplayName = (entry: (typeof withRank)[number]) => entry.name?.trim() || entry.username;
+
   const handleLongPressStart = (entry: (typeof withRank)[number]) => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    touchMovedRef.current = false;
+    longPressTriggeredRef.current = false;
     longPressTimer.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
       triggerHaptics();
       setPreviewUser(entry);
     }, 420);
   };
 
-  const handleLongPressEnd = () => {
+  const handleLongPressMove = () => {
+    touchMovedRef.current = true;
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
+  const handleLongPressEnd = (entry?: (typeof withRank)[number]) => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    if (entry && !touchMovedRef.current && !longPressTriggeredRef.current) {
+      triggerHaptics();
+      openProfile(entry);
+    }
   };
 
   return (
@@ -184,16 +204,17 @@ const Leaderboard = () => {
                       layout
                       whileHover={{ y: -6 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => navigate(`/profile/${entry.id}`)}
+                      onClick={() => openProfile(entry)}
                       onTouchStart={() => handleLongPressStart(entry)}
-                      onTouchEnd={handleLongPressEnd}
-                      onTouchCancel={handleLongPressEnd}
+                      onTouchMove={handleLongPressMove}
+                      onTouchEnd={() => handleLongPressEnd(entry)}
+                      onTouchCancel={() => handleLongPressEnd()}
                       key={entry.id}
                       className={`rounded-2xl border p-4 text-left transition ${podiumStyles[podiumRank]}`}
                     >
                       <p className="text-xs opacity-85">{podiumRank === 1 ? "🥇 Gold" : podiumRank === 2 ? "🥈 Silver" : "🥉 Bronze"}</p>
                       <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="lg" className="my-3" />
-                      <h3 className="font-semibold">{entry.username}</h3>
+                      <h3 className="font-semibold">{getDisplayName(entry)}</h3>
                       <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
                       <div className="mt-3 flex items-center justify-between">
                         <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
@@ -212,18 +233,16 @@ const Leaderboard = () => {
                     <motion.button
                       key={entry.id}
                       whileTap={{ scale: 0.97 }}
-                      onClick={() => {
-                        triggerHaptics();
-                        navigate(`/profile/${entry.id}`);
-                      }}
+                      onClick={() => openProfile(entry)}
                       onTouchStart={() => handleLongPressStart(entry)}
-                      onTouchEnd={handleLongPressEnd}
-                      onTouchCancel={handleLongPressEnd}
+                      onTouchMove={handleLongPressMove}
+                      onTouchEnd={() => handleLongPressEnd(entry)}
+                      onTouchCancel={() => handleLongPressEnd()}
                       className={`w-[82%] shrink-0 snap-center rounded-2xl border p-4 text-left transition ${podiumStyles[entry.rankPos as 1 | 2 | 3]} ${isChampion ? "scale-[1.01]" : "scale-95"}`}
                     >
                       <p className="text-xs opacity-80">Position #{entry.rankPos}</p>
                       <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size={isChampion ? "lg" : "md"} className="my-3" />
-                      <h3 className="text-base font-semibold">{entry.username}</h3>
+                      <h3 className="text-base font-semibold">{getDisplayName(entry)}</h3>
                       <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
                       <div className="mt-3 flex items-center justify-between gap-2">
                         <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
@@ -251,13 +270,11 @@ const Leaderboard = () => {
                   <motion.button
                     layout
                     key={`${activeTab}-${entry.id}`}
-                    onClick={() => {
-                      triggerHaptics();
-                      navigate(`/profile/${entry.id}`);
-                    }}
+                    onClick={() => openProfile(entry)}
                     onTouchStart={() => handleLongPressStart(entry)}
-                    onTouchEnd={handleLongPressEnd}
-                    onTouchCancel={handleLongPressEnd}
+                    onTouchMove={handleLongPressMove}
+                    onTouchEnd={() => handleLongPressEnd(entry)}
+                    onTouchCancel={() => handleLongPressEnd()}
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
@@ -268,7 +285,7 @@ const Leaderboard = () => {
                     <span className="w-8 text-center text-sm font-semibold text-muted-foreground">#{entry.rankPos}</span>
                     <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="md" />
                     <div className="flex-1">
-                      <p className="font-medium">{entry.username}</p>
+                      <p className="font-medium">{getDisplayName(entry)}</p>
                       <p className="text-xs text-muted-foreground">Level {entry.level} • XP {entry.xp.toLocaleString()}</p>
                     </div>
                     <div className="text-right">
@@ -304,7 +321,7 @@ const Leaderboard = () => {
               <div className="flex items-center gap-3">
                 <AvatarRenderer avatar={previewUser.avatar ?? undefined} avatarConfig={previewUser.avatarConfig as any} size="md" />
                 <div>
-                  <p className="font-semibold">{previewUser.username}</p>
+                  <p className="font-semibold">{getDisplayName(previewUser)}</p>
                   <p className="text-xs text-muted-foreground">Rank #{previewUser.rankPos} • Level {previewUser.level}</p>
                 </div>
               </div>

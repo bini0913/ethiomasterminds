@@ -11,7 +11,7 @@ import { Flame, Sword, Trophy, UserRoundPlus } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchFollowerCounts, fetchFollowing, fetchLeaderboardUsers, followUser, rankScore, tierStyle, unfollowUser, type LeaderboardUser } from "@/lib/leaderboardApi";
+import { createFollowChallenge, fetchFollowerCounts, fetchFollowing, fetchLeaderboardUsers, followUser, rankScore, tierStyle, unfollowUser, type LeaderboardUser } from "@/lib/leaderboardApi";
 import { getNextRankTier, getRankTierByLevel, getXpProgressInLevel, playRankUpTone } from "@/lib/rankSystem";
 import { toast } from "sonner";
 
@@ -153,6 +153,35 @@ const UserProfilePage = () => {
     }
   };
 
+  const onChallenge = async () => {
+    if (!authUser?.id || isSelf) {
+      navigate("/multiplayer");
+      return;
+    }
+
+    try {
+      await createFollowChallenge(authUser.id, profile.id);
+      const { data, error } = await (supabase as any).rpc("create_multiplayer_invite", {
+        p_receiver_id: profile.id,
+        p_room_id: null,
+        p_max_players: 2,
+        p_subject: "Mixed",
+        p_difficulty: "Medium",
+      });
+
+      if (error) throw error;
+
+      if (data?.room_id) {
+        navigate(`/multiplayer?room=${data.room_id}`);
+      } else {
+        navigate("/multiplayer");
+      }
+      toast.success(`Challenge sent to ${profile.name || profile.username}`);
+    } catch (error: any) {
+      toast.error(error.message ?? "Could not send challenge");
+    }
+  };
+
   const updatePrivacy = async (next: { isPublic: boolean; hideStats: boolean }) => {
     if (!authUser?.id) return;
     setPrivacy(next);
@@ -199,14 +228,14 @@ const UserProfilePage = () => {
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex items-center justify-between">
           <Button variant="outline" onClick={() => navigate(-1)}>Back</Button>
-          <Button onClick={() => navigate("/multiplayer")} className="gap-2"><Sword className="h-4 w-4" />Challenge to Match</Button>
+          <Button onClick={onChallenge} className="gap-2"><Sword className="h-4 w-4" />Challenge to Match</Button>
         </header>
 
         <Card>
           <CardContent className="grid gap-6 p-6 md:grid-cols-[auto_1fr_auto] md:items-center">
             <AvatarRenderer avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size="xl" />
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold">{profile.username}</h1>
+              <h1 className="text-3xl font-bold">{profile.name || profile.username}</h1>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className={`bg-gradient-to-r ${tierStyle(profile.level)}`}><motion.span initial={{ scale: 0.92 }} animate={{ scale: 1 }} className="inline-flex items-center gap-1">{currentTier.icon} {currentTier.name}</motion.span></Badge>
                 <Badge variant="secondary">Rank #{profileRank}</Badge>

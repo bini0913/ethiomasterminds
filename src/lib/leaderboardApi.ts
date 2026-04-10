@@ -144,3 +144,13 @@ export async function fetchFollowerCounts(userId: string) {
     following: following.count ?? 0,
   };
 }
+
+export async function createFollowChallenge(challengerId: string, challengedId: string) {
+  const { error } = await supabase.from("follow_challenges" as never).insert({
+    challenger_id: challengerId,
+    challenged_id: challengedId,
+    status: "pending",
+  } as never);
+
+  if (error) throw error;
+}
