@@ -163,8 +163,6 @@ const LibraryPage: React.FC = () => {
   }, [user?.id]);
 
   const userGrade = Number(user?.grade || 0);
-  const studentRestrictedToAssigned = user?.role === 'student' && userGrade > 0 && userGrade <= 8;
-  const assignedBookIds = useMemo(() => new Set(assignedBooks.map((book) => book.id)), [assignedBooks]);
 
   const shortHash = (value: string) => {
     let hash = 0;
@@ -191,15 +189,12 @@ const LibraryPage: React.FC = () => {
 
       if (activeSection === 'my-books') return inQuery && inSubject && inGrade && book.uploader_id === user?.id;
       if (activeSection === 'community') {
-        if (studentRestrictedToAssigned) {
-          return false;
-        }
         const minGrade = user?.role === 'student' ? 1 : 1;
         return inQuery && inSubject && inGrade && (book.grade_level || minGrade) >= minGrade;
       }
       return inQuery && inSubject && inGrade;
     });
-  }, [books, search, subjectFilter, gradeFilter, activeSection, user?.id, user?.role, studentRestrictedToAssigned]);
+  }, [books, search, subjectFilter, gradeFilter, activeSection, user?.id, user?.role]);
 
   const visibleBooks = filteredBooks.slice(0, visibleCount);
 
@@ -302,11 +297,6 @@ const LibraryPage: React.FC = () => {
   };
 
   const openReader = (book: LibraryBook) => {
-    if (studentRestrictedToAssigned && !assignedBookIds.has(book.id)) {
-      toast.error('This book is not assigned to your class yet.');
-      return;
-    }
-
     const url = getPdfPublicUrl(book.pdf_path);
     if (!isValidPublicUrl(url)) {
       toast.error('Book file URL is invalid. Please retry.');
@@ -578,7 +568,6 @@ const LibraryPage: React.FC = () => {
                 ['highlights', 'Highlights'],
                 ['notes', 'Saved Notes'],
               ] as [SectionKey, string][])
-                .filter(([key]) => !(studentRestrictedToAssigned && key === 'community'))
                 .map(([key, label]) => (
                 <Button key={key} variant={activeSection === key ? 'default' : 'ghost'} className="w-full justify-start" onClick={() => {
                   setActiveSection(key);
