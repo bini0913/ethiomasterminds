@@ -1,15 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Send, Sparkles } from 'lucide-react';
+import {
+  Bot,
+  Flag,
+  Moon,
+  Paperclip,
+  Send,
+  Smile,
+  Sparkles,
+  Sun,
+  Volume2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import BackButton from '@/components/ui/BackButton';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUser } from '@/context/UserContext';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+
+type ChatType = 'private' | 'room' | 'class' | 'community';
 
 type ChatGroup = {
   id: string;
@@ -24,50 +38,119 @@ type ChatMessage = {
   created_at: string;
 };
 
+type ProfileMap = Record<string, { name: string; avatar?: string }>;
+
+const LOBBY_QUICK_MESSAGES = ['Ready!', 'Wait', "Let\'s go", 'Good luck', '🔥', '😎', '🎯'];
 const LEARNING_PROMPTS = [
-  "Summarize today's science lesson in 3 bullet points.",
-  'Ask for a quick quiz on algebra fundamentals.',
-  'Explain one history topic like I am 12 years old.',
+  'Generate quiz from this chat.',
+  'Explain this topic with simple examples.',
+  'Give 3 revision questions for this lesson.',
 ] as const;
+const BANNED_PATTERNS = ['kill yourself', 'hate you', 'stupid'];
+
+const resolveChatType = (groupType: string): ChatType => {
+  if (groupType === 'private') return 'private';
+  if (groupType === 'room') return 'room';
+  if (groupType === 'class') return 'class';
+  return 'community';
+};
+
+const sanitizeMessage = (text: string): { blocked: boolean; value: string } => {
+  const cleaned = text.trim();
+  if (!cleaned) return { blocked: true, value: '' };
+
+  const lowered = cleaned.toLowerCase();
+  const toxic = BANNED_PATTERNS.some((pattern) => lowered.includes(pattern));
+  const spammy = /(.)\1{8,}/.test(cleaned);
+
+  if (toxic || spammy) {
+    return { blocked: true, value: cleaned };
+  }
+
+  return { blocked: false, value: cleaned };
+};
 
 const Chat: React.FC = () => {
   const { user, isLoading } = useUser();
   const navigate = useNavigate();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeout = useRef<number | null>(null);
 
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [activeGroupId, setActiveGroupId] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [profiles, setProfiles] = useState<ProfileMap>({});
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
+  const [activeFilter, setActiveFilter] = useState<ChatType | 'all'>('all');
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
+  const [isDark, setIsDark] = useState(true);
 
   const activeGroup = useMemo(
     () => groups.find((g) => g.id === activeGroupId) ?? null,
     [groups, activeGroupId],
   );
 
-  const loadMessages = useCallback(async (groupId: string) => {
-    if (!groupId) return;
+  const activeChatType = useMemo(
+    () => (activeGroup ? resolveChatType(activeGroup.group_type) : null),
+    [activeGroup],
+  );
 
-    setLoadingMessages(true);
-    const { data, error } = await supabase
-      .from('group_messages')
-      .select('id, sender_id, content, created_at')
-      .eq('group_id', groupId)
-      .order('created_at', { ascending: true })
-      .limit(100);
+  const visibleGroups = useMemo(() => {
+    if (activeFilter === 'all') return groups;
+    return groups.filter((group) => resolveChatType(group.group_type) === activeFilter);
+  }, [activeFilter, groups]);
 
-    if (error) {
-      toast.error('Could not load messages right now.');
-      setLoadingMessages(false);
-      return;
-    }
+  const isLobbyChat = activeChatType === 'room';
 
-    setMessages(data || []);
-    setLoadingMessages(false);
+  const loadProfiles = useCallback(async (userIds: string[]) => {
+    const ids = [...new Set(userIds)].filter(Boolean);
+    if (!ids.length) return;
+
+    const { data } = await supabase.from('profiles').select('id, name, avatar').in('id', ids);
+    if (!data?.length) return;
+
+    const next: ProfileMap = {};
+    data.forEach((row) => {
+      next[row.id] = {
+        name: row.name || 'Learner',
+        avatar: row.avatar || '👤',
+      };
+    });
+
+    setProfiles((prev) => ({ ...prev, ...next }));
   }, []);
+
+  const loadMessages = useCallback(
+    async (groupId: string) => {
+      if (!groupId) return;
+
+      setLoadingMessages(true);
+      const { data, error } = await supabase
+        .from('group_messages')
+        .select('id, sender_id, content, created_at')
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: true })
+        .limit(100);
+
+      if (error) {
+        toast.error('Could not load messages right now.');
+        setLoadingMessages(false);
+        return;
+      }
+
+      const fetched = data || [];
+      setMessages(fetched);
+      void loadProfiles(fetched.map((m) => m.sender_id));
+      setLoadingMessages(false);
+    },
+    [loadProfiles],
+  );
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -130,6 +213,20 @@ const Chat: React.FC = () => {
   }, [activeGroupId, user?.id]);
 
   useEffect(() => {
+    const loadPresence = async () => {
+      const { data } = await supabase.from('user_presence').select('user_id, status, last_seen');
+      const now = Date.now();
+      const online = (data || [])
+        .filter((u) => u.status === 'online' && now - new Date(u.last_seen).getTime() < 5 * 60 * 1000)
+        .map((u) => u.user_id);
+      setOnlineUsers(online);
+      void loadProfiles(online);
+    };
+
+    void loadPresence();
+  }, [loadProfiles]);
+
+  useEffect(() => {
     if (!activeGroupId) {
       setMessages([]);
       return;
@@ -142,7 +239,7 @@ const Chat: React.FC = () => {
     if (!activeGroupId) return;
 
     const channel = supabase
-      .channel(`simple-chat-${activeGroupId}`)
+      .channel(`chat-updates-${activeGroupId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'group_messages', filter: `group_id=eq.${activeGroupId}` },
@@ -159,154 +256,331 @@ const Chat: React.FC = () => {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, typingUsers]);
 
-  const sendMessage = useCallback(async () => {
-    const sanitizedMessage = draft.trim();
-    if (!user?.id || !activeGroupId || !sanitizedMessage || isSending) return;
+  const sendMessage = useCallback(
+    async (forcedMessage?: string) => {
+      const raw = forcedMessage ?? draft;
+      const moderated = sanitizeMessage(raw);
 
-    setIsSending(true);
+      if (!user?.id || !activeGroupId || moderated.blocked || isSending) {
+        if (moderated.blocked && raw.trim()) {
+          toast.error('Message blocked by safety moderation. Keep chat respectful and spam-free.');
+        }
+        return;
+      }
 
-    const { error } = await supabase.from('group_messages').insert({
-      group_id: activeGroupId,
-      sender_id: user.id,
-      message_type: 'text',
-      content: sanitizedMessage,
-    });
+      if (isLobbyChat && !LOBBY_QUICK_MESSAGES.includes(moderated.value)) {
+        toast.warning('Lobby chat only supports safe quick messages and emotes.');
+        return;
+      }
 
-    if (error) {
-      toast.error('Message not sent. Please try again.');
+      setIsSending(true);
+
+      const { error } = await supabase.from('group_messages').insert({
+        group_id: activeGroupId,
+        sender_id: user.id,
+        message_type: 'text',
+        content: moderated.value,
+      });
+
+      if (error) {
+        toast.error('Message not sent. Please try again.');
+        setIsSending(false);
+        return;
+      }
+
+      setDraft('');
+      setIsTyping(false);
+      setTypingUsers((prev) => {
+        const next = { ...prev };
+        delete next[user.id];
+        return next;
+      });
       setIsSending(false);
-      return;
+    },
+    [activeGroupId, draft, isLobbyChat, isSending, user?.id],
+  );
+
+  const askAI = useCallback(async () => {
+    if (!activeGroupId || isSending) return;
+
+    const context = messages.slice(-5).map((m) => m.content).join(' | ');
+    const aiReply = context
+      ? `🧠 AI Study Coach: Based on this discussion, focus on key definitions first, then practice with 3 quiz questions.`
+      : '🧠 AI Study Coach: Start by asking a specific topic, and I can generate a quick explanation or quiz.';
+
+    await sendMessage(aiReply);
+  }, [activeGroupId, isSending, messages, sendMessage]);
+
+  const onDraftChange = (value: string) => {
+    setDraft(value);
+    if (!user?.id) return;
+
+    setIsTyping(Boolean(value.trim()));
+    setTypingUsers((prev) => ({
+      ...prev,
+      [user.id]: user.name || 'You',
+    }));
+
+    if (typingTimeout.current) {
+      window.clearTimeout(typingTimeout.current);
     }
 
-    setDraft('');
-    setIsSending(false);
-  }, [activeGroupId, draft, isSending, user?.id]);
+    typingTimeout.current = window.setTimeout(() => {
+      setIsTyping(false);
+      setTypingUsers((prev) => {
+        const next = { ...prev };
+        delete next[user.id];
+        return next;
+      });
+    }, 1200);
+  };
+
+  const onAttachFile = () => fileInputRef.current?.click();
+
+  const onFileSelected: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    await sendMessage(`📎 Shared file: ${file.name}`);
+    toast.success('Attachment shared in chat.');
+    event.target.value = '';
+  };
+
+  const chatTypes: Array<{ label: string; value: ChatType | 'all' }> = [
+    { label: 'All', value: 'all' },
+    { label: 'Private', value: 'private' },
+    { label: 'Room', value: 'room' },
+    { label: 'Class', value: 'class' },
+    { label: 'Community', value: 'community' },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className={cn('min-h-screen', isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900')}>
       <AnimatedBackground />
 
       <main className="relative z-10 mx-auto flex h-screen max-w-7xl flex-col gap-4 p-4">
-        <header className="flex items-center justify-between rounded-2xl border border-cyan-400/30 bg-slate-900/70 p-4 backdrop-blur">
+        <header
+          className={cn(
+            'flex items-center justify-between rounded-2xl border p-4 backdrop-blur',
+            isDark ? 'border-cyan-400/30 bg-slate-900/70' : 'border-slate-300 bg-white/80',
+          )}
+        >
           <div className="flex items-center gap-3">
             <BackButton />
             <div>
-              <h1 className="text-xl font-semibold tracking-wide">Edu Chat Nexus</h1>
-              <p className="text-sm text-cyan-200/80">Simple, futuristic, and focused on learning.</p>
+              <h1 className="text-xl font-semibold tracking-wide">Master Minds Chat</h1>
+              <p className={cn('text-sm', isDark ? 'text-cyan-200/80' : 'text-slate-600')}>
+                Real-time learning communication for students, teachers, and multiplayer rooms.
+              </p>
             </div>
           </div>
-          <Sparkles className="text-cyan-300" aria-hidden="true" />
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="icon" onClick={() => setIsDark((prev) => !prev)}>
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Sparkles className="text-cyan-300" aria-hidden="true" />
+          </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[280px_1fr]">
-          <aside className="rounded-2xl border border-cyan-400/20 bg-slate-900/70 p-3 backdrop-blur">
-            <h2 className="mb-3 text-sm font-medium uppercase text-cyan-200">Rooms</h2>
-            <ScrollArea className="h-[60vh] pr-2">
+        <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[320px_1fr]">
+          <aside
+            className={cn(
+              'rounded-2xl border p-3 backdrop-blur',
+              isDark ? 'border-cyan-400/20 bg-slate-900/70' : 'border-slate-300 bg-white/80',
+            )}
+          >
+            <h2 className="mb-3 text-sm font-medium uppercase">Chats</h2>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {chatTypes.map((tab) => (
+                <Button
+                  key={tab.value}
+                  type="button"
+                  size="sm"
+                  variant={activeFilter === tab.value ? 'default' : 'outline'}
+                  onClick={() => setActiveFilter(tab.value)}
+                >
+                  {tab.label}
+                </Button>
+              ))}
+            </div>
+
+            <ScrollArea className="h-[44vh] pr-2">
               <div className="space-y-2">
-                {loadingGroups && <p className="text-sm text-slate-400">Loading rooms...</p>}
-                {!loadingGroups && groups.length === 0 && (
-                  <p className="text-sm text-slate-400">No rooms available yet.</p>
+                {loadingGroups && <p className="text-sm opacity-70">Loading chats...</p>}
+                {!loadingGroups && visibleGroups.length === 0 && (
+                  <p className="text-sm opacity-70">No chats match this filter yet.</p>
                 )}
-                {groups.map((group) => (
-                  <button
-                    key={group.id}
-                    type="button"
-                    onClick={() => setActiveGroupId(group.id)}
-                    className={`w-full rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
-                      group.id === activeGroupId
-                        ? 'border-cyan-300 bg-cyan-500/20 text-cyan-100'
-                        : 'border-slate-700 bg-slate-900/70 text-slate-300 hover:border-cyan-400/40'
-                    }`}
-                    aria-pressed={group.id === activeGroupId}
-                  >
-                    <p className="font-medium">{group.name || 'Untitled Room'}</p>
-                    <p className="text-xs uppercase opacity-70">{group.group_type}</p>
-                  </button>
-                ))}
+                {visibleGroups.map((group) => {
+                  const type = resolveChatType(group.group_type);
+                  return (
+                    <button
+                      key={group.id}
+                      type="button"
+                      onClick={() => setActiveGroupId(group.id)}
+                      className={cn(
+                        'w-full rounded-xl border px-3 py-2 text-left transition',
+                        group.id === activeGroupId
+                          ? 'border-cyan-300 bg-cyan-500/20'
+                          : isDark
+                            ? 'border-slate-700 bg-slate-900/70 hover:border-cyan-400/40'
+                            : 'border-slate-300 bg-white hover:border-cyan-400/70',
+                      )}
+                    >
+                      <p className="font-medium">{group.name || 'Untitled Chat'}</p>
+                      <Badge variant="secondary" className="mt-1 text-[10px] uppercase tracking-wide">
+                        {type}
+                      </Badge>
+                    </button>
+                  );
+                })}
               </div>
             </ScrollArea>
+
+            <div className="mt-4 rounded-xl border border-emerald-400/30 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase">Online learners</p>
+              <div className="space-y-1 text-sm">
+                {onlineUsers.slice(0, 6).map((id) => (
+                  <p key={id}>🟢 {profiles[id]?.name || 'Learner'}</p>
+                ))}
+                {!onlineUsers.length && <p className="opacity-70">No active users detected.</p>}
+              </div>
+            </div>
           </aside>
 
-          <section className="flex min-h-0 flex-col rounded-2xl border border-cyan-400/20 bg-slate-900/70 p-3 backdrop-blur">
-            <div className="mb-3 flex items-center justify-between border-b border-slate-700/80 pb-3">
+          <section
+            className={cn(
+              'flex min-h-0 flex-col rounded-2xl border p-3 backdrop-blur',
+              isDark ? 'border-cyan-400/20 bg-slate-900/70' : 'border-slate-300 bg-white/80',
+            )}
+          >
+            <div className="mb-3 flex items-center justify-between border-b border-slate-500/30 pb-3">
               <div>
-                <h2 className="font-semibold">{activeGroup?.name || 'Select a room'}</h2>
-                <p className="text-xs text-slate-400">Educational collaboration channel</p>
+                <h2 className="font-semibold">{activeGroup?.name || 'Select a chat'}</h2>
+                <p className="text-xs opacity-70">
+                  {isLobbyChat ? 'Lobby quick-chat mode (safe presets only)' : 'Learning collaboration channel'}
+                </p>
               </div>
-              <Bot className="text-cyan-300" aria-hidden="true" />
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{onlineUsers.length} online</Badge>
+                <Button type="button" variant="outline" size="sm" onClick={() => void askAI()}>
+                  <Bot className="mr-1 h-4 w-4" /> Ask AI
+                </Button>
+              </div>
             </div>
 
             <ScrollArea className="flex-1 pr-3">
               <div className="space-y-3">
-                {loadingMessages && <p className="text-sm text-slate-400">Loading messages...</p>}
+                {loadingMessages && <p className="text-sm opacity-70">Loading messages...</p>}
                 {!loadingMessages && messages.length === 0 && (
-                  <p className="text-sm text-slate-400">Start the discussion with a study question.</p>
+                  <p className="text-sm opacity-70">Start with a question, note, or class update.</p>
                 )}
                 {messages.map((message) => {
                   const isOwn = message.sender_id === user?.id;
+                  const sender = isOwn ? 'You' : profiles[message.sender_id]?.name || 'Learner';
                   return (
-                    <article key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                    <article key={message.id} className={cn('flex', isOwn ? 'justify-end' : 'justify-start')}>
                       <div
-                        className={`max-w-[80%] rounded-2xl border px-3 py-2 text-sm ${
+                        className={cn(
+                          'max-w-[80%] rounded-2xl border px-3 py-2 text-sm shadow-sm transition duration-200',
                           isOwn
-                            ? 'border-cyan-300/40 bg-cyan-500/20 text-cyan-50'
-                            : 'border-slate-700 bg-slate-900 text-slate-100'
-                        }`}
+                            ? 'border-cyan-300/40 bg-cyan-500/20'
+                            : isDark
+                              ? 'border-slate-700 bg-slate-900'
+                              : 'border-slate-300 bg-white',
+                        )}
                       >
+                        <p className="text-xs font-medium opacity-75">{sender}</p>
                         <p>{message.content}</p>
-                        <time className="mt-1 block text-[11px] opacity-70" dateTime={message.created_at}>
-                          {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </time>
+                        <div className="mt-1 flex items-center justify-between gap-2 text-[11px] opacity-70">
+                          <time dateTime={message.created_at}>
+                            {new Date(message.created_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </time>
+                          {isOwn && <span>✓✓</span>}
+                        </div>
                       </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="ml-1 mt-2 h-7 w-7"
+                        onClick={() => toast.success('Message reported. Moderators will review it.')}
+                      >
+                        <Flag className="h-3.5 w-3.5" />
+                      </Button>
                     </article>
                   );
                 })}
+
+                {Object.values(typingUsers).length > 0 && (
+                  <p className="text-xs italic opacity-70">{Object.values(typingUsers).join(', ')} typing...</p>
+                )}
+
                 <div ref={bottomRef} />
               </div>
             </ScrollArea>
 
-            <div className="mt-3 space-y-3 border-t border-slate-700/80 pt-3">
+            <div className="mt-3 space-y-3 border-t border-slate-500/30 pt-3">
               <div className="flex flex-wrap gap-2">
                 {LEARNING_PROMPTS.map((prompt) => (
-                  <Button
-                    key={prompt}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="border-cyan-300/40 bg-transparent text-xs text-cyan-100 hover:bg-cyan-500/20"
-                    onClick={() => setDraft(prompt)}
-                  >
+                  <Button key={prompt} type="button" size="sm" variant="outline" onClick={() => setDraft(prompt)}>
                     {prompt}
                   </Button>
                 ))}
               </div>
 
+              {isLobbyChat && (
+                <div className="flex flex-wrap gap-2">
+                  {LOBBY_QUICK_MESSAGES.map((preset) => (
+                    <Button key={preset} type="button" variant="secondary" size="sm" onClick={() => void sendMessage(preset)}>
+                      {preset}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
               <div className="flex gap-2">
+                <input ref={fileInputRef} type="file" className="hidden" onChange={onFileSelected} />
+                <Button type="button" variant="outline" size="icon" onClick={onAttachFile} aria-label="Attach file">
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+                <Button type="button" variant="outline" size="icon" aria-label="Emoji">
+                  <Smile className="h-4 w-4" />
+                </Button>
                 <Input
                   value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Ask a question, share a concept, or help a classmate..."
-                  className="border-cyan-300/30 bg-slate-950/60"
+                  onChange={(event) => onDraftChange(event.target.value)}
+                  placeholder={
+                    isLobbyChat
+                      ? 'Use quick-chat buttons for safe multiplayer communication.'
+                      : 'Ask a question, share notes, or collaborate with your class...'
+                  }
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                       event.preventDefault();
                       void sendMessage();
                     }
                   }}
-                  disabled={!activeGroupId || isSending}
+                  disabled={!activeGroupId || isSending || isLobbyChat}
                   aria-label="Message input"
                 />
+                <Button type="button" variant="outline" size="icon" aria-label="Sound notifications">
+                  <Volume2 className="h-4 w-4" />
+                </Button>
                 <Button
                   onClick={() => void sendMessage()}
                   className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
-                  disabled={!draft.trim() || !activeGroupId || isSending}
+                  disabled={!draft.trim() || !activeGroupId || isSending || isLobbyChat}
                   aria-label="Send message"
                 >
-                  <Send className="h-4 w-4" aria-hidden="true" />
+                  <Send className="h-4 w-4" />
                 </Button>
               </div>
+              {isTyping && <p className="text-xs opacity-70">Typing indicator active...</p>}
             </div>
           </section>
         </div>
