@@ -94,6 +94,71 @@ export interface CreateBookPayload {
 
 const db = supabase as any;
 
+type UploaderProfile = NonNullable<LibraryBook['profiles']>;
+
+async function fetchUploaderProfiles(uploaderIds: string[]) {
+  const ids = Array.from(new Set(uploaderIds.filter(Boolean)));
+  if (!ids.length) return new Map<string, UploaderProfile>();
+
+  const { data, error } = await db
+    .from('profiles')
+    .select('id, name, username')
+    .in('id', ids);
+
+  if (error) throw error;
+
+  return new Map<string, UploaderProfile>(
+    ((data || []) as Array<{ id: string; name: string; username: string | null }>).map((profile) => [
+      profile.id,
+      { name: profile.name, username: profile.username },
+    ]),
+  );
+}
+
+async function withUploaderProfiles<T extends { uploader_id: string }>(rows: T[]) {
+  if (!rows.length) {
+    return rows.map((row) => ({ ...row, profiles: null as UploaderProfile | null }));
+  }
+
+  try {
+    const profileMap = await fetchUploaderProfiles(rows.map((row) => row.uploader_id));
+    return rows.map((row) => ({
+      ...row,
+      profiles: profileMap.get(row.uploader_id) ?? null,
+    }));
+  } catch (error) {
+    console.warn('Library profile enrichment failed:', error);
+    return rows.map((row) => ({
+      ...row,
+      profiles: null as UploaderProfile | null,
+    }));
+  }
+}
+
+async function withUploaderProfile<T extends { uploader_id: string }>(row: T) {
+  const [enriched] = await withUploaderProfiles([row]);
+  return enriched;
+}
+
+async function cleanupUploadedAssets(pdfPath: string, thumbnailPath: string | null) {
+  const cleanupTasks = [
+    supabase.storage.from('library-files').remove([pdfPath]),
+    ...(thumbnailPath ? [supabase.storage.from('library-thumbnails').remove([thumbnailPath])] : []),
+  ];
+
+  const results = await Promise.allSettled(cleanupTasks);
+  results.forEach((result) => {
+    if (result.status === 'rejected') {
+      console.warn('Library upload cleanup failed:', result.reason);
+      return;
+    }
+
+    if (result.value.error) {
+      console.warn('Library upload cleanup failed:', result.value.error);
+    }
+  });
+}
+
 function getErrorCode(error: unknown): string | undefined {
   return typeof error === 'object' && error !== null && 'code' in error ? String((error as { code?: string }).code) : undefined;
 }
@@ -104,7 +169,7 @@ export async function listBooks(options?: { includePending?: boolean; userId?: s
 
   let query = db
     .from('library_books')
-    .select('*, profiles:uploader_id(name, username)')
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (includePending) {
@@ -117,19 +182,20 @@ export async function listBooks(options?: { includePending?: boolean; userId?: s
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data || []) as LibraryBook[];
+  return await withUploaderProfiles((data || []) as LibraryBook[]);
 }
 
 export async function listAssignedBooks(userId: string) {
   const { data, error } = await db
     .from('book_permissions')
-    .select('book_id, library_books!inner(*, profiles:uploader_id(name, username))')
+    .select('book_id, library_books!inner(*)')
     .eq('user_id', userId)
     .eq('can_read', true)
     .eq('library_books.status', 'approved');
 
   if (error) throw error;
-  return (data || []).map((row: any) => row.library_books) as LibraryBook[];
+  const books = (data || []).map((row: any) => row.library_books).filter(Boolean) as LibraryBook[];
+  return await withUploaderProfiles(books);
 }
 
 async function generatePdfThumbnail(pdfFile: File): Promise<Blob | null> {
@@ -227,12 +293,15 @@ export async function createBook(payload: CreateBookPayload) {
       uploader_id: payload.uploaderId,
       uploader_role: payload.uploaderRole,
     })
-    .select('*, profiles:uploader_id(name, username)')
+    .select('*')
     .single();
 
-  if (error) throw error;
+  if (error) {
+    await cleanupUploadedAssets(pdfPath, thumbnailPath);
+    throw error;
+  }
 
-  const createdBook = data as LibraryBook;
+  const createdBook = await withUploaderProfile(data as LibraryBook);
 
   try {
     const { error: insertUploadError } = await db.from('book_uploads').insert({
@@ -274,11 +343,11 @@ export async function updateBook(id: string, patch: Partial<Pick<LibraryBook, 't
     .from('library_books')
     .update(patch)
     .eq('id', id)
-    .select('*, profiles:uploader_id(name, username)')
+    .select('*')
     .single();
 
   if (error) throw error;
-  return data as LibraryBook;
+  return await withUploaderProfile(data as LibraryBook);
 }
 
 export async function moderateBookUpload(payload: {
