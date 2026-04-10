@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Flame, Trophy, Users, Globe, CalendarClock } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CalendarClock, Flame, Globe, Swords, Trophy, Users, Zap } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,11 +16,18 @@ import { getRankTierByLevel } from "@/lib/rankSystem";
 
 type LeaderboardTab = "global" | "grade" | "friends" | "weekly";
 
-const rowStyles = {
-  1: "border-yellow-500/50 bg-yellow-500/10",
-  2: "border-slate-400/50 bg-slate-400/10",
-  3: "border-amber-700/50 bg-amber-700/10",
+const podiumStyles = {
+  1: "border-yellow-400/70 bg-gradient-to-b from-yellow-500/20 via-amber-500/15 to-background shadow-[0_0_30px_rgba(250,204,21,0.35)]",
+  2: "border-slate-300/70 bg-gradient-to-b from-slate-400/20 via-slate-400/10 to-background shadow-[0_0_24px_rgba(148,163,184,0.28)]",
+  3: "border-amber-600/60 bg-gradient-to-b from-amber-700/20 via-orange-600/10 to-background shadow-[0_0_20px_rgba(180,83,9,0.3)]",
 };
+
+const tabConfig: Array<{ value: LeaderboardTab; label: string; icon: typeof Globe }> = [
+  { value: "global", label: "Global", icon: Globe },
+  { value: "grade", label: "Grade", icon: Users },
+  { value: "friends", label: "Friends", icon: Users },
+  { value: "weekly", label: "Weekly", icon: CalendarClock },
+];
 
 const Leaderboard = () => {
   const navigate = useNavigate();
@@ -30,6 +37,9 @@ const Leaderboard = () => {
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("global");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [visibleRows, setVisibleRows] = useState(16);
+  const [previewUser, setPreviewUser] = useState<(LeaderboardUser & { rankPos: number; score: number; tier: string }) | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadLeaderboard = async () => {
     setLoading(true);
@@ -58,6 +68,7 @@ const Leaderboard = () => {
 
     return () => {
       supabase.removeChannel(channel);
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
     };
   }, [user?.id]);
 
@@ -87,11 +98,35 @@ const Leaderboard = () => {
   }));
 
   const topThree = withRank.slice(0, 3);
+  const mobilePodium = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : topThree;
   const rest = withRank.slice(3);
+  const visibleRest = rest.slice(0, visibleRows);
+
+  useEffect(() => {
+    setVisibleRows(16);
+  }, [activeTab, selectedGrade]);
+
+  const triggerHaptics = () => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(16);
+    }
+  };
+
+  const handleLongPressStart = (entry: (typeof withRank)[number]) => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      triggerHaptics();
+      setPreviewUser(entry);
+    }, 420);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-primary/5 p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/10 p-4 md:p-8">
+      <div className="mx-auto max-w-6xl space-y-6 pb-24">
         <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm text-muted-foreground">Live database rankings only • no demo accounts</p>
@@ -100,20 +135,28 @@ const Leaderboard = () => {
           <Button variant="outline" onClick={() => navigate("/")}>Back to home</Button>
         </header>
 
-        <Card>
+        <Card className="border-primary/30 bg-background/80 backdrop-blur-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-500" /> Dynamic Ranking Arena
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeaderboardTab)}>
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
-                <TabsTrigger value="global" className="gap-2"><Globe className="h-4 w-4" />Global</TabsTrigger>
-                <TabsTrigger value="grade" className="gap-2"><Users className="h-4 w-4" />Grade</TabsTrigger>
-                <TabsTrigger value="friends" className="gap-2"><Users className="h-4 w-4" />Friends</TabsTrigger>
-                <TabsTrigger value="weekly" className="gap-2"><CalendarClock className="h-4 w-4" />Weekly</TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto pb-2">
+                <TabsList className="inline-flex min-w-max gap-2 bg-muted/70 p-1">
+                  {tabConfig.map(({ value, label, icon: Icon }) => (
+                    <TabsTrigger
+                      key={value}
+                      value={value}
+                      className="gap-2 rounded-full px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_18px_rgba(99,102,241,0.45)]"
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
             </Tabs>
 
             {activeTab === "grade" && (
@@ -132,60 +175,149 @@ const Leaderboard = () => {
 
             {loading ? <p className="text-sm text-muted-foreground">Loading leaderboard…</p> : null}
 
-            <div className="grid gap-4 md:grid-cols-3">
-              {topThree.map((entry, index) => (
-                <motion.button
-                  layout
-                  whileHover={{ y: -4 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate(`/profile/${entry.id}`)}
-                  key={entry.id}
-                  className={`rounded-xl border p-4 text-left transition ${rowStyles[(index + 1) as 1 | 2 | 3]}`}
-                >
-                  <p className="text-xs">{index === 0 ? "🥇 Gold" : index === 1 ? "🥈 Silver" : "🥉 Bronze"}</p>
-                  <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="lg" className="my-2" />
-                  <h3 className="font-semibold">{entry.username}</h3>
-                  <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)} ${entry.rankPos <= 10 ? "animate-pulse" : ""}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
-                    <span className="font-bold">#{entry.rankPos}</span>
-                  </div>
-                  <p className="mt-2 text-sm">{Math.round(entry.score).toLocaleString()} pts</p>
-                </motion.button>
-              ))}
-            </div>
+            <section className="space-y-3">
+              <div className="hidden gap-4 md:grid md:grid-cols-3">
+                {topThree.map((entry, index) => {
+                  const podiumRank = (index + 1) as 1 | 2 | 3;
+                  return (
+                    <motion.button
+                      layout
+                      whileHover={{ y: -6 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => navigate(`/profile/${entry.id}`)}
+                      onTouchStart={() => handleLongPressStart(entry)}
+                      onTouchEnd={handleLongPressEnd}
+                      onTouchCancel={handleLongPressEnd}
+                      key={entry.id}
+                      className={`rounded-2xl border p-4 text-left transition ${podiumStyles[podiumRank]}`}
+                    >
+                      <p className="text-xs opacity-85">{podiumRank === 1 ? "🥇 Gold" : podiumRank === 2 ? "🥈 Silver" : "🥉 Bronze"}</p>
+                      <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="lg" className="my-3" />
+                      <h3 className="font-semibold">{entry.username}</h3>
+                      <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
+                      <div className="mt-3 flex items-center justify-between">
+                        <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
+                        <span className="font-bold">#{entry.rankPos}</span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} XP</p>
+                    </motion.button>
+                  );
+                })}
+              </div>
 
-            <ScrollArea className="h-[420px] rounded-lg border p-2">
+              <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 md:hidden">
+                {mobilePodium.map((entry) => {
+                  const isChampion = entry.rankPos === 1;
+                  return (
+                    <motion.button
+                      key={entry.id}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => {
+                        triggerHaptics();
+                        navigate(`/profile/${entry.id}`);
+                      }}
+                      onTouchStart={() => handleLongPressStart(entry)}
+                      onTouchEnd={handleLongPressEnd}
+                      onTouchCancel={handleLongPressEnd}
+                      className={`w-[82%] shrink-0 snap-center rounded-2xl border p-4 text-left transition ${podiumStyles[entry.rankPos as 1 | 2 | 3]} ${isChampion ? "scale-[1.01]" : "scale-95"}`}
+                    >
+                      <p className="text-xs opacity-80">Position #{entry.rankPos}</p>
+                      <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size={isChampion ? "lg" : "md"} className="my-3" />
+                      <h3 className="text-base font-semibold">{entry.username}</h3>
+                      <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
+                        <span className="text-lg font-bold">#{entry.rankPos}</span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} XP</p>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <div
+              className="h-[440px] space-y-2 overflow-y-auto rounded-xl border border-primary/20 bg-background/60 p-2 backdrop-blur"
+              onScroll={(event) => {
+                const target = event.currentTarget;
+                const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 100;
+                if (nearBottom && visibleRows < rest.length) {
+                  setVisibleRows((count) => Math.min(count + 12, rest.length));
+                }
+              }}
+            >
               <AnimatePresence>
-                {rest.map((entry) => (
+                {visibleRest.map((entry) => (
                   <motion.button
                     layout
                     key={`${activeTab}-${entry.id}`}
-                    onClick={() => navigate(`/profile/${entry.id}`)}
+                    onClick={() => {
+                      triggerHaptics();
+                      navigate(`/profile/${entry.id}`);
+                    }}
+                    onTouchStart={() => handleLongPressStart(entry)}
+                    onTouchEnd={handleLongPressEnd}
+                    onTouchCancel={handleLongPressEnd}
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    className={`mb-2 flex w-full items-center gap-3 rounded-lg border p-3 text-left ${entry.rankPos <= 10 ? "shadow-[0_0_14px_rgba(99,102,241,0.25)]" : ""}`}
+                    className={`mb-2 flex w-full items-center gap-3 rounded-xl border p-3 text-left transition active:shadow-[0_0_20px_rgba(99,102,241,0.28)] ${entry.rankPos <= 10 ? "shadow-[0_0_14px_rgba(99,102,241,0.25)]" : "bg-card/80"}`}
                   >
-                    <span className="w-6 text-center font-semibold text-muted-foreground">#{entry.rankPos}</span>
+                    <span className="w-8 text-center text-sm font-semibold text-muted-foreground">#{entry.rankPos}</span>
                     <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="md" />
                     <div className="flex-1">
                       <p className="font-medium">{entry.username}</p>
                       <p className="text-xs text-muted-foreground">Level {entry.level} • XP {entry.xp.toLocaleString()}</p>
                     </div>
                     <div className="text-right">
+                      <Badge className={`mb-1 bg-gradient-to-r ${tierStyle(entry.level)}`}>{entry.tier}</Badge>
                       <p className="text-sm font-semibold">{Math.round(entry.score).toLocaleString()} pts</p>
                       <p className="inline-flex items-center gap-1 text-xs text-orange-500"><Flame className="h-3 w-3" />{entry.streak}</p>
                     </div>
                   </motion.button>
                 ))}
               </AnimatePresence>
-            </ScrollArea>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      <Button
+        onClick={() => navigate("/social")}
+        className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-[0_0_22px_rgba(168,85,247,0.75)] md:bottom-6 md:right-6"
+        aria-label="Quick challenge"
+      >
+        <Swords className="h-5 w-5" />
+      </Button>
+
+      <Dialog open={!!previewUser} onOpenChange={(isOpen) => !isOpen && setPreviewUser(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-primary" /> Mini Profile Preview
+            </DialogTitle>
+          </DialogHeader>
+          {previewUser ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <AvatarRenderer avatar={previewUser.avatar ?? undefined} avatarConfig={previewUser.avatarConfig as any} size="md" />
+                <div>
+                  <p className="font-semibold">{previewUser.username}</p>
+                  <p className="text-xs text-muted-foreground">Rank #{previewUser.rankPos} • Level {previewUser.level}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge className={`bg-gradient-to-r ${tierStyle(previewUser.level)}`}>{previewUser.tier}</Badge>
+                <Badge variant="secondary">{Math.round(previewUser.score).toLocaleString()} pts</Badge>
+                <Badge variant="outline">🔥 {previewUser.streak} day streak</Badge>
+              </div>
+              <Button className="w-full" onClick={() => navigate(`/profile/${previewUser.id}`)}>Open full profile</Button>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
