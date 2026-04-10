@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getRankTierByLevel } from "@/lib/rankSystem";
 
 export interface LeaderboardUser {
   id: string;
@@ -31,31 +32,11 @@ export const rankScore = (user: LeaderboardUser) => {
   return user.xp + user.accuracy * 15 + performance * 300 + user.contributions * 2;
 };
 
-export const tierFromUser = (user: LeaderboardUser) => {
-  const score = rankScore(user);
-  if (score >= 9800) return "Legend";
-  if (score >= 7800) return "Master";
-  if (score >= 6200) return "Diamond";
-  if (score >= 4400) return "Gold";
-  if (score >= 2600) return "Silver";
-  return "Bronze";
-};
+export const tierFromUser = (user: LeaderboardUser) => getRankTierByLevel(user.level).name;
 
-export const tierStyle = (tier: string) => {
-  switch (tier) {
-    case "Legend":
-      return "from-fuchsia-500 to-amber-300 text-white shadow-[0_0_25px_rgba(217,70,239,0.55)]";
-    case "Master":
-      return "from-violet-500 to-indigo-500 text-white shadow-[0_0_18px_rgba(99,102,241,0.45)]";
-    case "Diamond":
-      return "from-cyan-500 to-sky-500 text-white shadow-[0_0_18px_rgba(14,165,233,0.45)]";
-    case "Gold":
-      return "from-yellow-500 to-amber-500 text-white shadow-[0_0_18px_rgba(245,158,11,0.45)]";
-    case "Silver":
-      return "from-slate-300 to-slate-500 text-white shadow-[0_0_15px_rgba(148,163,184,0.4)]";
-    default:
-      return "from-amber-700 to-orange-900 text-white shadow-[0_0_15px_rgba(146,64,14,0.35)]";
-  }
+export const tierStyle = (level: number) => {
+  const tierConfig = getRankTierByLevel(level);
+  return `${tierConfig.colorClass} ${tierConfig.glowClass}`;
 };
 
 export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {

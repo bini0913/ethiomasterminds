@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,8 @@ import { Flame, Sword, Trophy, UserRoundPlus } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchFollowerCounts, fetchFollowing, fetchLeaderboardUsers, followUser, rankScore, tierFromUser, tierStyle, unfollowUser, type LeaderboardUser } from "@/lib/leaderboardApi";
+import { fetchFollowerCounts, fetchFollowing, fetchLeaderboardUsers, followUser, rankScore, tierStyle, unfollowUser, type LeaderboardUser } from "@/lib/leaderboardApi";
+import { getNextRankTier, getRankTierByLevel, getXpProgressInLevel, playRankUpTone } from "@/lib/rankSystem";
 import { toast } from "sonner";
 
 const UserProfilePage = () => {
@@ -27,6 +28,8 @@ const UserProfilePage = () => {
   const [activities, setActivities] = useState<Array<{ id: string; text: string; time: string }>>([]);
   const [achievements, setAchievements] = useState<Array<{ id: string; name: string; icon: string; date: string }>>([]);
   const [privacy, setPrivacy] = useState({ isPublic: true, hideStats: false });
+  const previousLevelRef = useRef<number | null>(null);
+  const previousRankRef = useRef<string | null>(null);
 
   const refreshCore = async () => {
     const rows = await fetchLeaderboardUsers();
@@ -129,8 +132,11 @@ const UserProfilePage = () => {
 
   const isSelf = authUser?.id === profile.id;
   const isFollowing = followingIds.includes(profile.id);
-  const xpIntoLevel = profile.xp % 220;
-  const progress = (xpIntoLevel / 220) * 100;
+  const xpProgress = getXpProgressInLevel(profile.xp);
+  const xpIntoLevel = xpProgress.current;
+  const progress = xpProgress.percentage;
+  const currentTier = getRankTierByLevel(profile.level);
+  const nextTier = getNextRankTier(profile.level);
 
   const onFollowToggle = async () => {
     if (!authUser?.id) return;
@@ -163,6 +169,31 @@ const UserProfilePage = () => {
   const losses = Number(statsJson.total_losses ?? profile.losses ?? 0);
   const contributions = Number(statsJson.study_time_hours ?? profile.contributions / 10 ?? 0);
 
+  useEffect(() => {
+    if (!isSelf) return;
+
+    if (previousLevelRef.current === null) {
+      previousLevelRef.current = profile.level;
+      previousRankRef.current = currentTier.name;
+      return;
+    }
+
+    const leveledUp = profile.level > (previousLevelRef.current ?? profile.level);
+    const rankChanged = previousRankRef.current !== currentTier.name;
+
+    if (leveledUp) {
+      toast.success(`⬆️ Level up! You are now level ${profile.level}.`);
+    }
+
+    if (rankChanged) {
+      toast.success(`🎉 You reached ${currentTier.name} rank!`);
+      playRankUpTone();
+    }
+
+    previousLevelRef.current = profile.level;
+    previousRankRef.current = currentTier.name;
+  }, [currentTier.name, isSelf, profile.level]);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background p-4 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -177,12 +208,13 @@ const UserProfilePage = () => {
             <div className="space-y-2">
               <h1 className="text-3xl font-bold">{profile.username}</h1>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className={`bg-gradient-to-r ${tierStyle(tierFromUser(profile))}`}>{tierFromUser(profile)}</Badge>
+                <Badge className={`bg-gradient-to-r ${tierStyle(profile.level)}`}><motion.span initial={{ scale: 0.92 }} animate={{ scale: 1 }} className="inline-flex items-center gap-1">{currentTier.icon} {currentTier.name}</motion.span></Badge>
                 <Badge variant="secondary">Rank #{profileRank}</Badge>
                 <Badge variant="outline">Level {profile.level}</Badge>
               </div>
               <div>
                 <div className="mb-1 flex justify-between text-sm"><span>XP Progress</span><span>{xpIntoLevel}/220</span></div>
+                <p className="text-xs text-muted-foreground">Level {profile.level} → {currentTier.name} → Next: {nextTier ? nextTier.name : "MAX RANK"}</p>
                 <motion.div initial={{ width: 0 }} animate={{ width: "100%" }}><Progress value={progress} /></motion.div>
               </div>
             </div>

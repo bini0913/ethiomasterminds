@@ -12,6 +12,7 @@ import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchFollowing, fetchLeaderboardUsers, rankScore, tierFromUser, tierStyle, type LeaderboardUser } from "@/lib/leaderboardApi";
+import { getRankTierByLevel } from "@/lib/rankSystem";
 
 type LeaderboardTab = "global" | "grade" | "friends" | "weekly";
 
@@ -146,7 +147,7 @@ const Leaderboard = () => {
                   <h3 className="font-semibold">{entry.username}</h3>
                   <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
                   <div className="mt-2 flex items-center justify-between">
-                    <Badge className={`bg-gradient-to-r ${tierStyle(entry.tier)}`}>{entry.tier}</Badge>
+                    <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)} ${entry.rankPos <= 10 ? "animate-pulse" : ""}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
                     <span className="font-bold">#{entry.rankPos}</span>
                   </div>
                   <p className="mt-2 text-sm">{Math.round(entry.score).toLocaleString()} pts</p>
@@ -166,7 +167,7 @@ const Leaderboard = () => {
                     exit={{ opacity: 0 }}
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    className="mb-2 flex w-full items-center gap-3 rounded-lg border p-3 text-left"
+                    className={`mb-2 flex w-full items-center gap-3 rounded-lg border p-3 text-left ${entry.rankPos <= 10 ? "shadow-[0_0_14px_rgba(99,102,241,0.25)]" : ""}`}
                   >
                     <span className="w-6 text-center font-semibold text-muted-foreground">#{entry.rankPos}</span>
                     <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="md" />
