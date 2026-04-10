@@ -686,16 +686,61 @@ const Lobby: React.FC = () => {
   const handleRandomMatch = async () => {
     if (!user) return;
 
-    const availableRooms = rooms.filter(
-      (room) =>
-        room.status === "waiting" &&
-        !room.password &&
-        (room.players?.length || 0) < room.maxPlayers
-    );
+    await refreshRooms();
+
+    const { data: waitingRooms, error: waitingRoomsError } = await supabase
+      .from("multiplayer_rooms")
+      .select("id, name, max_players")
+      .eq("status", "waiting")
+      .is("password", null)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if (waitingRoomsError) {
+      toast.error("Could not search for available matches.");
+      return;
+    }
+
+    const roomIds = (waitingRooms || []).map((room) => room.id);
+    const { data: playerRows, error: playerRowsError } = roomIds.length
+      ? await supabase.from("room_players").select("room_id").in("room_id", roomIds)
+      : { data: [], error: null };
+
+    if (playerRowsError) {
+      toast.error("Could not check room capacity.");
+      return;
+    }
+
+    const playerCounts = new Map<string, number>();
+    (playerRows || []).forEach((row: { room_id: string }) => {
+      playerCounts.set(row.room_id, (playerCounts.get(row.room_id) || 0) + 1);
+    });
+
+    const availableRooms = (waitingRooms || []).filter((room) => {
+      const count = playerCounts.get(room.id) || 0;
+      return count < room.max_players;
+    });
 
     if (availableRooms.length === 0) {
-      setCreateRoomOpen(true);
-      toast.info("No open rooms yet. Create one and invite friends!");
+      const quickMatchRoomName = `${user.name || "Player"}'s Quick Match`;
+      const quickRoom = await contextCreateRoom(
+        quickMatchRoomName,
+        {
+          subject: "Mixed",
+          difficulty: "Medium",
+          questionCount: 10,
+          timePerQuestion: 30,
+        },
+        2,
+      );
+
+      if (!quickRoom) {
+        toast.error("Could not create a quick match room. Try again.");
+        return;
+      }
+
+      toast.success("Quick match room created. Waiting for an opponent…");
+      navigate(`/multiplayer?room=${quickRoom.id}`);
       return;
     }
 
