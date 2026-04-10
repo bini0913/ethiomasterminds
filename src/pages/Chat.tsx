@@ -76,6 +76,7 @@ const Chat: React.FC = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeout = useRef<number | null>(null);
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [activeGroupId, setActiveGroupId] = useState('');
@@ -90,6 +91,7 @@ const Chat: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const [isDark, setIsDark] = useState(true);
+  const [currentGrade, setCurrentGrade] = useState<number | null>(null);
 
   const activeGroup = useMemo(
     () => groups.find((g) => g.id === activeGroupId) ?? null,
@@ -102,9 +104,15 @@ const Chat: React.FC = () => {
   );
 
   const visibleGroups = useMemo(() => {
-    if (activeFilter === 'all') return groups;
-    return groups.filter((group) => resolveChatType(group.group_type) === activeFilter);
-  }, [activeFilter, groups]);
+    const eligibleGroups = groups.filter((group) => {
+      const groupType = resolveChatType(group.group_type);
+      if (groupType !== 'community') return true;
+      return (currentGrade ?? 12) >= 5;
+    });
+
+    if (activeFilter === 'all') return eligibleGroups;
+    return eligibleGroups.filter((group) => resolveChatType(group.group_type) === activeFilter);
+  }, [activeFilter, currentGrade, groups]);
 
   const isLobbyChat = activeChatType === 'room';
 
@@ -157,6 +165,22 @@ const Chat: React.FC = () => {
       navigate('/');
     }
   }, [isLoading, navigate, user]);
+
+  useEffect(() => {
+    const loadCurrentGrade = async () => {
+      if (!user?.id) return;
+
+      const { data } = await supabase.from('profiles').select('grade').eq('id', user.id).single();
+      if (!data?.grade) return;
+
+      const numericGrade = Number.parseInt(String(data.grade).replace(/[^\d]/g, ''), 10);
+      if (!Number.isNaN(numericGrade)) {
+        setCurrentGrade(numericGrade);
+      }
+    };
+
+    void loadCurrentGrade();
+  }, [user?.id]);
 
   useEffect(() => {
     const loadGroups = async () => {
@@ -238,6 +262,32 @@ const Chat: React.FC = () => {
   useEffect(() => {
     if (!activeGroupId) return;
 
+    const typingChannel = supabase.channel(`typing-${activeGroupId}`, {
+      config: {
+        broadcast: { self: false },
+      },
+    });
+
+    typingChannel
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        const typedBy = payload.payload?.userName as string | undefined;
+        const typedById = payload.payload?.userId as string | undefined;
+
+        if (!typedById || typedById === user?.id) return;
+
+        setTypingUsers((prev) => ({ ...prev, [typedById]: typedBy || 'Learner' }));
+        window.setTimeout(() => {
+          setTypingUsers((prev) => {
+            const next = { ...prev };
+            delete next[typedById];
+            return next;
+          });
+        }, 1400);
+      })
+      .subscribe();
+
+    typingChannelRef.current = typingChannel;
+
     const channel = supabase
       .channel(`chat-updates-${activeGroupId}`)
       .on(
@@ -250,9 +300,13 @@ const Chat: React.FC = () => {
       .subscribe();
 
     return () => {
+      if (typingChannelRef.current) {
+        void supabase.removeChannel(typingChannelRef.current);
+        typingChannelRef.current = null;
+      }
       void supabase.removeChannel(channel);
     };
-  }, [activeGroupId, loadMessages]);
+  }, [activeGroupId, loadMessages, user?.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -323,6 +377,17 @@ const Chat: React.FC = () => {
       [user.id]: user.name || 'You',
     }));
 
+    if (value.trim() && typingChannelRef.current) {
+      void typingChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          userId: user.id,
+          userName: user.name || 'Learner',
+        },
+      });
+    }
+
     if (typingTimeout.current) {
       window.clearTimeout(typingTimeout.current);
     }
@@ -343,7 +408,35 @@ const Chat: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    await sendMessage(`📎 Shared file: ${file.name}`);
+    if (!activeGroupId || !user?.id) return;
+
+    const filePath = `${activeGroupId}/${user.id}/${Date.now()}-${file.name}`;
+    const upload = await supabase.storage.from('chat-attachments').upload(filePath, file, { upsert: false });
+
+    if (upload.error) {
+      await sendMessage(`📎 Shared file: ${file.name}`);
+      toast.warning('File metadata shared, but binary upload bucket is unavailable.');
+      event.target.value = '';
+      return;
+    }
+
+    const { data } = supabase.storage.from('chat-attachments').getPublicUrl(filePath);
+    const attachmentUrl = data.publicUrl;
+
+    const { error } = await supabase.from('group_messages').insert({
+      group_id: activeGroupId,
+      sender_id: user.id,
+      message_type: 'file',
+      content: `📎 ${file.name}`,
+      attachment_url: attachmentUrl,
+    });
+
+    if (error) {
+      toast.error('Attachment upload succeeded, but chat message save failed.');
+      event.target.value = '';
+      return;
+    }
+
     toast.success('Attachment shared in chat.');
     event.target.value = '';
   };
@@ -508,7 +601,22 @@ const Chat: React.FC = () => {
                         variant="ghost"
                         size="icon"
                         className="ml-1 mt-2 h-7 w-7"
-                        onClick={() => toast.success('Message reported. Moderators will review it.')}
+                        onClick={async () => {
+                          if (!user?.id) return;
+                          const { error } = await supabase.from('reports').insert({
+                            reporter_id: user.id,
+                            reported_type: 'group_message',
+                            reported_id: message.id,
+                            reason: 'Chat safety report',
+                            description: `Reported from group ${activeGroupId}`,
+                          });
+
+                          if (error) {
+                            toast.error('Unable to submit report right now.');
+                            return;
+                          }
+                          toast.success('Message reported. Moderators will review it.');
+                        }}
                       >
                         <Flag className="h-3.5 w-3.5" />
                       </Button>
