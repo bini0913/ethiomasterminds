@@ -33,6 +33,7 @@ import ExamModePage from "./pages/ExamModePage";
 import StudyPlannerPage from "./pages/StudyPlannerPage";
 import AcademicInsightsPage from "./pages/AcademicInsightsPage";
 import LibraryPage from "./pages/LibraryPage";
+import UserProfilePage from "./pages/UserProfilePage";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -70,6 +71,7 @@ const App = () => (
                               <Route path="/multiplayer" element={<Multiplayer />} />
                               <Route path="/lobby" element={<Lobby />} />
                               <Route path="/leaderboard" element={<Leaderboard />} />
+                              <Route path="/profile/:userId" element={<UserProfilePage />} />
                               <Route path="/friends" element={<Friends />} />
                               <Route path="/settings" element={<Settings />} />
                               <Route path="/chat" element={<Chat />} />
