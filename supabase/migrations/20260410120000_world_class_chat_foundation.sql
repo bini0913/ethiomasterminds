@@ -1,5 +1,5 @@
 -- World-class learning chat foundation tables
--- Adds compatibility tables requested by product spec while preserving existing chat_groups/group_messages.
+-- Compatible with existing chat_groups / group_messages / reports schema.
 
 create table if not exists public.chats (
   id uuid primary key default gen_random_uuid(),
@@ -22,8 +22,8 @@ create table if not exists public.chat_members (
 
 create table if not exists public.attachments (
   id uuid primary key default gen_random_uuid(),
-  chat_id uuid not null references public.chats(id) on delete cascade,
-  message_id uuid,
+  group_id uuid not null references public.chat_groups(id) on delete cascade,
+  message_id uuid references public.group_messages(id) on delete set null,
   uploaded_by uuid references auth.users(id) on delete set null,
   file_name text not null,
   file_url text not null,
@@ -32,25 +32,23 @@ create table if not exists public.attachments (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.reports (
-  id uuid primary key default gen_random_uuid(),
-  chat_id uuid references public.chats(id) on delete cascade,
-  message_id uuid,
-  reported_by uuid references auth.users(id) on delete set null,
-  reason text not null,
-  status text not null default 'open' check (status in ('open', 'reviewing', 'closed')),
-  created_at timestamptz not null default now()
-);
+-- Existing deployments already have public.reports, ensure chat-report columns exist.
+alter table public.reports add column if not exists chat_id uuid references public.chat_groups(id) on delete set null;
+alter table public.reports add column if not exists message_id uuid references public.group_messages(id) on delete set null;
+alter table public.reports add column if not exists reported_by uuid references auth.users(id) on delete set null;
+
+update public.reports
+set reported_by = reporter_id
+where reported_by is null;
 
 create index if not exists idx_chats_type_updated on public.chats(chat_type, updated_at desc);
 create index if not exists idx_chat_members_user on public.chat_members(user_id, joined_at desc);
-create index if not exists idx_attachments_chat on public.attachments(chat_id, created_at desc);
-create index if not exists idx_reports_status on public.reports(status, created_at desc);
+create index if not exists idx_attachments_group on public.attachments(group_id, created_at desc);
+create index if not exists idx_reports_chat_message on public.reports(chat_id, message_id, created_at desc);
 
 alter table public.chats enable row level security;
 alter table public.chat_members enable row level security;
 alter table public.attachments enable row level security;
-alter table public.reports enable row level security;
 
 create policy "Users can read chats where they are members"
 on public.chats for select
@@ -99,8 +97,8 @@ create policy "Members can read attachments"
 on public.attachments for select
 using (
   exists (
-    select 1 from public.chat_members cm
-    where cm.chat_id = attachments.chat_id
+    select 1 from public.chat_group_members cm
+    where cm.group_id = attachments.group_id
       and cm.user_id = auth.uid()
   )
 );
@@ -110,30 +108,8 @@ on public.attachments for insert
 with check (
   uploaded_by = auth.uid()
   and exists (
-    select 1 from public.chat_members cm
-    where cm.chat_id = attachments.chat_id
+    select 1 from public.chat_group_members cm
+    where cm.group_id = attachments.group_id
       and cm.user_id = auth.uid()
-  )
-);
-
-create policy "Members can create reports"
-on public.reports for insert
-with check (
-  reported_by = auth.uid()
-  and exists (
-    select 1 from public.chat_members cm
-    where cm.chat_id = reports.chat_id
-      and cm.user_id = auth.uid()
-  )
-);
-
-create policy "Teachers and moderators can read reports"
-on public.reports for select
-using (
-  exists (
-    select 1 from public.chat_members cm
-    where cm.chat_id = reports.chat_id
-      and cm.user_id = auth.uid()
-      and cm.role in ('owner', 'teacher', 'moderator')
   )
 );
