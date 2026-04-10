@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUser } from '@/context/UserContext';
 import { cn } from '@/lib/utils';
+import { getRankTierByLevel } from '@/lib/rankSystem';
 import { supabase } from '@/integrations/supabase/client';
 
 type ChatType = 'private' | 'room' | 'class' | 'community';
@@ -38,7 +39,7 @@ type ChatMessage = {
   created_at: string;
 };
 
-type ProfileMap = Record<string, { name: string; avatar?: string }>;
+type ProfileMap = Record<string, { name: string; avatar?: string; level?: number; rankTitle?: string }>; 
 
 const LOBBY_QUICK_MESSAGES = ['Ready!', 'Wait', "Let\'s go", 'Good luck', '🔥', '😎', '🎯'];
 const LEARNING_PROMPTS = [
@@ -112,7 +113,7 @@ const Chat: React.FC = () => {
     const ids = [...new Set(userIds)].filter(Boolean);
     if (!ids.length) return;
 
-    const { data } = await supabase.from('profiles').select('id, name, avatar').in('id', ids);
+    const { data } = await supabase.from('profiles').select('id, name, avatar, level').in('id', ids);
     if (!data?.length) return;
 
     const next: ProfileMap = {};
@@ -120,6 +121,8 @@ const Chat: React.FC = () => {
       next[row.id] = {
         name: row.name || 'Learner',
         avatar: row.avatar || '👤',
+        level: row.level || 1,
+        rankTitle: getRankTierByLevel(row.level || 1).name,
       };
     });
 
@@ -442,7 +445,7 @@ const Chat: React.FC = () => {
               <p className="mb-2 text-xs font-semibold uppercase">Online learners</p>
               <div className="space-y-1 text-sm">
                 {onlineUsers.slice(0, 6).map((id) => (
-                  <p key={id}>🟢 {profiles[id]?.name || 'Learner'}</p>
+                  <p key={id} className="flex items-center gap-2">🟢 {profiles[id]?.name || 'Learner'} <span className="text-[10px] rounded px-1.5 py-0.5 bg-primary/10">{profiles[id]?.rankTitle || 'BRONZE'}</span></p>
                 ))}
                 {!onlineUsers.length && <p className="opacity-70">No active users detected.</p>}
               </div>
@@ -479,6 +482,7 @@ const Chat: React.FC = () => {
                 {messages.map((message) => {
                   const isOwn = message.sender_id === user?.id;
                   const sender = isOwn ? 'You' : profiles[message.sender_id]?.name || 'Learner';
+                  const senderRank = profiles[message.sender_id]?.rankTitle || 'BRONZE';
                   return (
                     <article key={message.id} className={cn('flex', isOwn ? 'justify-end' : 'justify-start')}>
                       <div
@@ -491,7 +495,7 @@ const Chat: React.FC = () => {
                               : 'border-slate-300 bg-white',
                         )}
                       >
-                        <p className="text-xs font-medium opacity-75">{sender}</p>
+                        <div className="flex items-center gap-2"><p className="text-xs font-medium opacity-75">{sender}</p><span className="text-[10px] rounded px-1.5 py-0.5 bg-primary/15">{senderRank}</span></div>
                         <p>{message.content}</p>
                         <div className="mt-1 flex items-center justify-between gap-2 text-[11px] opacity-70">
                           <time dateTime={message.created_at}>

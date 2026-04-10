@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Users, Lock, Play, Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useUser } from '@/context/UserContext';
+import { getRankTierByLevel } from '@/lib/rankSystem';
 
 const RoomLobby: React.FC = () => {
   const { rooms, createRoom, joinRoom, getPublicRooms } = useRoom();
@@ -19,6 +21,8 @@ const RoomLobby: React.FC = () => {
   const [questionCount, setQuestionCount] = useState('10');
 
   const publicRooms = getPublicRooms();
+  const { user } = useUser();
+  const myRank = getRankTierByLevel(user?.level || 1);
 
   const handleCreateRoom = () => {
     if (!roomName.trim()) return;
@@ -46,6 +50,7 @@ const RoomLobby: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold">Multiplayer Lobby</h2>
           <p className="text-muted-foreground">Join a room or create your own</p>
+          <Badge className={`mt-2 bg-gradient-to-r ${myRank.colorClass} ${myRank.glowClass}`}>{myRank.icon} {myRank.name}</Badge>
         </div>
         
         <Dialog open={showCreateRoom} onOpenChange={setShowCreateRoom}>

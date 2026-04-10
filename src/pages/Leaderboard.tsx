@@ -1,282 +1,190 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
-import UserLevel from "@/components/profile/UserLevel";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Flame, Trophy, Users, Globe, CalendarClock } from "lucide-react";
+import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Badge } from "@/components/ui/badge";
-import { Clock, Users, TrendingUp, Trophy, Award, Star, Home } from "lucide-react";
-import { motion } from "framer-motion";
-import BackButton from "@/components/ui/BackButton";
-import AvatarRenderer from "@/components/avatar/AvatarRenderer";
+import { fetchFollowing, fetchLeaderboardUsers, rankScore, tierFromUser, tierStyle, type LeaderboardUser } from "@/lib/leaderboardApi";
+import { getRankTierByLevel } from "@/lib/rankSystem";
 
-interface LeaderboardEntry {
-  id: string;
-  name: string;
-  username: string;
-  avatar: string;
-  level: number;
-  xp: number;
-  rank: number;
-  score: number;
-}
+type LeaderboardTab = "global" | "grade" | "friends" | "weekly";
 
-const Leaderboard: React.FC = () => {
+const rowStyles = {
+  1: "border-yellow-500/50 bg-yellow-500/10",
+  2: "border-slate-400/50 bg-slate-400/10",
+  3: "border-amber-700/50 bg-amber-700/10",
+};
+
+const Leaderboard = () => {
   const navigate = useNavigate();
-  const [timeFrame, setTimeFrame] = useState<string>("week");
   const { user } = useUser();
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [activeUsers, setActiveUsers] = useState<number>(0);
-  const [userRank, setUserRank] = useState<number | null>(null);
+  const [users, setUsers] = useState<LeaderboardUser[]>([]);
+  const [following, setFollowing] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<LeaderboardTab>("global");
+  const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const [loading, setLoading] = useState(true);
-  
-  const calculateScore = (xp: number, level: number): number => {
-    return xp + (level * 100);
+
+  const loadLeaderboard = async () => {
+    setLoading(true);
+    const rows = await fetchLeaderboardUsers();
+    setUsers(rows);
+    setLoading(false);
   };
-  
+
+  const loadFollowing = async () => {
+    if (!user?.id) return;
+    const ids = await fetchFollowing(user.id);
+    setFollowing(ids);
+  };
+
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      setLoading(true);
-      try {
-        // Use the public leaderboard RPC function
-        const { data, error } = await supabase.rpc('get_public_leaderboard', {
-          limit_count: 50,
-          timeframe: timeFrame
-        });
+    loadLeaderboard();
+    loadFollowing();
 
-        if (error) {
-          console.error('Leaderboard fetch error:', error);
-          setLeaderboard([]);
-          return;
-        }
+    const channel = supabase
+      .channel("leaderboard-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, loadLeaderboard)
+      .on("postgres_changes", { event: "*", schema: "public", table: "question_attempts" }, loadLeaderboard)
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_streaks" }, loadLeaderboard)
+      .on("postgres_changes", { event: "*", schema: "public", table: "followers" }, loadFollowing)
+      .subscribe();
 
-        // Transform and rank the data
-        const entries: LeaderboardEntry[] = (data || []).map((entry: any, index: number) => ({
-          id: entry.id,
-          name: entry.name || 'Anonymous',
-          username: entry.username || '',
-          avatar: entry.avatar || '👤',
-          level: entry.level || 1,
-          xp: entry.xp || 0,
-          rank: index + 1,
-          score: calculateScore(entry.xp || 0, entry.level || 1)
-        }));
-
-        setLeaderboard(entries);
-
-        // Find user's rank
-        if (user) {
-          const userIndex = entries.findIndex(e => e.id === user.id);
-          setUserRank(userIndex >= 0 ? userIndex + 1 : null);
-        }
-      } catch (err) {
-        console.error('Leaderboard error:', err);
-      } finally {
-        setLoading(false);
-      }
+    return () => {
+      supabase.removeChannel(channel);
     };
+  }, [user?.id]);
 
-    fetchLeaderboard();
-    
-    // Calculate simulated active users based on time of day
-    const hour = new Date().getHours();
-    let baseActiveUsers = 15;
-    if (hour >= 8 && hour <= 22) {
-      baseActiveUsers = 25 + Math.floor(Math.random() * 15);
-    } else {
-      baseActiveUsers = 5 + Math.floor(Math.random() * 10);
-    }
-    setActiveUsers(baseActiveUsers);
-  }, [user, timeFrame]);
+  const rankedUsers = useMemo(() => [...users].sort((a, b) => rankScore(b) - rankScore(a)), [users]);
 
-  const renderLeaderboard = (entries: LeaderboardEntry[]) => {
-    if (loading) {
-      return (
-        <div className="text-center py-8 text-muted-foreground">
-          Loading leaderboard...
-        </div>
-      );
+  const leaderboardData = useMemo(() => {
+    if (activeTab === "friends") {
+      return rankedUsers.filter((row) => following.includes(row.id) || row.id === user?.id);
     }
 
-    if (entries.length === 0) {
-      return (
-        <div className="text-center py-8 text-muted-foreground">
-          No players found. Be the first to join the leaderboard!
-        </div>
-      );
+    if (activeTab === "grade") {
+      return selectedGrade === "all" ? rankedUsers : rankedUsers.filter((row) => row.grade === Number(selectedGrade));
     }
 
-    return entries.map((entry) => (
-      <motion.div
-        key={entry.id}
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: entry.rank * 0.05 }}
-        className={`flex items-center gap-3 p-3 rounded-md ${
-          entry.rank <= 3 
-            ? "bg-gradient-to-r from-primary/10 to-background shadow-sm" 
-            : "hover:bg-muted/50"
-        }`}
-      >
-        <div className={`font-semibold w-6 text-center ${
-          entry.rank === 1 ? "text-yellow-500" :
-          entry.rank === 2 ? "text-gray-400" :
-          entry.rank === 3 ? "text-amber-700" :
-          "text-muted-foreground"
-        }`}>
-          {entry.rank}
-        </div>
-        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-lg">
-          👤
-        </div>
-        <div className="flex-1">
-          <div className="font-medium flex items-center">
-            {entry.name}
-            {entry.rank <= 3 && (
-              <Award className={`h-4 w-4 ml-1 ${
-                entry.rank === 1 ? "text-yellow-500" : 
-                entry.rank === 2 ? "text-gray-400" : "text-amber-700"
-              }`} />
-            )}
-          </div>
-          <UserLevel level={entry.level} xp={entry.xp} className="w-full mt-1" />
-        </div>
-        <div className="font-semibold text-foreground">{entry.score} pts</div>
-      </motion.div>
-    ));
-  };
+    if (activeTab === "weekly") {
+      return [...users].sort((a, b) => b.weeklyScore - a.weeklyScore);
+    }
+
+    return rankedUsers;
+  }, [activeTab, following, rankedUsers, selectedGrade, user?.id, users]);
+
+  const withRank = leaderboardData.map((entry, index) => ({
+    ...entry,
+    rankPos: index + 1,
+    score: activeTab === "weekly" ? entry.weeklyScore : rankScore(entry),
+    tier: tierFromUser(entry),
+  }));
+
+  const topThree = withRank.slice(0, 3);
+  const rest = withRank.slice(3);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-yellow-500/5">
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-yellow-600 via-amber-600 to-orange-600 px-4 py-3 shadow-xl">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <BackButton to="/" className="text-white hover:bg-white/20" />
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
-              <Trophy className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">Leaderboard</h1>
-              <p className="text-xs text-white/70">Top players worldwide</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-b from-background to-primary/5 p-4 md:p-8">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">Live database rankings only • no demo accounts</p>
+            <h1 className="text-3xl font-bold tracking-tight">Master Minds Leaderboard</h1>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2">
-            <Home className="h-4 w-4" /> Menu
-          </Button>
-        </div>
-      </header>
-      
-      <div className="container max-w-md mx-auto py-6 px-4">
-        {/* Stats Section */}
-        <div className="flex gap-3 mb-6">
-          <Card className="flex-1">
-            <CardContent className="p-4 flex items-center gap-2">
-              <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-full">
-                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Players</p>
-                <p className="font-semibold">{leaderboard.length}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="flex-1">
-            <CardContent className="p-4 flex items-center gap-2">
-              <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full">
-                <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Online</p>
-                <p className="font-semibold">{activeUsers}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="flex-1">
-            <CardContent className="p-4 flex items-center gap-2">
-              <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-full">
-                <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Updated</p>
-                <p className="font-semibold">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        
+          <Button variant="outline" onClick={() => navigate("/")}>Back to home</Button>
+        </header>
+
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-center flex items-center justify-center gap-2">
-              <Trophy className="h-5 w-5 text-yellow-500" />
-              Top Players
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-yellow-500" /> Dynamic Ranking Arena
             </CardTitle>
-            <div className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
-              <TrendingUp className="h-3 w-3" />
-              <span>Live rankings based on performance</span>
-            </div>
           </CardHeader>
-          <CardContent>
-            <Tabs defaultValue={timeFrame} onValueChange={setTimeFrame}>
-              <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="day">Today</TabsTrigger>
-                <TabsTrigger value="week">This Week</TabsTrigger>
-                <TabsTrigger value="month">This Month</TabsTrigger>
+          <CardContent className="space-y-4">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeaderboardTab)}>
+              <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+                <TabsTrigger value="global" className="gap-2"><Globe className="h-4 w-4" />Global</TabsTrigger>
+                <TabsTrigger value="grade" className="gap-2"><Users className="h-4 w-4" />Grade</TabsTrigger>
+                <TabsTrigger value="friends" className="gap-2"><Users className="h-4 w-4" />Friends</TabsTrigger>
+                <TabsTrigger value="weekly" className="gap-2"><CalendarClock className="h-4 w-4" />Weekly</TabsTrigger>
               </TabsList>
-              
-              <TabsContent value="day" className="space-y-2">
-                {renderLeaderboard(leaderboard.slice(0, 10))}
-              </TabsContent>
-              
-              <TabsContent value="week" className="space-y-2">
-                {renderLeaderboard(leaderboard.slice(0, 10))}
-              </TabsContent>
-              
-              <TabsContent value="month" className="space-y-2">
-                {renderLeaderboard(leaderboard.slice(0, 10))}
-              </TabsContent>
             </Tabs>
-          </CardContent>
-        </Card>
-        
-        {/* User's position */}
-        {user && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="mt-6 p-4 bg-muted rounded-lg"
-          >
-            <div className="text-center font-medium text-foreground mb-2 flex items-center justify-center">
-              <Star className="h-4 w-4 mr-1 text-yellow-500" />
-              Your Position
-            </div>
-            {userRank ? (
-              <div className="flex items-center gap-3 p-3 bg-background rounded-md shadow-sm">
-                <div className="font-semibold w-6 text-center text-muted-foreground">{userRank}</div>
-                <AvatarRenderer avatar={user.avatar} avatarConfig={user.avatarConfig} size="sm" />
-                <div className="flex-1">
-                  <div className="font-medium flex items-center">
-                    {user.name} 
-                    {userRank <= 3 && (
-                      <Award className={`h-4 w-4 ml-1 ${
-                        userRank === 1 ? "text-yellow-500" : 
-                        userRank === 2 ? "text-gray-400" : "text-amber-700"
-                      }`} />
-                    )}
-                  </div>
-                  <UserLevel level={user.level} xp={user.xp} className="w-full mt-1" />
-                </div>
-                <div className="font-semibold">{calculateScore(user.xp, user.level)} pts</div>
-              </div>
-            ) : (
-              <div className="text-center py-2 text-muted-foreground">
-                Complete quizzes and earn XP to appear on the leaderboard!
+
+            {activeTab === "grade" && (
+              <div className="w-40">
+                <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                  <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All grades</SelectItem>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((grade) => (
+                      <SelectItem key={grade} value={`${grade}`}>Grade {grade}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
-          </motion.div>
-        )}
+
+            {loading ? <p className="text-sm text-muted-foreground">Loading leaderboard…</p> : null}
+
+            <div className="grid gap-4 md:grid-cols-3">
+              {topThree.map((entry, index) => (
+                <motion.button
+                  layout
+                  whileHover={{ y: -4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate(`/profile/${entry.id}`)}
+                  key={entry.id}
+                  className={`rounded-xl border p-4 text-left transition ${rowStyles[(index + 1) as 1 | 2 | 3]}`}
+                >
+                  <p className="text-xs">{index === 0 ? "🥇 Gold" : index === 1 ? "🥈 Silver" : "🥉 Bronze"}</p>
+                  <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="lg" className="my-2" />
+                  <h3 className="font-semibold">{entry.username}</h3>
+                  <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)} ${entry.rankPos <= 10 ? "animate-pulse" : ""}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
+                    <span className="font-bold">#{entry.rankPos}</span>
+                  </div>
+                  <p className="mt-2 text-sm">{Math.round(entry.score).toLocaleString()} pts</p>
+                </motion.button>
+              ))}
+            </div>
+
+            <ScrollArea className="h-[420px] rounded-lg border p-2">
+              <AnimatePresence>
+                {rest.map((entry) => (
+                  <motion.button
+                    layout
+                    key={`${activeTab}-${entry.id}`}
+                    onClick={() => navigate(`/profile/${entry.id}`)}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    className={`mb-2 flex w-full items-center gap-3 rounded-lg border p-3 text-left ${entry.rankPos <= 10 ? "shadow-[0_0_14px_rgba(99,102,241,0.25)]" : ""}`}
+                  >
+                    <span className="w-6 text-center font-semibold text-muted-foreground">#{entry.rankPos}</span>
+                    <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="md" />
+                    <div className="flex-1">
+                      <p className="font-medium">{entry.username}</p>
+                      <p className="text-xs text-muted-foreground">Level {entry.level} • XP {entry.xp.toLocaleString()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold">{Math.round(entry.score).toLocaleString()} pts</p>
+                      <p className="inline-flex items-center gap-1 text-xs text-orange-500"><Flame className="h-3 w-3" />{entry.streak}</p>
+                    </div>
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
