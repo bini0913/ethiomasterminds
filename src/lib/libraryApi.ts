@@ -515,7 +515,16 @@ export async function invokeLibraryAI(payload: {
 }
 
 export function getPdfPublicUrl(path: string) {
-  const { data } = supabase.storage.from('library-files').getPublicUrl(path);
+  if (!path) return '';
+
+  // Backward compatibility for legacy rows that may already store
+  // an absolute URL instead of a bucket-relative storage path.
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const normalizedPath = path.replace(/^\/+/, '');
+  const { data } = supabase.storage.from('library-files').getPublicUrl(normalizedPath);
   return data.publicUrl;
 }
 
@@ -531,6 +540,14 @@ export function isValidPublicUrl(url: string | null | undefined) {
 
 export function getThumbnailPublicUrl(path: string | null) {
   if (!path) return null;
-  const { data } = supabase.storage.from('library-thumbnails').getPublicUrl(path);
+
+  // Backward compatibility for legacy rows that may already store
+  // an absolute URL instead of a bucket-relative storage path.
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const normalizedPath = path.replace(/^\/+/, '');
+  const { data } = supabase.storage.from('library-thumbnails').getPublicUrl(normalizedPath);
   return data.publicUrl;
 }
