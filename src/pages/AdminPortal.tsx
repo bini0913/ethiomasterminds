@@ -82,6 +82,20 @@ interface Report {
   reported_content?: string;
 }
 
+interface PendingLibraryBook {
+  id: string;
+  title: string;
+  author: string;
+  subject: string;
+  status: 'pending' | 'approved' | 'rejected';
+  uploader_id: string;
+  created_at: string;
+  profiles?: {
+    name: string;
+    username: string | null;
+  } | null;
+}
+
 const AdminPortal: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useUser();
@@ -101,6 +115,8 @@ const AdminPortal: React.FC = () => {
   const [flashcards, setFlashcards] = useState<any[]>([]);
   const [socialPosts, setSocialPosts] = useState<any[]>([]);
   const [books, setBooks] = useState<any[]>([]);
+  const [pendingLibraryBooks, setPendingLibraryBooks] = useState<PendingLibraryBook[]>([]);
+  const [moderatingBookId, setModeratingBookId] = useState<string | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
 
@@ -193,18 +209,39 @@ const AdminPortal: React.FC = () => {
   };
 
   const fetchContent = async () => {
-    const [quizRes, questionRes, flashRes, postRes, bookRes] = await Promise.all([
+    const [quizRes, questionRes, flashRes, postRes, bookRes, libraryRes] = await Promise.all([
       supabase.from('quizzes').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('flashcards').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('social_posts').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('study_plans').select('*').order('created_at', { ascending: false }).limit(200),
+      supabase.from('library_books').select('id,title,author,subject,status,uploader_id,created_at').order('created_at', { ascending: false }).limit(300),
     ]);
     setQuizzes(quizRes.data || []);
     setQuestions(questionRes.data || []);
     setFlashcards(flashRes.data || []);
     setSocialPosts(postRes.data || []);
     setBooks(bookRes.data || []);
+
+    const pendingRows = ((libraryRes.data || []) as PendingLibraryBook[]).filter((book) => book.status === 'pending');
+    const uploaderIds = Array.from(new Set(pendingRows.map((book) => book.uploader_id).filter(Boolean)));
+    if (!uploaderIds.length) {
+      setPendingLibraryBooks(pendingRows);
+      return;
+    }
+
+    const { data: profileRows } = await supabase
+      .from('profiles')
+      .select('id,name,username')
+      .in('id', uploaderIds);
+
+    const profileMap = new Map((profileRows || []).map((profile: any) => [profile.id, profile]));
+    setPendingLibraryBooks(
+      pendingRows.map((book) => ({
+        ...book,
+        profiles: profileMap.get(book.uploader_id) || null,
+      })),
+    );
   };
 
   const fetchReports = async () => {
@@ -391,6 +428,50 @@ const AdminPortal: React.FC = () => {
     fetchStatsAndCharts();
   };
 
+  const handleModerateLibraryBook = async (bookId: string, status: 'approved' | 'rejected') => {
+    if (!user?.id) return;
+
+    setModeratingBookId(bookId);
+    const moderatedAt = new Date().toISOString();
+
+    const { error: bookError } = await supabase
+      .from('library_books')
+      .update({ status })
+      .eq('id', bookId);
+
+    if (bookError) {
+      setModeratingBookId(null);
+      toast.error(`Failed to ${status} book`);
+      return;
+    }
+
+    const uploadPatch = {
+      status,
+      moderated_by: user.id,
+      moderated_at: moderatedAt,
+      moderation_note: status === 'approved' ? 'Approved by admin portal.' : 'Rejected by admin portal.',
+    };
+
+    const { data: uploadRow } = await supabase.from('book_uploads').select('id').eq('book_id', bookId).maybeSingle();
+    if (uploadRow?.id) {
+      await supabase.from('book_uploads').update(uploadPatch).eq('id', uploadRow.id);
+    } else {
+      const { data: bookRow } = await supabase.from('library_books').select('uploader_id').eq('id', bookId).single();
+      await supabase.from('book_uploads').insert({
+        book_id: bookId,
+        uploader_id: bookRow?.uploader_id,
+        ...uploadPatch,
+      });
+    }
+
+    toast.success(`Book ${status}`);
+    pushNotification(`Library book ${status}`);
+    logAction(`Library book ${status}`, bookId);
+    setModeratingBookId(null);
+    fetchContent();
+    fetchStatsAndCharts();
+  };
+
   const saveSystemSettings = () => {
     if (!isAdmin) {
       toast.error('Admin only: system settings');
@@ -532,7 +613,50 @@ const AdminPortal: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="content" className="space-y-4">
-              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Approve, edit, or delete books, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => item.type === 'quiz' ? handleModerateReport(item.id, 'resolved') : toast.success('Approved')} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Library Upload Approvals</CardTitle>
+                  <CardDescription>When students upload books, they appear here until admin or manager approves/rejects them.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {pendingLibraryBooks.length === 0 && <p className="text-sm text-muted-foreground">No pending library uploads right now.</p>}
+                  {pendingLibraryBooks.map((book) => (
+                    <div key={book.id} className="border rounded-xl p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="font-medium">{book.title}</p>
+                          <p className="text-sm text-muted-foreground">{book.author} • {book.subject}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Uploaded by {book.profiles?.name || 'Unknown user'} ({book.profiles?.username ? `@${book.profiles.username}` : 'no username'}) on {new Date(book.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{book.status}</Badge>
+                          <Button
+                            size="sm"
+                            disabled={moderatingBookId === book.id}
+                            onClick={() => handleModerateLibraryBook(book.id, 'approved')}
+                          >
+                            {moderatingBookId === book.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={moderatingBookId === book.id}
+                            onClick={() => handleModerateLibraryBook(book.id, 'rejected')}
+                          >
+                            {moderatingBookId === book.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <X className="w-4 h-4 mr-1" />}
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Manage quizzes, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => item.type === 'quiz' ? handleModerateReport(item.id, 'resolved') : toast.success('Approved')} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-4">
