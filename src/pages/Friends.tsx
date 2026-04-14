@@ -26,7 +26,8 @@ const Friends: React.FC = () => {
     sendMessage,
     markMessageAsRead,
     searchUsers,
-    onlineFriends
+    onlineFriends,
+    friendPresence
   } = useFriends();
   const navigate = useNavigate();
   
@@ -159,6 +160,17 @@ const Friends: React.FC = () => {
 
   const isOnline = (friendId: string) => onlineFriends.some(f => f.id === friendId);
 
+  const getLastSeenText = (friendId: string) => {
+    const presence = friendPresence[friendId];
+    if (!presence?.lastSeen) return "last seen unavailable";
+    const seenAt = new Date(presence.lastSeen);
+    const diffMs = Date.now() - seenAt.getTime();
+    if (diffMs < 60_000) return "last seen just now";
+    if (diffMs < 3_600_000) return `last seen ${Math.floor(diffMs / 60_000)}m ago`;
+    if (diffMs < 86_400_000) return `last seen ${Math.floor(diffMs / 3_600_000)}h ago`;
+    return `last seen ${seenAt.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Header */}
@@ -253,7 +265,7 @@ const Friends: React.FC = () => {
                             {lastMessage ? lastMessage.content : `Level ${friend.level} • ${friend.xp} XP`}
                           </div>
                           <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {isOnline(friend.id) ? "🟢 Online now" : "⚪ Offline"}
+                            {isOnline(friend.id) ? "🟢 Online now" : `⚪ ${getLastSeenText(friend.id)}`}
                           </div>
                         </div>
                         {getUnreadMessageCount(friend.id) > 0 && (
@@ -411,7 +423,7 @@ const Friends: React.FC = () => {
                 <div>
                   <div className="font-medium text-foreground">{selectedFriend.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    Level {selectedFriend.level} • {selectedFriend.xp} XP • {isOnline(selectedFriend.id) ? "🟢 Online" : "⚪ Away"}
+                    Level {selectedFriend.level} • {selectedFriend.xp} XP • {isOnline(selectedFriend.id) ? "🟢 Online" : `⚪ ${getLastSeenText(selectedFriend.id)}`}
                   </div>
                 </div>
                 <div className="ml-auto flex gap-1.5">
