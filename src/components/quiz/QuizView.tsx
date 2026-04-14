@@ -162,6 +162,18 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     const timeBonus = Math.floor((timeRemaining / 20) * (basePoints * 0.5));
     return basePoints + timeBonus;
   };
+
+  const getXPPerCorrectAnswer = () => {
+    switch (quiz.difficulty) {
+      case "Easy":
+        return 3;
+      case "Hard":
+        return 10;
+      case "Medium":
+      default:
+        return 7;
+    }
+  };
   
   const saveQuizResults = async (finalScore: number, totalXP: number) => {
     try {
@@ -224,11 +236,10 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       const finalScore = score;
       setQuizCompleted(true);
       
-      // Calculate XP to award based on score and performance
-      const accuracyPercentage = calculateAccuracy();
-      const baseXP = Math.floor(finalScore / 2); 
-      const accuracyBonus = Math.floor(baseXP * (accuracyPercentage / 100));
-      const totalXP = allowXP ? baseXP + accuracyBonus : 0;
+      // Calculate XP by difficulty and number of correct answers.
+      // Easy = 3 XP, Medium = 7 XP, Hard = 10 XP per correct answer.
+      const xpPerCorrectAnswer = getXPPerCorrectAnswer();
+      const totalXP = allowXP ? answeredCorrectly * xpPerCorrectAnswer : 0;
       
       setEarnedXP(totalXP);
       
