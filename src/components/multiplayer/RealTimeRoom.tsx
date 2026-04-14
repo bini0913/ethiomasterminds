@@ -164,11 +164,12 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   useEffect(() => {
     if (roomState.status !== 'countdown') return;
-    if (countdownEndsAt) {
-      const remaining = Math.max(0, Math.ceil((new Date(countdownEndsAt).getTime() - Date.now()) / 1000));
-      setCountdownValue(remaining);
-    }
-    if (countdownValue <= 0) {
+    const remaining = countdownEndsAt
+      ? Math.max(0, Math.ceil((new Date(countdownEndsAt).getTime() - Date.now()) / 1000))
+      : countdownValue;
+    setCountdownValue(remaining);
+
+    if (remaining <= 0) {
       if (isHost) void startGame();
       return;
     }
@@ -519,8 +520,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   const startGame = async () => {
     if (!isHost) return;
-    if (!allReady || players.length < 2) {
-      toast.error('All players must be ready before starting');
+    if (players.length < 2) {
+      toast.error('At least 2 players are required to start');
       return;
     }
 
@@ -623,7 +624,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     await supabase
       .from('multiplayer_rooms')
       .update({
-        subject: merged.subject,
+        subject: merged.subject === 'Mixed' ? null : merged.subject,
         difficulty: merged.difficulty,
         game_mode: merged.gameMode,
         question_count: merged.questionCount,
@@ -634,7 +635,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   };
 
   const triggerCountdown = async () => {
-    if (!isHost || !allReady || players.length < 2) return;
+    if (!isHost || players.length < 2) return;
     const endTime = new Date(Date.now() + 5000).toISOString();
 
     await supabase
@@ -658,7 +659,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     toast.info(`${playerName} was removed from the room`);
   };
 
-  const allReady = players.length >= 2 && players.every((p) => p.isReady);
   const currentPlayer = players.find((p) => p.id === currentUserId);
   const connectionQuality = latencyMs <= 120 ? 'Excellent' : latencyMs <= 220 ? 'Stable' : latencyMs <= 350 ? 'Degraded' : 'Poor';
   const connectionColor = latencyMs <= 120 ? 'text-emerald-300' : latencyMs <= 220 ? 'text-cyan-300' : latencyMs <= 350 ? 'text-amber-300' : 'text-red-300';
@@ -787,7 +787,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     <Button size="lg" className="min-h-11 px-6" variant={currentPlayer?.isReady ? 'default' : 'outline'} onClick={toggleReady}>
                       {currentPlayer?.isReady ? '✓ Ready!' : 'Tap Ready'}
                     </Button>
-                    {isHost && allReady && players.length >= 2 && (
+                    {isHost && players.length >= 2 && (
                       <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 min-h-11 px-6" onClick={triggerCountdown}>
                         <Play className="h-4 w-4 mr-2" /> Start Countdown
                       </Button>
