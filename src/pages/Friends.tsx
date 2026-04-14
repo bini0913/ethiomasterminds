@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, UserPlus, Check, X, Users, Home, MessageCircle, Search, Loader2 } from "lucide-react";
+import { Send, UserPlus, Check, X, Users, Home, MessageCircle, Search, Loader2, Swords, Gamepad2, BookOpen, Bell, ShieldBan, VolumeX } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useFriends, FriendRequest } from "@/context/FriendsContext";
 import { useUser, UserProfile } from "@/context/UserContext";
@@ -25,7 +25,8 @@ const Friends: React.FC = () => {
     getMessagesWithUser,
     sendMessage,
     markMessageAsRead,
-    searchUsers
+    searchUsers,
+    onlineFriends
   } = useFriends();
   const navigate = useNavigate();
   
@@ -39,6 +40,7 @@ const Friends: React.FC = () => {
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [pendingSentRequests, setPendingSentRequests] = useState<Set<string>>(new Set());
+  const [messageReactions, setMessageReactions] = useState<Record<string, string>>({});
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,6 +95,19 @@ const Friends: React.FC = () => {
   const filteredFriends = friends.filter(friend => 
     friend.name.toLowerCase().includes(searchInput.toLowerCase())
   );
+
+  const friendConversations = filteredFriends
+    .map(friend => {
+      const convo = getMessagesWithUser(friend.id);
+      const lastMessage = convo[convo.length - 1];
+      return { friend, lastMessage };
+    })
+    .sort((a, b) => {
+      if (!a.lastMessage && !b.lastMessage) return 0;
+      if (!a.lastMessage) return 1;
+      if (!b.lastMessage) return -1;
+      return b.lastMessage.timestamp.getTime() - a.lastMessage.timestamp.getTime();
+    });
   
   const pendingRequests = friendRequests.filter(
     req => req.status === "pending" && req.receiver.id === user?.id
@@ -142,6 +157,8 @@ const Friends: React.FC = () => {
     return pendingSentRequests.has(userId) || friends.some(f => f.id === userId);
   };
 
+  const isOnline = (friendId: string) => onlineFriends.some(f => f.id === friendId);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Header */}
@@ -153,8 +170,8 @@ const Friends: React.FC = () => {
               <Users className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Friends & Messages</h1>
-              <p className="text-xs text-white/70">{friends.length} friends</p>
+              <h1 className="text-xl font-bold text-white">💬🧠 MASTER MINDS — CHAT SYSTEM</h1>
+              <p className="text-xs text-white/70">{friends.length} friends • learn, chat & compete</p>
             </div>
           </div>
           <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2">
@@ -205,8 +222,8 @@ const Friends: React.FC = () => {
             <TabsContent value="friends" className="m-0">
               <ScrollArea className="h-[calc(100vh-200px)]">
                 <div className="divide-y">
-                  {filteredFriends.length > 0 ? (
-                    filteredFriends.map((friend) => (
+                  {friendConversations.length > 0 ? (
+                    friendConversations.map(({ friend, lastMessage }) => (
                       <motion.div
                         key={friend.id}
                         whileHover={{ x: 4 }}
@@ -224,9 +241,19 @@ const Friends: React.FC = () => {
                           className="mr-3"
                         />
                         <div className="flex-1">
-                          <div className="font-medium text-foreground">{friend.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            Level {friend.level} • {friend.xp} XP
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-medium text-foreground">{friend.name}</div>
+                            {lastMessage && (
+                              <div className="text-[10px] text-muted-foreground">
+                                {formatTime(lastMessage.timestamp)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {lastMessage ? lastMessage.content : `Level ${friend.level} • ${friend.xp} XP`}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {isOnline(friend.id) ? "🟢 Online now" : "⚪ Offline"}
                           </div>
                         </div>
                         {getUnreadMessageCount(friend.id) > 0 && (
@@ -384,8 +411,16 @@ const Friends: React.FC = () => {
                 <div>
                   <div className="font-medium text-foreground">{selectedFriend.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    Level {selectedFriend.level} • {selectedFriend.xp} XP
+                    Level {selectedFriend.level} • {selectedFriend.xp} XP • {isOnline(selectedFriend.id) ? "🟢 Online" : "⚪ Away"}
                   </div>
+                </div>
+                <div className="ml-auto flex gap-1.5">
+                  <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => navigate("/lobby")}>
+                    <Gamepad2 className="h-3 w-3" /> Join Room
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => navigate("/multiplayer")}>
+                    <Swords className="h-3 w-3" /> Challenge
+                  </Button>
                 </div>
               </div>
               
@@ -406,6 +441,7 @@ const Friends: React.FC = () => {
                         className={`flex ${msg.sender === user?.id ? 'justify-end' : 'justify-start'}`}
                       >
                         <div 
+                          onDoubleClick={() => setMessageReactions(prev => ({ ...prev, [msg.id]: prev[msg.id] ? '' : '❤️' }))}
                           className={`max-w-[70%] px-3 py-2 rounded-lg ${
                             msg.sender === user?.id 
                               ? 'bg-primary text-primary-foreground shadow-md' 
@@ -413,10 +449,13 @@ const Friends: React.FC = () => {
                           }`}
                         >
                           <div>{msg.content}</div>
+                          {messageReactions[msg.id] && (
+                            <div className="mt-1 text-sm">{messageReactions[msg.id]}</div>
+                          )}
                           <div className={`text-xs mt-1 ${
                             msg.sender === user?.id ? 'text-primary-foreground/70' : 'text-muted-foreground'
                           }`}>
-                            {formatTime(msg.timestamp)}
+                            {formatTime(msg.timestamp)} • {msg.sender === user?.id ? (msg.read ? "seen" : "sent") : "delivered"}
                           </div>
                         </div>
                       </motion.div>
@@ -428,9 +467,23 @@ const Friends: React.FC = () => {
               
               {/* Message Input */}
               <div className="p-3 border-t bg-card/90 backdrop-blur-sm">
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  <Button type="button" size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setMessageInput(prev => `${prev}${prev ? " " : ""}📚 Quiz challenge: `)}>
+                    <BookOpen className="h-3 w-3" /> Quiz Link
+                  </Button>
+                  <Button type="button" size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setMessageInput(prev => `${prev}${prev ? " " : ""}🎮 Invite to match!`)}>
+                    <Swords className="h-3 w-3" /> Invite Match
+                  </Button>
+                  <Button type="button" size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setMessageInput(prev => `${prev}${prev ? " " : ""}📝 Shared study note: `)}>
+                    <BookOpen className="h-3 w-3" /> Notes
+                  </Button>
+                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7"><Bell className="h-3.5 w-3.5" /></Button>
+                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7"><VolumeX className="h-3.5 w-3.5" /></Button>
+                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7"><ShieldBan className="h-3.5 w-3.5" /></Button>
+                </div>
                 <form onSubmit={handleSendMessage} className="flex gap-2">
                   <Input
-                    placeholder="Type a message..."
+                    placeholder="Type a message, flashcard, challenge, or note..."
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
                     className="flex-1 border-primary/20 focus-visible:ring-primary/40"
@@ -439,6 +492,9 @@ const Friends: React.FC = () => {
                     <Send className="h-4 w-4" />
                   </Button>
                 </form>
+                {messageInput.trim() && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">Typing… real-time sync enabled</p>
+                )}
               </div>
             </>
           ) : (
