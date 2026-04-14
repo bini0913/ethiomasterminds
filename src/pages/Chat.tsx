@@ -6,7 +6,7 @@ import {
   ArrowLeft, Send, Smile, Paperclip, MoreVertical,
   Phone, Video, UserPlus, Swords, BookOpen, BrainCircuit,
   Check, CheckCheck, Image, FileText, Mic, X, Hash,
-  Crown, Shield, Gamepad2, Loader2
+  Crown, Shield, Gamepad2, Loader2, Bell, Trophy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,7 @@ interface ChatMember {
   avatar: string;
   level: number;
   isOnline: boolean;
+  lastSeen?: string | null;
 }
 
 interface ChatMessage {
@@ -94,7 +95,7 @@ const Chat: React.FC = () => {
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupType, setNewGroupType] = useState<string>('private');
-  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const [presenceMap, setPresenceMap] = useState<Record<string, { status: string; lastSeen: string | null }>>({});
   const [profileCache, setProfileCache] = useState<Record<string, { name: string; avatar: string; level: number }>>({});
   const [searchResults, setSearchResults] = useState<ChatRoom[]>([]);
   const [showSearch, setShowSearch] = useState(false);
@@ -115,11 +116,14 @@ const Chat: React.FC = () => {
   useEffect(() => {
     const loadOnline = async () => {
       const { data } = await supabase.from('user_presence').select('user_id, status, last_seen');
-      const now = Date.now();
-      const online = new Set((data || [])
-        .filter(u => u.status === 'online' && now - new Date(u.last_seen).getTime() < 5 * 60 * 1000)
-        .map(u => u.user_id));
-      setOnlineUserIds(online);
+      const map: Record<string, { status: string; lastSeen: string | null }> = {};
+      (data || []).forEach(u => {
+        map[u.user_id] = {
+          status: u.status || 'offline',
+          lastSeen: u.last_seen || null,
+        };
+      });
+      setPresenceMap(map);
     };
     loadOnline();
     const interval = setInterval(loadOnline, 30000);
@@ -231,11 +235,14 @@ const Chat: React.FC = () => {
       return {
         id: m.id, user_id: m.user_id, role: m.role,
         name: p.name, avatar: p.avatar, level: p.level,
-        isOnline: onlineUserIds.has(m.user_id),
+        isOnline: presenceMap[m.user_id]?.status === 'online'
+          && !!presenceMap[m.user_id]?.lastSeen
+          && (Date.now() - new Date(presenceMap[m.user_id].lastSeen as string).getTime() < 5 * 60 * 1000),
+        lastSeen: presenceMap[m.user_id]?.lastSeen || null,
       };
     });
     setMembers(memberList);
-  }, [loadProfiles, profileCache, onlineUserIds]);
+  }, [loadProfiles, profileCache, presenceMap]);
 
   // Select room
   const selectRoom = useCallback((room: ChatRoom) => {
@@ -430,6 +437,16 @@ const Chat: React.FC = () => {
     return `${names.slice(0, 2).join(', ')} are typing...`;
   }, [typingUsers, user?.name]);
 
+  const formatLastSeen = (value?: string | null) => {
+    if (!value) return 'last seen unavailable';
+    const date = new Date(value);
+    const diff = Date.now() - date.getTime();
+    if (diff < 60_000) return 'last seen just now';
+    if (diff < 3_600_000) return `last seen ${Math.floor(diff / 60_000)}m ago`;
+    if (diff < 86_400_000) return `last seen ${Math.floor(diff / 3_600_000)}h ago`;
+    return `last seen ${date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -446,7 +463,7 @@ const Chat: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <BackButton />
-            <h1 className="text-lg font-bold text-foreground">Chats</h1>
+            <h1 className="text-lg font-bold text-foreground">💬🧠 Master Minds Chat</h1>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSearch(true)}>
@@ -570,11 +587,17 @@ const Chat: React.FC = () => {
             <div>
               <h3 className="font-semibold text-sm text-foreground">{activeRoom.name}</h3>
               <p className="text-[11px] text-muted-foreground">
-                {typingText || `${activeRoom.memberCount} members`}
+                {typingText || `${members.filter(m => m.isOnline).length} online • ${activeRoom.memberCount} members`}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/lobby')}>
+              <Gamepad2 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/multiplayer')}>
+              <Trophy className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8"
               onClick={() => setShowMembers(!showMembers)}>
               <Users className="h-4 w-4" />
@@ -727,6 +750,21 @@ const Chat: React.FC = () => {
 
             {/* Input */}
             <div className="px-3 py-3 border-t border-border/30 bg-card/50">
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setDraft(prev => `${prev}${prev ? ' ' : ''}📚 Quiz link: `)}>
+                  <BookOpen className="h-3 w-3" /> Quiz
+                </Button>
+                <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setDraft(prev => `${prev}${prev ? ' ' : ''}📝 Study note: `)}>
+                  <FileText className="h-3 w-3" /> Notes
+                </Button>
+                <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setDraft(prev => `${prev}${prev ? ' ' : ''}🎮 Join my room: `)}>
+                  <Gamepad2 className="h-3 w-3" /> Join Room
+                </Button>
+                <Button size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setDraft(prev => `${prev}${prev ? ' ' : ''}⚔️ Challenge accepted!`)}>
+                  <Swords className="h-3 w-3" /> Challenge
+                </Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7"><Bell className="h-3.5 w-3.5" /></Button>
+              </div>
               <div className="flex items-center gap-2">
                 <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
                   <PopoverTrigger asChild>
@@ -766,7 +804,7 @@ const Chat: React.FC = () => {
                   value={draft}
                   onChange={e => handleDraftChange(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  placeholder="Type a message..."
+                  placeholder="Message, emoji, quiz link, notes, or match invite..."
                   className="flex-1 h-9 bg-muted/50 border-border/30 text-sm rounded-full"
                 />
 
@@ -810,7 +848,9 @@ const Chat: React.FC = () => {
                             <span className="text-xs font-medium truncate text-foreground">{m.name}</span>
                             {getRoleIcon(m.role)}
                           </div>
-                          <span className="text-[10px] text-muted-foreground">Lv. {m.level}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            Lv. {m.level} • {m.isOnline ? 'online now' : formatLastSeen(m.lastSeen)}
+                          </span>
                         </div>
                         {m.user_id !== user?.id && (
                           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0"

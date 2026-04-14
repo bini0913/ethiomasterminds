@@ -23,6 +23,11 @@ export interface Message {
   timestamp: Date;
 }
 
+export interface FriendPresence {
+  status: string;
+  lastSeen: string | null;
+}
+
 interface FriendsContextType {
   friends: UserProfile[];
   friendRequests: FriendRequest[];
@@ -39,6 +44,7 @@ interface FriendsContextType {
   getFriendById: (userId: string) => UserProfile | undefined;
   searchUsers: (query: string) => Promise<UserProfile[]>;
   onlineFriends: UserProfile[];
+  friendPresence: Record<string, FriendPresence>;
   refreshFriends: () => Promise<void>;
   isPendingRequest: (userId: string) => boolean;
 }
@@ -53,6 +59,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([]);
+  const [friendPresence, setFriendPresence] = useState<Record<string, FriendPresence>>({});
 
   const getDisplayName = (profile: { name?: string | null; username?: string | null } | undefined, userId: string) => {
     const trimmedName = profile?.name?.trim();
@@ -69,6 +76,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       setFriends([]);
       setFriendRequests([]);
       setOutgoingRequests([]);
+      setFriendPresence({});
       setLoading(false);
       return;
     }
@@ -97,7 +105,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       const allUserIds = [...new Set([...friendIdsFromAccepted, ...senderIds, ...receiverIds])];
 
       const profilesMap = new Map<string, any>();
-      const presenceMap = new Map<string, string>();
+      const presenceMap = new Map<string, FriendPresence>();
 
       if (allUserIds.length > 0) {
         // Fetch all profiles at once
@@ -111,10 +119,15 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         // Fetch presence
         const { data: presenceData } = await supabase
           .from('user_presence')
-          .select('user_id, status')
+          .select('user_id, status, last_seen')
           .in('user_id', friendIdsFromAccepted);
 
-        presenceData?.forEach(p => presenceMap.set(p.user_id, p.status));
+        presenceData?.forEach(p => {
+          presenceMap.set(p.user_id, {
+            status: p.status || 'offline',
+            lastSeen: p.last_seen || null,
+          });
+        });
       }
 
       // Map accepted friends
@@ -135,7 +148,13 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       });
 
       setFriends(mappedFriends);
-      setOnlineFriends(mappedFriends.filter(f => presenceMap.get(f.id) === 'online'));
+      const now = Date.now();
+      setOnlineFriends(mappedFriends.filter(f => {
+        const presence = presenceMap.get(f.id);
+        if (!presence || presence.status !== 'online' || !presence.lastSeen) return false;
+        return now - new Date(presence.lastSeen).getTime() < 5 * 60 * 1000;
+      }));
+      setFriendPresence(Object.fromEntries(presenceMap.entries()));
 
       // Map incoming pending requests
       const mappedIncoming: FriendRequest[] = incomingPending.map(r => {
@@ -244,6 +263,14 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
           table: 'friends'
         }, () => {
           // Refresh on any friends table change
+          fetchFriends();
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'user_presence'
+        }, () => {
+          // Keep online + last-seen data fresh
           fetchFriends();
         })
         .subscribe();
@@ -471,6 +498,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         getFriendById,
         searchUsers,
         onlineFriends,
+        friendPresence,
         refreshFriends,
         isPendingRequest
       }}
