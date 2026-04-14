@@ -291,6 +291,18 @@ const Quiz: React.FC = () => {
         return <Book className="h-5 w-5" />;
     }
   };
+
+  const getXPPerCorrectAnswer = (difficulty: "Easy" | "Medium" | "Hard") => {
+    switch (difficulty) {
+      case "Easy":
+        return 3;
+      case "Hard":
+        return 10;
+      case "Medium":
+      default:
+        return 7;
+    }
+  };
   
   if (activeQuiz) {
     return (
@@ -448,7 +460,7 @@ const Quiz: React.FC = () => {
                             </span>
                             <span className="flex items-center gap-1">
                               <Trophy className="h-4 w-4" />
-                              +{quiz.questions.length * 10} XP
+                              +{quiz.questions.length * getXPPerCorrectAnswer(quiz.difficulty)} XP max
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground mb-3">
