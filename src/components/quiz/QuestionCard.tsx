@@ -16,6 +16,10 @@ interface QuestionCardProps {
 const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLeft }) => {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [answered, setAnswered] = useState<boolean>(false);
+  const normalizedOptions =
+    question.type === "Multiple Choice"
+      ? [...question.options, "", "", "", ""].slice(0, 4)
+      : question.options;
   
   const handleOptionSelect = (option: string) => {
     if (answered) return;
@@ -57,11 +61,11 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLef
       </div>
       
       <div className="space-y-3 mb-6">
-        {question.options.map((option, index) => {
+        {normalizedOptions.map((option, index) => {
           const optionLabel = String.fromCharCode(65 + index); // A, B, C, D
           return (
             <div
-              key={option}
+              key={`${optionLabel}-${index}`}
               onClick={() => handleOptionSelect(option)}
               className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
                 answered && option === question.correctAnswer

@@ -31,30 +31,49 @@ const Quiz: React.FC = () => {
   
   useEffect(() => {
     const preferredGrade = parseInt(user?.grade || "5", 10);
-    const boundedGrade = Number.isNaN(preferredGrade) ? 5 : Math.min(12, Math.max(5, preferredGrade));
+    const boundedGrade = Number.isNaN(preferredGrade) ? 5 : Math.min(9, Math.max(5, preferredGrade));
     setSelectedGrade(boundedGrade.toString());
   }, [user?.grade]);
 
   const studentGrade = useMemo(() => {
     const preferredGrade = parseInt(user?.grade || "5", 10);
-    return Number.isNaN(preferredGrade) ? 5 : Math.min(12, Math.max(5, preferredGrade));
+    return Number.isNaN(preferredGrade) ? 5 : Math.min(9, Math.max(5, preferredGrade));
   }, [user?.grade]);
 
+  const selectedGradeNumber = useMemo(() => {
+    const parsed = parseInt(selectedGrade, 10);
+    return Number.isNaN(parsed) ? studentGrade : Math.min(9, Math.max(5, parsed));
+  }, [selectedGrade, studentGrade]);
+
   const normalizeCategory = (value: string) => value.toLowerCase().trim();
+  const rotateOptionsForBalance = (question: Question, quizIndexSeed: number, questionIndex: number): Question => {
+    if (question.type !== "Multiple Choice") return question;
+
+    const options = question.options.slice(0, 4);
+    if (options.length < 2 || !options.includes(question.correctAnswer)) return question;
+
+    const shift = (quizIndexSeed + questionIndex) % options.length;
+    if (shift === 0) return question;
+
+    const rotatedOptions = options.map((_, idx) => options[(idx + shift) % options.length]);
+    return {
+      ...question,
+      options: rotatedOptions,
+    };
+  };
 
   const categories = useMemo(
     () => [...new Set(
       quizzes
-        .filter((quiz) => quiz.gradeLevel === studentGrade)
+        .filter((quiz) => quiz.gradeLevel === selectedGradeNumber)
         .map((quiz) => quiz.category)
     )],
-    [quizzes, studentGrade]
+    [quizzes, selectedGradeNumber]
   );
 
-  // Create rich practice sets per grade+subject:
-  // 10 sets with 5 questions and 10 sets with 10 questions (20 total per subject+grade).
+  // Create 10 practice sets per grade+subject with 10 questions each.
   const generatedPracticeQuizzes = useMemo(() => {
-    const grade = studentGrade;
+    const grade = selectedGradeNumber;
     if (Number.isNaN(grade)) return [];
 
     const quizzesByCategory = new Map<string, QuizType[]>();
@@ -71,11 +90,17 @@ const Quiz: React.FC = () => {
         quiz.questions.forEach((question) => dedupedQuestions.set(question.id, question));
       });
       const pool = Array.from(dedupedQuestions.values());
+      const fallbackOptions = [
+        `Choice 1 for Grade ${grade} ${category}`,
+        `Choice 2 for Grade ${grade} ${category}`,
+        `Choice 3 for Grade ${grade} ${category}`,
+        `Choice 4 for Grade ${grade} ${category}`,
+      ];
       const fallbackQuestion: Question = {
         id: `fallback-${category.toLowerCase().replace(/\s+/g, "-")}-g${grade}-q${index + 1}`,
         text: `Grade ${grade} ${category}: Practice question ${index + 1}`,
-        options: ["Option A", "Option B", "Option C", "Option D"],
-        correctAnswer: "Option A",
+        options: fallbackOptions,
+        correctAnswer: fallbackOptions[index % fallbackOptions.length],
         difficulty: "Medium",
         subject: category,
         grade,
@@ -88,13 +113,14 @@ const Quiz: React.FC = () => {
       const selectedQuestions = Array.from({ length: questionCount }, (_, pickIndex) => {
         if (pool.length === 0) return fallbackQuestion;
         const question = pool[(offset + pickIndex) % pool.length];
-        return question || fallbackQuestion;
+        const baseQuestion = question || fallbackQuestion;
+        return rotateOptionsForBalance(baseQuestion, index, pickIndex);
       });
       const avgPoints = selectedQuestions.reduce((acc, q) => acc + (q.points || 10), 0) / Math.max(selectedQuestions.length, 1);
       const quizDifficulty: QuizType["difficulty"] = avgPoints >= 15 ? "Hard" : avgPoints >= 10 ? "Medium" : "Easy";
       const sourceQuizId = subjectQuizzes[0]?.id;
-      const setType = questionCount === 5 ? "Sprint" : "Mastery";
-      const setNumber = questionCount === 5 ? index + 1 : index - 9;
+      const setType = "Practice";
+      const setNumber = index + 1;
 
       return {
         id: `practice-g${grade}-${category.toLowerCase().replace(/\s+/g, "-")}-${questionCount}-${setNumber}`,
@@ -119,14 +145,14 @@ const Quiz: React.FC = () => {
 
     categoriesToBuild.forEach((category) => {
       const subjectQuizzes = quizzesByCategory.get(category) || [];
-      for (let i = 0; i < 20; i++) {
-        const questionCount = i < 10 ? 5 : 10;
+      for (let i = 0; i < 10; i++) {
+        const questionCount = 10;
         practiceSets.push(buildSet(subjectQuizzes, category, questionCount, i));
       }
     });
 
     return practiceSets;
-  }, [categories, quizzes, selectedCategory, studentGrade]);
+  }, [categories, quizzes, selectedCategory, selectedGradeNumber]);
   
   const filteredQuizzes = generatedPracticeQuizzes;
 
@@ -191,7 +217,7 @@ const Quiz: React.FC = () => {
 
     const matchingQuestions = quizzes
       .filter((quiz) => {
-        const sameGrade = quiz.gradeLevel === studentGrade;
+        const sameGrade = quiz.gradeLevel === selectedGradeNumber;
         const sameSubject = normalizeCategory(quiz.category) === normalizeCategory(selectedCategory);
         const difficultyMatch = quiz.difficulty === targetDifficulty;
         return sameGrade && sameSubject && difficultyMatch;
@@ -200,26 +226,28 @@ const Quiz: React.FC = () => {
 
     const freshPool = matchingQuestions.filter((question) => !attemptedQuestionIds.has(question.id));
     const shuffledFreshPool = [...freshPool].sort(() => Math.random() - 0.5);
-    const selectedQuestions = shuffledFreshPool.slice(0, numQuestions);
+    const selectedQuestions = shuffledFreshPool
+      .slice(0, numQuestions)
+      .map((question, index) => rotateOptionsForBalance(question, selectedGradeNumber, index));
 
     if (selectedQuestions.length < numQuestions) {
-      toast.error(`Not enough new ${selectedCategory} questions available for Grade ${studentGrade} at ${targetDifficulty} level.`);
+      toast.error(`Not enough new ${selectedCategory} questions available for Grade ${selectedGradeNumber} at ${targetDifficulty} level.`);
       return;
     }
 
     const randomQuiz: QuizType = {
-      id: `quick-${selectedCategory.toLowerCase().replace(/\s+/g, "-")}-g${studentGrade}-${Date.now()}`,
-      title: `Quick ${selectedCategory} Quiz - Grade ${studentGrade}`,
-      description: `${numQuestions} random ${targetDifficulty.toLowerCase()} questions from your class level`,
+      id: `quick-${selectedCategory.toLowerCase().replace(/\s+/g, "-")}-g${selectedGradeNumber}-${Date.now()}`,
+      title: `Quick ${selectedCategory} Quiz - Grade ${selectedGradeNumber}`,
+      description: `${numQuestions} random ${targetDifficulty.toLowerCase()} questions from your selected class level`,
       questions: selectedQuestions,
       subject: selectedCategory,
-      grade: studentGrade,
+      grade: selectedGradeNumber,
       difficulty: targetDifficulty,
       timeLimit: numQuestions * 30,
       createdAt: new Date(),
       topics: ["General"],
       category: selectedCategory,
-      gradeLevel: studentGrade
+      gradeLevel: selectedGradeNumber
     };
 
     setAllowXPForActiveQuiz(true);
@@ -354,12 +382,12 @@ const Quiz: React.FC = () => {
                       {/* Grade Filter */}
                       <div className="flex items-center gap-2 ml-auto">
                         <span className="text-sm font-medium text-muted-foreground">Grade:</span>
-                        <Select value={selectedGrade} disabled>
+                        <Select value={selectedGrade} onValueChange={setSelectedGrade}>
                           <SelectTrigger className="w-28 glass border-border/50">
                             <SelectValue placeholder="Grade" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
+                            {[5, 6, 7, 8, 9].map((grade) => (
                               <SelectItem key={grade} value={grade.toString()}>
                                 Grade {grade}
                               </SelectItem>
@@ -502,12 +530,12 @@ const Quiz: React.FC = () => {
                       
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Grade</label>
-                        <Select value={selectedGrade} disabled>
+                        <Select value={selectedGrade} onValueChange={setSelectedGrade}>
                           <SelectTrigger className="glass border-border/50">
                             <SelectValue placeholder="Select Grade" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
+                            {[5, 6, 7, 8, 9].map((grade) => (
                               <SelectItem key={grade} value={grade.toString()}>
                                 Grade {grade}
                               </SelectItem>
