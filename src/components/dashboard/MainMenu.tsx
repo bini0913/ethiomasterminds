@@ -11,7 +11,7 @@ import DailyChallenge from "../challenges/DailyChallenge";
 import { useAIHelper } from "@/context/AIHelperContext";
 import { 
   Bot, BookOpen, Trophy, Users, Settings, GraduationCap,
-  Gamepad, Store, Award, Zap, Target, Medal, Home, LogOut, Sparkles, Compass
+  Gamepad, Store, Award, Zap, Target, LogOut, Sparkles, Compass, Timer
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
@@ -49,6 +49,7 @@ const MainMenu: React.FC = () => {
     { title: t("game-lobby"), icon: <Gamepad className="h-6 w-6" />, path: "/lobby", category: "play", color: "from-green-400 to-emerald-500", description: t("join-matches-chat") },
     { title: t("leaderboard"), icon: <Trophy className="h-6 w-6" />, path: "/leaderboard", category: "compete", color: "from-yellow-500 to-amber-600", description: t("see-whos-top") },
     { title: t("ai-tutor"), icon: <Bot className="h-6 w-6" />, path: "/ai-tutor", category: "learn", color: "from-violet-500 to-purple-600", description: t("24-7-ai-helper") },
+    { title: "Study Mode", icon: <Timer className="h-6 w-6" />, path: "/study-mode", category: "learn", color: "from-blue-500 to-indigo-600", description: "Focus timer, tasks & streaks" },
     { title: "Library", icon: <BookOpen className="h-6 w-6" />, path: "/library", category: "social", color: "from-emerald-500 to-teal-600", description: "Read books with AI tools" },
     { title: t("social-feed"), icon: <Compass className="h-6 w-6" />, path: "/social", category: "social", color: "from-sky-500 to-blue-600", description: t("posts-updates") },
     { title: t("friends"), icon: <Users className="h-6 w-6" />, path: "/friends", category: "social", color: "from-teal-500 to-cyan-600", description: t("connect-chat") },

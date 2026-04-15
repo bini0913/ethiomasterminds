@@ -34,6 +34,7 @@ import StudyPlannerPage from "./pages/StudyPlannerPage";
 import AcademicInsightsPage from "./pages/AcademicInsightsPage";
 import LibraryPage from "./pages/LibraryPage";
 import UserProfilePage from "./pages/UserProfilePage";
+import StudyModePage from "./pages/StudyModePage";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -72,6 +73,7 @@ const App = () => (
                               <Route path="/lobby" element={<Lobby />} />
                               <Route path="/leaderboard" element={<Leaderboard />} />
                               <Route path="/profile/:userId" element={<UserProfilePage />} />
+                              <Route path="/study-mode" element={<StudyModePage />} />
                               <Route path="/friends" element={<Friends />} />
                               <Route path="/settings" element={<Settings />} />
                               <Route path="/chat" element={<Chat />} />
