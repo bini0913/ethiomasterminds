@@ -191,7 +191,7 @@ const PlusHelper: React.FC<PlusHelperProps> = ({ isOpen, onClose, context }) => 
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 50, scale: 0.9 }}
         transition={{ duration: 0.3, type: 'spring' }}
-        className="fixed bottom-4 right-4 md:bottom-8 md:right-8 z-50"
+        className="fixed bottom-5 right-5 z-[9999]"
       >
         <div className="glass neon-border rounded-2xl w-[95vw] sm:w-[420px] max-w-[420px] overflow-hidden flex flex-col shadow-2xl">
           {/* Header */}

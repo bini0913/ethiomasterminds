@@ -66,7 +66,7 @@ const AIHelper: React.FC = () => {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 50, scale: 0.9 }}
           transition={{ duration: 0.2 }}
-          className="fixed bottom-4 right-4 md:bottom-8 md:right-8 z-50"
+          className="fixed bottom-5 right-5 z-[9999]"
         >
           <div className="bg-white rounded-xl shadow-2xl w-[90vw] sm:w-[450px] max-w-[450px] overflow-hidden flex flex-col">
             {/* Header */}

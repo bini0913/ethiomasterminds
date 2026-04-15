@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Book, Calculator, Atom, BookOpen, Brain, Zap, Trophy, Target, Play, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import AIHelper from "@/components/ai/AIHelper";
 import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import BackButton from "@/components/ui/BackButton";
 import { motion } from "framer-motion";
@@ -667,7 +666,6 @@ const Quiz: React.FC = () => {
         </footer>
       </div>
       
-      <AIHelper />
     </div>
   );
 };
