@@ -34,6 +34,7 @@ import StudyPlannerPage from "./pages/StudyPlannerPage";
 import AcademicInsightsPage from "./pages/AcademicInsightsPage";
 import LibraryPage from "./pages/LibraryPage";
 import UserProfilePage from "./pages/UserProfilePage";
+import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -122,6 +123,15 @@ const App = () => (
                                     <LibraryPage />
                                   </ProtectedRoute>
                                 }
+                              />
+
+                              <Route 
+                                path="/root-control-portal-9xA7" 
+                                element={
+                                  <ProtectedRoute allowedRoles={['extreme_admin']}>
+                                    <ExtremeAdminPortal />
+                                  </ProtectedRoute>
+                                } 
                               />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
