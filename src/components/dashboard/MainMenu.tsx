@@ -10,8 +10,8 @@ import { motion } from "framer-motion";
 import DailyChallenge from "../challenges/DailyChallenge";
 import { useAIHelper } from "@/context/AIHelperContext";
 import { 
-  Bot, BookOpen, Calculator, Atom, Trophy, Users, Settings, GraduationCap,
-  School, Gamepad, Store, Award, Zap, Target, Medal, Home, LogOut, Sparkles, Brain, Compass
+  Bot, BookOpen, Trophy, Users, Settings, GraduationCap,
+  Gamepad, Store, Award, Zap, Target, Medal, Home, LogOut, Sparkles, Compass
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
@@ -48,17 +48,12 @@ const MainMenu: React.FC = () => {
     { title: t("multiplayer"), icon: <Users className="h-6 w-6" />, path: "/multiplayer", category: "play", color: "from-blue-500 to-cyan-600", description: t("compete-friends") },
     { title: t("game-lobby"), icon: <Gamepad className="h-6 w-6" />, path: "/lobby", category: "play", color: "from-green-400 to-emerald-500", description: t("join-matches-chat") },
     { title: t("leaderboard"), icon: <Trophy className="h-6 w-6" />, path: "/leaderboard", category: "compete", color: "from-yellow-500 to-amber-600", description: t("see-whos-top") },
-    { title: t("avatar-store"), icon: <Store className="h-6 w-6" />, path: "/store", category: "social", color: "from-purple-500 to-pink-600", description: t("customize-look") },
-    { title: t("tournaments"), icon: <Award className="h-6 w-6" />, path: "/tournaments", category: "compete", color: "from-orange-500 to-red-600", description: t("global-competitions") },
-    { title: t("mathematics"), icon: <Calculator className="h-6 w-6" />, path: "/quiz?subject=math", category: "learn", color: "from-red-500 to-pink-600", description: t("numbers-algebra") },
-    { title: t("science"), icon: <Atom className="h-6 w-6" />, path: "/quiz?subject=science", category: "learn", color: "from-green-500 to-emerald-600", description: t("physics-chemistry") },
-    { title: t("english"), icon: <BookOpen className="h-6 w-6" />, path: "/quiz?subject=english", category: "learn", color: "from-blue-500 to-indigo-600", description: t("grammar-vocabulary") },
-    { title: t("general-knowledge"), icon: <School className="h-6 w-6" />, path: "/quiz?subject=gk", category: "learn", color: "from-amber-500 to-orange-600", description: t("history-geography") },
     { title: t("ai-tutor"), icon: <Bot className="h-6 w-6" />, path: "/ai-tutor", category: "learn", color: "from-violet-500 to-purple-600", description: t("24-7-ai-helper") },
-    { title: t("learning-dna"), icon: <Brain className="h-6 w-6" />, path: "/learning-dna", category: "learn", color: "from-pink-500 to-rose-600", description: t("your-brain-map") },
-    { title: t("friends"), icon: <Users className="h-6 w-6" />, path: "/friends", category: "social", color: "from-teal-500 to-cyan-600", description: t("connect-chat") },
-    { title: t("social-feed"), icon: <Compass className="h-6 w-6" />, path: "/social", category: "social", color: "from-sky-500 to-blue-600", description: t("posts-updates") },
     { title: "Library", icon: <BookOpen className="h-6 w-6" />, path: "/library", category: "social", color: "from-emerald-500 to-teal-600", description: "Read books with AI tools" },
+    { title: t("social-feed"), icon: <Compass className="h-6 w-6" />, path: "/social", category: "social", color: "from-sky-500 to-blue-600", description: t("posts-updates") },
+    { title: t("friends"), icon: <Users className="h-6 w-6" />, path: "/friends", category: "social", color: "from-teal-500 to-cyan-600", description: t("connect-chat") },
+    { title: t("tournaments"), icon: <Award className="h-6 w-6" />, path: "/tournaments", category: "compete", color: "from-orange-500 to-red-600", description: t("global-competitions") },
+    { title: t("avatar-store"), icon: <Store className="h-6 w-6" />, path: "/store", category: "social", color: "from-purple-500 to-pink-600", description: t("customize-look") },
     { title: t("settings"), icon: <Settings className="h-6 w-6" />, path: "/settings", category: "all", color: "from-gray-500 to-slate-600", description: t("preferences") },
   ];
 
