@@ -125,6 +125,15 @@ const App = () => (
                                   </ProtectedRoute>
                                 }
                               />
+
+                              <Route 
+                                path="/root-control-portal-9xA7" 
+                                element={
+                                  <ProtectedRoute allowedRoles={['extreme_admin']}>
+                                    <ExtremeAdminPortal />
+                                  </ProtectedRoute>
+                                } 
+                              />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             <AIHelper />

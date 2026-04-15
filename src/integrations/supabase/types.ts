@@ -2437,6 +2437,102 @@ export type Database = {
         Args: { p_invite_id: string; p_response: string }
         Returns: Json
       }
+      extreme_admin_adjust_economy: {
+        Args: {
+          p_coin_delta?: number
+          p_reset_progress?: boolean
+          p_user_id: string
+          p_xp_delta?: number
+        }
+        Returns: Json
+      }
+      extreme_admin_check_access: {
+        Args: { p_request_ip?: string; p_two_factor_code?: string }
+        Returns: boolean
+      }
+      extreme_admin_configure_security: {
+        Args: {
+          p_allowed_ips?: string[]
+          p_require_2fa?: boolean
+          p_two_factor_code?: string
+        }
+        Returns: {
+          allowed_ips: string[]
+          id: boolean
+          require_2fa: boolean
+          two_factor_code_hash: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+      }
+      extreme_admin_delete_library_book: { Args: { p_book_id: string }; Returns: boolean }
+      extreme_admin_delete_message: { Args: { p_message_id: string }; Returns: boolean }
+      extreme_admin_delete_social_post: { Args: { p_post_id: string }; Returns: boolean }
+      extreme_admin_get_audit_logs: {
+        Args: { p_limit?: number }
+        Returns: {
+          action: string
+          actor_id: string
+          actor_name: string | null
+          created_at: string
+          details: Json
+          id: string
+          target_id: string | null
+          target_type: string
+        }[]
+      }
+      extreme_admin_get_dashboard: { Args: Record<PropertyKey, never>; Returns: Json }
+      extreme_admin_get_security: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          allowed_ips: string[]
+          require_2fa: boolean
+          updated_at: string
+          updated_by: string | null
+        }[]
+      }
+      extreme_admin_get_settings: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+          updated_by: string | null
+        }[]
+      }
+      extreme_admin_list_users: {
+        Args: { p_limit?: number }
+        Returns: {
+          account_status: string
+          coins: number
+          created_at: string
+          grade: string | null
+          id: string
+          level: number
+          name: string
+          role: Database["public"]["Enums"]["app_role"]
+          username: string | null
+          xp: number
+        }[]
+      }
+      extreme_admin_purge_user_data: { Args: { p_user_id: string }; Returns: boolean }
+      extreme_admin_set_setting: {
+        Args: { p_key: string; p_value: Json }
+        Returns: {
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+      }
+      extreme_admin_set_user_status: {
+        Args: { p_reason?: string; p_status: string; p_user_id: string }
+        Returns: boolean
+      }
+      extreme_admin_update_user_role: {
+        Args: { p_role: Database["public"]["Enums"]["app_role"]; p_user_id: string }
+        Returns: boolean
+      }
       update_analytics: {
         Args: {
           p_avg_time: number
@@ -2450,7 +2546,7 @@ export type Database = {
       update_user_streak: { Args: { p_user_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "student" | "teacher" | "admin" | "manager"
+      app_role: "student" | "teacher" | "admin" | "manager" | "extreme_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2578,7 +2674,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["student", "teacher", "admin", "manager"],
+      app_role: ["student", "teacher", "admin", "manager", "extreme_admin"],
     },
   },
 } as const

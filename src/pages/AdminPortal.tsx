@@ -38,7 +38,7 @@ import {
   YAxis,
 } from 'recharts';
 
-type Role = 'student' | 'teacher' | 'admin' | 'manager';
+type Role = 'student' | 'teacher' | 'admin' | 'manager' | 'extreme_admin';
 
 interface SystemUser {
   id: string;
