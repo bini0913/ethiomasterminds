@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
   Crown,
-  Play,
   Clock,
   MessageCircle,
   Send,
@@ -56,7 +55,7 @@ interface Question {
 }
 
 interface RoomState {
-  status: 'waiting' | 'countdown' | 'playing' | 'finished';
+  status: 'waiting' | 'ready' | 'countdown' | 'starting' | 'playing' | 'finished';
   question_index: number;
   current_question_id: string | null;
   question_started_at: string | null;
@@ -114,7 +113,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [loading, setLoading] = useState(true);
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [isHost, setIsHost] = useState(false);
-  const [countdownValue, setCountdownValue] = useState(10);
+  const [countdownValue, setCountdownValue] = useState(5);
   const [countdownEndsAt, setCountdownEndsAt] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [offlineSeconds, setOfflineSeconds] = useState(30);
@@ -125,7 +124,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [answerShake, setAnswerShake] = useState(false);
   const [latencyMs, setLatencyMs] = useState(42);
   const [roomConfig, setRoomConfig] = useState({
-    subject: 'Mixed',
+    subject: 'Math',
     difficulty: 'Medium',
     gameMode: 'speed',
     questionCount: 10,
@@ -133,6 +132,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   const advancingQuestionRef = useRef(false);
   const prevPlayersRef = useRef<Player[]>([]);
+  const autoStartTriggeredRef = useRef(false);
 
   useEffect(() => {
     void loadRoomData();
@@ -163,7 +163,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }, [isHost, roomState.status, timeRemaining]);
 
   useEffect(() => {
-    if (roomState.status !== 'countdown') return;
+    if (roomState.status !== 'countdown' && roomState.status !== 'starting') return;
     const remaining = countdownEndsAt
       ? Math.max(0, Math.ceil((new Date(countdownEndsAt).getTime() - Date.now()) / 1000))
       : countdownValue;
@@ -181,6 +181,22 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
     return () => clearTimeout(tick);
   }, [roomState.status, countdownEndsAt, countdownValue, isHost]);
+
+  useEffect(() => {
+    if (roomState.status !== 'waiting') {
+      autoStartTriggeredRef.current = false;
+      return;
+    }
+
+    if (!canAutoStart) {
+      autoStartTriggeredRef.current = false;
+      return;
+    }
+
+    if (!isHost || autoStartTriggeredRef.current) return;
+    autoStartTriggeredRef.current = true;
+    void triggerCountdown();
+  }, [canAutoStart, isHost, roomState.status]);
 
   useEffect(() => {
     const handleOffline = () => {
@@ -269,7 +285,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       setIsHost(room.host_id === currentUserId);
       setTotalQuestions(room.question_count || 10);
       setRoomConfig({
-        subject: room.subject || 'Mixed',
+        subject: room.subject || 'Math',
         difficulty: room.difficulty || 'Medium',
         gameMode: room.game_mode || 'speed',
         questionCount: room.question_count || 10,
@@ -290,7 +306,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
       if (state) {
         setRoomState(state as RoomState);
-        if (state.status === 'countdown') {
+        if (state.status === 'countdown' || state.status === 'starting') {
           setCountdownEndsAt(state.question_ends_at);
         }
         if (state.current_question_id) {
@@ -440,7 +456,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           const newState = payload.new as RoomState | null;
           if (!newState) return;
           setRoomState(newState);
-          if (newState.status === 'countdown') {
+          if (newState.status === 'countdown' || newState.status === 'starting') {
             setCountdownEndsAt(newState.question_ends_at);
           } else {
             setCountdownEndsAt(null);
@@ -624,7 +640,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     await supabase
       .from('multiplayer_rooms')
       .update({
-        subject: merged.subject === 'Mixed' ? null : merged.subject,
+        subject: merged.subject,
         difficulty: merged.difficulty,
         game_mode: merged.gameMode,
         question_count: merged.questionCount,
@@ -643,7 +659,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       .upsert(
         {
           room_id: roomId,
-          status: 'countdown',
+          status: 'starting',
           question_started_at: new Date().toISOString(),
           question_ends_at: endTime,
         },
@@ -665,6 +681,19 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const strongestOpponent = players
     .filter((p) => p.id !== currentUserId)
     .sort((a, b) => b.level - a.level)[0];
+
+  const readyPlayers = players.filter((p) => p.isReady).length;
+  const canAutoStart = players.length >= 2 && readyPlayers === players.length;
+  const roomPhaseLabel =
+    roomState.status === 'countdown' || roomState.status === 'starting'
+      ? 'starting'
+      : roomState.status === 'playing'
+      ? 'playing'
+      : roomState.status === 'finished'
+      ? 'finished'
+      : canAutoStart
+      ? 'ready'
+      : 'waiting';
 
   const highlightKeywords = (text: string) => {
     const words = text.split(' ');
@@ -701,7 +730,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
           <div>
             <h1 className="text-2xl font-display font-bold">{roomName}</h1>
-            <p className="text-sm text-blue-100/75">Room ID: {roomId.slice(0, 8)}... · Topic: Mixed · Difficulty: Adaptive</p>
+            <p className="text-sm text-blue-100/75">Room ID: {roomId.slice(0, 8)}... · Subject: {roomConfig.subject} · Mode: {roomConfig.gameMode}</p>
           </div>
           <div className={`text-xs rounded-md border border-white/20 bg-black/25 px-2 py-1 flex items-center gap-2 ${connectionColor}`}>
             <Signal className="h-3 w-3" /> {connectionQuality} · {latencyMs}ms
@@ -737,38 +766,26 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                   <p className="text-blue-100/80">{players.length}/{maxPlayers} players connected</p>
                   <Progress value={(players.length / maxPlayers) * 100} className="h-2" />
 
+                  <div className="rounded-lg border border-cyan-300/35 bg-cyan-500/10 px-3 py-2 text-sm">
+                    Room State: <span className="font-semibold uppercase">{roomPhaseLabel}</span>
+                  </div>
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                     <div className="rounded-lg border border-white/15 p-2">Questions: {roomConfig.questionCount}</div>
                     <div className="rounded-lg border border-white/15 p-2">Topic: {roomConfig.subject}</div>
-                    <div className="rounded-lg border border-white/15 p-2">Difficulty: {roomConfig.difficulty}</div>
+                    <div className="rounded-lg border border-white/15 p-2">Ready: {readyPlayers}/{players.length || 1}</div>
                     <div className="rounded-lg border border-white/15 p-2">Mode: {roomConfig.gameMode}</div>
                   </div>
 
                   {isHost && (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                      <Select value={roomConfig.gameMode} onValueChange={(value) => void updateRoomConfig({ gameMode: value })}>
-                        <SelectTrigger><SelectValue placeholder="Game mode" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="speed">⚡ Speed</SelectItem>
-                          <SelectItem value="accuracy">🎯 Accuracy</SelectItem>
-                          <SelectItem value="battle">🔥 Battle</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                       <Select value={roomConfig.subject} onValueChange={(value) => void updateRoomConfig({ subject: value })}>
-                        <SelectTrigger><SelectValue placeholder="Topic" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Mixed">Mixed</SelectItem>
-                          <SelectItem value="Mathematics">Mathematics</SelectItem>
+                          <SelectItem value="Math">Math</SelectItem>
                           <SelectItem value="Science">Science</SelectItem>
                           <SelectItem value="English">English</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={roomConfig.difficulty} onValueChange={(value) => void updateRoomConfig({ difficulty: value })}>
-                        <SelectTrigger><SelectValue placeholder="Difficulty" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Easy">Easy</SelectItem>
-                          <SelectItem value="Medium">Medium</SelectItem>
-                          <SelectItem value="Hard">Hard</SelectItem>
+                          <SelectItem value="GK">GK</SelectItem>
                         </SelectContent>
                       </Select>
                       <Select value={String(roomConfig.questionCount)} onValueChange={(value) => void updateRoomConfig({ questionCount: Number(value) })}>
@@ -776,8 +793,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                         <SelectContent>
                           <SelectItem value="5">5 Questions</SelectItem>
                           <SelectItem value="10">10 Questions</SelectItem>
-                          <SelectItem value="15">15 Questions</SelectItem>
                           <SelectItem value="20">20 Questions</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={roomConfig.gameMode} onValueChange={(value) => void updateRoomConfig({ gameMode: value })}>
+                        <SelectTrigger><SelectValue placeholder="Mode" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="speed">⚡ Speed</SelectItem>
+                          <SelectItem value="accuracy">🎯 Accuracy</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -785,13 +808,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
                   <div className="flex justify-center gap-2 flex-wrap">
                     <Button size="lg" className="min-h-11 px-6" variant={currentPlayer?.isReady ? 'default' : 'outline'} onClick={toggleReady}>
-                      {currentPlayer?.isReady ? '✓ Ready!' : 'Tap Ready'}
+                      {currentPlayer?.isReady ? 'READY ✅' : 'READY'}
                     </Button>
-                    {isHost && players.length >= 2 && (
-                      <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 min-h-11 px-6" onClick={triggerCountdown}>
-                        <Play className="h-4 w-4 mr-2" /> Start Countdown
-                      </Button>
-                    )}
                   </div>
 
                   <div className="flex justify-center gap-2">
@@ -809,12 +827,12 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
               </Card>
             )}
 
-            {roomState.status === 'countdown' && (
+            {(roomState.status === 'countdown' || roomState.status === 'starting') && (
               <Card className="p-12 bg-white/5 border-white/10 text-center">
                 <motion.div key={countdownValue} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-8xl font-display font-bold text-cyan-300">
                   {countdownValue}
                 </motion.div>
-                <p className="text-xl mt-4">All players ready. Match launching!</p>
+                <p className="text-xl mt-4">Match Starting… Syncing both players now</p>
               </Card>
             )}
 
@@ -838,6 +856,15 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                   )}
 
                   <Progress value={(timeRemaining / 30) * 100} className="h-2" />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {players.map((p) => (
+                      <div key={p.id} className="rounded-lg border border-white/15 px-3 py-2 flex items-center justify-between">
+                        <span className="truncate">{p.name}</span>
+                        <span className="font-semibold text-cyan-300">{p.score} pts</span>
+                      </div>
+                    ))}
+                  </div>
 
                   {strongestOpponent && strongestOpponent.level >= (currentPlayer?.level || 1) + 3 && (
                     <div className="rounded-lg border border-amber-300/35 bg-amber-500/10 p-2 text-sm text-amber-100">
@@ -915,11 +942,13 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                 {players.map((player) => (
                   <motion.div key={player.id} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={cn('p-3 rounded-xl border text-center', player.isReady ? 'border-green-400/50 bg-green-500/10' : 'border-white/15 bg-white/5')}>
                     <AvatarRenderer avatar={player.avatar} size="md" className="mx-auto mb-1" />
+                    <div className="text-[11px] uppercase tracking-wide text-blue-100/70">Player {players.findIndex((p) => p.id === player.id) + 1}</div>
                     <div className="text-sm font-medium truncate">{player.name}</div>
                     <div className="flex items-center justify-center gap-1 mt-1 text-xs text-blue-100/75">
                       {player.isHost && <Crown className="h-3 w-3 text-yellow-400" />} Lv.{player.level}
                     </div>
                     <div className={cn('flex justify-center items-center gap-1 mt-1 text-xs', connectionColor)}><Signal className="h-3 w-3" /> {connectionQuality}</div>
+                    <div className="mt-1 text-xs">{player.isReady ? 'Ready ✅' : 'Waiting ⏳'}</div>
                     {roomState.status !== 'waiting' && <div className="text-sm font-bold text-cyan-300 mt-1">{player.score} pts</div>}
                     {isHost && player.id !== currentUserId && roomState.status === 'waiting' && (
                       <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => void kickPlayer(player.id, player.name)}>

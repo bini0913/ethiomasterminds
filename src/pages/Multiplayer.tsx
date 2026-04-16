@@ -7,6 +7,7 @@ import {
   Lock,
   Medal,
   RefreshCw,
+  Share2,
   Swords,
   Trophy,
   UserPlus,
@@ -158,17 +159,18 @@ const Multiplayer: React.FC = () => {
               <CardDescription>
                 {didWin
                   ? "XP burst, rank climb, and streak bonus unlocked."
-                  : "Great fight — tune accuracy and bounce back."}
+                  : "Great fight — tune accuracy and bounce back."} Winner: {didWin ? 'You 🥇' : 'Opponent 🥇'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid sm:grid-cols-5 gap-3">
+              <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
                   { label: "XP gained", value: `+${matchSummary.xpGained}` },
                   { label: "Rank change", value: `${matchSummary.rankChange > 0 ? "+" : ""}${matchSummary.rankChange}` },
                   { label: "Accuracy", value: `${matchSummary.accuracy}%` },
                   { label: "Avg speed", value: `${matchSummary.avgResponseTime}s` },
                   { label: "Best streak", value: `${matchSummary.streak}` },
+                  { label: "Coins earned", value: `+${Math.max(10, Math.round(matchSummary.xpGained / 2))}` },
                 ].map((stat) => (
                   <Card key={stat.label} className="bg-muted/50">
                     <CardContent className="p-3 text-sm">
@@ -199,6 +201,9 @@ const Multiplayer: React.FC = () => {
                     </Button>
                     <Button variant="secondary" onClick={() => navigate("/leaderboard")}>
                       <BarChart3 className="w-4 h-4 mr-2" /> View Stats
+                    </Button>
+                    <Button variant="outline" onClick={() => toast.success('Result card shared')}>
+                      <Share2 className="w-4 h-4 mr-2" /> Share Result
                     </Button>
                   </CardContent>
                 </Card>
