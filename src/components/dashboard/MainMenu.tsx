@@ -7,7 +7,6 @@ import { useCurrency } from "@/context/CurrencyContext";
 import { useAchievements } from "@/context/AchievementsContext";
 import UserLevel from "../profile/UserLevel";
 import { motion } from "framer-motion";
-import DailyChallenge from "../challenges/DailyChallenge";
 import { useAIHelper } from "@/context/AIHelperContext";
 import { 
   Bot, BookOpen, Trophy, Users, Settings, GraduationCap,
@@ -148,9 +147,6 @@ const MainMenu: React.FC = () => {
           </motion.div>
         </div>
       )}
-
-      {/* Daily Challenge */}
-      <div className="px-4 py-4 max-w-7xl mx-auto w-full"><DailyChallenge /></div>
 
       {/* Category Filters */}
       <div className="px-4 pb-2 max-w-7xl mx-auto w-full">
