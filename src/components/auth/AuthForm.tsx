@@ -146,25 +146,32 @@ const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, initialTab = "student" }
             </div>
 
             {/* Role Selector Tabs */}
-            <div className="flex border-b border-border/50">
-              {(['student', 'teacher', 'admin'] as const).map((r) => {
-                const RoleIcon = roleConfig[r].icon;
-                return (
-                  <button
-                    key={r}
-                    onClick={() => setRole(r)}
-                    className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 transition-all ${
-                      role === r 
-                        ? 'bg-primary/20 text-primary border-b-2 border-primary' 
-                        : 'text-muted-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    <RoleIcon className="h-4 w-4" />
-                    <span className="text-sm font-medium capitalize hidden sm:inline">{r}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {!isSignup ? (
+              <div className="flex border-b border-border/50">
+                {(['student', 'teacher', 'admin'] as const).map((r) => {
+                  const RoleIcon = roleConfig[r].icon;
+                  return (
+                    <button
+                      key={r}
+                      onClick={() => setRole(r)}
+                      className={`flex-1 py-3 px-4 flex items-center justify-center gap-2 transition-all ${
+                        role === r 
+                          ? 'bg-primary/20 text-primary border-b-2 border-primary' 
+                          : 'text-muted-foreground hover:bg-muted/50'
+                      }`}
+                    >
+                      <RoleIcon className="h-4 w-4" />
+                      <span className="text-sm font-medium capitalize hidden sm:inline">{r}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="border-b border-border/50 px-4 py-3 text-center">
+                <p className="text-sm font-medium text-foreground">Student Sign Up</p>
+                <p className="text-xs text-muted-foreground">Only student accounts can be created.</p>
+              </div>
+            )}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
