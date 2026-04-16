@@ -47,7 +47,6 @@ import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
 import { ChatProvider } from "./context/ChatContext";
 import AIHelper from "./components/ai/AIHelper";
-import PlusButton from "./components/ai/PlusButton";
 
 const queryClient = new QueryClient();
 
@@ -138,7 +137,6 @@ const App = () => (
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             <AIHelper />
-                            <PlusButton />
                           </BrowserRouter>
                         </TooltipProvider>
                       </ChatProvider>
