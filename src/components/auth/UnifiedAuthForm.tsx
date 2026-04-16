@@ -89,7 +89,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     try {
       let success = false;
       if (isSignup) {
-        success = await signupWithRole(email, password, name, username, role);
+        success = await signupWithRole(email, password, name, username, "student");
       } else {
         success = await loginWithUsername(username, password);
       }
@@ -131,6 +131,9 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
 
   const config = roleConfig[role];
   const Icon = config.icon;
+  const activeRole = isSignup ? "student" : role;
+  const activeConfig = roleConfig[activeRole];
+  const ActiveIcon = activeConfig.icon;
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -145,7 +148,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
         >
           <div className="glass rounded-3xl overflow-hidden border border-primary/20">
             {/* Header */}
-            <div className={`bg-gradient-to-r ${config.gradient} bg-[length:200%_100%] p-6 relative overflow-hidden`}>
+            <div className={`bg-gradient-to-r ${activeConfig.gradient} bg-[length:200%_100%] p-6 relative overflow-hidden`}>
               <div className="absolute inset-0 overflow-hidden">
                 {[...Array(5)].map((_, i) => (
                   <motion.div
@@ -167,17 +170,24 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                   transition={{ type: "spring", delay: 0.2 }}
                   className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl"
                 >
-                  <Icon className="h-10 w-10 text-white" />
+                  <ActiveIcon className="h-10 w-10 text-white" />
                 </motion.div>
                 <h1 className="text-2xl font-display font-bold text-white">
-                  {isSignup ? `${config.title} ${t("signup")}` : `${config.title} ${t("login")}`}
+                  {isSignup ? `${t("student")} ${t("signup")}` : `${activeConfig.title} ${t("login")}`}
                 </h1>
-                <p className="text-white/80 text-sm mt-1">{config.description}</p>
+                <p className="text-white/80 text-sm mt-1">
+                  {isSignup ? t("student-desc") : activeConfig.description}
+                </p>
               </div>
             </div>
 
             {/* Role Selector Tabs */}
-            {isSignup && (
+            {isSignup ? (
+              <div className="border-b border-border/50 px-4 py-3 text-center">
+                <p className="text-sm font-medium text-foreground">{t("student-signup")}</p>
+                <p className="text-xs text-muted-foreground">Only student accounts can be created.</p>
+              </div>
+            ) : (
               <div className="flex border-b border-border/50">
                 {(['student', 'teacher', 'admin', 'manager'] as const).map((r) => {
                   const RoleIcon = roleConfig[r].icon;
@@ -258,7 +268,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                 {isSignup && <p className="text-xs text-muted-foreground">{t("min-6-chars")}</p>}
               </div>
 
-              <Button type="submit" disabled={loading || authLoading} className={`w-full h-14 text-lg font-display font-bold bg-gradient-to-r ${config.gradient} bg-[length:200%_100%] hover:bg-[position:100%_0] transition-all duration-500 rounded-xl shadow-lg text-white`}>
+              <Button type="submit" disabled={loading || authLoading} className={`w-full h-14 text-lg font-display font-bold bg-gradient-to-r ${activeConfig.gradient} bg-[length:200%_100%] hover:bg-[position:100%_0] transition-all duration-500 rounded-xl shadow-lg text-white`}>
                 {loading || authLoading ? (
                   <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full" />
                 ) : (

@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useUser } from '@/context/UserContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { 
   User, GraduationCap, Shield, Eye, EyeOff, Loader2, 
-  LogIn, UserPlus, Key, Mail, Lock
+  LogIn, UserPlus, Mail, Lock
 } from 'lucide-react';
 
 interface RoleLoginFormProps {
@@ -28,32 +27,8 @@ const RoleLoginForm: React.FC<RoleLoginFormProps> = ({ onSuccess }) => {
     email: '',
     password: '',
     name: '',
-    username: '',
-    accessCode: ''
+    username: ''
   });
-
-  const validateAccessCode = async (code: string, codeType: string): Promise<boolean> => {
-    const { data, error } = await supabase
-      .from('access_codes')
-      .select('*')
-      .eq('code', code.toUpperCase())
-      .eq('code_type', codeType)
-      .eq('is_used', false)
-      .single();
-
-    if (error || !data) {
-      return false;
-    }
-
-    return true;
-  };
-
-  const markCodeAsUsed = async (code: string, userId: string) => {
-    await supabase
-      .from('access_codes')
-      .update({ is_used: true, used_by: userId })
-      .eq('code', code.toUpperCase());
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,18 +38,9 @@ const RoleLoginForm: React.FC<RoleLoginFormProps> = ({ onSuccess }) => {
       return;
     }
 
-    // Validate access code for teacher/admin
-    if (mode === 'signup' && (role === 'teacher' || role === 'admin')) {
-      if (!formData.accessCode) {
-        toast.error(`Please enter a valid ${role} access code`);
-        return;
-      }
-
-      const isValidCode = await validateAccessCode(formData.accessCode, role);
-      if (!isValidCode) {
-        toast.error(`Invalid or already used ${role} code`);
-        return;
-      }
+    if (mode === 'signup' && role !== 'student') {
+      toast.error('Only student accounts can be created through sign up');
+      return;
     }
 
     setLoading(true);
@@ -97,17 +63,6 @@ const RoleLoginForm: React.FC<RoleLoginFormProps> = ({ onSuccess }) => {
         if (!success) {
           setLoading(false);
           return;
-        }
-
-        // Mark access code as used for teacher/admin
-        if (role === 'teacher' || role === 'admin') {
-          // Get current user after signup
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          if (currentUser) {
-            await markCodeAsUsed(formData.accessCode, currentUser.id);
-            // Update user role
-            await supabase.from('user_roles').update({ role }).eq('user_id', currentUser.id);
-          }
         }
 
         toast.success('Account created successfully!');
@@ -173,34 +128,41 @@ const RoleLoginForm: React.FC<RoleLoginFormProps> = ({ onSuccess }) => {
           </Tabs>
 
           {/* Role Selection */}
-          <div className="space-y-3">
-            <Label>Select Role</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['student', 'teacher', 'admin'] as const).map((r) => {
-                const config = roleConfig[r];
-                const Icon = config.icon;
-                return (
-                  <motion.button
-                    key={r}
-                    type="button"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setRole(r)}
-                    className={`relative p-4 rounded-xl border-2 transition-all ${
-                      role === r 
-                        ? `border-primary bg-gradient-to-br ${config.color} text-white` 
-                        : 'border-border hover:border-primary/50 bg-muted/50'
-                    }`}
-                  >
-                    <Icon className={`w-6 h-6 mx-auto mb-2 ${role === r ? 'text-white' : 'text-muted-foreground'}`} />
-                    <p className={`text-sm font-medium ${role === r ? 'text-white' : ''}`}>
-                      {config.title}
-                    </p>
-                  </motion.button>
-                );
-              })}
+          {mode === 'login' ? (
+            <div className="space-y-3">
+              <Label>Select Role</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['student', 'teacher', 'admin'] as const).map((r) => {
+                  const config = roleConfig[r];
+                  const Icon = config.icon;
+                  return (
+                    <motion.button
+                      key={r}
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setRole(r)}
+                      className={`relative p-4 rounded-xl border-2 transition-all ${
+                        role === r 
+                          ? `border-primary bg-gradient-to-br ${config.color} text-white` 
+                          : 'border-border hover:border-primary/50 bg-muted/50'
+                      }`}
+                    >
+                      <Icon className={`w-6 h-6 mx-auto mb-2 ${role === r ? 'text-white' : 'text-muted-foreground'}`} />
+                      <p className={`text-sm font-medium ${role === r ? 'text-white' : ''}`}>
+                        {config.title}
+                      </p>
+                    </motion.button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-border bg-muted/30 p-4 text-center">
+              <p className="font-medium">Student Sign Up</p>
+              <p className="text-xs text-muted-foreground">Only student accounts can be created.</p>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -263,26 +225,6 @@ const RoleLoginForm: React.FC<RoleLoginFormProps> = ({ onSuccess }) => {
               </div>
             </div>
 
-            {/* Access Code for Teacher/Admin */}
-            {mode === 'signup' && (role === 'teacher' || role === 'admin') && (
-              <div className="space-y-2">
-                <Label htmlFor="accessCode" className="flex items-center gap-2">
-                  <Key className="w-4 h-4" />
-                  {role === 'teacher' ? 'Teacher' : 'Admin'} Access Code
-                </Label>
-                <Input
-                  id="accessCode"
-                  placeholder={`Enter ${role} code`}
-                  value={formData.accessCode}
-                  onChange={(e) => setFormData({ ...formData, accessCode: e.target.value.toUpperCase() })}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  Contact an administrator to get an access code
-                </p>
-              </div>
-            )}
-
             <Button 
               type="submit" 
               className={`w-full bg-gradient-to-r ${roleConfig[role].color} text-white`}
@@ -293,14 +235,6 @@ const RoleLoginForm: React.FC<RoleLoginFormProps> = ({ onSuccess }) => {
             </Button>
           </form>
 
-          {/* Default Codes Info */}
-          {mode === 'signup' && (role === 'teacher' || role === 'admin') && (
-            <div className="p-3 bg-muted/50 rounded-lg text-sm">
-              <p className="text-muted-foreground text-center">
-                Default codes: <span className="font-mono">TEACHER2024</span> or <span className="font-mono">ADMIN2024</span>
-              </p>
-            </div>
-          )}
         </CardContent>
       </Card>
     </motion.div>

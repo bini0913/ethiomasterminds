@@ -259,6 +259,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     role: UserRole
   ): Promise<boolean> => {
     try {
+      if (role !== 'student') {
+        toast.error("Only student accounts can be created through sign up.");
+        return false;
+      }
+
       if (!email.trim() || !password.trim() || !name.trim() || !username.trim()) {
         toast.error("Please fill all required fields");
         return false;
