@@ -33,6 +33,7 @@ import ExamModePage from "./pages/ExamModePage";
 import StudyPlannerPage from "./pages/StudyPlannerPage";
 import AcademicInsightsPage from "./pages/AcademicInsightsPage";
 import LibraryPage from "./pages/LibraryPage";
+import StudyModePage from "./pages/StudyModePage";
 import UserProfilePage from "./pages/UserProfilePage";
 import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -111,6 +112,7 @@ const App = () => (
                               <Route path="/revision" element={<TimeTravelRevision />} />
                               <Route path="/avatar-creator" element={<AvatarCreator />} />
                               <Route path="/academic" element={<AcademicMode />} />
+                              <Route path="/study-mode" element={<StudyModePage />} />
                               <Route path="/academic/flashcards" element={<FlashcardsPage />} />
                               <Route path="/academic/topics" element={<TopicCoveragePage />} />
                               <Route path="/academic/exam" element={<ExamModePage />} />
