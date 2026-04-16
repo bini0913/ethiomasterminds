@@ -59,6 +59,21 @@ for all
 using (auth.uid() = host_id)
 with check (auth.uid() = host_id);
 
+
+create policy if not exists "members_or_open_rooms_can_view_rooms"
+on public.study_rooms
+for select
+using (
+  status in ('open', 'live')
+  or auth.uid() = host_id
+  or exists (
+    select 1
+    from public.room_members rm
+    where rm.room_id = study_rooms.id
+      and rm.user_id = auth.uid()
+  )
+);
+
 create policy if not exists "members_view_room_members"
 on public.room_members
 for select
