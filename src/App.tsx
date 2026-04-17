@@ -35,6 +35,7 @@ import AcademicInsightsPage from "./pages/AcademicInsightsPage";
 import LibraryPage from "./pages/LibraryPage";
 import StudyModePage from "./pages/StudyModePage";
 import UserProfilePage from "./pages/UserProfilePage";
+import Tournaments from "./pages/Tournaments";
 import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
@@ -102,7 +103,7 @@ const App = () => (
                                 } 
                               />
                               <Route path="/store" element={<StorePage />} />
-                              <Route path="/tournaments" element={<Lobby />} />
+                              <Route path="/tournaments" element={<Tournaments />} />
                               <Route path="/enhanced-settings" element={<EnhancedSettings />} />
                               <Route path="/social" element={<EnhancedSocial />} />
                               <Route path="/ai-tutor" element={<AITutor />} />
