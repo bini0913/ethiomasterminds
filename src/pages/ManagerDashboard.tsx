@@ -99,6 +99,7 @@ type TournamentPlayer = {
   id: string;
   name: string;
   progress: number;
+  userId: string;
 };
 
 type TournamentMatch = {
@@ -132,20 +133,31 @@ type ManagedTournament = {
   paused: boolean;
 };
 
+type TournamentParticipantRow = {
+  id: string;
+  tournament_id: string;
+  user_id: string;
+  score: number | null;
+};
+
+type TournamentMatchRow = {
+  id: string;
+  tournament_id: string;
+  round: number;
+  bracket_position: number;
+  status: 'pending' | 'ready' | 'live' | 'finished';
+  player1_id: string | null;
+  player2_id: string | null;
+  winner_id: string | null;
+};
+
 const gradeBands = ['Grade 1-4', 'Grade 5-8', 'Grade 9-12'];
 const subjects = ['Math', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography', 'Language'];
-const managerTournamentPool = ['Amina', 'Noah', 'Mika', 'Eden', 'Sami', 'Liya', 'Kenan', 'Rahel', 'Abel', 'Hana', 'Martha', 'Kidus'];
-
-const makeDemoMatches = (players: TournamentPlayer[]): TournamentMatch[] => {
-  const names = players.map((player) => player.name);
-  const matchCount = Math.max(2, Math.floor(names.length / 2));
-  return Array.from({ length: matchCount }).map((_, index) => ({
-    id: `match-${index + 1}`,
-    round: 'Round 1',
-    playerA: names[index * 2] || `Player ${index * 2 + 1}`,
-    playerB: names[index * 2 + 1] || `Player ${index * 2 + 2}`,
-    status: index === 0 ? 'live' : 'waiting',
-  }));
+const roundNameBySize: Record<number, string> = {
+  16: 'Round of 16',
+  8: 'Quarterfinal',
+  4: 'Semifinal',
+  2: 'Final',
 };
 
 const ManagerDashboard: React.FC = () => {
@@ -201,64 +213,8 @@ const ManagerDashboard: React.FC = () => {
 
   const [activityLog, setActivityLog] = useState<Array<{ id: string; action: string; at: string }>>([]);
   const [tournamentLog, setTournamentLog] = useState<Array<{ id: string; action: string; at: string }>>([]);
-  const [managedTournaments, setManagedTournaments] = useState<ManagedTournament[]>([
-    {
-      id: 't-1',
-      name: 'Weekend Math Clash',
-      subject: 'Math',
-      status: 'waiting',
-      maxPlayers: 16,
-      questionCount: 15,
-      mode: 'speed',
-      entryFeeType: 'coins',
-      entryFeeCoins: 120,
-      players: managerTournamentPool.slice(0, 12).map((name, index) => ({ id: `p-${index + 1}`, name, progress: Math.floor(Math.random() * 20) })),
-      matches: [],
-      rewards: { winnerCoins: 500, winnerXp: 250, runnerUpCoins: 250, runnerUpXp: 120 },
-      locked: false,
-      paused: false,
-    },
-    {
-      id: 't-2',
-      name: 'Science Sprint Cup',
-      subject: 'Physics',
-      status: 'active',
-      maxPlayers: 8,
-      questionCount: 12,
-      mode: 'accuracy',
-      entryFeeType: 'free',
-      entryFeeCoins: 0,
-      players: managerTournamentPool.slice(0, 8).map((name, index) => ({ id: `ap-${index + 1}`, name, progress: 25 + index * 8 })),
-      matches: [
-        { id: 'm-a1', round: 'Quarterfinal', playerA: 'Amina', playerB: 'Noah', status: 'live' },
-        { id: 'm-a2', round: 'Quarterfinal', playerA: 'Mika', playerB: 'Eden', status: 'finished', winner: 'Eden' },
-        { id: 'm-a3', round: 'Quarterfinal', playerA: 'Sami', playerB: 'Liya', status: 'waiting' },
-        { id: 'm-a4', round: 'Quarterfinal', playerA: 'Kenan', playerB: 'Rahel', status: 'waiting' },
-      ],
-      rewards: { winnerCoins: 300, winnerXp: 180, runnerUpCoins: 140, runnerUpXp: 90 },
-      locked: true,
-      paused: false,
-    },
-    {
-      id: 't-3',
-      name: 'History Finals',
-      subject: 'History',
-      status: 'finished',
-      maxPlayers: 8,
-      questionCount: 10,
-      mode: 'accuracy',
-      entryFeeType: 'free',
-      entryFeeCoins: 0,
-      players: managerTournamentPool.slice(0, 8).map((name, index) => ({ id: `fp-${index + 1}`, name, progress: 100 - index * 6 })),
-      matches: [
-        { id: 'm-f1', round: 'Final', playerA: 'Amina', playerB: 'Eden', status: 'finished', winner: 'Amina' },
-      ],
-      rewards: { winnerCoins: 250, winnerXp: 220, runnerUpCoins: 100, runnerUpXp: 120 },
-      locked: true,
-      paused: false,
-    },
-  ]);
-  const [selectedTournamentId, setSelectedTournamentId] = useState('t-1');
+  const [managedTournaments, setManagedTournaments] = useState<ManagedTournament[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState('');
   const [createTournamentForm, setCreateTournamentForm] = useState({
     maxPlayers: '8',
     subject: 'Math',
@@ -297,9 +253,88 @@ const ManagerDashboard: React.FC = () => {
         fetchCharts(),
         fetchStudents(),
         fetchModerationData(),
+        fetchManagerTournaments(),
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchManagerTournaments = async () => {
+    const [{ data: tournaments }, { data: participants }, { data: matches }, { data: profiles }] = await Promise.all([
+      supabase
+        .from('tournaments')
+        .select('id,name,subject,status,max_participants,entry_fee_coins,prize_coins,start_time,end_time')
+        .order('start_time', { ascending: false })
+        .limit(50),
+      supabase.from('tournament_participants').select('id,tournament_id,user_id,score'),
+      supabase
+        .from('tournament_matches' as any)
+        .select('id,tournament_id,round,bracket_position,status,player1_id,player2_id,winner_id')
+        .order('round', { ascending: true })
+        .order('bracket_position', { ascending: true }),
+      supabase.from('profiles').select('id,name'),
+    ]);
+
+    const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile.name || 'Student']));
+    const participantsByTournament = (participants || []).reduce<Record<string, TournamentParticipantRow[]>>((acc, row) => {
+      if (!acc[row.tournament_id]) acc[row.tournament_id] = [];
+      acc[row.tournament_id].push(row as TournamentParticipantRow);
+      return acc;
+    }, {});
+
+    const matchesByTournament = (matches || []).reduce<Record<string, TournamentMatchRow[]>>((acc, row) => {
+      if (!acc[row.tournament_id]) acc[row.tournament_id] = [];
+      acc[row.tournament_id].push(row as TournamentMatchRow);
+      return acc;
+    }, {});
+
+    const mapped = (tournaments || []).map((tournament): ManagedTournament => {
+      const players = (participantsByTournament[tournament.id] || []).map((row) => ({
+        id: row.id,
+        userId: row.user_id,
+        name: profileMap.get(row.user_id) || 'Student',
+        progress: Math.max(0, Math.min(100, row.score || 0)),
+      }));
+
+      const bracketMatches = (matchesByTournament[tournament.id] || []).map((row) => {
+        const roundSize = Math.pow(2, Math.max(1, 5 - row.round));
+        return {
+          id: row.id,
+          round: roundNameBySize[roundSize] || `Round ${row.round}`,
+          playerA: row.player1_id ? profileMap.get(row.player1_id) || 'TBD' : 'TBD',
+          playerB: row.player2_id ? profileMap.get(row.player2_id) || 'TBD' : 'TBD',
+          status: row.status === 'pending' ? 'waiting' : row.status,
+          winner: row.winner_id ? profileMap.get(row.winner_id) || undefined : undefined,
+        } as TournamentMatch;
+      });
+
+      return {
+        id: tournament.id,
+        name: tournament.name,
+        subject: tournament.subject || 'Mixed',
+        status: tournament.status === 'completed' ? 'finished' : (tournament.status as ManagerTournamentStatus),
+        maxPlayers: ((tournament.max_participants || 16) as 8 | 16 | 32),
+        questionCount: 15,
+        mode: 'speed',
+        entryFeeType: (tournament.entry_fee_coins || 0) > 0 ? 'coins' : 'free',
+        entryFeeCoins: tournament.entry_fee_coins || 0,
+        players,
+        matches: bracketMatches,
+        rewards: {
+          winnerCoins: tournament.prize_coins || 1500,
+          winnerXp: 800,
+          runnerUpCoins: Math.round((tournament.prize_coins || 1500) * 0.4),
+          runnerUpXp: 300,
+        },
+        locked: tournament.status === 'active' || tournament.status === 'completed',
+        paused: false,
+      };
+    });
+
+    setManagedTournaments(mapped);
+    if (mapped.length && !mapped.some((item) => item.id === selectedTournamentId)) {
+      setSelectedTournamentId(mapped[0].id);
     }
   };
 
@@ -526,97 +561,135 @@ const ManagerDashboard: React.FC = () => {
     if (questionCount < 5) return toast.error('Question count should be at least 5');
     if (entryFeeCoins < 0) return toast.error('Entry fee must be positive');
 
-    const newPlayers = managerTournamentPool
-      .slice(0, Math.min(4, maxPlayers))
-      .map((name, index) => ({ id: `np-${Date.now()}-${index}`, name, progress: 0 }));
-    const id = `t-${Date.now()}`;
     const tournamentName = `${createTournamentForm.subject} ${createTournamentForm.mode === 'speed' ? 'Blitz' : 'Precision'} Cup`;
+    const now = new Date();
+    const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const { data, error } = await supabase
+      .from('tournaments')
+      .insert({
+        name: tournamentName,
+        subject: createTournamentForm.subject,
+        status: 'upcoming',
+        max_participants: maxPlayers,
+        entry_fee_coins: entryFeeCoins,
+        prize_coins: 1500,
+        prize_description: `${maxPlayers}-player champions league`,
+        start_time: now.toISOString(),
+        end_time: end.toISOString(),
+        created_by: user?.id || '',
+      })
+      .select('id')
+      .single();
 
-    const newTournament: ManagedTournament = {
-      id,
-      name: tournamentName,
-      subject: createTournamentForm.subject,
-      status: 'waiting',
-      maxPlayers,
-      questionCount,
-      mode: createTournamentForm.mode,
-      entryFeeType: createTournamentForm.entryFeeType,
-      entryFeeCoins,
-      players: newPlayers,
-      matches: makeDemoMatches(newPlayers),
-      rewards: { winnerCoins: 300, winnerXp: 180, runnerUpCoins: 160, runnerUpXp: 90 },
-      locked: false,
-      paused: false,
-    };
+    if (error || !data) return toast.error('Failed to create tournament');
 
-    setManagedTournaments((prev) => [newTournament, ...prev]);
-    setSelectedTournamentId(id);
-    toast.success('Tournament created');
+    await fetchManagerTournaments();
+    setSelectedTournamentId(data.id);
+    toast.success('Tournament created in database');
     await pushTournamentLog(`Created tournament "${tournamentName}"`);
-  };
-
-  const updateSelectedTournament = async (updater: (current: ManagedTournament) => ManagedTournament, logMessage: string) => {
-    if (!selectedTournament) return;
-    setManagedTournaments((prev) => prev.map((t) => (t.id === selectedTournament.id ? updater(t) : t)));
-    await pushTournamentLog(logMessage);
   };
 
   const setTournamentStatus = async (status: ManagerTournamentStatus) => {
     if (!selectedTournament) return;
-    await updateSelectedTournament(
-      (tournament) => ({ ...tournament, status, paused: status === 'active' ? false : tournament.paused }),
-      `Set ${selectedTournament.name} status to ${status}`,
-    );
+    const nextStatus = status === 'finished' ? 'completed' : status === 'waiting' ? 'upcoming' : 'active';
+    const { error } = await supabase.from('tournaments').update({ status: nextStatus }).eq('id', selectedTournament.id);
+    if (error) return toast.error('Failed to update tournament status');
+    await fetchManagerTournaments();
+    await pushTournamentLog(`Set ${selectedTournament.name} status to ${status}`);
   };
 
   const addPlayerManually = async () => {
-    const name = manualPlayerName.trim();
-    if (!selectedTournament || !name) return toast.error('Enter player name');
+    const userId = manualPlayerName.trim();
+    if (!selectedTournament || !userId) return toast.error('Enter player user id');
     if (selectedTournament.players.length >= selectedTournament.maxPlayers) return toast.error('Tournament is full');
-    await updateSelectedTournament(
-      (tournament) => ({
-        ...tournament,
-        players: [...tournament.players, { id: `manual-${Date.now()}`, name, progress: 0 }],
-      }),
-      `Added player ${name} into ${selectedTournament.name}`,
-    );
+    const { error } = await supabase.from('tournament_participants').insert({
+      tournament_id: selectedTournament.id,
+      user_id: userId,
+    });
+    if (error) return toast.error('Could not add player (check user id)');
+    await fetchManagerTournaments();
+    await pushTournamentLog(`Added player ${userId} into ${selectedTournament.name}`);
     setManualPlayerName('');
   };
 
   const removePlayer = async (playerId: string) => {
     if (!selectedTournament) return;
     const player = selectedTournament.players.find((item) => item.id === playerId);
-    await updateSelectedTournament(
-      (tournament) => ({ ...tournament, players: tournament.players.filter((item) => item.id !== playerId) }),
-      `Removed player ${player?.name || playerId} from ${selectedTournament.name}`,
-    );
+    const { error } = await supabase.from('tournament_participants').delete().eq('id', playerId);
+    if (error) return toast.error('Failed to remove player');
+    await fetchManagerTournaments();
+    await pushTournamentLog(`Removed player ${player?.name || playerId} from ${selectedTournament.name}`);
   };
 
   const toggleTournamentLock = async () => {
     if (!selectedTournament) return;
-    await updateSelectedTournament(
-      (tournament) => ({ ...tournament, locked: !tournament.locked }),
-      `${selectedTournament.locked ? 'Unlocked' : 'Locked'} tournament ${selectedTournament.name}`,
-    );
+    const nextStatus = selectedTournament.locked ? 'upcoming' : 'active';
+    const { error } = await supabase.from('tournaments').update({ status: nextStatus }).eq('id', selectedTournament.id);
+    if (error) return toast.error('Failed to lock/unlock');
+    await fetchManagerTournaments();
+    await pushTournamentLog(`${selectedTournament.locked ? 'Unlocked' : 'Locked'} tournament ${selectedTournament.name}`);
   };
 
   const updateMatch = async (matchId: string, updater: (match: TournamentMatch) => TournamentMatch, action: string) => {
     if (!selectedTournament) return;
-    await updateSelectedTournament(
-      (tournament) => ({ ...tournament, matches: tournament.matches.map((match) => (match.id === matchId ? updater(match) : match)) }),
-      action,
-    );
+    const existing = selectedTournament.matches.find((match) => match.id === matchId);
+    if (!existing) return;
+    const next = updater(existing);
+    const winnerUserId = next.winner
+      ? selectedTournament.players.find((player) => player.name === next.winner)?.userId || null
+      : null;
+    const status = next.status === 'waiting' ? 'pending' : next.status;
+    const { error } = await supabase
+      .from('tournament_matches' as any)
+      .update({ status, winner_id: winnerUserId })
+      .eq('id', matchId);
+    if (error) return toast.error('Failed to update match');
+    await fetchManagerTournaments();
+    await pushTournamentLog(action);
   };
 
   const updateRewards = async (key: keyof ManagedTournament['rewards'], value: number) => {
     if (!selectedTournament) return;
-    setManagedTournaments((prev) =>
-      prev.map((tournament) =>
-        tournament.id === selectedTournament.id
-          ? { ...tournament, rewards: { ...tournament.rewards, [key]: value } }
-          : tournament,
-      ),
-    );
+    if (key !== 'winnerCoins') return;
+    const { error } = await supabase.from('tournaments').update({ prize_coins: value }).eq('id', selectedTournament.id);
+    if (error) return toast.error('Failed to update rewards');
+    await fetchManagerTournaments();
+  };
+
+  const generateChampionsBracket = async () => {
+    if (!selectedTournament) return;
+    if (selectedTournament.maxPlayers !== 16) {
+      toast.error('Champions League bracket is designed for 16 players');
+      return;
+    }
+    if (selectedTournament.players.length < 16) {
+      toast.error('Need 16 registered players before generating bracket');
+      return;
+    }
+
+    const seeded = [...selectedTournament.players].slice(0, 16);
+    const matchRows = seeded.slice(0, 16).reduce<Array<Record<string, unknown>>>((acc, _, index, arr) => {
+      if (index % 2 !== 0) return acc;
+      acc.push({
+        tournament_id: selectedTournament.id,
+        round: 1,
+        bracket_position: Math.floor(index / 2) + 1,
+        status: 'ready',
+        player1_id: arr[index].userId,
+        player2_id: arr[index + 1]?.userId || null,
+      });
+      return acc;
+    }, []);
+
+    const { error: clearError } = await supabase.from('tournament_matches' as any).delete().eq('tournament_id', selectedTournament.id);
+    if (clearError) return toast.error('Failed to reset previous bracket');
+
+    const { error } = await supabase.from('tournament_matches' as any).insert(matchRows);
+    if (error) return toast.error('Failed to generate Round of 16');
+
+    await fetchManagerTournaments();
+    await pushTournamentLog(`Generated Champions League Round of 16 bracket for ${selectedTournament.name}`);
+    toast.success('Round of 16 bracket generated');
   };
 
   const messagingTrend = weeklyLearning.map((item) => ({ day: item.day, messages: item.quizzes * 2 + item.flashcards }));
@@ -952,9 +1025,9 @@ const ManagerDashboard: React.FC = () => {
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Button onClick={() => setTournamentStatus('active')}><Play className="h-4 w-4 mr-2" />Start tournament</Button>
-                        <Button variant="outline" onClick={() => updateSelectedTournament((t) => ({ ...t, paused: true }), `Paused ${selectedTournament.name}`)}><Pause className="h-4 w-4 mr-2" />Pause</Button>
-                        <Button variant="outline" onClick={() => updateSelectedTournament((t) => ({ ...t, paused: false }), `Resumed ${selectedTournament.name}`)}><Play className="h-4 w-4 mr-2" />Resume</Button>
-                        <Button variant="outline" onClick={() => updateSelectedTournament((t) => ({ ...t, matches: t.matches.map((m) => ({ ...m, round: 'Skipped to next round' })) }), `Skipped round for ${selectedTournament.name}`)}><SkipForward className="h-4 w-4 mr-2" />Skip rounds</Button>
+                        <Button variant="outline" onClick={() => pushTournamentLog(`Paused ${selectedTournament.name}`)}><Pause className="h-4 w-4 mr-2" />Pause</Button>
+                        <Button variant="outline" onClick={() => pushTournamentLog(`Resumed ${selectedTournament.name}`)}><Play className="h-4 w-4 mr-2" />Resume</Button>
+                        <Button variant="outline" onClick={generateChampionsBracket}><SkipForward className="h-4 w-4 mr-2" />Generate R16 bracket</Button>
                         <Button variant={selectedTournament.locked ? 'secondary' : 'outline'} onClick={toggleTournamentLock}>{selectedTournament.locked ? <Lock className="h-4 w-4 mr-2" /> : <ClipboardList className="h-4 w-4 mr-2" />}{selectedTournament.locked ? 'Locked' : 'Lock tournament'}</Button>
                         <Button variant="outline" onClick={() => setTournamentStatus('finished')}>End tournament</Button>
                       </div>
@@ -1019,7 +1092,7 @@ const ManagerDashboard: React.FC = () => {
                   <CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-cyan-500" /> Player Control</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex gap-2">
-                      <Input placeholder="Add player manually" value={manualPlayerName} onChange={(event) => setManualPlayerName(event.target.value)} />
+                      <Input placeholder="Enter player user id" value={manualPlayerName} onChange={(event) => setManualPlayerName(event.target.value)} />
                       <Button onClick={addPlayerManually}><UserPlus className="h-4 w-4 mr-2" />Add</Button>
                     </div>
                     <ScrollArea className="h-56 pr-3">
