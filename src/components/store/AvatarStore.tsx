@@ -9,6 +9,7 @@ import { Coins, Gem, Lock, Check, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface StoreItem {
   id: string;
@@ -37,6 +38,7 @@ const AvatarStore: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [autoEquip, setAutoEquip] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<StoreItem | null>(null);
 
   useEffect(() => {
     void fetchStoreItems();
@@ -198,7 +200,7 @@ const AvatarStore: React.FC = () => {
                 </div>
               </div>
 
-              <Button size="sm" className="w-full" onClick={() => handlePurchase(item)} disabled={purchasing === item.id || !hasEnough}>
+              <Button size="sm" className="w-full" onClick={() => setSelectedItem(item)} disabled={purchasing === item.id || !hasEnough}>
                 {purchasing === item.id ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : !hasEnough ? (
@@ -279,6 +281,38 @@ const AvatarStore: React.FC = () => {
           </TabsContent>
         ))}
       </Tabs>
+
+      <Dialog open={Boolean(selectedItem)} onOpenChange={(open) => !open && setSelectedItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Purchase</DialogTitle>
+            <DialogDescription>Preview the item and confirm unlock.</DialogDescription>
+          </DialogHeader>
+          {selectedItem && (
+            <div className="rounded-md border p-4 text-center space-y-2">
+              <div className="text-5xl">{selectedItem.preview}</div>
+              <p className="font-semibold">{selectedItem.name}</p>
+              <p className="text-sm text-muted-foreground">{selectedItem.description}</p>
+              <p className="text-sm">
+                Price: <strong>{selectedItem.price}</strong> {selectedItem.currency}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSelectedItem(null)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                if (!selectedItem) return;
+                await handlePurchase(selectedItem);
+                setSelectedItem(null);
+              }}
+              disabled={!selectedItem || purchasing === selectedItem.id}
+            >
+              {purchasing && selectedItem && purchasing === selectedItem.id ? 'Purchasing...' : 'Buy'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

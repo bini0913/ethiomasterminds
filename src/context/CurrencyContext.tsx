@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUser } from './UserContext';
 
 interface CurrencyContextType {
+  xp: number;
   coins: number;
   gems: number;
   dailyStreak: number;
@@ -12,8 +13,10 @@ interface CurrencyContextType {
   addGems: (amount: number) => Promise<boolean>;
   spendGems: (amount: number) => Promise<boolean>;
   convertXpToCoins: (xpAmount: number) => Promise<boolean>;
+  convertCoinsToGems: (coinAmount: number) => Promise<boolean>;
   transferCoins: (receiverId: string, amount: number) => Promise<boolean>;
   claimDailyReward: () => Promise<boolean>;
+  luckySpin: () => Promise<{ success: boolean; message?: string }>;
   refreshCurrency: () => Promise<void>;
 }
 
@@ -21,6 +24,7 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 
 export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
+  const [xp, setXp] = useState(0);
   const [coins, setCoins] = useState(0);
   const [gems, setGems] = useState(0);
   const [dailyStreak, setDailyStreak] = useState(0);
@@ -28,6 +32,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchCurrency = useCallback(async () => {
     if (!user?.id) {
+      setXp(0);
       setCoins(0);
       setGems(0);
       setDailyStreak(0);
@@ -40,6 +45,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       if (ensureError) throw ensureError;
 
       const wallet = ensured;
+      setXp(wallet?.xp ?? 0);
       setCoins(wallet?.coins ?? 0);
       setGems(wallet?.gems ?? 0);
       setDailyStreak(wallet?.daily_streak ?? 0);
@@ -76,6 +82,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       });
 
       setCoins(data?.coins ?? coins + amount);
+      setXp(data?.xp ?? xp);
       setGems(data?.gems ?? gems);
       setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
@@ -108,6 +115,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       });
 
       setCoins(data?.coins ?? newAmount);
+      setXp(data?.xp ?? xp);
       setGems(data?.gems ?? gems);
       setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
@@ -131,6 +139,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       setCoins(data?.coins ?? coins);
+      setXp(data?.xp ?? xp);
       setGems(data?.gems ?? gems + amount);
       setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
@@ -154,6 +163,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       setCoins(data?.coins ?? coins);
+      setXp(data?.xp ?? xp);
       setGems(data?.gems ?? gems - amount);
       setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
@@ -170,12 +180,31 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       const { data, error } = await (supabase as any).rpc('convert_xp_to_coins', { p_xp: xpAmount });
       if (error) throw error;
 
+      setXp(data?.xp ?? xp);
       setCoins(data?.coins ?? coins);
       setGems(data?.gems ?? gems);
       setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
     } catch (err) {
       console.error('Error converting XP:', err);
+      return false;
+    }
+  };
+
+  const convertCoinsToGems = async (coinAmount: number): Promise<boolean> => {
+    if (!user?.id) return false;
+
+    try {
+      const { data, error } = await (supabase as any).rpc('convert_coins_to_gems', { p_coins: coinAmount });
+      if (error) throw error;
+
+      setXp(data?.xp ?? xp);
+      setCoins(data?.coins ?? coins);
+      setGems(data?.gems ?? gems);
+      setDailyStreak(data?.daily_streak ?? dailyStreak);
+      return true;
+    } catch (err) {
+      console.error('Error converting coins to gems:', err);
       return false;
     }
   };
@@ -192,6 +221,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       setCoins(data?.coins ?? coins);
+      setXp(data?.xp ?? xp);
       setGems(data?.gems ?? gems);
       setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
@@ -209,12 +239,31 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       setCoins(data?.coins ?? coins);
+      setXp(data?.xp ?? xp);
       setGems(data?.gems ?? gems);
       setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
     } catch (err) {
       console.error('Error claiming daily reward:', err);
       return false;
+    }
+  };
+
+  const luckySpin = async (): Promise<{ success: boolean; message?: string }> => {
+    if (!user?.id) return { success: false, message: 'Not authenticated' };
+
+    try {
+      const { data, error } = await (supabase as any).rpc('perform_lucky_spin');
+      if (error) throw error;
+
+      setXp(data?.xp ?? xp);
+      setCoins(data?.coins ?? coins);
+      setGems(data?.gems ?? gems);
+      setDailyStreak(data?.daily_streak ?? dailyStreak);
+      return { success: true };
+    } catch (err: any) {
+      console.error('Lucky spin failed:', err);
+      return { success: false, message: err?.message ?? 'Spin failed' };
     }
   };
 
@@ -226,6 +275,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     <CurrencyContext.Provider
       value={{
         coins,
+        xp,
         gems,
         dailyStreak,
         loading,
@@ -234,8 +284,10 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
         addGems,
         spendGems,
         convertXpToCoins,
+        convertCoinsToGems,
         transferCoins,
         claimDailyReward,
+        luckySpin,
         refreshCurrency,
       }}
     >
