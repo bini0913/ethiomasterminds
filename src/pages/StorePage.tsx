@@ -221,15 +221,7 @@ const StorePage: React.FC = () => {
             </TabsList>
 
             <TabsContent value="store" className="space-y-4">
-              <Card className="border-primary/20">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Featured Shop Experience</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Preview items, confirm purchase, then equip instantly. Unlock titles, avatars, effects, and personalization cosmetics.
-                </CardContent>
-              </Card>
-              <AvatarStore />
+              <AvatarStore onQuickNavigate={(tab) => setActiveTab(tab)} />
             </TabsContent>
 
             <TabsContent value="exchange" className="space-y-4">
