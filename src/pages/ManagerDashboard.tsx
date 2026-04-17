@@ -18,14 +18,22 @@ import {
   AlertTriangle,
   BarChart3,
   BookOpen,
+  ClipboardList,
   Crown,
+  Gamepad2,
+  Lock,
   MessageSquare,
+  Pause,
+  Play,
   RefreshCw,
   Settings,
   Shield,
+  SkipForward,
   LogOut,
   Trophy,
   Upload,
+  UserMinus,
+  UserPlus,
   Users,
   Zap,
   Sparkles,
@@ -83,8 +91,62 @@ type ManagedPost = {
   post_type: string;
 };
 
+type ManagerTournamentStatus = 'waiting' | 'active' | 'finished';
+type TournamentMode = 'speed' | 'accuracy';
+type BracketMatchStatus = 'waiting' | 'live' | 'finished';
+
+type TournamentPlayer = {
+  id: string;
+  name: string;
+  progress: number;
+};
+
+type TournamentMatch = {
+  id: string;
+  round: string;
+  playerA: string;
+  playerB: string;
+  status: BracketMatchStatus;
+  winner?: string;
+};
+
+type ManagedTournament = {
+  id: string;
+  name: string;
+  subject: string;
+  status: ManagerTournamentStatus;
+  maxPlayers: 8 | 16 | 32;
+  questionCount: number;
+  mode: TournamentMode;
+  entryFeeType: 'coins' | 'free';
+  entryFeeCoins: number;
+  players: TournamentPlayer[];
+  matches: TournamentMatch[];
+  rewards: {
+    winnerCoins: number;
+    winnerXp: number;
+    runnerUpCoins: number;
+    runnerUpXp: number;
+  };
+  locked: boolean;
+  paused: boolean;
+};
+
 const gradeBands = ['Grade 1-4', 'Grade 5-8', 'Grade 9-12'];
 const subjects = ['Math', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography', 'Language'];
+const managerTournamentPool = ['Amina', 'Noah', 'Mika', 'Eden', 'Sami', 'Liya', 'Kenan', 'Rahel', 'Abel', 'Hana', 'Martha', 'Kidus'];
+
+const makeDemoMatches = (players: TournamentPlayer[]): TournamentMatch[] => {
+  const names = players.map((player) => player.name);
+  const matchCount = Math.max(2, Math.floor(names.length / 2));
+  return Array.from({ length: matchCount }).map((_, index) => ({
+    id: `match-${index + 1}`,
+    round: 'Round 1',
+    playerA: names[index * 2] || `Player ${index * 2 + 1}`,
+    playerB: names[index * 2 + 1] || `Player ${index * 2 + 2}`,
+    status: index === 0 ? 'live' : 'waiting',
+  }));
+};
 
 const ManagerDashboard: React.FC = () => {
   const { user, logout } = useUser();
@@ -138,6 +200,74 @@ const ManagerDashboard: React.FC = () => {
   });
 
   const [activityLog, setActivityLog] = useState<Array<{ id: string; action: string; at: string }>>([]);
+  const [tournamentLog, setTournamentLog] = useState<Array<{ id: string; action: string; at: string }>>([]);
+  const [managedTournaments, setManagedTournaments] = useState<ManagedTournament[]>([
+    {
+      id: 't-1',
+      name: 'Weekend Math Clash',
+      subject: 'Math',
+      status: 'waiting',
+      maxPlayers: 16,
+      questionCount: 15,
+      mode: 'speed',
+      entryFeeType: 'coins',
+      entryFeeCoins: 120,
+      players: managerTournamentPool.slice(0, 12).map((name, index) => ({ id: `p-${index + 1}`, name, progress: Math.floor(Math.random() * 20) })),
+      matches: [],
+      rewards: { winnerCoins: 500, winnerXp: 250, runnerUpCoins: 250, runnerUpXp: 120 },
+      locked: false,
+      paused: false,
+    },
+    {
+      id: 't-2',
+      name: 'Science Sprint Cup',
+      subject: 'Physics',
+      status: 'active',
+      maxPlayers: 8,
+      questionCount: 12,
+      mode: 'accuracy',
+      entryFeeType: 'free',
+      entryFeeCoins: 0,
+      players: managerTournamentPool.slice(0, 8).map((name, index) => ({ id: `ap-${index + 1}`, name, progress: 25 + index * 8 })),
+      matches: [
+        { id: 'm-a1', round: 'Quarterfinal', playerA: 'Amina', playerB: 'Noah', status: 'live' },
+        { id: 'm-a2', round: 'Quarterfinal', playerA: 'Mika', playerB: 'Eden', status: 'finished', winner: 'Eden' },
+        { id: 'm-a3', round: 'Quarterfinal', playerA: 'Sami', playerB: 'Liya', status: 'waiting' },
+        { id: 'm-a4', round: 'Quarterfinal', playerA: 'Kenan', playerB: 'Rahel', status: 'waiting' },
+      ],
+      rewards: { winnerCoins: 300, winnerXp: 180, runnerUpCoins: 140, runnerUpXp: 90 },
+      locked: true,
+      paused: false,
+    },
+    {
+      id: 't-3',
+      name: 'History Finals',
+      subject: 'History',
+      status: 'finished',
+      maxPlayers: 8,
+      questionCount: 10,
+      mode: 'accuracy',
+      entryFeeType: 'free',
+      entryFeeCoins: 0,
+      players: managerTournamentPool.slice(0, 8).map((name, index) => ({ id: `fp-${index + 1}`, name, progress: 100 - index * 6 })),
+      matches: [
+        { id: 'm-f1', round: 'Final', playerA: 'Amina', playerB: 'Eden', status: 'finished', winner: 'Amina' },
+      ],
+      rewards: { winnerCoins: 250, winnerXp: 220, runnerUpCoins: 100, runnerUpXp: 120 },
+      locked: true,
+      paused: false,
+    },
+  ]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState('t-1');
+  const [createTournamentForm, setCreateTournamentForm] = useState({
+    maxPlayers: '8',
+    subject: 'Math',
+    questionCount: '10',
+    mode: 'speed' as TournamentMode,
+    entryFeeType: 'free' as 'coins' | 'free',
+    entryFeeCoins: '0',
+  });
+  const [manualPlayerName, setManualPlayerName] = useState('');
 
   useEffect(() => {
     loadDashboard();
@@ -375,6 +505,120 @@ const ManagerDashboard: React.FC = () => {
     setAnnouncementBody('');
   };
 
+  const selectedTournament = useMemo(
+    () => managedTournaments.find((tournament) => tournament.id === selectedTournamentId) || managedTournaments[0],
+    [managedTournaments, selectedTournamentId],
+  );
+
+  const pushTournamentLog = async (action: string) => {
+    const stamp = new Date().toISOString();
+    setTournamentLog((prev) => [{ id: `${stamp}-${Math.random()}`, action, at: stamp }, ...prev].slice(0, 40));
+    await logAction(`Tournament control: ${action}`);
+  };
+
+  const createTournament = async () => {
+    const maxPlayers = Number(createTournamentForm.maxPlayers) as 8 | 16 | 32;
+    const questionCount = Number(createTournamentForm.questionCount);
+    const entryFeeCoins = createTournamentForm.entryFeeType === 'coins' ? Number(createTournamentForm.entryFeeCoins) : 0;
+
+    if (![8, 16, 32].includes(maxPlayers)) return toast.error('Players must be 8, 16, or 32');
+    if (!createTournamentForm.subject.trim()) return toast.error('Subject is required');
+    if (questionCount < 5) return toast.error('Question count should be at least 5');
+    if (entryFeeCoins < 0) return toast.error('Entry fee must be positive');
+
+    const newPlayers = managerTournamentPool
+      .slice(0, Math.min(4, maxPlayers))
+      .map((name, index) => ({ id: `np-${Date.now()}-${index}`, name, progress: 0 }));
+    const id = `t-${Date.now()}`;
+    const tournamentName = `${createTournamentForm.subject} ${createTournamentForm.mode === 'speed' ? 'Blitz' : 'Precision'} Cup`;
+
+    const newTournament: ManagedTournament = {
+      id,
+      name: tournamentName,
+      subject: createTournamentForm.subject,
+      status: 'waiting',
+      maxPlayers,
+      questionCount,
+      mode: createTournamentForm.mode,
+      entryFeeType: createTournamentForm.entryFeeType,
+      entryFeeCoins,
+      players: newPlayers,
+      matches: makeDemoMatches(newPlayers),
+      rewards: { winnerCoins: 300, winnerXp: 180, runnerUpCoins: 160, runnerUpXp: 90 },
+      locked: false,
+      paused: false,
+    };
+
+    setManagedTournaments((prev) => [newTournament, ...prev]);
+    setSelectedTournamentId(id);
+    toast.success('Tournament created');
+    await pushTournamentLog(`Created tournament "${tournamentName}"`);
+  };
+
+  const updateSelectedTournament = async (updater: (current: ManagedTournament) => ManagedTournament, logMessage: string) => {
+    if (!selectedTournament) return;
+    setManagedTournaments((prev) => prev.map((t) => (t.id === selectedTournament.id ? updater(t) : t)));
+    await pushTournamentLog(logMessage);
+  };
+
+  const setTournamentStatus = async (status: ManagerTournamentStatus) => {
+    if (!selectedTournament) return;
+    await updateSelectedTournament(
+      (tournament) => ({ ...tournament, status, paused: status === 'active' ? false : tournament.paused }),
+      `Set ${selectedTournament.name} status to ${status}`,
+    );
+  };
+
+  const addPlayerManually = async () => {
+    const name = manualPlayerName.trim();
+    if (!selectedTournament || !name) return toast.error('Enter player name');
+    if (selectedTournament.players.length >= selectedTournament.maxPlayers) return toast.error('Tournament is full');
+    await updateSelectedTournament(
+      (tournament) => ({
+        ...tournament,
+        players: [...tournament.players, { id: `manual-${Date.now()}`, name, progress: 0 }],
+      }),
+      `Added player ${name} into ${selectedTournament.name}`,
+    );
+    setManualPlayerName('');
+  };
+
+  const removePlayer = async (playerId: string) => {
+    if (!selectedTournament) return;
+    const player = selectedTournament.players.find((item) => item.id === playerId);
+    await updateSelectedTournament(
+      (tournament) => ({ ...tournament, players: tournament.players.filter((item) => item.id !== playerId) }),
+      `Removed player ${player?.name || playerId} from ${selectedTournament.name}`,
+    );
+  };
+
+  const toggleTournamentLock = async () => {
+    if (!selectedTournament) return;
+    await updateSelectedTournament(
+      (tournament) => ({ ...tournament, locked: !tournament.locked }),
+      `${selectedTournament.locked ? 'Unlocked' : 'Locked'} tournament ${selectedTournament.name}`,
+    );
+  };
+
+  const updateMatch = async (matchId: string, updater: (match: TournamentMatch) => TournamentMatch, action: string) => {
+    if (!selectedTournament) return;
+    await updateSelectedTournament(
+      (tournament) => ({ ...tournament, matches: tournament.matches.map((match) => (match.id === matchId ? updater(match) : match)) }),
+      action,
+    );
+  };
+
+  const updateRewards = async (key: keyof ManagedTournament['rewards'], value: number) => {
+    if (!selectedTournament) return;
+    setManagedTournaments((prev) =>
+      prev.map((tournament) =>
+        tournament.id === selectedTournament.id
+          ? { ...tournament, rewards: { ...tournament.rewards, [key]: value } }
+          : tournament,
+      ),
+    );
+  };
+
   const messagingTrend = weeklyLearning.map((item) => ({ day: item.day, messages: item.quizzes * 2 + item.flashcards }));
   const panelClass = 'border border-primary/20 bg-background/70 backdrop-blur-xl shadow-[0_0_30px_rgba(99,102,241,0.12)]';
   const subtlePanelClass = 'border border-primary/15 bg-background/60 backdrop-blur-md';
@@ -432,7 +676,7 @@ const ManagerDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className={`grid grid-cols-2 md:grid-cols-5 xl:grid-cols-10 h-auto p-1 ${panelClass}`}>
+          <TabsList className={`grid grid-cols-2 md:grid-cols-6 xl:grid-cols-11 h-auto p-1 ${panelClass}`}>
             <TabsTrigger value="overview" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Overview</TabsTrigger>
             <TabsTrigger value="students" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Students</TabsTrigger>
             <TabsTrigger value="content" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Content</TabsTrigger>
@@ -441,6 +685,7 @@ const ManagerDashboard: React.FC = () => {
             <TabsTrigger value="xp" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">XP Control</TabsTrigger>
             <TabsTrigger value="analytics" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Analytics</TabsTrigger>
             <TabsTrigger value="announcements" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Announcements</TabsTrigger>
+            <TabsTrigger value="tournaments" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Tournaments</TabsTrigger>
             <TabsTrigger value="settings" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">Settings</TabsTrigger>
             <TabsTrigger value="ai" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-300">AI Monitor</TabsTrigger>
           </TabsList>
@@ -674,6 +919,182 @@ const ManagerDashboard: React.FC = () => {
                 <Button onClick={sendAnnouncement}>Send Announcement</Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="tournaments" className="space-y-6">
+            <div className="grid lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-amber-500" /> Tournament Control Center</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid md:grid-cols-3 gap-3">
+                    {managedTournaments.map((tournament) => (
+                      <button
+                        key={tournament.id}
+                        type="button"
+                        onClick={() => setSelectedTournamentId(tournament.id)}
+                        className={`text-left rounded-lg border p-3 transition ${selectedTournament?.id === tournament.id ? 'border-cyan-500 bg-cyan-500/10' : 'border-border hover:border-cyan-500/40'}`}
+                      >
+                        <p className="font-semibold">{tournament.name}</p>
+                        <p className="text-xs text-muted-foreground">{tournament.subject} • {tournament.players.length}/{tournament.maxPlayers} players</p>
+                        <Badge className="mt-2 capitalize" variant={tournament.status === 'active' ? 'default' : 'secondary'}>{tournament.status}</Badge>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedTournament && (
+                    <div className="rounded-lg border p-4 space-y-4">
+                      <div className="grid md:grid-cols-4 gap-3 text-sm">
+                        <div className="rounded-md border p-2"><p className="text-muted-foreground">Status</p><p className="font-semibold capitalize">{selectedTournament.status}</p></div>
+                        <div className="rounded-md border p-2"><p className="text-muted-foreground">Mode</p><p className="font-semibold capitalize">{selectedTournament.mode}</p></div>
+                        <div className="rounded-md border p-2"><p className="text-muted-foreground">Questions</p><p className="font-semibold">{selectedTournament.questionCount}</p></div>
+                        <div className="rounded-md border p-2"><p className="text-muted-foreground">Entry Fee</p><p className="font-semibold">{selectedTournament.entryFeeType === 'free' ? 'Free' : `${selectedTournament.entryFeeCoins} coins`}</p></div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button onClick={() => setTournamentStatus('active')}><Play className="h-4 w-4 mr-2" />Start tournament</Button>
+                        <Button variant="outline" onClick={() => updateSelectedTournament((t) => ({ ...t, paused: true }), `Paused ${selectedTournament.name}`)}><Pause className="h-4 w-4 mr-2" />Pause</Button>
+                        <Button variant="outline" onClick={() => updateSelectedTournament((t) => ({ ...t, paused: false }), `Resumed ${selectedTournament.name}`)}><Play className="h-4 w-4 mr-2" />Resume</Button>
+                        <Button variant="outline" onClick={() => updateSelectedTournament((t) => ({ ...t, matches: t.matches.map((m) => ({ ...m, round: 'Skipped to next round' })) }), `Skipped round for ${selectedTournament.name}`)}><SkipForward className="h-4 w-4 mr-2" />Skip rounds</Button>
+                        <Button variant={selectedTournament.locked ? 'secondary' : 'outline'} onClick={toggleTournamentLock}>{selectedTournament.locked ? <Lock className="h-4 w-4 mr-2" /> : <ClipboardList className="h-4 w-4 mr-2" />}{selectedTournament.locked ? 'Locked' : 'Lock tournament'}</Button>
+                        <Button variant="outline" onClick={() => setTournamentStatus('finished')}>End tournament</Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="flex items-center gap-2"><Gamepad2 className="h-5 w-5 text-cyan-500" /> Create Tournament</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label>Number of players</Label>
+                    <Select value={createTournamentForm.maxPlayers} onValueChange={(value) => setCreateTournamentForm((prev) => ({ ...prev, maxPlayers: value }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="8">8</SelectItem>
+                        <SelectItem value="16">16</SelectItem>
+                        <SelectItem value="32">32</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Subject</Label>
+                    <Input value={createTournamentForm.subject} onChange={(event) => setCreateTournamentForm((prev) => ({ ...prev, subject: event.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Number of questions</Label>
+                    <Input type="number" min={5} value={createTournamentForm.questionCount} onChange={(event) => setCreateTournamentForm((prev) => ({ ...prev, questionCount: event.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Mode</Label>
+                    <Select value={createTournamentForm.mode} onValueChange={(value: TournamentMode) => setCreateTournamentForm((prev) => ({ ...prev, mode: value }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="speed">Speed</SelectItem>
+                        <SelectItem value="accuracy">Accuracy</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Entry fee</Label>
+                    <Select value={createTournamentForm.entryFeeType} onValueChange={(value: 'coins' | 'free') => setCreateTournamentForm((prev) => ({ ...prev, entryFeeType: value }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="free">Free</SelectItem>
+                        <SelectItem value="coins">Coins</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {createTournamentForm.entryFeeType === 'coins' && (
+                    <Input type="number" min={0} value={createTournamentForm.entryFeeCoins} onChange={(event) => setCreateTournamentForm((prev) => ({ ...prev, entryFeeCoins: event.target.value }))} />
+                  )}
+                  <Button className="w-full" onClick={createTournament}>Create Tournament</Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {selectedTournament && (
+              <div className="grid xl:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-cyan-500" /> Player Control</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex gap-2">
+                      <Input placeholder="Add player manually" value={manualPlayerName} onChange={(event) => setManualPlayerName(event.target.value)} />
+                      <Button onClick={addPlayerManually}><UserPlus className="h-4 w-4 mr-2" />Add</Button>
+                    </div>
+                    <ScrollArea className="h-56 pr-3">
+                      <div className="space-y-2">
+                        {selectedTournament.players.map((player) => (
+                          <div key={player.id} className="rounded-lg border p-2 flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{player.name}</p>
+                              <p className="text-xs text-muted-foreground">Progress {player.progress}%</p>
+                            </div>
+                            <Button size="sm" variant="destructive" onClick={() => removePlayer(player.id)}><UserMinus className="h-4 w-4 mr-1" />Remove</Button>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-fuchsia-500" /> Match + Bracket Control</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <ScrollArea className="h-64 pr-3">
+                      <div className="space-y-2">
+                        {selectedTournament.matches.map((match) => (
+                          <div key={match.id} className="rounded-lg border p-3 space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>{match.round}</span>
+                              <Badge variant={match.status === 'live' ? 'default' : 'secondary'} className="capitalize">{match.status}</Badge>
+                            </div>
+                            <p className="font-semibold">{match.playerA} vs {match.playerB}</p>
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" variant="outline" onClick={() => updateMatch(match.id, (m) => ({ ...m, status: 'live' }), `Force started match ${match.id} in ${selectedTournament.name}`)}>Force start</Button>
+                              <Button size="sm" variant="outline" onClick={() => updateMatch(match.id, (m) => ({ ...m, status: 'finished', winner: m.playerA }), `Ended match ${match.id} manually`)}>End match</Button>
+                              <Button size="sm" onClick={() => updateMatch(match.id, (m) => ({ ...m, status: 'finished', winner: m.playerB }), `Assigned winner ${match.playerB} in match ${match.id}`)}>Assign winner</Button>
+                              <Button size="sm" variant="secondary" onClick={() => updateMatch(match.id, (m) => ({ ...m, playerA: m.playerB, playerB: m.playerA }), `Edited pairing for match ${match.id}`)}>Swap pairing</Button>
+                            </div>
+                            {match.winner && <p className="text-xs text-emerald-600">Winner: {match.winner}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Reward Control</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-3">
+                    <div><Label>Winner coins</Label><Input type="number" value={selectedTournament.rewards.winnerCoins} onChange={(event) => updateRewards('winnerCoins', Number(event.target.value))} /></div>
+                    <div><Label>Winner XP</Label><Input type="number" value={selectedTournament.rewards.winnerXp} onChange={(event) => updateRewards('winnerXp', Number(event.target.value))} /></div>
+                    <div><Label>Runner-up coins</Label><Input type="number" value={selectedTournament.rewards.runnerUpCoins} onChange={(event) => updateRewards('runnerUpCoins', Number(event.target.value))} /></div>
+                    <div><Label>Runner-up XP</Label><Input type="number" value={selectedTournament.rewards.runnerUpXp} onChange={(event) => updateRewards('runnerUpXp', Number(event.target.value))} /></div>
+                    <Button className="col-span-2" onClick={() => pushTournamentLog(`Applied rewards for ${selectedTournament.name}`)}>Give winner + runner-up rewards</Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader><CardTitle>Live Monitoring + Logs</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div className="rounded-lg border p-2"><p className="text-muted-foreground">Active matches</p><p className="font-semibold">{selectedTournament.matches.filter((m) => m.status === 'live').length}</p></div>
+                      <div className="rounded-lg border p-2"><p className="text-muted-foreground">Live results</p><p className="font-semibold">{selectedTournament.matches.filter((m) => m.status === 'finished').length}</p></div>
+                      <div className="rounded-lg border p-2"><p className="text-muted-foreground">Player progress</p><p className="font-semibold">{Math.round(selectedTournament.players.reduce((sum, player) => sum + player.progress, 0) / Math.max(1, selectedTournament.players.length))}%</p></div>
+                    </div>
+                    <ScrollArea className="h-52 pr-3">
+                      <div className="space-y-2">
+                        {tournamentLog.map((log) => (
+                          <div key={log.id} className="text-sm rounded-lg border p-2">{log.action}<span className="text-muted-foreground"> • {new Date(log.at).toLocaleString()}</span></div>
+                        ))}
+                        {!tournamentLog.length && <p className="text-sm text-muted-foreground">Manager tournament actions will appear here.</p>}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
