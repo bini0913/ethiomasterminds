@@ -133,6 +133,10 @@ const Multiplayer: React.FC = () => {
 
   const joinMode = (mode: HubMode) => {
     toast.success(`Queued for ${mode.title}`);
+    if (mode.id === "tournament") {
+      navigate("/tournaments");
+      return;
+    }
     navigate("/lobby");
   };
 
