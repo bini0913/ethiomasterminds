@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
 
-type MatchStatus = "pending" | "ready" | "live" | "finished";
+type MatchStatus = "waiting" | "playing" | "finished" | "pending" | "ready" | "live";
 
 type DBTournament = {
   id: string;
@@ -41,10 +41,10 @@ type HubMatch = {
 };
 
 const roundName: Record<number, string> = {
-  1: "Round of 16",
-  2: "Quarterfinal",
-  3: "Semifinal",
-  4: "Final",
+  1: "Round 1",
+  2: "Semifinal",
+  3: "Final",
+  4: "Grand Final",
 };
 
 const TournamentHub: React.FC = () => {
@@ -151,23 +151,26 @@ const TournamentHub: React.FC = () => {
   const joinTournament = async (tournamentId: string) => {
     if (!user?.id) return toast.error("Please sign in first");
 
-    const { error } = await supabase.from("tournament_participants").insert({
-      tournament_id: tournamentId,
-      user_id: user.id,
+    const { data, error } = await supabase.rpc("join_tournament" as any, {
+      p_tournament_id: tournamentId,
     });
 
     if (error) {
-      toast.error("Could not join tournament");
+      toast.error(error.message || "Could not join tournament");
       return;
     }
 
-    addNotification("Registered successfully. Wait for organizer to generate Round of 16 bracket.");
+    if ((data as any)?.auto_started) {
+      addNotification("Tournament full. Bracket generated and tournament started automatically.");
+    } else {
+      addNotification("Registered successfully. Waiting for tournament to fill up.");
+    }
     await loadTournaments();
   };
 
   const statusBadge = (status: MatchStatus) => {
-    if (status === "live") return <Badge className="bg-red-500 text-white">Live</Badge>;
-    if (status === "ready") return <Badge className="bg-emerald-500 text-white">Ready</Badge>;
+    if (status === "live" || status === "playing") return <Badge className="bg-red-500 text-white">Playing</Badge>;
+    if (status === "ready" || status === "waiting" || status === "pending") return <Badge className="bg-emerald-500 text-white">Waiting</Badge>;
     if (status === "finished") return <Badge className="bg-violet-500 text-white">Finished</Badge>;
     return <Badge variant="secondary">Pending</Badge>;
   };
