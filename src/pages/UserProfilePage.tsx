@@ -7,18 +7,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Flame, Sword, Trophy, UserRoundPlus } from "lucide-react";
+import { Flame, Gem, Package, Send, Sword, Trophy, UserRoundPlus } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import { useUser } from "@/context/UserContext";
+import { useCurrency } from "@/context/CurrencyContext";
 import { supabase } from "@/integrations/supabase/client";
 import { createFollowChallenge, fetchFollowerCounts, fetchFollowing, fetchLeaderboardUsers, followUser, rankScore, tierStyle, unfollowUser, type LeaderboardUser } from "@/lib/leaderboardApi";
 import { getNextRankTier, getRankTierByLevel, getXpProgressInLevel, playRankUpTone } from "@/lib/rankSystem";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 const UserProfilePage = () => {
   const navigate = useNavigate();
   const { userId } = useParams();
   const { user: authUser } = useUser();
+  const { coins, gems, transferCoins, refreshCurrency } = useCurrency();
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [followersCount, setFollowersCount] = useState(0);
@@ -30,6 +34,11 @@ const UserProfilePage = () => {
   const [privacy, setPrivacy] = useState({ isPublic: true, hideStats: false });
   const previousLevelRef = useRef<number | null>(null);
   const previousRankRef = useRef<string | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferAmount, setTransferAmount] = useState("10");
+  const [isFriend, setIsFriend] = useState(false);
+  const [ownedItems, setOwnedItems] = useState(0);
+  const [equippedAvatar, setEquippedAvatar] = useState<string | null>(null);
 
   const refreshCore = async () => {
     const rows = await fetchLeaderboardUsers();
@@ -38,17 +47,27 @@ const UserProfilePage = () => {
 
   const refreshSocial = async () => {
     if (!authUser?.id || !userId) return;
-    const [mine, viewed] = await Promise.all([fetchFollowing(authUser.id), fetchFollowerCounts(userId)]);
+    const [mine, viewed, friendship] = await Promise.all([
+      fetchFollowing(authUser.id),
+      fetchFollowerCounts(userId),
+      (supabase as any)
+        .from("friends")
+        .select("id")
+        .or(`and(user_id.eq.${authUser.id},friend_id.eq.${userId}),and(user_id.eq.${userId},friend_id.eq.${authUser.id})`)
+        .eq("status", "accepted")
+        .maybeSingle(),
+    ]);
     setFollowingIds(mine);
     setFollowersCount(viewed.followers);
     setFollowingCount(viewed.following);
+    setIsFriend(Boolean(friendship?.data));
   };
 
   const refreshProfileDetails = async () => {
     if (!userId) return;
 
     try {
-      const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, privacyRes] = await Promise.all([
+      const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, privacyRes, myItemsRes] = await Promise.all([
         supabase.rpc("get_user_stats", { p_user_id: userId }),
         supabase.from("analytics").select("strong_topics,weak_topics").eq("user_id", userId),
         supabase
@@ -65,6 +84,9 @@ const UserProfilePage = () => {
           .order("unlocked_at", { ascending: false })
           .limit(6),
         supabase.from("profile_privacy_settings" as never).select("is_public,hide_stats").eq("user_id", userId).maybeSingle(),
+        authUser?.id
+          ? (supabase as any).from("user_items").select("item_id, equipped, store_items(name, section)").eq("user_id", authUser.id)
+          : Promise.resolve({ data: [] }),
       ]);
 
       setStatsJson((statsRes.data ?? {}) as Record<string, any>);
@@ -103,12 +125,21 @@ const UserProfilePage = () => {
         const p = (privacyRes as any).data as { is_public: boolean; hide_stats: boolean };
         setPrivacy({ isPublic: p.is_public, hideStats: p.hide_stats });
       }
+
+      if (authUser?.id) {
+        const items = (myItemsRes as any)?.data ?? [];
+        setOwnedItems(items.length);
+        const avatarItem = items.find((item: any) => item.equipped && item.store_items?.section === "avatars");
+        setEquippedAvatar(avatarItem?.store_items?.name ?? null);
+      }
     } catch (error) {
       console.error("Failed to load full profile details. Falling back to basic profile.", error);
       setStatsJson({});
       setInsights({ strong: [], weak: [], recommended: [] });
       setActivities([]);
       setAchievements([]);
+      setOwnedItems(0);
+      setEquippedAvatar(null);
     }
   };
 
@@ -186,6 +217,26 @@ const UserProfilePage = () => {
     }
   };
 
+  const onTransferCoins = async () => {
+    const amount = Number(transferAmount);
+    if (!profile) return;
+    if (!Number.isFinite(amount) || amount < 10) {
+      toast.error("Minimum transfer is 10 coins.");
+      return;
+    }
+
+    const success = await transferCoins(profile.id, amount);
+    if (!success) {
+      toast.error("Transfer failed. Check balance, friendship status, and daily limit.");
+      return;
+    }
+
+    toast.success(`Sent ${amount} coins to ${profile.name || profile.username}.`);
+    setTransferOpen(false);
+    setTransferAmount("10");
+    await refreshCurrency();
+  };
+
   const updatePrivacy = async (next: { isPublic: boolean; hideStats: boolean }) => {
     if (!authUser?.id) return;
     setPrivacy(next);
@@ -256,10 +307,16 @@ const UserProfilePage = () => {
               </div>
             </div>
             {!isSelf && (
-              <Button variant={isFollowing ? "secondary" : "default"} className="gap-2" onClick={onFollowToggle}>
-                <UserRoundPlus className="h-4 w-4" />
-                {isFollowing ? "Unfollow" : "Follow"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant={isFollowing ? "secondary" : "default"} className="gap-2" onClick={onFollowToggle}>
+                  <UserRoundPlus className="h-4 w-4" />
+                  {isFollowing ? "Unfollow" : "Follow"}
+                </Button>
+                <Button variant="outline" className="gap-2" disabled={!isFriend} onClick={() => setTransferOpen(true)}>
+                  <Send className="h-4 w-4" />
+                  Send Coins
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -283,6 +340,7 @@ const UserProfilePage = () => {
               <p>Followers: <strong>{followersCount}</strong></p>
               <p>Following: <strong>{followingCount}</strong></p>
               <p>Power score: <strong>{Math.round(rankScore(profile))}</strong></p>
+              <p>Friend transfer status: <strong>{isSelf ? "N/A" : isFriend ? "Eligible" : "Friends only"}</strong></p>
               <Separator />
               <p className="text-xs text-muted-foreground">Notifications</p>
               <p className="text-sm">🔔 Rank increases, new followers, and badges are shown in-app instantly.</p>
@@ -306,6 +364,16 @@ const UserProfilePage = () => {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
+          <Card>
+            <CardHeader><CardTitle>Economy</CardTitle></CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <p className="inline-flex items-center gap-2"><Trophy className="h-4 w-4 text-yellow-500" /> Coins: <strong>{coins.toLocaleString()}</strong></p>
+              <p className="inline-flex items-center gap-2"><Gem className="h-4 w-4 text-purple-500" /> Gems: <strong>{gems.toLocaleString()}</strong></p>
+              <p className="inline-flex items-center gap-2"><Package className="h-4 w-4 text-primary" /> Owned items: <strong>{ownedItems}</strong></p>
+              <p className="text-xs text-muted-foreground">Equipped avatar: {equippedAvatar ?? "Default avatar"}</p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle>Learning Insights</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
@@ -345,6 +413,32 @@ const UserProfilePage = () => {
           </Card>
         </div>
       </div>
+
+      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Coins</DialogTitle>
+            <DialogDescription>
+              Transfer coins to {profile.name || profile.username}. Minimum 10 coins, max 500/day, friends only.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Your balance: <strong>{coins.toLocaleString()}</strong> coins</p>
+            <Input
+              type="number"
+              min={10}
+              step={10}
+              value={transferAmount}
+              onChange={(e) => setTransferAmount(e.target.value)}
+              placeholder="Enter amount"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTransferOpen(false)}>Cancel</Button>
+            <Button onClick={onTransferCoins}>Confirm Transfer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };
