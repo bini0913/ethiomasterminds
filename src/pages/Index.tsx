@@ -26,7 +26,11 @@ const Index: React.FC = () => {
     if (isLoading) return;
     
     if (isAuthenticated && user) {
-      // Redirect teachers and admins to their portals
+      // Redirect privileged roles to their portals
+      if (user.role === 'extreme_admin') {
+        navigate('/root-control-portal-9xA7');
+        return;
+      }
       if (user.role === 'teacher') {
         navigate('/teacher');
         return;
