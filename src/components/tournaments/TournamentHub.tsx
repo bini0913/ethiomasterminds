@@ -1,381 +1,498 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Users, Clock, Star, Calendar, Award, Crown, Zap, Target, Sparkles, ChevronRight } from 'lucide-react';
-import { toast } from 'sonner';
+import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Bell,
+  Clock,
+  Crown,
+  Gamepad2,
+  Medal,
+  Sparkles,
+  Swords,
+  Target,
+  Trophy,
+  UserCheck,
+  Users,
+  Zap,
+} from "lucide-react";
+import { toast } from "sonner";
 
-interface Tournament {
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+type TournamentStatus = "joinable" | "lobby" | "live" | "completed";
+type MatchStatus = "pending" | "ready" | "live" | "finished";
+
+type Tournament = {
   id: string;
   name: string;
-  description: string;
-  type: 'bracket' | 'swiss' | 'leaderboard';
-  status: 'upcoming' | 'active' | 'completed';
-  participants: number;
-  maxParticipants: number;
-  startDate: Date;
-  endDate: Date;
+  mode: "knockout" | "timed" | "daily";
+  maxPlayers: number;
+  currentPlayers: number;
+  entry: "free" | "coins";
+  entryCost?: number;
+  status: TournamentStatus;
+  countdownSeconds: number;
+};
+
+type Match = {
+  id: string;
+  roundName: string;
+  round: number;
+  player1: string;
+  player2: string;
+  winner?: string;
+  status: MatchStatus;
   subject: string;
-  grade: number;
-  prizePool: {
-    coins: number;
-    gems: number;
-    badges: string[];
-  };
-  entryFee?: {
-    coins?: number;
-    gems?: number;
-  };
-  currentRound?: number;
-  totalRounds?: number;
-}
+  questionCount: number;
+  mode: "standard" | "speed";
+};
+
+type NotificationItem = {
+  id: string;
+  message: string;
+  createdAt: number;
+};
+
+const roundLabels: Record<number, string> = {
+  1: "Quarterfinal",
+  2: "Semifinal",
+  3: "Final",
+};
+
+const starterPlayers = [
+  "You",
+  "Amina",
+  "Noah",
+  "Mika",
+  "Eden",
+  "Sami",
+  "Liya",
+  "Kenan",
+];
+
+const createRoundOneMatches = (): Match[] => [
+  { id: "qf-1", roundName: "Quarterfinal", round: 1, player1: "You", player2: "Amina", status: "ready", subject: "Math", questionCount: 12, mode: "standard" },
+  { id: "qf-2", roundName: "Quarterfinal", round: 1, player1: "Noah", player2: "Mika", status: "live", subject: "Science", questionCount: 12, mode: "standard" },
+  { id: "qf-3", roundName: "Quarterfinal", round: 1, player1: "Eden", player2: "Sami", status: "finished", winner: "Eden", subject: "English", questionCount: 12, mode: "speed" },
+  { id: "qf-4", roundName: "Quarterfinal", round: 1, player1: "Liya", player2: "Kenan", status: "pending", subject: "Mixed", questionCount: 12, mode: "standard" },
+];
+
+const tournamentCatalog: Tournament[] = [
+  {
+    id: "mm-knockout-8",
+    name: "Master Minds Knockout Cup",
+    mode: "knockout",
+    maxPlayers: 8,
+    currentPlayers: 7,
+    entry: "free",
+    status: "joinable",
+    countdownSeconds: 90,
+  },
+  {
+    id: "mm-daily-blitz",
+    name: "Daily Blitz Tournament",
+    mode: "daily",
+    maxPlayers: 16,
+    currentPlayers: 13,
+    entry: "coins",
+    entryCost: 100,
+    status: "joinable",
+    countdownSeconds: 600,
+  },
+  {
+    id: "mm-timed-night",
+    name: "Evening Timed Clash",
+    mode: "timed",
+    maxPlayers: 16,
+    currentPlayers: 16,
+    entry: "coins",
+    entryCost: 150,
+    status: "live",
+    countdownSeconds: 0,
+  },
+];
+
+const formatClock = (seconds: number) => {
+  const mins = Math.floor(seconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const secs = Math.max(0, seconds % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${mins}:${secs}`;
+};
 
 const TournamentHub: React.FC = () => {
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
-  
-  const [tournaments] = useState<Tournament[]>([
-    {
-      id: 'weekly_math',
-      name: 'Weekly Math Championship',
-      description: 'Test your mathematical skills against students worldwide',
-      type: 'bracket',
-      status: 'active',
-      participants: 128,
-      maxParticipants: 256,
-      startDate: new Date('2025-01-06'),
-      endDate: new Date('2025-01-13'),
-      subject: 'Math',
-      grade: 8,
-      prizePool: {
-        coins: 5000,
-        gems: 100,
-        badges: ['math_champion', 'tournament_winner']
-      },
-      entryFee: { coins: 50 },
-      currentRound: 3,
-      totalRounds: 8
-    },
-    {
-      id: 'science_sprint',
-      name: 'Science Sprint',
-      description: 'Quick-fire science questions for the curious minds',
-      type: 'leaderboard',
-      status: 'upcoming',
-      participants: 45,
-      maxParticipants: 100,
-      startDate: new Date('2025-01-10'),
-      endDate: new Date('2025-01-17'),
-      subject: 'Science',
-      grade: 7,
-      prizePool: {
-        coins: 3000,
-        gems: 50,
-        badges: ['science_expert']
-      }
-    },
-    {
-      id: 'global_challenge',
-      name: 'Global Mind Challenge',
-      description: 'Multi-subject tournament for the ultimate brain test',
-      type: 'swiss',
-      status: 'upcoming',
-      participants: 512,
-      maxParticipants: 1000,
-      startDate: new Date('2025-01-15'),
-      endDate: new Date('2025-01-22'),
-      subject: 'Mixed',
-      grade: 9,
-      prizePool: {
-        coins: 15000,
-        gems: 500,
-        badges: ['global_champion', 'master_mind', 'legendary_player']
-      },
-      entryFee: { gems: 25 }
-    },
-    {
-      id: 'daily_dash',
-      name: 'Daily Dash',
-      description: 'Quick daily tournament for active players',
-      type: 'leaderboard',
-      status: 'completed',
-      participants: 89,
-      maxParticipants: 200,
-      startDate: new Date('2025-01-05'),
-      endDate: new Date('2025-01-05'),
-      subject: 'English',
-      grade: 6,
-      prizePool: {
-        coins: 1000,
-        gems: 20,
-        badges: ['daily_winner']
-      }
+  const [joined, setJoined] = useState(false);
+  const [lobbyPlayers, setLobbyPlayers] = useState<string[]>([]);
+  const [lobbyCountdown, setLobbyCountdown] = useState(45);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [matches, setMatches] = useState<Match[]>(createRoundOneMatches());
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [transitionCountdown, setTransitionCountdown] = useState<number | null>(null);
+  const [champion, setChampion] = useState<string | null>(null);
+
+  const activeMatch = useMemo(
+    () => matches.find((match) => ["ready", "live"].includes(match.status) && match.player1 === "You"),
+    [matches],
+  );
+
+  const activeRoundMatches = useMemo(() => matches.filter((match) => match.round === currentRound), [matches, currentRound]);
+
+  const addNotification = (message: string) => {
+    const item = { id: `${Date.now()}-${Math.random()}`, message, createdAt: Date.now() };
+    setNotifications((prev) => [item, ...prev].slice(0, 8));
+    toast(message);
+  };
+
+  const joinTournament = (tournament: Tournament) => {
+    setSelectedTournament(tournament);
+    setJoined(true);
+    setLobbyPlayers(["You", ...starterPlayers.filter((player) => player !== "You").slice(0, tournament.currentPlayers)]);
+    setLobbyCountdown(20);
+    addNotification(`Joined ${tournament.name}. Waiting lobby opened.`);
+  };
+
+  useEffect(() => {
+    if (!joined || champion) return;
+
+    const interval = window.setInterval(() => {
+      setLobbyPlayers((prev) => {
+        if (!selectedTournament) return prev;
+        if (prev.length >= selectedTournament.maxPlayers) return prev;
+        const nextCandidate = starterPlayers[prev.length];
+        if (!nextCandidate) return prev;
+        return [...prev, nextCandidate];
+      });
+
+      setLobbyCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [joined, selectedTournament, champion]);
+
+  useEffect(() => {
+    if (!selectedTournament || !joined || champion) return;
+
+    if (lobbyPlayers.length >= selectedTournament.maxPlayers) {
+      addNotification("Tournament full. Matchmaking started.");
+      setMatches(createRoundOneMatches());
+      setCurrentRound(1);
     }
-  ]);
+  }, [lobbyPlayers.length, selectedTournament, joined, champion]);
 
-  const getStatusConfig = (status: Tournament['status']) => {
-    const configs = {
-      upcoming: { color: 'from-blue-500 to-cyan-500', text: 'Upcoming', icon: Calendar },
-      active: { color: 'from-green-500 to-emerald-500', text: 'Live', icon: Zap },
-      completed: { color: 'from-gray-500 to-gray-600', text: 'Ended', icon: Trophy }
-    };
-    return configs[status];
-  };
-
-  const getTypeConfig = (type: Tournament['type']) => {
-    const configs = {
-      bracket: { icon: '🏆', label: 'Bracket', color: 'from-yellow-500 to-orange-500' },
-      swiss: { icon: '⚔️', label: 'Swiss', color: 'from-purple-500 to-pink-500' },
-      leaderboard: { icon: '📊', label: 'Leaderboard', color: 'from-cyan-500 to-blue-500' }
-    };
-    return configs[type];
-  };
-
-  const handleRegister = (tournament: Tournament) => {
-    toast.success(`Registered for ${tournament.name}!`, {
-      description: 'You will be notified when the tournament begins.'
-    });
-  };
-
-  const activeTournaments = tournaments.filter(t => t.status === 'active');
-  const upcomingTournaments = tournaments.filter(t => t.status === 'upcoming');
-  const completedTournaments = tournaments.filter(t => t.status === 'completed');
-
-  const renderTournamentCard = (tournament: Tournament) => {
-    const statusConfig = getStatusConfig(tournament.status);
-    const typeConfig = getTypeConfig(tournament.type);
-    const StatusIcon = statusConfig.icon;
-    
-    return (
-      <motion.div
-        key={tournament.id}
-        layout
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        whileHover={{ y: -4 }}
-        className="group"
-      >
-        <Card className="glass neon-border overflow-hidden h-full transition-all duration-300 hover:shadow-lg hover:shadow-primary/20">
-          {/* Status Banner */}
-          <div className={`h-1.5 bg-gradient-to-r ${statusConfig.color}`} />
-          
-          <CardContent className="p-6 space-y-4">
-            {/* Header */}
-            <div className="flex items-start justify-between">
-              <div className="space-y-1 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{typeConfig.icon}</span>
-                  <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
-                    {tournament.name}
-                  </h3>
-                </div>
-                <p className="text-sm text-muted-foreground line-clamp-2">{tournament.description}</p>
-              </div>
-              <Badge className={`bg-gradient-to-r ${statusConfig.color} text-white border-0 shrink-0`}>
-                <StatusIcon className="w-3 h-3 mr-1" />
-                {statusConfig.text}
-              </Badge>
-            </div>
-
-            {/* Stats Row */}
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-lg">
-                <Users className="w-4 h-4" />
-                <span>{tournament.participants}/{tournament.maxParticipants}</span>
-              </div>
-              <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-lg">
-                <Calendar className="w-4 h-4" />
-                <span>{tournament.startDate.toLocaleDateString()}</span>
-              </div>
-              {tournament.status === 'active' && tournament.currentRound && (
-                <div className="flex items-center gap-1.5 bg-primary/20 text-primary px-2 py-1 rounded-lg">
-                  <Target className="w-4 h-4" />
-                  <span>Round {tournament.currentRound}/{tournament.totalRounds}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="border-border/50">{tournament.subject}</Badge>
-              <Badge variant="outline" className="border-border/50">Grade {tournament.grade}</Badge>
-              <Badge variant="outline" className={`border-0 bg-gradient-to-r ${typeConfig.color} text-white`}>
-                {typeConfig.label}
-              </Badge>
-            </div>
-
-            {/* Progress Bar for Active */}
-            {tournament.status === 'active' && tournament.currentRound && tournament.totalRounds && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tournament Progress</span>
-                  <span className="text-primary font-medium">{Math.round((tournament.currentRound / tournament.totalRounds) * 100)}%</span>
-                </div>
-                <Progress 
-                  value={(tournament.currentRound / tournament.totalRounds) * 100} 
-                  className="h-2"
-                />
-              </div>
-            )}
-
-            {/* Prize Pool */}
-            <div className="p-3 rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
-              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
-                Prize Pool
-              </div>
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-lg">🪙</span>
-                  <span className="font-bold text-foreground">{tournament.prizePool.coins.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-lg">💎</span>
-                  <span className="font-bold text-foreground">{tournament.prizePool.gems.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Award className="w-4 h-4 text-primary" />
-                  <span className="font-bold text-foreground">{tournament.prizePool.badges.length} Badges</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Entry Fee */}
-            {tournament.entryFee && (
-              <div className="text-sm text-muted-foreground">
-                <span className="font-medium">Entry Fee: </span>
-                {tournament.entryFee.coins && <span className="text-foreground">🪙 {tournament.entryFee.coins}</span>}
-                {tournament.entryFee.gems && <span className="text-foreground">💎 {tournament.entryFee.gems}</span>}
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex gap-2 pt-2">
-              {tournament.status === 'upcoming' && (
-                <Button 
-                  className="flex-1 bg-gradient-to-r from-primary to-accent text-primary-foreground"
-                  onClick={() => handleRegister(tournament)}
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Register Now
-                </Button>
-              )}
-              {tournament.status === 'active' && (
-                <Button className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white">
-                  <Zap className="w-4 h-4 mr-2" />
-                  Continue Playing
-                </Button>
-              )}
-              {tournament.status === 'completed' && (
-                <Button variant="outline" className="flex-1 border-border/50">
-                  <Trophy className="w-4 h-4 mr-2" />
-                  View Results
-                </Button>
-              )}
-              <Button variant="outline" size="icon" className="border-border/50">
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+  const setMatchResult = (matchId: string, winner: string) => {
+    setMatches((prev) =>
+      prev.map((match) =>
+        match.id === matchId
+          ? {
+              ...match,
+              winner,
+              status: "finished",
+            }
+          : match,
+      ),
     );
+
+    addNotification(`Match finished: ${winner} advanced.`);
+  };
+
+  useEffect(() => {
+    if (!joined || champion) return;
+    const allFinished = activeRoundMatches.length > 0 && activeRoundMatches.every((match) => match.status === "finished");
+
+    if (!allFinished) return;
+
+    const winners = activeRoundMatches.map((match) => match.winner).filter(Boolean) as string[];
+
+    if (winners.length === 1 && currentRound === 3) {
+      setChampion(winners[0]);
+      addNotification(`🏆 ${winners[0]} became Tournament Champion.`);
+      return;
+    }
+
+    if (winners.length < 2) return;
+
+    setTransitionCountdown(6);
+    addNotification("Next Round Starting...");
+  }, [activeRoundMatches, currentRound, joined, champion]);
+
+  useEffect(() => {
+    if (transitionCountdown === null) return;
+
+    if (transitionCountdown <= 0) {
+      const winners = activeRoundMatches.map((match) => match.winner).filter(Boolean) as string[];
+      const nextRound = currentRound + 1;
+      const nextMatches: Match[] = [];
+
+      for (let index = 0; index < winners.length; index += 2) {
+        const left = winners[index];
+        const right = winners[index + 1];
+        if (!left || !right) continue;
+
+        nextMatches.push({
+          id: `${nextRound}-${index}`,
+          round: nextRound,
+          roundName: roundLabels[nextRound],
+          player1: left,
+          player2: right,
+          status: left === "You" ? "ready" : "pending",
+          subject: nextRound === 3 ? "Mixed Finals" : "STEM Mix",
+          questionCount: 15,
+          mode: nextRound === 3 ? "speed" : "standard",
+        });
+      }
+
+      setMatches((prev) => [...prev, ...nextMatches]);
+      setCurrentRound(nextRound);
+      setTransitionCountdown(null);
+      addNotification(`${roundLabels[nextRound]} launched.`);
+      return;
+    }
+
+    const interval = window.setInterval(() => setTransitionCountdown((prev) => (prev === null ? null : prev - 1)), 1000);
+    return () => window.clearInterval(interval);
+  }, [transitionCountdown, activeRoundMatches, currentRound]);
+
+  const bracketRounds = useMemo(() => {
+    const byRound = new Map<number, Match[]>();
+    matches.forEach((match) => {
+      const current = byRound.get(match.round) ?? [];
+      byRound.set(match.round, [...current, match]);
+    });
+
+    return [1, 2, 3].map((round) => ({ round, label: roundLabels[round], matches: byRound.get(round) ?? [] }));
+  }, [matches]);
+
+  const statusBadge = (status: MatchStatus) => {
+    if (status === "live") return <Badge className="bg-red-500 text-white">Live</Badge>;
+    if (status === "ready") return <Badge className="bg-emerald-500 text-white">Ready</Badge>;
+    if (status === "finished") return <Badge className="bg-violet-500 text-white">Finished</Badge>;
+    return <Badge variant="secondary">Pending</Badge>;
   };
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="text-center space-y-4">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="inline-block"
-        >
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent blur-xl opacity-50" />
-            <h2 className="relative text-4xl font-bold text-gradient flex items-center justify-center gap-3">
-              <Trophy className="w-10 h-10" />
-              Tournament Hub
-            </h2>
-          </div>
-        </motion.div>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          Compete with students worldwide and climb the ranks to legendary status
-        </p>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Active', count: activeTournaments.length, icon: Zap, color: 'from-green-500 to-emerald-500' },
-          { label: 'Upcoming', count: upcomingTournaments.length, icon: Calendar, color: 'from-blue-500 to-cyan-500' },
-          { label: 'Completed', count: completedTournaments.length, icon: Trophy, color: 'from-purple-500 to-pink-500' },
-        ].map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Card className="glass text-center p-4">
-              <div className={`w-10 h-10 mx-auto rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-2`}>
-                <stat.icon className="w-5 h-5 text-white" />
-              </div>
-              <div className="text-2xl font-bold text-foreground">{stat.count}</div>
-              <div className="text-sm text-muted-foreground">{stat.label}</div>
+    <div className="space-y-6 text-foreground">
+      <Card className="bg-gradient-to-br from-slate-950 via-slate-900 to-black border-primary/30 shadow-lg shadow-primary/15">
+        <CardHeader>
+          <CardTitle className="text-3xl flex items-center gap-3 text-primary">
+            <Trophy className="w-8 h-8" /> Master Minds Tournament Arena
+          </CardTitle>
+          <CardDescription>
+            Esports-style knockout competitions with live battles, round transitions, rewards, and champion titles.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-4 gap-4">
+          {[
+            { icon: Users, label: "Lobby", value: joined ? `${lobbyPlayers.length}/${selectedTournament?.maxPlayers ?? 8}` : "Not Joined" },
+            { icon: Swords, label: "Current Round", value: joined ? roundLabels[currentRound] ?? "TBD" : "-" },
+            { icon: Zap, label: "Live Match", value: activeMatch ? `${activeMatch.player1} vs ${activeMatch.player2}` : "No active room" },
+            { icon: Crown, label: "Champion", value: champion ?? "To be decided" },
+          ].map((tile) => (
+            <Card key={tile.label} className="bg-white/5 border-white/10">
+              <CardContent className="pt-6">
+                <tile.icon className="w-5 h-5 text-cyan-400 mb-2" />
+                <p className="text-xs text-muted-foreground">{tile.label}</p>
+                <p className="font-semibold">{tile.value}</p>
+              </CardContent>
             </Card>
-          </motion.div>
-        ))}
-      </div>
+          ))}
+        </CardContent>
+      </Card>
 
-      {/* Tabs */}
-      <Tabs defaultValue="active" className="space-y-6">
-        <TabsList className="glass grid grid-cols-3 w-full max-w-lg mx-auto p-1">
-          <TabsTrigger value="active" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Zap className="w-4 h-4" />
-            <span>Live ({activeTournaments.length})</span>
-          </TabsTrigger>
-          <TabsTrigger value="upcoming" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Calendar className="w-4 h-4" />
-            <span>Upcoming ({upcomingTournaments.length})</span>
-          </TabsTrigger>
-          <TabsTrigger value="completed" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Trophy className="w-4 h-4" />
-            <span>Ended ({completedTournaments.length})</span>
-          </TabsTrigger>
+      <Tabs defaultValue="join" className="space-y-5">
+        <TabsList className="grid grid-cols-4">
+          <TabsTrigger value="join">Tournaments</TabsTrigger>
+          <TabsTrigger value="lobby">Lobby</TabsTrigger>
+          <TabsTrigger value="matches">Live Matches</TabsTrigger>
+          <TabsTrigger value="bracket">Bracket</TabsTrigger>
         </TabsList>
 
-        <AnimatePresence mode="wait">
-          <TabsContent value="active" className="mt-0">
-            {activeTournaments.length === 0 ? (
-              <Card className="glass p-12 text-center">
-                <Zap className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No active tournaments at the moment</p>
-              </Card>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {activeTournaments.map(renderTournamentCard)}
+        <TabsContent value="join" className="space-y-4">
+          <div className="grid md:grid-cols-3 gap-4">
+            {tournamentCatalog.map((tournament) => (
+              <motion.div key={tournament.id} initial={{ opacity: 0.7 }} animate={{ opacity: 1 }}>
+                <Card className="border-primary/30 hover:border-primary transition-colors h-full bg-card/90">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{tournament.name}</CardTitle>
+                    <CardDescription className="capitalize">{tournament.mode} tournament</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Entry</span>
+                      <span className="font-medium">{tournament.entry === "free" ? "Free" : `${tournament.entryCost} coins`}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Players</span>
+                      <span className="font-medium">{tournament.currentPlayers}/{tournament.maxPlayers}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Start in</span>
+                      <span className="font-medium">{formatClock(tournament.countdownSeconds)}</span>
+                    </div>
+                    <Button className="w-full" onClick={() => joinTournament(tournament)}>
+                      <Gamepad2 className="w-4 h-4 mr-2" /> Join Tournament
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="lobby" className="grid lg:grid-cols-3 gap-4">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Tournament Lobby</CardTitle>
+              <CardDescription>Waiting room before automatic tournament start.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Total players</p>
+                <p className="font-semibold">{joined ? `${lobbyPlayers.length}/${selectedTournament?.maxPlayers ?? 8}` : "0/8"}</p>
               </div>
-            )}
-          </TabsContent>
+              <Progress value={joined && selectedTournament ? (lobbyPlayers.length / selectedTournament.maxPlayers) * 100 : 0} />
+              <div className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
+                <span className="flex items-center gap-2"><Clock className="w-4 h-4" /> Countdown</span>
+                <strong>{formatClock(lobbyCountdown)}</strong>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {lobbyPlayers.map((player) => (
+                  <div key={player} className="rounded-lg border border-border px-3 py-2 text-sm flex justify-between">
+                    <span>{player}</span>
+                    <UserCheck className="w-4 h-4 text-green-500" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-          <TabsContent value="upcoming" className="mt-0">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {upcomingTournaments.map(renderTournamentCard)}
-            </div>
-          </TabsContent>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Bell className="w-5 h-5" /> Notifications</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {notifications.length === 0 && <p className="text-sm text-muted-foreground">No tournament alerts yet.</p>}
+              {notifications.map((note) => (
+                <div key={note.id} className="text-sm rounded-lg bg-muted/30 p-2 border border-border">
+                  {note.message}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="completed" className="mt-0">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {completedTournaments.map(renderTournamentCard)}
-            </div>
-          </TabsContent>
-        </AnimatePresence>
+        <TabsContent value="matches" className="space-y-4">
+          {transitionCountdown !== null && (
+            <Card className="border-amber-500/50 bg-amber-500/10">
+              <CardContent className="pt-6 flex items-center justify-between">
+                <p className="font-semibold">Next Round Starting…</p>
+                <Badge className="bg-amber-500 text-black">{transitionCountdown}s</Badge>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {activeRoundMatches.map((match) => (
+              <Card key={match.id} className="border-border/60">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span>{match.roundName} · {match.player1} vs {match.player2}</span>
+                    {statusBadge(match.status)}
+                  </CardTitle>
+                  <CardDescription>
+                    Subject: {match.subject} · Questions: {match.questionCount} · Mode: {match.mode}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      disabled={match.status === "finished"}
+                      onClick={() => setMatchResult(match.id, match.player1)}
+                    >
+                      {match.player1} wins
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={match.status === "finished"}
+                      onClick={() => setMatchResult(match.id, match.player2)}
+                    >
+                      {match.player2} wins
+                    </Button>
+                  </div>
+                  {match.winner && <p className="text-sm text-emerald-500">Winner: {match.winner} advanced to next round.</p>}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="bracket" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Target className="w-5 h-5" /> Knockout Bracket</CardTitle>
+              <CardDescription>Real-time progression from Quarterfinal to Champion.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid lg:grid-cols-3 gap-4">
+              {bracketRounds.map((column) => (
+                <div key={column.round}>
+                  <h3 className="font-semibold mb-3">{column.label}</h3>
+                  <div className="space-y-2">
+                    {column.matches.length === 0 && (
+                      <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">Waiting for previous round.</div>
+                    )}
+                    {column.matches.map((match) => (
+                      <div key={match.id} className="rounded-lg border p-3 bg-muted/20">
+                        <p className="text-sm">{match.player1} vs {match.player2}</p>
+                        <div className="flex justify-between items-center mt-2">
+                          {statusBadge(match.status)}
+                          {match.winner ? <span className="text-xs text-emerald-500 font-medium">{match.winner} ✓</span> : <span className="text-xs text-muted-foreground">In progress</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {champion && (
+            <Card className="border-yellow-400/60 bg-yellow-500/10">
+              <CardContent className="pt-6 space-y-3">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <Crown className="w-6 h-6 text-yellow-500" /> {champion} is Tournament Champion
+                </h3>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                  <div className="rounded-lg border p-3 bg-black/20">🏅 Winner Reward: 1,500 Coins</div>
+                  <div className="rounded-lg border p-3 bg-black/20">🎯 XP Bonus: +800 XP</div>
+                  <div className="rounded-lg border p-3 bg-black/20">🏆 Badge: Tournament Champion</div>
+                  <div className="rounded-lg border p-3 bg-black/20">🥈 Runner-up: 600 Coins + 300 XP</div>
+                </div>
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" /> Title unlocked: "Tournament Champion"
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
       </Tabs>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Medal className="w-5 h-5" /> Competitive Ranking Loop</CardTitle>
+          <CardDescription>Every tournament updates rankings, streaks, and reward economy.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-lg border p-3">Live match status with ready-state checks and synchronized question timers.</div>
+          <div className="rounded-lg border p-3">Automatic winner advancement and elimination with bracket updates.</div>
+          <div className="rounded-lg border p-3">Notifications for opponent found, next round, and match readiness.</div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
