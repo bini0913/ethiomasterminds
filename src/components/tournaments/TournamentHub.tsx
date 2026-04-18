@@ -136,11 +136,16 @@ const TournamentHub: React.FC = () => {
   }, [matches]);
 
   const loadTournaments = async () => {
-    await supabase.rpc("auto_start_due_tournaments" as any);
+    // Best-effort auto-start. This should never block tournament loading.
+    const { error: autoStartError } = await supabase.rpc("auto_start_due_tournaments" as any);
+    if (autoStartError) {
+      console.warn("auto_start_due_tournaments unavailable:", autoStartError.message);
+    }
+
     const [{ data: tournamentRows, error: tError }, { data: playerRows }, { data: profileRows }] = await Promise.all([
       supabase
         .from("tournaments")
-        .select("id,name,status,mode,subject,questions_per_match,question_count,questions_count,start_time,starts_at,registration_deadline,max_participants,current_players,entry_fee,entry_fee_coins,prize_coins,winner_id")
+        .select("id,name,status,mode,subject,settings,question_count,questions_count,start_time,starts_at,max_participants,current_players,entry_fee,entry_fee_coins,prize_coins,winner_id")
         .order("created_at", { ascending: false })
         .limit(30),
       supabase.from("tournament_players" as any).select("tournament_id,user_id"),
@@ -165,9 +170,9 @@ const TournamentHub: React.FC = () => {
       status: row.status,
       mode: row.mode ?? "speed",
       subject: row.subject ?? "General",
-      questionsPerMatch: row.questions_per_match ?? row.question_count ?? row.questions_count ?? 10,
+      questionsPerMatch: row.settings?.questions_per_match ?? row.question_count ?? row.questions_count ?? 10,
       startTime: row.start_time ?? row.starts_at ?? null,
-      registrationDeadline: row.registration_deadline ?? null,
+      registrationDeadline: row.settings?.registration_deadline ?? null,
       maxPlayers: row.max_participants || 16,
       currentPlayers: row.current_players ?? participantCounts[row.id] ?? 0,
       entryFee: row.entry_fee ?? row.entry_fee_coins ?? 0,
