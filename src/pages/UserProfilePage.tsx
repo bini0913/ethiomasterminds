@@ -210,7 +210,7 @@ const UserProfilePage = () => {
     if (!userId) return;
 
     try {
-      const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, privacyRes, allStoreItemsRes, profileRes] = await Promise.all([
+      const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, achievementHistoryRes, privacyRes, allStoreItemsRes, profileRes] = await Promise.all([
         supabase.rpc("get_user_stats", { p_user_id: userId }),
         supabase.from("analytics").select("strong_topics,weak_topics").eq("user_id", userId),
         supabase
@@ -226,6 +226,12 @@ const UserProfilePage = () => {
           .eq("completed", true)
           .order("unlocked_at", { ascending: false })
           .limit(9),
+        (supabase as any)
+          .from("profile_achievement_history")
+          .select("id,title,description,achievement_type,achieved_at,metadata")
+          .eq("user_id", userId)
+          .order("achieved_at", { ascending: false })
+          .limit(12),
         supabase.from("profile_privacy_settings" as never).select("is_public,hide_stats").eq("user_id", userId).maybeSingle(),
         (supabase as any).from("store_items").select("id,name,section,rarity,preview,price").eq("is_active", true),
         supabase.from("profiles").select("created_at").eq("id", userId).single(),
@@ -258,18 +264,36 @@ const UserProfilePage = () => {
         : { data: [] as Array<{ id: string; name: string; icon: string; description?: string }> };
 
       const byId = new Map<string, { id: string; name: string; icon: string; description?: string }>((defs as any[] ?? []).map((d: any) => [d.id, d]));
-      setAchievements(
-        (userAchievementsRes.data ?? []).map((row, index) => {
-          const def = byId.get(row.achievement_id);
-          return {
-            id: row.id,
-            name: def?.name ?? `Achievement ${index + 1}`,
-            icon: def?.icon ?? "🏅",
-            description: def?.description ?? "A high-impact milestone unlocked through learning consistency.",
-            date: row.unlocked_at ? new Date(row.unlocked_at).toLocaleDateString() : "",
-          };
-        }),
-      );
+
+      const unlockedAchievements: Achievement[] = (userAchievementsRes.data ?? []).map((row, index) => {
+        const def = byId.get(row.achievement_id);
+        return {
+          id: row.id,
+          name: def?.name ?? `Achievement ${index + 1}`,
+          icon: def?.icon ?? "🏅",
+          description: def?.description ?? "A high-impact milestone unlocked through learning consistency.",
+          date: row.unlocked_at ? new Date(row.unlocked_at).toLocaleDateString() : "",
+        };
+      });
+
+      const resetHistoryAchievements: Achievement[] = ((achievementHistoryRes as any).data ?? []).map((entry: any, index: number) => {
+        const xpBeforeReset = Number(entry?.metadata?.xp_before_reset ?? 0);
+        const rankBeforeReset = String(entry?.metadata?.rank_before_reset ?? "UNRANKED");
+        const coinsCredited = Number(entry?.metadata?.coins_credited ?? 0);
+        const icon = entry?.achievement_type === "leaderboard_reset_snapshot" ? "🏆" : "📘";
+
+        return {
+          id: `history-${entry.id}`,
+          name: entry.title ?? `History Milestone ${index + 1}`,
+          icon,
+          description:
+            entry.description ??
+            `Season finish: ${rankBeforeReset} rank with ${xpBeforeReset} XP. ${coinsCredited} coins moved to wallet.`,
+          date: entry.achieved_at ? new Date(entry.achieved_at).toLocaleDateString() : "",
+        };
+      });
+
+      setAchievements([...resetHistoryAchievements, ...unlockedAchievements].slice(0, 18));
       const nextUnlockedIds = new Set<string>((userAchievementsRes.data ?? []).map((row) => row.achievement_id));
       if (unlockedAchievementIdsRef.current.size) {
         for (const unlockedId of nextUnlockedIds) {
@@ -367,7 +391,8 @@ const UserProfilePage = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "followers" }, refreshSocial)
       .on("postgres_changes", { event: "*", schema: "public", table: "quiz_results" }, refreshProfileDetails)
       .on("postgres_changes", { event: "*", schema: "public", table: "user_achievements" }, refreshProfileDetails)
-      .on("postgres_changes", { event: "*", schema: "public", table: "user_items" }, refreshProfileDetails)
+       .on("postgres_changes", { event: "*", schema: "public", table: "user_items" }, refreshProfileDetails)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profile_achievement_history" }, refreshProfileDetails)
       .subscribe();
 
     return () => {
