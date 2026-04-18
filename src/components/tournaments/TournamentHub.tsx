@@ -15,13 +15,14 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
 
-type TournamentStatus = "waiting" | "starting" | "active" | "finished" | "upcoming" | "completed" | "next_round";
+type TournamentStatus = "waiting" | "starting" | "active" | "finished" | "upcoming" | "completed" | "next_round" | "cancelled";
 type MatchStatus = "waiting" | "playing" | "finished" | "pending" | "ready" | "live";
 type PlayerStatus = "active" | "eliminated" | "champion" | "runner_up" | "withdrawn";
 
@@ -61,6 +62,13 @@ type HubMatch = {
   meta: Record<string, unknown>;
 };
 
+type TournamentEvent = {
+  id: string;
+  eventType: string;
+  createdAt: string;
+  data: Record<string, unknown>;
+};
+
 const roundLabel: Record<number, string> = {
   1: "Round 1",
   2: "Quarterfinals",
@@ -88,6 +96,11 @@ const TournamentHub: React.FC = () => {
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
   const [matches, setMatches] = useState<HubMatch[]>([]);
+  const [events, setEvents] = useState<TournamentEvent[]>([]);
+  const [newPlayerUsername, setNewPlayerUsername] = useState("");
+  const [matchWinnerById, setMatchWinnerById] = useState<Record<string, string>>({});
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const isManager = user?.role === "manager" || user?.role === "admin" || user?.role === "extreme_admin";
 
   const selectedTournament = useMemo(
     () => tournaments.find((item) => item.id === selectedTournamentId) || null,
@@ -150,7 +163,7 @@ const TournamentHub: React.FC = () => {
   };
 
   const loadTournamentDetails = async (tournamentId: string) => {
-    const [{ data: playerRows }, { data: matchRows }, { data: profileRows }] = await Promise.all([
+    const [{ data: playerRows }, { data: matchRows }, { data: profileRows }, { data: eventRows }] = await Promise.all([
       supabase
         .from("tournament_players" as any)
         .select("id,user_id,status")
@@ -163,6 +176,12 @@ const TournamentHub: React.FC = () => {
         .order("round", { ascending: true })
         .order("bracket_position", { ascending: true }),
       supabase.from("profiles").select("id,name,avatar_url"),
+      supabase
+        .from("tournament_events" as any)
+        .select("id,event_type,data,payload,created_at")
+        .eq("tournament_id", tournamentId)
+        .order("created_at", { ascending: false })
+        .limit(20),
     ]);
 
     const profileMap = new Map((profileRows || []).map((profile) => [profile.id, profile]));
@@ -193,6 +212,14 @@ const TournamentHub: React.FC = () => {
 
     setPlayers(mappedPlayers);
     setMatches(mappedMatches);
+    setEvents(
+      (eventRows || []).map((event: any): TournamentEvent => ({
+        id: event.id,
+        eventType: event.event_type,
+        createdAt: event.created_at,
+        data: (event.data || event.payload || {}) as Record<string, unknown>,
+      })),
+    );
   };
 
   useEffect(() => {
@@ -240,6 +267,113 @@ const TournamentHub: React.FC = () => {
     await loadTournaments();
     await loadTournamentDetails(tournamentId);
     setSelectedTournamentId(tournamentId);
+  };
+
+  const runManagerAction = async (
+    action: () => Promise<{ error: { message?: string } | null }>,
+    successMessage: string,
+  ) => {
+    setIsSubmittingAction(true);
+    try {
+      const { error } = await action();
+      if (error) {
+        toast.error(error.message || "Manager action failed");
+        return false;
+      }
+
+      toast.success(successMessage);
+      await loadTournaments();
+      if (selectedTournamentId) {
+        await loadTournamentDetails(selectedTournamentId);
+      }
+
+      return true;
+    } finally {
+      setIsSubmittingAction(false);
+    }
+  };
+
+  const addPlayerAsManager = async () => {
+    if (!selectedTournamentId || !newPlayerUsername.trim()) return;
+
+    await runManagerAction(
+      () =>
+        supabase.rpc("manager_add_tournament_player" as any, {
+          p_tournament_id: selectedTournamentId,
+          p_username: newPlayerUsername.trim(),
+        }),
+      `Player ${newPlayerUsername.trim()} added`,
+    );
+
+    setNewPlayerUsername("");
+  };
+
+  const removePlayerAsManager = async (playerUserId: string, playerName: string) => {
+    if (!selectedTournamentId) return;
+
+    await runManagerAction(
+      () =>
+        supabase.rpc("manager_remove_tournament_player" as any, {
+          p_tournament_id: selectedTournamentId,
+          p_user_id: playerUserId,
+        }),
+      `${playerName} removed from tournament`,
+    );
+  };
+
+  const setTournamentStatus = async (status: "waiting" | "active" | "finished" | "cancelled") => {
+    if (!selectedTournamentId) return;
+
+    await runManagerAction(
+      () =>
+        supabase.rpc("manager_set_tournament_status" as any, {
+          p_tournament_id: selectedTournamentId,
+          p_status: status,
+        }),
+      `Tournament set to ${status}`,
+    );
+  };
+
+  const skipRound = async () => {
+    if (!selectedTournamentId) return;
+
+    await runManagerAction(
+      () =>
+        supabase.rpc("manager_skip_to_next_round" as any, {
+          p_tournament_id: selectedTournamentId,
+        }),
+      "Round skipped successfully",
+    );
+  };
+
+  const updateMatchStatus = async (matchId: string, status: "waiting" | "playing" | "finished") => {
+    await runManagerAction(
+      () =>
+        supabase.rpc("manager_update_match_status" as any, {
+          p_match_id: matchId,
+          p_status: status,
+        }),
+      `Match moved to ${status}`,
+    );
+  };
+
+  const setMatchWinner = async (match: HubMatch) => {
+    const winnerId = matchWinnerById[match.id];
+    if (!winnerId) {
+      toast.error("Please choose a winner from this match");
+      return;
+    }
+
+    await runManagerAction(
+      () =>
+        supabase.rpc("manager_set_match_winner" as any, {
+          p_match_id: match.id,
+          p_winner_id: winnerId,
+          p_player1_score: match.score1,
+          p_player2_score: match.score2,
+        }),
+      "Winner set successfully",
+    );
   };
 
   const championLabel =
@@ -434,6 +568,71 @@ const TournamentHub: React.FC = () => {
         </section>
       )}
 
+      {isManager && selectedTournament && (
+        <Card className="border-amber-500/25 bg-slate-950/90">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-100"><Crown className="h-5 w-5 text-amber-300" /> Manager Control Center</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+              <Input
+                placeholder="Add participant by username"
+                value={newPlayerUsername}
+                onChange={(event) => setNewPlayerUsername(event.target.value)}
+              />
+              <Button onClick={addPlayerAsManager} disabled={isSubmittingAction || !newPlayerUsername.trim()} className="bg-amber-500 text-black hover:bg-amber-400">
+                Add Player
+              </Button>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <Button variant="secondary" onClick={() => setTournamentStatus("active")} disabled={isSubmittingAction}>Start/Resume</Button>
+              <Button variant="secondary" onClick={() => setTournamentStatus("waiting")} disabled={isSubmittingAction}>Pause</Button>
+              <Button variant="secondary" onClick={skipRound} disabled={isSubmittingAction}>Skip Round</Button>
+              <Button variant="destructive" onClick={() => setTournamentStatus("cancelled")} disabled={isSubmittingAction}>Cancel</Button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-200">Player management</p>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {players.map((player) => (
+                  <div key={player.id} className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2">
+                    <p className="text-xs text-slate-200">{player.name}</p>
+                    <Button size="sm" variant="outline" onClick={() => removePlayerAsManager(player.userId, player.name)} disabled={isSubmittingAction}>Remove</Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-200">Match overrides</p>
+              <div className="space-y-2">
+                {matches.map((match) => (
+                  <div key={match.id} className="rounded-lg border border-slate-700 bg-slate-900/70 p-3 space-y-2">
+                    <p className="text-xs text-slate-300">Round {match.round} • Match {match.bracketPosition}</p>
+                    <div className="grid gap-2 md:grid-cols-4">
+                      <Button size="sm" variant="secondary" onClick={() => updateMatchStatus(match.id, "playing")} disabled={isSubmittingAction}>Force Start</Button>
+                      <Button size="sm" variant="secondary" onClick={() => updateMatchStatus(match.id, "waiting")} disabled={isSubmittingAction}>Reset</Button>
+                      <select
+                        className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1 text-xs text-slate-100"
+                        value={matchWinnerById[match.id] || ""}
+                        onChange={(event) => setMatchWinnerById((prev) => ({ ...prev, [match.id]: event.target.value }))}
+                      >
+                        <option value="">Select winner</option>
+                        {match.player1Id && <option value={match.player1Id}>{match.player1}</option>}
+                        {match.player2Id && <option value={match.player2Id}>{match.player2}</option>}
+                      </select>
+                      <Button size="sm" onClick={() => setMatchWinner(match)} disabled={isSubmittingAction || !matchWinnerById[match.id]}>Set Winner</Button>
+                    </div>
+                  </div>
+                ))}
+                {matches.length === 0 && <p className="text-xs text-muted-foreground">No matches to manage yet.</p>}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-purple-500/30 bg-slate-950/90 shadow-[0_0_34px_rgba(168,85,247,0.22)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-purple-100"><PlayCircle className="h-5 w-5" /> 🎮 Live Match Arena</CardTitle>
@@ -472,12 +671,17 @@ const TournamentHub: React.FC = () => {
 
       <Card className="border-cyan-400/25 bg-slate-950/90">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-cyan-100"><Zap className="h-5 w-5" /> 📊 Manager Real-Time Control</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-cyan-100"><Zap className="h-5 w-5" /> 📊 Realtime Event Feed</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3 text-sm">Start tournament from Manager Dashboard.</div>
-          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3 text-sm">End match and assign winner in control center.</div>
-          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3 text-sm">Bracket and player status update in real-time.</div>
+        <CardContent className="space-y-2">
+          {events.map((event) => (
+            <div key={event.id} className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs">
+              <p className="font-semibold text-cyan-100">{event.eventType}</p>
+              <p className="text-slate-300">{new Date(event.createdAt).toLocaleString()}</p>
+              <p className="text-slate-400">{JSON.stringify(event.data)}</p>
+            </div>
+          ))}
+          {events.length === 0 && <p className="text-sm text-muted-foreground">No realtime events yet for this tournament.</p>}
         </CardContent>
       </Card>
     </div>
