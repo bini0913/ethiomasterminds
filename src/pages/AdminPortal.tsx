@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import {
   Shield, Users, BookOpen, Trophy, Bell, LogOut, Plus, Trash2, UserCheck, Key,
   Database, Activity, BarChart3, Bot, Search, RefreshCw, Check, X, AlertTriangle,
-  Loader2, Crown, Zap, Flag, FileText, MessageSquare, Coins, Target, RotateCcw
+  Loader2, Crown, Zap, Flag, FileText, MessageSquare, Coins, Target, RotateCcw, SlidersHorizontal
 } from 'lucide-react';
 import {
   Bar,
@@ -433,6 +433,29 @@ const AdminPortal: React.FC = () => {
     logAction(`Deleted ${type}`, id);
     fetchContent();
     fetchStatsAndCharts();
+  };
+
+  const handleApproveContent = async (type: 'quiz' | 'question' | 'flashcard' | 'social', id: string) => {
+    if (type === 'quiz') {
+      const { error } = await supabase
+        .from('quizzes')
+        .update({ is_approved: true } as never)
+        .eq('id', id);
+
+      if (error) {
+        toast.error('Failed to approve quiz');
+        return;
+      }
+
+      toast.success('Quiz approved');
+      logAction('Approved quiz', id);
+      fetchContent();
+      fetchStatsAndCharts();
+      return;
+    }
+
+    toast.success(`${type} reviewed`);
+    logAction(`Reviewed ${type}`, id);
   };
 
   const handleModerateLibraryBook = async (bookId: string, status: 'approved' | 'rejected') => {
@@ -932,7 +955,7 @@ const AdminPortal: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Manage quizzes, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => item.type === 'quiz' ? handleModerateReport(item.id, 'resolved') : toast.success('Approved')} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Manage quizzes, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => handleApproveContent(item.type, item.id)} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-4">
