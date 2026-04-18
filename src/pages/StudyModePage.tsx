@@ -100,6 +100,7 @@ const StudyModePage: React.FC = () => {
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("medium");
 
   const [room, setRoom] = useState<StudyRoom | null>(null);
+  const [availableRooms, setAvailableRooms] = useState<StudyRoom[]>([]);
   const [joinRoomId, setJoinRoomId] = useState("");
   const [roomMembers, setRoomMembers] = useState<RoomMember[]>([]);
   const [memberNames, setMemberNames] = useState<Record<string, string>>({});
@@ -120,18 +121,21 @@ const StudyModePage: React.FC = () => {
   }, [timerMode, customMinutes, isBreak]);
 
   const ensureMembership = async (roomId: string) => {
-    if (!user) return;
-    const { data } = await db
-      .from("room_members")
-      .select("room_id,user_id")
-      .eq("room_id", roomId)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    if (!user) return false;
 
-    if (!data) {
-      const { error } = await db.from("room_members").insert({ room_id: roomId, user_id: user.id });
-      if (error) toast.error(error.message);
+    const { error } = await db
+      .from("room_members")
+      .upsert(
+        { room_id: roomId, user_id: user.id },
+        { onConflict: "room_id,user_id", ignoreDuplicates: true }
+      );
+
+    if (error) {
+      toast.error(error.message);
+      return false;
     }
+
+    return true;
   };
 
   const fetchMemberNames = async (members: RoomMember[]) => {
@@ -157,16 +161,19 @@ const StudyModePage: React.FC = () => {
     if (!user) return;
     setLoading(true);
 
-    const [sessionsRes, tasksRes] = await Promise.all([
+    const [sessionsRes, tasksRes, roomsRes] = await Promise.all([
       db.from("study_sessions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
       db.from("tasks").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      db.from("study_rooms").select("*").in("status", ["open", "live"]).order("created_at", { ascending: false }).limit(20),
     ]);
 
     if (sessionsRes.error) toast.error(sessionsRes.error.message);
     if (tasksRes.error) toast.error(tasksRes.error.message);
+    if (roomsRes.error) toast.error(roomsRes.error.message);
 
     setSessions((sessionsRes.data ?? []) as StudySession[]);
     setTasks((tasksRes.data ?? []) as StudyTask[]);
+    setAvailableRooms((roomsRes.data ?? []) as StudyRoom[]);
 
     let activeRoomId = selectedRoomId;
 
@@ -195,7 +202,11 @@ const StudyModePage: React.FC = () => {
         }
 
         activeRoomId = created.data.id;
-        await ensureMembership(activeRoomId);
+        const joined = await ensureMembership(activeRoomId);
+        if (!joined) {
+          setLoading(false);
+          return;
+        }
       }
     }
 
@@ -229,10 +240,9 @@ const StudyModePage: React.FC = () => {
     if (!user) return;
 
     const channel = supabase
-      .channel(`study-mode-live-${user.id}`)
+      .channel(`study-mode-user-${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "study_sessions", filter: `user_id=eq.${user.id}` }, () => loadStudyData(room?.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` }, () => loadStudyData(room?.id))
-      .on("postgres_changes", { event: "*", schema: "public", table: "room_members", filter: room ? `room_id=eq.${room.id}` : undefined }, () => loadStudyData(room?.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "study_rooms" }, () => loadStudyData(room?.id))
       .subscribe();
 
@@ -240,6 +250,19 @@ const StudyModePage: React.FC = () => {
       supabase.removeChannel(channel);
     };
   }, [user?.id, room?.id]);
+
+  useEffect(() => {
+    if (!room?.id) return;
+
+    const roomChannel = supabase
+      .channel(`study-mode-room-${room.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "room_members", filter: `room_id=eq.${room.id}` }, () => loadStudyData(room.id))
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(roomChannel);
+    };
+  }, [room?.id, user?.id]);
 
   useEffect(() => {
     if (!running) return;
@@ -408,8 +431,28 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    await ensureMembership(joinRoomId.trim());
-    await loadStudyData(joinRoomId.trim());
+    const roomId = joinRoomId.trim();
+    const roomRes = await db
+      .from("study_rooms")
+      .select("id,status")
+      .eq("id", roomId)
+      .in("status", ["open", "live"])
+      .maybeSingle();
+
+    if (roomRes.error) {
+      toast.error(roomRes.error.message);
+      return;
+    }
+
+    if (!roomRes.data) {
+      toast.error("Room not found or not joinable.");
+      return;
+    }
+
+    const joined = await ensureMembership(roomId);
+    if (!joined) return;
+
+    await loadStudyData(roomId);
     toast.success("Joined room.");
   };
 
@@ -499,6 +542,22 @@ const StudyModePage: React.FC = () => {
             <div className="flex gap-2">
               <Button onClick={createRoom} className="flex-1">Create Room</Button>
               <Button onClick={joinRoom} variant="secondary" className="flex-1">Join Room</Button>
+            </div>
+            <div className="md:col-span-3 space-y-2">
+              <p className="text-xs text-white/70">Open rooms from database</p>
+              <div className="grid md:grid-cols-2 gap-2">
+                {availableRooms.slice(0, 6).map((openRoom) => (
+                  <button
+                    key={openRoom.id}
+                    onClick={() => setJoinRoomId(openRoom.id)}
+                    className="text-left bg-white/5 border border-white/10 hover:border-violet-300/60 rounded-md p-2 transition"
+                  >
+                    <p className="text-sm font-medium truncate">{openRoom.title}</p>
+                    <p className="text-xs text-white/60 truncate">{openRoom.id}</p>
+                  </button>
+                ))}
+                {availableRooms.length === 0 && <p className="text-sm text-white/60">No open rooms yet. Create one to start live study.</p>}
+              </div>
             </div>
           </CardContent>
         </Card>
