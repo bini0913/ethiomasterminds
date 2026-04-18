@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import {
   Shield, Users, BookOpen, Trophy, Bell, LogOut, Plus, Trash2, UserCheck, Key,
   Database, Activity, BarChart3, Bot, Search, RefreshCw, Check, X, AlertTriangle,
-  Loader2, Crown, Zap, Flag, FileText, MessageSquare, Coins, Target, RotateCcw, SlidersHorizontal
+  Loader2, Crown, Zap, Flag, FileText, MessageSquare, Coins, Target, RotateCcw
 } from 'lucide-react';
 import {
   Bar,
@@ -758,6 +758,53 @@ const AdminPortal: React.FC = () => {
                 <Button variant="outline" size="sm" onClick={() => handleBulkAction('ban')}>Bulk Ban</Button>
                 <Button variant="destructive" size="sm" onClick={() => handleBulkAction('delete')}>Bulk Delete</Button>
               </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">User Control Panel (Admin Only)</CardTitle>
+                  <CardDescription>Add XP, set level, reset progress, and adjust coins by user ID or username.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Target user (ID or username)</Label>
+                    <Input
+                      value={controlUserIdentifier}
+                      onChange={(e) => setControlUserIdentifier(e.target.value)}
+                      placeholder="user uuid or username"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <Label>Add XP</Label>
+                      <Input value={xpAmount} onChange={(e) => setXpAmount(e.target.value)} type="number" placeholder="XP amount" />
+                      <Button className="w-full" onClick={handleAddXP}><Zap className="w-4 h-4 mr-2" />Add XP</Button>
+                    </div>
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <Label>Set Level</Label>
+                      <Input value={levelAmount} onChange={(e) => setLevelAmount(e.target.value)} type="number" min={1} placeholder="Level" />
+                      <Button className="w-full" onClick={handleSetLevel}><Target className="w-4 h-4 mr-2" />Update Level</Button>
+                    </div>
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <Label>Reset User</Label>
+                      <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'xp' | 'level' | 'full')}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="xp">Reset XP</SelectItem>
+                          <SelectItem value="level">Reset Level</SelectItem>
+                          <SelectItem value="full">Full Reset</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button variant="destructive" className="w-full" onClick={handleResetUserProgress}><RotateCcw className="w-4 h-4 mr-2" />Apply Reset</Button>
+                    </div>
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <Label>Add / Remove Coins</Label>
+                      <Input value={coinAmount} onChange={(e) => setCoinAmount(e.target.value)} type="number" placeholder="Coins (+/-)" />
+                      <Button className="w-full" onClick={handleCoinAdjustment}><Coins className="w-4 h-4 mr-2" />Apply Coins</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               <Card><CardContent className="p-0"><ScrollArea className="h-[560px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Select</th><th className="p-3 text-left">User</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Joined</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{filteredUsers.map((u) => (<tr key={u.id} className="border-b border-border/50"><td className="p-3"><input type="checkbox" checked={selectedUsers.includes(u.id)} onChange={(e) => setSelectedUsers((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))} /></td><td className="p-3"><p className="font-medium">{u.name}</p><p className="text-xs text-muted-foreground">@{u.username}</p></td><td className="p-3"><Select value={u.role} onValueChange={(v) => handleUpdateUserRole(u.id, v as Role)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></td><td className="p-3">{u.grade || '-'}</td><td className="p-3"><span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" />{u.xp}</span></td><td className="p-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)}><Key className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
