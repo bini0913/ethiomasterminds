@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   Shield, Users, BookOpen, Trophy, Bell, LogOut, Plus, Trash2, UserCheck, Key,
@@ -662,17 +663,49 @@ const AdminPortal: React.FC = () => {
 
         <main className="container mx-auto px-4 py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid grid-cols-8 lg:grid-cols-10 gap-2 bg-muted/50 p-1 rounded-xl">
-              <TabsTrigger value="dashboard"><BarChart3 className="w-4 h-4 mr-1" />Dashboard</TabsTrigger>
-              <TabsTrigger value="users"><Users className="w-4 h-4 mr-1" />Users</TabsTrigger>
-              <TabsTrigger value="content"><FileText className="w-4 h-4 mr-1" />Content</TabsTrigger>
-              <TabsTrigger value="analytics"><Activity className="w-4 h-4 mr-1" />Analytics</TabsTrigger>
-              <TabsTrigger value="reports"><Flag className="w-4 h-4 mr-1" />Reports</TabsTrigger>
-              <TabsTrigger value="announcements"><MessageSquare className="w-4 h-4 mr-1" />Notify</TabsTrigger>
-              <TabsTrigger value="settings"><Bot className="w-4 h-4 mr-1" />Settings</TabsTrigger>
-              <TabsTrigger value="logs"><Activity className="w-4 h-4 mr-1" />Logs</TabsTrigger>
-              <TabsTrigger value="leaderboard"><Trophy className="w-4 h-4 mr-1" />Leaderboard</TabsTrigger>
-              <TabsTrigger value="monitoring"><Bell className="w-4 h-4 mr-1" />Live</TabsTrigger>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {[
+                { title: 'Manage Users', description: 'Roles, access, and account actions', icon: Users, tab: 'users' },
+                { title: 'XP Control', description: 'Add XP and tune progression', icon: Zap, tab: 'control' },
+                { title: 'Level Control', description: 'Set level and reset progress', icon: Target, tab: 'control' },
+                { title: 'Reset System', description: 'Account progress reset tools', icon: RotateCcw, tab: 'control' },
+                { title: 'Tournament Control', description: 'Leaderboard and event updates', icon: Trophy, tab: 'leaderboard' },
+                { title: 'System Settings', description: 'Platform feature toggles', icon: SlidersHorizontal, tab: 'settings' },
+              ].map((item) => (
+                <Card
+                  key={item.title}
+                  className="border-border/70 bg-card/80 transition-all hover:shadow-[0_0_25px_rgba(99,102,241,0.28)]"
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <item.icon className="w-4 h-4 text-primary" />
+                      <p className="font-semibold">{item.title}</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                    <Button
+                      className="w-full min-h-12"
+                      variant="outline"
+                      onClick={() => setActiveTab(item.tab)}
+                    >
+                      Open
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <TabsList className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 bg-muted/50 p-2 rounded-xl max-h-[56vh] overflow-y-auto">
+              <TabsTrigger className="min-h-12 py-3" value="dashboard"><BarChart3 className="w-4 h-4 mr-1" />Dashboard</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="users"><Users className="w-4 h-4 mr-1" />Users</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="control"><Shield className="w-4 h-4 mr-1" />Control</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="content"><FileText className="w-4 h-4 mr-1" />Content</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="analytics"><Activity className="w-4 h-4 mr-1" />Analytics</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="reports"><Flag className="w-4 h-4 mr-1" />Reports</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="announcements"><MessageSquare className="w-4 h-4 mr-1" />Notify</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="settings"><Bot className="w-4 h-4 mr-1" />Settings</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="logs"><Activity className="w-4 h-4 mr-1" />Logs</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="leaderboard"><Trophy className="w-4 h-4 mr-1" />Leaderboard</TabsTrigger>
+              <TabsTrigger className="min-h-12 py-3" value="monitoring"><Bell className="w-4 h-4 mr-1" />Live</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-4">
@@ -774,6 +807,85 @@ const AdminPortal: React.FC = () => {
               </Card>
 
               <Card><CardContent className="p-0"><ScrollArea className="h-[560px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Select</th><th className="p-3 text-left">User</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Joined</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{filteredUsers.map((u) => (<tr key={u.id} className="border-b border-border/50"><td className="p-3"><input type="checkbox" checked={selectedUsers.includes(u.id)} onChange={(e) => setSelectedUsers((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))} /></td><td className="p-3"><p className="font-medium">{u.name}</p><p className="text-xs text-muted-foreground">@{u.username}</p></td><td className="p-3"><Select value={u.role} onValueChange={(v) => handleUpdateUserRole(u.id, v as Role)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></td><td className="p-3">{u.grade || '-'}</td><td className="p-3"><span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" />{u.xp}</span></td><td className="p-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)}><Key className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+            </TabsContent>
+
+            <TabsContent value="control" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Shield className="w-4 h-4 text-primary" />User Control Panel</CardTitle>
+                  <CardDescription>Admin-only controls for XP, level, reset, and coins. Use user ID or username.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Target user (user ID or username)</Label>
+                    <Input
+                      value={controlUserIdentifier}
+                      onChange={(e) => setControlUserIdentifier(e.target.value)}
+                      placeholder="e.g. 8f6... or @student_username"
+                    />
+                  </div>
+                  <Accordion type="multiple" defaultValue={['user-controls']} className="w-full">
+                    <AccordionItem value="user-controls">
+                      <AccordionTrigger>▶ User Controls</AccordionTrigger>
+                      <AccordionContent className="space-y-3 pt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                          <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
+                            <Label>Add XP</Label>
+                            <Input value={xpAmount} onChange={(e) => setXpAmount(e.target.value)} type="number" placeholder="XP amount" />
+                            <Button className="w-full min-h-12" onClick={handleAddXP}><Zap className="w-4 h-4 mr-2" />Add XP</Button>
+                          </div>
+                          <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
+                            <Label>Set Level</Label>
+                            <Input value={levelAmount} onChange={(e) => setLevelAmount(e.target.value)} type="number" min={1} placeholder="Level" />
+                            <Button className="w-full min-h-12" onClick={handleSetLevel}><Target className="w-4 h-4 mr-2" />Update Level</Button>
+                          </div>
+                          <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
+                            <Label>Reset User</Label>
+                            <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'xp' | 'level' | 'full')}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="xp">Reset XP</SelectItem>
+                                <SelectItem value="level">Reset Level</SelectItem>
+                                <SelectItem value="full">Full Reset</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button variant="destructive" className="w-full min-h-12" onClick={handleResetUserProgress}><RotateCcw className="w-4 h-4 mr-2" />Apply Reset</Button>
+                          </div>
+                          <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
+                            <Label>Add / Remove Coins</Label>
+                            <Input value={coinAmount} onChange={(e) => setCoinAmount(e.target.value)} type="number" placeholder="Coins amount (+/-)" />
+                            <Button className="w-full min-h-12" onClick={handleCoinAdjustment}><Coins className="w-4 h-4 mr-2" />Apply Coins</Button>
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="tournament-controls">
+                      <AccordionTrigger>▶ Tournament Controls</AccordionTrigger>
+                      <AccordionContent className="pt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <Button className="min-h-12" variant="outline" onClick={() => setActiveTab('leaderboard')}>
+                            <Trophy className="w-4 h-4 mr-2" />Open Leaderboard Control
+                          </Button>
+                          <Button className="min-h-12" variant="outline" onClick={fetchAllData}>
+                            <RefreshCw className="w-4 h-4 mr-2" />Refresh Tournament/Ranking Data
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="system-settings">
+                      <AccordionTrigger>▶ System Settings</AccordionTrigger>
+                      <AccordionContent className="pt-2">
+                        <p className="text-sm text-muted-foreground mb-3">Only admin can change platform-level controls.</p>
+                        <Button className="min-h-12 w-full md:w-auto" onClick={() => setActiveTab('settings')}>
+                          <SlidersHorizontal className="w-4 h-4 mr-2" />Open System Settings
+                        </Button>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="content" className="space-y-4">
