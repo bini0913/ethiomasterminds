@@ -23,6 +23,7 @@ import {
   Swords,
   Trophy,
   Users,
+  UserPlus,
 } from "lucide-react";
 
 type TimerMode = "pomodoro" | "custom";
@@ -65,6 +66,31 @@ type RoomMember = {
   joined_at: string;
 };
 
+type StudyInvite = {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: "pending" | "accepted" | "declined" | "expired" | "cancelled";
+  message: string | null;
+  created_at: string;
+  expires_at: string;
+};
+
+type FriendOption = {
+  id: string;
+  name: string;
+};
+
+type StudyTimeLeaderboardRow = {
+  user_id: string;
+  name: string;
+  total_minutes: number;
+  focus_sessions: number;
+  completed_tasks: number;
+  updated_at: string;
+};
+
 const db = supabase as any;
 
 const formatTime = (totalSeconds: number) => {
@@ -103,6 +129,12 @@ const StudyModePage: React.FC = () => {
   const [joinRoomId, setJoinRoomId] = useState("");
   const [roomMembers, setRoomMembers] = useState<RoomMember[]>([]);
   const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+  const [friends, setFriends] = useState<FriendOption[]>([]);
+  const [inviteFriendId, setInviteFriendId] = useState("");
+  const [inviteMessage, setInviteMessage] = useState("");
+  const [incomingInvites, setIncomingInvites] = useState<StudyInvite[]>([]);
+  const [outgoingInvites, setOutgoingInvites] = useState<StudyInvite[]>([]);
+  const [globalLeaderboard, setGlobalLeaderboard] = useState<StudyTimeLeaderboardRow[]>([]);
 
   useEffect(() => {
     if (timerMode === "pomodoro") {
@@ -151,6 +183,67 @@ const StudyModePage: React.FC = () => {
     }, {});
 
     setMemberNames(names);
+  };
+
+  const loadFriends = async () => {
+    if (!user) return;
+
+    const { data, error } = await db
+      .from("friends")
+      .select("user_id,friend_id")
+      .eq("status", "accepted")
+      .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    const friendIds = [...new Set((data ?? []).map((row: { user_id: string; friend_id: string }) => (row.user_id === user.id ? row.friend_id : row.user_id)))];
+    if (friendIds.length === 0) {
+      setFriends([]);
+      return;
+    }
+
+    const { data: profiles, error: profilesError } = await db.from("profiles").select("id,name,username").in("id", friendIds);
+    if (profilesError) {
+      toast.error(profilesError.message);
+      return;
+    }
+
+    const options = (profiles ?? []).map((profile: { id: string; name: string | null; username: string | null }) => ({
+      id: profile.id,
+      name: profile.name?.trim() || profile.username?.trim() || `User ${profile.id.slice(0, 8)}`,
+    }));
+    setFriends(options);
+  };
+
+  const loadInvites = async () => {
+    if (!user) return;
+    const { data, error } = await db
+      .from("study_room_invites")
+      .select("*")
+      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    const mapped = (data ?? []) as StudyInvite[];
+    setIncomingInvites(mapped.filter((invite) => invite.receiver_id === user.id));
+    setOutgoingInvites(mapped.filter((invite) => invite.sender_id === user.id));
+  };
+
+  const loadGlobalLeaderboard = async () => {
+    const { data, error } = await db.rpc("get_study_time_leaderboard", { p_limit: 25 });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setGlobalLeaderboard((data ?? []) as StudyTimeLeaderboardRow[]);
   };
 
   const loadStudyData = async (selectedRoomId?: string) => {
@@ -217,6 +310,8 @@ const StudyModePage: React.FC = () => {
       }
     }
 
+    await Promise.all([loadFriends(), loadInvites(), loadGlobalLeaderboard()]);
+
     setLoading(false);
   };
 
@@ -234,6 +329,8 @@ const StudyModePage: React.FC = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${user.id}` }, () => loadStudyData(room?.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "room_members", filter: room ? `room_id=eq.${room.id}` : undefined }, () => loadStudyData(room?.id))
       .on("postgres_changes", { event: "*", schema: "public", table: "study_rooms" }, () => loadStudyData(room?.id))
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_room_invites", filter: `receiver_id=eq.${user.id}` }, () => loadStudyData(room?.id))
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_room_invites", filter: `sender_id=eq.${user.id}` }, () => loadStudyData(room?.id))
       .subscribe();
 
     return () => {
@@ -413,6 +510,48 @@ const StudyModePage: React.FC = () => {
     toast.success("Joined room.");
   };
 
+  const sendRoomInvite = async () => {
+    if (!room?.id) {
+      toast.error("Create or join a room first.");
+      return;
+    }
+    if (!inviteFriendId) {
+      toast.error("Select a friend to invite.");
+      return;
+    }
+
+    const { error } = await db.rpc("create_study_room_invite", {
+      p_room_id: room.id,
+      p_receiver_id: inviteFriendId,
+      p_message: inviteMessage.trim() || null,
+    });
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    setInviteMessage("");
+    setInviteFriendId("");
+    toast.success("Study room invite sent.");
+    await loadStudyData(room.id);
+  };
+
+  const respondToInvite = async (inviteId: string, response: "accepted" | "declined") => {
+    const { error } = await db.rpc("respond_study_room_invite", {
+      p_invite_id: inviteId,
+      p_response: response,
+    });
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success(response === "accepted" ? "Invite accepted. Joined room." : "Invite declined.");
+    await loadStudyData(room?.id);
+  };
+
   const progress = Math.round(((durationSeconds - remainingSeconds) / durationSeconds) * 100);
 
   const totalMinutes = useMemo(
@@ -493,12 +632,62 @@ const StudyModePage: React.FC = () => {
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2"><Users className="h-5 w-5 text-cyan-300" /> Study Rooms (Live)</CardTitle>
           </CardHeader>
-          <CardContent className="grid md:grid-cols-3 gap-2">
-            <Input value={room?.id ?? ""} readOnly className="bg-white/5 border-white/20" />
-            <Input value={joinRoomId} onChange={(event) => setJoinRoomId(event.target.value)} placeholder="Paste room id to join" className="bg-white/5 border-white/20" />
-            <div className="flex gap-2">
-              <Button onClick={createRoom} className="flex-1">Create Room</Button>
-              <Button onClick={joinRoom} variant="secondary" className="flex-1">Join Room</Button>
+          <CardContent className="space-y-3">
+            <div className="grid md:grid-cols-3 gap-2">
+              <Input value={room?.id ?? ""} readOnly className="bg-white/5 border-white/20" />
+              <Input value={joinRoomId} onChange={(event) => setJoinRoomId(event.target.value)} placeholder="Paste room id to join" className="bg-white/5 border-white/20" />
+              <div className="flex gap-2">
+                <Button onClick={createRoom} className="flex-1">Create Room</Button>
+                <Button onClick={joinRoom} variant="secondary" className="flex-1">Join Room</Button>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-2">
+              <select
+                value={inviteFriendId}
+                onChange={(event) => setInviteFriendId(event.target.value)}
+                className="md:col-span-2 bg-white/5 border border-white/20 rounded-md px-3 text-sm"
+              >
+                <option value="">Invite a friend</option>
+                {friends.map((friend) => (
+                  <option key={friend.id} value={friend.id}>{friend.name}</option>
+                ))}
+              </select>
+              <Input
+                value={inviteMessage}
+                onChange={(event) => setInviteMessage(event.target.value)}
+                placeholder="Optional invite message"
+                className="bg-white/5 border-white/20"
+              />
+              <Button onClick={() => void sendRoomInvite()} variant="secondary"><UserPlus className="h-4 w-4 mr-1" /> Invite</Button>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-2 text-sm">
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
+                <p className="text-white/80 font-medium">Incoming invites</p>
+                {incomingInvites.filter((invite) => invite.status === "pending").slice(0, 4).map((invite) => (
+                  <div key={invite.id} className="flex items-center justify-between gap-2">
+                    <span className="text-white/70 truncate">Room {invite.room_id.slice(0, 8)}…</span>
+                    <div className="flex gap-1">
+                      <Button size="sm" onClick={() => void respondToInvite(invite.id, "accepted")}>Accept</Button>
+                      <Button size="sm" variant="outline" onClick={() => void respondToInvite(invite.id, "declined")}>Decline</Button>
+                    </div>
+                  </div>
+                ))}
+                {incomingInvites.filter((invite) => invite.status === "pending").length === 0 && (
+                  <p className="text-white/60">No pending invites.</p>
+                )}
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
+                <p className="text-white/80 font-medium">Outgoing invites</p>
+                {outgoingInvites.slice(0, 4).map((invite) => (
+                  <div key={invite.id} className="flex items-center justify-between gap-2">
+                    <span className="text-white/70 truncate">To {memberNames[invite.receiver_id] ?? invite.receiver_id.slice(0, 8)}</span>
+                    <Badge variant="secondary" className="capitalize">{invite.status}</Badge>
+                  </div>
+                ))}
+                {outgoingInvites.length === 0 && <p className="text-white/60">No sent invites yet.</p>}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -581,6 +770,17 @@ const StudyModePage: React.FC = () => {
                 </div>
               ))}
               <div className="text-xs text-white/70 pt-1">Win by: most study time, most tasks completed, best focus streak.</div>
+
+              <div className="pt-3 border-t border-white/10 space-y-2">
+                <p className="text-sm font-medium text-white/90">Global Study Time Leaderboard</p>
+                {globalLeaderboard.slice(0, 5).map((entry, index) => (
+                  <div key={entry.user_id} className="text-xs bg-white/5 border border-white/10 rounded-md p-2 flex items-center justify-between gap-2">
+                    <span className="truncate">#{index + 1} {entry.name}</span>
+                    <span className="text-white/70">{entry.total_minutes}m • {entry.completed_tasks} tasks</span>
+                  </div>
+                ))}
+                {globalLeaderboard.length === 0 && <p className="text-xs text-white/60">No global study data yet.</p>}
+              </div>
             </CardContent>
           </Card>
         </div>
