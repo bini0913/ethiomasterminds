@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 interface StoreItem {
   id: string;
   name: string;
-  section: 'avatars' | 'customization' | 'titles' | 'effects';
+  section: 'featured' | 'avatars' | 'clothes' | 'cars' | 'houses' | 'titles' | 'customization' | 'effects';
   price: number;
   currency: 'coins' | 'gems';
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
@@ -28,9 +28,13 @@ interface AvatarStoreProps {
 }
 
 const sectionLabel: Record<StoreItem['section'], string> = {
+  featured: 'Featured',
   avatars: 'Avatars',
-  customization: 'Customization',
+  clothes: 'Clothes',
+  cars: 'Cars',
+  houses: 'Houses',
   titles: 'Titles',
+  customization: 'Customization',
   effects: 'Premium',
 };
 
@@ -83,6 +87,25 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
 
   useEffect(() => {
     void fetchStoreItems();
+  }, [user?.id]);
+
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`store-live-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_items', filter: `user_id=eq.${user.id}` }, () => {
+        void fetchStoreItems();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_items' }, () => {
+        void fetchStoreItems();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   useEffect(() => {
@@ -157,15 +180,20 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
 
   const categoryItems = useMemo(() => {
     const avatars = storeItems.filter((item) => item.section === 'avatars');
-    const customization = storeItems.filter((item) => item.section === 'customization');
+    const clothes = storeItems.filter((item) => item.section === 'clothes' || item.section === 'customization');
+    const cars = storeItems.filter((item) => item.section === 'cars');
+    const houses = storeItems.filter((item) => item.section === 'houses');
     const titles = storeItems.filter((item) => item.section === 'titles');
     const premium = storeItems.filter((item) => item.section === 'effects' || item.rarity === 'legendary' || item.currency === 'gems');
-    const featured = pickRotatingItems(storeItems.filter((item) => item.rarity !== 'common'), 6);
+    const featured = pickRotatingItems(
+      storeItems.filter((item) => item.section === 'featured' || item.rarity !== 'common'),
+      6
+    );
     const daily = pickRotatingItems(storeItems, 8);
-    const bundles = pickRotatingItems([...customization, ...titles], 3);
+    const bundles = pickRotatingItems([...clothes, ...titles], 3);
     const featuredDrop = featured.find((i) => i.rarity === 'legendary') || featured[0] || null;
 
-    return { featured, daily, premium, avatars, customization, titles, bundles, featuredDrop };
+    return { featured, daily, premium, avatars, clothes, cars, houses, titles, bundles, featuredDrop };
   }, [storeItems]);
 
   const handlePurchase = async (item: StoreItem) => {
@@ -370,7 +398,9 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
       {renderSection('🛍️ Daily Items', <TimerReset className="h-4 w-4 text-cyan-400" />, categoryItems.daily, <Badge className="bg-red-500/80">Today Only</Badge>, true)}
       {renderSection('💎 Premium', <Crown className="h-4 w-4 text-amber-400" />, categoryItems.premium)}
       {renderSection('👤 Avatars', <Sparkles className="h-4 w-4 text-sky-300" />, categoryItems.avatars)}
-      {renderSection('👕 Customization', <Zap className="h-4 w-4 text-pink-400" />, categoryItems.customization)}
+      {renderSection('👕 Clothes', <Zap className="h-4 w-4 text-pink-400" />, categoryItems.clothes)}
+      {renderSection('🚗 Cars', <Zap className="h-4 w-4 text-cyan-300" />, categoryItems.cars)}
+      {renderSection('🏠 Houses', <Crown className="h-4 w-4 text-emerald-300" />, categoryItems.houses)}
       {renderSection('🏷️ Titles', <Badge className="h-4 w-4 rounded-full p-0" />, categoryItems.titles, <Badge className="bg-fuchsia-500/80">Exclusive</Badge>, false, true)}
       {renderSection('🎁 Bundles', <Gift className="h-4 w-4 text-emerald-300" />, categoryItems.bundles)}
 

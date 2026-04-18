@@ -5,10 +5,11 @@ import { useCurrency } from '@/context/CurrencyContext';
 import { useFriends } from '@/context/FriendsContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Home, Store, Coins, Gem, Gift, RefreshCcw, Sparkles, ArrowLeftRight, Wallet, Send } from 'lucide-react';
+import { Home, Store, Coins, Gem, Gift, RefreshCcw, Sparkles, ArrowLeftRight, Wallet, Send, ShieldCheck } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import AvatarStore from '@/components/store/AvatarStore';
+import InventoryPanel from '@/components/store/InventoryPanel';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,7 @@ const StorePage: React.FC = () => {
     dailyStreak,
     convertXpToCoins,
     convertCoinsToGems,
+    convertCoinsToXp,
     claimDailyReward,
     transferCoins,
     luckySpin,
@@ -52,6 +54,8 @@ const StorePage: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState('store');
   const [convertingXp, setConvertingXp] = React.useState<number | null>(null);
   const [coinToGemInput, setCoinToGemInput] = React.useState('100');
+  const [xpExchangeInput, setXpExchangeInput] = React.useState('100');
+  const [coinsToXpInput, setCoinsToXpInput] = React.useState('10');
   const [claimingDaily, setClaimingDaily] = React.useState(false);
   const [spinning, setSpinning] = React.useState(false);
   const [transactions, setTransactions] = React.useState<TransactionRow[]>([]);
@@ -98,10 +102,15 @@ const StorePage: React.FC = () => {
   const estimatedGems = Math.floor(coinToGemValue / 100);
 
   const handleConvertXp = async (xpAmount: number) => {
+    if (!Number.isFinite(xpAmount) || xpAmount < 100) {
+      toast.error('Minimum XP exchange is 100.');
+      return;
+    }
+
     setConvertingXp(xpAmount);
     const success = await convertXpToCoins(xpAmount);
     if (success) {
-      const reward = xpTiers.find((tier) => tier.xp === xpAmount)?.coins ?? 0;
+      const reward = xpTiers.find((tier) => tier.xp === xpAmount)?.coins ?? Math.floor(xpAmount / 10);
       toast.success(`Converted ${xpAmount} XP → ${reward} Coins`);
       await loadTransactions();
     } else {
@@ -213,11 +222,12 @@ const StorePage: React.FC = () => {
 
         <main className="container mx-auto px-4 py-6 space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full">
+            <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full">
               <TabsTrigger value="store">🛍️ Store</TabsTrigger>
               <TabsTrigger value="exchange">💱 Exchange</TabsTrigger>
               <TabsTrigger value="wallet">💳 Wallet</TabsTrigger>
               <TabsTrigger value="transfer">🤝 Transfer</TabsTrigger>
+              <TabsTrigger value="inventory">🎒 Inventory</TabsTrigger>
             </TabsList>
 
             <TabsContent value="store" className="space-y-4">
@@ -232,19 +242,40 @@ const StorePage: React.FC = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-sm">Current XP: <strong>{xp.toLocaleString()}</strong></p>
-                    {xpTiers.map((tier) => (
-                      <Button
-                        key={tier.xp}
-                        size="sm"
-                        variant="outline"
-                        className="w-full justify-between"
-                        onClick={() => handleConvertXp(tier.xp)}
-                        disabled={convertingXp !== null}
-                      >
-                        <span>{tier.xp} XP</span>
-                        <span>→ {tier.coins} Coins</span>
-                      </Button>
-                    ))}
+                    <p className="text-xs text-muted-foreground">Rate: 100 XP = 10 Coins • Daily XP exchange cap enabled server-side.</p>
+                    <Input
+                      type="number"
+                      min={100}
+                      step={100}
+                      value={xpExchangeInput}
+                      onChange={(e) => setXpExchangeInput(e.target.value)}
+                      placeholder="Enter XP amount"
+                    />
+                    <div className="text-sm">
+                      You receive: <strong>{Math.floor((Number(xpExchangeInput) || 0) / 10)}</strong> coins
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => handleConvertXp(Number(xpExchangeInput) || 0)}
+                      disabled={convertingXp !== null}
+                    >
+                      <ArrowLeftRight className="h-4 w-4 mr-2" /> Exchange
+                    </Button>
+                    <div className="grid gap-2">
+                      {xpTiers.map((tier) => (
+                        <Button
+                          key={tier.xp}
+                          size="sm"
+                          variant="outline"
+                          className="w-full justify-between"
+                          onClick={() => handleConvertXp(tier.xp)}
+                          disabled={convertingXp !== null}
+                        >
+                          <span>{tier.xp} XP</span>
+                          <span>→ {tier.coins} Coins</span>
+                        </Button>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -258,6 +289,36 @@ const StorePage: React.FC = () => {
                     <div className="text-sm">You receive: <strong>{estimatedGems}</strong> gems</div>
                     <Button className="w-full" onClick={handleCoinToGem}>
                       <ArrowLeftRight className="h-4 w-4 mr-2" /> Convert
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Coins → XP (Optional, Limited)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">Rate: 1 coin = 10 XP • Daily cap applied.</p>
+                    <Input type="number" min={10} value={coinsToXpInput} onChange={(e) => setCoinsToXpInput(e.target.value)} />
+                    <div className="text-sm">You receive: <strong>{(Number(coinsToXpInput) || 0) * 10}</strong> XP</div>
+                    <Button
+                      className="w-full"
+                      onClick={async () => {
+                        const amount = Number(coinsToXpInput) || 0;
+                        if (amount < 10) {
+                          toast.error('Minimum coins to exchange is 10.');
+                          return;
+                        }
+                        const success = await convertCoinsToXp(amount);
+                        if (!success) {
+                          toast.error('Coins to XP exchange failed.');
+                          return;
+                        }
+                        toast.success(`Converted ${amount} Coins → ${amount * 10} XP`);
+                        await loadTransactions();
+                      }}
+                    >
+                      <ArrowLeftRight className="h-4 w-4 mr-2" /> Exchange
                     </Button>
                   </CardContent>
                 </Card>
@@ -332,6 +393,9 @@ const StorePage: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm text-muted-foreground">Rules: minimum 10 coins, max 500/day, friends only, no self-transfer.</p>
+                  <div className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Abuse protection + negative amount checks active
+                  </div>
                   <p className="text-sm">Your balance: <strong>{coins.toLocaleString()}</strong> coins</p>
 
                   <Input placeholder="Search friend..." value={transferSearch} onChange={(e) => setTransferSearch(e.target.value)} />
@@ -359,6 +423,9 @@ const StorePage: React.FC = () => {
                   </Button>
                 </CardContent>
               </Card>
+            </TabsContent>
+            <TabsContent value="inventory" className="space-y-4">
+              <InventoryPanel />
             </TabsContent>
           </Tabs>
         </main>

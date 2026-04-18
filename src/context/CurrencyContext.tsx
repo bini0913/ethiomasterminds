@@ -14,6 +14,7 @@ interface CurrencyContextType {
   spendGems: (amount: number) => Promise<boolean>;
   convertXpToCoins: (xpAmount: number) => Promise<boolean>;
   convertCoinsToGems: (coinAmount: number) => Promise<boolean>;
+  convertCoinsToXp: (coinAmount: number) => Promise<boolean>;
   transferCoins: (receiverId: string, amount: number) => Promise<boolean>;
   claimDailyReward: () => Promise<boolean>;
   luckySpin: () => Promise<{ success: boolean; message?: string }>;
@@ -59,6 +60,31 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     fetchCurrency();
   }, [fetchCurrency]);
+
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const walletChannel = supabase
+      .channel(`wallet-live-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'wallets', filter: `user_id=eq.${user.id}` },
+        (payload: any) => {
+          const next = payload?.new;
+          if (!next) return;
+          setCoins(next.coins ?? 0);
+          setXp(next.xp ?? 0);
+          setGems(next.gems ?? 0);
+          setDailyStreak(next.daily_streak ?? 0);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(walletChannel);
+    };
+  }, [user?.id]);
 
   const addCoins = async (amount: number, source = 'manual_reward'): Promise<boolean> => {
     if (!user?.id || amount <= 0) return false;
@@ -209,6 +235,25 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+
+  const convertCoinsToXp = async (coinAmount: number): Promise<boolean> => {
+    if (!user?.id) return false;
+
+    try {
+      const { data, error } = await (supabase as any).rpc('convert_coins_to_xp', { p_coins: coinAmount });
+      if (error) throw error;
+
+      setXp(data?.xp ?? xp);
+      setCoins(data?.coins ?? coins);
+      setGems(data?.gems ?? gems);
+      setDailyStreak(data?.daily_streak ?? dailyStreak);
+      return true;
+    } catch (err) {
+      console.error('Error converting coins to XP:', err);
+      return false;
+    }
+  };
+
   const transferCoins = async (receiverId: string, amount: number): Promise<boolean> => {
     if (!user?.id) return false;
 
@@ -285,6 +330,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
         spendGems,
         convertXpToCoins,
         convertCoinsToGems,
+        convertCoinsToXp,
         transferCoins,
         claimDailyReward,
         luckySpin,
