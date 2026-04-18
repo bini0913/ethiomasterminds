@@ -5,21 +5,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   BadgeCheck,
   Car,
+  Clock3,
+  Crown,
   Flame,
-  Gift,
   Home,
+  Lock,
   Pencil,
+  Rocket,
   Send,
   Shirt,
   Sparkles,
+  Star,
   Sword,
   Target,
   Trophy,
@@ -47,25 +49,28 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-const HIGHLIGHT_TABS = ["Achievements", "Top Wins", "Collections", "Moments"] as const;
-type HighlightTab = (typeof HIGHLIGHT_TABS)[number];
+type Activity = { id: string; text: string; time: string; icon: "trophy" | "zap" | "spark" };
+type Achievement = { id: string; name: string; icon: string; description: string; date: string; locked?: boolean };
 
 const UserProfilePage = () => {
   const navigate = useNavigate();
   const { userId } = useParams();
   const { user: authUser } = useUser();
   const { coins, transferCoins, refreshCurrency } = useCurrency();
+
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [statsJson, setStatsJson] = useState<Record<string, any>>({});
   const [insights, setInsights] = useState<{ strong: string[]; weak: string[]; recommended: string[] }>({ strong: [], weak: [], recommended: [] });
-  const [activities, setActivities] = useState<Array<{ id: string; text: string; time: string }>>([]);
-  const [achievements, setAchievements] = useState<Array<{ id: string; name: string; icon: string; date: string }>>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [privacy, setPrivacy] = useState({ isPublic: true, hideStats: false });
   const previousLevelRef = useRef<number | null>(null);
   const previousRankRef = useRef<string | null>(null);
+  const aboutHydratedRef = useRef(false);
+
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferAmount, setTransferAmount] = useState("10");
   const [isFriend, setIsFriend] = useState(false);
@@ -75,11 +80,8 @@ const UserProfilePage = () => {
   const [totalCollectionItems, setTotalCollectionItems] = useState(0);
   const [joinedAt, setJoinedAt] = useState<string | null>(null);
   const [aboutText, setAboutText] = useState("");
-  const [highlightOpen, setHighlightOpen] = useState(false);
-  const [activeHighlight, setActiveHighlight] = useState<HighlightTab>("Achievements");
   const [avatarReacting, setAvatarReacting] = useState(false);
-
-  const openProfile = (id: string) => navigate(`/profile/${id}`);
+  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
 
   const refreshCore = async () => {
     const rows = await fetchLeaderboardUsers();
@@ -140,20 +142,21 @@ const UserProfilePage = () => {
           id: row.id,
           text: [
             `Won a match with ${Math.round(row.score)}% accuracy`,
-            `Leveled up momentum with +${row.xp_earned ?? 0} XP`,
-            `Joined a high-focus streak session`,
-            `Bought a performance boost item`,
+            `Reached a new momentum spike (+${row.xp_earned ?? 0} XP)`,
+            "Unlocked a sharp-focus study streak",
+            "Completed a precision challenge",
           ][index % 4],
-          time: row.completed_at ? new Date(row.completed_at).toLocaleString() : "recently",
+          time: row.completed_at ? new Date(row.completed_at).toISOString() : new Date().toISOString(),
+          icon: (["trophy", "zap", "spark", "spark"] as const)[index % 4],
         })),
       );
 
       const achievementIds = (userAchievementsRes.data ?? []).map((x) => x.achievement_id);
       const { data: defs } = achievementIds.length
-        ? await supabase.from("achievements").select("id,name,icon").in("id", achievementIds)
-        : { data: [] as Array<{ id: string; name: string; icon: string }> };
+        ? await supabase.from("achievements").select("id,name,icon,description").in("id", achievementIds)
+        : { data: [] as Array<{ id: string; name: string; icon: string; description?: string }> };
 
-      const byId = new Map<string, { id: string; name: string; icon: string }>((defs as any[] ?? []).map((d: any) => [d.id, d]));
+      const byId = new Map<string, { id: string; name: string; icon: string; description?: string }>((defs as any[] ?? []).map((d: any) => [d.id, d]));
       setAchievements(
         (userAchievementsRes.data ?? []).map((row, index) => {
           const def = byId.get(row.achievement_id);
@@ -161,6 +164,7 @@ const UserProfilePage = () => {
             id: row.id,
             name: def?.name ?? `Achievement ${index + 1}`,
             icon: def?.icon ?? "🏅",
+            description: def?.description ?? "A high-impact milestone unlocked through learning consistency.",
             date: row.unlocked_at ? new Date(row.unlocked_at).toLocaleDateString() : "",
           };
         }),
@@ -176,6 +180,7 @@ const UserProfilePage = () => {
         .select("item_id,equipped,acquired_at,store_items(section,rarity,name,preview,price)")
         .eq("user_id", userId)
         .order("acquired_at", { ascending: false });
+
       const viewedItems = (viewedItemsRes.data ?? []).map((item: any) => ({
         item_id: item.item_id,
         equipped: Boolean(item.equipped),
@@ -186,6 +191,7 @@ const UserProfilePage = () => {
         preview: item.store_items?.preview ?? "🎁",
         price: item.store_items?.price ?? 0,
       }));
+
       setCollections(viewedItems);
       const allStore = ((allStoreItemsRes as any).data ?? []).map((item: any) => ({
         item_id: item.id,
@@ -239,10 +245,102 @@ const UserProfilePage = () => {
   const isSelf = authUser?.id === (profile?.id ?? "");
   const isFollowing = profile ? followingIds.includes(profile.id) : false;
   const xpProgress = getXpProgressInLevel(profile?.xp ?? 0);
-  const xpIntoLevel = xpProgress.current;
   const progress = xpProgress.percentage;
   const currentTier = getRankTierByLevel(profile?.level ?? 1);
   const nextTier = getNextRankTier(profile?.level ?? 1);
+
+  const wins = Number(statsJson.total_wins ?? profile?.wins ?? 0);
+  const streak = Number(statsJson.current_streak ?? profile?.streak ?? 0);
+  const weeklyXp = Number(statsJson.weekly_xp ?? Math.round((profile?.xp ?? 0) * 0.08));
+
+  const collectionCatalog = useMemo(() => {
+    const categorize = (section: string, name: string) => {
+      const normalizedSection = section.toLowerCase();
+      const normalizedName = name.toLowerCase();
+      if (normalizedSection.includes("title")) return "titles";
+      if (normalizedSection.includes("avatar") || normalizedSection.includes("cloth") || normalizedSection.includes("outfit") || normalizedSection.includes("wearable")) return "outfit";
+      if (normalizedSection.includes("house") || normalizedName.includes("house") || normalizedName.includes("home") || normalizedName.includes("theme")) return "lifestyle";
+      if (normalizedSection.includes("car") || normalizedName.includes("car")) return "garage";
+      return "outfit";
+    };
+
+    const ownedById = new Map<string, (typeof collections)[number]>(collections.map((item) => [item.item_id, item]));
+    const catalog = {
+      outfit: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
+      garage: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
+      lifestyle: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
+      titles: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
+    };
+
+    for (const item of allCollectionItems) {
+      const owned = ownedById.get(item.item_id);
+      const bucket = categorize(item.section, item.name) as keyof typeof catalog;
+      catalog[bucket].push({
+        item_id: item.item_id,
+        name: item.name,
+        preview: item.preview,
+        rarity: item.rarity,
+        owned: Boolean(owned),
+        equipped: Boolean(owned?.equipped),
+        price: item.price,
+        sourceSection: item.section,
+      });
+    }
+
+    return catalog;
+  }, [allCollectionItems, collections]);
+
+  const featuredItems = useMemo(() => collections.filter((item) => item.rarity === "legendary" || item.rarity === "epic" || item.equipped).slice(0, 4), [collections]);
+
+  const displayedAchievements = useMemo(
+    () => [
+      ...achievements,
+      ...Array.from({ length: Math.max(0, 8 - achievements.length) }).map((_, index) => ({
+        id: `locked-${index}`,
+        name: "Locked Achievement",
+        icon: "🔒",
+        description: "Keep leveling up and winning matches to unlock this badge.",
+        date: "",
+        locked: true,
+      })),
+    ],
+    [achievements],
+  );
+
+  useEffect(() => {
+    if (!userId) return;
+    setAboutText(localStorage.getItem(`profile-bio:${userId}`) ?? "");
+    aboutHydratedRef.current = true;
+  }, [userId]);
+
+  useEffect(() => {
+    if (!isSelf || !userId || !aboutHydratedRef.current) return;
+    const timeoutId = window.setTimeout(() => {
+      localStorage.setItem(`profile-bio:${userId}`, aboutText.trim());
+    }, 500);
+    return () => window.clearTimeout(timeoutId);
+  }, [aboutText, isSelf, userId]);
+
+  useEffect(() => {
+    if (!isSelf || !profile) return;
+    if (previousLevelRef.current === null) {
+      previousLevelRef.current = profile.level;
+      previousRankRef.current = currentTier.name;
+      return;
+    }
+
+    const leveledUp = profile.level > (previousLevelRef.current ?? profile.level);
+    const rankChanged = previousRankRef.current !== currentTier.name;
+
+    if (leveledUp) toast.success(`⬆️ Level up! You are now level ${profile.level}.`);
+    if (rankChanged) {
+      toast.success(`🎉 You reached ${currentTier.name} rank!`);
+      playRankUpTone();
+    }
+
+    previousLevelRef.current = profile.level;
+    previousRankRef.current = currentTier.name;
+  }, [currentTier.name, isSelf, profile?.level]);
 
   const onFollowToggle = async () => {
     if (!authUser?.id || !profile) return;
@@ -251,7 +349,6 @@ const UserProfilePage = () => {
         await unfollowUser(authUser.id, profile.id);
       } else {
         await followUser(authUser.id, profile.id);
-        toast.success(`${authUser.name ?? "A user"} started following ${profile.username}`);
       }
       await refreshSocial();
     } catch (error: any) {
@@ -274,14 +371,8 @@ const UserProfilePage = () => {
         p_subject: "Mixed",
         p_difficulty: "Medium",
       });
-
       if (error) throw error;
-
-      if (data?.room_id) {
-        navigate(`/multiplayer?room=${data.room_id}`);
-      } else {
-        navigate("/multiplayer");
-      }
+      navigate(data?.room_id ? `/multiplayer?room=${data.room_id}` : "/multiplayer");
       toast.success(`Challenge sent to ${profile.name || profile.username}`);
     } catch (error: any) {
       toast.error(error.message ?? "Could not send challenge");
@@ -318,115 +409,15 @@ const UserProfilePage = () => {
     } as never);
   };
 
-  const wins = Number(statsJson.total_wins ?? profile?.wins ?? 0);
-  const streak = Number(statsJson.current_streak ?? profile?.streak ?? 0);
-  const weeklyXp = Number(statsJson.weekly_xp ?? Math.round((profile?.xp ?? 0) * 0.08));
-  const collectionProgress = totalCollectionItems > 0 ? Math.round((collections.length / totalCollectionItems) * 100) : 0;
-  const collectionCatalog = useMemo(() => {
-    const categorize = (section: string, name: string) => {
-      const normalizedSection = section.toLowerCase();
-      const normalizedName = name.toLowerCase();
-      if (normalizedSection.includes("title")) return "titles";
-      if (normalizedSection.includes("avatar")) return "outfit";
-      if (normalizedSection.includes("cloth") || normalizedSection.includes("outfit") || normalizedSection.includes("wearable")) return "outfit";
-      if (normalizedSection.includes("house") || normalizedName.includes("house") || normalizedName.includes("home") || normalizedName.includes("theme")) return "lifestyle";
-      if (normalizedSection.includes("car") || normalizedName.includes("car")) return "garage";
-      return "outfit";
-    };
-
-    const ownedById = new Map<string, (typeof collections)[number]>(collections.map((item) => [item.item_id, item]));
-    const catalog = {
-      outfit: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
-      garage: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
-      lifestyle: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
-      titles: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
-    };
-
-    for (const item of allCollectionItems) {
-      const owned = ownedById.get(item.item_id);
-      const bucket = categorize(item.section, item.name) as keyof typeof catalog;
-      catalog[bucket].push({
-        item_id: item.item_id,
-        name: item.name,
-        preview: item.preview,
-        rarity: item.rarity,
-        owned: Boolean(owned),
-        equipped: Boolean(owned?.equipped),
-        price: item.price,
-        sourceSection: item.section,
-      });
-    }
-    return catalog;
-  }, [allCollectionItems, collections]);
-
-  const featuredItems = useMemo(() => {
-    return collections
-      .filter((item) => item.rarity === "legendary" || item.rarity === "epic" || item.equipped)
-      .slice(0, 4);
-  }, [collections]);
-
-  const progressHeat = useMemo(() => {
-    const data = Array.from({ length: 14 }).map((_, idx) => {
-      const base = Math.max(10, Math.min(100, Math.round((weeklyXp / 10) * ((idx % 5) + 1))));
-      return base;
-    });
-    return data;
-  }, [weeklyXp]);
-
-  useEffect(() => {
-    if (!userId) return;
-    const savedBio = localStorage.getItem(`profile-bio:${userId}`);
-    setAboutText(savedBio ?? "");
-  }, [userId]);
-
-  useEffect(() => {
-    if (!isSelf || !profile) return;
-
-    if (previousLevelRef.current === null) {
-      previousLevelRef.current = profile.level;
-      previousRankRef.current = currentTier.name;
-      return;
-    }
-
-    const leveledUp = profile.level > (previousLevelRef.current ?? profile.level);
-    const rankChanged = previousRankRef.current !== currentTier.name;
-
-    if (leveledUp) {
-      toast.success(`⬆️ Level up! You are now level ${profile.level}.`);
-    }
-
-    if (rankChanged) {
-      toast.success(`🎉 You reached ${currentTier.name} rank!`);
-      playRankUpTone();
-    }
-
-    previousLevelRef.current = profile.level;
-    previousRankRef.current = currentTier.name;
-  }, [currentTier.name, isSelf, profile?.level]);
-
-  const saveAbout = () => {
-    if (!userId) return;
-    localStorage.setItem(`profile-bio:${userId}`, aboutText.trim());
-    toast.success("About section saved.");
-  };
-
   const onEquipCollectionItem = async (itemId: string, section: string) => {
     if (!authUser?.id || !isSelf) return;
     try {
       const sameSectionOwnedIds = collections.filter((item) => item.section === section).map((item) => item.item_id);
       if (sameSectionOwnedIds.length) {
-        await (supabase as any)
-          .from("user_items")
-          .update({ equipped: false })
-          .eq("user_id", authUser.id)
-          .in("item_id", sameSectionOwnedIds);
+        await (supabase as any).from("user_items").update({ equipped: false }).eq("user_id", authUser.id).in("item_id", sameSectionOwnedIds);
       }
 
-      await (supabase as any)
-        .from("user_items")
-        .update({ equipped: true })
-        .eq("user_id", authUser.id)
-        .eq("item_id", itemId);
+      await (supabase as any).from("user_items").update({ equipped: true }).eq("user_id", authUser.id).eq("item_id", itemId);
       toast.success("Item equipped.");
       await refreshProfileDetails();
     } catch (error: any) {
@@ -434,50 +425,60 @@ const UserProfilePage = () => {
     }
   };
 
-  if (!profile) {
-    return <div className="p-8">Profile not found.</div>;
-  }
+  const relativeTime = (value: string) => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "recently";
+    const diff = Date.now() - parsed.getTime();
+    const hour = 60 * 60 * 1000;
+    const day = 24 * hour;
+    if (diff < hour) return `${Math.max(1, Math.floor(diff / (60 * 1000)))}m ago`;
+    if (diff < day) return `${Math.floor(diff / hour)}h ago`;
+    return `${Math.floor(diff / day)}d ago`;
+  };
+
+  if (!profile) return <div className="p-8">Profile not found.</div>;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#05060f] px-3 pb-14 pt-4 text-foreground md:px-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[radial-gradient(circle_at_top,_#1e1b4b,_#0b1020_45%,_#05060f)] px-3 pb-14 pt-4 text-foreground md:px-8">
+      <div className="mx-auto max-w-6xl space-y-5">
         <header className="flex items-center justify-between">
           <Button variant="outline" onClick={() => navigate(-1)} className="gap-2 border-white/20 bg-white/5">
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
-          <Button variant="ghost" size="sm" className="text-xs text-white/70" onClick={() => openProfile(profile.id)}>
-            openProfile({profile.id.slice(0, 8)}...)
-          </Button>
+          <p className="text-xs text-white/60">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "recently"}</p>
         </header>
 
-        <Card className="relative overflow-hidden border-primary/20 bg-gradient-to-br from-indigo-700/40 via-fuchsia-700/25 to-cyan-600/30">
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-indigo-900/70 via-violet-900/60 to-cyan-900/50 shadow-[0_0_60px_rgba(34,211,238,0.12)]">
           <motion.div
             aria-hidden
             className="absolute inset-0"
             animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
             transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
-            style={{ backgroundImage: "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.15), transparent 40%), radial-gradient(circle at 80% 0%, rgba(34,211,238,0.25), transparent 35%)" }}
+            style={{ backgroundImage: "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1), transparent 40%), radial-gradient(circle at 80% 0%, rgba(34,211,238,0.25), transparent 35%)" }}
           />
-          <CardContent className="relative flex min-h-[75vh] flex-col items-center justify-center gap-5 p-8 text-center md:p-10">
+          <div className="pointer-events-none absolute -left-20 top-10 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-500/20 blur-3xl" />
+
+          <div className="relative flex min-h-[70vh] flex-col items-center justify-center gap-5 p-8 text-center md:p-10">
             <motion.button
               type="button"
               onClick={() => {
                 setAvatarReacting(true);
-                setTimeout(() => setAvatarReacting(false), 400);
+                setTimeout(() => setAvatarReacting(false), 420);
               }}
               whileTap={{ scale: 0.96 }}
-              animate={avatarReacting ? { scale: [1, 1.05, 1], y: [0, -4, 0] } : { y: [0, -6, 0] }}
-              transition={avatarReacting ? { duration: 0.4 } : { duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+              animate={avatarReacting ? { scale: [1, 1.05, 1], y: [0, -6, 0] } : { y: [0, -8, 0] }}
+              transition={avatarReacting ? { duration: 0.42 } : { duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
               className="relative rounded-full"
             >
-              <div className={`absolute inset-0 rounded-full blur-2xl ${tierStyle(profile.level)} opacity-45`} />
-              <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={280} autoRotate={false} />
+              <div className={`absolute inset-0 rounded-full blur-2xl ${tierStyle(profile.level)} opacity-50`} />
+              <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={290} autoRotate={false} />
             </motion.button>
 
             <div className="space-y-2">
               <h1 className="text-4xl font-black tracking-tight md:text-5xl">{profile.name || profile.username}</h1>
               <p className="text-sm text-white/80">@{profile.username}</p>
-              <Badge className={`animate-pulse bg-gradient-to-r ${tierStyle(profile.level)} px-3 py-1 text-sm`}>
+              <Badge className={`animate-pulse bg-gradient-to-r ${tierStyle(profile.level)} px-4 py-1 text-sm shadow-[0_0_24px_rgba(168,85,247,0.5)]`}>
                 {currentTier.icon} {currentTier.name}
               </Badge>
             </div>
@@ -485,38 +486,31 @@ const UserProfilePage = () => {
             <motion.div className="w-full max-w-2xl space-y-2" initial={{ opacity: 0, width: "50%" }} animate={{ opacity: 1, width: "100%" }} transition={{ duration: 0.8 }}>
               <div className="flex items-center justify-between text-sm text-white/85">
                 <span>Level {profile.level}</span>
-                <span>{xpIntoLevel}/220 XP</span>
+                <span>{xpProgress.current}/220 XP</span>
               </div>
               <motion.div initial={{ scaleX: 0.2 }} animate={{ scaleX: 1 }} transition={{ duration: 1 }} style={{ transformOrigin: "left" }}>
-                <Progress value={progress} className="h-3 bg-white/20" />
+                <Progress value={progress} className="h-2.5 bg-white/20" />
               </motion.div>
               <p className="text-xs text-white/70">Next tier: {nextTier ? nextTier.name : "MAX RANK"}</p>
             </motion.div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {[`Lv.${profile.level}`, `${(profile.xp ?? 0).toLocaleString()} XP`, `#${profileRank > 0 ? profileRank : "-"} Rank`, `Grade ${Math.max(1, Math.ceil((profile.level ?? 1) / 2))}`].map((chip) => (
+                <motion.div key={chip} whileHover={{ y: -3, scale: 1.03 }} className="rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs font-semibold shadow-[0_0_20px_rgba(56,189,248,0.22)] backdrop-blur">
+                  {chip}
+                </motion.div>
+              ))}
+            </div>
 
             {isSelf ? (
               <div className="flex flex-wrap justify-center gap-2">
                 <Button onClick={() => navigate("/avatar-creator")} className="gap-2 bg-white text-black hover:bg-white/90">
                   <Pencil className="h-4 w-4" /> Edit Avatar
                 </Button>
-                <Button variant="outline" className="gap-2 border-white/40 bg-white/5" onClick={() => setActiveHighlight("Collections") || setHighlightOpen(true)}>
-                  <Gift className="h-4 w-4" /> Change Outfit
-                </Button>
               </div>
             ) : null}
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/15 bg-card/80 backdrop-blur">
-          <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
-            {[{ label: "Followers", value: followersCount, icon: Users }, { label: "Following", value: followingCount, icon: UserRoundPlus }, { label: "Streak", value: streak, icon: Flame }, { label: "Wins", value: wins, icon: Trophy }].map((stat) => (
-              <motion.div key={stat.label} whileHover={{ y: -4 }} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-center">
-                <stat.icon className="mx-auto mb-1 h-4 w-4 text-primary" />
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-                <p className="text-xl font-extrabold">{stat.value.toLocaleString()}</p>
-              </motion.div>
-            ))}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         <Card className="border-white/15 bg-card/80">
           <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4">
@@ -539,170 +533,17 @@ const UserProfilePage = () => {
                 </Button>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "recently"}</p>
+            <p className="text-xs text-muted-foreground">Premium profile mode</p>
           </CardContent>
         </Card>
 
-        <Card className="border-white/15 bg-card/80">
-          <CardHeader>
-            <CardTitle>Highlights</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {HIGHLIGHT_TABS.map((item) => (
-                <motion.button
-                  key={item}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    setActiveHighlight(item);
-                    setHighlightOpen(true);
-                  }}
-                  className="min-w-24 rounded-full border border-white/20 bg-white/[0.04] px-4 py-3 text-sm font-semibold"
-                >
-                  {item}
-                </motion.button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/15 bg-card/80">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary" />Learning Progress</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="mb-2 flex items-center justify-between text-sm">
-                <span>XP this week</span>
-                <span className="font-bold text-primary">+{weeklyXp}</span>
-              </div>
-              <Progress value={Math.min(100, Math.round((weeklyXp / 1200) * 100))} />
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                <p className="text-xs text-emerald-100">Strong subjects</p>
-                <p className="mt-1 text-sm font-semibold">{insights.strong.length ? insights.strong.join(" • ") : "Math • Logic • Speed"}</p>
-              </div>
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-                <p className="text-xs text-amber-100">Weak subjects</p>
-                <p className="mt-1 text-sm font-semibold">{insights.weak.length ? insights.weak.join(" • ") : "Grammar • Theory"}</p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="mb-2 text-xs text-muted-foreground">2-week heatmap</p>
-              <div className="grid grid-cols-7 gap-2">
-                {progressHeat.map((value, index) => (
-                  <motion.div key={`${value}-${index}`} className="h-7 rounded-md bg-primary/20" initial={{ opacity: 0.3 }} animate={{ opacity: 0.55 + value / 200 }} whileHover={{ scale: 1.08 }} />
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/15 bg-card/80">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-primary" />Achievements</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-              {[...achievements, ...Array.from({ length: Math.max(0, 6 - achievements.length) }).map((_, index) => ({
-                id: `locked-${index}`,
-                name: "Locked",
-                icon: "🔒",
-                date: "",
-              }))].map((achievement, index) => {
-                const locked = achievement.name === "Locked";
-                const rare = !locked && index < 2;
-                return (
-                  <motion.button
-                    key={achievement.id}
-                    type="button"
-                    whileHover={{ y: -4 }}
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => {
-                      setActiveHighlight("Achievements");
-                      setHighlightOpen(true);
-                    }}
-                    className={`rounded-2xl border p-3 text-left ${locked ? "opacity-50 grayscale" : "bg-primary/5"} ${rare ? "animate-pulse border-fuchsia-400/40" : "border-white/10"}`}
-                  >
-                    <p className="text-2xl">{achievement.icon}</p>
-                    <p className="mt-1 text-sm font-semibold">{achievement.name}</p>
-                    <p className="text-xs text-muted-foreground">{locked ? "Keep playing" : `Unlocked ${achievement.date}`}</p>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/15 bg-card/80">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />Collection Showroom</span>
-              <Badge variant="secondary">{collections.length}/{totalCollectionItems || 0} owned</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Progress value={collectionProgress} />
-
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-              <p className="mb-2 text-xs text-muted-foreground">Featured Items</p>
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                {featuredItems.length ? featuredItems.map((item) => (
-                  <div key={item.item_id} className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/10 p-2 text-center">
-                    <p className="text-2xl">{item.preview}</p>
-                    <p className="truncate text-xs font-semibold">{item.name}</p>
-                  </div>
-                )) : <p className="col-span-full text-sm text-muted-foreground">No featured items yet.</p>}
-              </div>
-            </div>
-
-            <Tabs defaultValue="outfit" className="space-y-4">
-              <TabsList className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                <TabsTrigger value="outfit" className="gap-1"><Shirt className="h-4 w-4" />Outfit</TabsTrigger>
-                <TabsTrigger value="garage" className="gap-1"><Car className="h-4 w-4" />Garage</TabsTrigger>
-                <TabsTrigger value="lifestyle" className="gap-1"><Home className="h-4 w-4" />Lifestyle</TabsTrigger>
-                <TabsTrigger value="titles" className="gap-1"><Trophy className="h-4 w-4" />Titles</TabsTrigger>
-              </TabsList>
-
-              {(Object.keys(collectionCatalog) as Array<keyof typeof collectionCatalog>).map((category) => (
-                <TabsContent key={category} value={category}>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-                    {collectionCatalog[category].map((item) => (
-                      <motion.div
-                        key={item.item_id}
-                        whileHover={{ scale: 1.02 }}
-                        className={`rounded-xl border p-3 text-center transition ${item.owned ? "bg-card" : "opacity-45 grayscale"} ${item.rarity === "legendary" ? "border-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.25)]" : "border-white/10"}`}
-                      >
-                        <p className="text-3xl">{item.preview}</p>
-                        <p className="mt-2 truncate text-sm font-semibold">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">{item.owned ? "Owned" : `Locked • ${item.price} coins`}</p>
-                        {item.owned && item.equipped ? <Badge className="mt-2">Equipped</Badge> : null}
-                        {item.owned && isSelf && !item.equipped ? (
-                          <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => onEquipCollectionItem(item.item_id, item.sourceSection)}>
-                            Equip
-                          </Button>
-                        ) : null}
-                      </motion.div>
-                    ))}
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
-          </CardContent>
-        </Card>
-
-        <Card className="border-white/15 bg-card/80">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-primary" />Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {(activities.length ? activities : [{ id: "0", text: "Joined tournament", time: "recently" }]).map((activity, index) => (
-              <motion.div key={activity.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="font-semibold">{activity.text}</p>
-                <p className="text-xs text-muted-foreground">{activity.time}</p>
+        <Card className="border-white/15 bg-card/80 backdrop-blur">
+          <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
+            {[{ label: "Followers", value: followersCount, icon: Users }, { label: "Following", value: followingCount, icon: UserRoundPlus }, { label: "Streak", value: streak, icon: Flame }, { label: "Wins", value: wins, icon: Trophy }].map((stat) => (
+              <motion.div key={stat.label} whileHover={{ y: -4 }} className="rounded-full border border-white/10 bg-white/[0.03] p-3 text-center">
+                <stat.icon className="mx-auto mb-1 h-4 w-4 text-primary" />
+                <p className="text-xs text-muted-foreground">{stat.label}</p>
+                <p className="text-xl font-extrabold">{stat.value.toLocaleString()}</p>
               </motion.div>
             ))}
           </CardContent>
@@ -710,22 +551,133 @@ const UserProfilePage = () => {
 
         <Card className="border-white/15 bg-card/80">
           <CardHeader>
-            <CardTitle>About</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary" />Learning Progress</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {isSelf ? (
-              <>
-                <Textarea value={aboutText} onChange={(event) => setAboutText(event.target.value)} placeholder="Tell others about yourself..." className="min-h-24" />
-                <Button variant="secondary" onClick={saveAbout}>Save Bio</Button>
-              </>
-            ) : (
-              <p className="text-sm leading-relaxed text-muted-foreground">{aboutText || "This learner hasn't added an about section yet."}</p>
-            )}
-            {equippedAvatar ? <p className="text-xs text-primary">Equipped avatar item: {equippedAvatar}</p> : null}
-            <Separator />
-            <p className="text-xs text-muted-foreground">Digital identity is live across leaderboard, friends, multiplayer, and chat.</p>
+          <CardContent className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4">
+              <p className="text-xs text-cyan-100">XP this week</p>
+              <p className="text-xl font-bold">+{weeklyXp}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+              <p className="text-xs text-emerald-100">Strong subjects</p>
+              <p className="mt-1 text-sm font-semibold">{insights.strong.length ? insights.strong.join(" • ") : "Math • Logic • Speed"}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+              <p className="text-xs text-amber-100">Weak subjects</p>
+              <p className="mt-1 text-sm font-semibold">{insights.weak.length ? insights.weak.join(" • ") : "Grammar • Theory"}</p>
+            </div>
           </CardContent>
         </Card>
+
+        <section className="space-y-3 rounded-3xl border border-white/15 bg-card/70 p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="h-5 w-5 text-primary" />Achievements</h2>
+            <p className="text-xs text-white/60">Tap a badge for details</p>
+          </div>
+          <div className="flex snap-x gap-3 overflow-x-auto pb-2">
+            {displayedAchievements.map((achievement) => (
+              <motion.button
+                key={achievement.id}
+                type="button"
+                whileHover={{ y: -4 }}
+                whileTap={{ scale: 0.96 }}
+                onClick={() => setSelectedAchievement(achievement)}
+                className={`min-w-36 snap-start rounded-2xl border p-4 text-left transition ${achievement.locked ? "border-white/10 bg-white/[0.03] opacity-55 blur-[0.4px]" : "border-cyan-400/25 bg-cyan-400/10"}`}
+              >
+                <p className="text-3xl">{achievement.icon}</p>
+                <p className="mt-2 text-sm font-semibold">{achievement.name}</p>
+                <p className="text-xs text-white/70">{achievement.locked ? "Locked" : `Unlocked ${achievement.date || "recently"}`}</p>
+              </motion.button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-4 rounded-3xl border border-white/15 bg-card/70 p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><Sparkles className="h-5 w-5 text-primary" />Collection Showroom</h2>
+            <Badge variant="secondary">{collections.length}/{totalCollectionItems || 0} owned</Badge>
+          </div>
+
+          <div className="rounded-2xl border border-violet-400/25 bg-gradient-to-r from-violet-500/20 via-cyan-500/10 to-transparent p-4">
+            <p className="mb-2 text-xs uppercase tracking-wide text-violet-100/80">Featured Loadout</p>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              {featuredItems.length ? featuredItems.map((item) => (
+                <motion.div key={item.item_id} whileHover={{ scale: 1.04 }} className="rounded-xl border border-white/15 bg-white/[0.04] p-3 text-center">
+                  <p className="text-3xl">{item.preview}</p>
+                  <p className="truncate text-xs font-semibold">{item.name}</p>
+                  <p className="text-[10px] uppercase text-white/60">{item.section}</p>
+                </motion.div>
+              )) : <p className="col-span-full text-sm text-muted-foreground">No featured items yet.</p>}
+            </div>
+          </div>
+
+          <Tabs defaultValue="outfit" className="space-y-4">
+            <TabsList className="grid grid-cols-2 gap-2 bg-transparent md:grid-cols-4">
+              <TabsTrigger value="outfit" className="gap-1 data-[state=active]:border-b-2 data-[state=active]:border-cyan-300"><Shirt className="h-4 w-4" />Clothes</TabsTrigger>
+              <TabsTrigger value="garage" className="gap-1 data-[state=active]:border-b-2 data-[state=active]:border-cyan-300"><Car className="h-4 w-4" />Cars</TabsTrigger>
+              <TabsTrigger value="lifestyle" className="gap-1 data-[state=active]:border-b-2 data-[state=active]:border-cyan-300"><Home className="h-4 w-4" />Houses</TabsTrigger>
+              <TabsTrigger value="titles" className="gap-1 data-[state=active]:border-b-2 data-[state=active]:border-cyan-300"><Trophy className="h-4 w-4" />Titles</TabsTrigger>
+            </TabsList>
+
+            {(Object.keys(collectionCatalog) as Array<keyof typeof collectionCatalog>).map((category) => (
+              <TabsContent key={category} value={category}>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                  {collectionCatalog[category].map((item) => (
+                    <motion.div
+                      key={item.item_id}
+                      whileHover={{ scale: 1.03 }}
+                      className={`rounded-2xl border p-3 text-center transition ${item.owned ? "bg-card" : "opacity-45 grayscale"} ${item.rarity === "legendary" ? "border-amber-400/60 shadow-[0_0_24px_rgba(251,191,36,0.35)]" : "border-white/10"}`}
+                    >
+                      <p className="text-4xl">{item.preview}</p>
+                      <p className="mt-2 truncate text-sm font-semibold">{item.name}</p>
+                      <p className="text-xs text-muted-foreground">{item.owned ? "Owned" : `Locked • ${item.price} coins`}</p>
+                      {item.owned && item.equipped ? <Badge className="mt-2">Equipped</Badge> : null}
+                      {item.owned && isSelf && !item.equipped ? (
+                        <Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => onEquipCollectionItem(item.item_id, item.sourceSection)}>
+                          Equip
+                        </Button>
+                      ) : null}
+                    </motion.div>
+                  ))}
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
+        </section>
+
+        <section className="space-y-3 rounded-3xl border border-white/15 bg-card/70 p-5">
+          <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><Rocket className="h-5 w-5 text-primary" />Activity Feed</h2>
+          {(activities.length ? activities : [{ id: "0", text: "Reached a new learning milestone", time: new Date().toISOString(), icon: "spark" as const }]).map((activity, index) => (
+            <motion.div key={activity.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <span className="rounded-full border border-white/20 bg-white/10 p-2">
+                {activity.icon === "trophy" ? <Trophy className="h-4 w-4 text-amber-300" /> : activity.icon === "zap" ? <Zap className="h-4 w-4 text-cyan-300" /> : <Sparkles className="h-4 w-4 text-fuchsia-300" />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold leading-tight">{activity.text}</p>
+                <p className="text-xs text-muted-foreground">{relativeTime(activity.time)}</p>
+              </div>
+              <Clock3 className="h-4 w-4 text-white/40" />
+            </motion.div>
+          ))}
+        </section>
+
+        <section className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 backdrop-blur">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">About</h2>
+            {isSelf ? <span className="text-xs text-white/60">Auto-saves</span> : null}
+          </div>
+          {isSelf ? (
+            <textarea
+              value={aboutText}
+              onChange={(event) => setAboutText(event.target.value)}
+              placeholder="Tell others about yourself..."
+              className="min-h-16 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-sm leading-relaxed text-white/90 outline-none focus:border-cyan-400/50"
+            />
+          ) : (
+            <p className="text-sm leading-relaxed text-muted-foreground">{aboutText || "This learner hasn't added an about section yet."}</p>
+          )}
+          {equippedAvatar ? <p className="mt-3 text-xs text-primary">Equipped avatar item: {equippedAvatar}</p> : null}
+        </section>
 
         {isSelf && (
           <Card className="border-white/15 bg-card/80">
@@ -746,25 +698,19 @@ const UserProfilePage = () => {
         )}
       </div>
 
-      <Dialog open={highlightOpen} onOpenChange={setHighlightOpen}>
-        <DialogContent className="max-w-3xl border-white/20 bg-[#0b1020]">
+      <Dialog open={Boolean(selectedAchievement)} onOpenChange={(open) => !open && setSelectedAchievement(null)}>
+        <DialogContent className="border-white/20 bg-[#0b1020]">
           <DialogHeader>
-            <DialogTitle>{activeHighlight}</DialogTitle>
-            <DialogDescription>Swipe-ready quick view of profile highlights.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <span className="text-2xl">{selectedAchievement?.icon}</span>
+              {selectedAchievement?.name}
+            </DialogTitle>
+            <DialogDescription>{selectedAchievement?.description}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            {activeHighlight === "Achievements" ? achievements.map((item) => (
-              <div key={item.id} className="rounded-xl border border-white/10 p-3">{item.icon} {item.name} • {item.date || "Unlocked recently"}</div>
-            )) : null}
-            {activeHighlight === "Top Wins" ? (
-              <div className="rounded-xl border border-white/10 p-3">Top wins this season: {wins} • Streak best: {streak} days.</div>
-            ) : null}
-            {activeHighlight === "Collections" ? (
-              <div className="rounded-xl border border-white/10 p-3">Owned {collections.length} items and {featuredItems.length} featured flex items.</div>
-            ) : null}
-            {activeHighlight === "Moments" ? activities.map((activity) => (
-              <div key={activity.id} className="rounded-xl border border-white/10 p-3">{activity.text}</div>
-            )) : null}
+          <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
+            <p className="inline-flex items-center gap-2"><Star className="h-4 w-4 text-cyan-300" />Status: {selectedAchievement?.locked ? "Locked" : "Unlocked"}</p>
+            <p className="inline-flex items-center gap-2"><Crown className="h-4 w-4 text-amber-300" />Earn date: {selectedAchievement?.date || "Not yet earned"}</p>
+            <p className="inline-flex items-center gap-2"><Lock className="h-4 w-4 text-violet-300" />Rarity: {selectedAchievement?.locked ? "Hidden" : "Profile highlight"}</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -773,20 +719,11 @@ const UserProfilePage = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Send Coins</DialogTitle>
-            <DialogDescription>
-              Transfer coins to {profile.name || profile.username}. Minimum 10 coins, max 500/day, friends only.
-            </DialogDescription>
+            <DialogDescription>Transfer coins to {profile.name || profile.username}. Minimum 10 coins, max 500/day, friends only.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Your balance: <strong>{coins.toLocaleString()}</strong> coins</p>
-            <Input
-              type="number"
-              min={10}
-              step={10}
-              value={transferAmount}
-              onChange={(e) => setTransferAmount(e.target.value)}
-              placeholder="Enter amount"
-            />
+            <Input type="number" min={10} step={10} value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} placeholder="Enter amount" />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setTransferOpen(false)}>Cancel</Button>
