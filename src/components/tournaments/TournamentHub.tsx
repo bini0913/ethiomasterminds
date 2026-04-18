@@ -30,6 +30,11 @@ type HubTournament = {
   id: string;
   name: string;
   status: TournamentStatus;
+  mode: string;
+  subject: string;
+  questionsPerMatch: number;
+  startTime: string | null;
+  registrationDeadline: string | null;
   maxPlayers: number;
   currentPlayers: number;
   entryFee: number;
@@ -98,6 +103,16 @@ const TournamentHub: React.FC = () => {
   const [matches, setMatches] = useState<HubMatch[]>([]);
   const [events, setEvents] = useState<TournamentEvent[]>([]);
   const [newPlayerUsername, setNewPlayerUsername] = useState("");
+  const [createForm, setCreateForm] = useState({
+    name: "",
+    mode: "speed",
+    subject: "Math",
+    maxPlayers: 8,
+    questionsPerMatch: 10,
+    startTime: "",
+    registrationDeadline: "",
+    entryFee: 0,
+  });
   const [matchWinnerById, setMatchWinnerById] = useState<Record<string, string>>({});
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const isManager = user?.role === "manager" || user?.role === "admin" || user?.role === "extreme_admin";
@@ -121,10 +136,16 @@ const TournamentHub: React.FC = () => {
   }, [matches]);
 
   const loadTournaments = async () => {
+    // Best-effort auto-start. This should never block tournament loading.
+    const { error: autoStartError } = await supabase.rpc("auto_start_due_tournaments" as any);
+    if (autoStartError) {
+      console.warn("auto_start_due_tournaments unavailable:", autoStartError.message);
+    }
+
     const [{ data: tournamentRows, error: tError }, { data: playerRows }, { data: profileRows }] = await Promise.all([
       supabase
         .from("tournaments")
-        .select("id,name,status,max_participants,current_players,entry_fee,entry_fee_coins,prize_coins,winner_id")
+        .select("id,name,status,mode,subject,settings,question_count,questions_count,start_time,starts_at,max_participants,current_players,entry_fee,entry_fee_coins,prize_coins,winner_id")
         .order("created_at", { ascending: false })
         .limit(30),
       supabase.from("tournament_players" as any).select("tournament_id,user_id"),
@@ -147,6 +168,11 @@ const TournamentHub: React.FC = () => {
       id: row.id,
       name: row.name,
       status: row.status,
+      mode: row.mode ?? "speed",
+      subject: row.subject ?? "General",
+      questionsPerMatch: row.settings?.questions_per_match ?? row.question_count ?? row.questions_count ?? 10,
+      startTime: row.start_time ?? row.starts_at ?? null,
+      registrationDeadline: row.settings?.registration_deadline ?? null,
       maxPlayers: row.max_participants || 16,
       currentPlayers: row.current_players ?? participantCounts[row.id] ?? 0,
       entryFee: row.entry_fee ?? row.entry_fee_coins ?? 0,
@@ -308,6 +334,35 @@ const TournamentHub: React.FC = () => {
     setNewPlayerUsername("");
   };
 
+  const createTournamentAsManager = async () => {
+    if (!createForm.name.trim()) {
+      toast.error("Tournament name is required");
+      return;
+    }
+
+    if (!createForm.startTime || !createForm.registrationDeadline) {
+      toast.error("Set both start time and registration deadline");
+      return;
+    }
+
+    await runManagerAction(
+      () =>
+        supabase.rpc("create_tournament_workflow" as any, {
+          p_name: createForm.name.trim(),
+          p_mode: createForm.mode,
+          p_subject: createForm.subject.trim(),
+          p_max_players: createForm.maxPlayers,
+          p_questions_per_match: createForm.questionsPerMatch,
+          p_start_time: new Date(createForm.startTime).toISOString(),
+          p_registration_deadline: new Date(createForm.registrationDeadline).toISOString(),
+          p_entry_fee: createForm.entryFee,
+        }),
+      `${createForm.name.trim()} created`,
+    );
+
+    setCreateForm((prev) => ({ ...prev, name: "", entryFee: 0 }));
+  };
+
   const removePlayerAsManager = async (playerUserId: string, playerName: string) => {
     if (!selectedTournamentId) return;
 
@@ -382,6 +437,10 @@ const TournamentHub: React.FC = () => {
       : "In Progress";
 
   const liveMatch = matches.find((m) => m.status === "playing" || m.status === "live") || null;
+  const isRegistrationOpen = (tournament: HubTournament) => {
+    if (!tournament.registrationDeadline) return true;
+    return new Date(tournament.registrationDeadline).getTime() > Date.now();
+  };
 
   return (
     <div className="space-y-6 text-foreground">
@@ -433,10 +492,13 @@ const TournamentHub: React.FC = () => {
                 <div className="space-y-1 text-sm text-slate-300">
                   <p className="flex items-center gap-2"><Users className="h-4 w-4 text-cyan-400" /> {tournament.currentPlayers}/{tournament.maxPlayers} players</p>
                   <p>Prize Pool 💰 {tournament.prize.toLocaleString()} coins</p>
+                  <p>{tournament.subject} • {tournament.mode} • {tournament.questionsPerMatch} Qs</p>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <Button className="w-full bg-red-500 text-white hover:bg-red-400" onClick={() => joinTournament(tournament.id)}>Join</Button>
+                <Button className="w-full bg-red-500 text-white hover:bg-red-400" onClick={() => joinTournament(tournament.id)} disabled={!isRegistrationOpen(tournament)}>
+                  {isRegistrationOpen(tournament) ? "Register" : "Registration Closed"}
+                </Button>
               </CardContent>
             </Card>
           ))}
@@ -460,7 +522,10 @@ const TournamentHub: React.FC = () => {
                 </div>
                 <p className="text-sm text-slate-300">Players: {tournament.currentPlayers}/{tournament.maxPlayers}</p>
                 <p className="text-sm text-slate-300">Entry: {tournament.entryFee > 0 ? `${tournament.entryFee} coins` : "Free"}</p>
-                <Button variant="outline" className="w-full border-amber-400/40 text-amber-100 hover:bg-amber-500/10" onClick={() => joinTournament(tournament.id)}>Join</Button>
+                <p className="text-sm text-slate-300">Starts: {tournament.startTime ? new Date(tournament.startTime).toLocaleString() : "TBD"}</p>
+                <Button variant="outline" className="w-full border-amber-400/40 text-amber-100 hover:bg-amber-500/10" onClick={() => joinTournament(tournament.id)} disabled={!isRegistrationOpen(tournament)}>
+                  {isRegistrationOpen(tournament) ? "Register" : "Registration Closed"}
+                </Button>
               </CardContent>
             </Card>
           ))}
@@ -503,9 +568,12 @@ const TournamentHub: React.FC = () => {
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3"><p className="text-xs text-slate-400">Player Count</p><p className="font-semibold">{selectedTournament.currentPlayers}/{selectedTournament.maxPlayers}</p></div>
+                <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3"><p className="text-xs text-slate-400">Mode</p><p className="font-semibold capitalize">{selectedTournament.mode}</p></div>
                 <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3"><p className="text-xs text-slate-400">Entry Fee</p><p className="font-semibold">{selectedTournament.entryFee > 0 ? `${selectedTournament.entryFee} coins` : "Free"}</p></div>
                 <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3"><p className="text-xs text-slate-400">Prize</p><p className="font-semibold">{selectedTournament.prize.toLocaleString()} coins</p></div>
                 <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3"><p className="text-xs text-slate-400">Champion</p><p className="font-semibold">{championLabel}</p></div>
+                <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3"><p className="text-xs text-slate-400">Start Time</p><p className="font-semibold">{selectedTournament.startTime ? new Date(selectedTournament.startTime).toLocaleString() : "TBD"}</p></div>
+                <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3"><p className="text-xs text-slate-400">Registration Deadline</p><p className="font-semibold">{selectedTournament.registrationDeadline ? new Date(selectedTournament.registrationDeadline).toLocaleString() : "Open until start"}</p></div>
               </div>
 
               <Separator className="bg-slate-700" />
@@ -574,6 +642,30 @@ const TournamentHub: React.FC = () => {
             <CardTitle className="flex items-center gap-2 text-amber-100"><Crown className="h-5 w-5 text-amber-300" /> Manager Control Center</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 space-y-3">
+              <p className="text-sm font-semibold text-amber-100">Create Tournament</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input placeholder="Tournament name" value={createForm.name} onChange={(event) => setCreateForm((prev) => ({ ...prev, name: event.target.value }))} />
+                <Input placeholder="Subject (Math, Science...)" value={createForm.subject} onChange={(event) => setCreateForm((prev) => ({ ...prev, subject: event.target.value }))} />
+                <select className="rounded-md border border-slate-600 bg-slate-950 px-2 py-2 text-sm text-slate-100" value={createForm.mode} onChange={(event) => setCreateForm((prev) => ({ ...prev, mode: event.target.value }))}>
+                  <option value="speed">Speed</option>
+                  <option value="accuracy">Accuracy</option>
+                </select>
+                <select className="rounded-md border border-slate-600 bg-slate-950 px-2 py-2 text-sm text-slate-100" value={createForm.maxPlayers} onChange={(event) => setCreateForm((prev) => ({ ...prev, maxPlayers: Number(event.target.value) }))}>
+                  <option value={8}>8 Players</option>
+                  <option value={16}>16 Players</option>
+                  <option value={32}>32 Players</option>
+                </select>
+                <Input type="number" min={5} max={50} placeholder="Questions per match" value={createForm.questionsPerMatch} onChange={(event) => setCreateForm((prev) => ({ ...prev, questionsPerMatch: Number(event.target.value) || 10 }))} />
+                <Input type="number" min={0} placeholder="Entry fee (coins)" value={createForm.entryFee} onChange={(event) => setCreateForm((prev) => ({ ...prev, entryFee: Number(event.target.value) || 0 }))} />
+                <Input type="datetime-local" value={createForm.startTime} onChange={(event) => setCreateForm((prev) => ({ ...prev, startTime: event.target.value }))} />
+                <Input type="datetime-local" value={createForm.registrationDeadline} onChange={(event) => setCreateForm((prev) => ({ ...prev, registrationDeadline: event.target.value }))} />
+              </div>
+              <Button onClick={createTournamentAsManager} disabled={isSubmittingAction} className="bg-amber-500 text-black hover:bg-amber-400">
+                Create Tournament
+              </Button>
+            </div>
+
             <div className="grid gap-2 md:grid-cols-[1fr_auto]">
               <Input
                 placeholder="Add participant by username"
