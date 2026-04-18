@@ -29,7 +29,7 @@ export const prefetchProfileBundle = async (userId: string) => {
       fetchFollowerCounts(userId),
       supabase
         .from("profiles")
-        .select("id,name,username,avatar,avatar_config,level,xp,wins,streak,grade,created_at")
+        .select("id,name,username,avatar,avatar_config,level,xp,grade,created_at")
         .eq("id", userId)
         .maybeSingle(),
       supabase.rpc("get_user_stats", { p_user_id: userId }),

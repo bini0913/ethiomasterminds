@@ -110,7 +110,7 @@ const UserProfilePage = () => {
 
     const { data: fallback } = await supabase
       .from("profiles")
-      .select("id,name,username,avatar,avatar_config,level,xp,total_xp,season_xp,wins,streak,grade")
+      .select("id,name,username,avatar,avatar_config,level,xp,grade")
       .eq("id", userId)
       .maybeSingle();
 
@@ -128,19 +128,19 @@ const UserProfilePage = () => {
       avatar: fallback.avatar ?? null,
       avatarConfig: (fallback as any).avatar_config ?? null,
       level: Number(fallback.level ?? 1),
-      xp: Number((fallback as any).total_xp ?? fallback.xp ?? 0),
-      wins: Number(fallback.wins ?? 0),
-      streak: Number(fallback.streak ?? 0),
+      xp: Number(fallback.xp ?? 0),
+      wins: 0,
+      streak: 0,
       grade: fallback.grade ? Number(fallback.grade) : null,
       rank: null,
       badges: [],
       weeklyScore: 0,
       accuracy: 0,
-      matchesPlayed: Number(fallback.wins ?? 0),
+      matchesPlayed: 0,
       losses: 0,
       contributions: 0,
-      totalXp: Number((fallback as any).total_xp ?? fallback.xp ?? 0),
-      seasonXp: Number((fallback as any).season_xp ?? fallback.xp ?? 0),
+      totalXp: Number(fallback.xp ?? 0),
+      seasonXp: Number(fallback.xp ?? 0),
       activeTitle: null,
     });
   };
