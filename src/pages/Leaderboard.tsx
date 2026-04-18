@@ -12,6 +12,7 @@ import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchFollowing, fetchLeaderboardUsers, rankScore, tierFromUser, tierStyle, type LeaderboardUser } from "@/lib/leaderboardApi";
+import { prefetchProfileBundle } from "@/lib/profilePrefetch";
 import { getRankTierByLevel } from "@/lib/rankSystem";
 
 type LeaderboardTab = "global" | "grade" | "friends" | "weekly";
@@ -115,6 +116,7 @@ const Leaderboard = () => {
   };
 
   const openProfile = (entry: (typeof withRank)[number]) => {
+    prefetchProfileBundle(entry.id);
     navigate(`/profile/${entry.id}`);
   };
 

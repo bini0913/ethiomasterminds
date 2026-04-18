@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -13,6 +14,7 @@ import {
   Car,
   Clock3,
   Crown,
+  Loader2,
   Flame,
   Home,
   Lock,
@@ -45,12 +47,19 @@ import {
   type LeaderboardUser,
 } from "@/lib/leaderboardApi";
 import { getNextRankTier, getRankTierByLevel, getXpProgressInLevel, playRankUpTone } from "@/lib/rankSystem";
+import { readPrefetchedProfile } from "@/lib/profilePrefetch";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 type Activity = { id: string; text: string; time: string; icon: "trophy" | "zap" | "spark" };
 type Achievement = { id: string; name: string; icon: string; description: string; date: string; locked?: boolean };
+type PrefetchedProfileBundle = {
+  leaderboardRows?: LeaderboardUser[];
+  followerCounts?: { followers: number; following: number };
+  profile?: any;
+  stats?: Record<string, any>;
+};
 
 const UserProfilePage = () => {
   const navigate = useNavigate();
@@ -82,10 +91,101 @@ const UserProfilePage = () => {
   const [aboutText, setAboutText] = useState("");
   const [avatarReacting, setAvatarReacting] = useState(false);
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileMissing, setProfileMissing] = useState(false);
+  const [fallbackProfile, setFallbackProfile] = useState<LeaderboardUser | null>(null);
+  const unlockedAchievementIdsRef = useRef<Set<string>>(new Set());
 
   const refreshCore = async () => {
+    if (!userId) return;
     const rows = await fetchLeaderboardUsers();
     setUsers(rows);
+
+    const found = rows.find((row) => row.id === userId);
+    if (found) {
+      setFallbackProfile(null);
+      setProfileMissing(false);
+      return;
+    }
+
+    const { data: fallback } = await supabase
+      .from("profiles")
+      .select("id,name,username,avatar,avatar_config,level,xp,wins,streak,grade")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!fallback) {
+      setProfileMissing(true);
+      setFallbackProfile(null);
+      return;
+    }
+
+    setProfileMissing(false);
+    setFallbackProfile({
+      id: fallback.id,
+      name: fallback.name ?? null,
+      username: fallback.username ?? "user",
+      avatar: fallback.avatar ?? null,
+      avatarConfig: (fallback as any).avatar_config ?? null,
+      level: Number(fallback.level ?? 1),
+      xp: Number(fallback.xp ?? 0),
+      wins: Number(fallback.wins ?? 0),
+      streak: Number(fallback.streak ?? 0),
+      grade: fallback.grade ? Number(fallback.grade) : null,
+      rank: null,
+      badges: [],
+      weeklyScore: 0,
+      accuracy: 0,
+      matchesPlayed: Number(fallback.wins ?? 0),
+      losses: 0,
+      contributions: 0,
+    });
+  };
+
+  const syncMilestoneAchievements = async (stats: Record<string, any>) => {
+    if (!authUser?.id || authUser.id !== userId) return;
+    const totalQuizzes = Number(stats.total_quizzes ?? stats.quizzes_completed ?? 0);
+    const currentStreak = Number(stats.current_streak ?? 0);
+    const level = Number(stats.level ?? 0);
+    const tournamentWins = Number(stats.tournament_wins ?? 0);
+
+    const rules = [
+      { name: "First Quiz Completed", met: totalQuizzes >= 1, progress: Math.min(totalQuizzes, 1) },
+      { name: "5 Win Streak", met: currentStreak >= 5, progress: Math.min(currentStreak, 5) },
+      { name: "Level 5 Reached", met: level >= 5, progress: Math.min(level, 5) },
+      { name: "First Tournament Win", met: tournamentWins >= 1, progress: Math.min(tournamentWins, 1) },
+    ];
+
+    const { data: defs } = await supabase.from("achievements").select("id,name").in("name", rules.map((rule) => rule.name));
+    if (!defs?.length) return;
+    const idsByName = new Map(defs.map((item) => [item.name, item.id]));
+
+    const achievementIds = Array.from(idsByName.values());
+    const { data: existing } = await supabase
+      .from("user_achievements")
+      .select("achievement_id,completed,unlocked_at")
+      .eq("user_id", authUser.id)
+      .in("achievement_id", achievementIds);
+    const existingMap = new Map((existing ?? []).map((row) => [row.achievement_id, row]));
+
+    const payload = rules
+      .filter((rule) => idsByName.has(rule.name))
+      .map((rule) => {
+        const achievementId = idsByName.get(rule.name)!;
+        const existingRow = existingMap.get(achievementId);
+        const unlockedAt = existingRow?.unlocked_at ?? (rule.met ? new Date().toISOString() : null);
+        return {
+          user_id: authUser.id,
+          achievement_id: achievementId,
+          progress: rule.progress,
+          completed: rule.met || Boolean(existingRow?.completed),
+          unlocked_at: rule.met || existingRow?.completed ? unlockedAt : null,
+        };
+      });
+
+    if (payload.length) {
+      await (supabase as any).from("user_achievements").upsert(payload, { onConflict: "user_id,achievement_id" });
+    }
   };
 
   const refreshSocial = async () => {
@@ -132,6 +232,7 @@ const UserProfilePage = () => {
       ]);
 
       setStatsJson((statsRes.data ?? {}) as Record<string, any>);
+      await syncMilestoneAchievements((statsRes.data ?? {}) as Record<string, any>);
 
       const strong = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.strong_topics) ? item.strong_topics : []));
       const weak = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.weak_topics) ? item.weak_topics : []));
@@ -169,6 +270,18 @@ const UserProfilePage = () => {
           };
         }),
       );
+      const nextUnlockedIds = new Set<string>((userAchievementsRes.data ?? []).map((row) => row.achievement_id));
+      if (unlockedAchievementIdsRef.current.size) {
+        for (const unlockedId of nextUnlockedIds) {
+          if (!unlockedAchievementIdsRef.current.has(unlockedId)) {
+            const unlockedDef = byId.get(unlockedId);
+            toast.success("🏆 Achievement Unlocked!", {
+              description: unlockedDef?.name ?? "New achievement earned",
+            });
+          }
+        }
+      }
+      unlockedAchievementIdsRef.current = nextUnlockedIds;
 
       if ((privacyRes as any)?.data) {
         const p = (privacyRes as any).data as { is_public: boolean; hide_stats: boolean };
@@ -220,9 +333,33 @@ const UserProfilePage = () => {
   };
 
   useEffect(() => {
-    refreshCore();
-    refreshSocial();
-    refreshProfileDetails();
+    let active = true;
+    const hydrate = async () => {
+      if (!userId) return;
+      setLoadingProfile(true);
+      setProfileMissing(false);
+
+      const prefetched = readPrefetchedProfile<PrefetchedProfileBundle>(userId);
+      if (prefetched?.leaderboardRows?.length && active) {
+        setUsers(prefetched.leaderboardRows);
+      }
+      if (prefetched?.followerCounts && active) {
+        setFollowersCount(prefetched.followerCounts.followers ?? 0);
+        setFollowingCount(prefetched.followerCounts.following ?? 0);
+      }
+      if (prefetched?.stats && active) {
+        setStatsJson(prefetched.stats);
+      }
+
+      try {
+        await Promise.all([refreshCore(), refreshSocial(), refreshProfileDetails()]);
+      } finally {
+        if (active) {
+          setLoadingProfile(false);
+        }
+      }
+    };
+    hydrate();
 
     const channel = supabase
       .channel(`profile-live-${userId}`)
@@ -234,13 +371,18 @@ const UserProfilePage = () => {
       .subscribe();
 
     return () => {
+      active = false;
       supabase.removeChannel(channel);
     };
   }, [authUser?.id, userId]);
 
   const ranked = useMemo(() => [...users].sort((a, b) => rankScore(b) - rankScore(a)), [users]);
-  const profile = useMemo(() => ranked.find((u) => u.id === userId), [ranked, userId]);
-  const profileRank = useMemo(() => ranked.findIndex((u) => u.id === userId) + 1, [ranked, userId]);
+  const rankedWithFallback = useMemo(() => {
+    if (!fallbackProfile || ranked.some((row) => row.id === fallbackProfile.id)) return ranked;
+    return [...ranked, fallbackProfile].sort((a, b) => rankScore(b) - rankScore(a));
+  }, [fallbackProfile, ranked]);
+  const profile = useMemo(() => rankedWithFallback.find((u) => u.id === userId) ?? fallbackProfile, [fallbackProfile, rankedWithFallback, userId]);
+  const profileRank = useMemo(() => rankedWithFallback.findIndex((u) => u.id === userId) + 1, [rankedWithFallback, userId]);
 
   const isSelf = authUser?.id === (profile?.id ?? "");
   const isFollowing = profile ? followingIds.includes(profile.id) : false;
@@ -436,7 +578,38 @@ const UserProfilePage = () => {
     return `${Math.floor(diff / day)}d ago`;
   };
 
-  if (!profile) return <div className="p-8">Profile not found.</div>;
+  if (loadingProfile) {
+    return (
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#1e1b4b,_#0b1020_45%,_#05060f)] px-3 pb-14 pt-4 md:px-8">
+        <div className="mx-auto max-w-6xl space-y-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-9 w-24 rounded-lg" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-card/50 p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              <Skeleton className="h-40 w-40 rounded-full" />
+              <div className="w-full space-y-3">
+                <Skeleton className="h-8 w-56" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-2.5 w-full" />
+                <Skeleton className="h-4 w-64" />
+              </div>
+            </div>
+          </div>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-2xl" />
+          ))}
+          <div className="flex items-center justify-center gap-2 text-sm text-white/70">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading profile…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (profileMissing || !profile) return <div className="p-8">Profile not found.</div>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[radial-gradient(circle_at_top,_#1e1b4b,_#0b1020_45%,_#05060f)] px-3 pb-14 pt-4 text-foreground md:px-8">
@@ -459,7 +632,7 @@ const UserProfilePage = () => {
           <div className="pointer-events-none absolute -left-20 top-10 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
           <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-500/20 blur-3xl" />
 
-          <div className="relative flex min-h-[70vh] flex-col items-center justify-center gap-5 p-8 text-center md:p-10">
+          <div className="relative flex flex-col gap-5 p-5 md:flex-row md:items-center md:gap-6 md:p-6">
             <motion.button
               type="button"
               onClick={() => {
@@ -467,48 +640,44 @@ const UserProfilePage = () => {
                 setTimeout(() => setAvatarReacting(false), 420);
               }}
               whileTap={{ scale: 0.96 }}
-              animate={avatarReacting ? { scale: [1, 1.05, 1], y: [0, -6, 0] } : { y: [0, -8, 0] }}
+              animate={avatarReacting ? { scale: [1, 1.04, 1], y: [0, -4, 0] } : { y: [0, -6, 0] }}
               transition={avatarReacting ? { duration: 0.42 } : { duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
-              className="relative rounded-full"
+              className="relative mx-auto md:mx-0"
             >
-              <div className={`absolute inset-0 rounded-full blur-2xl ${tierStyle(profile.level)} opacity-50`} />
-              <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={290} autoRotate={false} />
+              <div className={`absolute inset-0 rounded-full blur-2xl ${tierStyle(profile.level)} opacity-45`} />
+              <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={190} autoRotate={false} />
             </motion.button>
 
-            <div className="space-y-2">
-              <h1 className="text-4xl font-black tracking-tight md:text-5xl">{profile.name || profile.username}</h1>
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-3xl font-black tracking-tight md:text-4xl">{profile.name || profile.username}</h1>
+                <Badge className={`bg-gradient-to-r ${tierStyle(profile.level)} px-3 py-1 text-xs shadow-[0_0_18px_rgba(168,85,247,0.35)]`}>
+                  {currentTier.icon} {currentTier.name}
+                </Badge>
+              </div>
               <p className="text-sm text-white/80">@{profile.username}</p>
-              <Badge className={`animate-pulse bg-gradient-to-r ${tierStyle(profile.level)} px-4 py-1 text-sm shadow-[0_0_24px_rgba(168,85,247,0.5)]`}>
-                {currentTier.icon} {currentTier.name}
-              </Badge>
-            </div>
 
-            <motion.div className="w-full max-w-2xl space-y-2" initial={{ opacity: 0, width: "50%" }} animate={{ opacity: 1, width: "100%" }} transition={{ duration: 0.8 }}>
-              <div className="flex items-center justify-between text-sm text-white/85">
-                <span>Level {profile.level}</span>
-                <span>{xpProgress.current}/220 XP</span>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs text-white/85">
+                  <span>Level {profile.level}</span>
+                  <span>{xpProgress.current}/220 XP</span>
+                </div>
+                <Progress value={progress} className="h-2 bg-white/20" />
+                <p className="text-[11px] text-white/70">Next tier: {nextTier ? nextTier.name : "MAX RANK"}</p>
               </div>
-              <motion.div initial={{ scaleX: 0.2 }} animate={{ scaleX: 1 }} transition={{ duration: 1 }} style={{ transformOrigin: "left" }}>
-                <Progress value={progress} className="h-2.5 bg-white/20" />
-              </motion.div>
-              <p className="text-xs text-white/70">Next tier: {nextTier ? nextTier.name : "MAX RANK"}</p>
-            </motion.div>
 
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {[`Lv.${profile.level}`, `${(profile.xp ?? 0).toLocaleString()} XP`, `#${profileRank > 0 ? profileRank : "-"} Rank`, `Grade ${Math.max(1, Math.ceil((profile.level ?? 1) / 2))}`].map((chip) => (
-                <motion.div key={chip} whileHover={{ y: -3, scale: 1.03 }} className="rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs font-semibold shadow-[0_0_20px_rgba(56,189,248,0.22)] backdrop-blur">
-                  {chip}
-                </motion.div>
-              ))}
+              <p className="text-sm text-white/90">
+                Level {profile.level} • {(profile.xp ?? 0).toLocaleString()} XP • #{profileRank > 0 ? profileRank : "-"} Rank • Grade {Math.max(1, Math.ceil((profile.level ?? 1) / 2))}
+              </p>
+
+              {isSelf ? (
+                <div className="pt-1">
+                  <Button onClick={() => navigate("/avatar-creator")} className="gap-2 bg-white text-black hover:bg-white/90">
+                    <Pencil className="h-4 w-4" /> Edit Avatar
+                  </Button>
+                </div>
+              ) : null}
             </div>
-
-            {isSelf ? (
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button onClick={() => navigate("/avatar-creator")} className="gap-2 bg-white text-black hover:bg-white/90">
-                  <Pencil className="h-4 w-4" /> Edit Avatar
-                </Button>
-              </div>
-            ) : null}
           </div>
         </section>
 
@@ -582,9 +751,13 @@ const UserProfilePage = () => {
                 whileHover={{ y: -4 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => setSelectedAchievement(achievement)}
-                className={`min-w-36 snap-start rounded-2xl border p-4 text-left transition ${achievement.locked ? "border-white/10 bg-white/[0.03] opacity-55 blur-[0.4px]" : "border-cyan-400/25 bg-cyan-400/10"}`}
+                className={`min-w-40 snap-start rounded-2xl border p-4 text-left transition ${
+                  achievement.locked
+                    ? "border-white/10 bg-white/[0.03] opacity-55 blur-[0.4px]"
+                    : "border-cyan-400/30 bg-cyan-400/10 shadow-[0_0_24px_rgba(34,211,238,0.28)]"
+                }`}
               >
-                <p className="text-3xl">{achievement.icon}</p>
+                <p className="text-4xl">{achievement.icon}</p>
                 <p className="mt-2 text-sm font-semibold">{achievement.name}</p>
                 <p className="text-xs text-white/70">{achievement.locked ? "Locked" : `Unlocked ${achievement.date || "recently"}`}</p>
               </motion.button>
