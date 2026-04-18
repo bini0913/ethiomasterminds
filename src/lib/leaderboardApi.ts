@@ -48,7 +48,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   const [profilesRes, streakRes, weeklyRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,name,username,avatar,avatar_config,grade,xp,total_xp,season_xp,level,rank,badges"),
+      .select("id,name,username,avatar,avatar_config,grade,xp,level,rank,badges"),
     supabase.from("user_streaks").select("user_id,current_streak"),
     supabase
       .from("question_attempts")
@@ -83,14 +83,14 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
 
       return {
         id: profile.id,
-        username: profile.username ?? profile.name,
-        name: profile.name,
-        avatar: profile.avatar,
+        username: profile.username ?? profile.name ?? "user",
+        name: profile.name ?? profile.username ?? "Unknown User",
+        avatar: profile.avatar ?? null,
         avatarConfig: (profile.avatar_config as Record<string, unknown> | null) ?? null,
         grade: toGradeNumber(profile.grade),
-        xp: Number((profile as any).season_xp ?? profile.xp ?? 0),
+        xp: Number(profile.xp ?? 0),
         level: profile.level ?? 1,
-        rank: profile.rank,
+        rank: profile.rank ?? null,
         badges: profile.badges ?? [],
         streak: streakByUser.get(profile.id) ?? 0,
         accuracy: total > 0 ? Number(((correct / total) * 100).toFixed(1)) : 0,
@@ -99,8 +99,8 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
         losses,
         contributions,
         weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
-        totalXp: Number((profile as any).total_xp ?? profile.xp ?? 0),
-        seasonXp: Number((profile as any).season_xp ?? profile.xp ?? 0),
+        totalXp: Number(profile.xp ?? 0),
+        seasonXp: Number(profile.xp ?? 0),
         activeTitle: null,
       } as LeaderboardUser;
     }),
