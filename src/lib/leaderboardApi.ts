@@ -19,6 +19,9 @@ export interface LeaderboardUser {
   losses: number;
   contributions: number;
   weeklyScore: number;
+  totalXp: number;
+  seasonXp: number;
+  activeTitle: string | null;
 }
 
 const toGradeNumber = (grade: string | null): number | null => {
@@ -29,7 +32,7 @@ const toGradeNumber = (grade: string | null): number | null => {
 
 export const rankScore = (user: LeaderboardUser) => {
   const performance = user.matchesPlayed > 0 ? user.wins / user.matchesPlayed : 0;
-  return user.xp + user.accuracy * 15 + performance * 300 + user.contributions * 2;
+  return user.seasonXp + user.accuracy * 15 + performance * 300 + user.contributions * 2;
 };
 
 export const tierFromUser = (user: LeaderboardUser) => getRankTierByLevel(user.level).name;
@@ -45,7 +48,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   const [profilesRes, streakRes, weeklyRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,name,username,avatar,avatar_config,grade,xp,level,rank,badges"),
+      .select("id,name,username,avatar,avatar_config,grade,xp,total_xp,season_xp,level,rank,badges"),
     supabase.from("user_streaks").select("user_id,current_streak"),
     supabase
       .from("question_attempts")
@@ -85,7 +88,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
         avatar: profile.avatar,
         avatarConfig: (profile.avatar_config as Record<string, unknown> | null) ?? null,
         grade: toGradeNumber(profile.grade),
-        xp: profile.xp ?? 0,
+        xp: Number((profile as any).season_xp ?? profile.xp ?? 0),
         level: profile.level ?? 1,
         rank: profile.rank,
         badges: profile.badges ?? [],
@@ -96,9 +99,32 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
         losses,
         contributions,
         weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
+        totalXp: Number((profile as any).total_xp ?? profile.xp ?? 0),
+        seasonXp: Number((profile as any).season_xp ?? profile.xp ?? 0),
+        activeTitle: null,
       } as LeaderboardUser;
     }),
   );
+
+  const userIds = users.map((row) => row.id);
+  if (userIds.length) {
+    const { data: titles } = await (supabase as any)
+      .from("user_titles")
+      .select("user_id,title_name,is_active,created_at")
+      .in("user_id", userIds)
+      .eq("is_active", true);
+
+    const activeTitleByUser = new Map<string, string>();
+    (titles ?? []).forEach((row: any) => {
+      if (!activeTitleByUser.has(row.user_id)) {
+        activeTitleByUser.set(row.user_id, row.title_name);
+      }
+    });
+
+    users.forEach((row) => {
+      row.activeTitle = activeTitleByUser.get(row.id) ?? null;
+    });
+  }
 
   return users;
 }
