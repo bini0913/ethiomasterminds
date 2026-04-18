@@ -21,7 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import {
   Shield, Users, BookOpen, Trophy, Bell, LogOut, Plus, Trash2, UserCheck, Key,
   Database, Activity, BarChart3, Bot, Search, RefreshCw, Check, X, AlertTriangle,
-  Loader2, Crown, Zap, Flag, FileText, MessageSquare
+  Loader2, Crown, Zap, Flag, FileText, MessageSquare, Coins, Target, RotateCcw
 } from 'lucide-react';
 import {
   Bar,
@@ -47,6 +47,7 @@ interface SystemUser {
   email?: string;
   xp: number;
   level: number;
+  coins?: number;
   role: Role;
   grade?: string;
   created_at: string;
@@ -143,6 +144,11 @@ const AdminPortal: React.FC = () => {
 
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', target_type: 'all' });
+  const [controlUserIdentifier, setControlUserIdentifier] = useState('');
+  const [xpAmount, setXpAmount] = useState('50');
+  const [levelAmount, setLevelAmount] = useState('1');
+  const [coinAmount, setCoinAmount] = useState('50');
+  const [resetMode, setResetMode] = useState<'xp' | 'level' | 'full'>('full');
   const [systemSettings, setSystemSettings] = useState({
     feature_social_enabled: true,
     feature_xp_enabled: true,
@@ -472,6 +478,117 @@ const AdminPortal: React.FC = () => {
     fetchStatsAndCharts();
   };
 
+  const resolveTargetUser = () => {
+    const identifier = controlUserIdentifier.trim().toLowerCase();
+    if (!identifier) return null;
+    return users.find(
+      (item) => item.id.toLowerCase() === identifier || (item.username || '').toLowerCase() === identifier,
+    ) || null;
+  };
+
+  const ensureAdminPower = () => {
+    if (user?.role !== 'admin') {
+      toast.error('Access denied: only admin can modify XP, level, coins, or reset users.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleAddXP = async () => {
+    if (!ensureAdminPower()) return;
+    const target = resolveTargetUser();
+    const amount = Number(xpAmount);
+    if (!target || !Number.isFinite(amount)) {
+      toast.error('Provide a valid username/user ID and XP amount.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ xp: Math.max(0, (target.xp || 0) + amount) } as never)
+      .eq('id', target.id);
+    if (error) {
+      toast.error('Failed to update XP.');
+      return;
+    }
+
+    toast.success('XP updated successfully');
+    pushNotification(`XP updated for ${target.name}`);
+    logAction(`Adjusted XP by ${amount}`, target.id);
+    fetchAllData();
+  };
+
+  const handleSetLevel = async () => {
+    if (!ensureAdminPower()) return;
+    const target = resolveTargetUser();
+    const nextLevel = Math.max(1, Number(levelAmount) || 1);
+    if (!target) {
+      toast.error('Provide a valid username/user ID.');
+      return;
+    }
+
+    const { error } = await supabase.from('profiles').update({ level: nextLevel } as never).eq('id', target.id);
+    if (error) {
+      toast.error('Failed to update level.');
+      return;
+    }
+
+    toast.success('Level updated successfully');
+    pushNotification(`Level set to ${nextLevel} for ${target.name}`);
+    logAction(`Set level to ${nextLevel}`, target.id);
+    fetchAllData();
+  };
+
+  const handleResetUserProgress = async () => {
+    if (!ensureAdminPower()) return;
+    const target = resolveTargetUser();
+    if (!target) {
+      toast.error('Provide a valid username/user ID.');
+      return;
+    }
+
+    const patch: Partial<SystemUser> = resetMode === 'xp'
+      ? { xp: 0 }
+      : resetMode === 'level'
+        ? { level: 1 }
+        : { xp: 0, level: 1 };
+    const { error } = await supabase.from('profiles').update(patch as never).eq('id', target.id);
+
+    if (error) {
+      toast.error('Failed to reset user.');
+      return;
+    }
+
+    toast.success('User progress reset successfully');
+    pushNotification(`Progress reset for ${target.name}`);
+    logAction(`Reset user (${resetMode})`, target.id);
+    fetchAllData();
+  };
+
+  const handleCoinAdjustment = async () => {
+    if (!ensureAdminPower()) return;
+    const target = resolveTargetUser() as (SystemUser & { coins?: number }) | null;
+    const amount = Number(coinAmount);
+    if (!target || !Number.isFinite(amount)) {
+      toast.error('Provide a valid username/user ID and coin amount.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ coins: Math.max(0, (target.coins || 0) + amount) } as never)
+      .eq('id', target.id);
+    if (error) {
+      toast.error('Failed to update coins.');
+      return;
+    }
+
+    toast.success('Coins updated successfully');
+    pushNotification(`Coins updated for ${target.name}`);
+    logAction(`Adjusted coins by ${amount}`, target.id);
+    fetchAllData();
+  };
+
   const saveSystemSettings = () => {
     if (!isAdmin) {
       toast.error('Admin only: system settings');
@@ -608,6 +725,53 @@ const AdminPortal: React.FC = () => {
                 <Button variant="outline" size="sm" onClick={() => handleBulkAction('ban')}>Bulk Ban</Button>
                 <Button variant="destructive" size="sm" onClick={() => handleBulkAction('delete')}>Bulk Delete</Button>
               </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">User Control Panel (Admin Only)</CardTitle>
+                  <CardDescription>Add XP, set level, reset progress, and adjust coins by user ID or username.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Target user (ID or username)</Label>
+                    <Input
+                      value={controlUserIdentifier}
+                      onChange={(e) => setControlUserIdentifier(e.target.value)}
+                      placeholder="user uuid or username"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <Label>Add XP</Label>
+                      <Input value={xpAmount} onChange={(e) => setXpAmount(e.target.value)} type="number" placeholder="XP amount" />
+                      <Button className="w-full" onClick={handleAddXP}><Zap className="w-4 h-4 mr-2" />Add XP</Button>
+                    </div>
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <Label>Set Level</Label>
+                      <Input value={levelAmount} onChange={(e) => setLevelAmount(e.target.value)} type="number" min={1} placeholder="Level" />
+                      <Button className="w-full" onClick={handleSetLevel}><Target className="w-4 h-4 mr-2" />Update Level</Button>
+                    </div>
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <Label>Reset User</Label>
+                      <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'xp' | 'level' | 'full')}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="xp">Reset XP</SelectItem>
+                          <SelectItem value="level">Reset Level</SelectItem>
+                          <SelectItem value="full">Full Reset</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button variant="destructive" className="w-full" onClick={handleResetUserProgress}><RotateCcw className="w-4 h-4 mr-2" />Apply Reset</Button>
+                    </div>
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <Label>Add / Remove Coins</Label>
+                      <Input value={coinAmount} onChange={(e) => setCoinAmount(e.target.value)} type="number" placeholder="Coins (+/-)" />
+                      <Button className="w-full" onClick={handleCoinAdjustment}><Coins className="w-4 h-4 mr-2" />Apply Coins</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               <Card><CardContent className="p-0"><ScrollArea className="h-[560px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Select</th><th className="p-3 text-left">User</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Joined</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{filteredUsers.map((u) => (<tr key={u.id} className="border-b border-border/50"><td className="p-3"><input type="checkbox" checked={selectedUsers.includes(u.id)} onChange={(e) => setSelectedUsers((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))} /></td><td className="p-3"><p className="font-medium">{u.name}</p><p className="text-xs text-muted-foreground">@{u.username}</p></td><td className="p-3"><Select value={u.role} onValueChange={(v) => handleUpdateUserRole(u.id, v as Role)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></td><td className="p-3">{u.grade || '-'}</td><td className="p-3"><span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" />{u.xp}</span></td><td className="p-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)}><Key className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
