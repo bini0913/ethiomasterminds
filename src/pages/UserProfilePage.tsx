@@ -110,7 +110,7 @@ const UserProfilePage = () => {
 
     const { data: fallback } = await supabase
       .from("profiles")
-      .select("id,name,username,avatar,avatar_config,level,xp,wins,streak,grade")
+      .select("id,name,username,avatar,avatar_config,level,xp,total_xp,season_xp,wins,streak,grade")
       .eq("id", userId)
       .maybeSingle();
 
@@ -128,7 +128,7 @@ const UserProfilePage = () => {
       avatar: fallback.avatar ?? null,
       avatarConfig: (fallback as any).avatar_config ?? null,
       level: Number(fallback.level ?? 1),
-      xp: Number(fallback.xp ?? 0),
+      xp: Number((fallback as any).total_xp ?? fallback.xp ?? 0),
       wins: Number(fallback.wins ?? 0),
       streak: Number(fallback.streak ?? 0),
       grade: fallback.grade ? Number(fallback.grade) : null,
@@ -139,6 +139,9 @@ const UserProfilePage = () => {
       matchesPlayed: Number(fallback.wins ?? 0),
       losses: 0,
       contributions: 0,
+      totalXp: Number((fallback as any).total_xp ?? fallback.xp ?? 0),
+      seasonXp: Number((fallback as any).season_xp ?? fallback.xp ?? 0),
+      activeTitle: null,
     });
   };
 
@@ -210,7 +213,7 @@ const UserProfilePage = () => {
     if (!userId) return;
 
     try {
-      const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, achievementHistoryRes, privacyRes, allStoreItemsRes, profileRes] = await Promise.all([
+      const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, achievementHistoryRes, seasonResultsRes, userTitlesRes, privacyRes, allStoreItemsRes, profileRes] = await Promise.all([
         supabase.rpc("get_user_stats", { p_user_id: userId }),
         supabase.from("analytics").select("strong_topics,weak_topics").eq("user_id", userId),
         supabase
@@ -231,6 +234,18 @@ const UserProfilePage = () => {
           .select("id,title,description,achievement_type,achieved_at,metadata")
           .eq("user_id", userId)
           .order("achieved_at", { ascending: false })
+          .limit(12),
+        (supabase as any)
+          .from("season_results")
+          .select("id,season,rank_position,xp_earned,title_awarded,created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(8),
+        (supabase as any)
+          .from("user_titles")
+          .select("id,title_name,season,is_active,created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
           .limit(12),
         supabase.from("profile_privacy_settings" as never).select("is_public,hide_stats").eq("user_id", userId).maybeSingle(),
         (supabase as any).from("store_items").select("id,name,section,rarity,preview,price").eq("is_active", true),
@@ -293,7 +308,23 @@ const UserProfilePage = () => {
         };
       });
 
-      setAchievements([...resetHistoryAchievements, ...unlockedAchievements].slice(0, 18));
+      const seasonalAchievements: Achievement[] = ((seasonResultsRes as any).data ?? []).map((row: any) => ({
+        id: `season-${row.id}`,
+        name: row.title_awarded ?? `${row.season} Rank #${row.rank_position}`,
+        icon: row.rank_position === 1 ? "🥇" : row.rank_position === 2 ? "🥈" : row.rank_position === 3 ? "🥉" : "🏁",
+        description: `${row.season} finish: #${row.rank_position} with ${Number(row.xp_earned ?? 0).toLocaleString()} season XP`,
+        date: row.created_at ? new Date(row.created_at).toLocaleDateString() : "",
+      }));
+
+      const titleCollection: Achievement[] = ((userTitlesRes as any).data ?? []).map((row: any) => ({
+        id: `title-${row.id}`,
+        name: row.is_active ? `👑 ${row.title_name}` : row.title_name,
+        icon: row.is_active ? "👑" : "🎖️",
+        description: row.season ? `Title earned in ${row.season}` : "Permanent title reward",
+        date: row.created_at ? new Date(row.created_at).toLocaleDateString() : "",
+      }));
+
+      setAchievements([...titleCollection, ...seasonalAchievements, ...resetHistoryAchievements, ...unlockedAchievements].slice(0, 18));
       const nextUnlockedIds = new Set<string>((userAchievementsRes.data ?? []).map((row) => row.achievement_id));
       if (unlockedAchievementIdsRef.current.size) {
         for (const unlockedId of nextUnlockedIds) {

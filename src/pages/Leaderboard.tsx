@@ -222,7 +222,7 @@ const Leaderboard = () => {
                         <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
                         <span className="font-bold">#{entry.rankPos}</span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} XP</p>
+                      <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} Season XP</p>
                     </motion.button>
                   );
                 })}
@@ -250,7 +250,7 @@ const Leaderboard = () => {
                         <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
                         <span className="text-lg font-bold">#{entry.rankPos}</span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} XP</p>
+                      <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} Season XP</p>
                     </motion.button>
                   );
                 })}
@@ -288,7 +288,8 @@ const Leaderboard = () => {
                     <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="md" />
                     <div className="flex-1">
                       <p className="font-medium">{getDisplayName(entry)}</p>
-                      <p className="text-xs text-muted-foreground">Level {entry.level} • XP {entry.xp.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">Level {entry.level} • Season XP {entry.seasonXp.toLocaleString()}</p>
+                      {entry.activeTitle ? <p className="text-[11px] text-amber-400">{entry.activeTitle}</p> : null}
                     </div>
                     <div className="text-right">
                       <Badge className={`mb-1 bg-gradient-to-r ${tierStyle(entry.level)}`}>{entry.tier}</Badge>
