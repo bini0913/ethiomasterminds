@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Flame, Gem, Package, Send, Shirt, Sparkles, Sword, Trophy, UserRoundPlus, Car, Palette, BadgeCheck } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Car, Home, Send, Shirt, Sparkles, Sword, Trophy, UserRoundPlus } from "lucide-react";
 import AvatarShowcase3D from "@/components/avatar/AvatarShowcase3D";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -41,7 +42,10 @@ const UserProfilePage = () => {
   const [ownedItems, setOwnedItems] = useState(0);
   const [equippedAvatar, setEquippedAvatar] = useState<string | null>(null);
   const [collections, setCollections] = useState<Array<{ item_id: string; equipped: boolean; acquired_at: string; section: string; rarity: string; name: string; preview: string; price: number }>>([]);
+  const [allCollectionItems, setAllCollectionItems] = useState<Array<{ item_id: string; section: string; rarity: string; name: string; preview: string; price: number }>>([]);
   const [totalCollectionItems, setTotalCollectionItems] = useState(0);
+  const [joinedAt, setJoinedAt] = useState<string | null>(null);
+  const [aboutText, setAboutText] = useState("");
 
   const refreshCore = async () => {
     const rows = await fetchLeaderboardUsers();
@@ -70,7 +74,7 @@ const UserProfilePage = () => {
     if (!userId) return;
 
     try {
-      const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, privacyRes, myItemsRes, allStoreItemsRes] = await Promise.all([
+      const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, privacyRes, myItemsRes, allStoreItemsRes, profileRes] = await Promise.all([
         supabase.rpc("get_user_stats", { p_user_id: userId }),
         supabase.from("analytics").select("strong_topics,weak_topics").eq("user_id", userId),
         supabase
@@ -90,7 +94,8 @@ const UserProfilePage = () => {
         authUser?.id
           ? (supabase as any).from("user_items").select("item_id, equipped, store_items(name, section)").eq("user_id", authUser.id)
           : Promise.resolve({ data: [] }),
-        (supabase as any).from("store_items").select("id").eq("is_active", true),
+        (supabase as any).from("store_items").select("id,name,section,rarity,preview,price").eq("is_active", true),
+        supabase.from("profiles").select("created_at").eq("id", userId).single(),
       ]);
 
       setStatsJson((statsRes.data ?? {}) as Record<string, any>);
@@ -112,7 +117,7 @@ const UserProfilePage = () => {
         ? await supabase.from("achievements").select("id,name,icon").in("id", achievementIds)
         : { data: [] as Array<{ id: string; name: string; icon: string }> };
 
-      const byId = new Map((defs ?? []).map((d) => [d.id, d]));
+      const byId = new Map<string, { id: string; name: string; icon: string }>((defs as any[] ?? []).map((d: any) => [d.id, d]));
       setAchievements(
         (userAchievementsRes.data ?? []).map((row) => {
           const def = byId.get(row.achievement_id);
@@ -153,7 +158,17 @@ const UserProfilePage = () => {
         price: item.store_items?.price ?? 0,
       }));
       setCollections(viewedItems);
-      setTotalCollectionItems((allStoreItemsRes.data ?? []).length);
+      const allStore = ((allStoreItemsRes as any).data ?? []).map((item: any) => ({
+        item_id: item.id,
+        section: item.section ?? "customization",
+        rarity: item.rarity ?? "common",
+        name: item.name ?? "Unknown Item",
+        preview: item.preview ?? "🎁",
+        price: item.price ?? 0,
+      }));
+      setAllCollectionItems(allStore);
+      setTotalCollectionItems(allStore.length);
+      setJoinedAt((profileRes.data as any)?.created_at ?? null);
     } catch (error) {
       console.error("Failed to load full profile details. Falling back to basic profile.", error);
       setStatsJson({});
@@ -163,7 +178,9 @@ const UserProfilePage = () => {
       setOwnedItems(0);
       setEquippedAvatar(null);
       setCollections([]);
+      setAllCollectionItems([]);
       setTotalCollectionItems(0);
+      setJoinedAt(null);
     }
   };
 
@@ -300,6 +317,48 @@ const UserProfilePage = () => {
 
     return seed;
   }, [collections]);
+  const collectionCatalog = useMemo(() => {
+    const categorize = (section: string, name: string) => {
+      const normalizedSection = section.toLowerCase();
+      const normalizedName = name.toLowerCase();
+      if (normalizedSection.includes("title")) return "titles";
+      if (normalizedSection.includes("avatar")) return "clothes";
+      if (normalizedSection.includes("cloth") || normalizedSection.includes("outfit") || normalizedSection.includes("wearable")) return "clothes";
+      if (normalizedSection.includes("house") || normalizedName.includes("house") || normalizedName.includes("home")) return "houses";
+      if (normalizedSection.includes("car") || normalizedName.includes("car")) return "cars";
+      return "clothes";
+    };
+
+    const ownedById = new Map<string, (typeof collections)[number]>(collections.map((item) => [item.item_id, item]));
+    const catalog = {
+      clothes: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
+      cars: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
+      houses: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
+      titles: [] as Array<{ item_id: string; name: string; preview: string; rarity: string; owned: boolean; equipped: boolean; price: number; sourceSection: string }>,
+    };
+
+    for (const item of allCollectionItems) {
+      const owned = ownedById.get(item.item_id);
+      const bucket = categorize(item.section, item.name) as keyof typeof catalog;
+      catalog[bucket].push({
+        item_id: item.item_id,
+        name: item.name,
+        preview: item.preview,
+        rarity: item.rarity,
+        owned: Boolean(owned),
+        equipped: Boolean(owned?.equipped),
+        price: item.price,
+        sourceSection: item.section,
+      });
+    }
+    return catalog;
+  }, [allCollectionItems, collections]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const savedBio = localStorage.getItem(`profile-bio:${userId}`);
+    setAboutText(savedBio ?? "");
+  }, [userId]);
 
   useEffect(() => {
     if (!isSelf || !profile) return;
@@ -326,206 +385,235 @@ const UserProfilePage = () => {
     previousRankRef.current = currentTier.name;
   }, [currentTier.name, isSelf, profile?.level]);
 
+  const saveAbout = () => {
+    if (!userId) return;
+    localStorage.setItem(`profile-bio:${userId}`, aboutText.trim());
+    toast.success("About section saved.");
+  };
+
+  const onEquipCollectionItem = async (itemId: string, section: string) => {
+    if (!authUser?.id || !isSelf) return;
+    try {
+      const sameSectionOwnedIds = collections.filter((item) => item.section === section).map((item) => item.item_id);
+      if (sameSectionOwnedIds.length) {
+        await (supabase as any)
+          .from("user_items")
+          .update({ equipped: false })
+          .eq("user_id", authUser.id)
+          .in("item_id", sameSectionOwnedIds);
+      }
+
+      await (supabase as any)
+        .from("user_items")
+        .update({ equipped: true })
+        .eq("user_id", authUser.id)
+        .eq("item_id", itemId);
+      toast.success("Item equipped.");
+      await refreshProfileDetails();
+    } catch (error: any) {
+      toast.error(error.message ?? "Could not equip item");
+    }
+  };
+
   if (!profile) {
     return <div className="p-8">Profile not found.</div>;
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background px-4 pb-10 pt-4 md:px-8">
+      <div className="mx-auto max-w-5xl space-y-6">
         <header className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate(-1)}>Back</Button>
-          <Button onClick={onChallenge} className="gap-2"><Sword className="h-4 w-4" />Challenge to Match</Button>
+          <Button variant="outline" onClick={() => navigate(-1)} className="gap-2">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Button>
+          {!isSelf ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant={isFollowing ? "secondary" : "default"} className="gap-2" onClick={onFollowToggle}>
+                <UserRoundPlus className="h-4 w-4" />
+                {isFollowing ? "Unfollow" : "Follow"}
+              </Button>
+              <Button variant="outline" className="gap-2" onClick={onChallenge}>
+                <Sword className="h-4 w-4" />
+                Invite
+              </Button>
+              <Button variant="outline" className="gap-2" disabled={!isFriend} onClick={() => setTransferOpen(true)}>
+                <Send className="h-4 w-4" />
+                Send Coins
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" onClick={onChallenge} className="gap-2">
+              <Sword className="h-4 w-4" />
+              Challenge
+            </Button>
+          )}
         </header>
 
-        <Card>
-          <CardContent className="grid gap-6 p-6 md:grid-cols-[auto_1fr_auto] md:items-center">
-            <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={220} />
+        <Card className="overflow-hidden border-primary/20 bg-gradient-to-b from-primary/5 to-transparent">
+          <CardContent className="flex flex-col items-center gap-4 p-8 text-center md:p-10">
+            <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={260} />
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold">{profile.name || profile.username}</h1>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className={`bg-gradient-to-r ${tierStyle(profile.level)}`}><motion.span initial={{ scale: 0.92 }} animate={{ scale: 1 }} className="inline-flex items-center gap-1">{currentTier.icon} {currentTier.name}</motion.span></Badge>
-                <Badge variant="secondary">Rank #{profileRank}</Badge>
-                <Badge variant="outline">Level {profile.level}</Badge>
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-sm"><span>XP Progress</span><span>{xpIntoLevel}/220</span></div>
-                <p className="text-xs text-muted-foreground">Level {profile.level} → {currentTier.name} → Next: {nextTier ? nextTier.name : "MAX RANK"}</p>
-                <motion.div initial={{ width: 0 }} animate={{ width: "100%" }}><Progress value={progress} /></motion.div>
-              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight">{profile.name || profile.username}</h1>
+              <p className="text-sm text-muted-foreground">@{profile.username}</p>
+              <Badge className={`bg-gradient-to-r ${tierStyle(profile.level)}`}>
+                {currentTier.icon} {currentTier.name}
+              </Badge>
             </div>
-            {!isSelf && (
-              <div className="flex flex-wrap gap-2">
-                <Button variant={isFollowing ? "secondary" : "default"} className="gap-2" onClick={onFollowToggle}>
-                  <UserRoundPlus className="h-4 w-4" />
-                  {isFollowing ? "Unfollow" : "Follow"}
-                </Button>
-                <Button variant="outline" className="gap-2" disabled={!isFriend} onClick={() => setTransferOpen(true)}>
-                  <Send className="h-4 w-4" />
-                  Send Coins
-                </Button>
-                <Button variant="outline" className="gap-2" onClick={onChallenge}>
-                  <Sword className="h-4 w-4" />
-                  Invite to Match
-                </Button>
+            <div className="w-full max-w-xl space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Level {profile.level}</span>
+                <span>{xpIntoLevel}/220 XP</span>
               </div>
+              <Progress value={progress} />
+              <p className="text-xs text-muted-foreground">Next tier: {nextTier ? nextTier.name : "MAX RANK"}</p>
+            </div>
+            {isSelf && (
+              <Button onClick={() => navigate("/avatar-creator")} className="mt-2">
+                Edit Avatar
+              </Button>
             )}
           </CardContent>
         </Card>
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="achievements">Achievements</TabsTrigger>
-            <TabsTrigger value="collection">Collection</TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-3">
-              <Card className="lg:col-span-2">
-                <CardHeader><CardTitle>Stats</CardTitle></CardHeader>
-                <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                  <div><p className="text-xs text-muted-foreground">Total XP</p><p className="text-xl font-bold">{profile.xp.toLocaleString()}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Streak</p><p className="text-xl font-bold inline-flex items-center gap-1"><Flame className="h-4 w-4 text-orange-500" />{profile.streak}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Accuracy</p><p className="text-xl font-bold">{accuracy.toFixed(1)}%</p></div>
-                  <div><p className="text-xs text-muted-foreground">Matches</p><p className="text-xl font-bold">{matchesPlayed}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Wins / Losses</p><p className="text-xl font-bold">{wins}/{losses}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Contribution points</p><p className="text-xl font-bold">{Math.round(contributions * 10)}</p></div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader><CardTitle>Social</CardTitle></CardHeader>
-                <CardContent className="space-y-4 text-sm">
-                  <p>Followers: <strong>{followersCount}</strong></p>
-                  <p>Following: <strong>{followingCount}</strong></p>
-                  <p>Power score: <strong>{Math.round(rankScore(profile))}</strong></p>
-                  <p>Friend transfer status: <strong>{isSelf ? "N/A" : isFriend ? "Eligible" : "Friends only"}</strong></p>
-                  <Separator />
-                  <p className="text-xs text-muted-foreground">Notifications</p>
-                  <p className="text-sm">🔔 Rank increases, new followers, and badges are shown in-app instantly.</p>
-                  {isSelf && (
-                    <>
-                      <Separator />
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span>Public profile</span>
-                          <Switch checked={privacy.isPublic} onCheckedChange={(v) => updatePrivacy({ ...privacy, isPublic: v })} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Hide stats</span>
-                          <Switch checked={privacy.hideStats} onCheckedChange={(v) => updatePrivacy({ ...privacy, hideStats: v })} />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
+        <Card>
+          <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4 md:gap-4 md:p-6">
+            <div className="rounded-xl border bg-card p-3 text-center">
+              <p className="text-xs text-muted-foreground">Level</p>
+              <p className="text-xl font-bold">{profile.level}</p>
             </div>
-
-            <div className="grid gap-6 lg:grid-cols-3">
-              <Card>
-                <CardHeader><CardTitle>Economy</CardTitle></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <p className="inline-flex items-center gap-2"><Trophy className="h-4 w-4 text-yellow-500" /> Coins: <strong>{coins.toLocaleString()}</strong></p>
-                  <p className="inline-flex items-center gap-2"><Gem className="h-4 w-4 text-purple-500" /> Gems: <strong>{gems.toLocaleString()}</strong></p>
-                  <p className="inline-flex items-center gap-2"><Package className="h-4 w-4 text-primary" /> Owned items: <strong>{ownedItems}</strong></p>
-                  <p className="text-xs text-muted-foreground">Equipped avatar: {equippedAvatar ?? "Default avatar"}</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader><CardTitle>Learning Insights</CardTitle></CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <p><strong>Strong:</strong> {insights.strong.length ? insights.strong.join(", ") : "No data"}</p>
-                  <p><strong>Weak:</strong> {insights.weak.length ? insights.weak.join(", ") : "No data"}</p>
-                  <p><strong>Recommended:</strong> {insights.recommended.length ? insights.recommended.join(", ") : "No data"}</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader><CardTitle>Recent Activity</CardTitle></CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  {activities.length === 0 ? <p className="text-muted-foreground">No recent activity.</p> : null}
-                  {activities.map((item) => (
-                    <div key={item.id} className="rounded-md border p-2">
-                      <p>{item.text}</p>
-                      <p className="text-xs text-muted-foreground">{item.time}</p>
-                    </div>
-                  ))}
-                  <Button variant="outline" className="w-full gap-2" onClick={() => navigate('/multiplayer')}>
-                    <Trophy className="h-4 w-4" /> Challenge Now
-                  </Button>
-                </CardContent>
-              </Card>
+            <div className="rounded-xl border bg-card p-3 text-center">
+              <p className="text-xs text-muted-foreground">XP</p>
+              <p className="text-xl font-bold">{profile.xp.toLocaleString()}</p>
             </div>
-          </TabsContent>
+            <div className="rounded-xl border bg-card p-3 text-center">
+              <p className="text-xs text-muted-foreground">Rank</p>
+              <p className="text-xl font-bold">#{profileRank}</p>
+            </div>
+            <div className="rounded-xl border bg-card p-3 text-center">
+              <p className="text-xs text-muted-foreground">Grade</p>
+              <p className="text-xl font-bold">{profile.grade ?? "—"}</p>
+            </div>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="achievements">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-primary" />Achievement Gallery</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2">
-                {achievements.length === 0 ? <p className="text-sm text-muted-foreground">No achievements yet.</p> : null}
-                {achievements.map((achievement) => (
-                  <motion.div whileHover={{ x: 4 }} key={achievement.id} className="rounded-md border p-3">
-                    <p className="font-medium">{achievement.icon} {achievement.name}</p>
-                    <p className="text-xs text-muted-foreground">Earned on {achievement.date}</p>
-                  </motion.div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
+        <Card>
+          <CardHeader>
+            <CardTitle>About</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {isSelf ? (
+              <>
+                <Textarea
+                  value={aboutText}
+                  onChange={(event) => setAboutText(event.target.value)}
+                  placeholder="Tell others about yourself..."
+                  className="min-h-24"
+                />
+                <Button variant="secondary" onClick={saveAbout}>Save Bio</Button>
+              </>
+            ) : (
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {aboutText || "This learner hasn't added an about section yet."}
+              </p>
+            )}
+            <Separator />
+            <p className="text-xs text-muted-foreground">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "recently"}</p>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="collection" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />Collection Progress</span>
-                  <Badge variant="secondary">{collections.length}/{totalCollectionItems || 0} unlocked</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Progress value={collectionProgress} />
-                <p className="text-xs text-muted-foreground">{collectionProgress}% of all shop items collected.</p>
-              </CardContent>
-            </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-primary" />Achievements</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {[...achievements, ...Array.from({ length: Math.max(0, 8 - achievements.length) }).map((_, index) => ({
+                id: `locked-${index}`,
+                name: "Locked",
+                icon: "🔒",
+                date: "",
+              }))].map((achievement) => {
+                const locked = achievement.name === "Locked";
+                return (
+                  <div
+                    key={achievement.id}
+                    className={`min-w-40 rounded-xl border p-3 ${locked ? "opacity-50 grayscale" : "bg-primary/5"}`}
+                  >
+                    <p className="text-2xl">{achievement.icon}</p>
+                    <p className="mt-1 text-sm font-semibold">{achievement.name}</p>
+                    <p className="text-xs text-muted-foreground">{locked ? "Keep playing to unlock" : `Unlocked ${achievement.date}`}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {[
-                { key: "clothes", label: "Clothes", icon: <Shirt className="h-4 w-4" />, items: categorizedCollection.clothes },
-                { key: "avatars", label: "Avatars", icon: <UserRoundPlus className="h-4 w-4" />, items: categorizedCollection.avatars },
-                { key: "cars", label: "Cars", icon: <Car className="h-4 w-4" />, items: categorizedCollection.cars },
-                { key: "themes", label: "Themes", icon: <Palette className="h-4 w-4" />, items: categorizedCollection.themes },
-                { key: "titles", label: "Titles", icon: <BadgeCheck className="h-4 w-4" />, items: categorizedCollection.titles },
-                { key: "special", label: "Special", icon: <Gem className="h-4 w-4" />, items: categorizedCollection.special },
-              ].map((section) => (
-                <Card key={section.key}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between text-base">
-                      <span className="inline-flex items-center gap-2">{section.icon}{section.label}</span>
-                      <Badge variant="outline">{section.items.length}</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {section.items.length ? (
-                      <div className="grid grid-cols-3 gap-2">
-                        {section.items.map((item) => (
-                          <div key={item.item_id} className={`rounded-md border p-2 text-center ${item.rarity === "legendary" ? "border-amber-400/70 bg-amber-500/10" : ""}`}>
-                            <p className="text-2xl">{item.preview}</p>
-                            <p className="truncate text-xs font-medium">{item.name}</p>
-                          </div>
-                        ))}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />Collection</span>
+              <Badge variant="secondary">{collections.length}/{totalCollectionItems || 0} owned</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Progress value={collectionProgress} />
+            <Tabs defaultValue="clothes" className="space-y-4">
+              <TabsList className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <TabsTrigger value="clothes" className="gap-1"><Shirt className="h-4 w-4" />Clothes</TabsTrigger>
+                <TabsTrigger value="cars" className="gap-1"><Car className="h-4 w-4" />Cars</TabsTrigger>
+                <TabsTrigger value="houses" className="gap-1"><Home className="h-4 w-4" />Houses</TabsTrigger>
+                <TabsTrigger value="titles" className="gap-1"><Trophy className="h-4 w-4" />Titles</TabsTrigger>
+              </TabsList>
+
+              {(Object.keys(collectionCatalog) as Array<keyof typeof collectionCatalog>).map((category) => (
+                <TabsContent key={category} value={category}>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                    {collectionCatalog[category].map((item) => (
+                      <div
+                        key={item.item_id}
+                        className={`rounded-xl border p-3 text-center transition ${item.owned ? "bg-card" : "opacity-45 grayscale"}`}
+                      >
+                        <p className="text-3xl">{item.preview}</p>
+                        <p className="mt-2 truncate text-sm font-semibold">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">{item.owned ? "Owned" : `Locked • ${item.price} coins`}</p>
+                        {item.owned && item.equipped ? <Badge className="mt-2">Equipped</Badge> : null}
+                        {item.owned && isSelf && !item.equipped ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 w-full"
+                            onClick={() => onEquipCollectionItem(item.item_id, item.sourceSection)}
+                          >
+                            Equip
+                          </Button>
+                        ) : null}
                       </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No unlocked items yet.</p>
-                    )}
-                  </CardContent>
-                </Card>
+                    ))}
+                  </div>
+                </TabsContent>
               ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {isSelf && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Privacy</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Public profile</span>
+                <Switch checked={privacy.isPublic} onCheckedChange={(value) => updatePrivacy({ ...privacy, isPublic: value })} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Hide stats</span>
+                <Switch checked={privacy.hideStats} onCheckedChange={(value) => updatePrivacy({ ...privacy, hideStats: value })} />
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
