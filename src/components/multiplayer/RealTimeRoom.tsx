@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import AvatarRenderer from '@/components/avatar/AvatarRenderer';
+import { useFriends } from '@/context/FriendsContext';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Player {
   id: string;
@@ -123,6 +125,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [floatingXp, setFloatingXp] = useState<number | null>(null);
   const [answerShake, setAnswerShake] = useState(false);
   const [latencyMs, setLatencyMs] = useState(42);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [sendingInviteTo, setSendingInviteTo] = useState<string | null>(null);
   const [roomConfig, setRoomConfig] = useState({
     subject: 'Math',
     difficulty: 'Medium',
@@ -133,6 +137,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const advancingQuestionRef = useRef(false);
   const prevPlayersRef = useRef<Player[]>([]);
   const autoStartTriggeredRef = useRef(false);
+  const { onlineFriends } = useFriends();
 
   useEffect(() => {
     void loadRoomData();
@@ -675,6 +680,37 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     toast.info(`${playerName} was removed from the room`);
   };
 
+  const inviteableFriends = onlineFriends.filter((friend) => !players.some((player) => player.id === friend.id));
+
+  const inviteFriendToRoom = async (friendId: string, friendName: string) => {
+    if (!isHost) {
+      toast.error('Only the host can invite players to this room');
+      return;
+    }
+
+    setSendingInviteTo(friendId);
+    try {
+      const { error } = await (supabase as any).rpc('create_multiplayer_invite', {
+        p_receiver_id: friendId,
+        p_room_id: roomId,
+        p_max_players: maxPlayers,
+        p_subject: roomConfig.subject,
+        p_difficulty: roomConfig.difficulty,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success(`Invite sent to ${friendName}`);
+      setInviteDialogOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message || `Could not invite ${friendName}`);
+    } finally {
+      setSendingInviteTo(null);
+    }
+  };
+
   const currentPlayer = players.find((p) => p.id === currentUserId);
   const connectionQuality = latencyMs <= 120 ? 'Excellent' : latencyMs <= 220 ? 'Stable' : latencyMs <= 350 ? 'Degraded' : 'Poor';
   const connectionColor = latencyMs <= 120 ? 'text-emerald-300' : latencyMs <= 220 ? 'text-cyan-300' : latencyMs <= 350 ? 'text-amber-300' : 'text-red-300';
@@ -743,7 +779,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
               <MessageCircle className="h-4 w-4 mr-2" />
               Chat
             </Button>
-            <Button variant="outline" size="sm" onClick={() => toast.success('Invite panel opened')}>
+            <Button variant="outline" size="sm" onClick={() => setInviteDialogOpen(true)} disabled={!isHost}>
               <UserPlus className="h-4 w-4 mr-2" />
               Invite Friend
             </Button>
@@ -1019,6 +1055,47 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           </AnimatePresence>
         </div>
       </div>
+
+      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invite a friend to this match</DialogTitle>
+            <DialogDescription>
+              Invited players can join this exact room and continue the live quiz battle.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 max-h-72 overflow-y-auto">
+            {inviteableFriends.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No online friends available to invite right now.
+              </p>
+            ) : (
+              inviteableFriends.map((friend) => (
+                <div
+                  key={friend.id}
+                  className="flex items-center justify-between rounded-lg border border-border/60 bg-background/80 p-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <AvatarRenderer avatar={friend.avatar || 'avatar-1'} size="sm" />
+                    <div>
+                      <p className="text-sm font-medium">{friend.name}</p>
+                      <p className="text-xs text-muted-foreground">Level {friend.level || 1}</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => inviteFriendToRoom(friend.id, friend.name || 'Player')}
+                    disabled={sendingInviteTo !== null}
+                  >
+                    {sendingInviteTo === friend.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Invite'}
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
