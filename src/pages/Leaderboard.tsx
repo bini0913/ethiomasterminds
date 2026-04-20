@@ -11,11 +11,11 @@ import { CalendarClock, Flame, Globe, Swords, Trophy, Users, Zap } from "lucide-
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchFollowing, fetchLeaderboardUsers, rankScore, tierFromUser, tierStyle, type LeaderboardUser } from "@/lib/leaderboardApi";
+import { fetchClassCompetitionLeaderboard, fetchFollowing, fetchLeaderboardUsers, rankScore, tierFromUser, tierStyle, type ClassCompetitionRow, type LeaderboardUser } from "@/lib/leaderboardApi";
 import { prefetchProfileBundle } from "@/lib/profilePrefetch";
 import { getRankTierByLevel } from "@/lib/rankSystem";
 
-type LeaderboardTab = "global" | "grade" | "friends" | "weekly";
+type LeaderboardTab = "global" | "grade" | "friends" | "weekly" | "classes";
 
 const podiumStyles = {
   1: "border-yellow-400/70 bg-gradient-to-b from-yellow-500/20 via-amber-500/15 to-background shadow-[0_0_30px_rgba(250,204,21,0.35)]",
@@ -28,6 +28,7 @@ const tabConfig: Array<{ value: LeaderboardTab; label: string; icon: typeof Glob
   { value: "grade", label: "Grade", icon: Users },
   { value: "friends", label: "Friends", icon: Users },
   { value: "weekly", label: "Weekly", icon: CalendarClock },
+  { value: "classes", label: "Classes", icon: Users },
 ];
 
 const Leaderboard = () => {
@@ -38,6 +39,7 @@ const Leaderboard = () => {
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("global");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [classRows, setClassRows] = useState<ClassCompetitionRow[]>([]);
   const [visibleRows, setVisibleRows] = useState(16);
   const [previewUser, setPreviewUser] = useState<(LeaderboardUser & { rankPos: number; score: number; tier: any }) | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,6 +53,11 @@ const Leaderboard = () => {
     setLoading(false);
   };
 
+  const loadClassCompetition = async () => {
+    const rows = await fetchClassCompetitionLeaderboard(12);
+    setClassRows(rows);
+  };
+
   const loadFollowing = async () => {
     if (!user?.id) return;
     const ids = await fetchFollowing(user.id);
@@ -60,11 +67,14 @@ const Leaderboard = () => {
   useEffect(() => {
     loadLeaderboard();
     loadFollowing();
+    loadClassCompetition();
 
     const channel = supabase
       .channel("leaderboard-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, loadLeaderboard)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => { loadLeaderboard(); loadClassCompetition(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "question_attempts" }, loadLeaderboard)
+      .on("postgres_changes", { event: "*", schema: "public", table: "class_students" }, loadClassCompetition)
+      .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, loadClassCompetition)
       .on("postgres_changes", { event: "*", schema: "public", table: "user_streaks" }, loadLeaderboard)
       .on("postgres_changes", { event: "*", schema: "public", table: "followers" }, loadFollowing)
       .subscribe();
@@ -195,6 +205,23 @@ const Leaderboard = () => {
               </div>
             )}
 
+            {activeTab === "classes" ? (
+              <section className="space-y-3">
+                {classRows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No class competition data yet.</p>
+                ) : classRows.map((row, index) => (
+                  <div key={row.classId} className="flex items-center justify-between rounded-xl border border-border/70 bg-card/70 p-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">#{index + 1} Class Rank</p>
+                      <h3 className="text-lg font-semibold">{row.className}</h3>
+                      <p className="text-sm text-muted-foreground">{row.studentCount} students • {row.totalClassXp.toLocaleString()} total season XP</p>
+                    </div>
+                    <Badge className="text-base px-3 py-1">{row.classScore.toLocaleString()} avg XP</Badge>
+                  </div>
+                ))}
+              </section>
+            ) : (
+              <>
             {loading ? <p className="text-sm text-muted-foreground">Loading leaderboard…</p> : null}
 
             <section className="space-y-3">
@@ -300,6 +327,8 @@ const Leaderboard = () => {
                 ))}
               </AnimatePresence>
             </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
