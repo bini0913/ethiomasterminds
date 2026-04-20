@@ -24,6 +24,14 @@ export interface LeaderboardUser {
   activeTitle: string | null;
 }
 
+export interface ClassCompetitionRow {
+  classId: string;
+  className: string;
+  studentCount: number;
+  totalClassXp: number;
+  classScore: number;
+}
+
 const toGradeNumber = (grade: string | null): number | null => {
   if (!grade) return null;
   const parsed = Number(grade);
@@ -48,7 +56,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   const [profilesRes, streakRes, weeklyRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,name,username,avatar,avatar_config,grade,xp,level,rank,badges"),
+      .select("id,name,username,avatar,avatar_config,grade,xp,total_xp,season_xp,level,rank,badges"),
     supabase.from("user_streaks").select("user_id,current_streak"),
     supabase
       .from("question_attempts")
@@ -99,8 +107,8 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
         losses,
         contributions,
         weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
-        totalXp: Number(profile.xp ?? 0),
-        seasonXp: Number(profile.xp ?? 0),
+        totalXp: Number((profile as any).total_xp ?? profile.xp ?? 0),
+        seasonXp: Number((profile as any).season_xp ?? profile.xp ?? 0),
         activeTitle: null,
       } as LeaderboardUser;
     }),
@@ -179,4 +187,18 @@ export async function createFollowChallenge(challengerId: string, challengedId: 
   } as never);
 
   if (error) throw error;
+}
+
+
+export async function fetchClassCompetitionLeaderboard(limit = 10): Promise<ClassCompetitionRow[]> {
+  const { data, error } = await (supabase as any).rpc("get_class_competition_leaderboard", { p_limit: limit });
+  if (error) throw error;
+
+  return ((data ?? []) as any[]).map((row) => ({
+    classId: row.class_id,
+    className: row.class_name,
+    studentCount: Number(row.student_count ?? 0),
+    totalClassXp: Number(row.total_class_xp ?? 0),
+    classScore: Number(row.class_score ?? 0),
+  }));
 }
