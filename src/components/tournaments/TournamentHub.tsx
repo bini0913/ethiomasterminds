@@ -11,6 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ type HubMatch = {
   winnerName: string | null;
   score1: number;
   score2: number;
+  roomId: string | null;
   meta: Record<string, unknown>;
 };
 
@@ -96,6 +98,7 @@ const matchStatusPill = (status: MatchStatus) => {
 };
 
 const TournamentHub: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useUser();
   const [tournaments, setTournaments] = useState<HubTournament[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
@@ -115,6 +118,7 @@ const TournamentHub: React.FC = () => {
   });
   const [matchWinnerById, setMatchWinnerById] = useState<Record<string, string>>({});
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [navigatedMatchRoomId, setNavigatedMatchRoomId] = useState<string | null>(null);
   const isManager = user?.role === "manager" || user?.role === "admin" || user?.role === "extreme_admin";
 
   const selectedTournament = useMemo(
@@ -197,7 +201,7 @@ const TournamentHub: React.FC = () => {
         .order("joined_at", { ascending: true }),
       supabase
         .from("tournament_matches" as any)
-        .select("id,round,bracket_position,status,player1_id,player2_id,winner_id,score_player1,score_player2,meta")
+        .select("id,round,bracket_position,status,player1_id,player2_id,winner_id,score_player1,score_player2,room_id,meta")
         .eq("tournament_id", tournamentId)
         .order("round", { ascending: true })
         .order("bracket_position", { ascending: true }),
@@ -233,6 +237,7 @@ const TournamentHub: React.FC = () => {
       winnerName: match.winner_id ? profileMap.get(match.winner_id)?.name || "Unknown Player" : null,
       score1: match.score_player1 ?? 0,
       score2: match.score_player2 ?? 0,
+      roomId: match.room_id ?? null,
       meta: (match.meta || {}) as Record<string, unknown>,
     }));
 
@@ -256,6 +261,27 @@ const TournamentHub: React.FC = () => {
     if (!selectedTournamentId) return;
     loadTournamentDetails(selectedTournamentId);
   }, [selectedTournamentId]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const liveMatchForUser = matches.find(
+      (match) =>
+        ["playing", "live"].includes(match.status) &&
+        (match.player1Id === user.id || match.player2Id === user.id),
+    );
+    if (!liveMatchForUser) return;
+
+    const roomId =
+      liveMatchForUser.roomId ||
+      (typeof liveMatchForUser.meta?.room_id === "string" ? (liveMatchForUser.meta.room_id as string) : null);
+
+    if (!roomId || navigatedMatchRoomId === roomId) return;
+
+    setNavigatedMatchRoomId(roomId);
+    toast.success("Your tournament match is live. Launching battle room now!");
+    navigate(`/multiplayer?room=${roomId}`);
+  }, [matches, navigatedMatchRoomId, navigate, user?.id]);
 
   useEffect(() => {
     const channel = supabase
