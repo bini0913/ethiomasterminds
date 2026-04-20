@@ -151,6 +151,7 @@ const AdminPortal: React.FC = () => {
   const [coinAmount, setCoinAmount] = useState('50');
   const [resetMode, setResetMode] = useState<'season_xp' | 'level' | 'full'>('full');
   const [seasonConversionRate, setSeasonConversionRate] = useState('1');
+  const [classResetId, setClassResetId] = useState('');
   const [systemSettings, setSystemSettings] = useState({
     feature_social_enabled: true,
     feature_xp_enabled: true,
@@ -512,7 +513,7 @@ const AdminPortal: React.FC = () => {
   };
 
   const ensureAdminPower = () => {
-    if (user?.role !== 'admin') {
+    if (user?.role !== 'admin' && user?.role !== 'extreme_admin') {
       toast.error('Access denied: only admin can modify XP, level, coins, or reset users.');
       return false;
     }
@@ -621,6 +622,9 @@ const AdminPortal: React.FC = () => {
   const handleEndSeason = async () => {
     if (!ensureAdminPower()) return;
 
+    const confirmed = window.confirm('Are you sure you want to end the current season and reset season XP leaderboard?');
+    if (!confirmed) return;
+
     const rate = Number(seasonConversionRate);
     if (!Number.isFinite(rate) || rate <= 0) {
       toast.error('Conversion rate must be greater than 0.');
@@ -640,6 +644,74 @@ const AdminPortal: React.FC = () => {
     toast.success(`Season reset complete. Next: ${data?.next_season || 'created'}`);
     pushNotification('Season ended and leaderboard reset');
     logAction('Ended season and started next one');
+    fetchAllData();
+  };
+
+
+  const handleResetSingleUserSeason = async () => {
+    if (!ensureAdminPower()) return;
+    const identifier = controlUserIdentifier.trim();
+    if (!identifier) {
+      toast.error('Provide a valid user ID or username first.');
+      return;
+    }
+
+    const { error } = await (supabase as any).rpc('admin_reset_single_user_season', {
+      p_user_identifier: identifier,
+    });
+
+    if (error) {
+      toast.error(error.message || 'Failed to reset user season XP');
+      return;
+    }
+
+    toast.success('User season XP reset');
+    pushNotification(`Season XP reset for ${identifier}`);
+    logAction('Reset single user season XP', identifier);
+    fetchAllData();
+  };
+
+  const handleResetClassSeason = async () => {
+    if (!ensureAdminPower()) return;
+    const classId = classResetId.trim();
+    if (!classId) {
+      toast.error('Provide a class ID to reset.');
+      return;
+    }
+
+    const { error } = await (supabase as any).rpc('admin_reset_class_season', {
+      p_class_id: classId,
+    });
+
+    if (error) {
+      toast.error(error.message || 'Failed to reset class season XP');
+      return;
+    }
+
+    toast.success('Class season XP reset');
+    pushNotification(`Class season reset: ${classId}`);
+    logAction('Reset class season XP', classId);
+    fetchAllData();
+  };
+
+  const handleForceStartNewSeason = async () => {
+    if (!ensureAdminPower()) return;
+
+    const confirmed = window.confirm('Force start a new season now? This closes the active season immediately.');
+    if (!confirmed) return;
+
+    const { data, error } = await (supabase as any).rpc('admin_force_start_new_season', {
+      p_reason: 'Admin forced next season from control panel',
+    });
+
+    if (error) {
+      toast.error(error.message || 'Failed to start next season');
+      return;
+    }
+
+    toast.success(`Forced new season: ${data?.next_season || 'created'}`);
+    pushNotification('Admin forced a new season start');
+    logAction('Forced new season start');
     fetchAllData();
   };
 
@@ -1026,6 +1098,18 @@ const AdminPortal: React.FC = () => {
                     <Input value={seasonConversionRate} onChange={(e) => setSeasonConversionRate(e.target.value)} type="number" min="0.01" step="0.01" />
                   </div>
                   <Button variant="destructive" onClick={handleEndSeason}><Trophy className="w-4 h-4 mr-2" />End Season + Reset Leaderboard</Button>
+                  <div className="grid gap-3 md:grid-cols-2 pt-2 border-t">
+                    <div className="space-y-2">
+                      <Label>Reset Single User (season only)</Label>
+                      <Button variant="outline" onClick={handleResetSingleUserSeason}><RotateCcw className="w-4 h-4 mr-2" />Reset Single User</Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Reset Class (season only)</Label>
+                      <Input value={classResetId} onChange={(e) => setClassResetId(e.target.value)} placeholder="Class UUID" />
+                      <Button variant="outline" onClick={handleResetClassSeason}><Users className="w-4 h-4 mr-2" />Reset Class</Button>
+                    </div>
+                  </div>
+                  <Button variant="secondary" onClick={handleForceStartNewSeason}><RefreshCw className="w-4 h-4 mr-2" />Force Start New Season</Button>
                 </CardContent>
               </Card>
               <Card><CardHeader><CardTitle>Most Active Students (Season XP)</CardTitle></CardHeader><CardContent className="space-y-2">{[...users].filter((u) => u.role === 'student').sort((a, b) => b.xp - a.xp).slice(0, 20).map((u, i) => (<div key={u.id} className="flex items-center justify-between border rounded-lg p-2"><span>#{i + 1} {u.name}</span><Badge variant="outline">Lvl {u.level} • {u.xp} XP</Badge></div>))}</CardContent></Card>
