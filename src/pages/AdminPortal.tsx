@@ -149,7 +149,9 @@ const AdminPortal: React.FC = () => {
   const [xpAmount, setXpAmount] = useState('50');
   const [levelAmount, setLevelAmount] = useState('1');
   const [coinAmount, setCoinAmount] = useState('50');
-  const [resetMode, setResetMode] = useState<'xp' | 'level' | 'full'>('full');
+  const [resetMode, setResetMode] = useState<'season_xp' | 'level' | 'full'>('full');
+  const [seasonConversionRate, setSeasonConversionRate] = useState('1');
+  const [classResetId, setClassResetId] = useState('');
   const [systemSettings, setSystemSettings] = useState({
     feature_social_enabled: true,
     feature_xp_enabled: true,
@@ -511,7 +513,7 @@ const AdminPortal: React.FC = () => {
   };
 
   const ensureAdminPower = () => {
-    if (user?.role !== 'admin') {
+    if (user?.role !== 'admin' && user?.role !== 'extreme_admin') {
       toast.error('Access denied: only admin can modify XP, level, coins, or reset users.');
       return false;
     }
@@ -520,72 +522,76 @@ const AdminPortal: React.FC = () => {
 
   const handleAddXP = async () => {
     if (!ensureAdminPower()) return;
-    const target = resolveTargetUser();
+    const identifier = controlUserIdentifier.trim();
     const amount = Number(xpAmount);
-    if (!target || !Number.isFinite(amount)) {
+    if (!identifier || !Number.isFinite(amount)) {
       toast.error('Provide a valid username/user ID and XP amount.');
       return;
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ xp: Math.max(0, (target.xp || 0) + amount) } as never)
-      .eq('id', target.id);
+    const { error } = await (supabase as any).rpc('admin_update_user_xp', {
+      p_user_identifier: identifier,
+      p_xp_amount: Math.abs(amount),
+      p_action: amount >= 0 ? 'add' : 'remove',
+    });
+
     if (error) {
-      toast.error('Failed to update XP.');
+      toast.error(error.message || 'Failed to update XP.');
       return;
     }
 
     toast.success('XP updated successfully');
-    pushNotification(`XP updated for ${target.name}`);
-    logAction(`Adjusted XP by ${amount}`, target.id);
+    pushNotification(`XP updated for ${identifier}`);
+    logAction(`Adjusted XP by ${amount}`, identifier);
     fetchAllData();
   };
 
   const handleSetLevel = async () => {
     if (!ensureAdminPower()) return;
-    const target = resolveTargetUser();
+    const identifier = controlUserIdentifier.trim();
     const nextLevel = Math.max(1, Number(levelAmount) || 1);
-    if (!target) {
+    if (!identifier) {
       toast.error('Provide a valid username/user ID.');
       return;
     }
 
-    const { error } = await supabase.from('profiles').update({ level: nextLevel } as never).eq('id', target.id);
+    const { error } = await (supabase as any).rpc('admin_set_user_level', {
+      p_user_identifier: identifier,
+      p_level: nextLevel,
+    });
+
     if (error) {
-      toast.error('Failed to update level.');
+      toast.error(error.message || 'Failed to update level.');
       return;
     }
 
     toast.success('Level updated successfully');
-    pushNotification(`Level set to ${nextLevel} for ${target.name}`);
-    logAction(`Set level to ${nextLevel}`, target.id);
+    pushNotification(`Level set to ${nextLevel} for ${identifier}`);
+    logAction(`Set level to ${nextLevel}`, identifier);
     fetchAllData();
   };
 
   const handleResetUserProgress = async () => {
     if (!ensureAdminPower()) return;
-    const target = resolveTargetUser();
-    if (!target) {
+    const identifier = controlUserIdentifier.trim();
+    if (!identifier) {
       toast.error('Provide a valid username/user ID.');
       return;
     }
 
-    const patch: Partial<SystemUser> = resetMode === 'xp'
-      ? { xp: 0 }
-      : resetMode === 'level'
-        ? { level: 1 }
-        : { xp: 0, level: 1 };
-    const { error } = await supabase.from('profiles').update(patch as never).eq('id', target.id);
+    const { error } = await (supabase as any).rpc('admin_reset_user_progress', {
+      p_user_identifier: identifier,
+      p_reset_mode: resetMode,
+    });
 
     if (error) {
-      toast.error('Failed to reset user.');
+      toast.error(error.message || 'Failed to reset user.');
       return;
     }
 
     toast.success('User progress reset successfully');
-    pushNotification(`Progress reset for ${target.name}`);
-    logAction(`Reset user (${resetMode})`, target.id);
+    pushNotification(`Progress reset for ${identifier}`);
+    logAction(`Reset user (${resetMode})`, identifier);
     fetchAllData();
   };
 
@@ -610,6 +616,102 @@ const AdminPortal: React.FC = () => {
     toast.success('Coins updated successfully');
     pushNotification(`Coins updated for ${target.name}`);
     logAction(`Adjusted coins by ${amount}`, target.id);
+    fetchAllData();
+  };
+
+  const handleEndSeason = async () => {
+    if (!ensureAdminPower()) return;
+
+    const confirmed = window.confirm('Are you sure you want to end the current season and reset season XP leaderboard?');
+    if (!confirmed) return;
+
+    const rate = Number(seasonConversionRate);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      toast.error('Conversion rate must be greater than 0.');
+      return;
+    }
+
+    const { data, error } = await (supabase as any).rpc('admin_end_season', {
+      p_conversion_rate: rate,
+      p_reason: 'Admin triggered season close',
+    });
+
+    if (error) {
+      toast.error(error.message || 'Season reset failed');
+      return;
+    }
+
+    toast.success(`Season reset complete. Next: ${data?.next_season || 'created'}`);
+    pushNotification('Season ended and leaderboard reset');
+    logAction('Ended season and started next one');
+    fetchAllData();
+  };
+
+
+  const handleResetSingleUserSeason = async () => {
+    if (!ensureAdminPower()) return;
+    const identifier = controlUserIdentifier.trim();
+    if (!identifier) {
+      toast.error('Provide a valid user ID or username first.');
+      return;
+    }
+
+    const { error } = await (supabase as any).rpc('admin_reset_single_user_season', {
+      p_user_identifier: identifier,
+    });
+
+    if (error) {
+      toast.error(error.message || 'Failed to reset user season XP');
+      return;
+    }
+
+    toast.success('User season XP reset');
+    pushNotification(`Season XP reset for ${identifier}`);
+    logAction('Reset single user season XP', identifier);
+    fetchAllData();
+  };
+
+  const handleResetClassSeason = async () => {
+    if (!ensureAdminPower()) return;
+    const classId = classResetId.trim();
+    if (!classId) {
+      toast.error('Provide a class ID to reset.');
+      return;
+    }
+
+    const { error } = await (supabase as any).rpc('admin_reset_class_season', {
+      p_class_id: classId,
+    });
+
+    if (error) {
+      toast.error(error.message || 'Failed to reset class season XP');
+      return;
+    }
+
+    toast.success('Class season XP reset');
+    pushNotification(`Class season reset: ${classId}`);
+    logAction('Reset class season XP', classId);
+    fetchAllData();
+  };
+
+  const handleForceStartNewSeason = async () => {
+    if (!ensureAdminPower()) return;
+
+    const confirmed = window.confirm('Force start a new season now? This closes the active season immediately.');
+    if (!confirmed) return;
+
+    const { data, error } = await (supabase as any).rpc('admin_force_start_new_season', {
+      p_reason: 'Admin forced next season from control panel',
+    });
+
+    if (error) {
+      toast.error(error.message || 'Failed to start next season');
+      return;
+    }
+
+    toast.success(`Forced new season: ${data?.next_season || 'created'}`);
+    pushNotification('Admin forced a new season start');
+    logAction('Forced new season start');
     fetchAllData();
   };
 
@@ -810,10 +912,10 @@ const AdminPortal: React.FC = () => {
                     </div>
                     <div className="space-y-2 rounded-lg border p-3">
                       <Label>Reset User</Label>
-                      <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'xp' | 'level' | 'full')}>
+                      <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'season_xp' | 'level' | 'full')}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="xp">Reset XP</SelectItem>
+                          <SelectItem value="season_xp">Reset Season XP</SelectItem>
                           <SelectItem value="level">Reset Level</SelectItem>
                           <SelectItem value="full">Full Reset</SelectItem>
                         </SelectContent>
@@ -864,10 +966,10 @@ const AdminPortal: React.FC = () => {
                           </div>
                           <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
                             <Label>Reset User</Label>
-                            <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'xp' | 'level' | 'full')}>
+                            <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'season_xp' | 'level' | 'full')}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="xp">Reset XP</SelectItem>
+                                <SelectItem value="season_xp">Reset Season XP</SelectItem>
                                 <SelectItem value="level">Reset Level</SelectItem>
                                 <SelectItem value="full">Full Reset</SelectItem>
                               </SelectContent>
@@ -985,7 +1087,32 @@ const AdminPortal: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="leaderboard" className="space-y-4">
-              <Card><CardHeader><CardTitle>Most Active Students</CardTitle></CardHeader><CardContent className="space-y-2">{[...users].filter((u) => u.role === 'student').sort((a, b) => b.xp - a.xp).slice(0, 20).map((u, i) => (<div key={u.id} className="flex items-center justify-between border rounded-lg p-2"><span>#{i + 1} {u.name}</span><Badge variant="outline">Lvl {u.level} • {u.xp} XP</Badge></div>))}</CardContent></Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Season Control</CardTitle>
+                  <CardDescription>Close current season, convert season XP to wallet coins, archive winners, and open the next season.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="max-w-xs space-y-2">
+                    <Label>XP → Coins conversion rate</Label>
+                    <Input value={seasonConversionRate} onChange={(e) => setSeasonConversionRate(e.target.value)} type="number" min="0.01" step="0.01" />
+                  </div>
+                  <Button variant="destructive" onClick={handleEndSeason}><Trophy className="w-4 h-4 mr-2" />End Season + Reset Leaderboard</Button>
+                  <div className="grid gap-3 md:grid-cols-2 pt-2 border-t">
+                    <div className="space-y-2">
+                      <Label>Reset Single User (season only)</Label>
+                      <Button variant="outline" onClick={handleResetSingleUserSeason}><RotateCcw className="w-4 h-4 mr-2" />Reset Single User</Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Reset Class (season only)</Label>
+                      <Input value={classResetId} onChange={(e) => setClassResetId(e.target.value)} placeholder="Class UUID" />
+                      <Button variant="outline" onClick={handleResetClassSeason}><Users className="w-4 h-4 mr-2" />Reset Class</Button>
+                    </div>
+                  </div>
+                  <Button variant="secondary" onClick={handleForceStartNewSeason}><RefreshCw className="w-4 h-4 mr-2" />Force Start New Season</Button>
+                </CardContent>
+              </Card>
+              <Card><CardHeader><CardTitle>Most Active Students (Season XP)</CardTitle></CardHeader><CardContent className="space-y-2">{[...users].filter((u) => u.role === 'student').sort((a, b) => b.xp - a.xp).slice(0, 20).map((u, i) => (<div key={u.id} className="flex items-center justify-between border rounded-lg p-2"><span>#{i + 1} {u.name}</span><Badge variant="outline">Lvl {u.level} • {u.xp} XP</Badge></div>))}</CardContent></Card>
             </TabsContent>
 
             <TabsContent value="monitoring" className="space-y-4">
