@@ -36,7 +36,7 @@ const StudentBottomNav: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/50 pb-safe">
+    <div data-guide="bottom-nav" className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/50 pb-safe">
       <nav className="flex justify-around items-center h-16 max-w-lg mx-auto px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
