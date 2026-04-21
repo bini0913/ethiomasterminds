@@ -54,9 +54,11 @@ import AIHelper from "./components/ai/AIHelper";
 const queryClient = new QueryClient();
 
 const SelfProfileRedirect = () => {
-  const { user } = useUser();
-  if (!user?.id) return <Navigate to="/settings" replace />;
-  return <Navigate to={`/profile/${user.id}`} replace />;
+  const { user, session } = useUser();
+  const targetUserId = user?.id || session?.user?.id;
+
+  if (!targetUserId) return <Navigate to="/settings" replace />;
+  return <Navigate to={`/profile/${targetUserId}`} replace />;
 };
 
 const App = () => (
