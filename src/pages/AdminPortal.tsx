@@ -47,6 +47,8 @@ interface SystemUser {
   username: string;
   email?: string;
   xp: number;
+  season_xp?: number;
+  total_xp?: number;
   level: number;
   coins?: number;
   role: Role;
@@ -149,9 +151,8 @@ const AdminPortal: React.FC = () => {
   const [xpAmount, setXpAmount] = useState('50');
   const [levelAmount, setLevelAmount] = useState('1');
   const [coinAmount, setCoinAmount] = useState('50');
-  const [resetMode, setResetMode] = useState<'season_xp' | 'level' | 'full'>('full');
+  const [resetMode, setResetMode] = useState<'level' | 'full'>('full');
   const [seasonConversionRate, setSeasonConversionRate] = useState('1');
-  const [classResetId, setClassResetId] = useState('');
   const [systemSettings, setSystemSettings] = useState({
     feature_social_enabled: true,
     feature_xp_enabled: true,
@@ -183,6 +184,13 @@ const AdminPortal: React.FC = () => {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, () => {
         pushNotification('New user joined');
         logAction('Realtime event: new user');
+        fetchUsers();
+        fetchStatsAndCharts();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, () => {
+        pushNotification('Profile / XP update synced');
+        logAction('Realtime event: profile update');
+        fetchUsers();
         fetchStatsAndCharts();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_posts' }, () => {
@@ -646,54 +654,6 @@ const AdminPortal: React.FC = () => {
     logAction('Ended season and started next one');
     fetchAllData();
   };
-
-
-  const handleResetSingleUserSeason = async () => {
-    if (!ensureAdminPower()) return;
-    const identifier = controlUserIdentifier.trim();
-    if (!identifier) {
-      toast.error('Provide a valid user ID or username first.');
-      return;
-    }
-
-    const { error } = await (supabase as any).rpc('admin_reset_single_user_season', {
-      p_user_identifier: identifier,
-    });
-
-    if (error) {
-      toast.error(error.message || 'Failed to reset user season XP');
-      return;
-    }
-
-    toast.success('User season XP reset');
-    pushNotification(`Season XP reset for ${identifier}`);
-    logAction('Reset single user season XP', identifier);
-    fetchAllData();
-  };
-
-  const handleResetClassSeason = async () => {
-    if (!ensureAdminPower()) return;
-    const classId = classResetId.trim();
-    if (!classId) {
-      toast.error('Provide a class ID to reset.');
-      return;
-    }
-
-    const { error } = await (supabase as any).rpc('admin_reset_class_season', {
-      p_class_id: classId,
-    });
-
-    if (error) {
-      toast.error(error.message || 'Failed to reset class season XP');
-      return;
-    }
-
-    toast.success('Class season XP reset');
-    pushNotification(`Class season reset: ${classId}`);
-    logAction('Reset class season XP', classId);
-    fetchAllData();
-  };
-
   const handleForceStartNewSeason = async () => {
     if (!ensureAdminPower()) return;
 
@@ -887,7 +847,7 @@ const AdminPortal: React.FC = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">User Control Panel (Admin Only)</CardTitle>
-                  <CardDescription>Add XP, set level, reset progress, and adjust coins by user ID or username.</CardDescription>
+                  <CardDescription>Add/Remove XP, set level, reset level/full progress, and adjust coins by user ID or username.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -901,9 +861,9 @@ const AdminPortal: React.FC = () => {
 
                   <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
                     <div className="space-y-2 rounded-lg border p-3">
-                      <Label>Add XP</Label>
+                      <Label>Add / Remove XP</Label>
                       <Input value={xpAmount} onChange={(e) => setXpAmount(e.target.value)} type="number" placeholder="XP amount" />
-                      <Button className="w-full" onClick={handleAddXP}><Zap className="w-4 h-4 mr-2" />Add XP</Button>
+                      <Button className="w-full" onClick={handleAddXP}><Zap className="w-4 h-4 mr-2" />Apply XP</Button>
                     </div>
                     <div className="space-y-2 rounded-lg border p-3">
                       <Label>Set Level</Label>
@@ -912,10 +872,9 @@ const AdminPortal: React.FC = () => {
                     </div>
                     <div className="space-y-2 rounded-lg border p-3">
                       <Label>Reset User</Label>
-                      <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'season_xp' | 'level' | 'full')}>
+                      <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'level' | 'full')}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="season_xp">Reset Season XP</SelectItem>
                           <SelectItem value="level">Reset Level</SelectItem>
                           <SelectItem value="full">Full Reset</SelectItem>
                         </SelectContent>
@@ -938,7 +897,7 @@ const AdminPortal: React.FC = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2"><Shield className="w-4 h-4 text-primary" />User Control Panel</CardTitle>
-                  <CardDescription>Admin-only controls for XP, level, reset, and coins. Use user ID or username.</CardDescription>
+                  <CardDescription>Admin-only controls for XP, level, reset (not season), and coins. Use user ID or username.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -955,9 +914,9 @@ const AdminPortal: React.FC = () => {
                       <AccordionContent className="space-y-3 pt-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                           <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
-                            <Label>Add XP</Label>
+                            <Label>Add / Remove XP</Label>
                             <Input value={xpAmount} onChange={(e) => setXpAmount(e.target.value)} type="number" placeholder="XP amount" />
-                            <Button className="w-full min-h-12" onClick={handleAddXP}><Zap className="w-4 h-4 mr-2" />Add XP</Button>
+                            <Button className="w-full min-h-12" onClick={handleAddXP}><Zap className="w-4 h-4 mr-2" />Apply XP</Button>
                           </div>
                           <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
                             <Label>Set Level</Label>
@@ -966,10 +925,9 @@ const AdminPortal: React.FC = () => {
                           </div>
                           <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
                             <Label>Reset User</Label>
-                            <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'season_xp' | 'level' | 'full')}>
+                            <Select value={resetMode} onValueChange={(value) => setResetMode(value as 'level' | 'full')}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="season_xp">Reset Season XP</SelectItem>
                                 <SelectItem value="level">Reset Level</SelectItem>
                                 <SelectItem value="full">Full Reset</SelectItem>
                               </SelectContent>
@@ -1090,7 +1048,7 @@ const AdminPortal: React.FC = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>Season Control</CardTitle>
-                  <CardDescription>Close current season, convert season XP to wallet coins, archive winners, and open the next season.</CardDescription>
+                  <CardDescription>Global-only season reset: close current season, convert season XP to wallet coins, archive winners, zero every student season XP, and open the next season.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="max-w-xs space-y-2">
@@ -1098,21 +1056,11 @@ const AdminPortal: React.FC = () => {
                     <Input value={seasonConversionRate} onChange={(e) => setSeasonConversionRate(e.target.value)} type="number" min="0.01" step="0.01" />
                   </div>
                   <Button variant="destructive" onClick={handleEndSeason}><Trophy className="w-4 h-4 mr-2" />End Season + Reset Leaderboard</Button>
-                  <div className="grid gap-3 md:grid-cols-2 pt-2 border-t">
-                    <div className="space-y-2">
-                      <Label>Reset Single User (season only)</Label>
-                      <Button variant="outline" onClick={handleResetSingleUserSeason}><RotateCcw className="w-4 h-4 mr-2" />Reset Single User</Button>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Reset Class (season only)</Label>
-                      <Input value={classResetId} onChange={(e) => setClassResetId(e.target.value)} placeholder="Class UUID" />
-                      <Button variant="outline" onClick={handleResetClassSeason}><Users className="w-4 h-4 mr-2" />Reset Class</Button>
-                    </div>
-                  </div>
+                  <p className="text-sm text-muted-foreground pt-2 border-t">Season XP resets are global-only from this panel (no single-user or class season reset actions).</p>
                   <Button variant="secondary" onClick={handleForceStartNewSeason}><RefreshCw className="w-4 h-4 mr-2" />Force Start New Season</Button>
                 </CardContent>
               </Card>
-              <Card><CardHeader><CardTitle>Most Active Students (Season XP)</CardTitle></CardHeader><CardContent className="space-y-2">{[...users].filter((u) => u.role === 'student').sort((a, b) => b.xp - a.xp).slice(0, 20).map((u, i) => (<div key={u.id} className="flex items-center justify-between border rounded-lg p-2"><span>#{i + 1} {u.name}</span><Badge variant="outline">Lvl {u.level} • {u.xp} XP</Badge></div>))}</CardContent></Card>
+              <Card><CardHeader><CardTitle>Most Active Students (Season XP)</CardTitle></CardHeader><CardContent className="space-y-2">{[...users].filter((u) => u.role === 'student').sort((a, b) => (b.season_xp ?? b.xp ?? 0) - (a.season_xp ?? a.xp ?? 0)).slice(0, 20).map((u, i) => (<div key={u.id} className="flex items-center justify-between border rounded-lg p-2"><span>#{i + 1} {u.name}</span><Badge variant="outline">Lvl {u.level} • {(u.season_xp ?? u.xp ?? 0)} season XP</Badge></div>))}</CardContent></Card>
             </TabsContent>
 
             <TabsContent value="monitoring" className="space-y-4">
