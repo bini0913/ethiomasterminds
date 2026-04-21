@@ -37,6 +37,7 @@ import StudyModePage from "./pages/StudyModePage";
 import UserProfilePage from "./pages/UserProfilePage";
 import Tournaments from "./pages/Tournaments";
 import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
+import SupabaseMigration from "./pages/SupabaseMigration";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -145,6 +146,7 @@ const App = () => (
                                   </ProtectedRoute>
                                 } 
                               />
+                              <Route path="/migrate-supabase" element={<SupabaseMigration />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             <AIHelper />
