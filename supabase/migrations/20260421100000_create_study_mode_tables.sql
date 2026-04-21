@@ -24,6 +24,44 @@ alter table public.study_sessions
   add column if not exists mode text,
   add column if not exists paused_at timestamptz;
 
+update public.study_sessions
+set
+  start_time = coalesce(start_time, created_at - make_interval(secs => greatest(duration, 0))),
+  end_time = coalesce(end_time, created_at),
+  status = coalesce(status, 'completed'),
+  planned_duration = coalesce(planned_duration, greatest(duration, 25)),
+  mode = coalesce(mode, 'pomodoro')
+where
+  start_time is null
+  or end_time is null
+  or status is null
+  or planned_duration is null
+  or mode is null;
+
+alter table public.study_sessions
+  alter column start_time set default now(),
+  alter column start_time set not null,
+  alter column status set default 'active',
+  alter column status set not null,
+  alter column planned_duration set default 25,
+  alter column planned_duration set not null,
+  alter column mode set default 'pomodoro',
+  alter column mode set not null;
+
+alter table public.study_sessions
+  drop constraint if exists study_sessions_status_check;
+
+alter table public.study_sessions
+  add constraint study_sessions_status_check
+  check (status in ('active', 'completed'));
+
+alter table public.study_sessions
+  drop constraint if exists study_sessions_mode_check;
+
+alter table public.study_sessions
+  add constraint study_sessions_mode_check
+  check (mode in ('pomodoro', 'deep', 'custom'));
+
 create table if not exists public.study_tasks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -208,6 +246,105 @@ create policy if not exists "receivers_or_senders_update_study_room_invites"
 on public.study_room_invites for update
 using (auth.uid() = sender_id or auth.uid() = receiver_id)
 with check (auth.uid() = sender_id or auth.uid() = receiver_id);
+
+create or replace function public.complete_study_session(
+  p_session_id uuid,
+  p_duration_override integer default null,
+  p_task_id uuid default null,
+  p_mark_task_complete boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_now timestamptz := now();
+  v_session public.study_sessions%rowtype;
+  v_minutes integer;
+  v_xp integer;
+  v_coins integer;
+begin
+  if v_uid is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select *
+  into v_session
+  from public.study_sessions
+  where id = p_session_id
+    and user_id = v_uid
+  for update;
+
+  if not found then
+    raise exception 'Session not found';
+  end if;
+
+  if v_session.status = 'completed' then
+    return jsonb_build_object(
+      'session_id', v_session.id,
+      'duration', v_session.duration,
+      'xp_earned', 0,
+      'coins_earned', 0,
+      'already_completed', true
+    );
+  end if;
+
+  v_minutes := greatest(
+    1,
+    coalesce(
+      p_duration_override,
+      ceil(greatest(extract(epoch from (v_now - v_session.start_time)), 0) / 60.0)::integer
+    )
+  );
+  v_xp := greatest(0, v_minutes * 10);
+  v_coins := greatest(0, v_minutes);
+
+  update public.study_sessions
+  set
+    end_time = v_now,
+    duration = v_minutes,
+    status = 'completed'
+  where id = v_session.id
+  returning * into v_session;
+
+  if p_mark_task_complete and p_task_id is not null then
+    update public.study_tasks
+    set completed = true
+    where id = p_task_id
+      and user_id = v_uid;
+  end if;
+
+  update public.study_participants sp
+  set total_study_time = coalesce(sp.total_study_time, 0) + v_minutes
+  from public.study_competitions sc
+  where sp.competition_id = sc.id
+    and sp.user_id = v_uid
+    and sc.status = 'active'
+    and sc.start_time <= v_now
+    and (sc.end_time is null or sc.end_time >= v_now)
+    and (v_session.competition_id is null or sp.competition_id = v_session.competition_id);
+
+  insert into public.study_live_status as sls (user_id, is_studying, current_session_start, updated_at)
+  values (v_uid, false, null, v_now)
+  on conflict (user_id)
+  do update set
+    is_studying = excluded.is_studying,
+    current_session_start = excluded.current_session_start,
+    updated_at = excluded.updated_at;
+
+  return jsonb_build_object(
+    'session_id', v_session.id,
+    'duration', v_minutes,
+    'xp_earned', v_xp,
+    'coins_earned', v_coins,
+    'already_completed', false
+  );
+end;
+$$;
+
+grant execute on function public.complete_study_session(uuid, integer, uuid, boolean) to authenticated;
 
 create index if not exists idx_study_sessions_user_created_at on public.study_sessions(user_id, created_at desc);
 create index if not exists idx_study_sessions_user_status on public.study_sessions(user_id, status, created_at desc);
