@@ -64,7 +64,7 @@ type PrefetchedProfileBundle = {
 const UserProfilePage = () => {
   const navigate = useNavigate();
   const { userId } = useParams();
-  const { user: authUser } = useUser();
+  const { user: authUser, session } = useUser();
   const { coins, transferCoins, refreshCurrency } = useCurrency();
 
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
@@ -97,7 +97,11 @@ const UserProfilePage = () => {
   const unlockedAchievementIdsRef = useRef<Set<string>>(new Set());
 
   const refreshCore = async () => {
-    if (!userId) return;
+    if (!userId) {
+      setProfileMissing(true);
+      setFallbackProfile(null);
+      return;
+    }
     const rows = await fetchLeaderboardUsers();
     setUsers(rows);
 
@@ -108,13 +112,43 @@ const UserProfilePage = () => {
       return;
     }
 
-    const { data: fallback } = await supabase
+    const { data: fallback, error: fallbackError } = await supabase
       .from("profiles")
       .select("id,name,username,avatar,avatar_config,level,xp,grade")
       .eq("id", userId)
       .maybeSingle();
 
-    if (!fallback) {
+    let resolvedFallback = fallback;
+
+    const currentViewerId = session?.user?.id ?? authUser?.id;
+
+    if (!resolvedFallback && currentViewerId === userId) {
+      const fallbackName = authUser.name?.trim() || authUser.username?.trim() || "Student";
+      const fallbackUsername = (authUser.username?.trim() || authUser.name?.trim() || `user-${userId.slice(0, 6)}`).toLowerCase();
+
+      const { error: upsertError } = await (supabase as any).from("profiles").upsert({
+        id: userId,
+        name: fallbackName,
+        username: fallbackUsername,
+        avatar: "avatar-1",
+        level: 1,
+        xp: 0,
+      });
+
+      if (!upsertError) {
+        const { data: retryProfile } = await supabase
+          .from("profiles")
+          .select("id,name,username,avatar,avatar_config,level,xp,grade")
+          .eq("id", userId)
+          .maybeSingle();
+        resolvedFallback = retryProfile;
+      }
+    }
+
+    if (!resolvedFallback) {
+      if (fallbackError && fallbackError.code !== "PGRST116") {
+        console.error("Failed to load profile fallback", fallbackError);
+      }
       setProfileMissing(true);
       setFallbackProfile(null);
       return;
@@ -122,16 +156,16 @@ const UserProfilePage = () => {
 
     setProfileMissing(false);
     setFallbackProfile({
-      id: fallback.id,
-      name: fallback.name ?? null,
-      username: fallback.username ?? "user",
-      avatar: fallback.avatar ?? null,
-      avatarConfig: (fallback as any).avatar_config ?? null,
-      level: Number(fallback.level ?? 1),
-      xp: Number(fallback.xp ?? 0),
+      id: resolvedFallback.id,
+      name: resolvedFallback.name ?? null,
+      username: resolvedFallback.username ?? "user",
+      avatar: resolvedFallback.avatar ?? null,
+      avatarConfig: (resolvedFallback as any).avatar_config ?? null,
+      level: Number(resolvedFallback.level ?? 1),
+      xp: Number(resolvedFallback.xp ?? 0),
       wins: 0,
       streak: 0,
-      grade: fallback.grade ? Number(fallback.grade) : null,
+      grade: resolvedFallback.grade ? Number(resolvedFallback.grade) : null,
       rank: null,
       badges: [],
       weeklyScore: 0,
@@ -139,8 +173,8 @@ const UserProfilePage = () => {
       matchesPlayed: 0,
       losses: 0,
       contributions: 0,
-      totalXp: Number(fallback.xp ?? 0),
-      seasonXp: Number(fallback.xp ?? 0),
+      totalXp: Number(resolvedFallback.xp ?? 0),
+      seasonXp: Number(resolvedFallback.xp ?? 0),
       activeTitle: null,
     });
   };
@@ -249,7 +283,7 @@ const UserProfilePage = () => {
           .limit(12),
         supabase.from("profile_privacy_settings" as never).select("is_public,hide_stats").eq("user_id", userId).maybeSingle(),
         (supabase as any).from("store_items").select("id,name,section,rarity,preview,price").eq("is_active", true),
-        supabase.from("profiles").select("created_at").eq("id", userId).single(),
+        supabase.from("profiles").select("created_at").eq("id", userId).maybeSingle(),
       ]);
 
       setStatsJson((statsRes.data ?? {}) as Record<string, any>);
@@ -440,7 +474,8 @@ const UserProfilePage = () => {
   const profile = useMemo(() => rankedWithFallback.find((u) => u.id === userId) ?? fallbackProfile, [fallbackProfile, rankedWithFallback, userId]);
   const profileRank = useMemo(() => rankedWithFallback.findIndex((u) => u.id === userId) + 1, [rankedWithFallback, userId]);
 
-  const isSelf = authUser?.id === (profile?.id ?? "");
+  const currentViewerId = session?.user?.id ?? authUser?.id ?? "";
+  const isSelf = currentViewerId === (profile?.id ?? "");
   const isFollowing = profile ? followingIds.includes(profile.id) : false;
   const xpProgress = getXpProgressInLevel(profile?.xp ?? 0);
   const progress = xpProgress.percentage;
