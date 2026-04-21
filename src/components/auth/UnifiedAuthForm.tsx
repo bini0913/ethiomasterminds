@@ -7,6 +7,7 @@ import { useUser } from "@/context/UserContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
 import { lovable } from "@/integrations/lovable";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   GraduationCap, 
   Users, 
@@ -36,7 +37,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
 }) => {
   const { loginWithUsername, signupWithRole, isLoading: authLoading } = useUser();
   const { t } = useLanguage();
-  const [role, setRole] = useState<"student" | "teacher" | "admin" | "manager">(initialTab);
+  const [role, setRole] = useState<"student" | "teacher" | "admin" | "manager" | "parent_view">(initialTab);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -93,7 +94,22 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
       } else {
         success = await loginWithUsername(username, password);
       }
-      if (success) { onSuccess(); }
+      if (success) {
+        if (role === "parent_view") {
+          localStorage.setItem("masterminds_login_mode", "parent");
+          const { data: authData } = await supabase.auth.getUser();
+          if (authData.user?.id) {
+            await supabase.from("profiles").update({ login_mode: "parent" } as any).eq("id", authData.user.id);
+          }
+        } else {
+          localStorage.removeItem("masterminds_login_mode");
+          const { data: authData } = await supabase.auth.getUser();
+          if (authData.user?.id) {
+            await supabase.from("profiles").update({ login_mode: "student" } as any).eq("id", authData.user.id);
+          }
+        }
+        onSuccess();
+      }
     } catch (error) {
       console.error('Auth error:', error);
       toast.error(t("auth-failed"));
@@ -126,6 +142,12 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
       gradient: "from-purple-500 via-pink-500 to-purple-500",
       title: t("manager"),
       description: t("manager-desc")
+    },
+    parent_view: {
+      icon: Users,
+      gradient: "from-sky-500 via-blue-500 to-indigo-500",
+      title: "Parent Portal",
+      description: "Login with your child account credentials"
     }
   };
 
@@ -189,7 +211,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
               </div>
             ) : (
               <div className="flex border-b border-border/50">
-                {(['student', 'teacher', 'admin', 'manager'] as const).map((r) => {
+                {(['student', 'teacher', 'admin', 'manager', 'parent_view'] as const).map((r) => {
                   const RoleIcon = roleConfig[r].icon;
                   return (
                     <button
@@ -202,7 +224,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                       }`}
                     >
                       <RoleIcon className="h-4 w-4" />
-                      <span className="text-xs font-medium hidden sm:inline">{t(r)}</span>
+                      <span className="text-xs font-medium hidden sm:inline">{r === "parent_view" ? "Parent" : t(r)}</span>
                     </button>
                   );
                 })}

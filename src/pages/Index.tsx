@@ -26,6 +26,12 @@ const Index: React.FC = () => {
     if (isLoading) return;
     
     if (isAuthenticated && user) {
+      const loginMode = localStorage.getItem("masterminds_login_mode");
+      if (loginMode === "parent") {
+        navigate('/parent-dashboard');
+        return;
+      }
+
       // Redirect privileged roles to their portals
       if (user.role === 'extreme_admin') {
         navigate('/root-control-portal-9xA7');
