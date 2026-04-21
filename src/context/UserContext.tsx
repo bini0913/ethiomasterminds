@@ -69,6 +69,32 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     return Math.floor(xp / 100) + 1;
   };
 
+  const createMissingProfile = async (userId: string) => {
+    const fallbackName =
+      session?.user?.user_metadata?.name ||
+      session?.user?.email?.split("@")[0] ||
+      "Student";
+    const fallbackUsername =
+      session?.user?.user_metadata?.username ||
+      session?.user?.email?.split("@")[0] ||
+      `user-${userId.slice(0, 6)}`;
+
+    const { error } = await (supabase as any)
+      .from("profiles")
+      .upsert({
+        id: userId,
+        name: fallbackName,
+        username: String(fallbackUsername).toLowerCase(),
+        avatar: "avatar-1",
+        level: 1,
+        xp: 0,
+      });
+
+    if (error) {
+      throw error;
+    }
+  };
+
   // Fetch user profile and role from database
   const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
@@ -80,6 +106,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (profileError) {
+        if (profileError.code === "PGRST116") {
+          await createMissingProfile(userId);
+          return await fetchUserProfile(userId);
+        }
         console.error('Error fetching profile:', profileError);
         return null;
       }

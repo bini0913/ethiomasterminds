@@ -600,7 +600,7 @@ const StudentDashboard: React.FC = () => {
                     <Button 
                       variant="ghost" 
                       className="w-full mt-3 text-primary"
-                      onClick={() => navigate('/profile')}
+                      onClick={() => navigate(user?.id ? `/profile/${user.id}` : '/settings')}
                     >
                       View All Achievements
                     </Button>
