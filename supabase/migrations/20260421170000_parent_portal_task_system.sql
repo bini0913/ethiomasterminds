@@ -26,10 +26,20 @@ create table if not exists public.parent_tasks (
 create index if not exists idx_parent_tasks_student_created_at on public.parent_tasks(student_id, created_at desc);
 create index if not exists idx_parent_tasks_student_status on public.parent_tasks(student_id, status);
 
-create trigger update_parent_tasks_updated_at
-before update on public.parent_tasks
-for each row
-execute function public.update_updated_at_column();
+do $$
+begin
+  if exists (
+    select 1
+    from pg_proc
+    where proname = 'update_updated_at_column'
+  ) then
+    drop trigger if exists update_parent_tasks_updated_at on public.parent_tasks;
+    create trigger update_parent_tasks_updated_at
+    before update on public.parent_tasks
+    for each row
+    execute function public.update_updated_at_column();
+  end if;
+end $$;
 
 alter table public.parent_tasks enable row level security;
 

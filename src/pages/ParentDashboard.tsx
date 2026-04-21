@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Award, BookOpen, CalendarClock, Check, Clock3, Flame, Plus, Save, Trash2, TrendingDown, TrendingUp, UserCheck } from "lucide-react";
+import { AlertTriangle, Award, BookOpen, CalendarClock, Check, Clock3, Flame, Home, LogOut, Plus, Save, Trash2, TrendingDown, TrendingUp, UserCheck } from "lucide-react";
 
 type QuizRow = {
   id: string;
@@ -50,7 +50,7 @@ const db = supabase as any;
 const toDateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
 const ParentDashboard: React.FC = () => {
-  const { user, isAuthenticated, isLoading } = useUser();
+  const { user, isAuthenticated, isLoading, logout } = useUser();
   const [loadingData, setLoadingData] = useState(true);
   const [quizResults, setQuizResults] = useState<QuizRow[]>([]);
   const [studySessions, setStudySessions] = useState<StudySessionRow[]>([]);
@@ -68,6 +68,17 @@ const ParentDashboard: React.FC = () => {
   const [taskRequired, setTaskRequired] = useState(true);
 
   const isParentMode = localStorage.getItem("masterminds_login_mode") === "parent";
+
+  const handleLeaveParentPortal = () => {
+    localStorage.removeItem("masterminds_login_mode");
+    toast.success("Exited parent view.");
+    window.location.href = "/";
+  };
+
+  const handleSignOut = async () => {
+    await logout();
+    window.location.href = "/";
+  };
 
   const loadAll = async () => {
     if (!user?.id) return;
@@ -333,7 +344,17 @@ const ParentDashboard: React.FC = () => {
               <p className="text-sm text-muted-foreground">Live monitoring dashboard for {user.name}</p>
             </div>
           </div>
-          <Badge variant="secondary">Parent View Mode</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">Parent View Mode</Badge>
+            <Button variant="outline" size="sm" onClick={handleLeaveParentPortal}>
+              <Home className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
