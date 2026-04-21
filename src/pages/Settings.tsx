@@ -19,6 +19,9 @@ import { motion } from "framer-motion";
 import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import BackButton from "@/components/ui/BackButton";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+
+const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 
 const Settings: React.FC = () => {
   const { user, logout } = useUser();
@@ -41,6 +44,18 @@ const Settings: React.FC = () => {
     logout();
     navigate('/');
     toast.success('Logged out successfully');
+  };
+
+  const handleReplayTutorial = async () => {
+    localStorage.removeItem(HOME_ONBOARDING_STORAGE_KEY);
+    if (user?.id) {
+      await supabase.from("user_onboarding_states" as any).upsert({
+        user_id: user.id,
+        home_completed: false,
+        updated_at: new Date().toISOString(),
+      });
+    }
+    toast.success("Tutorial reset. Return to Home to replay it.");
   };
 
   const settingsSections = [
@@ -138,6 +153,17 @@ const Settings: React.FC = () => {
                     ))}
                   </RadioGroup>
                 </CardContent>
+              </Card>
+
+              <Card className="glass border-primary/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Tutorial</span>
+                    <Button variant="outline" onClick={handleReplayTutorial}>
+                      Replay Tutorial
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
               </Card>
               
             </motion.div>
