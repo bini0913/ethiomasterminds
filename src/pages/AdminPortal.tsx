@@ -100,6 +100,22 @@ interface PendingLibraryBook {
   } | null;
 }
 
+interface SeasonStats {
+  season_name: string;
+  total_users: number;
+  top_player: string;
+  total_xp: number;
+}
+
+interface RewardPreviewRow {
+  user_id: string;
+  name: string;
+  season_xp: number;
+  projected_rank: number;
+  projected_coins: number;
+  projected_title?: string | null;
+}
+
 const AdminPortal: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useUser();
@@ -153,6 +169,9 @@ const AdminPortal: React.FC = () => {
   const [coinAmount, setCoinAmount] = useState('50');
   const [resetMode, setResetMode] = useState<'level' | 'full'>('full');
   const [seasonConversionRate, setSeasonConversionRate] = useState('1');
+  const [seasonConfirmText, setSeasonConfirmText] = useState('');
+  const [seasonStats, setSeasonStats] = useState<SeasonStats | null>(null);
+  const [rewardPreview, setRewardPreview] = useState<RewardPreviewRow[]>([]);
   const [systemSettings, setSystemSettings] = useState({
     feature_social_enabled: true,
     feature_xp_enabled: true,
@@ -170,7 +189,7 @@ const AdminPortal: React.FC = () => {
   };
 
   const fetchAllData = async () => {
-    await Promise.all([fetchUsers(), fetchContent(), fetchReports(), fetchAnnouncements(), fetchStatsAndCharts()]);
+    await Promise.all([fetchUsers(), fetchContent(), fetchReports(), fetchAnnouncements(), fetchStatsAndCharts(), fetchSeasonControlData()]);
   };
 
   useEffect(() => {
@@ -192,7 +211,10 @@ const AdminPortal: React.FC = () => {
         logAction('Realtime event: profile update');
         fetchUsers();
         fetchStatsAndCharts();
+        fetchSeasonControlData();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'season_runtime_state' }, () => fetchSeasonControlData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'season_history' }, () => fetchSeasonControlData())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_posts' }, () => {
         pushNotification('New social post published');
         logAction('Realtime event: new post');
@@ -260,6 +282,32 @@ const AdminPortal: React.FC = () => {
       })),
     );
   };
+
+  const fetchSeasonControlData = async () => {
+    const rate = Number(seasonConversionRate);
+    const safeRate = Number.isFinite(rate) && rate > 0 ? rate : 0.1;
+
+    const [statsRes, previewRes] = await Promise.all([
+      (supabase as any).rpc('admin_get_current_season_stats'),
+      (supabase as any).rpc('admin_get_season_rewards_preview', {
+        p_conversion_rate: safeRate,
+        p_limit: 10,
+      }),
+    ]);
+
+    if (!statsRes.error && statsRes.data) {
+      setSeasonStats(statsRes.data as SeasonStats);
+    }
+
+    if (!previewRes.error && Array.isArray(previewRes.data)) {
+      setRewardPreview(previewRes.data as RewardPreviewRow[]);
+    }
+  };
+
+  useEffect(() => {
+    fetchSeasonControlData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seasonConversionRate]);
 
   const fetchReports = async () => {
     const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(200);
@@ -630,8 +678,12 @@ const AdminPortal: React.FC = () => {
   const handleEndSeason = async () => {
     if (!ensureAdminPower()) return;
 
-    const confirmed = window.confirm('Are you sure you want to end the current season and reset season XP leaderboard?');
+    const confirmed = window.confirm('Are you sure you want to end the current season and reset season XP leaderboard? Type CONFIRM in the panel first.');
     if (!confirmed) return;
+    if (seasonConfirmText.trim().toUpperCase() !== 'CONFIRM') {
+      toast.error('Type CONFIRM to proceed.');
+      return;
+    }
 
     const rate = Number(seasonConversionRate);
     if (!Number.isFinite(rate) || rate <= 0) {
@@ -642,6 +694,7 @@ const AdminPortal: React.FC = () => {
     const { data, error } = await (supabase as any).rpc('admin_end_season', {
       p_conversion_rate: rate,
       p_reason: 'Admin triggered season close',
+      p_confirm_text: seasonConfirmText.trim().toUpperCase(),
     });
 
     if (error) {
@@ -652,6 +705,7 @@ const AdminPortal: React.FC = () => {
     toast.success(`Season reset complete. Next: ${data?.next_season || 'created'}`);
     pushNotification('Season ended and leaderboard reset');
     logAction('Ended season and started next one');
+    setSeasonConfirmText('');
     fetchAllData();
   };
   const handleForceStartNewSeason = async () => {
@@ -1059,6 +1113,30 @@ const AdminPortal: React.FC = () => {
             <TabsContent value="leaderboard" className="space-y-4">
               <Card>
                 <CardHeader>
+                  <CardTitle>Current Season</CardTitle>
+                  <CardDescription>Live status powered by database RPC + realtime subscriptions.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid md:grid-cols-3 gap-3">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">Season</p>
+                    <p className="font-semibold">{seasonStats?.season_name || 'Loading...'}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">Total users</p>
+                    <p className="font-semibold">{seasonStats?.total_users ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm text-muted-foreground">Top player</p>
+                    <p className="font-semibold">{seasonStats?.top_player || '-'}</p>
+                  </div>
+                  <div className="rounded-lg border p-3 md:col-span-3">
+                    <p className="text-sm text-muted-foreground">Total XP</p>
+                    <p className="font-semibold">{(seasonStats?.total_xp ?? 0).toLocaleString()} XP</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
                   <CardTitle>Season Control</CardTitle>
                   <CardDescription>Global-only season reset: close current season, convert season XP to wallet coins, archive winners, zero every student season XP, and open the next season.</CardDescription>
                 </CardHeader>
@@ -1067,9 +1145,28 @@ const AdminPortal: React.FC = () => {
                     <Label>XP → Coins conversion rate</Label>
                     <Input value={seasonConversionRate} onChange={(e) => setSeasonConversionRate(e.target.value)} type="number" min="0.01" step="0.01" />
                   </div>
+                  <div className="max-w-xs space-y-2">
+                    <Label>Type CONFIRM to end season</Label>
+                    <Input value={seasonConfirmText} onChange={(e) => setSeasonConfirmText(e.target.value)} placeholder="CONFIRM" />
+                  </div>
                   <Button variant="destructive" onClick={handleEndSeason}><Trophy className="w-4 h-4 mr-2" />End Season + Reset Leaderboard</Button>
                   <p className="text-sm text-muted-foreground pt-2 border-t">Season XP resets are global-only from this panel (no single-user or class season reset actions).</p>
                   <Button variant="secondary" onClick={handleForceStartNewSeason}><RefreshCw className="w-4 h-4 mr-2" />Force Start New Season</Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Rewards Preview</CardTitle>
+                  <CardDescription>Projected payout before reset with rank bonuses included.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {rewardPreview.map((row) => (
+                    <div key={row.user_id} className="flex items-center justify-between border rounded-lg p-2">
+                      <span>#{row.projected_rank} {row.name}</span>
+                      <Badge variant="outline">{row.season_xp} XP → {row.projected_coins} coins {row.projected_title ? `• ${row.projected_title}` : ''}</Badge>
+                    </div>
+                  ))}
+                  {rewardPreview.length === 0 && <p className="text-sm text-muted-foreground">No reward preview available.</p>}
                 </CardContent>
               </Card>
               <Card><CardHeader><CardTitle>Most Active Students (Season XP)</CardTitle></CardHeader><CardContent className="space-y-2">{[...users].filter((u) => u.role === 'student').sort((a, b) => (b.season_xp ?? b.xp ?? 0) - (a.season_xp ?? a.xp ?? 0)).slice(0, 20).map((u, i) => (<div key={u.id} className="flex items-center justify-between border rounded-lg p-2"><span>#{i + 1} {u.name}</span><Badge variant="outline">Lvl {u.level} • {(u.season_xp ?? u.xp ?? 0)} season XP</Badge></div>))}</CardContent></Card>
