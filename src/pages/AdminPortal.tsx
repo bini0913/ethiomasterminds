@@ -748,7 +748,12 @@ const AdminPortal: React.FC = () => {
 
         <main className="container mx-auto px-4 py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Quick actions</h2>
+                <Badge variant="secondary">Jump to tools</Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               {[
                 { title: 'Manage Users', description: 'Roles, access, and account actions', icon: Users, tab: 'users' },
                 { title: 'XP Control', description: 'Add XP and tune progression', icon: Zap, tab: 'control' },
@@ -777,7 +782,8 @@ const AdminPortal: React.FC = () => {
                   </CardContent>
                 </Card>
               ))}
-            </div>
+              </div>
+            </section>
 
             <TabsList className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 bg-muted/50 p-2 rounded-xl max-h-[56vh] overflow-y-auto">
               <TabsTrigger className="min-h-12 py-3" value="dashboard"><BarChart3 className="w-4 h-4 mr-1" />Dashboard</TabsTrigger>
@@ -793,26 +799,31 @@ const AdminPortal: React.FC = () => {
               <TabsTrigger className="min-h-12 py-3" value="monitoring"><Bell className="w-4 h-4 mr-1" />Live</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="dashboard" className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <TabsContent value="dashboard" className="space-y-5">
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Overview metrics</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {[
-                  ['Total Users', stats.totalUsers, Users],
-                  ['Active (10m)', stats.activeUsersNow, Activity],
-                  ['Flashcards', stats.totalFlashcards, Database],
-                  ['Books/Plans', stats.totalBooks, BookOpen],
-                  ['Quizzes', stats.totalQuizzes, Crown],
-                ].map(([label, value, IconComp], i) => {
+                  ['Total Users', stats.totalUsers, Users, 'border-sky-500/40 bg-sky-500/5'],
+                  ['Active (10m)', stats.activeUsersNow, Activity, 'border-emerald-500/40 bg-emerald-500/5'],
+                  ['Flashcards', stats.totalFlashcards, Database, 'border-violet-500/40 bg-violet-500/5'],
+                  ['Books/Plans', stats.totalBooks, BookOpen, 'border-amber-500/40 bg-amber-500/5'],
+                  ['Quizzes', stats.totalQuizzes, Crown, 'border-rose-500/40 bg-rose-500/5'],
+                ].map(([label, value, IconComp, colorClass], i) => {
                   const LucideIcon = IconComp as React.ComponentType<{ className?: string }>;
                   return (
                   <motion.div key={String(label)} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                    <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{value as number}</p><LucideIcon className="w-5 h-5 text-primary" /></div></CardContent></Card>
+                    <Card className={String(colorClass)}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{value as number}</p><LucideIcon className="w-5 h-5 text-primary" /></div></CardContent></Card>
                   </motion.div>
                   );
                 })}
+                </div>
               </div>
 
-              <div className="grid lg:grid-cols-3 gap-4">
-                <Card className="lg:col-span-2">
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Trends & composition</h3>
+                <div className="grid lg:grid-cols-3 gap-4">
+                <Card className="lg:col-span-2 border-primary/30 bg-primary/5">
                   <CardHeader><CardTitle>Daily Activity</CardTitle></CardHeader>
                   <CardContent className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
@@ -820,12 +831,13 @@ const AdminPortal: React.FC = () => {
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="border-secondary/50 bg-secondary/20">
                   <CardHeader><CardTitle>Content Mix</CardTitle></CardHeader>
                   <CardContent className="h-72">
                     <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={contentMix} dataKey="value" nameKey="name" innerRadius={36} outerRadius={80}>{contentMix.map((s) => <Cell key={s.name} fill={s.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer>
                   </CardContent>
                 </Card>
+                </div>
               </div>
             </TabsContent>
 
