@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Quiz from "./pages/Quiz";
 import QuizFilter from "./pages/QuizFilter";
@@ -47,9 +47,16 @@ import { CurrencyProvider } from "./context/CurrencyContext";
 import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
 import { ChatProvider } from "./context/ChatContext";
+import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
 
 const queryClient = new QueryClient();
+
+const SelfProfileRedirect = () => {
+  const { user } = useUser();
+  if (!user?.id) return <Navigate to="/settings" replace />;
+  return <Navigate to={`/profile/${user.id}`} replace />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -73,6 +80,7 @@ const App = () => (
                               <Route path="/multiplayer" element={<Multiplayer />} />
                               <Route path="/lobby" element={<Lobby />} />
                               <Route path="/leaderboard" element={<Leaderboard />} />
+                              <Route path="/profile" element={<SelfProfileRedirect />} />
                               <Route path="/profile/:userId" element={<UserProfilePage />} />
                               <Route path="/friends" element={<Friends />} />
                               <Route path="/settings" element={<Settings />} />
