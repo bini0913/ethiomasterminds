@@ -64,7 +64,7 @@ type PrefetchedProfileBundle = {
 const UserProfilePage = () => {
   const navigate = useNavigate();
   const { userId } = useParams();
-  const { user: authUser } = useUser();
+  const { user: authUser, session } = useUser();
   const { coins, transferCoins, refreshCurrency } = useCurrency();
 
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
@@ -97,7 +97,11 @@ const UserProfilePage = () => {
   const unlockedAchievementIdsRef = useRef<Set<string>>(new Set());
 
   const refreshCore = async () => {
-    if (!userId) return;
+    if (!userId) {
+      setProfileMissing(true);
+      setFallbackProfile(null);
+      return;
+    }
     const rows = await fetchLeaderboardUsers();
     setUsers(rows);
 
@@ -116,7 +120,9 @@ const UserProfilePage = () => {
 
     let resolvedFallback = fallback;
 
-    if (!resolvedFallback && authUser?.id === userId) {
+    const currentViewerId = session?.user?.id ?? authUser?.id;
+
+    if (!resolvedFallback && currentViewerId === userId) {
       const fallbackName = authUser.name?.trim() || authUser.username?.trim() || "Student";
       const fallbackUsername = (authUser.username?.trim() || authUser.name?.trim() || `user-${userId.slice(0, 6)}`).toLowerCase();
 
@@ -468,7 +474,8 @@ const UserProfilePage = () => {
   const profile = useMemo(() => rankedWithFallback.find((u) => u.id === userId) ?? fallbackProfile, [fallbackProfile, rankedWithFallback, userId]);
   const profileRank = useMemo(() => rankedWithFallback.findIndex((u) => u.id === userId) + 1, [rankedWithFallback, userId]);
 
-  const isSelf = authUser?.id === (profile?.id ?? "");
+  const currentViewerId = session?.user?.id ?? authUser?.id ?? "";
+  const isSelf = currentViewerId === (profile?.id ?? "");
   const isFollowing = profile ? followingIds.includes(profile.id) : false;
   const xpProgress = getXpProgressInLevel(profile?.xp ?? 0);
   const progress = xpProgress.percentage;
