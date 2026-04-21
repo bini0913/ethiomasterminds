@@ -119,7 +119,14 @@ const App = () => (
                               <Route path="/social" element={<EnhancedSocial />} />
                               <Route path="/ai-tutor" element={<AITutor />} />
                               <Route path="/learning-dna" element={<LearningDNA />} />
-                              <Route path="/parent-dashboard" element={<ParentDashboard />} />
+                              <Route
+                                path="/parent-dashboard"
+                                element={
+                                  <ProtectedRoute allowedRoles={['student', 'teacher', 'admin', 'manager', 'extreme_admin']}>
+                                    <ParentDashboard />
+                                  </ProtectedRoute>
+                                }
+                              />
                               <Route path="/revision" element={<TimeTravelRevision />} />
                               <Route path="/avatar-creator" element={<AvatarCreator />} />
                               <Route path="/academic" element={<AcademicMode />} />
