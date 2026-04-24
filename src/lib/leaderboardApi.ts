@@ -56,7 +56,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   const [profilesRes, streakRes, weeklyRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,name,username,avatar,avatar_config,grade,xp,total_xp,season_xp,level,rank,badges"),
+      .select("id,name,username,avatar,avatar_config,grade,xp,level,rank,badges"),
     supabase.from("user_streaks").select("user_id,current_streak"),
     supabase
       .from("question_attempts")
@@ -64,7 +64,10 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
       .gte("created_at", since),
   ]);
 
-  if (profilesRes.error) throw profilesRes.error;
+  if (profilesRes.error) {
+    console.error("fetchLeaderboardUsers profiles error", profilesRes.error);
+    throw profilesRes.error;
+  }
 
   const streakByUser = new Map<string, number>();
   (streakRes.data ?? []).forEach((row) => streakByUser.set(row.user_id, row.current_streak));
