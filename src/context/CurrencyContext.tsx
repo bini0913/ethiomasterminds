@@ -23,11 +23,14 @@ interface CurrencyContextType {
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
+const COIN_PER_XP = 100; // 1 coin per 100 XP
+const COIN_PER_GEM = 50; // 50 coins -> 1 gem
+
 export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
   const [xp, setXp] = useState(0);
-  const [coins, setCoins] = useState(0);
-  const [gems, setGems] = useState(0);
+  const [coins, setCoins] = useState(100);
+  const [gems, setGems] = useState(10);
   const [dailyStreak, setDailyStreak] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -42,14 +45,31 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const { data: ensured, error: ensureError } = await (supabase as any).rpc('ensure_wallet', { p_user_id: user.id });
-      if (ensureError) throw ensureError;
+      // Ensure a wallet row exists
+      let { data: wallet } = await supabase
+        .from('user_currency')
+        .select('coins,gems')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-      const wallet = ensured;
-      setXp(wallet?.xp ?? 0);
-      setCoins(wallet?.coins ?? 0);
-      setGems(wallet?.gems ?? 0);
-      setDailyStreak(wallet?.daily_streak ?? 0);
+      if (!wallet) {
+        const { data: created } = await supabase
+          .from('user_currency')
+          .insert({ user_id: user.id })
+          .select('coins,gems')
+          .single();
+        wallet = created ?? { coins: 100, gems: 10 };
+      }
+
+      const [{ data: profile }, { data: streak }] = await Promise.all([
+        supabase.from('profiles').select('xp').eq('id', user.id).maybeSingle(),
+        supabase.from('user_streaks').select('current_streak').eq('user_id', user.id).maybeSingle(),
+      ]);
+
+      setCoins(wallet?.coins ?? 100);
+      setGems(wallet?.gems ?? 10);
+      setXp(profile?.xp ?? 0);
+      setDailyStreak(streak?.current_streak ?? 0);
     } catch (err) {
       console.error('Error fetching wallet:', err);
     } finally {
@@ -61,56 +81,64 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     fetchCurrency();
   }, [fetchCurrency]);
 
-
+  // Realtime updates: profile (xp) and user_currency (coins/gems)
   useEffect(() => {
     if (!user?.id) return;
 
-    const walletChannel = supabase
+    const channel = supabase
       .channel(`wallet-live-${user.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'wallets', filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'user_currency', filter: `user_id=eq.${user.id}` },
         (payload: any) => {
           const next = payload?.new;
           if (!next) return;
           setCoins(next.coins ?? 0);
-          setXp(next.xp ?? 0);
           setGems(next.gems ?? 0);
-          setDailyStreak(next.daily_streak ?? 0);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        (payload: any) => {
+          const next = payload?.new;
+          if (!next) return;
+          setXp(next.xp ?? 0);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_streaks', filter: `user_id=eq.${user.id}` },
+        (payload: any) => {
+          const next = payload?.new;
+          if (!next) return;
+          setDailyStreak(next.current_streak ?? 0);
         }
       )
       .subscribe();
 
     return () => {
-      void supabase.removeChannel(walletChannel);
+      void supabase.removeChannel(channel);
     };
   }, [user?.id]);
 
-  const addCoins = async (amount: number, source = 'manual_reward'): Promise<boolean> => {
+  const updateWallet = async (patch: { coins?: number; gems?: number }) => {
+    if (!user?.id) return null;
+    const { data, error } = await supabase
+      .from('user_currency')
+      .update({ ...patch, updated_at: new Date().toISOString() } as never)
+      .eq('user_id', user.id)
+      .select('coins,gems')
+      .single();
+    if (error) throw error;
+    return data;
+  };
+
+  const addCoins = async (amount: number): Promise<boolean> => {
     if (!user?.id || amount <= 0) return false;
-
     try {
-      const { data, error } = await (supabase as any)
-        .from('wallets')
-        .update({ coins: coins + amount })
-        .eq('user_id', user.id)
-        .select('coins, gems, daily_streak')
-        .single();
-
-      if (error) throw error;
-
-      await (supabase as any).from('transactions').insert({
-        sender_id: null,
-        receiver_id: user.id,
-        amount,
-        type: 'earn',
-        source,
-      });
-
+      const data = await updateWallet({ coins: coins + amount });
       setCoins(data?.coins ?? coins + amount);
-      setXp(data?.xp ?? xp);
-      setGems(data?.gems ?? gems);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
     } catch (err) {
       console.error('Error adding coins:', err);
@@ -118,32 +146,11 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const spendCoins = async (amount: number, source = 'manual_spend'): Promise<boolean> => {
+  const spendCoins = async (amount: number): Promise<boolean> => {
     if (!user?.id || coins < amount || amount <= 0) return false;
-
     try {
-      const newAmount = coins - amount;
-      const { data, error } = await (supabase as any)
-        .from('wallets')
-        .update({ coins: newAmount })
-        .eq('user_id', user.id)
-        .select('coins, gems, daily_streak')
-        .single();
-
-      if (error) throw error;
-
-      await (supabase as any).from('transactions').insert({
-        sender_id: user.id,
-        receiver_id: null,
-        amount,
-        type: 'spend',
-        source,
-      });
-
-      setCoins(data?.coins ?? newAmount);
-      setXp(data?.xp ?? xp);
-      setGems(data?.gems ?? gems);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
+      const data = await updateWallet({ coins: coins - amount });
+      setCoins(data?.coins ?? coins - amount);
       return true;
     } catch (err) {
       console.error('Error spending coins:', err);
@@ -153,21 +160,9 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
 
   const addGems = async (amount: number): Promise<boolean> => {
     if (!user?.id || amount <= 0) return false;
-
     try {
-      const { data, error } = await (supabase as any)
-        .from('wallets')
-        .update({ gems: gems + amount })
-        .eq('user_id', user.id)
-        .select('coins, gems, daily_streak')
-        .single();
-
-      if (error) throw error;
-
-      setCoins(data?.coins ?? coins);
-      setXp(data?.xp ?? xp);
+      const data = await updateWallet({ gems: gems + amount });
       setGems(data?.gems ?? gems + amount);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
     } catch (err) {
       console.error('Error adding gems:', err);
@@ -177,21 +172,9 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
 
   const spendGems = async (amount: number): Promise<boolean> => {
     if (!user?.id || gems < amount || amount <= 0) return false;
-
     try {
-      const { data, error } = await (supabase as any)
-        .from('wallets')
-        .update({ gems: gems - amount })
-        .eq('user_id', user.id)
-        .select('coins, gems, daily_streak')
-        .single();
-
-      if (error) throw error;
-
-      setCoins(data?.coins ?? coins);
-      setXp(data?.xp ?? xp);
+      const data = await updateWallet({ gems: gems - amount });
       setGems(data?.gems ?? gems - amount);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
       return true;
     } catch (err) {
       console.error('Error spending gems:', err);
@@ -199,35 +182,30 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // XP -> coins manual conversion (1 coin per 100 XP)
   const convertXpToCoins = async (xpAmount: number): Promise<boolean> => {
-    if (!user?.id) return false;
-
+    if (!user?.id || xpAmount < COIN_PER_XP || xp < xpAmount) return false;
     try {
-      const { data, error } = await (supabase as any).rpc('convert_xp_to_coins', { p_xp: xpAmount });
-      if (error) throw error;
-
-      setXp(data?.xp ?? xp);
-      setCoins(data?.coins ?? coins);
-      setGems(data?.gems ?? gems);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
+      const coinsToAdd = Math.floor(xpAmount / COIN_PER_XP);
+      // Decrement XP via add_xp (negative)
+      await (supabase as any).rpc('add_xp', { p_user_id: user.id, p_amount: -xpAmount });
+      const data = await updateWallet({ coins: coins + coinsToAdd });
+      setCoins(data?.coins ?? coins + coinsToAdd);
+      setXp(Math.max(0, xp - xpAmount));
       return true;
     } catch (err) {
-      console.error('Error converting XP:', err);
+      console.error('Error converting XP to coins:', err);
       return false;
     }
   };
 
   const convertCoinsToGems = async (coinAmount: number): Promise<boolean> => {
-    if (!user?.id) return false;
-
+    if (!user?.id || coinAmount < COIN_PER_GEM || coins < coinAmount) return false;
     try {
-      const { data, error } = await (supabase as any).rpc('convert_coins_to_gems', { p_coins: coinAmount });
-      if (error) throw error;
-
-      setXp(data?.xp ?? xp);
-      setCoins(data?.coins ?? coins);
-      setGems(data?.gems ?? gems);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
+      const gemsToAdd = Math.floor(coinAmount / COIN_PER_GEM);
+      const data = await updateWallet({ coins: coins - coinAmount, gems: gems + gemsToAdd });
+      setCoins(data?.coins ?? coins - coinAmount);
+      setGems(data?.gems ?? gems + gemsToAdd);
       return true;
     } catch (err) {
       console.error('Error converting coins to gems:', err);
@@ -235,18 +213,21 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-
   const convertCoinsToXp = async (coinAmount: number): Promise<boolean> => {
-    if (!user?.id) return false;
-
+    if (!user?.id || coinAmount <= 0 || coins < coinAmount) return false;
     try {
-      const { data, error } = await (supabase as any).rpc('convert_coins_to_xp', { p_coins: coinAmount });
-      if (error) throw error;
-
-      setXp(data?.xp ?? xp);
-      setCoins(data?.coins ?? coins);
-      setGems(data?.gems ?? gems);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
+      const xpToAdd = coinAmount * COIN_PER_XP;
+      const data = await updateWallet({ coins: coins - coinAmount });
+      // Add XP without the auto-coin loop: add_xp will credit floor(xpToAdd/100) coins back automatically.
+      // To avoid that, just update profile.xp directly.
+      const { data: prof } = await supabase
+        .from('profiles')
+        .update({ xp: xp + xpToAdd } as never)
+        .eq('id', user.id)
+        .select('xp')
+        .single();
+      setCoins(data?.coins ?? coins - coinAmount);
+      setXp(prof?.xp ?? xp + xpToAdd);
       return true;
     } catch (err) {
       console.error('Error converting coins to XP:', err);
@@ -255,20 +236,25 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const transferCoins = async (receiverId: string, amount: number): Promise<boolean> => {
-    if (!user?.id) return false;
-
+    if (!user?.id || amount <= 0 || coins < amount || receiverId === user.id) return false;
     try {
-      const { data, error } = await (supabase as any).rpc('transfer_coins', {
-        p_receiver_id: receiverId,
-        p_amount: amount,
-      });
-
-      if (error) throw error;
-
-      setCoins(data?.coins ?? coins);
-      setXp(data?.xp ?? xp);
-      setGems(data?.gems ?? gems);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
+      // Decrement sender
+      const data = await updateWallet({ coins: coins - amount });
+      // Increment receiver
+      const { data: recv } = await supabase
+        .from('user_currency')
+        .select('coins')
+        .eq('user_id', receiverId)
+        .maybeSingle();
+      if (recv) {
+        await supabase
+          .from('user_currency')
+          .update({ coins: (recv.coins ?? 0) + amount } as never)
+          .eq('user_id', receiverId);
+      } else {
+        await supabase.from('user_currency').insert({ user_id: receiverId, coins: 100 + amount } as never);
+      }
+      setCoins(data?.coins ?? coins - amount);
       return true;
     } catch (err) {
       console.error('Error transferring coins:', err);
@@ -278,15 +264,11 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
 
   const claimDailyReward = async (): Promise<boolean> => {
     if (!user?.id) return false;
-
     try {
-      const { data, error } = await (supabase as any).rpc('claim_daily_reward');
-      if (error) throw error;
-
-      setCoins(data?.coins ?? coins);
-      setXp(data?.xp ?? xp);
-      setGems(data?.gems ?? gems);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
+      const reward = 25 + dailyStreak * 5;
+      await (supabase as any).rpc('update_user_streak', { p_user_id: user.id });
+      const data = await updateWallet({ coins: coins + reward });
+      setCoins(data?.coins ?? coins + reward);
       return true;
     } catch (err) {
       console.error('Error claiming daily reward:', err);
@@ -296,16 +278,16 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
 
   const luckySpin = async (): Promise<{ success: boolean; message?: string }> => {
     if (!user?.id) return { success: false, message: 'Not authenticated' };
-
+    if (coins < 10) return { success: false, message: 'Need at least 10 coins to spin' };
     try {
-      const { data, error } = await (supabase as any).rpc('perform_lucky_spin');
-      if (error) throw error;
-
-      setXp(data?.xp ?? xp);
-      setCoins(data?.coins ?? coins);
-      setGems(data?.gems ?? gems);
-      setDailyStreak(data?.daily_streak ?? dailyStreak);
-      return { success: true };
+      const outcome = Math.random();
+      let coinDelta = -10;
+      if (outcome > 0.9) coinDelta = 200;
+      else if (outcome > 0.6) coinDelta = 50;
+      else if (outcome > 0.3) coinDelta = 10;
+      const data = await updateWallet({ coins: Math.max(0, coins + coinDelta) });
+      setCoins(data?.coins ?? coins + coinDelta);
+      return { success: true, message: coinDelta > 0 ? `Won ${coinDelta} coins!` : 'Better luck next time' };
     } catch (err: any) {
       console.error('Lucky spin failed:', err);
       return { success: false, message: err?.message ?? 'Spin failed' };
