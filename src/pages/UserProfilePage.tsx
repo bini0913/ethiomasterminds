@@ -169,12 +169,14 @@ const UserProfilePage = () => {
       rank: null,
       badges: [],
       weeklyScore: 0,
+      monthlyScore: 0,
       accuracy: 0,
       matchesPlayed: 0,
       losses: 0,
       contributions: 0,
       totalXp: Number(resolvedFallback.xp ?? 0),
       seasonXp: Number(resolvedFallback.xp ?? 0),
+      coins: 0,
       activeTitle: null,
     });
   };
