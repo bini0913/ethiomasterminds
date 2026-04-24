@@ -8,7 +8,7 @@ export interface Question {
   text: string;
   options: string[];
   correctAnswer: string;
-  difficulty: 'Easy' | 'Medium' | 'Hard';
+  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Extreme';
   subject: string;
   grade: number;
   topic: string;
@@ -26,7 +26,7 @@ export interface Quiz {
   questions: Question[];
   subject: string;
   grade: number;
-  difficulty: 'Easy' | 'Medium' | 'Hard';
+  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Extreme';
   timeLimit?: number;
   createdBy?: string;
   createdAt: Date;
@@ -40,7 +40,7 @@ export interface QuizContextType {
   quizzes: Quiz[];
   currentQuiz: Quiz | null;
   setCurrentQuiz: (quiz: Quiz | null) => void;
-  createRandomQuiz: (category: string, count: number, grade?: number, difficulty?: 'easy' | 'medium' | 'hard', topic?: string) => Quiz;
+  createRandomQuiz: (category: string, count: number, grade?: number, difficulty?: 'easy' | 'medium' | 'hard' | 'extreme', topic?: string) => Quiz;
   createQuiz: (quiz: Quiz) => void;
   updateQuiz: (quiz: Quiz) => void;
   deleteQuiz: (id: string) => void;
@@ -123,7 +123,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           text: q.question_text,
           options,
           correctAnswer: q.correct_answer,
-          difficulty: (q.points >= 15 ? 'Hard' : q.points >= 10 ? 'Medium' : 'Easy') as 'Easy' | 'Medium' | 'Hard',
+          difficulty: (q.points >= 20 ? 'Extreme' : q.points >= 15 ? 'Hard' : q.points >= 10 ? 'Medium' : 'Easy') as 'Easy' | 'Medium' | 'Hard' | 'Extreme',
           subject: '', // Will be set from quiz
           grade: 0, // Will be set from quiz
           topic: 'General',
@@ -152,7 +152,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           questions,
           subject: q.subject,
           grade: gradeNum,
-          difficulty: (q.difficulty === 'easy' ? 'Easy' : q.difficulty === 'hard' ? 'Hard' : 'Medium') as 'Easy' | 'Medium' | 'Hard',
+          difficulty: (q.difficulty === 'easy' ? 'Easy' : q.difficulty === 'hard' ? 'Hard' : q.difficulty === 'extreme' ? 'Extreme' : 'Medium') as 'Easy' | 'Medium' | 'Hard' | 'Extreme',
           timeLimit: q.time_limit || questions.length * 30,
           createdBy: q.created_by,
           createdAt: new Date(q.created_at),
@@ -176,13 +176,14 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     category: string,
     count: number, 
     grade?: number, 
-    difficulty?: 'easy' | 'medium' | 'hard',
+    difficulty?: 'easy' | 'medium' | 'hard' | 'extreme',
     topic?: string
   ): Quiz => {
-    const difficultyMapping: Record<string, 'Easy' | 'Medium' | 'Hard'> = {
+    const difficultyMapping: Record<string, 'Easy' | 'Medium' | 'Hard' | 'Extreme'> = {
       'easy': 'Easy',
       'medium': 'Medium',
-      'hard': 'Hard'
+      'hard': 'Hard',
+      'extreme': 'Extreme'
     };
     
     const properDifficulty = difficulty ? difficultyMapping[difficulty] : 'Medium';
@@ -224,7 +225,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         grade: grade || 5,
         topic: topic || 'General',
         type: questionType,
-        points: properDifficulty === 'Easy' ? 5 : properDifficulty === 'Medium' ? 10 : 15,
+        points: properDifficulty === 'Easy' ? 5 : properDifficulty === 'Medium' ? 10 : properDifficulty === 'Hard' ? 15 : 20,
         timeLimit: 30,
         explanation: ''
       });
@@ -264,7 +265,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     category: string,
     count: number, 
     grade?: number, 
-    difficulty?: 'easy' | 'medium' | 'hard',
+    difficulty?: 'easy' | 'medium' | 'hard' | 'extreme',
     topic?: string
   ): Quiz => {
     const newQuiz = generateRandomQuiz(category, count, grade, difficulty, topic);
