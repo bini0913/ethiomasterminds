@@ -205,7 +205,7 @@ const TournamentHub: React.FC = () => {
         .eq("tournament_id", tournamentId)
         .order("round", { ascending: true })
         .order("bracket_position", { ascending: true }),
-      supabase.from("profiles").select("id,name,avatar_url"),
+      supabase.from("profiles").select("id,name,avatar"),
       supabase
         .from("tournament_events" as any)
         .select("id,event_type,data,payload,created_at")
@@ -214,13 +214,13 @@ const TournamentHub: React.FC = () => {
         .limit(20),
     ]);
 
-    const profileMap = new Map((profileRows || []).map((profile) => [profile.id, profile]));
+    const profileMap = new Map(((profileRows as any[]) || []).map((profile: any) => [profile.id, profile]));
 
     const mappedPlayers = (playerRows || []).map((player: any): TournamentPlayer => ({
       id: player.id,
       userId: player.user_id,
       name: profileMap.get(player.user_id)?.name || "Unknown Player",
-      avatarUrl: profileMap.get(player.user_id)?.avatar_url || null,
+      avatarUrl: profileMap.get(player.user_id)?.avatar || null,
       status: player.status,
     }));
 
