@@ -261,7 +261,7 @@ const LibraryPage: React.FC = () => {
           type: form.type,
           pdfFile: form.file,
           uploaderId: user.id,
-          uploaderRole: user.role,
+          uploaderRole: user.role as 'admin' | 'manager' | 'student' | 'teacher',
           onProgress: setUploadPhase,
         });
         toast.success(created.status === 'approved' ? 'Book uploaded to library.' : 'Book uploaded and waiting for approval.');

@@ -70,11 +70,11 @@ const ExtremeAdminPortal: React.FC = () => {
     setLoading(true);
     try {
       const [{ data: dashboardData, error: dashboardError }, { data: userData, error: usersError }, { data: logData, error: logsError }, { data: settingsData, error: settingsError }, { data: securityData, error: securityError }] = await Promise.all([
-        supabase.rpc('extreme_admin_get_dashboard'),
-        supabase.rpc('extreme_admin_list_users', { p_limit: 300 }),
-        supabase.rpc('extreme_admin_get_audit_logs', { p_limit: 100 }),
-        supabase.rpc('extreme_admin_get_settings'),
-        supabase.rpc('extreme_admin_get_security'),
+        supabase.rpc('extreme_admin_get_dashboard' as any),
+        supabase.rpc('extreme_admin_list_users' as any, { p_limit: 300 }),
+        supabase.rpc('extreme_admin_get_audit_logs' as any, { p_limit: 100 }),
+        supabase.rpc('extreme_admin_get_settings' as any),
+        supabase.rpc('extreme_admin_get_security' as any),
       ]);
 
       if (dashboardError || usersError || logsError || settingsError || securityError) {
@@ -82,8 +82,8 @@ const ExtremeAdminPortal: React.FC = () => {
       }
 
       setDashboard((dashboardData as Record<string, number>) || {});
-      setUsers((userData as PortalUser[]) || []);
-      setLogs(logData || []);
+      setUsers(((userData as unknown) as PortalUser[]) || []);
+      setLogs((logData as any) || []);
 
       const mappedSettings = (settingsData || []).reduce((acc: Record<string, boolean>, row: any) => {
         acc[row.setting_key] = row.setting_value === true;
@@ -107,7 +107,7 @@ const ExtremeAdminPortal: React.FC = () => {
   }, [user?.id, isExtremeAdmin]);
 
   const verifyAccess = async () => {
-    const { error } = await supabase.rpc('extreme_admin_check_access', {
+    const { error } = await supabase.rpc('extreme_admin_check_access' as any, {
       p_request_ip: requestIp || null,
       p_two_factor_code: twoFactorCode || null,
     });
@@ -126,7 +126,7 @@ const ExtremeAdminPortal: React.FC = () => {
       .map((value) => value.trim())
       .filter(Boolean);
 
-    const { error } = await supabase.rpc('extreme_admin_configure_security', {
+    const { error } = await supabase.rpc('extreme_admin_configure_security' as any, {
       p_allowed_ips: allowIps,
       p_require_2fa: require2FA,
       p_two_factor_code: securityCodeInput || null,
@@ -143,7 +143,7 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const setRole = async () => {
-    const { error } = await supabase.rpc('extreme_admin_update_user_role', {
+    const { error } = await supabase.rpc('extreme_admin_update_user_role' as any, {
       p_user_id: targetUserId,
       p_role: targetRole,
     });
@@ -158,7 +158,7 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const setUserStatus = async () => {
-    const { error } = await supabase.rpc('extreme_admin_set_user_status', {
+    const { error } = await supabase.rpc('extreme_admin_set_user_status' as any, {
       p_user_id: targetUserId,
       p_status: status,
       p_reason: statusReason || null,
@@ -174,7 +174,7 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const adjustEconomy = async (reset = false) => {
-    const { error } = await supabase.rpc('extreme_admin_adjust_economy', {
+    const { error } = await supabase.rpc('extreme_admin_adjust_economy' as any, {
       p_user_id: targetUserId,
       p_xp_delta: Number(xpDelta) || 0,
       p_coin_delta: Number(coinDelta) || 0,
@@ -191,7 +191,7 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const deleteMessage = async () => {
-    const { error } = await supabase.rpc('extreme_admin_delete_message', { p_message_id: messageId });
+    const { error } = await supabase.rpc('extreme_admin_delete_message' as any, { p_message_id: messageId });
     if (error) return toast.error(error.message || 'Failed to delete message');
     toast.success('Message deleted');
     setMessageId('');
@@ -199,7 +199,7 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const deletePost = async () => {
-    const { error } = await supabase.rpc('extreme_admin_delete_social_post', { p_post_id: postId });
+    const { error } = await supabase.rpc('extreme_admin_delete_social_post' as any, { p_post_id: postId });
     if (error) return toast.error(error.message || 'Failed to delete post');
     toast.success('Post deleted');
     setPostId('');
@@ -207,7 +207,7 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const deleteBook = async () => {
-    const { error } = await supabase.rpc('extreme_admin_delete_library_book', { p_book_id: bookId });
+    const { error } = await supabase.rpc('extreme_admin_delete_library_book' as any, { p_book_id: bookId });
     if (error) return toast.error(error.message || 'Failed to delete book');
     toast.success('Book deleted');
     setBookId('');
@@ -215,14 +215,14 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const purgeUserData = async () => {
-    const { error } = await supabase.rpc('extreme_admin_purge_user_data', { p_user_id: targetUserId });
+    const { error } = await supabase.rpc('extreme_admin_purge_user_data' as any, { p_user_id: targetUserId });
     if (error) return toast.error(error.message || 'Failed to purge user data');
     toast.success('User platform data purged');
     refreshAll();
   };
 
   const updateSetting = async (key: string, value: boolean) => {
-    const { error } = await supabase.rpc('extreme_admin_set_setting', {
+    const { error } = await supabase.rpc('extreme_admin_set_setting' as any, {
       p_key: key,
       p_value: value,
     });
