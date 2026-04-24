@@ -19,8 +19,10 @@ export interface LeaderboardUser {
   losses: number;
   contributions: number;
   weeklyScore: number;
+  monthlyScore: number;
   totalXp: number;
   seasonXp: number;
+  coins: number;
   activeTitle: string | null;
 }
 
@@ -51,17 +53,19 @@ export const tierStyle = (level: number) => {
 };
 
 export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [profilesRes, streakRes, weeklyRes] = await Promise.all([
+  const [profilesRes, streakRes, attemptsRes, currencyRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("id,name,username,avatar,avatar_config,grade,xp,level,rank,badges"),
     supabase.from("user_streaks").select("user_id,current_streak"),
     supabase
       .from("question_attempts")
-      .select("user_id,is_correct")
-      .gte("created_at", since),
+      .select("user_id,is_correct,created_at")
+      .gte("created_at", monthAgo),
+    supabase.from("user_currency").select("user_id,coins"),
   ]);
 
   if (profilesRes.error) {
@@ -72,70 +76,53 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   const streakByUser = new Map<string, number>();
   (streakRes.data ?? []).forEach((row) => streakByUser.set(row.user_id, row.current_streak));
 
+  const coinsByUser = new Map<string, number>();
+  (currencyRes.data ?? []).forEach((row) => coinsByUser.set(row.user_id, row.coins ?? 0));
+
   const weeklyByUser = new Map<string, { attempts: number; correct: number }>();
-  (weeklyRes.data ?? []).forEach((row) => {
-    const current = weeklyByUser.get(row.user_id) ?? { attempts: 0, correct: 0 };
-    current.attempts += 1;
-    if (row.is_correct) current.correct += 1;
-    weeklyByUser.set(row.user_id, current);
+  const monthlyByUser = new Map<string, { attempts: number; correct: number }>();
+  (attemptsRes.data ?? []).forEach((row) => {
+    const m = monthlyByUser.get(row.user_id) ?? { attempts: 0, correct: 0 };
+    m.attempts += 1;
+    if (row.is_correct) m.correct += 1;
+    monthlyByUser.set(row.user_id, m);
+    if (row.created_at >= weekAgo) {
+      const w = weeklyByUser.get(row.user_id) ?? { attempts: 0, correct: 0 };
+      w.attempts += 1;
+      if (row.is_correct) w.correct += 1;
+      weeklyByUser.set(row.user_id, w);
+    }
   });
 
-  const users = await Promise.all(
-    (profilesRes.data ?? []).map(async (profile) => {
-      const { data: statsData } = await supabase.rpc("get_user_stats", { p_user_id: profile.id });
-      const stats = (statsData ?? {}) as Record<string, unknown>;
-
-      const correct = Number(stats.total_correct_answers ?? 0);
-      const total = Number(stats.total_questions_answered ?? 0);
-      const wins = Number(stats.total_wins ?? 0);
-      const losses = Number(stats.total_losses ?? 0);
-      const contributions = Number(stats.study_time_hours ?? 0) * 10;
-      const weekly = weeklyByUser.get(profile.id) ?? { attempts: 0, correct: 0 };
-
-      return {
-        id: profile.id,
-        username: profile.username ?? profile.name ?? "user",
-        name: profile.name ?? profile.username ?? "Unknown User",
-        avatar: profile.avatar ?? null,
-        avatarConfig: (profile.avatar_config as Record<string, unknown> | null) ?? null,
-        grade: toGradeNumber(profile.grade),
-        xp: Number(profile.xp ?? 0),
-        level: profile.level ?? 1,
-        rank: profile.rank ?? null,
-        badges: profile.badges ?? [],
-        streak: streakByUser.get(profile.id) ?? 0,
-        accuracy: total > 0 ? Number(((correct / total) * 100).toFixed(1)) : 0,
-        matchesPlayed: wins + losses,
-        wins,
-        losses,
-        contributions,
-        weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
-        totalXp: Number((profile as any).total_xp ?? profile.xp ?? 0),
-        seasonXp: Number((profile as any).season_xp ?? profile.xp ?? 0),
-        activeTitle: null,
-      } as LeaderboardUser;
-    }),
-  );
-
-  const userIds = users.map((row) => row.id);
-  if (userIds.length) {
-    const { data: titles } = await (supabase as any)
-      .from("user_titles")
-      .select("user_id,title_name,is_active,created_at")
-      .in("user_id", userIds)
-      .eq("is_active", true);
-
-    const activeTitleByUser = new Map<string, string>();
-    (titles ?? []).forEach((row: any) => {
-      if (!activeTitleByUser.has(row.user_id)) {
-        activeTitleByUser.set(row.user_id, row.title_name);
-      }
-    });
-
-    users.forEach((row) => {
-      row.activeTitle = activeTitleByUser.get(row.id) ?? null;
-    });
-  }
+  const users: LeaderboardUser[] = (profilesRes.data ?? []).map((profile) => {
+    const weekly = weeklyByUser.get(profile.id) ?? { attempts: 0, correct: 0 };
+    const monthly = monthlyByUser.get(profile.id) ?? { attempts: 0, correct: 0 };
+    const accuracy = monthly.attempts > 0 ? Number(((monthly.correct / monthly.attempts) * 100).toFixed(1)) : 0;
+    return {
+      id: profile.id,
+      username: profile.username ?? profile.name ?? "user",
+      name: profile.name ?? profile.username ?? "Unknown User",
+      avatar: profile.avatar ?? null,
+      avatarConfig: (profile.avatar_config as Record<string, unknown> | null) ?? null,
+      grade: toGradeNumber(profile.grade),
+      xp: Number(profile.xp ?? 0),
+      level: profile.level ?? 1,
+      rank: profile.rank ?? null,
+      badges: profile.badges ?? [],
+      streak: streakByUser.get(profile.id) ?? 0,
+      accuracy,
+      matchesPlayed: 0,
+      wins: 0,
+      losses: 0,
+      contributions: 0,
+      weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
+      monthlyScore: monthly.attempts * 10 + monthly.correct * 5,
+      totalXp: Number(profile.xp ?? 0),
+      seasonXp: Number(profile.xp ?? 0),
+      coins: coinsByUser.get(profile.id) ?? 0,
+      activeTitle: null,
+    } as LeaderboardUser;
+  });
 
   return users;
 }
