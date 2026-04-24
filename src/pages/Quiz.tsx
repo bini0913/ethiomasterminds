@@ -51,6 +51,18 @@ const Quiz: React.FC = () => {
     return Number.isNaN(parsed) ? studentGrade : Math.min(9, Math.max(5, parsed));
   }, [selectedGrade, studentGrade]);
 
+  const adaptiveDifficulty = useMemo<"easy" | "medium" | "hard" | "extreme">(() => {
+    const level = user?.level || 1;
+    if (level <= 5) return "easy";
+    if (level <= 10) return "medium";
+    if (level <= 20) return "hard";
+    return "extreme";
+  }, [user?.level]);
+
+  useEffect(() => {
+    setDifficulty(adaptiveDifficulty);
+  }, [adaptiveDifficulty]);
+
   const normalizeCategory = (value: string) => value.toLowerCase().trim();
   const rotateOptionsForBalance = (question: Question, quizIndexSeed: number, questionIndex: number): Question => {
     if (question.type !== "Multiple Choice") return question;
@@ -248,10 +260,7 @@ const Quiz: React.FC = () => {
       hard: "Hard",
       extreme: "Extreme",
     };
-    const targetDifficulty = adjustDifficulty(
-      difficultyMap[difficulty] as QuizDifficulty,
-      performanceOffset
-    ) as QuizType["difficulty"];
+    const targetDifficulty = difficultyMap[adaptiveDifficulty];
 
     const matchingQuestions = quizzes
       .filter((quiz) => {
@@ -263,6 +272,10 @@ const Quiz: React.FC = () => {
       .flatMap((quiz) => quiz.questions);
 
     const freshPool = matchingQuestions.filter((question) => !attemptedQuestionIds.has(question.id));
+    if (matchingQuestions.length === 0) {
+      toast.error("No quiz available");
+      return;
+    }
     const shuffledFreshPool = [...freshPool].sort(() => Math.random() - 0.5);
     const selectedQuestions = shuffledFreshPool
       .slice(0, numQuestions)
@@ -290,7 +303,7 @@ const Quiz: React.FC = () => {
 
     setAllowXPForActiveQuiz(true);
     setActiveQuiz(randomQuiz);
-    toast.success(`Created an adaptive ${targetDifficulty.toLowerCase()} ${selectedCategory} quiz with ${selectedQuestions.length} questions`);
+    toast.success(`Created an adaptive ${adaptiveDifficulty} ${selectedCategory} quiz with ${selectedQuestions.length} new questions`);
   };
   
   const handleQuizComplete = (score: number, completedQuestionIds: string[]) => {
@@ -330,7 +343,20 @@ const Quiz: React.FC = () => {
     }
   };
 
-  const getXPPerCorrectAnswer = (difficulty: QuizDifficulty) => xpPerCorrectByDifficulty[difficulty];
+  const getXPPerCorrectAnswer = (difficulty: "Easy" | "Medium" | "Hard" | "Extreme") => {
+    switch (difficulty) {
+      case "Easy":
+        return 2;
+      case "Medium":
+        return 4;
+      case "Hard":
+        return 6;
+      case "Extreme":
+        return 8;
+      default:
+        return 4;
+    }
+  };
   
   if (activeQuiz) {
     return (
@@ -585,19 +611,16 @@ const Quiz: React.FC = () => {
                       </div>
                       
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Difficulty</label>
-                        <Select 
-                          value={difficulty} 
-                          onValueChange={(val) => setDifficulty(val as "easy" | "medium" | "hard" | "extreme")}
-                        >
+                        <label className="text-sm font-medium text-foreground">Adaptive Difficulty</label>
+                        <Select value={difficulty} disabled>
                           <SelectTrigger className="glass border-border/50">
-                            <SelectValue placeholder="Difficulty" />
+                            <SelectValue placeholder="Adaptive difficulty" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="easy">Easy</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="hard">Hard</SelectItem>
-                            <SelectItem value="extreme">Extreme</SelectItem>
+                            <SelectItem value="easy">Easy (Levels 1–5)</SelectItem>
+                            <SelectItem value="medium">Medium (Levels 6–10)</SelectItem>
+                            <SelectItem value="hard">Hard (Levels 11–20)</SelectItem>
+                            <SelectItem value="extreme">Extreme (Levels 21+)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

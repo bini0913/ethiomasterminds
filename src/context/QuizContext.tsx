@@ -123,7 +123,11 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           text: q.question_text,
           options,
           correctAnswer: q.correct_answer,
-          difficulty: (q.points >= 20 ? 'Extreme' : q.points >= 15 ? 'Hard' : q.points >= 10 ? 'Medium' : 'Easy') as 'Easy' | 'Medium' | 'Hard' | 'Extreme',
+          difficulty: (
+            q.difficulty
+              ? (q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1).toLowerCase())
+              : (q.points >= 20 ? 'Extreme' : q.points >= 15 ? 'Hard' : q.points >= 10 ? 'Medium' : 'Easy')
+          ) as 'Easy' | 'Medium' | 'Hard' | 'Extreme',
           subject: '', // Will be set from quiz
           grade: 0, // Will be set from quiz
           topic: 'General',
@@ -152,7 +156,15 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           questions,
           subject: q.subject,
           grade: gradeNum,
-          difficulty: (q.difficulty === 'easy' ? 'Easy' : q.difficulty === 'hard' ? 'Hard' : q.difficulty === 'extreme' ? 'Extreme' : 'Medium') as 'Easy' | 'Medium' | 'Hard' | 'Extreme',
+          difficulty: (
+            q.difficulty === 'easy'
+              ? 'Easy'
+              : q.difficulty === 'hard'
+                ? 'Hard'
+                : q.difficulty === 'extreme'
+                  ? 'Extreme'
+                  : 'Medium'
+          ) as 'Easy' | 'Medium' | 'Hard' | 'Extreme',
           timeLimit: q.time_limit || questions.length * 30,
           createdBy: q.created_by,
           createdAt: new Date(q.created_at),
@@ -162,8 +174,9 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
       });
 
-      setQuizzes(mappedQuizzes);
-      setFilteredQuizzes(mappedQuizzes);
+      const nonEmptyMappedQuizzes = mappedQuizzes.filter((quiz) => quiz.questions.length > 0);
+      setQuizzes(nonEmptyMappedQuizzes);
+      setFilteredQuizzes(nonEmptyMappedQuizzes);
     } catch (err) {
       console.error('Error in fetchQuizzes:', err);
     } finally {

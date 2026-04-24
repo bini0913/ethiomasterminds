@@ -44,6 +44,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
   const mindForgeSettings = getMindForgeSettings();
   const questionStartTime = useRef(Date.now());
   const questionTimes = useRef<{[key: string]: number}>({});
+  const submissionIdRef = useRef<string | null>(null);
   const uuidLikeRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   // Get the current question from the quiz
@@ -125,7 +126,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
 
       toast.success(`Correct! +${pointsEarned} points`);
     } else {
-      setAnsweredWrong((prev) => prev + 1);
+      setAnsweredWrong(prev => prev + 1);
       setStreak(0);
       const nextWrongCount = (wrongByTopic[currentQuestion.topic] || 0) + 1;
       setWrongByTopic((prev) => ({ ...prev, [currentQuestion.topic]: nextWrongCount }));
@@ -167,7 +168,33 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     return basePoints + timeBonus;
   };
 
-  const saveQuizResults = async (finalScore: number, totalXP: number, wrongAnswers: number, difficulty: QuizDifficulty) => {
+  const getXPPerCorrectAnswer = () => {
+    switch (quiz.difficulty) {
+      case "Easy":
+        return 2;
+      case "Medium":
+        return 4;
+      case "Hard":
+        return 6;
+      case "Extreme":
+        return 8;
+      default:
+        return 4;
+    }
+  };
+
+  const getWrongPenalty = () => {
+    switch (quiz.difficulty) {
+      case "Hard":
+        return 2;
+      case "Extreme":
+        return 3;
+      default:
+        return 0;
+    }
+  };
+  
+  const saveQuizResults = async (finalScore: number, totalXP: number) => {
     try {
       const totalTimeTaken = Object.values(questionTimes.current).reduce((a, b) => a + b, 0);
       const persistedQuizId = quiz.sourceQuizId || quiz.id;
@@ -178,38 +205,18 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
         return;
       }
       
-      // Save quiz result
-      await supabase.from('quiz_results').insert({
-        quiz_id: persistedQuizId,
-        student_id: user!.id,
-        score: finalScore,
-        total_questions: quiz.questions.length,
-        correct_answers: answeredCorrectly,
-        time_taken: totalTimeTaken,
-        xp_earned: totalXP,
-        answers: userAnswers as any
+      const submissionId = submissionIdRef.current || crypto.randomUUID();
+      submissionIdRef.current = submissionId;
+      const { data, error } = await supabase.rpc('submit_quiz_result_secure', {
+        p_quiz_id: persistedQuizId,
+        p_answers: userAnswers as any,
+        p_time_taken: totalTimeTaken,
+        p_submission_id: submissionId
       });
-
-      await (supabase as any).from('quiz_attempts').insert({
-        user_id: user!.id,
-        quiz_id: persistedQuizId,
-        correct_answers: answeredCorrectly,
-        wrong_answers: wrongAnswers,
-        xp_earned: totalXP,
-        difficulty
-      });
-
-      // Save individual question attempts
-      const attempts = quiz.questions.map((q) => ({
-        quiz_id: persistedQuizId,
-        question_id: q.id,
-        user_id: user!.id,
-        selected_answer: userAnswers[q.id] || 'no_answer',
-        is_correct: userAnswers[q.id] === q.correctAnswer,
-        time_taken_seconds: questionTimes.current[q.id] || 20
-      }));
-      
-      await supabase.from('question_attempts').insert(attempts);
+      if (error) throw error;
+      if (data?.xp_earned !== undefined) {
+        setEarnedXP(Number(data.xp_earned) || 0);
+      }
 
       // Update analytics, streak, and achievements
       const avgTime = totalTimeTaken / quiz.questions.length;
@@ -237,9 +244,11 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       const finalScore = score;
       setQuizCompleted(true);
       
-      const difficulty = normalizeDifficulty(quiz.difficulty) as QuizDifficulty;
-      const wrongAnswers = Math.max(0, quiz.questions.length - answeredCorrectly);
-      const totalXP = allowXP ? calculateQuizXP(difficulty, answeredCorrectly, wrongAnswers) : 0;
+      // Calculate XP by difficulty and number of correct answers.
+      // Easy = 3 XP, Medium = 7 XP, Hard = 10 XP per correct answer.
+      const xpPerCorrectAnswer = getXPPerCorrectAnswer();
+      const wrongPenalty = getWrongPenalty();
+      const totalXP = allowXP ? (answeredCorrectly * xpPerCorrectAnswer) - (answeredWrong * wrongPenalty) : 0;
       
       setEarnedXP(totalXP);
       
@@ -277,6 +286,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     setCompletedQuestionIds([]);
     setAnsweredCorrectly(0);
     setAnsweredWrong(0);
+    submissionIdRef.current = null;
   };
   
   // Calculate accuracy percentage
