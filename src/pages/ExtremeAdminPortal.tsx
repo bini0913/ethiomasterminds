@@ -82,8 +82,8 @@ const ExtremeAdminPortal: React.FC = () => {
       }
 
       setDashboard((dashboardData as Record<string, number>) || {});
-      setUsers((userData as PortalUser[]) || []);
-      setLogs(logData || []);
+      setUsers(((userData as unknown) as PortalUser[]) || []);
+      setLogs((logData as any) || []);
 
       const mappedSettings = (settingsData || []).reduce((acc: Record<string, boolean>, row: any) => {
         acc[row.setting_key] = row.setting_value === true;
