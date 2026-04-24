@@ -322,7 +322,7 @@ const TournamentHub: React.FC = () => {
   };
 
   const runManagerAction = async (
-    action: () => Promise<{ error: { message?: string } | null }>,
+    action: () => any,
     successMessage: string,
   ) => {
     setIsSubmittingAction(true);
