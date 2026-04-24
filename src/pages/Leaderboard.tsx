@@ -202,19 +202,32 @@ const Leaderboard = () => {
               </div>
             </Tabs>
 
-            {activeTab === "grade" && (
-              <div className="w-40">
-                <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-                  <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground">Timeframe</span>
+                <Select value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
+                  <SelectTrigger className="w-36"><SelectValue placeholder="Timeframe" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All grades</SelectItem>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((grade) => (
-                      <SelectItem key={grade} value={`${grade}`}>Grade {grade}</SelectItem>
-                    ))}
+                    <SelectItem value="all">All time</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
+              {activeTab === "grade" && (
+                <div className="w-40">
+                  <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                    <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All grades</SelectItem>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((grade) => (
+                        <SelectItem key={grade} value={`${grade}`}>Grade {grade}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
 
             {activeTab === "classes" ? (
               <section className="space-y-3">
