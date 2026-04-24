@@ -14,6 +14,7 @@ import { Mic } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import MindForgeReactionOverlay from "./MindForgeReactionOverlay";
 import { getMindForgeSettings, MindForgeReactionType } from "@/lib/mindforge";
+import { calculateQuizXP, normalizeDifficulty, QuizDifficulty } from "@/lib/quizDifficulty";
 
 interface QuizViewProps {
   quiz: Quiz;
@@ -33,6 +34,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
   const [userAnswers, setUserAnswers] = useState<{[key: string]: string}>({});
   const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
   const [answeredCorrectly, setAnsweredCorrectly] = useState(0);
+  const [answeredWrong, setAnsweredWrong] = useState(0);
   const [voiceMode, setVoiceMode] = useState(false);
   const [streak, setStreak] = useState(0);
   const [activeReaction, setActiveReaction] = useState<MindForgeReactionType | null>(null);
@@ -80,6 +82,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
         ...prev,
         [currentQuestion.id]: "no_answer"
       }));
+      setAnsweredWrong((prev) => prev + 1);
 
       // Add to completed questions
       setCompletedQuestionIds(prev => [...prev, currentQuestion.id]);
@@ -122,6 +125,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
 
       toast.success(`Correct! +${pointsEarned} points`);
     } else {
+      setAnsweredWrong((prev) => prev + 1);
       setStreak(0);
       const nextWrongCount = (wrongByTopic[currentQuestion.topic] || 0) + 1;
       setWrongByTopic((prev) => ({ ...prev, [currentQuestion.topic]: nextWrongCount }));
@@ -163,19 +167,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     return basePoints + timeBonus;
   };
 
-  const getXPPerCorrectAnswer = () => {
-    switch (quiz.difficulty) {
-      case "Easy":
-        return 3;
-      case "Hard":
-        return 10;
-      case "Medium":
-      default:
-        return 7;
-    }
-  };
-  
-  const saveQuizResults = async (finalScore: number, totalXP: number) => {
+  const saveQuizResults = async (finalScore: number, totalXP: number, wrongAnswers: number, difficulty: QuizDifficulty) => {
     try {
       const totalTimeTaken = Object.values(questionTimes.current).reduce((a, b) => a + b, 0);
       const persistedQuizId = quiz.sourceQuizId || quiz.id;
@@ -196,6 +188,15 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
         time_taken: totalTimeTaken,
         xp_earned: totalXP,
         answers: userAnswers as any
+      });
+
+      await (supabase as any).from('quiz_attempts').insert({
+        user_id: user!.id,
+        quiz_id: persistedQuizId,
+        correct_answers: answeredCorrectly,
+        wrong_answers: wrongAnswers,
+        xp_earned: totalXP,
+        difficulty
       });
 
       // Save individual question attempts
@@ -236,16 +237,15 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       const finalScore = score;
       setQuizCompleted(true);
       
-      // Calculate XP by difficulty and number of correct answers.
-      // Easy = 3 XP, Medium = 7 XP, Hard = 10 XP per correct answer.
-      const xpPerCorrectAnswer = getXPPerCorrectAnswer();
-      const totalXP = allowXP ? answeredCorrectly * xpPerCorrectAnswer : 0;
+      const difficulty = normalizeDifficulty(quiz.difficulty) as QuizDifficulty;
+      const wrongAnswers = Math.max(0, quiz.questions.length - answeredCorrectly);
+      const totalXP = allowXP ? calculateQuizXP(difficulty, answeredCorrectly, wrongAnswers) : 0;
       
       setEarnedXP(totalXP);
       
       // Save results to database
       if (user?.id) {
-        saveQuizResults(finalScore, totalXP);
+        saveQuizResults(finalScore, totalXP, wrongAnswers, difficulty);
       }
       
       // Call the onComplete callback with completed question IDs
@@ -276,6 +276,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     setQuizCompleted(false);
     setCompletedQuestionIds([]);
     setAnsweredCorrectly(0);
+    setAnsweredWrong(0);
   };
   
   // Calculate accuracy percentage
@@ -401,6 +402,10 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
                 <div>
                   <div className="text-2xl font-bold text-green-500">{answeredCorrectly}/{quiz.questions.length}</div>
                   <div className="text-sm text-gray-500">Correct Answers</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-500">{answeredWrong}</div>
+                  <div className="text-sm text-gray-500">Wrong Answers</div>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-blue-500">+{earnedXP}</div>
