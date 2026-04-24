@@ -187,13 +187,15 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     return () => clearTimeout(tick);
   }, [roomState.status, countdownEndsAt, countdownValue, isHost]);
 
+  const readyCount = players.filter((p) => p.isReady).length;
+  const autoStartReady = players.length >= 2 && readyCount === players.length;
   useEffect(() => {
     if (roomState.status !== 'waiting') {
       autoStartTriggeredRef.current = false;
       return;
     }
 
-    if (!canAutoStart) {
+    if (!autoStartReady) {
       autoStartTriggeredRef.current = false;
       return;
     }
@@ -201,7 +203,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (!isHost || autoStartTriggeredRef.current) return;
     autoStartTriggeredRef.current = true;
     void triggerCountdown();
-  }, [canAutoStart, isHost, roomState.status]);
+  }, [autoStartReady, isHost, roomState.status]);
 
   useEffect(() => {
     const handleOffline = () => {
