@@ -283,7 +283,7 @@ const ManagerDashboard: React.FC = () => {
       return acc;
     }, {});
 
-    const matchesByTournament = (matches || []).reduce<Record<string, TournamentMatchRow[]>>((acc, row) => {
+    const matchesByTournament = ((matches as any[]) || []).reduce<Record<string, TournamentMatchRow[]>>((acc, row: any) => {
       if (!acc[row.tournament_id]) acc[row.tournament_id] = [];
       acc[row.tournament_id].push(row as TournamentMatchRow);
       return acc;
