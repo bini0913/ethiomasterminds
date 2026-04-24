@@ -14,6 +14,7 @@ import { Mic } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import MindForgeReactionOverlay from "./MindForgeReactionOverlay";
 import { getMindForgeSettings, MindForgeReactionType } from "@/lib/mindforge";
+import { calculateQuizXP, normalizeDifficulty, QuizDifficulty } from "@/lib/quizDifficulty";
 
 interface QuizViewProps {
   quiz: Quiz;
@@ -82,6 +83,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
         ...prev,
         [currentQuestion.id]: "no_answer"
       }));
+      setAnsweredWrong((prev) => prev + 1);
 
       // Add to completed questions
       setCompletedQuestionIds(prev => [...prev, currentQuestion.id]);
@@ -252,7 +254,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       
       // Save results to database
       if (user?.id) {
-        saveQuizResults(finalScore, totalXP);
+        saveQuizResults(finalScore, totalXP, wrongAnswers, difficulty);
       }
       
       // Call the onComplete callback with completed question IDs
@@ -410,6 +412,10 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
                 <div>
                   <div className="text-2xl font-bold text-green-500">{answeredCorrectly}/{quiz.questions.length}</div>
                   <div className="text-sm text-gray-500">Correct Answers</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-500">{answeredWrong}</div>
+                  <div className="text-sm text-gray-500">Wrong Answers</div>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-blue-500">+{earnedXP}</div>

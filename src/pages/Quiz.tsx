@@ -13,6 +13,7 @@ import BackButton from "@/components/ui/BackButton";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { adjustDifficulty, difficultyFromLevel, normalizeDifficulty, QuizDifficulty, xpPerCorrectByDifficulty } from "@/lib/quizDifficulty";
 
 const Quiz: React.FC = () => {
   const { quizzes } = useQuiz();
@@ -27,12 +28,18 @@ const Quiz: React.FC = () => {
   const [attemptedQuestionIds, setAttemptedQuestionIds] = useState<Set<string>>(new Set());
   const [completedQuizIds, setCompletedQuizIds] = useState<Set<string>>(new Set());
   const [allowXPForActiveQuiz, setAllowXPForActiveQuiz] = useState(true);
+  const [performanceOffset, setPerformanceOffset] = useState(0);
   
   useEffect(() => {
     const preferredGrade = parseInt(user?.grade || "5", 10);
     const boundedGrade = Number.isNaN(preferredGrade) ? 5 : Math.min(9, Math.max(5, preferredGrade));
     setSelectedGrade(boundedGrade.toString());
   }, [user?.grade]);
+
+  useEffect(() => {
+    const base = difficultyFromLevel(user?.level || 1).toLowerCase() as "easy" | "medium" | "hard" | "extreme";
+    setDifficulty(base);
+  }, [user?.level]);
 
   const studentGrade = useMemo(() => {
     const preferredGrade = parseInt(user?.grade || "5", 10);
@@ -189,6 +196,34 @@ const Quiz: React.FC = () => {
     loadCompletedFromDatabase();
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id || !selectedCategory) return;
+
+    const loadDifficultyOffset = async () => {
+      const { data } = await supabase
+        .from("quiz_results")
+        .select("correct_answers,total_questions")
+        .eq("student_id", user.id)
+        .order("completed_at", { ascending: false })
+        .limit(5);
+
+      if (!data?.length) {
+        setPerformanceOffset(0);
+        return;
+      }
+
+      const totalCorrect = data.reduce((sum, row) => sum + row.correct_answers, 0);
+      const totalQuestions = data.reduce((sum, row) => sum + row.total_questions, 0);
+      const avgAccuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
+
+      if (avgAccuracy >= 80) setPerformanceOffset(1);
+      else if (avgAccuracy < 50) setPerformanceOffset(-1);
+      else setPerformanceOffset(0);
+    };
+
+    loadDifficultyOffset();
+  }, [selectedCategory, user?.id]);
+
   const handleStartQuiz = (quiz: QuizType) => {
     const isCompletedQuiz = completedQuizIds.has(quiz.id) || (quiz.sourceQuizId && completedQuizIds.has(quiz.sourceQuizId));
     if (isCompletedQuiz) {
@@ -231,7 +266,7 @@ const Quiz: React.FC = () => {
       .filter((quiz) => {
         const sameGrade = quiz.gradeLevel === selectedGradeNumber;
         const sameSubject = normalizeCategory(quiz.category) === normalizeCategory(selectedCategory);
-        const difficultyMatch = quiz.difficulty === targetDifficulty;
+        const difficultyMatch = normalizeDifficulty(quiz.difficulty) === normalizeDifficulty(targetDifficulty);
         return sameGrade && sameSubject && difficultyMatch;
       })
       .flatMap((quiz) => quiz.questions);
@@ -253,8 +288,8 @@ const Quiz: React.FC = () => {
 
     const randomQuiz: QuizType = {
       id: `quick-${selectedCategory.toLowerCase().replace(/\s+/g, "-")}-g${selectedGradeNumber}-${Date.now()}`,
-      title: `Quick ${selectedCategory} Quiz - Grade ${selectedGradeNumber}`,
-      description: `${numQuestions} random ${targetDifficulty.toLowerCase()} questions from your selected class level`,
+      title: `Adaptive ${selectedCategory} Quiz - Grade ${selectedGradeNumber}`,
+      description: `${numQuestions} curriculum-aligned ${targetDifficulty.toLowerCase()} questions based on your level`,
       questions: selectedQuestions,
       subject: selectedCategory,
       grade: selectedGradeNumber,

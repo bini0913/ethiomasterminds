@@ -238,7 +238,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         grade: grade || 5,
         topic: topic || 'General',
         type: questionType,
-        points: properDifficulty === 'Easy' ? 5 : properDifficulty === 'Medium' ? 10 : 15,
+        points: properDifficulty === 'Easy' ? 5 : properDifficulty === 'Medium' ? 10 : properDifficulty === 'Hard' ? 15 : 20,
         timeLimit: 30,
         explanation: ''
       });
