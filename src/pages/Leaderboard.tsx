@@ -16,6 +16,7 @@ import { prefetchProfileBundle } from "@/lib/profilePrefetch";
 import { getRankTierByLevel } from "@/lib/rankSystem";
 
 type LeaderboardTab = "global" | "grade" | "friends" | "weekly" | "classes";
+type Timeframe = "all" | "monthly" | "weekly";
 
 const podiumStyles = {
   1: "border-yellow-400/70 bg-gradient-to-b from-yellow-500/20 via-amber-500/15 to-background shadow-[0_0_30px_rgba(250,204,21,0.35)]",
@@ -38,6 +39,7 @@ const Leaderboard = () => {
   const [following, setFollowing] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("global");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
+  const [timeframe, setTimeframe] = useState<Timeframe>("all");
   const [loading, setLoading] = useState(true);
   const [classRows, setClassRows] = useState<ClassCompetitionRow[]>([]);
   const [visibleRows, setVisibleRows] = useState(16);
