@@ -16,6 +16,7 @@ import { prefetchProfileBundle } from "@/lib/profilePrefetch";
 import { getRankTierByLevel } from "@/lib/rankSystem";
 
 type LeaderboardTab = "global" | "grade" | "friends" | "weekly" | "classes";
+type Timeframe = "all" | "monthly" | "weekly";
 
 const podiumStyles = {
   1: "border-yellow-400/70 bg-gradient-to-b from-yellow-500/20 via-amber-500/15 to-background shadow-[0_0_30px_rgba(250,204,21,0.35)]",
@@ -38,6 +39,7 @@ const Leaderboard = () => {
   const [following, setFollowing] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("global");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
+  const [timeframe, setTimeframe] = useState<Timeframe>("all");
   const [loading, setLoading] = useState(true);
   const [classRows, setClassRows] = useState<ClassCompetitionRow[]>([]);
   const [visibleRows, setVisibleRows] = useState(16);
@@ -85,7 +87,16 @@ const Leaderboard = () => {
     };
   }, [user?.id]);
 
-  const rankedUsers = useMemo(() => [...users].sort((a, b) => rankScore(b) - rankScore(a)), [users]);
+  const scoreFor = (u: LeaderboardUser) => {
+    if (timeframe === "weekly") return u.weeklyScore;
+    if (timeframe === "monthly") return u.monthlyScore;
+    return rankScore(u);
+  };
+
+  const rankedUsers = useMemo(
+    () => [...users].sort((a, b) => scoreFor(b) - scoreFor(a)),
+    [users, timeframe],
+  );
 
   const leaderboardData = useMemo(() => {
     if (activeTab === "friends") {
@@ -106,9 +117,9 @@ const Leaderboard = () => {
   const withRank = leaderboardData.map((entry, index) => ({
     ...entry,
     rankPos: index + 1,
-    score: activeTab === "weekly" ? entry.weeklyScore : rankScore(entry),
+    score: activeTab === "weekly" ? entry.weeklyScore : scoreFor(entry),
     tier: tierFromUser(entry),
-  })).slice(0, 15);
+  })).slice(0, 50);
 
   const topThree = withRank.slice(0, 3);
   const mobilePodium = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : topThree;
@@ -191,19 +202,32 @@ const Leaderboard = () => {
               </div>
             </Tabs>
 
-            {activeTab === "grade" && (
-              <div className="w-40">
-                <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-                  <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground">Timeframe</span>
+                <Select value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
+                  <SelectTrigger className="w-36"><SelectValue placeholder="Timeframe" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All grades</SelectItem>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((grade) => (
-                      <SelectItem key={grade} value={`${grade}`}>Grade {grade}</SelectItem>
-                    ))}
+                    <SelectItem value="all">All time</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
+              {activeTab === "grade" && (
+                <div className="w-40">
+                  <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                    <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All grades</SelectItem>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((grade) => (
+                        <SelectItem key={grade} value={`${grade}`}>Grade {grade}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
 
             {activeTab === "classes" ? (
               <section className="space-y-3">

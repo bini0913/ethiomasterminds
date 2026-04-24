@@ -2340,7 +2340,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _resolve_user_identifier: {
+        Args: { p_identifier: string }
+        Returns: string
+      }
       add_xp: { Args: { p_amount: number; p_user_id: string }; Returns: Json }
+      admin_adjust_coins: {
+        Args: { p_amount: number; p_user_identifier: string }
+        Returns: Json
+      }
+      admin_adjust_xp: {
+        Args: { p_amount: number; p_user_identifier: string }
+        Returns: Json
+      }
+      admin_reset_user_progress: {
+        Args: { p_reset_mode?: string; p_user_identifier: string }
+        Returns: Json
+      }
+      admin_set_user_level: {
+        Args: { p_level: number; p_user_identifier: string }
+        Returns: Json
+      }
       assign_user_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]
