@@ -87,7 +87,16 @@ const Leaderboard = () => {
     };
   }, [user?.id]);
 
-  const rankedUsers = useMemo(() => [...users].sort((a, b) => rankScore(b) - rankScore(a)), [users]);
+  const scoreFor = (u: LeaderboardUser) => {
+    if (timeframe === "weekly") return u.weeklyScore;
+    if (timeframe === "monthly") return u.monthlyScore;
+    return rankScore(u);
+  };
+
+  const rankedUsers = useMemo(
+    () => [...users].sort((a, b) => scoreFor(b) - scoreFor(a)),
+    [users, timeframe],
+  );
 
   const leaderboardData = useMemo(() => {
     if (activeTab === "friends") {
@@ -108,9 +117,9 @@ const Leaderboard = () => {
   const withRank = leaderboardData.map((entry, index) => ({
     ...entry,
     rankPos: index + 1,
-    score: activeTab === "weekly" ? entry.weeklyScore : rankScore(entry),
+    score: activeTab === "weekly" ? entry.weeklyScore : scoreFor(entry),
     tier: tierFromUser(entry),
-  })).slice(0, 15);
+  })).slice(0, 50);
 
   const topThree = withRank.slice(0, 3);
   const mobilePodium = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : topThree;
