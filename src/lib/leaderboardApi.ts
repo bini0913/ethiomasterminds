@@ -59,7 +59,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   const [profilesRes, streakRes, attemptsRes, currencyRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,name,username,avatar,avatar_config,grade,xp,level,rank,badges"),
+      .select("id,name,username,avatar,avatar_config,grade,xp,season_xp,level,rank,badges"),
     supabase.from("user_streaks").select("user_id,current_streak"),
     supabase
       .from("question_attempts")
@@ -118,7 +118,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
       weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
       monthlyScore: monthly.attempts * 10 + monthly.correct * 5,
       totalXp: Number(profile.xp ?? 0),
-      seasonXp: Number(profile.xp ?? 0),
+      seasonXp: Number((profile as any).season_xp ?? 0),
       coins: coinsByUser.get(profile.id) ?? 0,
       activeTitle: null,
     } as LeaderboardUser;
