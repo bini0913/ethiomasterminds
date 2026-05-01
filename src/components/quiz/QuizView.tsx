@@ -207,15 +207,16 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       
       const submissionId = submissionIdRef.current || crypto.randomUUID();
       submissionIdRef.current = submissionId;
-      const { data, error } = await supabase.rpc('submit_quiz_result_secure', {
+      const { data, error } = await (supabase as any).rpc('submit_quiz_result_secure', {
         p_quiz_id: persistedQuizId,
         p_answers: userAnswers as any,
         p_time_taken: totalTimeTaken,
         p_submission_id: submissionId
       });
       if (error) throw error;
-      if (data?.xp_earned !== undefined) {
-        setEarnedXP(Number(data.xp_earned) || 0);
+      const xpEarned = (data as any)?.xp_earned;
+      if (xpEarned !== undefined) {
+        setEarnedXP(Number(xpEarned) || 0);
       }
 
       // Update analytics, streak, and achievements
@@ -254,7 +255,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       
       // Save results to database
       if (user?.id) {
-        saveQuizResults(finalScore, totalXP, wrongAnswers, difficulty);
+        saveQuizResults(finalScore, totalXP);
       }
       
       // Call the onComplete callback with completed question IDs
