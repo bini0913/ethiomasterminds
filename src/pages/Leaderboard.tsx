@@ -44,6 +44,7 @@ const Leaderboard = () => {
   const [classRows, setClassRows] = useState<ClassCompetitionRow[]>([]);
   const [visibleRows, setVisibleRows] = useState(16);
   const [previewUser, setPreviewUser] = useState<(LeaderboardUser & { rankPos: number; score: number; tier: any }) | null>(null);
+  const [season, setSeason] = useState<{ name: string; number: number; startedAt: string | null }>({ name: "Season 1", number: 1, startedAt: null });
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchMovedRef = useRef(false);
   const longPressTriggeredRef = useRef(false);
@@ -66,10 +67,26 @@ const Leaderboard = () => {
     setFollowing(ids);
   };
 
+  const loadSeason = async () => {
+    const { data } = await (supabase as any)
+      .from("season_runtime_state")
+      .select("current_season_name,season_number,started_at")
+      .eq("id", 1)
+      .maybeSingle();
+    if (data) {
+      setSeason({
+        name: data.current_season_name ?? "Season 1",
+        number: data.season_number ?? 1,
+        startedAt: data.started_at ?? null,
+      });
+    }
+  };
+
   useEffect(() => {
     loadLeaderboard();
     loadFollowing();
     loadClassCompetition();
+    loadSeason();
 
     const channel = supabase
       .channel("leaderboard-live")
@@ -79,6 +96,8 @@ const Leaderboard = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "classes" }, loadClassCompetition)
       .on("postgres_changes", { event: "*", schema: "public", table: "user_streaks" }, loadLeaderboard)
       .on("postgres_changes", { event: "*", schema: "public", table: "followers" }, loadFollowing)
+      .on("postgres_changes", { event: "*", schema: "public", table: "season_runtime_state" }, () => { loadSeason(); loadLeaderboard(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "season_history" }, () => { loadSeason(); loadLeaderboard(); })
       .subscribe();
 
     return () => {
@@ -174,6 +193,14 @@ const Leaderboard = () => {
           <div>
             <p className="text-sm text-muted-foreground">Live database rankings only • no demo accounts</p>
             <h1 className="text-3xl font-bold tracking-tight">Master Minds Leaderboard</h1>
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs">
+              <Trophy className="h-3.5 w-3.5 text-yellow-400" />
+              <span className="font-semibold">{season.name}</span>
+              <span className="text-muted-foreground">#{season.number}</span>
+              {season.startedAt && (
+                <span className="text-muted-foreground">• started {new Date(season.startedAt).toLocaleDateString()}</span>
+              )}
+            </div>
           </div>
           <Button variant="outline" onClick={() => navigate("/")}>Back to home</Button>
         </header>
