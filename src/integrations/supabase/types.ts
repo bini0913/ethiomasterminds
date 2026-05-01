@@ -1131,6 +1131,7 @@ export type Database = {
           level: number
           name: string
           rank: string | null
+          season_xp: number
           updated_at: string
           username: string | null
           xp: number
@@ -1148,6 +1149,7 @@ export type Database = {
           level?: number
           name: string
           rank?: string | null
+          season_xp?: number
           updated_at?: string
           username?: string | null
           xp?: number
@@ -1165,6 +1167,7 @@ export type Database = {
           level?: number
           name?: string
           rank?: string | null
+          season_xp?: number
           updated_at?: string
           username?: string | null
           xp?: number
@@ -1760,6 +1763,75 @@ export type Database = {
           },
         ]
       }
+      season_history: {
+        Row: {
+          conversion_rate: number
+          ended_at: string
+          ended_by: string | null
+          id: string
+          reason: string | null
+          results: Json
+          season_name: string
+          season_number: number
+          started_at: string
+          top_user_id: string | null
+          top_user_name: string | null
+          total_users: number
+          total_xp: number
+        }
+        Insert: {
+          conversion_rate?: number
+          ended_at?: string
+          ended_by?: string | null
+          id?: string
+          reason?: string | null
+          results?: Json
+          season_name: string
+          season_number: number
+          started_at: string
+          top_user_id?: string | null
+          top_user_name?: string | null
+          total_users?: number
+          total_xp?: number
+        }
+        Update: {
+          conversion_rate?: number
+          ended_at?: string
+          ended_by?: string | null
+          id?: string
+          reason?: string | null
+          results?: Json
+          season_name?: string
+          season_number?: number
+          started_at?: string
+          top_user_id?: string | null
+          top_user_name?: string | null
+          total_users?: number
+          total_xp?: number
+        }
+        Relationships: []
+      }
+      season_runtime_state: {
+        Row: {
+          current_season_name: string
+          id: number
+          season_number: number
+          started_at: string
+        }
+        Insert: {
+          current_season_name?: string
+          id?: number
+          season_number?: number
+          started_at?: string
+        }
+        Update: {
+          current_season_name?: string
+          id?: number
+          season_number?: number
+          started_at?: string
+        }
+        Relationships: []
+      }
       social_post_comments: {
         Row: {
           content: string
@@ -1911,6 +1983,89 @@ export type Database = {
           },
         ]
       }
+      study_competitions: {
+        Row: {
+          created_at: string
+          created_by: string
+          end_time: string | null
+          id: string
+          name: string
+          start_time: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          end_time?: string | null
+          id?: string
+          name: string
+          start_time?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          end_time?: string | null
+          id?: string
+          name?: string
+          start_time?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      study_live_status: {
+        Row: {
+          current_session_start: string | null
+          is_studying: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          current_session_start?: string | null
+          is_studying?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          current_session_start?: string | null
+          is_studying?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      study_participants: {
+        Row: {
+          competition_id: string
+          id: string
+          joined_at: string
+          total_study_time: number
+          user_id: string
+        }
+        Insert: {
+          competition_id: string
+          id?: string
+          joined_at?: string
+          total_study_time?: number
+          user_id: string
+        }
+        Update: {
+          competition_id?: string
+          id?: string
+          joined_at?: string
+          total_study_time?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_participants_competition_id_fkey"
+            columns: ["competition_id"]
+            isOneToOne: false
+            referencedRelation: "study_competitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_plans: {
         Row: {
           completed: boolean
@@ -1946,6 +2101,101 @@ export type Database = {
           subject?: string
           topic?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      study_sessions: {
+        Row: {
+          competition_id: string | null
+          created_at: string
+          duration: number | null
+          end_time: string | null
+          id: string
+          mode: string | null
+          planned_duration: number | null
+          start_time: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          competition_id?: string | null
+          created_at?: string
+          duration?: number | null
+          end_time?: string | null
+          id?: string
+          mode?: string | null
+          planned_duration?: number | null
+          start_time?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          competition_id?: string | null
+          created_at?: string
+          duration?: number | null
+          end_time?: string | null
+          id?: string
+          mode?: string | null
+          planned_duration?: number | null
+          start_time?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_sessions_competition_id_fkey"
+            columns: ["competition_id"]
+            isOneToOne: false
+            referencedRelation: "study_competitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_settings: {
+        Row: {
+          auto_start_break: boolean
+          default_break_time: number
+          default_study_time: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_start_break?: boolean
+          default_break_time?: number
+          default_study_time?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_start_break?: boolean
+          default_break_time?: number
+          default_study_time?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      study_tasks: {
+        Row: {
+          completed: boolean
+          created_at: string
+          id: string
+          task_title: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          task_title: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          task_title?: string
           user_id?: string
         }
         Relationships: []
@@ -2353,12 +2603,44 @@ export type Database = {
         Args: { p_amount: number; p_user_identifier: string }
         Returns: Json
       }
+      admin_end_season: {
+        Args: {
+          p_confirm_text?: string
+          p_conversion_rate?: number
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      admin_force_start_new_season: {
+        Args: { p_reason?: string }
+        Returns: Json
+      }
+      admin_get_current_season_stats: { Args: never; Returns: Json }
+      admin_get_season_rewards_preview: {
+        Args: { p_conversion_rate?: number; p_limit?: number }
+        Returns: {
+          name: string
+          projected_coins: number
+          projected_rank: number
+          projected_title: string
+          season_xp: number
+          user_id: string
+        }[]
+      }
       admin_reset_user_progress: {
         Args: { p_reset_mode?: string; p_user_identifier: string }
         Returns: Json
       }
       admin_set_user_level: {
         Args: { p_level: number; p_user_identifier: string }
+        Returns: Json
+      }
+      admin_update_user_xp: {
+        Args: {
+          p_action?: string
+          p_user_identifier: string
+          p_xp_amount: number
+        }
         Returns: Json
       }
       assign_user_role: {
@@ -2370,6 +2652,15 @@ export type Database = {
       }
       calculate_rank: { Args: { p_xp: number }; Returns: string }
       check_achievements: { Args: { p_user_id: string }; Returns: Json }
+      complete_study_session: {
+        Args: {
+          p_duration_override?: number
+          p_mark_task_complete?: boolean
+          p_session_id: string
+          p_task_id?: string
+        }
+        Returns: Json
+      }
       create_multiplayer_invite: {
         Args: {
           p_difficulty?: string
