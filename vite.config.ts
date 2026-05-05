@@ -16,6 +16,7 @@ export default defineConfig(async ({ mode }) => {
   }
 
   return {
+    base: process.env.ELECTRON_BUILD ? './' : '/',
     server: {
       host: "::",
       port: 8080,
