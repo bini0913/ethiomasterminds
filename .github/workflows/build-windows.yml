@@ -1,0 +1,50 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install Electron tooling
+        run: npm install --save-dev electron@31 @electron/packager@18 --legacy-peer-deps
+
+      - name: Build web app for Electron
+        run: npx vite build
+        env:
+          ELECTRON_BUILD: '1'
+
+      - name: Package Windows EXE
+        run: npx @electron/packager . MasterMinds --platform=win32 --arch=x64 --out=release --overwrite --ignore="^/src" --ignore="^/public" --ignore="^/release" --ignore="^/electron-release" --ignore="^/supabase" --ignore="^/.github"
+
+      - name: Zip the build
+        run: Compress-Archive -Path release/MasterMinds-win32-x64/* -DestinationPath MasterMinds-Windows.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MasterMinds-Windows
+          path: MasterMinds-Windows.zip
+          retention-days: 30
+
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Master Minds Build ${{ github.run_number }}
+          files: MasterMinds-Windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
