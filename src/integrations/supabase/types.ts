@@ -1054,6 +1054,33 @@ export type Database = {
         }
         Relationships: []
       }
+      parent_goals: {
+        Row: {
+          bedtime_hour: number | null
+          daily_study_minutes: number
+          daily_xp_target: number
+          student_id: string
+          updated_at: string
+          weekly_quiz_target: number
+        }
+        Insert: {
+          bedtime_hour?: number | null
+          daily_study_minutes?: number
+          daily_xp_target?: number
+          student_id: string
+          updated_at?: string
+          weekly_quiz_target?: number
+        }
+        Update: {
+          bedtime_hour?: number | null
+          daily_study_minutes?: number
+          daily_xp_target?: number
+          student_id?: string
+          updated_at?: string
+          weekly_quiz_target?: number
+        }
+        Relationships: []
+      }
       parent_links: {
         Row: {
           created_at: string
@@ -1080,6 +1107,33 @@ export type Database = {
           linked_at?: string | null
           parent_id?: string
           status?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
+      parent_messages: {
+        Row: {
+          created_at: string
+          emoji: string | null
+          id: string
+          message: string
+          read: boolean
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          message: string
+          read?: boolean
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          message?: string
+          read?: boolean
           student_id?: string
         }
         Relationships: []
@@ -1114,6 +1168,45 @@ export type Database = {
           read?: boolean | null
           student_id?: string
           title?: string
+        }
+        Relationships: []
+      }
+      parent_tasks: {
+        Row: {
+          created_at: string
+          created_by: string
+          deadline: string | null
+          description: string | null
+          id: string
+          is_required: boolean
+          status: string
+          student_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          is_required?: boolean
+          status?: string
+          student_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          is_required?: boolean
+          status?: string
+          student_id?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
