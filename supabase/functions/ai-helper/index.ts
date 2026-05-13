@@ -30,6 +30,57 @@ Deno.serve(async (req) => {
   try {
     const { messages, mode = "explain", context }: RequestBody = await req.json();
 
+    // Input validation
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "messages must be a non-empty array" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (messages.length > 50) {
+      return new Response(
+        JSON.stringify({ error: "Too many messages (max 50)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    for (const msg of messages) {
+      if (!msg || typeof msg.role !== "string" || typeof msg.content !== "string") {
+        return new Response(
+          JSON.stringify({ error: "Invalid message format" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (!["user", "assistant", "system"].includes(msg.role)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid message role" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (msg.content.length > 5000) {
+        return new Response(
+          JSON.stringify({ error: "Message content too long (max 5000 chars)" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    if (!["hint", "explain", "coach", "silent"].includes(mode)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid mode" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const clip = (s: unknown, max: number) =>
+      typeof s === "string" ? s.slice(0, max) : undefined;
+    const safeContext = context
+      ? {
+          subject: clip(context.subject, 100),
+          topic: clip(context.topic, 200),
+          question: clip(context.question, 1000),
+          userAnswer: clip(context.userAnswer, 1000),
+          correctAnswer: clip(context.correctAnswer, 500),
+        }
+      : undefined;
+
     let systemPrompt = `You are Plus, a friendly and encouraging AI learning assistant for Master Minds, an educational quiz platform. You speak like a supportive friend and tutor.
 
 Your personality:
@@ -52,13 +103,13 @@ Current mode: ${mode}
       systemPrompt += `\nYou are in SILENT mode. Keep responses brief and only respond when directly asked.`;
     }
 
-    if (context) {
+    if (safeContext) {
       systemPrompt += `\n\nContext:`;
-      if (context.subject) systemPrompt += `\n- Subject: ${context.subject}`;
-      if (context.topic) systemPrompt += `\n- Topic: ${context.topic}`;
-      if (context.question) systemPrompt += `\n- Current Question: ${context.question}`;
-      if (context.userAnswer) systemPrompt += `\n- User's Answer: ${context.userAnswer}`;
-      if (context.correctAnswer) systemPrompt += `\n- Correct Answer: ${context.correctAnswer}`;
+      if (safeContext.subject) systemPrompt += `\n- Subject: ${safeContext.subject}`;
+      if (safeContext.topic) systemPrompt += `\n- Topic: ${safeContext.topic}`;
+      if (safeContext.question) systemPrompt += `\n- Current Question: ${safeContext.question}`;
+      if (safeContext.userAnswer) systemPrompt += `\n- User's Answer: ${safeContext.userAnswer}`;
+      if (safeContext.correctAnswer) systemPrompt += `\n- Correct Answer: ${safeContext.correctAnswer}`;
     }
 
     const apiMessages = [
