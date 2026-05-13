@@ -104,7 +104,8 @@ You remember everything in this conversation. Be encouraging, but never sugar-co
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-2.5-pro',
+        temperature: 0.6,
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }))
