@@ -20,6 +20,34 @@ Deno.serve(async (req) => {
   try {
     const { transcribedText, correctAnswer, questionType, options }: RequestBody = await req.json();
 
+    // Input validation
+    if (typeof transcribedText !== "string" || transcribedText.length === 0 || transcribedText.length > 500) {
+      return new Response(
+        JSON.stringify({ error: "Invalid transcribedText (1-500 chars required)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (typeof correctAnswer !== "string" || correctAnswer.length === 0 || correctAnswer.length > 500) {
+      return new Response(
+        JSON.stringify({ error: "Invalid correctAnswer" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (!["multiple_choice", "true_false", "fill_blank"].includes(questionType)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid questionType" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (options !== undefined) {
+      if (!Array.isArray(options) || options.length > 10 || options.some((o) => typeof o !== "string" || o.length > 200)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid options" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const normalizedInput = transcribedText.toLowerCase().trim();
     const normalizedCorrect = correctAnswer.toLowerCase().trim();
 
