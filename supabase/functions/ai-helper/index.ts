@@ -103,13 +103,13 @@ Current mode: ${mode}
       systemPrompt += `\nYou are in SILENT mode. Keep responses brief and only respond when directly asked.`;
     }
 
-    if (context) {
+    if (safeContext) {
       systemPrompt += `\n\nContext:`;
-      if (context.subject) systemPrompt += `\n- Subject: ${context.subject}`;
-      if (context.topic) systemPrompt += `\n- Topic: ${context.topic}`;
-      if (context.question) systemPrompt += `\n- Current Question: ${context.question}`;
-      if (context.userAnswer) systemPrompt += `\n- User's Answer: ${context.userAnswer}`;
-      if (context.correctAnswer) systemPrompt += `\n- Correct Answer: ${context.correctAnswer}`;
+      if (safeContext.subject) systemPrompt += `\n- Subject: ${safeContext.subject}`;
+      if (safeContext.topic) systemPrompt += `\n- Topic: ${safeContext.topic}`;
+      if (safeContext.question) systemPrompt += `\n- Current Question: ${safeContext.question}`;
+      if (safeContext.userAnswer) systemPrompt += `\n- User's Answer: ${safeContext.userAnswer}`;
+      if (safeContext.correctAnswer) systemPrompt += `\n- Correct Answer: ${safeContext.correctAnswer}`;
     }
 
     const apiMessages = [
