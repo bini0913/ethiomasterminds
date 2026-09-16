@@ -145,6 +145,14 @@ const App = () => (
                                 }
                               />
 
+                              {/*
+                                Owner-only portal (intentional, not a bug).
+                                The `extreme_admin` role is seeded once for the single owner account
+                                (see migration 20260417133000_seed_extreme_admin_account.sql). It is
+                                deliberately NOT grantable from the normal admin UI; the only way to
+                                grant it is the `extreme_admin_update_user_role` RPC, which itself
+                                requires an existing extreme_admin caller.
+                              */}
                               <Route 
                                 path="/root-control-portal-9xA7" 
                                 element={

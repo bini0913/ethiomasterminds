@@ -25,40 +25,13 @@ const AvatarCreator: React.FC = () => {
     if (!user) return;
     setIsSaving(true);
     try {
-      const [profileUpdate, avatarSave] = await Promise.all([
-        supabase
+      // avatar_config on profiles is the single source of truth for avatars.
+      const { error } = await supabase
         .from('profiles')
         .update({ avatar_config: config as unknown as Json })
-          .eq('id', user.id),
-        (supabase as any).from('avatars').upsert({
-          user_id: user.id,
-          face_data: {
-            skinTone: config.skinTone,
-            faceShape: config.faceShape,
-            eyeType: config.eyeType,
-            eyeColor: config.eyeColor,
-            eyebrowType: config.eyebrowType,
-            noseType: config.noseType,
-            mouthType: config.mouthType,
-            hairStyle: config.hairStyle,
-            hairColor: config.hairColor,
-          },
-          clothes_data: {
-            outfit: config.outfit,
-            outfitColor: config.outfitColor,
-            background: config.background,
-          },
-          accessories: {
-            accessory: config.accessory,
-            facialHair: config.facialHair,
-          },
-          data: config,
-          updated_at: new Date().toISOString(),
-        }),
-      ]);
+        .eq('id', user.id);
 
-      if (profileUpdate.error) throw profileUpdate.error;
-      if (avatarSave.error) throw avatarSave.error;
+      if (error) throw error;
 
       await updateProfile({ avatarConfig: config as any });
       toast.success('Avatar saved! 🎉', { description: '+10 XP earned!' });

@@ -21,30 +21,13 @@ export interface Room {
   createdAt: Date;
 }
 
-export interface GameSession {
-  roomId: string;
-  players: {
-    id: string;
-    name: string;
-    score: number;
-    answers: { questionId: string; answer: string; correct: boolean; timeUsed: number }[];
-  }[];
-  currentQuestion: number;
-  questions: any[];
-  startedAt?: Date;
-  finishedAt?: Date;
-}
-
 interface RoomContextType {
   rooms: Room[];
   currentRoom: Room | null;
-  gameSession: GameSession | null;
   loading: boolean;
   createRoom: (name: string, settings: Room['gameSettings'], maxPlayers: number, password?: string) => Promise<Room | null>;
   joinRoom: (roomId: string, playerName: string, password?: string) => Promise<boolean>;
   leaveRoom: (roomId: string, playerName: string) => Promise<void>;
-  startGame: (roomId: string) => Promise<void>;
-  submitAnswer: (questionId: string, answer: string, timeUsed: number) => void;
   getRoomById: (roomId: string) => Room | undefined;
   getPublicRooms: () => Room[];
   refreshRooms: () => Promise<void>;
@@ -56,7 +39,6 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
-  const [gameSession, setGameSession] = useState<GameSession | null>(null);
   const [loading, setLoading] = useState(true);
 
   const cleanupExpiredRooms = useCallback(async () => {
@@ -350,84 +332,11 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setCurrentRoom(null);
-      setGameSession(null);
       toast.info('Left the room');
       await fetchRooms();
     } catch (err) {
       console.error('Error leaving room:', err);
     }
-  };
-
-  const startGame = async (roomId: string) => {
-    if (!user?.id || !currentRoom || currentRoom.host !== user.id) return;
-
-    try {
-      await supabase
-        .from('multiplayer_rooms')
-        .update({ status: 'starting', started_at: new Date().toISOString() })
-        .eq('id', roomId);
-
-      setCurrentRoom({ ...currentRoom, status: 'starting' });
-
-      // Initialize game session
-      setGameSession({
-        roomId,
-        players: currentRoom.players.map(id => ({
-          id,
-          name: id,
-          score: 0,
-          answers: []
-        })),
-        currentQuestion: 0,
-        questions: [],
-        startedAt: new Date()
-      });
-
-      // Start the game after 3 seconds
-      setTimeout(async () => {
-        await supabase
-          .from('multiplayer_rooms')
-          .update({ status: 'playing' })
-          .eq('id', roomId);
-        
-        setCurrentRoom(prev => prev ? { ...prev, status: 'playing' } : null);
-      }, 3000);
-    } catch (err) {
-      console.error('Error starting game:', err);
-      toast.error('Failed to start game');
-    }
-  };
-
-  const submitAnswer = (questionId: string, answer: string, timeUsed: number) => {
-    if (!gameSession || !user?.id) return;
-
-    const isCorrect = Math.random() > 0.5; // Placeholder logic
-    const points = isCorrect ? Math.max(10 - timeUsed, 1) : 0;
-
-    // Update local score
-    setGameSession(prev => {
-      if (!prev) return prev;
-      
-      return {
-        ...prev,
-        players: prev.players.map(player => 
-          player.id === user.id
-            ? {
-                ...player,
-                score: player.score + points,
-                answers: [...player.answers, { questionId, answer, correct: isCorrect, timeUsed }]
-              }
-            : player
-        )
-      };
-    });
-
-    // Update score in database
-    supabase
-      .from('room_players')
-      .update({ score: gameSession.players.find(p => p.id === user.id)?.score || 0 + points })
-      .eq('room_id', currentRoom?.id)
-      .eq('user_id', user.id);
   };
 
   const getRoomById = (roomId: string) => {
@@ -446,13 +355,10 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     <RoomContext.Provider value={{
       rooms,
       currentRoom,
-      gameSession,
       loading,
       createRoom,
       joinRoom,
       leaveRoom,
-      startGame,
-      submitAnswer,
       getRoomById,
       getPublicRooms,
       refreshRooms
