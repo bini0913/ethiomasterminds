@@ -21,24 +21,9 @@ export interface Room {
   createdAt: Date;
 }
 
-export interface GameSession {
-  roomId: string;
-  players: {
-    id: string;
-    name: string;
-    score: number;
-    answers: { questionId: string; answer: string; correct: boolean; timeUsed: number }[];
-  }[];
-  currentQuestion: number;
-  questions: any[];
-  startedAt?: Date;
-  finishedAt?: Date;
-}
-
 interface RoomContextType {
   rooms: Room[];
   currentRoom: Room | null;
-  gameSession: GameSession | null;
   loading: boolean;
   createRoom: (name: string, settings: Room['gameSettings'], maxPlayers: number, password?: string) => Promise<Room | null>;
   joinRoom: (roomId: string, playerName: string, password?: string) => Promise<boolean>;
