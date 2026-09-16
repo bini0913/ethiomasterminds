@@ -28,8 +28,6 @@ interface RoomContextType {
   createRoom: (name: string, settings: Room['gameSettings'], maxPlayers: number, password?: string) => Promise<Room | null>;
   joinRoom: (roomId: string, playerName: string, password?: string) => Promise<boolean>;
   leaveRoom: (roomId: string, playerName: string) => Promise<void>;
-  startGame: (roomId: string) => Promise<void>;
-  submitAnswer: (questionId: string, answer: string, timeUsed: number) => void;
   getRoomById: (roomId: string) => Room | undefined;
   getPublicRooms: () => Room[];
   refreshRooms: () => Promise<void>;
@@ -41,7 +39,6 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
-  const [gameSession, setGameSession] = useState<GameSession | null>(null);
   const [loading, setLoading] = useState(true);
 
   const cleanupExpiredRooms = useCallback(async () => {
@@ -335,7 +332,6 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setCurrentRoom(null);
-      setGameSession(null);
       toast.info('Left the room');
       await fetchRooms();
     } catch (err) {
@@ -359,13 +355,10 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     <RoomContext.Provider value={{
       rooms,
       currentRoom,
-      gameSession,
       loading,
       createRoom,
       joinRoom,
       leaveRoom,
-      startGame,
-      submitAnswer,
       getRoomById,
       getPublicRooms,
       refreshRooms
