@@ -5,9 +5,15 @@ const config: CapacitorConfig = {
   appName: "Master Minds",
   webDir: "dist",
   server: {
-    // Loads the live preview during development for hot-reload on device.
-    // Remove this block for a production build that bundles the app locally.
-    url: "https://a549e3ca-84f7-4dce-aa6b-55e5beb976b5.lovableproject.com?forceHideBadge=true",
+    // Use the published app so Android always opens a stable WebView origin.
+    url: "https://ethiomasterminds.lovable.app",
+    androidScheme: "https",
+    allowNavigation: [
+      "ethiomasterminds.lovable.app",
+      "*.supabase.co",
+      "api.dicebear.com",
+      "cdn.jsdelivr.net",
+    ],
     cleartext: true,
   },
 };
