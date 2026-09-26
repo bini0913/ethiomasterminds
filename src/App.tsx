@@ -15,7 +15,6 @@ import EnhancedSettings from "./pages/EnhancedSettings";
 import NotFound from "./pages/NotFound";
 import StorePage from "./pages/StorePage";
 import TeacherPortal from "./pages/TeacherPortal";
-import Social from "./pages/Social";
 import AdminPortal from "./pages/AdminPortal";
 import StudentDashboard from "./pages/StudentDashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
