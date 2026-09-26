@@ -27,7 +27,7 @@ jobs:
           ELECTRON_BUILD: '1'
 
       - name: Package Windows EXE
-        run: npx @electron/packager . MasterMinds --platform=win32 --arch=x64 --out=release --overwrite --ignore="^/src" --ignore="^/public" --ignore="^/release" --ignore="^/electron-release" --ignore="^/supabase" --ignore="^/.github"
+        run: npx @electron/packager . MasterMinds --platform=win32 --arch=x64 --out=release --overwrite --ignore="^/src$" --ignore="^/public$" --ignore="^/release$" --ignore="^/electron-release$" --ignore="^/supabase$" --ignore="^/\.github$" --ignore="^/android$"
 
       - name: Zip the build
         run: Compress-Archive -Path release/MasterMinds-win32-x64/* -DestinationPath MasterMinds-Windows.zip
