@@ -370,16 +370,26 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      localStorage.removeItem("masterminds_login_mode");
-      setUser(null);
-      setSession(null);
-      toast.info("Logged out successfully");
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error("Logout failed");
-    }
+    // Clear local state first so logout is immediate even on slow/offline mobile networks.
+    localStorage.removeItem("masterminds_login_mode");
+    setUser(null);
+    setSession(null);
+    setShowLevelUp(false);
+    toast.info("Logged out");
+
+    // Revoke the remote session in the background; never block portal navigation on it.
+    void (async () => {
+      try {
+        await supabase.auth.signOut({ scope: "global" });
+      } catch (error) {
+        console.error("Global logout error:", error);
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch (localError) {
+          console.error("Local logout fallback error:", localError);
+        }
+      }
+    })();
   };
 
   const updateProfile = async (profileData: Partial<UserProfile>) => {
