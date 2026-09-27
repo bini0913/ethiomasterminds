@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const code = typeof body?.code === "string" ? body.code.trim() : "";
     const codeType = typeof body?.code_type === "string" ? body.code_type.trim() : "";
-    if (!code || !["teacher", "admin", "manager"].includes(codeType)) {
+    if (!code || code.length > 64 || !["teacher", "admin", "manager"].includes(codeType)) {
       return new Response(JSON.stringify({ error: "Invalid access code" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -25,12 +25,27 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData.user) return new Response(JSON.stringify({ error: "Invalid authentication token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+    // Privileged access-code redemption is intentionally much more tightly
+    // rate-limited than normal API calls to prevent brute-force attempts.
+    const rateLimit = await userClient.rpc("consume_edge_rate_limit", {
+      p_bucket: "redeem-access-code",
+      p_limit: 5,
+      p_window_seconds: 900,
+    });
+    if (rateLimit.error) throw rateLimit.error;
+    if (!rateLimit.data) {
+      return new Response(JSON.stringify({ error: "Too many access-code attempts. Please try again later." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data, error } = await userClient.rpc("redeem_access_code", {
       p_code: code,
       p_code_type: codeType,
     });
 
-    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (error) return new Response(JSON.stringify({ error: "Invalid or already used access code" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     console.error("Unexpected error:", error);

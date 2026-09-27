@@ -22,14 +22,32 @@ serve(async (req) => {
     if (!rateLimit.data) return new Response(JSON.stringify({ error: "Please wait before generating another study plan." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const { weakTopics, analytics, grade, existingPlans } = await req.json();
-    if (typeof grade !== "string" || grade.length > 40) return new Response(JSON.stringify({ error: "Invalid grade" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("grade")
+      .eq("id", authData.user.id)
+      .single();
+
+    if (profileError || typeof profile?.grade !== "string" || profile.grade.trim().length === 0) {
+      return new Response(JSON.stringify({ error: "Student grade is not available" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const serverGrade = profile.grade.trim();
+    if (grade !== undefined && (typeof grade !== "string" || grade.length > 40)) {
+      return new Response(JSON.stringify({ error: "Invalid grade" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (typeof grade === "string" && grade.trim().toLowerCase() !== serverGrade.toLowerCase()) {
+      return new Response(JSON.stringify({ error: "Grade does not match your profile" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (!Array.isArray(weakTopics) || weakTopics.length > 50 || !Array.isArray(analytics) || analytics.length > 100 || !Array.isArray(existingPlans) || existingPlans.length > 50) return new Response(JSON.stringify({ error: "Invalid planning data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (JSON.stringify({ weakTopics, analytics, existingPlans }).length > 30000) return new Response(JSON.stringify({ error: "Request data is too large" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const prompt = `You are an academic study planner for a Grade ${grade} Ethiopian student preparing for university entrance exams.
+    const prompt = `You are an academic study planner for a Grade ${serverGrade} Ethiopian student preparing for university entrance exams.
 
 Based on their performance data:
 - Weak topics: ${JSON.stringify(weakTopics?.slice(0, 10) || [])}
