@@ -18,16 +18,24 @@ begin
     raise exception 'Authentication required';
   end if;
 
-  select um.*, dm.reward_xp, dm.reward_coins
-    into v_mission, v_reward_xp, v_reward_coins
+  select um.* into v_mission
   from public.user_missions um
-  join public.daily_missions dm on dm.id = um.mission_id
   where um.id = p_user_mission_id
     and um.user_id = v_uid
   for update;
 
   if not found then
     raise exception 'Mission not found';
+  end if;
+
+  select greatest(0, coalesce(dm.reward_xp,0)),
+         greatest(0, coalesce(dm.reward_coins,0))
+    into v_reward_xp, v_reward_coins
+  from public.daily_missions dm
+  where dm.id = v_mission.mission_id;
+
+  if not found then
+    raise exception 'Mission definition not found';
   end if;
 
   if v_mission.claimed then
@@ -52,9 +60,6 @@ begin
   if not found then
     raise exception 'Reward was already claimed';
   end if;
-
-  v_reward_xp := greatest(0, coalesce(v_reward_xp,0));
-  v_reward_coins := greatest(0, coalesce(v_reward_coins,0));
 
   if v_reward_xp > 0 then
     perform public.add_xp(v_uid, least(v_reward_xp,500));
