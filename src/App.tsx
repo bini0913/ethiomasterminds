@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import Index from "./pages/Index";
 import Quiz from "./pages/Quiz";
 import QuizFilter from "./pages/QuizFilter";
@@ -58,11 +58,125 @@ import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
 import { ChatProvider } from "./context/ChatContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ArrowLeft, Home, LogOut } from "lucide-react";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
 import NativeBackHandler from "./components/mobile/NativeBackHandler";
 
 const queryClient = new QueryClient();
+
+const appRouteTitles: Array<{ prefix: string; title: string }> = [
+  { prefix: "/quiz/filter", title: "Quiz Setup" },
+  { prefix: "/early-games", title: "Play" },
+  { prefix: "/early-quiz", title: "Quick Quiz" },
+  { prefix: "/early-discover", title: "Discover" },
+  { prefix: "/early-videos", title: "Videos & Stories" },
+  { prefix: "/early-explore", title: "Explore" },
+  { prefix: "/early-progress", title: "My Progress" },
+  { prefix: "/quiz", title: "Quiz" },
+  { prefix: "/study-mode", title: "Study Mode" },
+  { prefix: "/library", title: "Library" },
+  { prefix: "/ai-tutor", title: "AI Tutor" },
+  { prefix: "/academic/flashcards", title: "Flashcards" },
+  { prefix: "/academic/topics", title: "Topics" },
+  { prefix: "/academic/exam", title: "Exam Mode" },
+  { prefix: "/academic/planner", title: "Study Planner" },
+  { prefix: "/academic/insights", title: "Academic Insights" },
+  { prefix: "/academic", title: "Academic Mode" },
+  { prefix: "/learning-dna", title: "Learning DNA" },
+  { prefix: "/lobby", title: "Game Lobby" },
+  { prefix: "/multiplayer", title: "Multiplayer" },
+  { prefix: "/tournaments", title: "Tournaments" },
+  { prefix: "/leaderboard", title: "Ranks" },
+  { prefix: "/friends", title: "Friends" },
+  { prefix: "/chat", title: "Chat" },
+  { prefix: "/social", title: "Social" },
+  { prefix: "/store", title: "Rewards Store" },
+  { prefix: "/avatar-creator", title: "Avatar" },
+  { prefix: "/profile/", title: "Profile" },
+  { prefix: "/enhanced-settings", title: "Settings" },
+  { prefix: "/settings", title: "Settings" },
+  { prefix: "/revision", title: "Revision" },
+  { prefix: "/parent-dashboard", title: "Parent Dashboard" },
+  { prefix: "/teacher", title: "Teacher Portal" },
+  { prefix: "/admin/early-content", title: "Early Content" },
+  { prefix: "/admin", title: "Admin Portal" },
+  { prefix: "/manager-dashboard", title: "Manager Dashboard" },
+  { prefix: "/root-control-portal-9xA7", title: "Control Portal" },
+];
+
+const getAppRouteTitle = (pathname: string) => {
+  if (pathname === "/") return "Home";
+  return appRouteTitles.find((route) => pathname.startsWith(route.prefix))?.title ?? "Master Minds";
+};
+
+const AppChrome = ({ children }: { children: React.ReactNode }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout } = useUser();
+
+  if (!isAuthenticated || !user) return <>{children}</>;
+
+  const isHome = location.pathname === "/";
+
+  const handleBack = () => {
+    const historyIndex = window.history.state?.idx;
+    if (typeof historyIndex === "number" && historyIndex > 0) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/", { replace: true });
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-3 sm:px-5">
+          <div className="flex min-w-0 items-center gap-2">
+            {!isHome ? (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Go back"
+                title="Go back"
+              >
+                <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+              </button>
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Home className="h-5 w-5" aria-hidden="true" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold leading-tight">{getAppRouteTitle(location.pathname)}</p>
+              <p className="hidden truncate text-[11px] text-muted-foreground sm:block">
+                {user.name || user.username || "Master Minds"}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Log out"
+            title="Log out"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Log out</span>
+          </button>
+        </div>
+      </header>
+      {children}
+    </div>
+  );
+};
+
 
 const SelfProfileRedirect = () => {
   const { user, session } = useUser();
@@ -89,7 +203,7 @@ const App = () => (
                           <Toaster />
                           <Sonner />
                           <BrowserRouter>
-                            <Routes>
+                            <AppChrome>\n                            <Routes>
                               <Route path="/" element={<Index />} />
                               <Route path="/quiz" element={<Quiz />} />
                               <Route path="/early-games" element={<EarlyTierOnlyRoute><EarlyGamesPage /></EarlyTierOnlyRoute>} />
