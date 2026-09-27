@@ -26,3 +26,12 @@ verify_jwt = true
 
 [functions.generate-parent-insights]
 verify_jwt = true
+
+[functions.ai-academic-insights]
+verify_jwt = true
+
+[functions.ai-study-planner]
+verify_jwt = true
+
+[functions.library-ai]
+verify_jwt = true

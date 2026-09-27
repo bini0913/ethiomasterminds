@@ -63,6 +63,7 @@ const ParentDashboard: React.FC = () => {
   const [aiLoading, setAiLoading] = useState(false);
 
   const isParentMode = localStorage.getItem("masterminds_login_mode") === "parent";
+  const isEarlyStudent = getUserTier(user?.grade) === "early";
 
   const handleLeaveParentPortal = () => { localStorage.removeItem("masterminds_login_mode"); toast.success("Exited parent view."); window.location.href = "/"; };
   const handleSignOut = async () => { await logout(); window.location.href = "/"; };

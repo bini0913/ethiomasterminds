@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,23 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { stats, topicData, streak, grade, xp } = await req.json();
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Authentication required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) return new Response(JSON.stringify({ error: "Invalid authentication token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const rateLimit = await supabase.rpc("consume_edge_rate_limit", { p_bucket: "ai-academic-insights", p_limit: 10, p_window_seconds: 300 });
+    if (rateLimit.error) throw rateLimit.error;
+    if (!rateLimit.data) return new Response(JSON.stringify({ error: "Please wait before generating another analysis." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const body = await req.json();
+    const { stats, topicData, streak, grade, xp } = body;
+    if (typeof grade !== "string" || grade.length > 40) return new Response(JSON.stringify({ error: "Invalid grade" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!Array.isArray(topicData) || topicData.length > 100) return new Response(JSON.stringify({ error: "Invalid topic data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (JSON.stringify({ stats, topicData, streak, xp }).length > 20000) return new Response(JSON.stringify({ error: "Request data is too large" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 

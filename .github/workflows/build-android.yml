@@ -3,6 +3,8 @@ name: Build Android APK
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -29,7 +31,9 @@ jobs:
           packages: "platforms;android-36 build-tools;36.0.0 platform-tools"
 
       - name: Install dependencies
-        run: npm ci
+        # package-lock.json is currently maintained by Lovable and can lag package.json.
+        # npm install keeps CI usable until the lockfile is regenerated normally.
+        run: npm install --legacy-peer-deps
 
       - name: Build web app
         run: npx vite build
