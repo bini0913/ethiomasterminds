@@ -2,7 +2,6 @@ import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useUser } from "@/context/UserContext";
-import { useTier } from "@/context/TierContext";
 import {
   Home,
   BookOpen,
@@ -15,7 +14,6 @@ const StudentBottomNav: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUser();
-  const tier = useTier();
 
   const profilePath = user?.id ? `/profile/${user.id}` : "/settings";
 
