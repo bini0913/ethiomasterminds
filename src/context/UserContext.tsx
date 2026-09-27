@@ -397,7 +397,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       // through the general profile update path.
       if (profileData.avatar !== undefined) updateData.avatar = profileData.avatar;
       if (profileData.avatarConfig !== undefined) updateData.avatar_config = profileData.avatarConfig;
-      if (profileData.rank !== undefined) updateData.rank = profileData.rank;
       if (profileData.badges !== undefined) updateData.badges = profileData.badges;
 
       const { error } = await supabase
