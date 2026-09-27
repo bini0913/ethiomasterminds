@@ -227,7 +227,7 @@ const StudyModePage: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, selectedCompetitionId]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!activeSession) return;
@@ -325,7 +325,13 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    const minutesCompleted = Math.max(1, Math.ceil((sessionTargetSeconds - countdownSeconds) / 60));
+    const elapsedSeconds = Math.max(0, sessionTargetSeconds - countdownSeconds);
+    if (elapsedSeconds < 60 && !autoBreak) {
+      toast.info("Study for at least 1 minute before ending the session.");
+      return;
+    }
+
+    const minutesCompleted = Math.max(1, Math.ceil(elapsedSeconds / 60));
 
     const { data, error } = await db.rpc("complete_study_session", {
       p_session_id: activeSession.id,
