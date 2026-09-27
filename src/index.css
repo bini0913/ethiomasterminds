@@ -101,6 +101,90 @@
     --sidebar-ring: 176 62% 64%;
   }
 
+  /* Upper-tier exam preparation uses a deliberately quiet blue-and-neutral palette. */
+  .tier-upper {
+    --background: 210 40% 99%;
+    --foreground: 215 25% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+    --primary: 204 88% 72%;
+    --primary-foreground: 215 25% 15%;
+    --primary-glow: 204 88% 72%;
+    --secondary: 210 45% 96%;
+    --secondary-foreground: 215 25% 15%;
+    --accent: 204 88% 72%;
+    --accent-foreground: 215 25% 15%;
+    --muted: 210 35% 96%;
+    --muted-foreground: 215 12% 40%;
+    --destructive: 204 88% 72%;
+    --destructive-foreground: 215 25% 15%;
+    --success: 204 88% 72%;
+    --success-foreground: 215 25% 15%;
+    --warning: 204 88% 72%;
+    --warning-foreground: 215 25% 15%;
+    --border: 210 22% 87%;
+    --input: 210 22% 87%;
+    --ring: 204 88% 72%;
+    --glow-blue: 204 88% 72%;
+    --glow-purple: 204 88% 72%;
+    --glow-pink: 204 88% 72%;
+    --glow-cyan: 204 88% 72%;
+    --glow-green: 204 88% 72%;
+    --glow-yellow: 204 88% 72%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 25% 15%;
+    --sidebar-primary: 204 88% 72%;
+    --sidebar-primary-foreground: 215 25% 15%;
+    --sidebar-accent: 210 35% 96%;
+    --sidebar-accent-foreground: 215 25% 15%;
+    --sidebar-border: 210 22% 87%;
+    --sidebar-ring: 204 88% 72%;
+  }
+
+  .dark .tier-upper {
+    color-scheme: dark;
+    --background: 215 22% 9%;
+    --foreground: 210 20% 92%;
+    --card: 215 19% 13%;
+    --card-foreground: 210 20% 92%;
+    --popover: 215 19% 13%;
+    --popover-foreground: 210 20% 92%;
+    --primary: 204 88% 72%;
+    --primary-foreground: 215 25% 12%;
+    --primary-glow: 204 88% 72%;
+    --secondary: 215 16% 18%;
+    --secondary-foreground: 210 20% 92%;
+    --accent: 204 88% 72%;
+    --accent-foreground: 215 25% 12%;
+    --muted: 215 16% 18%;
+    --muted-foreground: 212 12% 70%;
+    --destructive: 204 88% 72%;
+    --destructive-foreground: 215 25% 12%;
+    --success: 204 88% 72%;
+    --success-foreground: 215 25% 12%;
+    --warning: 204 88% 72%;
+    --warning-foreground: 215 25% 12%;
+    --border: 215 13% 28%;
+    --input: 215 13% 28%;
+    --ring: 204 88% 72%;
+    --glow-blue: 204 88% 72%;
+    --glow-purple: 204 88% 72%;
+    --glow-pink: 204 88% 72%;
+    --glow-cyan: 204 88% 72%;
+    --glow-green: 204 88% 72%;
+    --glow-yellow: 204 88% 72%;
+    --sidebar-background: 215 19% 13%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 204 88% 72%;
+    --sidebar-primary-foreground: 215 25% 12%;
+    --sidebar-accent: 215 16% 18%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 215 13% 28%;
+    --sidebar-ring: 204 88% 72%;
+  }
+
   * { @apply border-border; }
   body { @apply bg-background text-foreground; font-family: var(--font-sans); font-size: 1rem; line-height: 1.6; }
   h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); line-height: 1.2; font-weight: 700; }
