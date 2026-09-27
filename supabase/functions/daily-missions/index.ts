@@ -2,266 +2,159 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const todayUtc = () => new Date().toISOString().slice(0, 10);
+
+async function getAuthenticatedUser(req: Request) {
+  const authorization = req.headers.get("Authorization");
+  if (!authorization?.startsWith("Bearer ")) return null;
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !anonKey) return null;
+
+  const client = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authorization } },
+  });
+  const { data, error } = await client.auth.getUser();
+  if (error || !data.user) return null;
+  return data.user;
+}
+
+function adminClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+}
+
+async function assignForUser(client: ReturnType<typeof adminClient>, userId: string) {
+  const date = todayUtc();
+
+  const { data: existing, error: existingError } = await client
+    .from("user_missions")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("mission_date", date)
+    .limit(1);
+
+  if (existingError) throw existingError;
+  if (existing && existing.length > 0) {
+    return { assigned: 0, alreadyAssigned: true };
   }
 
+  const { data: activeMissions, error: missionError } = await client
+    .from("daily_missions")
+    .select("id")
+    .eq("is_active", true);
+
+  if (missionError) throw missionError;
+  if (!activeMissions || activeMissions.length === 0) {
+    return { assigned: 0, alreadyAssigned: false };
+  }
+
+  const selected = [...activeMissions]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3);
+
+  const { error: insertError } = await client.from("user_missions").insert(
+    selected.map((mission) => ({
+      user_id: userId,
+      mission_id: mission.id,
+      mission_date: date,
+      progress: 0,
+      completed: false,
+      claimed: false,
+    })),
+  );
+
+  if (insertError) throw insertError;
+  return { assigned: selected.length, alreadyAssigned: false };
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const body = await req.json();
+    const action = typeof body?.action === "string" ? body.action : "";
 
-    const { action, userId } = await req.json();
-
-    console.log(`Daily missions action: ${action} for user: ${userId}`);
-
-    if (action === 'assign') {
-      // Assign daily missions to a specific user
-      const today = new Date().toISOString().split('T')[0];
-
-      // Check if user already has missions for today
-      const { data: existingMissions } = await supabase
-        .from('user_missions')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('mission_date', today)
-        .limit(1);
-
-      if (existingMissions && existingMissions.length > 0) {
-        return new Response(
-          JSON.stringify({ message: 'Missions already assigned for today' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    // reset_all is service-to-service only. Never accept a caller-supplied user id.
+    if (action === "reset_all") {
+      const expected = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const authorization = req.headers.get("Authorization");
+      if (!expected || authorization !== `Bearer ${expected}`) {
+        return json({ error: "Service authentication required" }, 401);
       }
 
-      // Get active missions
-      const { data: activeMissions } = await supabase
-        .from('daily_missions')
-        .select('*')
-        .eq('is_active', true);
+      const client = adminClient();
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: activeUsers, error: usersError } = await client
+        .from("user_streaks")
+        .select("user_id")
+        .gte("last_activity_date", since);
 
-      if (!activeMissions || activeMissions.length === 0) {
-        return new Response(
-          JSON.stringify({ message: 'No active missions available' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (usersError) throw usersError;
+
+      let usersProcessed = 0;
+      for (const row of activeUsers ?? []) {
+        const result = await assignForUser(client, row.user_id);
+        if (result.assigned > 0) usersProcessed += 1;
       }
 
-      // Randomly select 3 missions
-      const shuffled = activeMissions.sort(() => 0.5 - Math.random());
-      const selectedMissions = shuffled.slice(0, 3);
-
-      // Assign missions to user
-      const inserts = selectedMissions.map(mission => ({
-        user_id: userId,
-        mission_id: mission.id,
-        mission_date: today,
-        progress: 0,
-        completed: false,
-        claimed: false
-      }));
-
-      const { error } = await supabase
-        .from('user_missions')
-        .insert(inserts);
-
-      if (error) {
-        console.error('Error assigning missions:', error);
-        throw error;
-      }
-
-      console.log(`Assigned ${selectedMissions.length} missions to user ${userId}`);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          missionsAssigned: selectedMissions.length 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } else if (action === 'reset_all') {
-      // Reset all users' missions (for scheduled cron job)
-      const today = new Date().toISOString().split('T')[0];
-
-      // Get all active users (those with activity in last 7 days)
-      const { data: activeUsers } = await supabase
-        .from('user_streaks')
-        .select('user_id')
-        .gte('last_activity_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-
-      if (!activeUsers || activeUsers.length === 0) {
-        return new Response(
-          JSON.stringify({ message: 'No active users to assign missions' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Get active missions
-      const { data: activeMissions } = await supabase
-        .from('daily_missions')
-        .select('*')
-        .eq('is_active', true);
-
-      if (!activeMissions || activeMissions.length === 0) {
-        return new Response(
-          JSON.stringify({ message: 'No active missions available' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      let assignedCount = 0;
-
-      for (const user of activeUsers) {
-        // Check if already has missions
-        const { data: existing } = await supabase
-          .from('user_missions')
-          .select('id')
-          .eq('user_id', user.user_id)
-          .eq('mission_date', today)
-          .limit(1);
-
-        if (existing && existing.length > 0) continue;
-
-        // Randomly select 3 missions
-        const shuffled = activeMissions.sort(() => 0.5 - Math.random());
-        const selectedMissions = shuffled.slice(0, 3);
-
-        const inserts = selectedMissions.map(mission => ({
-          user_id: user.user_id,
-          mission_id: mission.id,
-          mission_date: today,
-          progress: 0,
-          completed: false,
-          claimed: false
-        }));
-
-        await supabase.from('user_missions').insert(inserts);
-        assignedCount++;
-      }
-
-      console.log(`Assigned missions to ${assignedCount} users`);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          usersProcessed: assignedCount 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } else if (action === 'claim') {
-      // Claim a completed mission reward
-      const { missionId } = await req.json();
-
-      // Get mission details
-      const { data: userMission } = await supabase
-        .from('user_missions')
-        .select(`
-          *,
-          daily_missions!inner(reward_xp, reward_coins)
-        `)
-        .eq('id', missionId)
-        .eq('user_id', userId)
-        .single();
-
-      if (!userMission) {
-        return new Response(
-          JSON.stringify({ error: 'Mission not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (!userMission.completed) {
-        return new Response(
-          JSON.stringify({ error: 'Mission not completed yet' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (userMission.claimed) {
-        return new Response(
-          JSON.stringify({ error: 'Reward already claimed' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const rewardXP = userMission.daily_missions.reward_xp || 0;
-      const rewardCoins = userMission.daily_missions.reward_coins || 0;
-
-      // Mark as claimed
-      await supabase
-        .from('user_missions')
-        .update({ claimed: true })
-        .eq('id', missionId);
-
-      // Award XP
-      if (rewardXP > 0) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('xp, level')
-          .eq('id', userId)
-          .single();
-
-        if (profile) {
-          const newXP = (profile.xp || 0) + rewardXP;
-          let newLevel = profile.level;
-          
-          if (newXP >= profile.level * 100) {
-            newLevel = profile.level + 1;
-          }
-
-          await supabase
-            .from('profiles')
-            .update({ xp: newXP, level: newLevel })
-            .eq('id', userId);
-        }
-      }
-
-      // Award coins
-      if (rewardCoins > 0) {
-        const { data: currency } = await supabase
-          .from('user_currency')
-          .select('coins')
-          .eq('user_id', userId)
-          .single();
-
-        if (currency) {
-          await supabase
-            .from('user_currency')
-            .update({ coins: currency.coins + rewardCoins })
-            .eq('user_id', userId);
-        }
-      }
-
-      console.log(`User ${userId} claimed mission ${missionId}: ${rewardXP} XP, ${rewardCoins} coins`);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          xpAwarded: rewardXP,
-          coinsAwarded: rewardCoins
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return json({ success: true, usersProcessed });
     }
 
-    return new Response(
-      JSON.stringify({ error: 'Invalid action' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    const user = await getAuthenticatedUser(req);
+    if (!user) return json({ error: "Authentication required" }, 401);
 
+    const client = adminClient();
+
+    if (action === "assign") {
+      const result = await assignForUser(client, user.id);
+      return json({
+        success: true,
+        missionsAssigned: result.assigned,
+        alreadyAssigned: result.alreadyAssigned,
+      });
+    }
+
+    if (action === "claim") {
+      const missionId = typeof body?.missionId === "string" ? body.missionId : "";
+      if (!missionId || missionId.length > 100) {
+        return json({ error: "A valid missionId is required" }, 400);
+      }
+
+      // The database function locks the mission row and performs the reward
+      // atomically, so concurrent requests cannot double-claim.
+      const { data, error } = await client.rpc("claim_daily_mission", {
+        p_user_mission_id: missionId,
+      });
+
+      if (error) {
+        return json({ error: error.message }, 400);
+      }
+
+      const result = Array.isArray(data) ? data[0] : data;
+      return json(result ?? { success: true });
+    }
+
+    return json({ error: "Invalid action" }, 400);
   } catch (error) {
-    console.error('Error in daily-missions function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    console.error("daily-missions error:", error);
+    return json(
+      { error: error instanceof Error ? error.message : "Daily mission request failed" },
+      500,
     );
   }
 });
