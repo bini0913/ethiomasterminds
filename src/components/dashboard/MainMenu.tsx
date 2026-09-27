@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useUser } from "@/context/UserContext";
@@ -31,6 +31,7 @@ type GuideStep = {
 
 const MainMenu: React.FC = () => {
   const { user, logout, showLevelUp, setShowLevelUp, previousLevel } = useUser();
+  const navigate = useNavigate();
   const handleLogout = async () => {
     await logout();
   };
