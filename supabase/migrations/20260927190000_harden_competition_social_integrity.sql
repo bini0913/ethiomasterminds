@@ -1,4 +1,19 @@
 -- Harden multiplayer room mutations and tournament completion.
+CREATE OR REPLACE FUNCTION public.multiplayer_ensure_membership(p_room_id uuid)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_uid uuid:=auth.uid(); v_status text; v_max integer; v_count integer;
+BEGIN
+ IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+ SELECT status,max_players INTO v_status,v_max FROM public.multiplayer_rooms WHERE id=p_room_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Room not found'; END IF;
+ IF v_status NOT IN ('waiting','countdown','playing') THEN RAISE EXCEPTION 'Room is no longer active'; END IF;
+ IF EXISTS (SELECT 1 FROM public.room_players WHERE room_id=p_room_id AND user_id=v_uid) THEN RETURN true; END IF;
+ SELECT count(*) INTO v_count FROM public.room_players WHERE room_id=p_room_id;
+ IF v_count>=v_max THEN RAISE EXCEPTION 'Room is full'; END IF;
+ INSERT INTO public.room_players(room_id,user_id,is_ready) VALUES(p_room_id,v_uid,false);
+ RETURN true;
+END; $$;
+
 CREATE OR REPLACE FUNCTION public.multiplayer_toggle_ready(p_room_id uuid)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE v_uid uuid:=auth.uid(); v_ready boolean;
@@ -100,6 +115,7 @@ END; $$;
 
 REVOKE ALL ON FUNCTION public.complete_match_and_progress(uuid,uuid,integer,integer,boolean) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.complete_match_and_progress(uuid,uuid,integer,integer,boolean) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.multiplayer_ensure_membership(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.multiplayer_toggle_ready(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.multiplayer_update_room(uuid,text,text,text,integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.multiplayer_kick_player(uuid,uuid) TO authenticated;
