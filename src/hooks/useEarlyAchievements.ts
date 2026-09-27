@@ -31,10 +31,7 @@ export function useEarlyAchievements(){
      if(current>=d.requirement_value && !old?.completed){
        const rewarded=await reward("discoverCorrect",{activityId:`achievement-${d.key}`,skill:"achievement",completed:true});
        if(!rewarded) continue;
-       await supabase.from("early_user_achievements").upsert({user_id:user.id,achievement_id:d.id,progress:d.requirement_value,completed:true,unlocked_at:new Date().toISOString()},{onConflict:"user_id,achievement_id"});
        toast.success(`${d.icon} ${d.name} unlocked!`,{description:`${d.description} +${d.reward_xp} XP`});
-     } else {
-       await supabase.from("early_user_achievements").upsert({user_id:user.id,achievement_id:d.id,progress:Math.min(current,d.requirement_value),completed:false},{onConflict:"user_id,achievement_id"});
      }
    }
  },[rows,summary,reward]);
