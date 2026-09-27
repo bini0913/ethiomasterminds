@@ -383,26 +383,31 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    // Clear local state first so logout is immediate even on slow/offline mobile networks.
+    // Always revoke the local session before navigating away. Previously this was
+    // fire-and-forget, which could let Supabase restore the session on mobile or
+    // when the user immediately reopened the Early portal.
     localStorage.removeItem("masterminds_login_mode");
+    setShowLevelUp(false);
+
+    const { error: localError } = await supabase.auth.signOut({ scope: "local" });
+
+    // Local sign-out is enough to terminate this device's session even when the
+    // network is unavailable. Try global revocation afterward when possible.
+    if (localError) {
+      console.error("Local logout error:", localError);
+    }
+
     setUser(null);
     setSession(null);
-    setShowLevelUp(false);
-    toast.info("Logged out");
 
-    // Revoke the remote session in the background; never block portal navigation on it.
-    void (async () => {
-      try {
-        await supabase.auth.signOut({ scope: "global" });
-      } catch (error) {
+    if (!localError) {
+      void supabase.auth.signOut({ scope: "global" }).catch((error) => {
+        // Global revocation can fail offline; the local session is already gone.
         console.error("Global logout error:", error);
-        try {
-          await supabase.auth.signOut({ scope: "local" });
-        } catch (localError) {
-          console.error("Local logout fallback error:", localError);
-        }
-      }
-    })();
+      });
+    }
+
+    toast.success("Logged out");
   };
 
   const updateProfile = async (profileData: Partial<UserProfile>) => {
