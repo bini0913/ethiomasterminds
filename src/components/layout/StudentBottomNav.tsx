@@ -3,11 +3,12 @@ import { useNavigate,useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Home,Gamepad2,Globe2,Trophy,Gift,BookOpen,User,Swords } from "lucide-react";
 import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 
 const StudentBottomNav:React.FC=()=>{
  const navigate=useNavigate(),location=useLocation(),{user}=useUser();
  const profilePath=user?.id?"/profile/"+user.id:"/settings";
- const early=location.pathname.startsWith("/early-")||location.pathname==="/leaderboard"||location.pathname==="/store";
+ const early=getUserTier(user?.grade)==="early";
  const items=early?[
   {icon:Home,label:"Home",path:"/",match:["/"]},
   {icon:Gamepad2,label:"Play",path:"/early-games",match:["/early-games"]},
