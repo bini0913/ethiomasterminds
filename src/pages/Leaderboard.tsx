@@ -251,7 +251,14 @@ const Leaderboard = () => {
                     <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All grades</SelectItem>
-                      {Array.from({ length: leaderboardGradeMax - leaderboardGradeMin + 1 }, (_, i) => leaderboardGradeMin + i).map((grade) => (\n                        <SelectItem key={grade} value={String(grade)}>Grade {grade}</SelectItem>\n                      ))}}
+                      {Array.from(
+                        { length: leaderboardGradeMax - leaderboardGradeMin + 1 },
+                        (_, i) => leaderboardGradeMin + i,
+                      ).map((grade) => (
+                        <SelectItem key={grade} value={String(grade)}>
+                          Grade {grade}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
