@@ -25,6 +25,7 @@ DECLARE
   v_rank text;
   v_coins integer;
   v_achievement_key text;
+  v_achievement_id uuid;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Unauthorized';
@@ -68,13 +69,32 @@ BEGIN
 
   IF trim(p_activity_id) LIKE 'achievement-%' THEN
     v_achievement_key := substring(trim(p_activity_id) from 13);
-    SELECT reward_xp, reward_coins
-      INTO v_xp_reward, v_coin_reward
+    SELECT id, reward_xp, reward_coins
+      INTO v_achievement_id, v_xp_reward, v_coin_reward
     FROM public.early_achievements
     WHERE key = v_achievement_key AND active = true;
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Unknown Early achievement';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM public.early_user_achievements
+      WHERE user_id = v_user_id
+        AND achievement_id = v_achievement_id
+        AND completed = true
+    ) THEN
+      SELECT xp, level, rank INTO v_xp, v_level, v_rank
+      FROM public.profiles WHERE id = v_user_id;
+      SELECT coins INTO v_coins FROM public.user_currency WHERE user_id = v_user_id;
+      RETURN jsonb_build_object(
+        'processed', false,
+        'duplicate', true,
+        'xp', COALESCE(v_xp, 0),
+        'level', COALESCE(v_level, 1),
+        'rank', v_rank,
+        'coins', COALESCE(v_coins, 0)
+      );
     END IF;
   ELSIF trim(p_activity_id) LIKE 'quiz-%' THEN
     v_xp_reward := 8;
@@ -90,6 +110,18 @@ BEGIN
     v_coin_reward := 2;
   ELSE
     RAISE EXCEPTION 'Unknown Early activity';
+  END IF;
+
+  IF v_achievement_id IS NOT NULL THEN
+    INSERT INTO public.early_user_achievements (
+      user_id, achievement_id, progress, completed, unlocked_at
+    ) VALUES (
+      v_user_id, v_achievement_id, 0, true, now()
+    )
+    ON CONFLICT (user_id, achievement_id) DO UPDATE SET
+      progress = EXCLUDED.progress,
+      completed = true,
+      unlocked_at = COALESCE(public.early_user_achievements.unlocked_at, now());
   END IF;
 
   INSERT INTO public.early_activity_attempts (
