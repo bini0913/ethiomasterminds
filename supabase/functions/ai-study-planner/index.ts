@@ -108,7 +108,7 @@ Prioritize weak areas. Include variety. Focus on entrance exam topics.`;
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("AI error:", response.status, t);
+      console.error("AI error:", response.status, t.slice(0, 300));
       return new Response(JSON.stringify({ suggestions: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -122,8 +122,8 @@ Prioritize weak areas. Include variety. Focus on entrance exam topics.`;
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("Error:", e);
-    return new Response(JSON.stringify({ suggestions: [], error: e.message }), {
+    console.error("Error:", e instanceof Error ? e.message : "Unknown error");
+    return new Response(JSON.stringify({ suggestions: [], error: "Failed to generate study plan" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
