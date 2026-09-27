@@ -35,6 +35,9 @@ import LibraryPage from "./pages/LibraryPage";
 import StudyModePage from "./pages/StudyModePage";
 import UserProfilePage from "./pages/UserProfilePage";
 import Tournaments from "./pages/Tournaments";
+import EarlyGamesPage from "./pages/EarlyGamesPage";
+import EarlyQuizPage from "./pages/EarlyQuizPage";
+import EarlyVideosPage from "./pages/EarlyVideosPage";
 import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
 import SupabaseMigration from "./pages/SupabaseMigration";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -83,6 +86,9 @@ const App = () => (
                             <Routes>
                               <Route path="/" element={<Index />} />
                               <Route path="/quiz" element={<Quiz />} />
+                              <Route path="/early-games" element={<EarlyGamesPage />} />
+                              <Route path="/early-quiz" element={<EarlyQuizPage />} />
+                              <Route path="/early-videos" element={<EarlyVideosPage />} />
                               <Route path="/quiz/filter" element={<QuizFilter />} />
                               <Route path="/multiplayer" element={<Multiplayer />} />
                               <Route path="/lobby" element={<Lobby />} />
