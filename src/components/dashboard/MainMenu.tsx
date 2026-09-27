@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 import { useAIHelper } from "@/context/AIHelperContext";
 import {
   Bot, BookOpen, Trophy, Users, Settings, GraduationCap,
-  Gamepad2, Store, Award, Zap, Target, LogOut, Timer, ArrowRight, Flame, LibraryBig
+  Gamepad2, Store, Award, Zap, Target, Timer, ArrowRight, Flame, LibraryBig
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
@@ -30,12 +30,8 @@ type GuideStep = {
 };
 
 const MainMenu: React.FC = () => {
-  const { user, logout, showLevelUp, setShowLevelUp, previousLevel } = useUser();
+  const { user, showLevelUp, setShowLevelUp, previousLevel } = useUser();
   const navigate = useNavigate();
-  const handleLogout = async () => {
-    await logout();
-    navigate("/", { replace: true });
-  };
   const tier = useTier();
   const { dailyStreak } = useCurrency();
   const { getRecentBadges } = useAchievements();
@@ -265,10 +261,6 @@ const MainMenu: React.FC = () => {
             <ThemeToggle className="h-9 w-9" />
             <Button variant="ghost" size="icon" onClick={openHelper} className="h-9 w-9" aria-label="Open AI helper">
               <Bot className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" onClick={handleLogout} className="h-9 rounded-xl px-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:px-3" aria-label="Log out" title="Log out">
-              <LogOut className="h-5 w-5" />
-              <span className="hidden sm:inline">Log out</span>
             </Button>
           </div>
         </div>
