@@ -43,6 +43,7 @@ const EarlyTierHome: React.FC = () => {
           <p className="mt-1 text-lg font-display font-bold">{progress.skills.length ? `${progress.skills.length} skills in progress` : "Start your first skill"}</p>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{width:`${progress.accuracy}%`}} /></div>
           <p className="mt-2 text-sm text-muted-foreground">{progress.attempts ? `${progress.accuracy}% correct across ${progress.attempts} tries` : "Play a game or quiz to start tracking your learning."}</p>
+          <Link to="/early-progress" className="mt-3 inline-flex min-h-11 items-center rounded-xl px-3 font-semibold text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">See my learning →</Link>
         </CardContent></Card>
         <Card className="rounded-[1.5rem]"><CardContent className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today</p>
