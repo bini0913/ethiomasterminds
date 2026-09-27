@@ -13,8 +13,7 @@ type EarlyRewardOptions = {
   activityId: string;
   skill: string;
   completed?: boolean;
-  xpOverride?: number;
-  coinsOverride?: number;
+  attemptId?: string;
 };
 
 export function useEarlyReward() {
@@ -22,12 +21,9 @@ export function useEarlyReward() {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user?.id) return false;
 
-    const reward = EARLY_REWARDS[kind];
-    const xp = options?.xpOverride ?? reward.xp;
-    const coins = options?.coinsOverride ?? reward.coins;
     const activityId = options?.activityId ?? `early-${kind}`;
     const skill = options?.skill ?? "general";
-    const attemptId = crypto.randomUUID();
+    const attemptId = options?.attemptId ?? crypto.randomUUID();
 
     try {
       const { error } = await (supabase as any).rpc("complete_early_activity", {
@@ -35,8 +31,6 @@ export function useEarlyReward() {
         p_activity_id: activityId,
         p_skill: skill,
         p_correct: true,
-        p_xp: xp,
-        p_coins: coins,
         p_completed: options?.completed ?? false,
       });
 
