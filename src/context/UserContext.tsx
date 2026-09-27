@@ -69,14 +69,15 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     return Math.floor(xp / 100) + 1;
   };
 
-  const createMissingProfile = async (userId: string) => {
+  const createMissingProfile = async (authUser: User) => {
+    const userId = authUser.id;
     const fallbackName =
-      session?.user?.user_metadata?.name ||
-      session?.user?.email?.split("@")[0] ||
+      authUser.user_metadata?.name ||
+      authUser.email?.split("@")[0] ||
       "Student";
     const fallbackUsername =
-      session?.user?.user_metadata?.username ||
-      session?.user?.email?.split("@")[0] ||
+      authUser.user_metadata?.username ||
+      authUser.email?.split("@")[0] ||
       `user-${userId.slice(0, 6)}`;
 
     const { error } = await (supabase as any)
@@ -96,7 +97,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Fetch user profile and role from database
-  const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  const fetchUserProfile = async (userId: string, authUser?: User): Promise<UserProfile | null> => {
     try {
       // Fetch profile
       const { data: profile, error: profileError } = await supabase
@@ -107,8 +108,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
       if (profileError) {
         if (profileError.code === "PGRST116") {
-          await createMissingProfile(userId);
-          return await fetchUserProfile(userId);
+          if (!authUser) return null;
+          await createMissingProfile(authUser);
+          return await fetchUserProfile(userId, authUser);
         }
         console.error('Error fetching profile:', profileError);
         return null;
@@ -128,7 +130,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         id: profile.id,
         name: profile.name,
         username: profile.username || undefined,
-        email: session?.user?.email,
+        email: authUser?.email,
         role,
         gender: profile.gender || undefined,
         grade: profile.grade || undefined,
@@ -172,7 +174,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
       setSession(existingSession);
       if (existingSession?.user) {
-        fetchUserProfile(existingSession.user.id).then(profile => {
+        fetchUserProfile(existingSession.user.id, existingSession.user).then(profile => {
           setUser(profile);
           setIsLoading(false);
         });
@@ -383,30 +385,24 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    // Always revoke the local session before navigating away. Previously this was
-    // fire-and-forget, which could let Supabase restore the session on mobile or
-    // when the user immediately reopened the Early portal.
     localStorage.removeItem("masterminds_login_mode");
+    sessionStorage.clear();
     setShowLevelUp(false);
 
-    const { error: localError } = await supabase.auth.signOut({ scope: "local" });
+    // End only this device/session. A second global sign-out after a local
+    // sign-out can race the auth broker on mobile/preview and resurrect stale
+    // state. Supabase's local scope explicitly clears the current stored
+    // session and emits SIGNED_OUT.
+    const { error } = await supabase.auth.signOut({ scope: "local" });
 
-    // Local sign-out is enough to terminate this device's session even when the
-    // network is unavailable. Try global revocation afterward when possible.
-    if (localError) {
-      console.error("Local logout error:", localError);
+    if (error) {
+      console.error("Logout error:", error);
+      toast.error("Could not log out. Please try again.");
+      return;
     }
 
     setUser(null);
     setSession(null);
-
-    if (!localError) {
-      void supabase.auth.signOut({ scope: "global" }).catch((error) => {
-        // Global revocation can fail offline; the local session is already gone.
-        console.error("Global logout error:", error);
-      });
-    }
-
     toast.success("Logged out");
   };
 
