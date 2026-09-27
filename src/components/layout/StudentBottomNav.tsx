@@ -6,7 +6,7 @@ import { useTier } from "@/context/TierContext";
 import { Home, Gamepad2, Trophy, Users, Settings, Swords, User, BookOpen, Brain } from "lucide-react";
 
 const UPPER_STUDY_PATHS = ["/quiz", "/study-mode", "/library", "/academic", "/revision", "/ai-tutor"];
-const UPPER_PROFILE_PATHS = ["/profile", "/settings", "/enhanced-settings", "/friends", "/store", "/avatar-creator", "/social", "/lobby", "/tournaments", "/leaderboard", "/chat"];
+const UPPER_PROFILE_PATHS = ["/profile", "/settings", "/enhanced-settings", "/friends", "/store", "/avatar-creator"];
 
 const StudentBottomNav: React.FC = () => {
   const navigate = useNavigate();
@@ -22,9 +22,9 @@ const StudentBottomNav: React.FC = () => {
       { icon: User, label: "Profile", path: "/profile", activePaths: UPPER_PROFILE_PATHS },
     ];
     const isActive = (paths: string[]) => paths.some((path) => path === "/" ? location.pathname === "/" : location.pathname === path || location.pathname.startsWith(`${path}/`));
-    return <div data-guide="bottom-nav" className="bottom-safe-area fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 md:bg-background/90 md:backdrop-blur">
-      <nav aria-label="Primary navigation" className="mx-auto grid h-16 max-w-md grid-cols-4 items-stretch px-2 md:max-w-lg">
-        {navItems.map((item) => { const Icon = item.icon; const active = isActive(item.activePaths); return <motion.button key={item.path} onClick={() => navigate(item.path)} whileTap={{ scale: 0.96 }} aria-current={active ? "page" : undefined} className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}><Icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} aria-hidden="true" /><span>{item.label}</span></motion.button>; })}
+    return <div data-guide="bottom-nav" className="bottom-safe-area fixed bottom-0 left-0 right-0 z-50 border-t border-border/80 bg-background/95 shadow-[0_-4px_18px_hsl(var(--foreground)/0.05)] md:bg-background/90 md:backdrop-blur">
+      <nav aria-label="Primary navigation" className="mx-auto grid h-[4.5rem] max-w-md grid-cols-4 items-center gap-1 px-2 md:max-w-lg">
+        {navItems.map((item) => { const Icon = item.icon; const active = isActive(item.activePaths); return <motion.button key={item.path} onClick={() => navigate(item.path)} whileTap={{ scale: 0.97 }} aria-current={active ? "page" : undefined} className={`flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-primary/10 font-semibold text-primary" : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} aria-hidden="true" /><span>{item.label}</span></motion.button>; })}
       </nav>
     </div>;
   }
