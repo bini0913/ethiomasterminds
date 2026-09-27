@@ -156,10 +156,9 @@ const EnhancedSettings: React.FC = () => {
     toast.success(`Language changed to ${displayName}`);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-    toast.success("Logged out successfully");
+  const handleLogout = async () => {
+    await logout();
+    navigate('/', { replace: true });
   };
 
   const handleDeleteAccount = () => {

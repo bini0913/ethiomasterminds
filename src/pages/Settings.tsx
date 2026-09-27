@@ -40,10 +40,9 @@ const Settings: React.FC = () => {
     toast.success(`Language changed to ${value}`);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-    toast.success('Logged out successfully');
+  const handleLogout = async () => {
+    await logout();
+    navigate('/', { replace: true });
   };
 
   const handleReplayTutorial = async () => {

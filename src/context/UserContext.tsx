@@ -370,15 +370,20 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    // Clear local app state immediately so logout always works on mobile/offline
+    // even if the remote session-revocation request is temporarily unavailable.
+    localStorage.removeItem("masterminds_login_mode");
+    setUser(null);
+    setSession(null);
+    setShowLevelUp(false);
+
     try {
-      await supabase.auth.signOut();
-      localStorage.removeItem("masterminds_login_mode");
-      setUser(null);
-      setSession(null);
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) throw error;
       toast.info("Logged out successfully");
     } catch (error) {
-      console.error('Logout error:', error);
-      toast.error("Logout failed");
+      console.error("Logout error:", error);
+      toast.info("Logged out on this device");
     }
   };
 
