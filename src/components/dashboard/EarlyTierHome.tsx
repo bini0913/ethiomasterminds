@@ -18,6 +18,7 @@ const EarlyTierHome: React.FC = () => {
     { to:"/early-games", label:"Games", description:"Play & practise", icon:<Gamepad2 className="h-7 w-7"/>, tone:"bg-primary/10 text-primary" },
     { to:"/early-quiz", label:"Quiz", description:"Show what you know", icon:<Sparkles className="h-7 w-7"/>, tone:"bg-warning/15 text-warning" },
     { to:"/early-videos", label:"Videos", description:"Watch & discover", icon:<PlayCircle className="h-7 w-7"/>, tone:"bg-accent/15 text-accent" },
+    { to:"/early-discover", label:"Discover", description:"Amazing facts", icon:<Sparkles className="h-7 w-7"/>, tone:"bg-warning/15 text-warning" },
     { to:"/leaderboard", label:"Ranks", description:"See your progress", icon:<Trophy className="h-7 w-7"/>, tone:"bg-success/15 text-success" },
     { to:"/store", label:"Store", description:"Use your rewards", icon:<Store className="h-7 w-7"/>, tone:"bg-primary/10 text-primary" },
     { to:profilePath, label:"My Avatar", description:"Make it yours", icon:<UserRound className="h-7 w-7"/>, tone:"bg-accent/15 text-accent" },
