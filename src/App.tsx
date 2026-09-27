@@ -59,6 +59,7 @@ import { ChatProvider } from "./context/ChatContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
+import NativeBackHandler from "./components/mobile/NativeBackHandler";
 
 const queryClient = new QueryClient();
 
@@ -181,6 +182,7 @@ const App = () => (
                               <Route path="/migrate-supabase" element={<SupabaseMigration />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
+                            <NativeBackHandler />
                             <AIHelper />
                           </BrowserRouter>
                           </TooltipProvider>
