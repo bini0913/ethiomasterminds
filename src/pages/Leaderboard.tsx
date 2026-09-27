@@ -45,6 +45,10 @@ const Leaderboard = () => {
   const leaderboardTier = getUserTier(user?.grade);
   const leaderboardGradeMin = leaderboardTier === "early" ? 1 : leaderboardTier === "middle" ? 5 : leaderboardTier === "upper" ? 9 : 1;
   const leaderboardGradeMax = leaderboardTier === "early" ? 4 : leaderboardTier === "middle" ? 8 : leaderboardTier === "upper" ? 12 : 12;
+  const leaderboardGrades = Array.from(
+    { length: leaderboardGradeMax - leaderboardGradeMin + 1 },
+    (_, index) => leaderboardGradeMin + index,
+  );
   const [timeframe, setTimeframe] = useState<Timeframe>("all");
   const [loading, setLoading] = useState(true);
   const [classRows, setClassRows] = useState<ClassCompetitionRow[]>([]);
@@ -253,10 +257,7 @@ const Leaderboard = () => {
                     <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All grades</SelectItem>
-                      {Array.from(
-                        { length: leaderboardGradeMax - leaderboardGradeMin + 1 },
-                        (_, i) => leaderboardGradeMin + i,
-                      ).map((grade) => (
+                      {leaderboardGrades.map((grade) => (
                         <SelectItem key={grade} value={String(grade)}>
                           Grade {grade}
                         </SelectItem>
