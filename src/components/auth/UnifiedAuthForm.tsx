@@ -29,7 +29,7 @@ import {
   Loader2,
 } from "lucide-react";
 import AnimatedBackground from "@/components/ui/AnimatedBackground";
-import { getUserTier, type UserTier } from "@/lib/getUserTier";
+import type { UserTier } from "@/lib/getUserTier";
 
 interface UnifiedAuthFormProps {
   onSuccess: () => void;
