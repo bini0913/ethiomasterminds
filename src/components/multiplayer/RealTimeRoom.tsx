@@ -298,14 +298,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         questionCount: room.question_count || 10,
       });
 
-      await supabase.from('room_players').upsert(
-        {
-          room_id: roomId,
-          user_id: currentUserId,
-          is_ready: false,
-        },
-        { onConflict: 'room_id,user_id' },
-      );
+      const { error: membershipError } = await supabase.rpc('multiplayer_ensure_membership', { p_room_id: roomId });
+      if (membershipError) throw membershipError;
 
       await fetchPlayers();
 
@@ -673,7 +667,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   const kickPlayer = async (playerId: string, playerName: string) => {
     if (!isHost || playerId === currentUserId) return;
-    await supabase.from('room_players').delete().eq('room_id', roomId).eq('user_id', playerId);
+    const { error } = await supabase.rpc('multiplayer_kick_player', { p_room_id: roomId, p_player_id: playerId });
+    if (error) throw error;
     toast.info(`${playerName} was removed from the room`);
   };
 
