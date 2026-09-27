@@ -19,6 +19,7 @@ import LevelUpModal from "../profile/LevelUpModal";
 import CurrencyDisplay from "@/components/currency/CurrencyDisplay";
 import { supabase } from "@/integrations/supabase/client";
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import LearningDNASummary from "@/components/learning/LearningDNASummary";
 
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 
@@ -375,6 +376,10 @@ const MainMenu: React.FC = () => {
               </Link>
             </motion.section>
           )}
+
+          <motion.section variants={itemVariants}>
+            <LearningDNASummary />
+          </motion.section>
 
           <motion.section variants={itemVariants} data-guide="study-section">
             <div className="mb-3 flex items-end justify-between gap-3">
