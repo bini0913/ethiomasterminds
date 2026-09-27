@@ -683,7 +683,7 @@ const Quiz: React.FC = () => {
                               onClick={() => {
                                 setSelectedCategory(challenge.subject);
                                 setNumQuestions(10);
-                                handleCreateRandomQuiz();
+                                handleCreateRandomQuiz(challenge.subject);
                               }}
                             >
                               Play
