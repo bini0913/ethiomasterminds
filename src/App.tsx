@@ -48,6 +48,7 @@ import { CurrencyProvider } from "./context/CurrencyContext";
 import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
 import { ChatProvider } from "./context/ChatContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
 
@@ -63,17 +64,18 @@ const SelfProfileRedirect = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <UserProvider>
-      <TierProvider>
-        <LanguageProvider>
-          <CurrencyProvider>
-            <AchievementsProvider>
-              <QuizProvider>
-                <RoomProvider>
-                  <AIHelperProvider>
-                    <FriendsProvider>
-                      <ChatProvider>
-                        <TooltipProvider>
+    <ThemeProvider>
+      <UserProvider>
+        <TierProvider>
+          <LanguageProvider>
+            <CurrencyProvider>
+              <AchievementsProvider>
+                <QuizProvider>
+                  <RoomProvider>
+                    <AIHelperProvider>
+                      <FriendsProvider>
+                        <ChatProvider>
+                          <TooltipProvider>
                           <Toaster />
                           <Sonner />
                           <BrowserRouter>
@@ -167,17 +169,18 @@ const App = () => (
                             </Routes>
                             <AIHelper />
                           </BrowserRouter>
-                        </TooltipProvider>
-                      </ChatProvider>
-                    </FriendsProvider>
-                  </AIHelperProvider>
-                </RoomProvider>
-              </QuizProvider>
-            </AchievementsProvider>
-          </CurrencyProvider>
-      </LanguageProvider>
-      </TierProvider>
-     </UserProvider>
+                          </TooltipProvider>
+                        </ChatProvider>
+                      </FriendsProvider>
+                    </AIHelperProvider>
+                  </RoomProvider>
+                </QuizProvider>
+              </AchievementsProvider>
+            </CurrencyProvider>
+          </LanguageProvider>
+        </TierProvider>
+      </UserProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

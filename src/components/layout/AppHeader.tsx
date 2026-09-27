@@ -5,6 +5,7 @@ import { useUser } from '@/context/UserContext';
 import BackButton from '@/components/ui/BackButton';
 import CurrencyDisplay from '@/components/currency/CurrencyDisplay';
 import { Settings, LogOut, Bell, Home } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
 interface AppHeaderProps {
   title: string;
@@ -75,6 +76,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           <div className="flex items-center gap-2">
             {children}
             {showCurrency && <CurrencyDisplay showBoth />}
+            <ThemeToggle className="h-9 w-9" />
             {showNotifications && (
               <Button variant="ghost" size="icon" className="h-9 w-9">
                 <Bell className="h-5 w-5" />
