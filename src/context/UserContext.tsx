@@ -402,7 +402,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       // through the general profile update path.
       if (profileData.avatar !== undefined) updateData.avatar = profileData.avatar;
       if (profileData.avatarConfig !== undefined) updateData.avatar_config = profileData.avatarConfig;
-      if (profileData.badges !== undefined) updateData.badges = profileData.badges;
+      // Badges are progression-owned and can only be changed by server-side achievement logic.
 
       const { error } = await supabase
         .from('profiles')
