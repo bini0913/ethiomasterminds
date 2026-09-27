@@ -305,10 +305,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
-      if (!grade?.trim()) {
-        toast.error("Please choose your grade before creating your account.");
-        return false;
-      }
 
       // Check if username is already taken
       const { data: existingEmail } = await supabase
