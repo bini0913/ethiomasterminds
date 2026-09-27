@@ -118,6 +118,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   if (!isAuthenticated || !user) return <>{children}</>;
 
   const isHome = location.pathname === "/";
+  if (isHome) return <>{children}</>;
 
   const handleBack = () => {
     const historyIndex = window.history.state?.idx;
@@ -138,7 +139,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
-            {!isHome ? (
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={handleBack}
@@ -148,11 +149,16 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
               >
                 <ArrowLeft className="h-5 w-5" aria-hidden="true" />
               </button>
-            ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Go home"
+                title="Go home"
+              >
                 <Home className="h-5 w-5" aria-hidden="true" />
-              </div>
-            )}
+              </button>
+            </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold leading-tight">{getAppRouteTitle(location.pathname)}</p>
               <p className="hidden truncate text-[11px] text-muted-foreground sm:block">
