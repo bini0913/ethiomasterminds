@@ -396,13 +396,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (profileData.name !== undefined) updateData.name = profileData.name;
       if (profileData.username !== undefined) updateData.username = profileData.username;
       if (profileData.gender !== undefined) updateData.gender = profileData.gender;
-      if (profileData.grade !== undefined) updateData.grade = profileData.grade;
+      if (profileData.grade !== undefined) {
+        if (user.grade && profileData.grade !== user.grade && user.role !== "admin" && user.role !== "manager") {
+          toast.error("Grade changes require an administrator.");
+          return;
+        }
+        updateData.grade = profileData.grade;
+      }
       if (profileData.educationLevel !== undefined) updateData.education_level = profileData.educationLevel;
       // XP/level/rank/badges are progression-owned fields and cannot be edited
       // through the general profile update path.
       if (profileData.avatar !== undefined) updateData.avatar = profileData.avatar;
       if (profileData.avatarConfig !== undefined) updateData.avatar_config = profileData.avatarConfig;
-      if (profileData.badges !== undefined) updateData.badges = profileData.badges;
+
 
       const { error } = await supabase
         .from('profiles')
