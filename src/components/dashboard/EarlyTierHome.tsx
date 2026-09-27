@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 const EarlyTierHome: React.FC = () => {
   const { user, logout } = useUser();
   const navigate = useNavigate();
+  const navigate = useNavigate();
   const { xp, coins, dailyStreak } = useCurrency();
   const { summary: progress } = useEarlyProgress();
   const recommendations = useEarlyRecommendations();
@@ -20,6 +21,7 @@ const EarlyTierHome: React.FC = () => {
   const gradeLabel = !user?.grade || /^k|kindergarten|pre/i.test(user.grade) ? "Early learner" : `Grade ${user.grade}`;
   const handleLogout = async () => {
     await logout();
+    navigate("/", { replace: true });
   };
 
   const quick = [
