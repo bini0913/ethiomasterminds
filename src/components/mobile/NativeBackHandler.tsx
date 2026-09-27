@@ -6,7 +6,8 @@ export default function NativeBackHandler(){
  useEffect(()=>{
    const handler=()=>{
      if(location.pathname==="/") return;
-     if(window.history.length>1) navigate(-1); else navigate("/");
+     const historyIndex = window.history.state?.idx;
+     if (typeof historyIndex === "number" && historyIndex > 0) navigate(-1); else navigate("/");
    };
    window.addEventListener("nativeBackButton",handler);
    return()=>window.removeEventListener("nativeBackButton",handler);

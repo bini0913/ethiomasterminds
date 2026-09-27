@@ -30,7 +30,9 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(20);
   const [quizCompleted, setQuizCompleted] = useState(false);
-  const [earnedXP, setEarnedXP] = useState(0);\n  const [submissionReady, setSubmissionReady] = useState(false);\n  const [rewardClaimed, setRewardClaimed] = useState(false);
+  const [earnedXP, setEarnedXP] = useState(0);
+  const [submissionReady, setSubmissionReady] = useState(false);
+  const [rewardClaimed, setRewardClaimed] = useState(false);
   const [userAnswers, setUserAnswers] = useState<{[key: string]: string}>({});
   const userAnswersRef = useRef<{[key: string]: string}>({});
   const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
@@ -313,7 +315,9 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     setCompletedQuestionIds([]);
     setAnsweredCorrectly(0);
     setAnsweredWrong(0);
-    submissionIdRef.current = null;\n    setSubmissionReady(false);\n    setRewardClaimed(false);
+    submissionIdRef.current = null;
+    setSubmissionReady(false);
+    setRewardClaimed(false);
   };
   
   // Calculate accuracy percentage

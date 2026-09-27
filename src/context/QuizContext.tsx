@@ -220,30 +220,12 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const shuffled = availableQuestions.sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, Math.min(count, shuffled.length));
 
-    // If not enough questions, generate placeholders
-    while (selected.length < count) {
-      const types = ['Multiple Choice', 'True/False'] as const;
-      const questionType = types[Math.floor(Math.random() * types.length)];
-      const options = questionType === 'Multiple Choice' 
-        ? ['Option A', 'Option B', 'Option C', 'Option D'] 
-        : ['True', 'False'];
-      
-      selected.push({
-        id: `q-${Math.random().toString(36).substr(2, 9)}`,
-        text: `${category} question for grade ${grade || 5} (${properDifficulty})`,
-        options,
-        correctAnswer: options[0],
-        difficulty: properDifficulty,
-        subject: category,
-        grade: grade || 5,
-        topic: topic || 'General',
-        type: questionType,
-        points: properDifficulty === 'Easy' ? 5 : properDifficulty === 'Medium' ? 10 : properDifficulty === 'Hard' ? 15 : 20,
-        timeLimit: 30,
-        explanation: ''
-      });
+    // Never fabricate questions. Every student question must come from approved
+    // curriculum content so secure submission/reward logic always has a real question id.
+    if (selected.length < count) {
+      console.warn(`Requested ${count} questions but only ${selected.length} approved questions are available for this selection.`);
     }
-    
+
     return {
       id: `quiz-${Math.random().toString(36).substring(2, 9)}`,
       title: `${category} Quiz - Grade ${grade || 5}`,

@@ -28,6 +28,12 @@ serve(async (req) => {
       });
     }
 
+    const rateLimit = await supabaseClient.rpc("consume_edge_rate_limit", { p_bucket: "learning-dna", p_limit: 5, p_window_seconds: 300 });
+    if (rateLimit.error) throw rateLimit.error;
+    if (!rateLimit.data) {
+      return new Response(JSON.stringify({ error: "Please wait before generating another report." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Fetch user's question attempts
     const { data: attempts, error: attemptsError } = await supabaseClient
       .from('question_attempts')

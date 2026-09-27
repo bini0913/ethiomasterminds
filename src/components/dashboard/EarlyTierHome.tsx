@@ -18,6 +18,10 @@ const EarlyTierHome: React.FC = () => {
   const recommendations = useEarlyRecommendations();
   const profilePath = user?.id ? `/profile/${user.id}` : "/settings";
   const gradeLabel = !user?.grade || /^k|kindergarten|pre/i.test(user.grade) ? "Early learner" : `Grade ${user.grade}`;
+  const handleLogout = async () => {
+    await logout();
+    navigate("/", { replace: true });
+  };
 
   const quick = [
     { to:"/early-games", label:"Games", description:"Play & practise", icon:<Gamepad2 className="h-7 w-7"/>, tone:"bg-primary/10 text-primary" },

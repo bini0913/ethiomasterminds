@@ -235,7 +235,7 @@ const Quiz: React.FC = () => {
   };
   
   const handleCreateRandomQuiz = (requestedCategory?: string) => {
-    const category = requestedCategory || category;
+    const category = requestedCategory || selectedCategory;
     if (!category) {
       toast.error("Please select a subject first");
       return;
@@ -588,7 +588,7 @@ const Quiz: React.FC = () => {
                             <SelectValue placeholder="Select Grade" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[5, 6, 7, 8, 9].map((grade) => (
+                            {Array.from({ length: quizGradeMax - quizGradeMin + 1 }, (_, index) => quizGradeMin + index).map((grade) => (
                               <SelectItem key={grade} value={grade.toString()}>
                                 Grade {grade}
                               </SelectItem>
@@ -654,7 +654,7 @@ const Quiz: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {[
-                        { subject: "Mathematics", reward: "+50 XP", icon: Calculator, color: "from-primary to-accent" },
+                        { subject: "Math", reward: "+50 XP", icon: Calculator, color: "from-primary to-accent" },
                         { subject: "Science", reward: "+50 XP", icon: Atom, color: "from-secondary to-glow-cyan" },
                         { subject: "English", reward: "+50 XP", icon: BookOpen, color: "from-accent to-glow-pink" }
                       ].map((challenge, i) => (
