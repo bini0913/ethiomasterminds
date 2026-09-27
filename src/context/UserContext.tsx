@@ -442,42 +442,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const addXP = async (amount: number) => {
-    if (!user || !session?.user) return;
-
-    try {
-      const { data, error } = await supabase.rpc('add_xp', {
-        p_user_id: session.user.id,
-        p_amount: amount,
-      });
-
-      if (error) throw error;
-
-      const result = data as {
-        previous_xp?: number;
-        new_xp?: number;
-        previous_level?: number;
-        new_level?: number;
-        leveled_up?: boolean;
-      };
-
-      const newXP = Number(result?.new_xp ?? user.xp);
-      const newLevel = Number(result?.new_level ?? user.level);
-
-      if (newLevel > user.level) {
-        setPreviousLevel(user.level);
-        setTimeout(() => setShowLevelUp(true), 500);
-      }
-
-      setUser(prev => prev ? { ...prev, xp: newXP, level: newLevel } : null);
-
-      if (newLevel <= user.level) {
-        toast.success(`+${amount} XP gained!`);
-      }
-    } catch (error) {
-      console.error('Add XP error:', error);
-      toast.error('Unable to add XP securely.');
-    }
+  // Progress XP is awarded only by verified server-side activity completion RPCs.
+  // Keep this legacy method for compatibility with older callers, but never
+  // expose a generic client-controlled XP grant endpoint.
+  const addXP = async (_amount: number) => {
+    await refreshProfile();
+    toast.info("XP is awarded automatically when you complete a learning activity.");
   };
 
   const deleteAccount = async () => {

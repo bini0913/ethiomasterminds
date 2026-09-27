@@ -278,18 +278,11 @@ const StudyModePage: React.FC = () => {
 
     const plannedDuration = clampMinutes(studyMinutes, 5, 180);
 
-    const { data, error } = await db
-      .from("study_sessions")
-      .insert({
-        user_id: user.id,
-        start_time: new Date().toISOString(),
-        planned_duration: plannedDuration,
-        mode,
-        status: "active",
-        competition_id: selectedCompetitionId || null,
-      })
-      .select("*")
-      .single();
+    const { data, error } = await db.rpc("start_study_session", {
+      p_planned_duration: plannedDuration,
+      p_mode: mode,
+      p_competition_id: selectedCompetitionId || null,
+    });
 
     if (error) {
       toast.error(error.message);
