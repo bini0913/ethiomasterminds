@@ -40,6 +40,7 @@ import EarlyQuizPage from "./pages/EarlyQuizPage";
 import EarlyVideosPage from "./pages/EarlyVideosPage";
 import EarlyDiscoverPage from "./pages/EarlyDiscoverPage";
 import EarlyExplorePage from "./pages/EarlyExplorePage";
+import EarlyProgressPage from "./pages/EarlyProgressPage";
 import EarlyTierOnlyRoute from "./components/auth/EarlyTierOnlyRoute";
 import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
 import SupabaseMigration from "./pages/SupabaseMigration";
@@ -94,6 +95,7 @@ const App = () => (
                               <Route path="/early-videos" element={<EarlyTierOnlyRoute><EarlyVideosPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-discover" element={<EarlyTierOnlyRoute><EarlyDiscoverPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-explore" element={<EarlyTierOnlyRoute><EarlyExplorePage /></EarlyTierOnlyRoute>} />
+                              <Route path="/early-progress" element={<EarlyTierOnlyRoute><EarlyProgressPage /></EarlyTierOnlyRoute>} />
                               <Route path="/quiz/filter" element={<QuizFilter />} />
                               <Route path="/multiplayer" element={<Multiplayer />} />
                               <Route path="/lobby" element={<Lobby />} />
