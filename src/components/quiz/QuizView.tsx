@@ -223,6 +223,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       if (xpEarned !== undefined) {
         setEarnedXP(Number(xpEarned) || 0);
       }
+      setSubmissionReady(true);
 
       // Update analytics, streak, and achievements
       const avgTime = totalTimeTaken / quiz.questions.length;
