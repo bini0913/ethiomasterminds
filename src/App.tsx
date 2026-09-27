@@ -40,7 +40,9 @@ import EarlyQuizPage from "./pages/EarlyQuizPage";
 import EarlyVideosPage from "./pages/EarlyVideosPage";
 import EarlyDiscoverPage from "./pages/EarlyDiscoverPage";
 import EarlyExplorePage from "./pages/EarlyExplorePage";
+import EarlyProgressPage from "./pages/EarlyProgressPage";
 import EarlyTierOnlyRoute from "./components/auth/EarlyTierOnlyRoute";
+import EarlyContentAdminPage from "./pages/EarlyContentAdminPage";
 import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
 import SupabaseMigration from "./pages/SupabaseMigration";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -58,6 +60,7 @@ import { ChatProvider } from "./context/ChatContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
+import NativeBackHandler from "./components/mobile/NativeBackHandler";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +97,7 @@ const App = () => (
                               <Route path="/early-videos" element={<EarlyTierOnlyRoute><EarlyVideosPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-discover" element={<EarlyTierOnlyRoute><EarlyDiscoverPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-explore" element={<EarlyTierOnlyRoute><EarlyExplorePage /></EarlyTierOnlyRoute>} />
+                              <Route path="/early-progress" element={<EarlyTierOnlyRoute><EarlyProgressPage /></EarlyTierOnlyRoute>} />
                               <Route path="/quiz/filter" element={<QuizFilter />} />
                               <Route path="/multiplayer" element={<Multiplayer />} />
                               <Route path="/lobby" element={<Lobby />} />
@@ -179,6 +183,7 @@ const App = () => (
                               <Route path="/migrate-supabase" element={<SupabaseMigration />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
+                            <NativeBackHandler />
                             <AIHelper />
                           </BrowserRouter>
                           </TooltipProvider>
@@ -196,4 +201,5 @@ const App = () => (
   </QueryClientProvider>
 );
 
-export default App;
+export default App;<Route path="/admin/early-content" element={<ProtectedRoute allowedRoles={['admin','manager','extreme_admin']}><EarlyContentAdminPage /></ProtectedRoute>} />
+                              
