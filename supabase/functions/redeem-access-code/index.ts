@@ -41,6 +41,15 @@ serve(async (req) => {
       return json({ error: "Invalid authentication token" }, 401);
     }
 
+    const { data: allowed, error: rateError } = await client.rpc("consume_edge_rate_limit", {
+      p_function_name: "redeem-access-code",
+      p_limit: 10,
+      p_window_seconds: 600,
+    });
+    if (rateError || allowed !== true) {
+      return json({ error: "Too many redemption attempts. Please try again later." }, 429);
+    }
+
     const { data, error } = await client.rpc("redeem_access_code", {
       p_code: code.trim(),
       p_code_type: code_type,
