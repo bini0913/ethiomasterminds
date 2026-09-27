@@ -4,8 +4,10 @@ import EnhancedWelcomeScreen from "@/components/welcome/EnhancedWelcomeScreen";
 import UnifiedAuthForm from "@/components/auth/UnifiedAuthForm";
 import ProfileSetup from "@/components/profile/ProfileSetup";
 import MainMenu from "@/components/dashboard/MainMenu";
+import EarlyTierHome from "@/components/dashboard/EarlyTierHome";
 import StudentBottomNav from "@/components/layout/StudentBottomNav";
 import { useUser } from "@/context/UserContext";
+import { useTier } from "@/context/TierContext";
 
 // App stages
 enum AppStage {
@@ -17,6 +19,7 @@ enum AppStage {
 
 const Index: React.FC = () => {
   const { user, isAuthenticated, isLoading, refreshProfile } = useUser();
+  const tier = useTier();
   const [appStage, setAppStage] = useState<AppStage>(AppStage.Welcome);
   const [userType, setUserType] = useState<"student" | "teacher" | "admin" | "manager">("student");
   const navigate = useNavigate();
@@ -107,10 +110,14 @@ const Index: React.FC = () => {
         return <ProfileSetup onComplete={() => setAppStage(AppStage.MainMenu)} />;
       case AppStage.MainMenu:
         return (
-          <>
-            <MainMenu />
-            <StudentBottomNav />
-          </>
+          tier === "early" ? (
+            <EarlyTierHome />
+          ) : (
+            <>
+              <MainMenu />
+              <StudentBottomNav />
+            </>
+          )
         );
       default:
         return <div>Something went wrong</div>;
