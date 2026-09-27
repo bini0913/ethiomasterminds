@@ -1,16 +1,16 @@
 project_id = "midsuuwyqlsmzyfvhdzy"
 
 [functions.ai-helper]
-verify_jwt = false
+verify_jwt = true
 
 [functions.voice-evaluate]
-verify_jwt = false
+verify_jwt = true
 
 [functions.redeem-access-code]
-verify_jwt = false
+verify_jwt = true
 
 [functions.assign-role]
-verify_jwt = false
+verify_jwt = true
 
 [functions.award-rewards]
 verify_jwt = true
@@ -19,10 +19,10 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.analyze-learning-dna]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-tutor]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-parent-insights]
-verify_jwt = false
+verify_jwt = true
