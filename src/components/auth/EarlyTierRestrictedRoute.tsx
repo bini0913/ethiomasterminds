@@ -15,7 +15,11 @@ const EarlyTierRestrictedRoute: React.FC<EarlyTierRestrictedRouteProps> = ({ chi
   // Do not render restricted content before the loaded profile determines the tier.
   if (isLoading) return null;
 
-  if (!isAuthenticated) {\n    return <Navigate to="/" replace />;\n  }\n\n  if (tier === "early") {
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (tier === "early") {
     return <Navigate to="/" replace />;
   }
 
