@@ -326,12 +326,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           data: {
             name: name.trim(),
             username: username.trim().toLowerCase(),
-            grade: grade.trim(),
-            education_level: grade.trim().toLowerCase() === "k" || /^grade\s*[1-4]$/i.test(grade.trim())
-              ? "early"
-              : /^grade\s*[5-8]$/i.test(grade.trim())
-                ? "middle"
-                : "upper",
+            ...(grade?.trim()
+              ? {
+                  grade: grade.trim(),
+                  education_level:
+                    grade.trim().toLowerCase() === "k" || /^grade\s*[1-4]$/i.test(grade.trim())
+                      ? "early"
+                      : /^grade\s*[5-8]$/i.test(grade.trim())
+                        ? "middle"
+                        : "upper",
+                }
+              : {}),
           }
         }
       });
