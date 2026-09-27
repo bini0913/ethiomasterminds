@@ -13,6 +13,8 @@ type EarlyRewardOptions = {
   activityId: string;
   skill: string;
   completed?: boolean;
+  xpOverride?: number;
+  coinsOverride?: number;
 };
 
 export function useEarlyReward() {
@@ -21,6 +23,8 @@ export function useEarlyReward() {
     if (!auth.user?.id) return false;
 
     const reward = EARLY_REWARDS[kind];
+    const xp = options?.xpOverride ?? reward.xp;
+    const coins = options?.coinsOverride ?? reward.coins;
     const activityId = options?.activityId ?? `early-${kind}`;
     const skill = options?.skill ?? "general";
     const attemptId = crypto.randomUUID();
@@ -31,8 +35,8 @@ export function useEarlyReward() {
         p_activity_id: activityId,
         p_skill: skill,
         p_correct: true,
-        p_xp: reward.xp,
-        p_coins: reward.coins,
+        p_xp: xp,
+        p_coins: coins,
         p_completed: options?.completed ?? false,
       });
 
