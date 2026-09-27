@@ -14,7 +14,12 @@ serve(async (req) => {
   try {
     const { message, conversationId, subject } = await req.json();
 
-    if (!message) {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (typeof message !== "string" || message.length === 0 || message.length > 4000) {
       return new Response(JSON.stringify({ error: 'Message is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -37,6 +42,10 @@ serve(async (req) => {
       });
     }
 
+    const rateLimit = await supabaseClient.rpc("consume_edge_rate_limit", { p_bucket: "ai-tutor", p_limit: 20, p_window_seconds: 60 });
+    if (rateLimit.error) throw rateLimit.error;
+    if (!rateLimit.data) return new Response(JSON.stringify({ error: "Too many requests. Please wait a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     // Get or create conversation
     let conversation;
     if (conversationId) {
@@ -49,7 +58,7 @@ serve(async (req) => {
       conversation = data;
     }
 
-    const messages = conversation?.messages || [];
+    const messages = Array.isArray(conversation?.messages) ? conversation.messages.slice(-10) : [];
     messages.push({ role: 'user', content: message, timestamp: new Date().toISOString() });
 
     // Get user's learning data for context

@@ -2,266 +2,151 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
 serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const body = await req.json();
+    const action = typeof body?.action === "string" ? body.action : "";
+    const userIdFromBody = typeof body?.userId === "string" ? body.userId : null;
 
-    const { action, userId } = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const admin = createClient(supabaseUrl, serviceKey);
 
-    console.log(`Daily missions action: ${action} for user: ${userId}`);
-
-    if (action === 'assign') {
-      // Assign daily missions to a specific user
-      const today = new Date().toISOString().split('T')[0];
-
-      // Check if user already has missions for today
-      const { data: existingMissions } = await supabase
-        .from('user_missions')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('mission_date', today)
-        .limit(1);
-
-      if (existingMissions && existingMissions.length > 0) {
-        return new Response(
-          JSON.stringify({ message: 'Missions already assigned for today' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    // reset_all is a server-only scheduled operation. Never accept a client user id for it.
+    if (action === "reset_all") {
+      const cronSecret = Deno.env.get("DAILY_MISSIONS_CRON_SECRET");
+      if (!cronSecret || req.headers.get("x-cron-secret") !== cronSecret) {
+        return json({ error: "Forbidden" }, 403);
       }
 
-      // Get active missions
-      const { data: activeMissions } = await supabase
-        .from('daily_missions')
-        .select('*')
-        .eq('is_active', true);
+      const today = new Date().toISOString().split("T")[0];
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: activeUsers, error: usersError } = await admin
+        .from("user_streaks")
+        .select("user_id")
+        .gte("last_activity_date", cutoff);
 
-      if (!activeMissions || activeMissions.length === 0) {
-        return new Response(
-          JSON.stringify({ message: 'No active missions available' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      if (usersError) throw usersError;
 
-      // Randomly select 3 missions
-      const shuffled = activeMissions.sort(() => 0.5 - Math.random());
-      const selectedMissions = shuffled.slice(0, 3);
+      const { data: activeMissions, error: missionsError } = await admin
+        .from("daily_missions")
+        .select("id")
+        .eq("is_active", true);
 
-      // Assign missions to user
-      const inserts = selectedMissions.map(mission => ({
-        user_id: userId,
-        mission_id: mission.id,
-        mission_date: today,
-        progress: 0,
-        completed: false,
-        claimed: false
-      }));
-
-      const { error } = await supabase
-        .from('user_missions')
-        .insert(inserts);
-
-      if (error) {
-        console.error('Error assigning missions:', error);
-        throw error;
-      }
-
-      console.log(`Assigned ${selectedMissions.length} missions to user ${userId}`);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          missionsAssigned: selectedMissions.length 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } else if (action === 'reset_all') {
-      // Reset all users' missions (for scheduled cron job)
-      const today = new Date().toISOString().split('T')[0];
-
-      // Get all active users (those with activity in last 7 days)
-      const { data: activeUsers } = await supabase
-        .from('user_streaks')
-        .select('user_id')
-        .gte('last_activity_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-
-      if (!activeUsers || activeUsers.length === 0) {
-        return new Response(
-          JSON.stringify({ message: 'No active users to assign missions' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Get active missions
-      const { data: activeMissions } = await supabase
-        .from('daily_missions')
-        .select('*')
-        .eq('is_active', true);
-
-      if (!activeMissions || activeMissions.length === 0) {
-        return new Response(
-          JSON.stringify({ message: 'No active missions available' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      if (missionsError) throw missionsError;
+      if (!activeMissions?.length) return json({ message: "No active missions available" });
 
       let assignedCount = 0;
-
-      for (const user of activeUsers) {
-        // Check if already has missions
-        const { data: existing } = await supabase
-          .from('user_missions')
-          .select('id')
-          .eq('user_id', user.user_id)
-          .eq('mission_date', today)
+      for (const activeUser of activeUsers ?? []) {
+        const { data: existing } = await admin
+          .from("user_missions")
+          .select("id")
+          .eq("user_id", activeUser.user_id)
+          .eq("mission_date", today)
           .limit(1);
 
-        if (existing && existing.length > 0) continue;
+        if (existing?.length) continue;
 
-        // Randomly select 3 missions
-        const shuffled = activeMissions.sort(() => 0.5 - Math.random());
-        const selectedMissions = shuffled.slice(0, 3);
+        const selected = [...activeMissions]
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 3)
+          .map((mission) => ({
+            user_id: activeUser.user_id,
+            mission_id: mission.id,
+            mission_date: today,
+            progress: 0,
+            completed: false,
+            claimed: false,
+          }));
 
-        const inserts = selectedMissions.map(mission => ({
-          user_id: user.user_id,
+        if (selected.length) {
+          const { error } = await admin.from("user_missions").insert(selected);
+          if (!error) assignedCount++;
+        }
+      }
+
+      return json({ success: true, usersProcessed: assignedCount });
+    }
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Authentication required" }, 401);
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: authData, error: authError } = await userClient.auth.getUser();
+    if (authError || !authData.user) return json({ error: "Invalid authentication token" }, 401);
+
+    const userId = authData.user.id;
+    if (userIdFromBody && userIdFromBody !== userId) return json({ error: "User mismatch" }, 403);
+
+    if (action === "assign") {
+      const today = new Date().toISOString().split("T")[0];
+      const { data: existing } = await admin
+        .from("user_missions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("mission_date", today)
+        .limit(1);
+
+      if (existing?.length) return json({ message: "Missions already assigned for today" });
+
+      const { data: activeMissions, error } = await admin
+        .from("daily_missions")
+        .select("id")
+        .eq("is_active", true);
+
+      if (error) throw error;
+      if (!activeMissions?.length) return json({ message: "No active missions available" });
+
+      const selected = [...activeMissions]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3)
+        .map((mission) => ({
+          user_id: userId,
           mission_id: mission.id,
           mission_date: today,
           progress: 0,
           completed: false,
-          claimed: false
+          claimed: false,
         }));
 
-        await supabase.from('user_missions').insert(inserts);
-        assignedCount++;
-      }
+      const { error: insertError } = await admin.from("user_missions").insert(selected);
+      if (insertError) throw insertError;
 
-      console.log(`Assigned missions to ${assignedCount} users`);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          usersProcessed: assignedCount 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } else if (action === 'claim') {
-      // Claim a completed mission reward
-      const { missionId } = await req.json();
-
-      // Get mission details
-      const { data: userMission } = await supabase
-        .from('user_missions')
-        .select(`
-          *,
-          daily_missions!inner(reward_xp, reward_coins)
-        `)
-        .eq('id', missionId)
-        .eq('user_id', userId)
-        .single();
-
-      if (!userMission) {
-        return new Response(
-          JSON.stringify({ error: 'Mission not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (!userMission.completed) {
-        return new Response(
-          JSON.stringify({ error: 'Mission not completed yet' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (userMission.claimed) {
-        return new Response(
-          JSON.stringify({ error: 'Reward already claimed' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const rewardXP = userMission.daily_missions.reward_xp || 0;
-      const rewardCoins = userMission.daily_missions.reward_coins || 0;
-
-      // Mark as claimed
-      await supabase
-        .from('user_missions')
-        .update({ claimed: true })
-        .eq('id', missionId);
-
-      // Award XP
-      if (rewardXP > 0) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('xp, level')
-          .eq('id', userId)
-          .single();
-
-        if (profile) {
-          const newXP = (profile.xp || 0) + rewardXP;
-          let newLevel = profile.level;
-          
-          if (newXP >= profile.level * 100) {
-            newLevel = profile.level + 1;
-          }
-
-          await supabase
-            .from('profiles')
-            .update({ xp: newXP, level: newLevel })
-            .eq('id', userId);
-        }
-      }
-
-      // Award coins
-      if (rewardCoins > 0) {
-        const { data: currency } = await supabase
-          .from('user_currency')
-          .select('coins')
-          .eq('user_id', userId)
-          .single();
-
-        if (currency) {
-          await supabase
-            .from('user_currency')
-            .update({ coins: currency.coins + rewardCoins })
-            .eq('user_id', userId);
-        }
-      }
-
-      console.log(`User ${userId} claimed mission ${missionId}: ${rewardXP} XP, ${rewardCoins} coins`);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          xpAwarded: rewardXP,
-          coinsAwarded: rewardCoins
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return json({ success: true, missionsAssigned: selected.length });
     }
 
-    return new Response(
-      JSON.stringify({ error: 'Invalid action' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    if (action === "claim") {
+      const missionId = typeof body?.missionId === "string" ? body.missionId : "";
+      if (!missionId) return json({ error: "missionId is required" }, 400);
 
+      // Reward calculation and the claimed flag are handled atomically by PostgreSQL.
+      const { data, error } = await userClient.rpc("claim_daily_mission", {
+        p_mission_id: missionId,
+      });
+
+      if (error) return json({ error: error.message }, 400);
+      return json(data);
+    }
+
+    return json({ error: "Invalid action" }, 400);
   } catch (error) {
-    console.error('Error in daily-missions function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("Error in daily-missions function:", error);
+    return json({ error: error instanceof Error ? error.message : "Internal server error" }, 500);
   }
 });

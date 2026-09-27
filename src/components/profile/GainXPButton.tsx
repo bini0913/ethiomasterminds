@@ -1,7 +1,6 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/context/UserContext";
 import { Award, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -23,26 +22,16 @@ const GainXPButton: React.FC<GainXPButtonProps> = ({
   label,
   onClick, // Added onClick handler
 }) => {
-  const { addXP } = useUser();
   const [isAnimating, setIsAnimating] = useState(false);
   
   const handleClick = () => {
-    setIsAnimating(true);
-    addXP(amount);
-    
-    const message = amount >= 50 
-      ? "Great work!" 
-      : "Keep learning!";
-    
-    toast.success(`+${amount} XP gained!`, {
-      description: message,
-    });
-    
-    // Call the onClick handler if provided
-    if (onClick) {
-      onClick();
+    if (!onClick) {
+      toast.info("XP is awarded automatically when you complete a verified activity.");
+      return;
     }
-    
+
+    setIsAnimating(true);
+    onClick();
     setTimeout(() => setIsAnimating(false), 700);
   };
   
