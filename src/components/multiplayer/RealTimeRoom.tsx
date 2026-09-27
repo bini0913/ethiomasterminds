@@ -298,14 +298,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         questionCount: room.question_count || 10,
       });
 
-      await supabase.from('room_players').upsert(
-        {
-          room_id: roomId,
-          user_id: currentUserId,
-          is_ready: false,
-        },
-        { onConflict: 'room_id,user_id' },
-      );
+      const { error: membershipError } = await supabase.rpc('multiplayer_ensure_membership', { p_room_id: roomId });
+      if (membershipError) throw membershipError;
 
       await fetchPlayers();
 
@@ -532,11 +526,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     const currentPlayer = players.find((p) => p.id === currentUserId);
     if (!currentPlayer) return;
 
-    await supabase
-      .from('room_players')
-      .update({ is_ready: !currentPlayer.isReady })
-      .eq('room_id', roomId)
-      .eq('user_id', currentUserId);
+    const { error } = await supabase.rpc('multiplayer_toggle_ready', { p_room_id: roomId });
+    if (error) throw error;
 
     playTone(520, 0.08);
   };
@@ -631,11 +622,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     const content = (message || chatInput.trim()).slice(0, 80);
     if (!content) return;
 
-    await supabase.from('room_chat_messages').insert({
-      room_id: roomId,
-      user_id: currentUserId,
-      content,
+    const { error } = await supabase.rpc('multiplayer_send_room_message', {
+      p_room_id: roomId,
+      p_content: content,
     });
+    if (error) throw error;
 
     if (!message) setChatInput('');
   };
@@ -644,16 +635,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (!isHost) return;
     const merged = { ...roomConfig, ...nextConfig };
     setRoomConfig(merged);
-    await supabase
-      .from('multiplayer_rooms')
-      .update({
-        subject: merged.subject,
-        difficulty: merged.difficulty,
-        game_mode: merged.gameMode,
-        question_count: merged.questionCount,
-      })
-      .eq('id', roomId)
-      .eq('host_id', currentUserId);
+    const { error } = await supabase.rpc('multiplayer_update_room', {
+      p_room_id: roomId,
+      p_subject: merged.subject,
+      p_difficulty: merged.difficulty,
+      p_game_mode: merged.gameMode,
+      p_question_count: merged.questionCount,
+    });
+    if (error) throw error;
     toast.success('Room settings updated');
   };
 
@@ -678,7 +667,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   const kickPlayer = async (playerId: string, playerName: string) => {
     if (!isHost || playerId === currentUserId) return;
-    await supabase.from('room_players').delete().eq('room_id', roomId).eq('user_id', playerId);
+    const { error } = await supabase.rpc('multiplayer_kick_player', { p_room_id: roomId, p_player_id: playerId });
+    if (error) throw error;
     toast.info(`${playerName} was removed from the room`);
   };
 

@@ -315,69 +315,20 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const sendFriendRequest = async (targetUserId: string) => {
     if (!user?.id) return;
-
     try {
-      // Check if friendship already exists
-      const { data: existing } = await supabase
-        .from('friends')
-        .select('id, status')
-        .or(`and(user_id.eq.${user.id},friend_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},friend_id.eq.${user.id})`)
-        .single();
-
-      if (existing) {
-        if (existing.status === 'accepted') {
-          toast.info('You are already friends!');
-        } else {
-          toast.info('Friend request already exists');
-        }
-        return;
-      }
-
-      const { error } = await supabase
-        .from('friends')
-        .insert({
-          user_id: user.id,
-          friend_id: targetUserId,
-          status: 'pending'
-        });
-
+      const { error } = await supabase.rpc('send_friend_request', { p_target_user_id: targetUserId });
       if (error) throw error;
-
       toast.success('Friend request sent!');
       await fetchFriends();
     } catch (err: any) {
-      if (err.code === '23505') {
-        toast.error('Friend request already exists');
-      } else {
-        console.error('Error sending friend request:', err);
-        toast.error('Failed to send friend request');
-      }
+      toast.error(err?.message?.includes('already') ? 'Friend request already exists' : 'Failed to send friend request');
     }
   };
 
   const acceptFriendRequest = async (requestId: string) => {
     try {
-      // Verify this request is for the current user (they are the receiver)
-      const { data: request, error: fetchError } = await supabase
-        .from('friends')
-        .select('*')
-        .eq('id', requestId)
-        .eq('friend_id', user?.id)
-        .eq('status', 'pending')
-        .single();
-
-      if (fetchError || !request) {
-        toast.error('Invalid request or already processed');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('friends')
-        .update({ status: 'accepted', updated_at: new Date().toISOString() })
-        .eq('id', requestId);
-
+      const { error } = await supabase.rpc('respond_friend_request', { p_request_id: requestId, p_accept: true });
       if (error) throw error;
-
       toast.success('Friend request accepted!');
       await fetchFriends();
     } catch (err) {
@@ -388,13 +339,8 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const declineFriendRequest = async (requestId: string) => {
     try {
-      const { error } = await supabase
-        .from('friends')
-        .delete()
-        .eq('id', requestId);
-
+      const { error } = await supabase.rpc('respond_friend_request', { p_request_id: requestId, p_accept: false });
       if (error) throw error;
-
       toast.info('Friend request declined');
       await fetchFriends();
     } catch (err) {
@@ -404,13 +350,8 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const removeFriend = async (friendshipId: string) => {
     try {
-      const { error } = await supabase
-        .from('friends')
-        .delete()
-        .eq('id', friendshipId);
-
+      const { error } = await supabase.rpc('remove_friend', { p_friendship_id: friendshipId });
       if (error) throw error;
-
       toast.info('Friend removed');
       await fetchFriends();
     } catch (err) {
@@ -420,21 +361,12 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const sendMessage = async (receiverId: string, content: string) => {
     if (!user?.id || !content.trim()) return;
-
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user.id,
-          receiver_id: receiverId,
-          content: content.trim()
-        })
-        .select()
-        .single();
-
+      const { data, error } = await supabase.rpc('send_direct_message', {
+        p_receiver_id: receiverId,
+        p_content: content.trim(),
+      });
       if (error) throw error;
-
-      // Add to local state immediately
       if (data) {
         setMessages(prev => [...prev, {
           id: data.id,
@@ -452,15 +384,9 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const markMessageAsRead = (messageId: string) => {
-    supabase
-      .from('messages')
-      .update({ read: true })
-      .eq('id', messageId)
-      .then(() => {
-        setMessages(prev => prev.map(m => 
-          m.id === messageId ? { ...m, read: true } : m
-        ));
-      });
+    supabase.rpc('mark_direct_message_read', { p_message_id: messageId }).then(() => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, read: true } : m));
+    });
   };
 
   const getMessagesWithUser = (userId: string) => {

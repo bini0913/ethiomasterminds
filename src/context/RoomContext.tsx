@@ -151,31 +151,16 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return null;
 
     try {
-      const { data, error } = await supabase
-        .from('multiplayer_rooms')
-        .insert({
-          name,
-          host_id: user.id,
-          max_players: maxPlayers,
-          subject: settings.subject,
-          difficulty: settings.difficulty,
-          question_count: settings.questionCount,
-          password: password || null,
-          status: 'waiting'
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('multiplayer_create_room', {
+        p_name: name,
+        p_subject: settings.subject,
+        p_difficulty: settings.difficulty,
+        p_question_count: settings.questionCount,
+        p_max_players: maxPlayers,
+        p_password: password || null,
+      });
 
       if (error) throw error;
-
-      // Join the room as host
-      await supabase
-        .from('room_players')
-        .insert({
-          room_id: data.id,
-          user_id: user.id,
-          is_ready: true
-        });
 
       const room: Room = {
         id: data.id,
@@ -206,7 +191,6 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return false;
 
     try {
-      // Check if room exists and is still active
       const { data: roomData, error: roomError } = await supabase
         .from('multiplayer_rooms')
         .select('*')
@@ -219,43 +203,12 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
-      // Check password if required
-      if (roomData.password && roomData.password !== password) {
-        toast.error('Incorrect password');
-        return false;
-      }
-
-      // Allow reconnect if player is already in the room
-      const { data: existingMembership } = await supabase
-        .from('room_players')
-        .select('room_id, user_id')
-        .eq('room_id', roomId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (!existingMembership) {
-        // Check player count only for new joins
-        const { count } = await supabase
-          .from('room_players')
-          .select('*', { count: 'exact', head: true })
-          .eq('room_id', roomId);
-
-        if ((count || 0) >= roomData.max_players) {
-          toast.error('Room is full');
-          return false;
-        }
-
-        const { error: joinError } = await supabase
-          .from('room_players')
-          .insert({
-            room_id: roomId,
-            user_id: user.id,
-            is_ready: false
-          });
-
-        if (joinError) throw joinError;
-      }
-
+      const { error: joinError } = await supabase.rpc('multiplayer_join_room', {
+        p_room_id: roomId,
+        p_password: password || null,
+      });
+      if (joinError) throw joinError;
+      const existingMembership = false;
       const room: Room = {
         id: roomData.id,
         name: roomData.name,
@@ -293,44 +246,8 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return;
 
     try {
-      const { data: currentRoomData } = await supabase
-        .from('multiplayer_rooms')
-        .select('host_id, status')
-        .eq('id', roomId)
-        .maybeSingle();
-
-      const wasHost = currentRoomData?.host_id === user.id;
-
-      await supabase
-        .from('room_players')
-        .delete()
-        .eq('room_id', roomId)
-        .eq('user_id', user.id);
-
-      // If host leaves, transfer ownership to next player (PUBG-style continuity).
-      if (wasHost) {
-        const { data: remainingPlayers } = await supabase
-          .from('room_players')
-          .select('user_id')
-          .eq('room_id', roomId)
-          .limit(1);
-
-        const nextHostId = remainingPlayers?.[0]?.user_id;
-
-        if (nextHostId) {
-          await supabase
-            .from('multiplayer_rooms')
-            .update({ host_id: nextHostId })
-            .eq('id', roomId);
-          toast.info('Host left. New host assigned.');
-        } else {
-          await supabase
-            .from('multiplayer_rooms')
-            .delete()
-            .eq('id', roomId);
-        }
-      }
-
+      const { error } = await supabase.rpc('multiplayer_leave_room', { p_room_id: roomId });
+      if (error) throw error;
       setCurrentRoom(null);
       toast.info('Left the room');
       await fetchRooms();
