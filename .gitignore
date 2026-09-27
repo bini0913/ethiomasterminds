@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files (never commit local secrets or machine-specific config)
+.env
+.env.*
+!.env.example
