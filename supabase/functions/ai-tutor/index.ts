@@ -14,8 +14,8 @@ serve(async (req) => {
   try {
     const { message, conversationId, subject } = await req.json();
 
-    if (!message) {
-      return new Response(JSON.stringify({ error: 'Message is required' }), {
+    if (typeof message !== 'string' || message.trim().length === 0 || message.length > 4000) {
+      return new Response(JSON.stringify({ error: 'Message is required and must be 1-4000 characters' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -61,8 +61,8 @@ serve(async (req) => {
       conversation = data;
     }
 
-    const messages = conversation?.messages || [];
-    messages.push({ role: 'user', content: message, timestamp: new Date().toISOString() });
+    const messages = Array.isArray(conversation?.messages) ? conversation.messages.slice(-39) : [];
+    messages.push({ role: 'user', content: message.trim(), timestamp: new Date().toISOString() });
 
     // Get user's learning data for context
     const { data: learningDna } = await supabaseClient
@@ -166,7 +166,7 @@ You remember everything in this conversation. Be encouraging, but never sugar-co
         .from('ai_tutor_conversations')
         .insert({
           user_id: user.id,
-          subject: subject || 'General',
+          subject: typeof subject === 'string' ? subject.slice(0, 100) || 'General' : 'General',
           messages,
         })
         .select('id')
