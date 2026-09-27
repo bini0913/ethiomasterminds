@@ -378,11 +378,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setShowLevelUp(false);
 
     try {
-      const { error } = await supabase.auth.signOut({ scope: "local" });
+      const { error } = await supabase.auth.signOut({ scope: "global" });
       if (error) throw error;
       toast.info("Logged out successfully");
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("Global logout error:", error);
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch (localError) {
+        console.error("Local logout fallback error:", localError);
+      }
       toast.info("Logged out on this device");
     }
   };
