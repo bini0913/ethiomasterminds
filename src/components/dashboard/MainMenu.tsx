@@ -31,6 +31,9 @@ type GuideStep = {
 
 const MainMenu: React.FC = () => {
   const { user, logout, showLevelUp, setShowLevelUp, previousLevel } = useUser();
+  const handleLogout = async () => {
+    await logout();
+  };
   const tier = useTier();
   const { dailyStreak } = useCurrency();
   const { getRecentBadges } = useAchievements();
@@ -261,8 +264,9 @@ const MainMenu: React.FC = () => {
             <Button variant="ghost" size="icon" onClick={openHelper} className="h-9 w-9" aria-label="Open AI helper">
               <Bot className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={logout} className="h-9 w-9 text-muted-foreground hover:text-destructive" aria-label="Log out">
+            <Button variant="ghost" onClick={handleLogout} className="h-9 rounded-xl px-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:px-3" aria-label="Log out" title="Log out">
               <LogOut className="h-5 w-5" />
+              <span className="hidden sm:inline">Log out</span>
             </Button>
           </div>
         </div>
