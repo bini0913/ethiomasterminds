@@ -33,8 +33,6 @@ const tabConfig: Array<{ value: LeaderboardTab; label: string; icon: typeof Glob
   { value: "classes", label: "Classes", icon: Users },
 ];
 
-// Preview rebuild checkpoint: keep this page on the validated JSX path.
-
 const Leaderboard = () => {
   const navigate = useNavigate();
   const { user } = useUser();
