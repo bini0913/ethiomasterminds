@@ -41,6 +41,7 @@ export default {
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        overlay: 'hsl(var(--overlay))',
         surface: {
           DEFAULT: 'hsl(var(--surface))',
           elevated: 'hsl(var(--surface-elevated))',
@@ -70,6 +71,12 @@ export default {
         info: {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
+        },
+        upper: {
+          intelligence: 'hsl(var(--upper-intelligence))',
+          'intelligence-foreground': 'hsl(var(--upper-intelligence-foreground))',
+          mastery: 'hsl(var(--upper-mastery))',
+          focus: 'hsl(var(--upper-focus))',
         },
         'border-subtle': 'hsl(var(--border-subtle))',
         'focus-ring': 'hsl(var(--focus-ring))',
