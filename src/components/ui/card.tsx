@@ -3,11 +3,12 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-const cardVariants = cva("rounded-lg border bg-card text-card-foreground shadow-card", {
+const cardVariants = cva("rounded-lg border border-border bg-card text-card-foreground shadow-card", {
   variants: {
     variant: {
       default: "",
       interactive: "cursor-pointer transition-[background-color,border-color,box-shadow,transform] duration-150 hover:bg-card-hover hover:shadow-elevated focus-within:ring-2 focus-within:ring-focus-ring focus-within:ring-offset-2",
+      elevated: "bg-surface-elevated shadow-elevated",
       selected: "border-primary bg-card-hover ring-1 ring-primary",
       featured: "border-primary/40 bg-card-hover",
       success: "border-success/40",
