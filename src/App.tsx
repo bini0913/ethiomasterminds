@@ -10,7 +10,6 @@ import Multiplayer from "./pages/Multiplayer";
 import Lobby from "./pages/Lobby";
 import Leaderboard from "./pages/Leaderboard";
 import Friends from "./pages/Friends";
-import Settings from "./pages/Settings";
 import EnhancedSettings from "./pages/EnhancedSettings";
 import NotFound from "./pages/NotFound";
 import StorePage from "./pages/StorePage";
