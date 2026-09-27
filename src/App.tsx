@@ -226,7 +226,7 @@ const App = () => (
                               <Route path="/profile" element={<SelfProfileRedirect />} />
                               <Route path="/profile/:userId" element={<UserProfilePage />} />
                               <Route path="/friends" element={<EarlyTierRestrictedRoute><Friends /></EarlyTierRestrictedRoute>} />
-                              <Route path="/settings" element={<Settings />} />
+                              <Route path="/settings" element={<Navigate to="/enhanced-settings" replace />} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
                               <Route 
                                 path="/teacher" 
