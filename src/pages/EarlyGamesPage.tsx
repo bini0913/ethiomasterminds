@@ -1,154 +1,102 @@
 import React, { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Brain, CheckCircle2, RotateCcw, Sparkles, Star, Trophy, XCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, CheckCircle2, Gamepad2, Lightbulb, Sparkles, XCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
-import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
-type GameId = "memory" | "number" | "word" | "pattern" | "shape" | "science";
+type GameId = "number" | "word" | "shape" | "pattern" | "memory";
+type Feedback = "idle" | "correct" | "wrong";
 
-const gameList = [
-  { id: "memory" as GameId, title: "Memory Match", subtitle: "Remember and match pairs", icon: "🧠", skill: "Memory" },
-  { id: "number" as GameId, title: "Number Garden", subtitle: "Pick the number that solves it", icon: "🌱", skill: "Math" },
-  { id: "word" as GameId, title: "Word Builder", subtitle: "Complete the word", icon: "🔤", skill: "Reading" },
-  { id: "pattern" as GameId, title: "Pattern Detective", subtitle: "Find what comes next", icon: "🔎", skill: "Logic" },
-  { id: "shape" as GameId, title: "Shape Safari", subtitle: "Find the matching shape", icon: "🔷", skill: "Shapes" },
-  { id: "science" as GameId, title: "Science Sort", subtitle: "Sort the world around you", icon: "🌍", skill: "Science" },
-];
+const awardRound = async (userId: string, addCoins: (amount: number, source?: string) => Promise<boolean>, source: string) => {
+  await (supabase as any).rpc("add_xp", { p_user_id: userId, p_amount: 5 });
+  await addCoins(2, source);
+};
 
-const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
+const GameShell: React.FC<{ title: string; subtitle: string; icon: React.ReactNode; score: number; children: React.ReactNode }> = ({ title, subtitle, icon, score, children }) => (
+  <div className="space-y-5">
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">{icon}</div><div><h2 className="text-2xl font-display font-bold">{title}</h2><p className="text-sm text-muted-foreground">{subtitle}</p></div></div>
+      <Badge variant="secondary" className="rounded-full px-3 py-1"><Sparkles className="mr-1 h-3.5 w-3.5" />{score}</Badge>
+    </div>
+    {children}
+  </div>
+);
 
-const EarlyGamesPage: React.FC = () => {
+const FeedbackBox: React.FC<{ feedback: Feedback }> = ({ feedback }) => feedback === "idle" ? <div className="min-h-12" /> : (
+  <div role="status" aria-live="polite" className={`flex items-center justify-center gap-2 rounded-2xl p-3 font-bold ${feedback === "correct" ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}>
+    {feedback === "correct" ? <><CheckCircle2 className="h-5 w-5" />Great job!</> : <><XCircle className="h-5 w-5" />Try the next one!</>}
+  </div>
+);
+
+const useRoundGame = (onDone: () => void, source: string) => {
   const { user } = useUser();
-  const { refreshCurrency } = useCurrency();
-  const [selected, setSelected] = useState<GameId | null>(null);
-  const [score, setScore] = useState(0);
+  const { addCoins } = useCurrency();
   const [round, setRound] = useState(0);
-  const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
-
-  const grade = Number(user?.grade || 1);
-  const ageBand = grade <= 1 ? "starter" : grade <= 2 ? "beginner" : "growing";
-
-  const awardXp = async (amount: number) => {
-    if (!user?.id) return;
-    const key = `early-game-xp:${user.id}:${selected}:${new Date().toISOString().slice(0, 10)}`;
-    if (localStorage.getItem(key)) return;
-    await (supabase as any).rpc("add_xp", { p_user_id: user.id, p_amount: amount }).catch(() => undefined);
-    localStorage.setItem(key, "1");
-    await refreshCurrency();
-  };
-
-  const question = useMemo(() => {
-    if (!selected) return null;
-    if (selected === "number") {
-      const a = grade <= 1 ? 2 : grade <= 2 ? 5 : 8;
-      const b = grade <= 1 ? 3 : grade <= 2 ? 4 : 7;
-      const correct = a + b;
-      return { prompt: `What is ${a} + ${b}?`, options: shuffle([correct, correct + 1, Math.max(1, correct - 1), correct + 2]).map(String), correct: String(correct) };
-    }
-    if (selected === "word") {
-      const words = grade <= 1 ? [{ word: "CAT", missing: "A", options: ["A", "O", "E"] }, { word: "SUN", missing: "U", options: ["A", "U", "I"] }] : [{ word: "PLANT", missing: "A", options: ["A", "E", "I"] }, { word: "TRAIN", missing: "R", options: ["R", "T", "N"] }];
-      const item = words[round % words.length];
-      return { prompt: `Which letter completes ${item.word.replace(item.missing, "_")}?`, options: shuffle(item.options), correct: item.missing };
-    }
-    if (selected === "pattern") {
-      const patterns = grade <= 1 ? [{ p: "🔴 🔵 🔴 🔵 ?", options: ["🔴", "🟢", "🟡"], correct: "🔴" }, { p: "⭐ 🌙 ⭐ 🌙 ?", options: ["⭐", "☀️", "🌈"], correct: "⭐" }] : [{ p: "2, 4, 6, ?", options: ["7", "8", "9"], correct: "8" }, { p: "5, 10, 15, ?", options: ["18", "20", "25"], correct: "20" }];
-      return patterns[round % patterns.length];
-    }
-    if (selected === "shape") {
-      const items = grade <= 1 ? [{ prompt: "Find the circle", options: ["🔺", "⚪", "⬛"], correct: "⚪" }, { prompt: "Find the triangle", options: ["🟦", "🔺", "⚪"], correct: "🔺" }] : [{ prompt: "Find the rectangle", options: ["⚪", "▭", "🔺"], correct: "▭" }, { prompt: "Find the square", options: ["⬛", "⚪", "🔺"], correct: "⬛" }];
-      return items[round % items.length];
-    }
-    if (selected === "science") {
-      const items = [{ prompt: "Which one is a living thing?", options: ["🌳", "🪨", "⚽"], correct: "🌳" }, { prompt: "Which one can fly?", options: ["🐟", "🐦", "🐢"], correct: "🐦" }];
-      return items[round % items.length];
-    }
-    const symbols = ["🐶", "🐱", "🐸", "🦊"];
-    const pair = shuffle(symbols).slice(0, 2);
-    return { prompt: "Find the matching pair", options: shuffle([pair[0], pair[0], pair[1], pair[1]]), correct: pair[0] };
-  }, [selected, grade, round]);
-
-  const choose = async (value: string) => {
-    if (!question) return;
-    const correct = value === question.correct;
+  const [feedback, setFeedback] = useState<Feedback>("idle");
+  const [score, setScore] = useState(0);
+  const finishChoice = async (correct: boolean) => {
+    if (feedback !== "idle") return;
     setFeedback(correct ? "correct" : "wrong");
     if (correct) {
       setScore((s) => s + 1);
-      await awardXp(5);
+      if (user?.id) await awardRound(user.id, addCoins, source);
     }
     window.setTimeout(() => {
-      setFeedback(null);
-      setRound((r) => r + 1);
+      setFeedback("idle");
+      if (round >= 4) onDone();
+      else setRound((r) => r + 1);
     }, 650);
   };
-
-  if (!selected) {
-    return (
-      <div className="min-h-screen bg-background pb-24">
-        <header className="sticky top-0 z-20 border-b bg-background/95 px-4 py-3 backdrop-blur">
-          <div className="mx-auto flex max-w-5xl items-center justify-between">
-            <Link to="/" aria-label="Back home"><Button variant="ghost" size="icon"><ArrowLeft /></Button></Link>
-            <div className="text-center"><p className="font-display font-bold">Master Minds Play</p><p className="text-xs text-muted-foreground">Short games that help you learn</p></div>
-            <Badge variant="secondary"><Star className="mr-1 h-3.5 w-3.5" /> {score}</Badge>
-          </div>
-        </header>
-        <main className="mx-auto max-w-5xl px-4 py-6">
-          <section className="rounded-3xl bg-primary p-6 text-primary-foreground shadow-lg">
-            <div className="flex items-center gap-3"><Brain className="h-8 w-8" /><div><h1 className="text-2xl font-display font-bold">Choose a game</h1><p className="mt-1 text-sm text-primary-foreground/80">Play for a few minutes, learn a skill, earn XP.</p></div></div>
-          </section>
-          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3">
-            {gameList.map((game) => (
-              <button key={game.id} onClick={() => { setSelected(game.id); setScore(0); setRound(0); }} className="rounded-3xl border bg-card p-4 text-left shadow-sm transition hover:-translate-y-1 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-4xl">{game.icon}</span>
-                <p className="mt-3 font-display font-bold">{game.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{game.subtitle}</p>
-                <Badge variant="outline" className="mt-3">{game.skill}</Badge>
-              </button>
-            ))}
-          </div>
-          <p className="mt-6 text-center text-xs text-muted-foreground">Designed as short, simple activities with immediate feedback and age-appropriate interaction.</p>
-        </main>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-20 border-b bg-background/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => setSelected(null)} aria-label="Choose another game"><ArrowLeft /></Button>
-          <Badge variant="secondary"><Trophy className="mr-1 h-3.5 w-3.5" /> {score} points</Badge>
-          <Button variant="ghost" size="icon" onClick={() => { setScore(0); setRound(0); setFeedback(null); }} aria-label="Restart"><RotateCcw /></Button>
-        </div>
-      </header>
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <Card className="overflow-hidden rounded-3xl">
-          <CardHeader className="bg-primary/10 text-center">
-            <Badge variant="outline" className="mx-auto w-fit">{gameList.find((g) => g.id === selected)?.skill}</Badge>
-            <CardTitle className="text-2xl">{gameList.find((g) => g.id === selected)?.title}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6 p-5 sm:p-8">
-            <div className="min-h-32 rounded-3xl bg-muted/50 p-6 text-center">
-              <p className="text-xl font-display font-bold sm:text-2xl">{question?.prompt}</p>
-              {selected === "memory" ? <p className="mt-3 text-sm text-muted-foreground">Tap the animal that matches the highlighted animal.</p> : null}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {(question?.options || []).map((option, index) => (
-                <Button key={`${option}-${index}`} variant="outline" onClick={() => choose(option)} className="min-h-20 rounded-2xl text-2xl sm:text-3xl" disabled={!!feedback}>
-                  {option}
-                </Button>
-              ))}
-            </div>
-            {feedback && <div className={`rounded-2xl p-4 text-center font-bold ${feedback === "correct" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>{feedback === "correct" ? <><CheckCircle2 className="mx-auto mb-1 h-7 w-7" />Great job!</> : <><XCircle className="mx-auto mb-1 h-7 w-7" />Try the next one!</>}</div>}
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground"><Sparkles className="h-4 w-4" /> Level: {ageBand}</div>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
-  );
+  return { round, feedback, score, finishChoice };
 };
 
+const NumberQuest: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const { round, feedback, score, finishChoice } = useRoundGame(onDone, "early-number-quest");
+  const question = useMemo(() => {
+    const a = 2 + ((round * 3) % 7), b = 1 + ((round * 2) % 5), answer = a + b;
+    return { text: `What is ${a} + ${b}?`, answer, options: [answer, answer + 1, Math.max(1, answer - 1), answer + 2] };
+  }, [round]);
+  return <GameShell title="Number Quest" subtitle="Counting and addition adventures." icon={<span className="text-4xl">🔢</span>} score={score}><div className="rounded-3xl bg-primary/10 p-6 text-center"><p className="text-sm font-semibold text-muted-foreground">Round {round + 1} of 5</p><h2 className="mt-3 text-4xl font-display font-bold">{question.text}</h2></div><div className="grid grid-cols-2 gap-3">{question.options.map((o) => <Button key={o} onClick={() => finishChoice(o === question.answer)} variant="outline" className="min-h-20 rounded-3xl text-2xl font-display font-bold">{o}</Button>)}</div><FeedbackBox feedback={feedback} /></GameShell>;
+};
+
+const WordMatch: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const rounds = [{ emoji: "🐱", answer: "CAT", options: ["CAT","SUN","TREE","FISH"] },{ emoji: "☀️", answer: "SUN", options: ["BOOK","SUN","DOG","MOON"] },{ emoji: "🐟", answer: "FISH", options: ["FISH","BALL","BIRD","TREE"] },{ emoji: "🌳", answer: "TREE", options: ["CAR","TREE","STAR","CAT"] },{ emoji: "⭐", answer: "STAR", options: ["STAR","HOUSE","FISH","SUN"] }];
+  const { round, feedback, score, finishChoice } = useRoundGame(onDone, "early-word-match");
+  const current = rounds[round];
+  return <GameShell title="Word Match" subtitle="Pictures, letters, and early words." icon={<span className="text-4xl">🔤</span>} score={score}><div className="rounded-3xl bg-accent/15 p-7 text-center"><div className="text-7xl">{current.emoji}</div><p className="mt-2 text-sm font-semibold text-muted-foreground">Which word matches?</p></div><div className="grid grid-cols-2 gap-3">{current.options.map((o) => <Button key={o} variant="outline" onClick={() => finishChoice(o === current.answer)} className="min-h-16 rounded-3xl text-xl font-display font-bold">{o}</Button>)}</div><FeedbackBox feedback={feedback} /></GameShell>;
+};
+
+const ShapeHunt: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const rounds = [{ target:"Circle",options:["Circle","Square","Triangle","Star"] },{ target:"Triangle",options:["Heart","Triangle","Circle","Square"] },{ target:"Square",options:["Star","Circle","Square","Triangle"] },{ target:"Star",options:["Square","Star","Heart","Circle"] },{ target:"Heart",options:["Triangle","Heart","Star","Square"] }];
+  const symbols: Record<string,string> = { Circle:"●",Triangle:"▲",Square:"■",Star:"★",Heart:"♥" };
+  const { round, feedback, score, finishChoice } = useRoundGame(onDone, "early-shape-hunt");
+  const current = rounds[round];
+  return <GameShell title="Shape Hunt" subtitle="Find and name shapes." icon={<span className="text-4xl">🔷</span>} score={score}><div className="rounded-3xl bg-success/10 p-6 text-center"><p className="text-sm font-semibold text-muted-foreground">Find the</p><h2 className="mt-1 text-3xl font-display font-bold">{current.target}</h2></div><div className="grid grid-cols-2 gap-3">{current.options.map((o) => <Button key={o} variant="outline" onClick={() => finishChoice(o === current.target)} className="min-h-24 flex-col gap-1 rounded-3xl"><span className="text-4xl">{symbols[o]}</span><span className="font-semibold">{o}</span></Button>)}</div><FeedbackBox feedback={feedback} /></GameShell>;
+};
+
+const PatternBuilder: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const rounds = [{ sequence:["🔴","🔵","🔴","🔵","?"],answer:"🔴",options:["🔴","🟢","⭐","🟡"] },{ sequence:["⭐","⭐","🌙","⭐","⭐","?"],answer:"🌙",options:["🌙","⭐","☀️","❤️"] },{ sequence:["🍎","🍌","🍎","🍌","?"],answer:"🍎",options:["🍎","🍌","🍇","🍊"] },{ sequence:["🟩","🟩","🟨","🟩","🟩","?"],answer:"🟨",options:["🟦","🟨","🟥","🟩"] },{ sequence:["🐶","🐱","🐭","🐶","🐱","?"],answer:"🐭",options:["🐶","🐱","🐭","🐰"] }];
+  const { round, feedback, score, finishChoice } = useRoundGame(onDone, "early-pattern-builder");
+  const current = rounds[round];
+  return <GameShell title="Pattern Builder" subtitle="Look carefully. What comes next?" icon={<span className="text-4xl">🧩</span>} score={score}><div className="rounded-3xl bg-warning/15 p-6 text-center"><div className="flex flex-wrap justify-center gap-2 text-4xl">{current.sequence.map((item,i)=><span key={i} className="flex h-14 w-14 items-center justify-center rounded-2xl bg-background shadow-sm">{item}</span>)}</div></div><div className="grid grid-cols-2 gap-3">{current.options.map((o)=><Button key={o} variant="outline" onClick={()=>finishChoice(o===current.answer)} className="min-h-20 rounded-3xl text-3xl">{o}</Button>)}</div><FeedbackBox feedback={feedback} /></GameShell>;
+};
+
+const MemoryMatch: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const cards = ["🍎","🐶","⭐","🚀","🍎","🐶","⭐","🚀"];
+  const [flipped,setFlipped]=useState<number[]>([]), [matched,setMatched]=useState<number[]>([]), [locked,setLocked]=useState(false);
+  const { user }=useUser(); const { addCoins }=useCurrency();
+  const tap=(i:number)=>{ if(locked||flipped.includes(i)||matched.includes(i)) return; const next=[...flipped,i]; setFlipped(next); if(next.length!==2)return; setLocked(true); const same=cards[next[0]]===cards[next[1]]; window.setTimeout(async()=>{ if(same){setMatched(m=>[...m,...next]); if(user?.id) await awardRound(user.id,addCoins,"early-memory-match");} setFlipped([]);setLocked(false);if(same&&matched.length+2===cards.length)onDone();},650); };
+  return <GameShell title="Memory Match" subtitle="Find the matching pairs." icon={<span className="text-4xl">🧠</span>} score={matched.length/2}><div className="grid grid-cols-4 gap-2 sm:gap-3">{cards.map((card,i)=>{const visible=flipped.includes(i)||matched.includes(i);return <button key={i} onClick={()=>tap(i)} aria-label={visible?`Card ${i+1}: ${card}`:`Hidden card ${i+1}`} className="aspect-square min-h-16 rounded-2xl border-2 border-border bg-primary/10 text-3xl transition-transform active:scale-95 sm:text-4xl">{visible?card:"?"}</button>})}</div><p className="text-center text-sm font-semibold text-muted-foreground">{matched.length/2} of 4 pairs found</p></GameShell>;
+};
+
+const EarlyGamesPage: React.FC = () => {
+  const navigate=useNavigate(); const [game,setGame]=useState<GameId|null>(null); const [completed,setCompleted]=useState(0);
+  const gameCards=[{id:"number" as const,title:"Number Quest",description:"Counting and addition adventures.",icon:"🔢",tone:"bg-primary/10"},{id:"word" as const,title:"Word Match",description:"Pictures, letters, and early words.",icon:"🔤",tone:"bg-accent/15"},{id:"shape" as const,title:"Shape Hunt",description:"Find and name shapes.",icon:"🔷",tone:"bg-success/15"},{id:"pattern" as const,title:"Pattern Builder",description:"Spot what comes next.",icon:"🧩",tone:"bg-warning/15"},{id:"memory" as const,title:"Memory Match",description:"Build memory and attention.",icon:"🧠",tone:"bg-primary/10"}];
+  const done=()=>setCompleted(n=>n+1);
+  return <div className="min-h-screen bg-background pb-24"><header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur"><div className="mx-auto flex max-w-4xl items-center justify-between gap-3"><Button variant="ghost" size="icon" aria-label="Back to early home" onClick={()=>navigate("/")}><ArrowLeft/></Button><div className="flex items-center gap-2"><Gamepad2 className="h-6 w-6 text-primary"/><h1 className="font-display text-xl font-bold">Play & Learn</h1></div><Badge variant="secondary">{completed} played</Badge></div></header><main className="mx-auto max-w-4xl space-y-6 px-4 py-6">{!game?<><section className="rounded-[2rem] bg-primary p-6 text-primary-foreground shadow-lg sm:p-8"><p className="font-semibold opacity-90">Learning through play</p><h2 className="mt-1 text-3xl font-display font-bold">Pick a game!</h2><p className="mt-2 max-w-xl opacity-90">Short activities practise numbers, words, shapes, patterns, and memory.</p></section><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{gameCards.map(item=><button key={item.id} onClick={()=>setGame(item.id)} className={`min-h-44 rounded-[1.75rem] border border-border p-4 text-left shadow-sm transition hover:-translate-y-1 active:scale-[.98] ${item.tone}`}><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-background text-4xl">{item.icon}</div><h3 className="mt-4 font-display text-lg font-bold">{item.title}</h3><p className="mt-1 text-sm text-muted-foreground">{item.description}</p></button>)}</div><Card><CardContent className="flex items-center gap-3 p-4"><Lightbulb className="h-5 w-5 text-warning"/><p className="text-sm text-muted-foreground">Master Minds keeps early games short, clear, and skill-focused.</p></CardContent></Card></>:<Card className="rounded-[2rem] border-border shadow-sm"><CardContent className="p-4 sm:p-7">{game==="number"&&<NumberQuest onDone={()=>{done();setGame(null)}}/>}{game==="word"&&<WordMatch onDone={()=>{done();setGame(null)}}/>}{game==="shape"&&<ShapeHunt onDone={()=>{done();setGame(null)}}/>}{game==="pattern"&&<PatternBuilder onDone={()=>{done();setGame(null)}}/>}{game==="memory"&&<MemoryMatch onDone={()=>{done();setGame(null)}}/>}<Button variant="ghost" className="mt-4" onClick={()=>setGame(null)}><ArrowLeft className="mr-2 h-4 w-4"/>Choose another game</Button></CardContent></Card>}</main></div>;
+};
 export default EarlyGamesPage;
