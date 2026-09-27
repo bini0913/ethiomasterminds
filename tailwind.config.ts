@@ -24,8 +24,13 @@ export default {
         30: '7.5rem'
       },
       fontSize: {
-        body: ['1rem', { lineHeight: '1.6' }],
+        display: ['clamp(2rem, 4vw, 3rem)', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '700' }],
+        'heading-xl': ['clamp(1.5rem, 3vw, 2.25rem)', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '700' }],
+        body: ['1rem', { lineHeight: '1.5' }],
         small: ['0.875rem', { lineHeight: '1.45' }],
+        caption: ['0.75rem', { lineHeight: '1.35', letterSpacing: '0.01em' }],
+        label: ['0.875rem', { lineHeight: '1.25', fontWeight: '600' }],
+        stat: ['1.875rem', { lineHeight: '1', letterSpacing: '-0.03em', fontWeight: '700' }],
         'heading-sm': ['1.5rem', { lineHeight: '1.2' }],
         'heading-md': ['1.875rem', { lineHeight: '1.2' }],
         'heading-lg': ['2.25rem', { lineHeight: '1.15' }]
@@ -36,8 +41,13 @@ export default {
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        surface: {
+          DEFAULT: 'hsl(var(--surface))',
+          elevated: 'hsl(var(--surface-elevated))',
+        },
         primary: {
           DEFAULT: 'hsl(var(--primary))',
+          hover: 'hsl(var(--primary-hover))',
           foreground: 'hsl(var(--primary-foreground))',
           glow: 'hsl(var(--primary-glow))'
         },
@@ -57,6 +67,12 @@ export default {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))'
         },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
+        'border-subtle': 'hsl(var(--border-subtle))',
+        'focus-ring': 'hsl(var(--focus-ring))',
         muted: {
           DEFAULT: 'hsl(var(--muted))',
           foreground: 'hsl(var(--muted-foreground))'
@@ -71,7 +87,13 @@ export default {
         },
         card: {
           DEFAULT: 'hsl(var(--card))',
+          hover: 'hsl(var(--card-hover))',
           foreground: 'hsl(var(--card-foreground))'
+        },
+        tier: {
+          early: 'hsl(var(--tier-early))',
+          middle: 'hsl(var(--tier-middle))',
+          upper: 'hsl(var(--tier-upper))',
         },
         glow: {
           blue: 'hsl(var(--glow-blue))',
@@ -93,11 +115,19 @@ export default {
         }
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
-        '2xl': '1.5rem',
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+        pill: '9999px',
+        '2xl': 'var(--radius-xl)',
         '3xl': '2rem'
+      },
+      boxShadow: {
+        sm: 'var(--shadow-sm)',
+        card: 'var(--shadow-card)',
+        elevated: 'var(--shadow-elevated)',
+        overlay: 'var(--shadow-overlay)',
       },
       keyframes: {
         'accordion-down': {
