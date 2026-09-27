@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2, Gamepad2, Lightbulb, Sparkles, XCircle } from 
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useEarlyReward } from "@/hooks/useEarlyReward";
+import { useEarlyProgress } from "@/hooks/useEarlyProgress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -99,13 +100,15 @@ const Prompt:React.FC<{text:string}>=({text})=><div className="rounded-3xl bg-pr
 const Options:React.FC<{options:string[];onChoose:(value:string)=>void}>=({options,onChoose})=><div className="grid grid-cols-2 gap-3">{options.map(o=><Button key={o} onClick={()=>onChoose(o)} variant="outline" className="min-h-20 rounded-3xl text-xl font-display font-bold">{o}</Button>)}</div>;
 
 const EarlyGamesPage:React.FC=()=>{
- const navigate=useNavigate();const [game,setGame]=useState<GameId|null>(null);const [completed,setCompleted]=useState(0);
+ const navigate=useNavigate();const [game,setGame]=useState<GameId|null>(null);const [completed,setCompleted]=useState(0); const {rows}=useEarlyProgress();
+ const levels=useMemo(()=>Object.fromEntries(rows.map(r=>[r.activity_id,Math.min(3,1+Math.floor(r.completions/3))])),[rows]);
+ const totalCompletions=rows.reduce((n,r)=>n+r.completions,0);
  const gameCards=[
-  {id:"number" as const,title:"Number Quest",description:"Counting and addition adventures.",icon:"🔢",tone:"bg-primary/10"},
-  {id:"word" as const,title:"Word Match",description:"Pictures, letters, and early words.",icon:"🔤",tone:"bg-accent/15"},
-  {id:"shape" as const,title:"Shape Hunt",description:"Find and name shapes.",icon:"🔷",tone:"bg-success/15"},
-  {id:"pattern" as const,title:"Pattern Builder",description:"Spot what comes next.",icon:"🧩",tone:"bg-warning/15"},
-  {id:"memory" as const,title:"Memory Match",description:"Build memory and attention.",icon:"🧠",tone:"bg-primary/10"},
+  {id:"number" as const,title:"Number Quest",description:"Counting and addition adventures.",icon:"🔢",tone:"bg-primary/10",skillId:"number-quest"},
+  {id:"word" as const,title:"Word Match",description:"Pictures, letters, and early words.",icon:"🔤",tone:"bg-accent/15",skillId:"word-match"},
+  {id:"shape" as const,title:"Shape Hunt",description:"Find and name shapes.",icon:"🔷",tone:"bg-success/15",skillId:"shape-hunt"},
+  {id:"pattern" as const,title:"Pattern Builder",description:"Spot what comes next.",icon:"🧩",tone:"bg-warning/15",skillId:"pattern-builder"},
+  {id:"memory" as const,title:"Memory Match",description:"Build memory and attention.",icon:"🧠",tone:"bg-primary/10",skillId:"memory-match"},
   {id:"odd" as const,title:"Odd One Out",description:"Practice sorting and logic.",icon:"🕵️",tone:"bg-accent/15"},
   {id:"sort" as const,title:"Sort Safari",description:"Group things by what they are.",icon:"🦁",tone:"bg-success/15"},
   {id:"animal" as const,title:"Animal Detective",description:"Learn animals from clues.",icon:"🔎",tone:"bg-warning/15"},
