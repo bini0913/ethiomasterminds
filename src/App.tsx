@@ -115,6 +115,14 @@ const App = () => (
                                   </ProtectedRoute>
                                 } 
                               />
+                              <Route
+                                path="/admin/early-content"
+                                element={
+                                  <ProtectedRoute allowedRoles={['admin', 'manager', 'extreme_admin']}>
+                                    <EarlyContentAdminPage />
+                                  </ProtectedRoute>
+                                }
+                              />
                               <Route 
                                 path="/admin" 
                                 element={
