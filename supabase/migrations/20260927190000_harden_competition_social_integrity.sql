@@ -1,4 +1,55 @@
 -- Harden multiplayer room mutations and tournament completion.
+CREATE OR REPLACE FUNCTION public.multiplayer_create_room(
+ p_name text,p_subject text,p_difficulty text,p_question_count integer,p_max_players integer,p_password text default null
+)
+RETURNS public.multiplayer_rooms LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_uid uuid:=auth.uid(); v_room public.multiplayer_rooms%rowtype;
+BEGIN
+ IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+ IF p_max_players<2 OR p_max_players>32 THEN RAISE EXCEPTION 'Invalid player limit'; END IF;
+ IF p_question_count<1 OR p_question_count>50 THEN RAISE EXCEPTION 'Invalid question count'; END IF;
+ INSERT INTO public.multiplayer_rooms(name,host_id,max_players,subject,difficulty,question_count,password,status)
+ VALUES(left(trim(coalesce(p_name,'Room')),80),v_uid,p_max_players,coalesce(nullif(trim(p_subject),''),'Mixed'),coalesce(nullif(trim(p_difficulty),''),'Medium'),p_question_count,nullif(p_password,''),'waiting')
+ RETURNING * INTO v_room;
+ INSERT INTO public.room_players(room_id,user_id,is_ready) VALUES(v_room.id,v_uid,true);
+ RETURN v_room;
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.multiplayer_join_room(p_room_id uuid,p_password text default null)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_uid uuid:=auth.uid(); v_room public.multiplayer_rooms%rowtype; v_count integer;
+BEGIN
+ IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+ SELECT * INTO v_room FROM public.multiplayer_rooms WHERE id=p_room_id FOR UPDATE;
+ IF NOT FOUND OR v_room.status NOT IN ('waiting','countdown','playing') THEN RAISE EXCEPTION 'Room is no longer available'; END IF;
+ IF v_room.password IS NOT NULL AND v_room.password<>coalesce(p_password,'') THEN RAISE EXCEPTION 'Incorrect password'; END IF;
+ IF EXISTS (SELECT 1 FROM public.room_players WHERE room_id=p_room_id AND user_id=v_uid) THEN RETURN true; END IF;
+ SELECT count(*) INTO v_count FROM public.room_players WHERE room_id=p_room_id;
+ IF v_count>=v_room.max_players THEN RAISE EXCEPTION 'Room is full'; END IF;
+ INSERT INTO public.room_players(room_id,user_id,is_ready) VALUES(p_room_id,v_uid,false);
+ RETURN true;
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.multiplayer_leave_room(p_room_id uuid)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_uid uuid:=auth.uid(); v_host uuid; v_next uuid;
+BEGIN
+ IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+ SELECT host_id INTO v_host FROM public.multiplayer_rooms WHERE id=p_room_id FOR UPDATE;
+ IF NOT FOUND THEN RETURN false; END IF;
+ IF NOT EXISTS (SELECT 1 FROM public.room_players WHERE room_id=p_room_id AND user_id=v_uid) THEN RETURN false; END IF;
+ DELETE FROM public.room_players WHERE room_id=p_room_id AND user_id=v_uid;
+ IF v_host=v_uid THEN
+   SELECT user_id INTO v_next FROM public.room_players WHERE room_id=p_room_id ORDER BY created_at LIMIT 1;
+   IF v_next IS NULL THEN
+     DELETE FROM public.multiplayer_rooms WHERE id=p_room_id;
+   ELSE
+     UPDATE public.multiplayer_rooms SET host_id=v_next WHERE id=p_room_id;
+   END IF;
+ END IF;
+ RETURN true;
+END; $$;
+
 CREATE OR REPLACE FUNCTION public.multiplayer_ensure_membership(p_room_id uuid)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE v_uid uuid:=auth.uid(); v_status text; v_max integer; v_count integer;
@@ -115,6 +166,9 @@ END; $$;
 
 REVOKE ALL ON FUNCTION public.complete_match_and_progress(uuid,uuid,integer,integer,boolean) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.complete_match_and_progress(uuid,uuid,integer,integer,boolean) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.multiplayer_create_room(text,text,text,integer,integer,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.multiplayer_join_room(uuid,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.multiplayer_leave_room(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.multiplayer_ensure_membership(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.multiplayer_toggle_ready(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.multiplayer_update_room(uuid,text,text,text,integer) TO authenticated;
