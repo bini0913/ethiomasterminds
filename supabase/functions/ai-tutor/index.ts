@@ -46,7 +46,14 @@ serve(async (req) => {
     if (rateLimit.error) throw rateLimit.error;
     if (!rateLimit.data) return new Response(JSON.stringify({ error: "Too many requests. Please wait a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    if (conversationId !== undefined && conversationId !== null && (typeof conversationId !== "string" || conversationId.length > 100)) {\n      return new Response(JSON.stringify({ error: "Invalid conversation id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });\n    }\n    if (subject !== undefined && (typeof subject !== "string" || subject.length > 100)) {\n      return new Response(JSON.stringify({ error: "Invalid subject" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });\n    }\n\n    // Get or create conversation
+    if (conversationId !== undefined && conversationId !== null && (typeof conversationId !== "string" || conversationId.length > 100)) {
+      return new Response(JSON.stringify({ error: "Invalid conversation id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (subject !== undefined && (typeof subject !== "string" || subject.length > 100)) {
+      return new Response(JSON.stringify({ error: "Invalid subject" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Get or create conversation
     let conversation;
     if (conversationId) {
       const { data } = await supabaseClient
