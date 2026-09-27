@@ -18,6 +18,18 @@ export default {
       }
     },
     extend: {
+      spacing: {
+        18: '4.5rem',
+        22: '5.5rem',
+        30: '7.5rem'
+      },
+      fontSize: {
+        body: ['1rem', { lineHeight: '1.6' }],
+        small: ['0.875rem', { lineHeight: '1.45' }],
+        'heading-sm': ['1.5rem', { lineHeight: '1.2' }],
+        'heading-md': ['1.875rem', { lineHeight: '1.2' }],
+        'heading-lg': ['2.25rem', { lineHeight: '1.15' }]
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -36,6 +48,14 @@ export default {
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))'
+        },
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))'
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))'
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',
@@ -155,9 +175,9 @@ export default {
         'streak': 'streak 3s ease-in-out infinite'
       },
       fontFamily: {
-        sans: ['Rajdhani', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        display: ['Orbitron', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['Space Mono', 'ui-monospace', 'monospace']
+        sans: ['DM Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Space Grotesk', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'monospace']
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
