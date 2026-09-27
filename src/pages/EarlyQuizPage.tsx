@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2, CircleHelp, Sparkles, Trophy, XCircle } from "
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useEarlyReward } from "@/hooks/useEarlyReward";
+import { useEarlyProgress } from "@/hooks/useEarlyProgress";
 import { getUserTier } from "@/lib/getUserTier";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
