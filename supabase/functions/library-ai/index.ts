@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +30,31 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Authentication required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) return new Response(JSON.stringify({ error: "Invalid authentication token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const rateLimit = await supabase.rpc("consume_edge_rate_limit", { p_bucket: "library-ai", p_limit: 30, p_window_seconds: 60 });
+    if (rateLimit.error) throw rateLimit.error;
+    if (!rateLimit.data) return new Response(JSON.stringify({ error: "Too many requests. Please wait a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     const payload = (await req.json()) as RequestBody;
+
+    if (!["summary", "simple", "questions", "flashcards", "concepts"].includes(payload?.action)) {
+      return new Response(JSON.stringify({ error: "Invalid action." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (typeof payload?.text !== "string" || payload.text.length > MAX_TEXT_CHARS) {
+      return new Response(JSON.stringify({ error: "Text is required and must be 3500 characters or fewer." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (payload.grade !== undefined && (!Number.isInteger(payload.grade) || payload.grade < 1 || payload.grade > 12)) {
+      return new Response(JSON.stringify({ error: "Invalid grade." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (payload.subject !== undefined && (typeof payload.subject !== "string" || payload.subject.length > 100)) {
+      return new Response(JSON.stringify({ error: "Invalid subject." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     if (!payload?.text?.trim()) {
       return new Response(JSON.stringify({ error: "Text is required." }), {
