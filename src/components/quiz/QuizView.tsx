@@ -32,6 +32,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [earnedXP, setEarnedXP] = useState(0);
   const [userAnswers, setUserAnswers] = useState<{[key: string]: string}>({});
+  const userAnswersRef = useRef<{[key: string]: string}>({});
   const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
   const [answeredCorrectly, setAnsweredCorrectly] = useState(0);
   const [answeredWrong, setAnsweredWrong] = useState(0);
@@ -79,10 +80,12 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     if (!isAnswered) {
       setIsAnswered(true);
       // Record that the user didn't answer this question
-      setUserAnswers(prev => ({
-        ...prev,
-        [currentQuestion.id]: "no_answer"
-      }));
+      const nextAnswers = {
+        ...userAnswersRef.current,
+        [currentQuestion.id]: "no_answer",
+      };
+      userAnswersRef.current = nextAnswers;
+      setUserAnswers(nextAnswers);
       setAnsweredWrong((prev) => prev + 1);
 
       // Add to completed questions
@@ -100,10 +103,12 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     questionTimes.current[currentQuestion.id] = timeTaken;
     
     // Record user's answer
-    setUserAnswers(prev => ({
-      ...prev,
-      [currentQuestion.id]: answer
-    }));
+    const nextAnswers = {
+      ...userAnswersRef.current,
+      [currentQuestion.id]: answer,
+    };
+    userAnswersRef.current = nextAnswers;
+    setUserAnswers(nextAnswers);
     
     // Add to completed questions
     setCompletedQuestionIds(prev => [...prev, currentQuestion.id]);
@@ -194,7 +199,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     }
   };
   
-  const saveQuizResults = async (finalScore: number, totalXP: number) => {
+  const saveQuizResults = async (finalScore: number, totalXP: number, answers = userAnswersRef.current) => {
     try {
       const totalTimeTaken = Object.values(questionTimes.current).reduce((a, b) => a + b, 0);
       const persistedQuizId = quiz.sourceQuizId || quiz.id;
@@ -209,7 +214,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       submissionIdRef.current = submissionId;
       const { data, error } = await (supabase as any).rpc('submit_quiz_result_secure', {
         p_quiz_id: persistedQuizId,
-        p_answers: userAnswers as any,
+        p_answers: answers as any,
         p_time_taken: totalTimeTaken,
         p_submission_id: submissionId
       });
@@ -245,8 +250,8 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       const finalScore = score;
       setQuizCompleted(true);
       
-      // Calculate XP by difficulty and number of correct answers.
-      // Easy = 3 XP, Medium = 7 XP, Hard = 10 XP per correct answer.
+      // Calculate the provisional client-side XP display using the same difficulty table as quizDifficulty.ts.
+      // The secure submission RPC remains authoritative for persisted XP.
       const xpPerCorrectAnswer = getXPPerCorrectAnswer();
       const wrongPenalty = getWrongPenalty();
       const totalXP = allowXP ? (answeredCorrectly * xpPerCorrectAnswer) - (answeredWrong * wrongPenalty) : 0;
