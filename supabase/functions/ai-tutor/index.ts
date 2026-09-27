@@ -19,7 +19,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Authentication required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (typeof message !== "string" || message.length === 0 || message.length > 4000) {
+    if (typeof message !== "string" || message.trim().length === 0 || message.length > 4000) {
       return new Response(JSON.stringify({ error: 'Message is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -45,6 +45,13 @@ serve(async (req) => {
     const rateLimit = await supabaseClient.rpc("consume_edge_rate_limit", { p_bucket: "ai-tutor", p_limit: 20, p_window_seconds: 60 });
     if (rateLimit.error) throw rateLimit.error;
     if (!rateLimit.data) return new Response(JSON.stringify({ error: "Too many requests. Please wait a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    if (conversationId !== undefined && conversationId !== null && (typeof conversationId !== "string" || conversationId.length > 100)) {
+      return new Response(JSON.stringify({ error: "Invalid conversation id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (subject !== undefined && (typeof subject !== "string" || subject.length > 100)) {
+      return new Response(JSON.stringify({ error: "Invalid subject" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Get or create conversation
     let conversation;
@@ -125,7 +132,7 @@ You remember everything in this conversation. Be encouraging, but never sugar-co
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('AI API error:', errorText);
+      console.error('AI API error:', aiResponse.status, errorText.slice(0, 300));
       
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ error: 'Too many requests. Please wait a moment and try again.' }), {
@@ -180,9 +187,9 @@ You remember everything in this conversation. Be encouraging, but never sugar-co
     });
 
   } catch (error) {
-    console.error('Error in ai-tutor:', error);
+    console.error('Error in ai-tutor:', error instanceof Error ? error.message : 'Unknown error');
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: 'Failed to process AI tutor request' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

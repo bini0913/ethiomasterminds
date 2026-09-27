@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const text = await response.text();
-      console.error("library-ai gateway error:", text);
+      console.error("library-ai gateway error:", response.status, text.slice(0, 300));
       throw new Error(`AI Gateway error: ${response.status}`);
     }
 
@@ -98,9 +98,9 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("library-ai error:", error);
+    console.error("library-ai error:", error instanceof Error ? error.message : "Unknown error");
     return new Response(
-      JSON.stringify({ error: "Failed to generate AI content.", details: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "Failed to generate AI content." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }

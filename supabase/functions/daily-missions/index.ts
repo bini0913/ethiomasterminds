@@ -95,6 +95,14 @@ serve(async (req) => {
     if (userIdFromBody && userIdFromBody !== userId) return json({ error: "User mismatch" }, 403);
 
     if (action === "assign") {
+      const rateLimit = await userClient.rpc("consume_edge_rate_limit", {
+        p_bucket: "daily-missions-assign",
+        p_limit: 3,
+        p_window_seconds: 3600,
+      });
+      if (rateLimit.error) throw rateLimit.error;
+      if (!rateLimit.data) return json({ error: "Too many mission assignment attempts. Please try again later." }, 429);
+
       const today = new Date().toISOString().split("T")[0];
       const { data: existing } = await admin
         .from("user_missions")

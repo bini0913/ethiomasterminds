@@ -235,21 +235,21 @@ const App = () => (
                             <AppChrome>
                             <Routes>
                               <Route path="/" element={<Index />} />
-                              <Route path="/quiz" element={<Quiz />} />
+                              <Route path="/quiz" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Quiz /></ProtectedRoute>} />
                               <Route path="/early-games" element={<EarlyTierOnlyRoute><EarlyGamesPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-quiz" element={<EarlyTierOnlyRoute><EarlyQuizPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-videos" element={<EarlyTierOnlyRoute><EarlyVideosPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-discover" element={<EarlyTierOnlyRoute><EarlyDiscoverPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-explore" element={<EarlyTierOnlyRoute><EarlyExplorePage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-progress" element={<EarlyTierOnlyRoute><EarlyProgressPage /></EarlyTierOnlyRoute>} />
-                              <Route path="/quiz/filter" element={<QuizFilter />} />
-                              <Route path="/multiplayer" element={<Multiplayer />} />
-                              <Route path="/lobby" element={<Lobby />} />
-                              <Route path="/leaderboard" element={<Leaderboard />} />
-                              <Route path="/profile" element={<SelfProfileRedirect />} />
-                              <Route path="/profile/:userId" element={<UserProfilePage />} />
+                              <Route path="/quiz/filter" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><QuizFilter /></ProtectedRoute>} />
+                              <Route path="/multiplayer" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Multiplayer /></ProtectedRoute>} />
+                              <Route path="/lobby" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Lobby /></ProtectedRoute>} />
+                              <Route path="/leaderboard" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Leaderboard /></ProtectedRoute>} />
+                              <Route path="/profile" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><SelfProfileRedirect /></ProtectedRoute>} />
+                              <Route path="/profile/:userId" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><UserProfilePage /></ProtectedRoute>} />
                               <Route path="/friends" element={<EarlyTierRestrictedRoute><Friends /></EarlyTierRestrictedRoute>} />
-                              <Route path="/settings" element={<Settings />} />
+                              <Route path="/settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Settings /></ProtectedRoute>} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
                               <Route 
                                 path="/teacher" 
@@ -275,7 +275,7 @@ const App = () => (
                                   </ProtectedRoute>
                                 } 
                               />
-                              <Route path="/student-dashboard" element={<StudentDashboard />} />
+                              <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboard /></ProtectedRoute>} />
                               <Route 
                                 path="/manager-dashboard" 
                                 element={
@@ -284,12 +284,12 @@ const App = () => (
                                   </ProtectedRoute>
                                 } 
                               />
-                              <Route path="/store" element={<StorePage />} />
-                              <Route path="/tournaments" element={<Tournaments />} />
-                              <Route path="/enhanced-settings" element={<EnhancedSettings />} />
+                              <Route path="/store" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><StorePage /></ProtectedRoute>} />
+                              <Route path="/tournaments" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Tournaments /></ProtectedRoute>} />
+                              <Route path="/enhanced-settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><EnhancedSettings /></ProtectedRoute>} />
                               <Route path="/social" element={<EarlyTierRestrictedRoute><EnhancedSocial /></EarlyTierRestrictedRoute>} />
-                              <Route path="/ai-tutor" element={<AITutor />} />
-                              <Route path="/learning-dna" element={<LearningDNA />} />
+                              <Route path="/ai-tutor" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AITutor /></ProtectedRoute>} />
+                              <Route path="/learning-dna" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><LearningDNA /></ProtectedRoute>} />
                               <Route
                                 path="/parent-dashboard"
                                 element={
@@ -298,10 +298,10 @@ const App = () => (
                                   </ProtectedRoute>
                                 }
                               />
-                              <Route path="/revision" element={<TimeTravelRevision />} />
-                              <Route path="/avatar-creator" element={<AvatarCreator />} />
+                              <Route path="/revision" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><TimeTravelRevision /></ProtectedRoute>} />
+                              <Route path="/avatar-creator" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AvatarCreator /></ProtectedRoute>} />
                               <Route path="/academic" element={<EarlyTierRestrictedRoute><AcademicMode /></EarlyTierRestrictedRoute>} />
-                              <Route path="/study-mode" element={<StudyModePage />} />
+                              <Route path="/study-mode" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><StudyModePage /></ProtectedRoute>} />
                               <Route path="/academic/flashcards" element={<EarlyTierRestrictedRoute><FlashcardsPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/topics" element={<EarlyTierRestrictedRoute><TopicCoveragePage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/exam" element={<EarlyTierRestrictedRoute><ExamModePage /></EarlyTierRestrictedRoute>} />
@@ -332,7 +332,7 @@ const App = () => (
                                   </ProtectedRoute>
                                 } 
                               />
-                              <Route path="/migrate-supabase" element={<SupabaseMigration />} />
+                              <Route path="/migrate-supabase" element={<ProtectedRoute allowedRoles={["admin", "manager", "extreme_admin"]}><SupabaseMigration /></ProtectedRoute>} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             </AppChrome>
