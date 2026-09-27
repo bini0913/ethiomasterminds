@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '@/context/UserContext';
+import { getUserTier } from '@/lib/getUserTier';
 import { toast } from 'sonner';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
@@ -163,6 +164,9 @@ const LibraryPage: React.FC = () => {
   }, [user?.id]);
 
   const userGrade = Number(user?.grade || 0);
+  const userTier = getUserTier(user?.grade);
+  const studentGradeMin = userTier === 'upper' ? 9 : userTier === 'middle' ? 5 : userTier === 'early' ? 1 : 1;
+  const studentGradeMax = userTier === 'upper' ? 12 : userTier === 'middle' ? 8 : userTier === 'early' ? 4 : 12;
 
   const shortHash = (value: string) => {
     let hash = 0;
@@ -189,12 +193,15 @@ const LibraryPage: React.FC = () => {
 
       if (activeSection === 'my-books') return inQuery && inSubject && inGrade && book.uploader_id === user?.id;
       if (activeSection === 'community') {
-        const minGrade = user?.role === 'student' ? 1 : 1;
-        return inQuery && inSubject && inGrade && (book.grade_level || minGrade) >= minGrade;
+        if (user?.role === 'student') {
+          const grade = Number(book.grade_level || 0);
+          if (grade < studentGradeMin || grade > studentGradeMax) return false;
+        }
+        return inQuery && inSubject && inGrade;
       }
       return inQuery && inSubject && inGrade;
     });
-  }, [books, search, subjectFilter, gradeFilter, activeSection, user?.id, user?.role]);
+  }, [books, search, subjectFilter, gradeFilter, activeSection, user?.id, user?.role, studentGradeMin, studentGradeMax]);
 
   const visibleBooks = filteredBooks.slice(0, visibleCount);
 
@@ -217,8 +224,8 @@ const LibraryPage: React.FC = () => {
 
     if (user.role === 'student') {
       const g = Number(form.gradeLevel);
-      if (g < 5 || g > 12) {
-        toast.error('Students can upload/share for Grade 5 to Grade 12 only.');
+      if (g < studentGradeMin || g > studentGradeMax) {
+        toast.error(`Students can upload/share for Grade ${studentGradeMin} to Grade ${studentGradeMax} only.`);
         return;
       }
     }
@@ -596,7 +603,10 @@ const LibraryPage: React.FC = () => {
                     <SelectTrigger><SelectValue placeholder="All grades" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All grades</SelectItem>
-                      {Array.from({ length: 12 }).map((_, index) => <SelectItem key={index + 1} value={String(index + 1)}>Grade {index + 1}</SelectItem>)}
+                      {Array.from({ length: user?.role === 'student' ? studentGradeMax - studentGradeMin + 1 : 12 }, (_, index) => {
+                        const grade = user?.role === 'student' ? studentGradeMin + index : index + 1;
+                        return <SelectItem key={grade} value={String(grade)}>Grade {grade}</SelectItem>;
+                      })}
                     </SelectContent>
                   </Select>
                 </CardContent>
