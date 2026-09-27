@@ -1,6 +1,5 @@
 import { useCallback } from "react";
-import { useUser } from "@/context/UserContext";
-import { useCurrency } from "@/context/CurrencyContext";
+import { supabase } from "@/integrations/supabase/client";
 
 export const EARLY_REWARDS = {
   gameCorrect: { xp: 5, coins: 2 },
@@ -8,24 +7,44 @@ export const EARLY_REWARDS = {
   discoverCorrect: { xp: 5, coins: 2 },
 } as const;
 
-export function useEarlyReward() {
-  const { user, addXP } = useUser();
-  const { addCoins } = useCurrency();
+type RewardKind = keyof typeof EARLY_REWARDS;
 
-  return useCallback(
-    async (kind: keyof typeof EARLY_REWARDS) => {
-      if (!user?.id) return false;
-      const reward = EARLY_REWARDS[kind];
-      try {
-        await addXP(reward.xp);
-        const coinsAwarded = await addCoins(reward.coins, `early-${kind}`);
-        if (!coinsAwarded) return false;
-        return true;
-      } catch (error) {
+type EarlyRewardOptions = {
+  activityId: string;
+  skill: string;
+  completed?: boolean;
+};
+
+export function useEarlyReward() {
+  return useCallback(async (kind: RewardKind, options?: EarlyRewardOptions) => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user?.id) return false;
+
+    const reward = EARLY_REWARDS[kind];
+    const activityId = options?.activityId ?? `early-${kind}`;
+    const skill = options?.skill ?? "general";
+    const attemptId = crypto.randomUUID();
+
+    try {
+      const { error } = await supabase.rpc("complete_early_activity", {
+        p_attempt_id: attemptId,
+        p_activity_id: activityId,
+        p_skill: skill,
+        p_correct: true,
+        p_xp: reward.xp,
+        p_coins: reward.coins,
+        p_completed: options?.completed ?? false,
+      });
+
+      if (error) {
         console.error("Early reward failed:", error);
         return false;
       }
-    },
-    [addCoins, addXP, user?.id],
-  );
+
+      return true;
+    } catch (error) {
+      console.error("Early reward failed:", error);
+      return false;
+    }
+  }, []);
 }
