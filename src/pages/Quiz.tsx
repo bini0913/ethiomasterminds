@@ -107,7 +107,7 @@ const Quiz: React.FC = () => {
         quizzesByCategory.get(quiz.category)!.push(quiz);
       });
 
-    const buildSet = (subjectQuizzes: QuizType[], category: string, questionCount: number, index: number): QuizType => {
+    const buildSet = (subjectQuizzes: QuizType[], category: string, questionCount: number, index: number): QuizType | null => {
       const dedupedQuestions = new Map<string, Question>();
       subjectQuizzes.forEach((quiz) => {
         quiz.questions.forEach((question) => dedupedQuestions.set(question.id, question));
@@ -170,7 +170,8 @@ const Quiz: React.FC = () => {
       const subjectQuizzes = quizzesByCategory.get(category) || [];
       for (let i = 0; i < 10; i++) {
         const questionCount = 10;
-        practiceSets.push(buildSet(subjectQuizzes, category, questionCount, i));
+        const practiceSet = buildSet(subjectQuizzes, category, questionCount, i);
+        if (practiceSet) practiceSets.push(practiceSet);
       }
     });
 
