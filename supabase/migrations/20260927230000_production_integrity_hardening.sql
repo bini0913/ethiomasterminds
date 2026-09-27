@@ -334,7 +334,11 @@ BEGIN
   v_xp := greatest(0, coalesce(r.xp_earned, 0));
   v_coins := 5 + floor((coalesce(r.correct_answers, 0)::numeric / greatest(r.total_questions, 1)) * 15);
 
-  v_result := public.apply_xp_reward(uid, v_xp, false);
+  IF v_xp > 0 THEN
+    v_result := public.apply_xp_reward(uid, v_xp, false);
+  ELSE
+    v_result := jsonb_build_object('new_level', (SELECT level FROM public.profiles WHERE id = uid));
+  END IF;
 
   INSERT INTO public.user_currency(user_id, coins)
   VALUES (uid, v_coins)
