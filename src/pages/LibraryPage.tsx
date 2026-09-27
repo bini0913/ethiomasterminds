@@ -215,7 +215,12 @@ const LibraryPage: React.FC = () => {
     setEditingBookId(null);
   };
 
-  const canUpload = !!user && (user.role === 'teacher' || user.role === 'admin' || user.role === 'manager' || (user.role === 'student' && userGrade >= 5 && userGrade <= 12));
+  const canUpload = !!user && (
+    user.role === 'teacher' ||
+    user.role === 'admin' ||
+    user.role === 'manager' ||
+    (user.role === 'student' && userGrade >= studentGradeMin && userGrade <= studentGradeMax)
+  );
 
   const handleUploadOrEdit = async () => {
     if (!user) return;
@@ -523,7 +528,7 @@ const LibraryPage: React.FC = () => {
                     </div>
                     <div>
                       <Label>Grade (1-12)</Label>
-                      <Input type="number" min={1} max={12} value={form.gradeLevel} onChange={(e) => setForm((p) => ({ ...p, gradeLevel: e.target.value }))} />
+                      <Input type="number" min={user?.role === 'student' ? studentGradeMin : 1} max={user?.role === 'student' ? studentGradeMax : 12} value={form.gradeLevel} onChange={(e) => setForm((p) => ({ ...p, gradeLevel: e.target.value }))} />
                     </div>
                   </div>
                   <div>
@@ -745,7 +750,11 @@ const LibraryPage: React.FC = () => {
                                             author: book.author,
                                             subject: book.subject,
                                             description: book.description,
-                                            gradeLevel: String(book.grade_level || 9),
+                                            gradeLevel: String(
+                                              book.grade_level && user?.role === 'student'
+                                                ? Math.min(studentGradeMax, Math.max(studentGradeMin, book.grade_level))
+                                                : book.grade_level || (user?.role === 'student' ? studentGradeMin : 9)
+                                            ),
                                             type: book.type,
                                             file: null,
                                           });
