@@ -1,10 +1,7 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/context/UserContext";
 import { Award, Star } from "lucide-react";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
 
 interface GainXPButtonProps {
   amount?: number;
@@ -12,77 +9,50 @@ interface GainXPButtonProps {
   variant?: "default" | "outline" | "secondary" | "ghost";
   size?: "default" | "sm" | "lg";
   label?: string;
-  onClick?: () => void; // Added onClick handler support
+  onClick?: () => void | Promise<void>;
 }
 
-const GainXPButton: React.FC<GainXPButtonProps> = ({ 
-  amount = 25, 
+const GainXPButton: React.FC<GainXPButtonProps> = ({
+  amount = 25,
   className = "",
   variant = "outline",
   size = "sm",
   label,
-  onClick, // Added onClick handler
+  onClick,
 }) => {
-  const { addXP } = useUser();
   const [isAnimating, setIsAnimating] = useState(false);
-  
-  const handleClick = () => {
+
+  const handleClick = async () => {
+    if (isAnimating) return;
     setIsAnimating(true);
-    addXP(amount);
-    
-    const message = amount >= 50 
-      ? "Great work!" 
-      : "Keep learning!";
-    
-    toast.success(`+${amount} XP gained!`, {
-      description: message,
-    });
-    
-    // Call the onClick handler if provided
-    if (onClick) {
-      onClick();
-    }
-    
-    setTimeout(() => setIsAnimating(false), 700);
-  };
-  
-  const getVariantClasses = () => {
-    // Using custom classes for the quiz style that's not in the button variants
-    if (variant === "secondary") {
-      return "bg-secondary text-secondary-foreground hover:bg-secondary/80";
-    }
-    return "";
-  };
-  
-  const getSizeClasses = () => {
-    switch(size) {
-      case "default":
-        return "px-4 py-2";
-      case "lg":
-        return "px-6 py-3 text-lg";
-      default:
-        return "";
+
+    try {
+      // This component is a presentation/claim control. It must never award
+      // XP directly. Rewards are granted by the authoritative activity RPC.
+      await onClick?.();
+    } finally {
+      window.setTimeout(() => setIsAnimating(false), 700);
     }
   };
-  
+
   return (
     <motion.div
       animate={isAnimating ? { scale: [1, 1.1, 1] } : {}}
       transition={{ duration: 0.5 }}
     >
-      <Button 
-        onClick={handleClick}
+      <Button
+        onClick={() => void handleClick()}
         variant={variant}
         size={size}
-        className={`flex items-center gap-2 ${getVariantClasses()} ${getSizeClasses()} ${className}`}
+        className={`flex items-center gap-2 ${className}`}
         disabled={isAnimating}
       >
         {isAnimating ? (
-          <Star className="h-4 w-4 text-yellow-300 animate-spin" />
+          <Star className="h-4 w-4 animate-spin" />
         ) : (
           <Award className="h-4 w-4" />
         )}
-        <span>{label || `Gain ${amount} XP`}</span>
+        <span>{label || `Claim ${amount} XP`}</span>
       </Button>
     </motion.div>
   );
