@@ -108,3 +108,20 @@ INSERT INTO public.early_achievements (key,name,description,icon,requirement_typ
 ('accuracy-star','Accuracy Star','Reach 80% accuracy after ten attempts.','🎯','accuracy_80',10,30,15),
 ('xp-hunter','XP Hunter','Earn 100 XP through Early learning.','✨','xp_earned',100,30,15)
 ON CONFLICT (key) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.description,icon=EXCLUDED.icon,requirement_type=EXCLUDED.requirement_type,requirement_value=EXCLUDED.requirement_value,reward_xp=EXCLUDED.reward_xp,reward_coins=EXCLUDED.reward_coins;
+
+-- Admin/manager content curation. Normal students retain read-only access.
+DROP POLICY IF EXISTS "Admins manage Early content" ON public.early_content_items;
+CREATE POLICY "Admins manage Early content" ON public.early_content_items
+FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('admin','manager','extreme_admin'))
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('admin','manager','extreme_admin'))
+);
+
+DROP POLICY IF EXISTS "Admins manage Early videos" ON public.early_video_resources;
+CREATE POLICY "Admins manage Early videos" ON public.early_video_resources
+FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('admin','manager','extreme_admin'))
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('admin','manager','extreme_admin'))
+);
