@@ -16,7 +16,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.daily-missions]
-verify_jwt = true
+verify_jwt = false
 
 [functions.analyze-learning-dna]
 verify_jwt = false
