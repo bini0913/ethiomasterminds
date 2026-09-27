@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,6 +29,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authorization = req.headers.get("Authorization");
+    if (!authorization?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authorization } },
+    });
+    const { data: authData, error: authError } = await client.auth.getUser();
+    if (authError || !authData.user) {
+      return new Response(JSON.stringify({ error: "Invalid authentication token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { data: allowed, error: rateError } = await client.rpc("consume_edge_rate_limit", {
+      p_function_name: "ai-helper", p_limit: 30, p_window_seconds: 60,
+    });
+    if (rateError || allowed !== true) {
+      return new Response(JSON.stringify({ error: "Too many AI requests. Please wait a moment and try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { messages, mode = "explain", context }: RequestBody = await req.json();
 
     // Input validation
