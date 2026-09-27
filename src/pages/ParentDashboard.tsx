@@ -124,7 +124,8 @@ const ParentDashboard: React.FC = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "parent_messages", filter: `student_id=eq.${user.id}` }, () => void loadAll())
       .subscribe();
     const isEarlyStudent = getUserTier(user?.grade) === "early";
-    return () => { supabase.removeChannel(ch); };
+
+  return () => { supabase.removeChannel(ch); };
   }, [user?.id]);
 
   // Derived metrics
