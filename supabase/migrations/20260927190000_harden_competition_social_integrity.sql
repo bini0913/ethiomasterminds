@@ -1,3 +1,5 @@
+CREATE UNIQUE INDEX IF NOT EXISTS friends_user_pair_unique ON public.friends (LEAST(user_id, friend_id), GREATEST(user_id, friend_id));
+
 -- Harden multiplayer room mutations and tournament completion.
 CREATE OR REPLACE FUNCTION public.send_friend_request(p_target_user_id uuid)
 RETURNS public.friends LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
