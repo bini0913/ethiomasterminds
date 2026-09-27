@@ -72,7 +72,14 @@ BEGIN
   SELECT q.id, q.title, q.grade, q.subject, q.difficulty, q.level_min, q.level_max
   FROM public.quizzes q, target t
   WHERE q.is_approved = true
-    AND lower(q.grade) = lower(v_profile_grade)
+    AND (
+      substring(lower(trim(q.grade)) from '[0-9]+') = substring(lower(trim(v_profile_grade)) from '[0-9]+')
+      OR (
+        substring(lower(trim(q.grade)) from '[0-9]+') IS NULL
+        AND substring(lower(trim(v_profile_grade)) from '[0-9]+') IS NULL
+        AND lower(trim(q.grade)) = lower(trim(v_profile_grade))
+      )
+    )
     AND lower(q.subject) = lower(trim(p_subject))
     AND lower(q.difficulty) = t.wanted_difficulty
   ORDER BY q.created_at DESC
