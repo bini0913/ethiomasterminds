@@ -114,7 +114,7 @@ const EarlyQuizPage: React.FC = () => {
     if (correct) {
       setScore((s) => s + 1);
       await reward("quizCorrect", {
-        activityId: `quiz-${current.subject.toLowerCase()}`,
+        activityId: `early-quiz-${key}`,
         skill: subjectSkills[current.subject.toLowerCase()]?.[0] ?? "general",
         completed: index === questions.length - 1,
       });

@@ -13,7 +13,6 @@ import { Card, CardContent } from "@/components/ui/card";
 const EarlyTierHome: React.FC = () => {
   const { user, logout } = useUser();
   const navigate = useNavigate();
-  const navigate = useNavigate();
   const { xp, coins, dailyStreak } = useCurrency();
   const { summary: progress } = useEarlyProgress();
   const recommendations = useEarlyRecommendations();
