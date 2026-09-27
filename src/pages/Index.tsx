@@ -114,7 +114,10 @@ const Index: React.FC = () => {
           tier === "early" ? (
             <EarlyTierHome />
           ) : tier === "upper" ? (
-            <UpperTierHome />
+            <>
+              <UpperTierHome />
+              <StudentBottomNav />
+            </>
           ) : (
             <>
               <MainMenu />
