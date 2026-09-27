@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Gamepad2, PlayCircle, Settings, Sparkles, Store, Trophy, UserRound } from "lucide-react";
+import { Gamepad2, Lightbulb, PlayCircle, Settings, Sparkles, Store, Trophy, UserRound } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import { useUser } from "@/context/UserContext";
@@ -21,6 +21,7 @@ const EarlyTierHome: React.FC = () => {
     { to:"/early-quiz", label:"Quiz", description:"Show what you know", icon:<Sparkles className="h-7 w-7"/>, tone:"bg-warning/15 text-warning" },
     { to:"/early-videos", label:"Videos", description:"Watch & discover", icon:<PlayCircle className="h-7 w-7"/>, tone:"bg-accent/15 text-accent" },
     { to:"/early-discover", label:"Discover", description:"Amazing facts", icon:<Sparkles className="h-7 w-7"/>, tone:"bg-warning/15 text-warning" },
+    { to:"/early-explore", label:"Explore", description:"Stories, science & create", icon:<Lightbulb className="h-7 w-7"/>, tone:"bg-success/15 text-success" },
     { to:"/leaderboard", label:"Ranks", description:"See your progress", icon:<Trophy className="h-7 w-7"/>, tone:"bg-success/15 text-success" },
     { to:"/store", label:"Store", description:"Use your rewards", icon:<Store className="h-7 w-7"/>, tone:"bg-primary/10 text-primary" },
     { to:profilePath, label:"My Avatar", description:"Make it yours", icon:<UserRound className="h-7 w-7"/>, tone:"bg-accent/15 text-accent" },
