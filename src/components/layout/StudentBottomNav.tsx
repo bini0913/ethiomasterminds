@@ -1,24 +1,30 @@
 import React from "react";
 import { useNavigate,useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home,Gamepad2,Globe2,Trophy,Gift,BookOpen,User,Swords } from "lucide-react";
+import { BookOpen, BrainCircuit, Gamepad2, Gift, Globe2, Home, Trophy, User } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
 
 const StudentBottomNav:React.FC=()=>{
  const navigate=useNavigate(),location=useLocation(),{user}=useUser();
  const profilePath=user?.id?"/profile/"+user.id:"/settings";
- const early=getUserTier(user?.grade)==="early";
- const items=early?[
+ const items=tier===
+ "early"?[
   {icon:Home,label:"Home",path:"/",match:["/"]},
   {icon:Gamepad2,label:"Play",path:"/early-games",match:["/early-games"]},
   {icon:Globe2,label:"Discover",path:"/early-discover",match:["/early-discover","/early-videos","/early-explore"]},
   {icon:Trophy,label:"Ranks",path:"/leaderboard",match:["/leaderboard"]},
   {icon:Gift,label:"Rewards",path:"/store",match:["/store"]},
+ ]:tier==="upper"?[
+  {icon:Home,label:"Home",path:"/",match:["/"]},
+  {icon:BookOpen,label:"Study",path:"/quiz",match:["/quiz","/study-mode","/library","/ai-tutor","/academic","/revision"]},
+  {icon:BrainCircuit,label:"Learning DNA",path:"/learning-dna",match:["/learning-dna"]},
+  {icon:Trophy,label:"Ranks",path:"/leaderboard",match:["/leaderboard"]},
+  {icon:User,label:"Profile",path:profilePath,match:["/profile/","/friends","/store","/settings","/enhanced-settings","/avatar-creator"]},
  ]:[
   {icon:Home,label:"Home",path:"/",match:["/"]},
   {icon:BookOpen,label:"Study",path:"/quiz",match:["/quiz","/study-mode","/library","/ai-tutor","/academic","/revision"]},
-  {icon:Swords,label:"Play",path:"/lobby",match:["/lobby","/multiplayer","/tournaments"]},
+  {icon:Gamepad2,label:"Play",path:"/lobby",match:["/lobby","/multiplayer","/tournaments"]},
   {icon:Trophy,label:"Ranks",path:"/leaderboard",match:["/leaderboard"]},
   {icon:User,label:"Profile",path:profilePath,match:["/profile/","/friends","/store","/settings","/enhanced-settings","/avatar-creator"]},
  ];
