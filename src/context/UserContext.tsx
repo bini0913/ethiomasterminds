@@ -383,26 +383,26 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    // Clear local app state immediately so logout always works on mobile/offline
-    // even if the remote session-revocation request is temporarily unavailable.
+    // Clear local state first so logout is immediate even on slow/offline mobile networks.
     localStorage.removeItem("masterminds_login_mode");
     setUser(null);
     setSession(null);
     setShowLevelUp(false);
+    toast.info("Logged out");
 
-    try {
-      const { error } = await supabase.auth.signOut({ scope: "global" });
-      if (error) throw error;
-      toast.info("Logged out successfully");
-    } catch (error) {
-      console.error("Global logout error:", error);
+    // Revoke the remote session in the background; never block portal navigation on it.
+    void (async () => {
       try {
-        await supabase.auth.signOut({ scope: "local" });
-      } catch (localError) {
-        console.error("Local logout fallback error:", localError);
+        await supabase.auth.signOut({ scope: "global" });
+      } catch (error) {
+        console.error("Global logout error:", error);
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch (localError) {
+          console.error("Local logout fallback error:", localError);
+        }
       }
-      toast.info("Logged out on this device");
-    }
+    })();
   };
 
   const updateProfile = async (profileData: Partial<UserProfile>) => {

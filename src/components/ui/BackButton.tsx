@@ -14,8 +14,14 @@ const BackButton: React.FC<BackButtonProps> = ({ to, className = "" }) => {
   const handleBack = () => {
     if (to) {
       navigate(to);
-    } else {
+      return;
+    }
+
+    const historyIndex = window.history.state?.idx;
+    if (typeof historyIndex === "number" && historyIndex > 0) {
       navigate(-1);
+    } else {
+      navigate("/");
     }
   };
 
