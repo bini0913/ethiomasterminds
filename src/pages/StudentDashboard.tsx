@@ -64,7 +64,7 @@ interface OnlineFriend {
 
 const StudentDashboard: React.FC = () => {
   const { user, logout } = useUser();
-  const { coins, gems, addCoins, addGems } = useCurrency();
+  const { coins, gems } = useCurrency();
   const { unlockedBadges } = useAchievements();
   const { friends } = useFriends();
   const navigate = useNavigate();
@@ -131,7 +131,6 @@ const StudentDashboard: React.FC = () => {
 
     const today = new Date().toISOString().split('T')[0];
 
-    // Fetch user's daily missions
     const { data: userMissions, error } = await supabase
       .from('user_missions')
       .select(`
@@ -162,33 +161,23 @@ const StudentDashboard: React.FC = () => {
         rewardXp: um.daily_missions.reward_xp || 0,
         rewardCoins: um.daily_missions.reward_coins || 0,
         completed: um.completed || false,
-        claimed: um.claimed || false
+        claimed: um.claimed || false,
       }));
       setDailyMissions(missions);
-    } else {
-      // No missions assigned yet, fetch available missions and assign
-      const { data: availableMissions } = await supabase
-        .from('daily_missions')
-        .select('*')
-        .eq('is_active', true)
-        .limit(3);
-
-      if (availableMissions && availableMissions.length > 0) {
-        const inserts = availableMissions.map(m => ({
-          user_id: user.id,
-          mission_id: m.id,
-          mission_date: today,
-          progress: 0,
-          completed: false,
-          claimed: false
-        }));
-
-        await supabase.from('user_missions').insert(inserts);
-        
-        // Re-fetch
-        fetchDailyMissions();
-      }
+      return;
     }
+
+    // Assignment is server-controlled. Do not insert missions from the browser.
+    const { error: assignError } = await supabase.functions.invoke('daily-missions', {
+      body: { action: 'assign', userId: user.id },
+    });
+
+    if (assignError) {
+      console.error('Daily mission assignment failed:', assignError);
+      return;
+    }
+
+    await fetchDailyMissions();
   };
 
   const fetchStreak = async () => {
@@ -250,19 +239,15 @@ const StudentDashboard: React.FC = () => {
   const claimMissionReward = async (mission: DailyMission) => {
     if (!mission.completed || mission.claimed) return;
 
-    const { error } = await supabase
-      .from('user_missions')
-      .update({ claimed: true })
-      .eq('id', mission.id);
+    const { data, error } = await supabase.functions.invoke('daily-missions', {
+      body: { action: 'claim', missionId: mission.id, userId: user.id },
+    });
 
-    if (!error) {
-      // Award rewards
-      if (mission.rewardCoins > 0) {
-        await addCoins(mission.rewardCoins);
-      }
-      // XP is handled separately through profiles update
-      toast.success(`Claimed ${mission.rewardXp} XP + ${mission.rewardCoins} coins!`);
-      fetchDailyMissions();
+    if (!error && data?.success) {
+      toast.success(`Claimed ${data.xp_awarded ?? mission.rewardXp} XP + ${data.coins_awarded ?? mission.rewardCoins} coins!`);
+      await fetchDailyMissions();
+    } else if (error) {
+      toast.error('Unable to claim this mission reward yet.');
     }
   };
 
