@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchClassCompetitionLeaderboard, fetchFollowing, fetchLeaderboardUsers, rankScore, tierFromUser, tierStyle, type ClassCompetitionRow, type LeaderboardUser } from "@/lib/leaderboardApi";
 import { prefetchProfileBundle } from "@/lib/profilePrefetch";
 import { getRankTierByLevel } from "@/lib/rankSystem";
+import { getUserTier } from "@/lib/getUserTier";
 
 type LeaderboardTab = "global" | "grade" | "friends" | "weekly" | "classes";
 type Timeframe = "all" | "monthly" | "weekly";
@@ -39,6 +40,9 @@ const Leaderboard = () => {
   const [following, setFollowing] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("global");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
+  const leaderboardTier = getUserTier(user?.grade);
+  const leaderboardGradeMin = leaderboardTier === "early" ? 1 : leaderboardTier === "middle" ? 5 : leaderboardTier === "upper" ? 9 : 1;
+  const leaderboardGradeMax = leaderboardTier === "early" ? 4 : leaderboardTier === "middle" ? 8 : leaderboardTier === "upper" ? 12 : 12;
   const [timeframe, setTimeframe] = useState<Timeframe>("all");
   const [loading, setLoading] = useState(true);
   const [classRows, setClassRows] = useState<ClassCompetitionRow[]>([]);
@@ -247,9 +251,7 @@ const Leaderboard = () => {
                     <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All grades</SelectItem>
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map((grade) => (
-                        <SelectItem key={grade} value={`${grade}`}>Grade {grade}</SelectItem>
-                      ))}
+                      {Array.from({ length: leaderboardGradeMax - leaderboardGradeMin + 1 }, (_, i) => leaderboardGradeMin + i).map((grade) => (\n                        <SelectItem key={grade} value={String(grade)}>Grade {grade}</SelectItem>\n                      ))}}
                     </SelectContent>
                   </Select>
                 </div>
