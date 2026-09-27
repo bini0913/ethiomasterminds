@@ -107,37 +107,17 @@ const Quiz: React.FC = () => {
         quizzesByCategory.get(quiz.category)!.push(quiz);
       });
 
-    const buildSet = (subjectQuizzes: QuizType[], category: string, questionCount: number, index: number): QuizType => {
+    const buildSet = (subjectQuizzes: QuizType[], category: string, questionCount: number, index: number): QuizType | null => {
       const dedupedQuestions = new Map<string, Question>();
       subjectQuizzes.forEach((quiz) => {
         quiz.questions.forEach((question) => dedupedQuestions.set(question.id, question));
       });
       const pool = Array.from(dedupedQuestions.values());
-      const fallbackOptions = [
-        `Choice 1 for Grade ${grade} ${category}`,
-        `Choice 2 for Grade ${grade} ${category}`,
-        `Choice 3 for Grade ${grade} ${category}`,
-        `Choice 4 for Grade ${grade} ${category}`,
-      ];
-      const fallbackQuestion: Question = {
-        id: `fallback-${category.toLowerCase().replace(/\s+/g, "-")}-g${grade}-q${index + 1}`,
-        text: `Grade ${grade} ${category}: Practice question ${index + 1}`,
-        options: fallbackOptions,
-        correctAnswer: fallbackOptions[index % fallbackOptions.length],
-        difficulty: "Medium",
-        subject: category,
-        grade,
-        topic: "General",
-        type: "Multiple Choice",
-        points: 10,
-        explanation: "Use this as guided practice and replace with curriculum-aligned content."
-      };
-      const offset = (index * questionCount) % Math.max(pool.length, 1);
-      const selectedQuestions = Array.from({ length: questionCount }, (_, pickIndex) => {
-        if (pool.length === 0) return fallbackQuestion;
+      if (pool.length === 0) return null;
+      const offset = (index * questionCount) % pool.length;
+      const selectedQuestions = Array.from({ length: Math.min(questionCount, pool.length) }, (_, pickIndex) => {
         const question = pool[(offset + pickIndex) % pool.length];
-        const baseQuestion = question || fallbackQuestion;
-        return rotateOptionsForBalance(baseQuestion, index, pickIndex);
+        return rotateOptionsForBalance(question, index, pickIndex);
       });
       const avgPoints = selectedQuestions.reduce((acc, q) => acc + (q.points || 10), 0) / Math.max(selectedQuestions.length, 1);
       const quizDifficulty: QuizType["difficulty"] = avgPoints >= 15 ? "Hard" : avgPoints >= 10 ? "Medium" : "Easy";
@@ -170,7 +150,8 @@ const Quiz: React.FC = () => {
       const subjectQuizzes = quizzesByCategory.get(category) || [];
       for (let i = 0; i < 10; i++) {
         const questionCount = 10;
-        practiceSets.push(buildSet(subjectQuizzes, category, questionCount, i));
+        const practiceSet = buildSet(subjectQuizzes, category, questionCount, i);
+        if (practiceSet) practiceSets.push(practiceSet);
       }
     });
 
