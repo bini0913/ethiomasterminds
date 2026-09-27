@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface Message { role: "user" | "assistant" | "system"; content: string; }
+interface Message { role: "user" | "assistant"; content: string; }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) return new Response(JSON.stringify({ error: "messages must contain 1-50 items" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     for (const msg of messages) {
-      if (!msg || !["user", "assistant", "system"].includes(msg.role) || typeof msg.content !== "string" || msg.content.length > 5000) {
+      if (!msg || !["user", "assistant"].includes(msg.role) || typeof msg.content !== "string" || msg.content.length > 5000) {
         return new Response(JSON.stringify({ error: "Invalid message format" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
