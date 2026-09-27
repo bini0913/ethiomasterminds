@@ -42,6 +42,7 @@ import EarlyDiscoverPage from "./pages/EarlyDiscoverPage";
 import EarlyExplorePage from "./pages/EarlyExplorePage";
 import EarlyProgressPage from "./pages/EarlyProgressPage";
 import EarlyTierOnlyRoute from "./components/auth/EarlyTierOnlyRoute";
+import EarlyContentAdminPage from "./pages/EarlyContentAdminPage";
 import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
 import SupabaseMigration from "./pages/SupabaseMigration";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -200,4 +201,5 @@ const App = () => (
   </QueryClientProvider>
 );
 
-export default App;
+export default App;<Route path="/admin/early-content" element={<ProtectedRoute allowedRoles={['admin','manager','extreme_admin']}><EarlyContentAdminPage /></ProtectedRoute>} />
+                              
