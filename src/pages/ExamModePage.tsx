@@ -60,7 +60,11 @@ const ExamModePage: React.FC = () => {
     }
 
     const gradeMatchedQuizzes = quizzes.filter(q => parseInt(q.grade || "0") === userGrade);
-    const quizIds = (gradeMatchedQuizzes.length > 0 ? gradeMatchedQuizzes : quizzes).map(q => q.id);
+    if (gradeMatchedQuizzes.length === 0) {
+      toast.error(`No approved Grade ${userGrade} questions are available for this subject yet.`);
+      return;
+    }
+    const quizIds = gradeMatchedQuizzes.map(q => q.id);
     const { data: questionsData } = await supabase
       .from("questions")
       .select("*")
