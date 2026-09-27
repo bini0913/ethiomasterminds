@@ -32,7 +32,6 @@ type GuideStep = {
 const MainMenu: React.FC = () => {
   const { user, logout, showLevelUp, setShowLevelUp, previousLevel } = useUser();
   const navigate = useNavigate();
-  const navigate = useNavigate();
   const handleLogout = async () => {
     await logout();
     navigate("/", { replace: true });
