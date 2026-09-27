@@ -208,7 +208,10 @@ const LibraryPage: React.FC = () => {
   const subjects = useMemo(() => Array.from(new Set(books.map((b) => b.subject))).sort(), [books]);
 
   const resetForm = () => {
-    setForm({ title: '', author: '', subject: '', description: '', gradeLevel: '9', type: 'textbook', file: null });
+    const defaultGrade = user?.role === 'student'
+      ? Math.min(studentGradeMax, Math.max(studentGradeMin, userGrade || studentGradeMin))
+      : 9;
+    setForm({ title: '', author: '', subject: '', description: '', gradeLevel: String(defaultGrade), type: 'textbook', file: null });
     setEditingBookId(null);
   };
 
