@@ -61,8 +61,10 @@ const Index: React.FC = () => {
       } else {
         setAppStage(AppStage.MainMenu);
       }
-    } else if (!isAuthenticated && appStage !== AppStage.Welcome) {
-      setAppStage(AppStage.Auth);
+    } else if (!isAuthenticated) {
+      // A signed-out user should always land on the public welcome screen,
+      // including after logging out from an Early/Middle/Upper home screen.
+      setAppStage(AppStage.Welcome);
     }
   }, [isAuthenticated, user, isLoading, navigate, appStage]);
   
