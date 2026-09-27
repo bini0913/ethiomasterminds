@@ -6,15 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface RewardRequest {
-  userId: string;
-  quizId: string;
-  score: number;
-  correctAnswers: number;
-  totalQuestions: number;
-  timeTaken: number;
-}
-
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -43,202 +34,36 @@ serve(async (req) => {
       return json({ error: "Invalid authentication token" }, 401);
     }
 
-    const body: RewardRequest = await req.json();
-    const { userId, quizId, score, correctAnswers, totalQuestions, timeTaken } = body;
+    const body = await req.json();
+    const submissionId = body?.submissionId ?? body?.submission_id;
 
-    if (userId !== authData.user.id) {
-      return json({ error: "You can only award rewards for your own account" }, 403);
-    }
-    if (!quizId || typeof quizId !== "string" || quizId.length > 200) {
-      return json({ error: "Invalid quizId" }, 400);
-    }
-    if (!Number.isFinite(score) || score < 0 || score > 100) {
-      return json({ error: "Invalid score" }, 400);
-    }
-    if (!Number.isInteger(correctAnswers) || !Number.isInteger(totalQuestions) ||
-        totalQuestions <= 0 || correctAnswers < 0 || correctAnswers > totalQuestions) {
-      return json({ error: "Invalid quiz result" }, 400);
-    }
-    if (!Number.isFinite(timeTaken) || timeTaken < 0 || timeTaken > 24 * 60 * 60) {
-      return json({ error: "Invalid timeTaken" }, 400);
+    if (typeof submissionId !== "string" || submissionId.length > 100) {
+      return json({ error: "A finalized quiz submissionId is required" }, 400);
     }
 
-    const baseXP = 10;
-    const accuracyBonus = Math.floor((correctAnswers / totalQuestions) * 50);
-    const speedBonus = timeTaken < 60 ? 20 : timeTaken < 120 ? 10 : 0;
-    const perfectBonus = correctAnswers === totalQuestions ? 25 : 0;
-    const totalXP = baseXP + accuracyBonus + speedBonus + perfectBonus;
-
-    const baseCoins = 5;
-    const performanceCoins = Math.floor((score / 100) * 15);
-    const totalCoins = baseCoins + performanceCoins;
-
-    const { data: profile, error: profileError } = await admin
-      .from("profiles")
-      .select("xp, level")
-      .eq("id", authData.user.id)
-      .single();
-
-    if (profileError || !profile) throw profileError ?? new Error("Profile not found");
-
-    const newXP = (profile.xp || 0) + totalXP;
-    const xpForNextLevel = Math.max(100, (profile.level || 1) * 100);
-    const newLevel = newXP >= xpForNextLevel ? (profile.level || 1) + 1 : (profile.level || 1);
-
-    const { error: xpError } = await admin
-      .from("profiles")
-      .update({ xp: newXP, level: newLevel })
-      .eq("id", authData.user.id);
-    if (xpError) throw xpError;
-
-    const { data: currency, error: currencyReadError } = await admin
-      .from("user_currency")
-      .select("coins")
-      .eq("user_id", authData.user.id)
-      .single();
-    if (currencyReadError) throw currencyReadError;
-
-    const { error: currencyError } = await admin
-      .from("user_currency")
-      .update({ coins: (currency.coins || 0) + totalCoins })
-      .eq("user_id", authData.user.id);
-    if (currencyError) throw currencyError;
-
-    const { error: resultError } = await admin
-      .from("quiz_results")
-      .insert({
-        student_id: authData.user.id,
-        quiz_id: quizId,
-        score,
-        correct_answers: correctAnswers,
-        total_questions: totalQuestions,
-        time_taken: timeTaken,
-        xp_earned: totalXP,
-      });
-    if (resultError) throw resultError;
-
-    const today = new Date().toISOString().split("T")[0];
-    const { data: missions } = await admin
-      .from("user_missions")
-      .select("id, progress, daily_missions!inner(mission_type, target_value)")
-      .eq("user_id", authData.user.id)
-      .eq("mission_date", today)
-      .eq("completed", false);
-
-    for (const mission of missions ?? []) {
-      const missionType = (mission as any).daily_missions.mission_type;
-      const targetValue = (mission as any).daily_missions.target_value;
-      let newProgress = mission.progress;
-
-      if (missionType === "complete_quizzes") newProgress += 1;
-      else if (missionType === "score_percentage" && score >= 90) newProgress += 1;
-      else if (missionType === "correct_answers") newProgress += correctAnswers;
-
-      await admin
-        .from("user_missions")
-        .update({ progress: newProgress, completed: newProgress >= targetValue })
-        .eq("id", mission.id);
-    }
-
-    const { data: streak } = await admin
-      .from("user_streaks")
-      .select("*")
-      .eq("user_id", authData.user.id)
-      .single();
-
-    if (streak) {
-      const lastActivity = streak.last_activity_date ? new Date(streak.last_activity_date) : null;
-      const todayDate = new Date();
-      todayDate.setHours(0, 0, 0, 0);
-      let newStreak = streak.current_streak;
-
-      if (!lastActivity) newStreak = 1;
-      else {
-        const lastActivityDate = new Date(lastActivity);
-        lastActivityDate.setHours(0, 0, 0, 0);
-        const diffDays = Math.floor((todayDate.getTime() - lastActivityDate.getTime()) / 86400000);
-        if (diffDays === 1) newStreak += 1;
-        else if (diffDays > 1) newStreak = 1;
-      }
-
-      await admin
-        .from("user_streaks")
-        .update({
-          current_streak: newStreak,
-          longest_streak: Math.max(streak.longest_streak, newStreak),
-          last_activity_date: todayDate.toISOString(),
-        })
-        .eq("user_id", authData.user.id);
-    }
-
-    await checkAchievements(admin, authData.user.id, {
-      totalXP: newXP,
-      correctAnswers,
-      totalQuestions,
-      score,
-      level: newLevel,
+    // The score, correct answers, time, and XP are deliberately NOT accepted
+    // from the client. They must already exist in quiz_results and are computed
+    // by submit_quiz_result_secure from the stored answer key.
+    const { data, error } = await admin.rpc("claim_quiz_reward", {
+      p_submission_id: submissionId,
     });
+
+    if (error) {
+      console.error("Quiz reward claim failed:", error);
+      return json({ error: error.message }, 400);
+    }
+
+    const result = Array.isArray(data) ? data[0] : data;
 
     return json({
       success: true,
-      xpAwarded: totalXP,
-      coinsAwarded: totalCoins,
-      newLevel,
-      leveledUp: newLevel > profile.level,
+      xpAwarded: result?.xp_awarded ?? 0,
+      coinsAwarded: result?.coins_awarded ?? 0,
+      newLevel: result?.new_level ?? null,
+      alreadyClaimed: result?.already_claimed ?? false,
     });
   } catch (error) {
-    console.error("Error awarding rewards:", error);
+    console.error("Error claiming quiz reward:", error);
     return json({ error: error instanceof Error ? error.message : "Reward processing failed" }, 500);
   }
 });
-
-async function checkAchievements(supabase: any, userId: string, stats: any) {
-  const { data: achievements } = await supabase.from("achievements").select("*");
-  if (!achievements) return;
-
-  const { data: userAchievements } = await supabase
-    .from("user_achievements")
-    .select("achievement_id, completed")
-    .eq("user_id", userId);
-
-  const completedIds = new Set(
-    (userAchievements || []).filter((a: any) => a.completed).map((a: any) => a.achievement_id),
-  );
-
-  for (const achievement of achievements) {
-    if (completedIds.has(achievement.id)) continue;
-
-    let progress = 0;
-    let shouldComplete = false;
-
-    switch (achievement.requirement_type) {
-      case "xp_total":
-        progress = stats.totalXP;
-        shouldComplete = progress >= achievement.requirement_value;
-        break;
-      case "level_reach":
-        progress = stats.level;
-        shouldComplete = progress >= achievement.requirement_value;
-        break;
-      case "perfect_score":
-        if (stats.score === 100) {
-          progress = 1;
-          shouldComplete = progress >= achievement.requirement_value;
-        }
-        break;
-    }
-
-    if (progress > 0) {
-      await supabase.from("user_achievements").upsert(
-        {
-          user_id: userId,
-          achievement_id: achievement.id,
-          progress,
-          completed: shouldComplete,
-          unlocked_at: shouldComplete ? new Date().toISOString() : null,
-        },
-        { onConflict: "user_id,achievement_id" },
-      );
-    }
-  }
-}

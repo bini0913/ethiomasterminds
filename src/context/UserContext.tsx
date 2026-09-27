@@ -393,8 +393,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (profileData.gender !== undefined) updateData.gender = profileData.gender;
       if (profileData.grade !== undefined) updateData.grade = profileData.grade;
       if (profileData.educationLevel !== undefined) updateData.education_level = profileData.educationLevel;
-      if (profileData.xp !== undefined) updateData.xp = profileData.xp;
-      if (profileData.level !== undefined) updateData.level = profileData.level;
+      // XP/level/rank/badges are progression-owned fields and cannot be edited
+      // through the general profile update path.
       if (profileData.avatar !== undefined) updateData.avatar = profileData.avatar;
       if (profileData.avatarConfig !== undefined) updateData.avatar_config = profileData.avatarConfig;
       if (profileData.rank !== undefined) updateData.rank = profileData.rank;
@@ -423,25 +423,28 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const addXP = async (amount: number) => {
     if (!user || !session?.user) return;
 
-    const newXP = user.xp + amount;
-    const newLevel = calculateLevel(newXP);
-
-    if (newLevel > user.level) {
-      setPreviousLevel(user.level);
-      setTimeout(() => {
-        setShowLevelUp(true);
-      }, 500);
-    }
-
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ xp: newXP, level: newLevel })
-        .eq('id', session.user.id);
+      const { data, error } = await supabase.rpc('add_xp', {
+        p_user_id: session.user.id,
+        p_amount: amount,
+      });
 
-      if (error) {
-        console.error('Add XP error:', error);
-        return;
+      if (error) throw error;
+
+      const result = data as {
+        previous_xp?: number;
+        new_xp?: number;
+        previous_level?: number;
+        new_level?: number;
+        leveled_up?: boolean;
+      };
+
+      const newXP = Number(result?.new_xp ?? user.xp);
+      const newLevel = Number(result?.new_level ?? user.level);
+
+      if (newLevel > user.level) {
+        setPreviousLevel(user.level);
+        setTimeout(() => setShowLevelUp(true), 500);
       }
 
       setUser(prev => prev ? { ...prev, xp: newXP, level: newLevel } : null);
@@ -451,6 +454,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error('Add XP error:', error);
+      toast.error('Unable to add XP securely.');
     }
   };
 
