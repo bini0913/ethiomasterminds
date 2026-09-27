@@ -5,6 +5,7 @@ import UnifiedAuthForm from "@/components/auth/UnifiedAuthForm";
 import ProfileSetup from "@/components/profile/ProfileSetup";
 import MainMenu from "@/components/dashboard/MainMenu";
 import EarlyTierHome from "@/components/dashboard/EarlyTierHome";
+import UpperTierHome from "@/components/dashboard/UpperTierHome";
 import StudentBottomNav from "@/components/layout/StudentBottomNav";
 import { useUser } from "@/context/UserContext";
 import { useTier } from "@/context/TierContext";
@@ -112,6 +113,8 @@ const Index: React.FC = () => {
         return (
           tier === "early" ? (
             <EarlyTierHome />
+          ) : tier === "upper" ? (
+            <UpperTierHome />
           ) : (
             <>
               <MainMenu />
