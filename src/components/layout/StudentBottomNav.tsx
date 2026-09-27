@@ -8,6 +8,7 @@ import { getUserTier } from "@/lib/getUserTier";
 const StudentBottomNav:React.FC=()=>{
  const navigate=useNavigate(),location=useLocation(),{user}=useUser();
  const profilePath=user?.id?"/profile/"+user.id:"/settings";
+ const tier=getUserTier(user?.grade);
  const items=tier===
  "early"?[
   {icon:Home,label:"Home",path:"/",match:["/"]},
