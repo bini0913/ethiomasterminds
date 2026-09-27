@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 import { supabase } from "@/integrations/supabase/client";
 import BackButton from "@/components/ui/BackButton";
 import AnimatedBackground from "@/components/ui/AnimatedBackground";
@@ -58,6 +59,7 @@ const ParentDashboard: React.FC = () => {
   const [messageEmoji, setMessageEmoji] = useState("💪");
 
   const [aiInsights, setAiInsights] = useState<any>(null);
+  const [earlyProgress, setEarlyProgress] = useState<any[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
 
   const isParentMode = localStorage.getItem("masterminds_login_mode") === "parent";
@@ -68,7 +70,7 @@ const ParentDashboard: React.FC = () => {
   const loadAll = async () => {
     if (!user?.id) return;
     setLoadingData(true);
-    const [quizRes, studyRes, tasksRes, msgRes, goalsRes, leaderboardRes, classMembershipRes] = await Promise.all([
+    const [quizRes, studyRes, tasksRes, msgRes, goalsRes, leaderboardRes, classMembershipRes, earlyProgressRes] = await Promise.all([
       supabase.from("quiz_results").select("id,score,correct_answers,total_questions,completed_at,xp_earned,quiz_id").eq("student_id", user.id).order("completed_at", { ascending: false }).limit(60),
       db.from("study_sessions").select("id,created_at,duration,planned_duration,status").eq("user_id", user.id).order("created_at", { ascending: false }).limit(120),
       db.from("parent_tasks").select("*").eq("student_id", user.id).order("created_at", { ascending: false }),
@@ -76,12 +78,14 @@ const ParentDashboard: React.FC = () => {
       db.from("parent_goals").select("*").eq("student_id", user.id).maybeSingle(),
       supabase.rpc("get_public_leaderboard", { limit_count: 500, timeframe: "all" }),
       supabase.from("class_students").select("class_id").eq("student_id", user.id).limit(1),
+      db.from("early_activity_progress").select("activity_id,skill,attempts,correct_answers,completions,xp_earned").eq("user_id", user.id),
     ]);
 
     setQuizResults((quizRes.data ?? []) as QuizRow[]);
     setStudySessions((studyRes.data ?? []) as StudySessionRow[]);
     setTasks((tasksRes.data ?? []) as ParentTask[]);
     setMessages((msgRes.data ?? []) as ParentMessage[]);
+    setEarlyProgress((earlyProgressRes.data ?? []) as any[]);
     if (goalsRes.data) setGoals(goalsRes.data);
 
     const leaderboard = (leaderboardRes.data ?? []) as Array<{ id: string; xp: number }>;
@@ -119,6 +123,7 @@ const ParentDashboard: React.FC = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "parent_tasks", filter: `student_id=eq.${user.id}` }, () => void loadAll())
       .on("postgres_changes", { event: "*", schema: "public", table: "parent_messages", filter: `student_id=eq.${user.id}` }, () => void loadAll())
       .subscribe();
+    const isEarlyStudent = getUserTier(user?.grade) === "early";
     return () => { supabase.removeChannel(ch); };
   }, [user?.id]);
 
@@ -142,6 +147,11 @@ const ParentDashboard: React.FC = () => {
     studySessions.forEach(r => { if (new Date(r.created_at) >= t) recent.add(toDateOnly(r.created_at)); });
     return Math.round((recent.size / 7) * 100);
   }, [studySessions]);
+  const earlyAttempts = earlyProgress.reduce((s,r)=>s+(r.attempts||0),0);
+  const earlyCorrect = earlyProgress.reduce((s,r)=>s+(r.correct_answers||0),0);
+  const earlyAccuracy = earlyAttempts ? Math.round(earlyCorrect/earlyAttempts*100) : 0;
+  const earlyCompletions = earlyProgress.reduce((s,r)=>s+(r.completions||0),0);
+  const earlySkills = Array.from(new Set(earlyProgress.map(r=>r.skill))).length;
   const completedTasks = tasks.filter(t => t.status === "completed").length;
   const pendingTasks = tasks.filter(t => t.status === "pending").length;
   const overdueTasks = tasks.filter(t => t.status === "pending" && t.deadline && new Date(t.deadline) < new Date()).length;
@@ -335,7 +345,8 @@ const ParentDashboard: React.FC = () => {
           </Card>
         )}
 
-        <Tabs defaultValue="insights" className="w-full">
+        {isEarlyStudent && <Card className="mb-6 border-primary/20"><CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary"/>Early Learning Snapshot</CardTitle><CardDescription>Play-based progress from Master Minds activities.</CardDescription></CardHeader><CardContent><div className="grid gap-3 sm:grid-cols-4"><div><p className="text-xs text-muted-foreground">Skills</p><p className="text-2xl font-bold">{earlySkills}</p></div><div><p className="text-xs text-muted-foreground">Accuracy</p><p className="text-2xl font-bold">{earlyAccuracy}%</p></div><div><p className="text-xs text-muted-foreground">Activities</p><p className="text-2xl font-bold">{earlyCompletions}</p></div><div><p className="text-xs text-muted-foreground">Attempts</p><p className="text-2xl font-bold">{earlyAttempts}</p></div></div><div className="mt-4 space-y-2">{earlyProgress.slice(0,5).map(r=><div key={r.activity_id} className="flex items-center justify-between rounded-xl border p-3"><span className="text-sm font-medium">{String(r.skill).replace(/-/g," ")}</span><span className="text-sm text-muted-foreground">{r.correct_answers}/{r.attempts}</span></div>)}</div></CardContent></Card>}
+<Tabs defaultValue="insights" className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
             <TabsTrigger value="insights"><Sparkles className="h-4 w-4 mr-1.5" />Insights</TabsTrigger>
             <TabsTrigger value="activity"><TrendingUp className="h-4 w-4 mr-1.5" />Activity</TabsTrigger>
