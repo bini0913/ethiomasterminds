@@ -201,5 +201,4 @@ const App = () => (
   </QueryClientProvider>
 );
 
-export default App;<Route path="/admin/early-content" element={<ProtectedRoute allowedRoles={['admin','manager','extreme_admin']}><EarlyContentAdminPage /></ProtectedRoute>} />
-                              
+export default App;
