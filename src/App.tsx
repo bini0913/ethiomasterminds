@@ -119,28 +119,9 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
 
   const isHome = location.pathname === "/";
   if (isHome) {
-    const handleHomeLogout = async () => {
-      await logout();
-      navigate("/", { replace: true });
-    };
-
-    return (
-      <div className="relative min-h-screen">
-        {children}
-        <div className="pointer-events-none fixed right-3 top-3 z-[60] sm:right-5 sm:top-5">
-          <button
-            type="button"
-            onClick={handleHomeLogout}
-            className="pointer-events-auto flex h-10 items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-3 text-sm font-medium text-muted-foreground shadow-lg backdrop-blur-xl transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Log out"
-            title="Log out"
-          >
-            <LogOut className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Log out</span>
-          </button>
-        </div>
-      </div>
-    );
+    // Authenticated home tiers own their header actions. The shell stays neutral
+    // here so mobile and tablet headers never receive duplicate logout controls.
+    return <>{children}</>;
   }
 
   const handleBack = () => {
