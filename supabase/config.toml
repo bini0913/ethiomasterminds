@@ -13,7 +13,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.award-rewards]
-verify_jwt = false
+verify_jwt = true
 
 [functions.daily-missions]
 verify_jwt = false
