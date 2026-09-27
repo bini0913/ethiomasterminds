@@ -26,7 +26,6 @@ const StudentBottomNav: React.FC = () => {
   const active=(paths:string[])=>paths.some(p=>p==="/" ? location.pathname==="/" : location.pathname===p||location.pathname.startsWith(`${p}/`));
   return <NavShell count={5}>{items.map(item=><NavItem key={item.path} {...item} active={active(item.active)} onClick={()=>navigate(item.path)}/>)}</NavShell>;
 };
-const pathOr=(p:string)=>p;
 const NavShell:React.FC<{count:number;children:React.ReactNode}>=({count,children})=><div data-guide="bottom-nav" className="bottom-safe-area fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 md:bg-background/90 md:backdrop-blur"><nav aria-label="Primary navigation" className={`mx-auto grid h-16 max-w-lg items-stretch px-2 grid-cols-${count}`}>{children}</nav></div>;
 const NavItem:React.FC<any>=({icon:Icon,label,active,onClick})=><motion.button onClick={onClick} whileTap={{scale:.96}} aria-current={active?"page":undefined} className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active?"bg-primary/10 text-primary":"text-muted-foreground hover:text-foreground"}`}><Icon className={`h-5 w-5 ${active?"stroke-[2.5]":""}`} aria-hidden="true"/><span>{label}</span></motion.button>;
 export default StudentBottomNav;
