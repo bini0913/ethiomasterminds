@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useUser } from "@/context/UserContext";
+import { useTier } from "@/context/TierContext";
 import { 
   Home, 
   Gamepad2, 
@@ -16,6 +17,7 @@ const StudentBottomNav: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUser();
+  const tier = useTier();
 
   const profilePath = user?.id ? `/profile/${user.id}` : "/settings";
 
@@ -25,7 +27,7 @@ const StudentBottomNav: React.FC = () => {
     { icon: Swords, label: "Lobby", path: "/lobby" },
     { icon: Trophy, label: "Ranks", path: "/leaderboard" },
     { icon: User, label: "Profile", path: profilePath, matchPath: "/profile/" },
-    { icon: Users, label: "Friends", path: "/friends" },
+    ...(tier === "early" ? [] : [{ icon: Users, label: "Friends", path: "/friends" }]),
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
 

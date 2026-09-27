@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useUser } from "@/context/UserContext";
+import { useTier } from "@/context/TierContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAchievements } from "@/context/AchievementsContext";
 import UserLevel from "../profile/UserLevel";
@@ -29,6 +30,7 @@ type GuideStep = {
 
 const MainMenu: React.FC = () => {
   const { user, logout, showLevelUp, setShowLevelUp, previousLevel } = useUser();
+  const tier = useTier();
   useCurrency();
   const { getRecentBadges } = useAchievements();
   const { openHelper } = useAIHelper();
@@ -65,8 +67,10 @@ const MainMenu: React.FC = () => {
     { title: t("ai-tutor"), icon: <Bot className="h-6 w-6" />, path: "/ai-tutor", category: "learn", color: "from-violet-500 to-purple-600", description: t("24-7-ai-helper") },
     { title: "Study Mode", icon: <Timer className="h-6 w-6" />, path: "/study-mode", category: "learn", color: "from-indigo-500 to-blue-600", description: "Focus timer, streaks, and study competitions", guideId: "feature-study-mode" },
     { title: "Library", icon: <BookOpen className="h-6 w-6" />, path: "/library", category: "social", color: "from-emerald-500 to-teal-600", description: "Read books with AI tools" },
-    { title: t("social-feed"), icon: <Compass className="h-6 w-6" />, path: "/social", category: "social", color: "from-sky-500 to-blue-600", description: t("posts-updates"), guideId: "feature-social-feed" },
-    { title: t("friends"), icon: <Users className="h-6 w-6" />, path: "/friends", category: "social", color: "from-teal-500 to-cyan-600", description: t("connect-chat") },
+    ...(tier === "early" ? [] : [
+      { title: t("social-feed"), icon: <Compass className="h-6 w-6" />, path: "/social", category: "social", color: "from-sky-500 to-blue-600", description: t("posts-updates"), guideId: "feature-social-feed" },
+      { title: t("friends"), icon: <Users className="h-6 w-6" />, path: "/friends", category: "social", color: "from-teal-500 to-cyan-600", description: t("connect-chat") },
+    ]),
     { title: t("tournaments"), icon: <Award className="h-6 w-6" />, path: "/tournaments", category: "compete", color: "from-orange-500 to-red-600", description: t("global-competitions"), guideId: "feature-tournaments" },
     { title: t("avatar-store"), icon: <Store className="h-6 w-6" />, path: "/store", category: "social", color: "from-purple-500 to-pink-600", description: t("customize-look") },
     { title: t("settings"), icon: <Settings className="h-6 w-6" />, path: "/settings", category: "all", color: "from-gray-500 to-slate-600", description: t("preferences") },
@@ -251,7 +255,7 @@ const MainMenu: React.FC = () => {
             </Link>
           </motion.div>
 
-          {user && parseInt(user.grade || "0") >= 5 && parseInt(user.grade || "0") <= 12 && (
+          {(tier === "middle" || tier === "upper") && user && (
             <motion.div variants={itemVariants} data-guide="academic-mode" className="col-span-2 md:col-span-2">
               <Link to="/academic" className="block h-full"><Card className="h-full rounded-3xl border-0 bg-gradient-to-br from-slate-800 to-slate-950 text-white transition hover:-translate-y-1 hover:shadow-xl"><CardContent className="flex min-h-40 items-center gap-4 p-5"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl">📘</span><div><h3 className="font-display text-lg font-bold">{t("academic-mode")}</h3><p className="mt-1 text-sm text-white/65">{t("flashcards")} · {t("topic-coverage")} · {t("exam-mode")}</p></div><GraduationCap className="ml-auto h-6 w-6 shrink-0 text-white/60" /></CardContent></Card></Link>
             </motion.div>
