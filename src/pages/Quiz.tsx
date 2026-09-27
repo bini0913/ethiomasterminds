@@ -234,8 +234,9 @@ const Quiz: React.FC = () => {
     setActiveQuiz(modifiedQuiz);
   };
   
-  const handleCreateRandomQuiz = () => {
-    if (!selectedCategory) {
+  const handleCreateRandomQuiz = (requestedCategory?: string) => {
+    const category = requestedCategory || category;
+    if (!category) {
       toast.error("Please select a subject first");
       return;
     }
@@ -251,7 +252,7 @@ const Quiz: React.FC = () => {
     const matchingQuestions = quizzes
       .filter((quiz) => {
         const sameGrade = quiz.gradeLevel === selectedGradeNumber;
-        const sameSubject = normalizeCategory(quiz.category) === normalizeCategory(selectedCategory);
+        const sameSubject = normalizeCategory(quiz.category) === normalizeCategory(category);
         const difficultyMatch = normalizeDifficulty(quiz.difficulty) === normalizeDifficulty(targetDifficulty);
         return sameGrade && sameSubject && difficultyMatch;
       })
@@ -268,28 +269,28 @@ const Quiz: React.FC = () => {
       .map((question, index) => rotateOptionsForBalance(question, selectedGradeNumber, index));
 
     if (selectedQuestions.length < numQuestions) {
-      toast.error(`Not enough new ${selectedCategory} questions available for Grade ${selectedGradeNumber} at ${targetDifficulty} level.`);
+      toast.error(`Not enough new ${category} questions available for Grade ${selectedGradeNumber} at ${targetDifficulty} level.`);
       return;
     }
 
     const randomQuiz: QuizType = {
-      id: `quick-${selectedCategory.toLowerCase().replace(/\s+/g, "-")}-g${selectedGradeNumber}-${Date.now()}`,
-      title: `Adaptive ${selectedCategory} Quiz - Grade ${selectedGradeNumber}`,
+      id: `quick-${category.toLowerCase().replace(/\s+/g, "-")}-g${selectedGradeNumber}-${Date.now()}`,
+      title: `Adaptive ${category} Quiz - Grade ${selectedGradeNumber}`,
       description: `${numQuestions} curriculum-aligned ${targetDifficulty.toLowerCase()} questions based on your level`,
       questions: selectedQuestions,
-      subject: selectedCategory,
+      subject: category,
       grade: selectedGradeNumber,
       difficulty: targetDifficulty,
       timeLimit: numQuestions * 30,
       createdAt: new Date(),
       topics: ["General"],
-      category: selectedCategory,
+      category: category,
       gradeLevel: selectedGradeNumber
     };
 
     setAllowXPForActiveQuiz(true);
     setActiveQuiz(randomQuiz);
-    toast.success(`Created an adaptive ${adaptiveDifficulty} ${selectedCategory} quiz with ${selectedQuestions.length} new questions`);
+    toast.success(`Created an adaptive ${adaptiveDifficulty} ${category} quiz with ${selectedQuestions.length} new questions`);
   };
   
   const handleQuizComplete = (score: number, completedQuestionIds: string[]) => {
