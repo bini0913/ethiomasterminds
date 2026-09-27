@@ -72,6 +72,12 @@ export default {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
         },
+        upper: {
+          intelligence: 'hsl(var(--upper-intelligence))',
+          'intelligence-foreground': 'hsl(var(--upper-intelligence-foreground))',
+          mastery: 'hsl(var(--upper-mastery))',
+          focus: 'hsl(var(--upper-focus))',
+        },
         'border-subtle': 'hsl(var(--border-subtle))',
         'focus-ring': 'hsl(var(--focus-ring))',
         muted: {
