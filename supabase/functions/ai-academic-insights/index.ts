@@ -76,8 +76,8 @@ Use emojis for visual appeal. Be encouraging but honest. Keep it concise and act
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("Error:", e);
-    return new Response(JSON.stringify({ insights: null, error: e.message }), {
+    console.error("Error:", e instanceof Error ? e.message : "Unknown error");
+    return new Response(JSON.stringify({ insights: null, error: "Failed to generate academic insights" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
