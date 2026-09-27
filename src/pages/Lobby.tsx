@@ -755,6 +755,16 @@ const Lobby: React.FC = () => {
   const joinTournament = async (tournamentId: string) => {
     if (!user) return;
 
+    const target = tournaments.find((tournament) => tournament.id === tournamentId);
+    if (target?.status === "active" || target?.status === "completed") {
+      toast.error("This tournament is no longer accepting registrations.");
+      return;
+    }
+    if (target?.isFull) {
+      toast.error("This tournament is full.");
+      return;
+    }
+
     const { error } = await supabase
       .from('tournament_participants')
       .insert({
@@ -829,7 +839,7 @@ const Lobby: React.FC = () => {
 
   const startTournament = async (tournament: Tournament) => {
     if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      toast.error("Only admins can start tournaments");
+      toast.error("Only admins or managers can start tournaments");
       return;
     }
 
