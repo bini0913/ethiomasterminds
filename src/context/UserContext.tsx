@@ -43,7 +43,7 @@ interface UserContextType {
   login: (email: string, password: string) => Promise<boolean>;
   loginWithUsername: (username: string, password: string) => Promise<boolean>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
-  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole) => Promise<boolean>;
+  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<void>;
   addXP: (amount: number) => Promise<void>;
@@ -285,8 +285,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     email: string, 
     password: string, 
     name: string, 
-    username: string, 
-    role: UserRole
+    username: string,
+    role: UserRole,
+    grade?: string,
   ): Promise<boolean> => {
     try {
       if (role !== 'student') {
@@ -299,10 +300,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
-      if (password.length < 6) {
-        toast.error("Password must be at least 6 characters");
+      if (password.length < 8) {
+        toast.error("Password must be at least 8 characters");
         return false;
       }
+
 
       // Check if username is already taken
       const { data: existingEmail } = await supabase
@@ -324,6 +326,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           data: {
             name: name.trim(),
             username: username.trim().toLowerCase(),
+            ...(grade?.trim()
+              ? {
+                  grade: grade.trim(),
+                  education_level:
+                    grade.trim().toLowerCase() === "k" || /^grade\s*[1-4]$/i.test(grade.trim())
+                      ? "early"
+                      : /^grade\s*[5-8]$/i.test(grade.trim())
+                        ? "middle"
+                        : "upper",
+                }
+              : {}),
           }
         }
       });
