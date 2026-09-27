@@ -39,6 +39,7 @@ import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
 import SupabaseMigration from "./pages/SupabaseMigration";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { UserProvider } from "./context/UserContext";
+import { TierProvider } from "./context/TierContext";
 import { QuizProvider } from "./context/QuizContext";
 import { AIHelperProvider } from "./context/AIHelperContext";
 import { FriendsProvider } from "./context/FriendsContext";
@@ -63,6 +64,7 @@ const SelfProfileRedirect = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <UserProvider>
+      <TierProvider>
         <LanguageProvider>
           <CurrencyProvider>
             <AchievementsProvider>
@@ -174,7 +176,8 @@ const App = () => (
             </AchievementsProvider>
           </CurrencyProvider>
       </LanguageProvider>
-    </UserProvider>
+      </TierProvider>
+     </UserProvider>
   </QueryClientProvider>
 );
 
