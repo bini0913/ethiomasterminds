@@ -127,11 +127,11 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
     return (
       <div className="relative min-h-screen">
         {children}
-        <div className="pointer-events-none fixed right-3 top-3 z-[60] sm:right-5 sm:top-5">
+        <div className="pointer-events-none fixed right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[60] sm:right-5">
           <button
             type="button"
             onClick={handleHomeLogout}
-            className="pointer-events-auto flex h-10 items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-3 text-sm font-medium text-muted-foreground shadow-lg backdrop-blur-xl transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="pointer-events-auto flex h-11 items-center gap-2 rounded-xl border border-border/70 bg-background/95 px-3 text-sm font-medium text-muted-foreground shadow-lg backdrop-blur-xl transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Log out"
             title="Log out"
           >
