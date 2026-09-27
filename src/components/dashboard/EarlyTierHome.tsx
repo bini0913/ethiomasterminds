@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Gamepad2, Lightbulb, PlayCircle, Settings, Sparkles, Store, Trophy, UserRound } from "lucide-react";
+import { Gamepad2, Lightbulb, LogOut, PlayCircle, Settings, Sparkles, Store, Trophy, UserRound } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import { useUser } from "@/context/UserContext";
@@ -11,12 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 const EarlyTierHome: React.FC = () => {
-  const { user } = useUser();
+  const { user, logout } = useUser();
   const { xp, coins, dailyStreak } = useCurrency();
   const { summary: progress } = useEarlyProgress();
   const recommendations = useEarlyRecommendations();
   const profilePath = user?.id ? `/profile/${user.id}` : "/settings";
   const gradeLabel = !user?.grade || /^k|kindergarten|pre/i.test(user.grade) ? "Early learner" : `Grade ${user.grade}`;
+  const handleLogout = async () => {
+    await logout();
+  };
 
   const quick = [
     { to:"/early-games", label:"Games", description:"Play & practise", icon:<Gamepad2 className="h-7 w-7"/>, tone:"bg-primary/10 text-primary" },
@@ -33,7 +36,7 @@ const EarlyTierHome: React.FC = () => {
     <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
       <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-2xl shadow-sm">🧠</div><div><p className="font-display text-lg font-bold">Master Minds</p><p className="text-xs font-semibold text-primary">{gradeLabel} • Learn through play</p></div></Link>
-        <div className="flex items-center gap-1"><ThemeToggle className="h-11 w-11 rounded-xl"/><Link to={profilePath} aria-label="Open profile"><AvatarRenderer avatar={user?.avatar} avatarConfig={user?.avatarConfig} size="md" className="h-11 w-11 ring-2 ring-primary/20"/></Link><Link to="/settings" aria-label="Settings" className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted"><Settings className="h-5 w-5"/></Link></div>
+        <div className="flex items-center gap-1"><ThemeToggle className="h-11 w-11 rounded-xl"/><Link to={profilePath} aria-label="Open profile"><AvatarRenderer avatar={user?.avatar} avatarConfig={user?.avatarConfig} size="md" className="h-11 w-11 ring-2 ring-primary/20"/></Link><Link to="/settings" aria-label="Settings" className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted"><Settings className="h-5 w-5"/></Link><Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Log out" title="Log out" className="h-11 w-11 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-5 w-5"/></Button></div>
       </div>
     </header>
     <main className="mx-auto max-w-4xl space-y-5 px-4 py-5">
