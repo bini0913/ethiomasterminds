@@ -1,4 +1,64 @@
 -- Harden multiplayer room mutations and tournament completion.
+CREATE OR REPLACE FUNCTION public.send_friend_request(p_target_user_id uuid)
+RETURNS public.friends LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_uid uuid:=auth.uid(); v_friend public.friends%rowtype; v_existing public.friends%rowtype;
+BEGIN
+ IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+ IF p_target_user_id IS NULL OR p_target_user_id=v_uid THEN RAISE EXCEPTION 'Invalid friend target'; END IF;
+ SELECT * INTO v_existing FROM public.friends WHERE (user_id=v_uid AND friend_id=p_target_user_id) OR (user_id=p_target_user_id AND friend_id=v_uid) LIMIT 1 FOR UPDATE;
+ IF FOUND THEN
+   IF v_existing.status='accepted' THEN RAISE EXCEPTION 'Already friends'; END IF;
+   RAISE EXCEPTION 'Friend request already exists';
+ END IF;
+ INSERT INTO public.friends(user_id,friend_id,status) VALUES(v_uid,p_target_user_id,'pending') RETURNING * INTO v_friend;
+ RETURN v_friend;
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.respond_friend_request(p_request_id uuid,p_accept boolean)
+RETURNS public.friends LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_uid uuid:=auth.uid(); v_friend public.friends%rowtype;
+BEGIN
+ IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+ SELECT * INTO v_friend FROM public.friends WHERE id=p_request_id AND friend_id=v_uid AND status='pending' FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Friend request not found'; END IF;
+ IF p_accept THEN
+   UPDATE public.friends SET status='accepted',updated_at=now() WHERE id=p_request_id RETURNING * INTO v_friend;
+ ELSE
+   DELETE FROM public.friends WHERE id=p_request_id RETURNING * INTO v_friend;
+ END IF;
+ RETURN v_friend;
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.remove_friend(p_friendship_id uuid)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_uid uuid:=auth.uid();
+BEGIN
+ IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+ DELETE FROM public.friends WHERE id=p_friendship_id AND (user_id=v_uid OR friend_id=v_uid);
+ RETURN FOUND;
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.send_direct_message(p_receiver_id uuid,p_content text)
+RETURNS public.messages LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_uid uuid:=auth.uid(); v_message public.messages%rowtype; v_content text;
+BEGIN
+ IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+ IF p_receiver_id IS NULL OR p_receiver_id=v_uid THEN RAISE EXCEPTION 'Invalid recipient'; END IF;
+ v_content:=left(trim(coalesce(p_content,'')),2000);
+ IF v_content='' THEN RAISE EXCEPTION 'Message cannot be empty'; END IF;
+ INSERT INTO public.messages(sender_id,receiver_id,content) VALUES(v_uid,p_receiver_id,v_content) RETURNING * INTO v_message;
+ RETURN v_message;
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.mark_direct_message_read(p_message_id uuid)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_uid uuid:=auth.uid();
+BEGIN
+ IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+ UPDATE public.messages SET read=true WHERE id=p_message_id AND receiver_id=v_uid;
+ RETURN FOUND;
+END; $$;
+
 CREATE OR REPLACE FUNCTION public.multiplayer_create_room(
  p_name text,p_subject text,p_difficulty text,p_question_count integer,p_max_players integer,p_password text default null
 )
@@ -166,6 +226,11 @@ END; $$;
 
 REVOKE ALL ON FUNCTION public.complete_match_and_progress(uuid,uuid,integer,integer,boolean) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.complete_match_and_progress(uuid,uuid,integer,integer,boolean) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.send_friend_request(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.respond_friend_request(uuid,boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.remove_friend(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.send_direct_message(uuid,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.mark_direct_message_read(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.multiplayer_create_room(text,text,text,integer,integer,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.multiplayer_join_room(uuid,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.multiplayer_leave_room(uuid) TO authenticated;
