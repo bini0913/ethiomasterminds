@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useQuiz, Quiz as QuizType, Question } from "@/context/QuizContext";
 import QuizView from "@/components/quiz/QuizView";
 import { useUser } from "@/context/UserContext";
+import { useTier } from "@/context/TierContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,9 +19,13 @@ import { adjustDifficulty, difficultyFromLevel, normalizeDifficulty, QuizDifficu
 const Quiz: React.FC = () => {
   const { quizzes } = useQuiz();
   const { user } = useUser();
+  const tier = useTier();
   const [activeQuiz, setActiveQuiz] = useState<QuizType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedGrade, setSelectedGrade] = useState<string>("5");
+  const defaultQuizGrade = tier === "upper" ? 9 : 5;
+  const quizGradeMin = tier === "upper" ? 9 : tier === "middle" ? 5 : 5;
+  const quizGradeMax = tier === "upper" ? 12 : tier === "middle" ? 8 : 12;
+  const [selectedGrade, setSelectedGrade] = useState<string>(String(defaultQuizGrade));
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "extreme">("easy");
   const [activeTab, setActiveTab] = useState<string>("browse");
   const [numQuestions, setNumQuestions] = useState<number>(10);
@@ -31,10 +36,10 @@ const Quiz: React.FC = () => {
   const [performanceOffset, setPerformanceOffset] = useState(0);
   
   useEffect(() => {
-    const preferredGrade = parseInt(user?.grade || "5", 10);
-    const boundedGrade = Number.isNaN(preferredGrade) ? 5 : Math.min(9, Math.max(5, preferredGrade));
+    const preferredGrade = parseInt(user?.grade || String(defaultQuizGrade), 10);
+    const boundedGrade = Number.isNaN(preferredGrade) ? defaultQuizGrade : Math.min(quizGradeMax, Math.max(quizGradeMin, preferredGrade));
     setSelectedGrade(boundedGrade.toString());
-  }, [user?.grade]);
+  }, [user?.grade, defaultQuizGrade, quizGradeMin, quizGradeMax]);
 
   useEffect(() => {
     const base = difficultyFromLevel(user?.level || 1).toLowerCase() as "easy" | "medium" | "hard" | "extreme";
@@ -42,14 +47,14 @@ const Quiz: React.FC = () => {
   }, [user?.level]);
 
   const studentGrade = useMemo(() => {
-    const preferredGrade = parseInt(user?.grade || "5", 10);
-    return Number.isNaN(preferredGrade) ? 5 : Math.min(9, Math.max(5, preferredGrade));
-  }, [user?.grade]);
+    const preferredGrade = parseInt(user?.grade || String(defaultQuizGrade), 10);
+    return Number.isNaN(preferredGrade) ? defaultQuizGrade : Math.min(quizGradeMax, Math.max(quizGradeMin, preferredGrade));
+  }, [user?.grade, defaultQuizGrade, quizGradeMin, quizGradeMax]);
 
   const selectedGradeNumber = useMemo(() => {
     const parsed = parseInt(selectedGrade, 10);
-    return Number.isNaN(parsed) ? studentGrade : Math.min(9, Math.max(5, parsed));
-  }, [selectedGrade, studentGrade]);
+    return Number.isNaN(parsed) ? studentGrade : Math.min(quizGradeMax, Math.max(quizGradeMin, parsed));
+  }, [selectedGrade, studentGrade, quizGradeMin, quizGradeMax]);
 
   const adaptiveDifficulty = useMemo<"easy" | "medium" | "hard" | "extreme">(() => {
     const level = user?.level || 1;
@@ -453,7 +458,7 @@ const Quiz: React.FC = () => {
                             <SelectValue placeholder="Grade" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[5, 6, 7, 8, 9].map((grade) => (
+                            {Array.from({ length: quizGradeMax - quizGradeMin + 1 }, (_, index) => quizGradeMin + index).map((grade) => (
                               <SelectItem key={grade} value={grade.toString()}>
                                 Grade {grade}
                               </SelectItem>
