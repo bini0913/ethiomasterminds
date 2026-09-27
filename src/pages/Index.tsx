@@ -61,8 +61,10 @@ const Index: React.FC = () => {
       } else {
         setAppStage(AppStage.MainMenu);
       }
-    } else if (!isAuthenticated && appStage !== AppStage.Welcome) {
-      setAppStage(AppStage.Auth);
+    } else if (!isAuthenticated) {
+      // A real logout should always return to the public welcome screen,
+      // including from the Early portal and Android WebView.
+      setAppStage(AppStage.Welcome);
     }
   }, [isAuthenticated, user, isLoading, navigate, appStage]);
   
