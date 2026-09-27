@@ -10,13 +10,14 @@ import { motion } from "framer-motion";
 import { useAIHelper } from "@/context/AIHelperContext";
 import {
   Bot, BookOpen, Trophy, Users, Settings, GraduationCap,
-  Gamepad, Store, Award, Zap, Target, LogOut, Sparkles, Compass, Timer
+  Gamepad, Store, Award, Zap, Target, LogOut, Sparkles, Compass, Timer, ArrowRight, Flame
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import LevelUpModal from "../profile/LevelUpModal";
 import CurrencyDisplay from "@/components/currency/CurrencyDisplay";
 import { supabase } from "@/integrations/supabase/client";
+import ThemeToggle from "@/components/layout/ThemeToggle";
 
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 
@@ -184,165 +185,102 @@ const MainMenu: React.FC = () => {
   const itemVariants = { hidden: { y: 20, opacity: 0 }, show: { y: 0, opacity: 1 } };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-primary via-primary to-indigo-600 px-4 py-3 shadow-xl">
-        <div className="flex justify-between items-center max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 pb-20">
+      <header className="sticky top-0 z-50 border-b border-border/70 bg-background/90 px-4 py-3 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-3">
-            <motion.div className="bg-white/20 backdrop-blur-sm rounded-xl p-2" whileHover={{ rotate: 360 }} transition={{ duration: 0.8 }}>
-              <span className="text-2xl">🧠</span>
+            <motion.div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-xl shadow-lg shadow-primary/20" whileHover={{ rotate: 12 }}>
+              🧠
             </motion.div>
             <div>
-              <h1 className="text-xl font-bold text-white">Master Minds</h1>
-              <p className="text-xs text-white/70">{t("learn-play-win")}</p>
+              <h1 className="text-lg font-display font-bold text-foreground">Master Minds</h1>
+              <p className="text-xs text-muted-foreground">{t("learn-play-win")}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <CurrencyDisplay />
-            <Button variant="ghost" size="icon" onClick={openHelper} className="text-white hover:bg-white/20"><Bot className="h-5 w-5" /></Button>
-            <Button variant="ghost" size="icon" onClick={logout} className="text-white hover:bg-white/20"><LogOut className="h-5 w-5" /></Button>
+            <ThemeToggle className="h-9 w-9" />
+            <Button variant="ghost" size="icon" onClick={openHelper} className="h-9 w-9" aria-label="Open AI helper"><Bot className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={logout} className="h-9 w-9 text-muted-foreground hover:text-destructive" aria-label="Log out"><LogOut className="h-5 w-5" /></Button>
           </div>
         </div>
       </header>
 
-      {user && (
-        <div className="px-4 py-4 max-w-7xl mx-auto w-full" data-guide="profile-header">
-          <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-card/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-border/50">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <AvatarRenderer avatar={user.avatar} avatarConfig={user.avatarConfig} size="lg" className="rounded-2xl" />
-                <div className="absolute -bottom-1 -right-1 bg-primary text-white text-xs px-2 py-0.5 rounded-full font-bold">Lv.{user.level}</div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold truncate">{user.name}</h2>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="capitalize">{t(user.role)}</span>
-                  <span>•</span>
-                  <span>{t("grade")} {user.grade || 'N/A'}</span>
+      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:py-8">
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
+          {user && (
+            <motion.section variants={itemVariants} data-guide="profile-header" className="col-span-2 overflow-hidden rounded-3xl border border-border bg-card p-5 shadow-sm md:col-span-2 md:p-6">
+              <div className="flex items-start gap-4">
+                <div className="relative shrink-0">
+                  <AvatarRenderer avatar={user.avatar} avatarConfig={user.avatarConfig} size="lg" className="rounded-2xl" />
+                  <span className="absolute -bottom-2 -right-2 rounded-full bg-primary px-2 py-1 text-xs font-bold text-primary-foreground">Lv. {user.level}</span>
                 </div>
-                <div className="mt-1"><UserLevel level={user.level} xp={user.xp} showBadge={false} /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-muted-foreground">Welcome back</p>
+                  <h2 className="truncate text-2xl font-display font-bold">{user.name}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground capitalize">{t(user.role)} · {t("grade")} {user.grade || "N/A"}</p>
+                  <div className="mt-4"><UserLevel level={user.level} xp={user.xp} showBadge={false} /></div>
+                </div>
               </div>
-              <div className="hidden sm:flex flex-col items-end gap-1">
-                {recentBadges.slice(0, 3).map((badge, i) => (<span key={i} className="text-xl">{badge.icon}</span>))}
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+              {recentBadges.length > 0 && <div className="mt-5 flex items-center gap-2 border-t border-border pt-4"><Award className="h-4 w-4 text-warning" /><span className="text-sm text-muted-foreground">Recent wins</span><div className="ml-auto flex gap-1">{recentBadges.slice(0, 3).map((badge, i) => <span key={i} className="text-lg">{badge.icon}</span>)}</div></div>}
+            </motion.section>
+          )}
 
-      <div className="px-4 max-w-7xl mx-auto w-full" data-guide="quick-actions">
-        <div className="grid grid-cols-3 gap-3">
-          {quickActions.map((action, index) => (
-            <motion.div key={action.path} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
-              <Link to={action.path}>
-                <Card className={`bg-gradient-to-br ${action.color} border-0 overflow-hidden group cursor-pointer`}>
-                  <CardContent className="p-3 text-center text-white">
-                    <div className="mx-auto mb-1 group-hover:scale-110 transition-transform">{action.icon}</div>
-                    <div className="text-xs font-semibold">{action.title}</div>
-                  </CardContent>
-                </Card>
+          <motion.section variants={itemVariants} data-guide="quick-actions" className="col-span-2 row-span-2 overflow-hidden rounded-3xl bg-primary p-6 text-primary-foreground shadow-xl shadow-primary/20 md:col-span-2 md:p-8">
+            <div className="flex h-full flex-col items-start">
+              <span className="rounded-full bg-primary-foreground/15 px-3 py-1 text-xs font-bold uppercase tracking-widest">Quick start</span>
+              <div className="mt-6">
+                <Zap className="h-8 w-8" />
+                <h2 className="mt-3 text-3xl font-display font-bold sm:text-4xl">{t("quick-play")}</h2>
+                <p className="mt-2 max-w-sm text-sm text-primary-foreground/80 sm:text-base">{t("jump-into-quiz")}</p>
+              </div>
+              <Link to="/quiz" className="mt-auto pt-8">
+                <Button size="lg" className="gap-2 rounded-xl bg-primary-foreground px-5 font-bold text-primary hover:bg-primary-foreground/90">{t("start-quiz")} <ArrowRight className="h-5 w-5" /></Button>
               </Link>
-            </motion.div>
-          ))}
-        </div>
-      </div>
+            </div>
+          </motion.section>
 
-      {user && parseInt(user.grade || "0") >= 5 && parseInt(user.grade || "0") <= 12 && (
-        <div className="px-4 py-4 max-w-7xl mx-auto w-full" data-guide="academic-mode">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <Link to="/academic">
-              <Card className="bg-gradient-to-r from-slate-800 via-slate-900 to-gray-900 border-0 overflow-hidden group cursor-pointer hover:shadow-2xl transition-all">
-                <CardContent className="p-4 flex items-center gap-4 text-white">
-                  <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📘</div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-base">{t("academic-mode")}</h3>
-                    <p className="text-xs text-white/60">{t("flashcards")} • {t("topic-coverage")} • {t("exam-mode")} • {t("study-planner")}</p>
-                  </div>
-                  <div className="bg-white/10 rounded-full p-2"><GraduationCap className="h-5 w-5" /></div>
-                </CardContent>
-              </Card>
+          <motion.div variants={itemVariants} className="col-span-1">
+            <Link to="/multiplayer" className="block h-full">
+              <Card className="group h-full rounded-3xl border-border bg-card transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg"><CardContent className="flex h-full min-h-40 flex-col justify-between p-5"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent text-accent-foreground"><Target className="h-5 w-5" /></span><div><h3 className="text-base font-display font-bold">{t("1v1-battle")}</h3><p className="mt-1 text-xs text-muted-foreground">{t("challenge-player")}</p></div></CardContent></Card>
             </Link>
           </motion.div>
-        </div>
-      )}
+          <motion.div variants={itemVariants} className="col-span-1">
+            <Link to="/lobby" className="block h-full">
+              <Card className="group h-full rounded-3xl border-border bg-card transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg"><CardContent className="flex h-full min-h-40 flex-col justify-between p-5"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-success text-success-foreground"><Users className="h-5 w-5" /></span><div><h3 className="text-base font-display font-bold">{t("join-lobby")}</h3><p className="mt-1 text-xs text-muted-foreground">{t("find-matches")}</p></div></CardContent></Card>
+            </Link>
+          </motion.div>
 
-      <div className="px-4 pb-2 max-w-7xl mx-auto w-full">
-        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2">
-          {categories.map(category => (
-            <Button key={category.id} variant={activeCategory === category.id ? "default" : "outline"} size="sm" onClick={() => setActiveCategory(category.id)}
-              className={`whitespace-nowrap gap-1.5 ${activeCategory === category.id ? "bg-primary text-primary-foreground shadow-lg" : "bg-card/50 hover:bg-card"}`}>
-              {category.icon}{category.name}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      <motion.div variants={containerVariants} initial="hidden" animate="show" className="flex-1 px-4 pb-6 max-w-7xl mx-auto w-full">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {filteredItems.map((item) => (
-            <motion.div key={item.path + item.title} variants={itemVariants} data-guide={item.guideId}>
-              <Link to={item.path}>
-                <Card className="h-full bg-card/80 backdrop-blur-sm border-border/50 overflow-hidden group cursor-pointer hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                  <CardContent className="p-4">
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform shadow-lg`}>{item.icon}</div>
-                    <h3 className="font-semibold text-sm mb-1">{item.title}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
-                  </CardContent>
-                </Card>
-              </Link>
+          {user && parseInt(user.grade || "0") >= 5 && parseInt(user.grade || "0") <= 12 && (
+            <motion.div variants={itemVariants} data-guide="academic-mode" className="col-span-2 md:col-span-2">
+              <Link to="/academic" className="block h-full"><Card className="h-full rounded-3xl border-0 bg-gradient-to-br from-slate-800 to-slate-950 text-white transition hover:-translate-y-1 hover:shadow-xl"><CardContent className="flex min-h-40 items-center gap-4 p-5"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-2xl">📘</span><div><h3 className="font-display text-lg font-bold">{t("academic-mode")}</h3><p className="mt-1 text-sm text-white/65">{t("flashcards")} · {t("topic-coverage")} · {t("exam-mode")}</p></div><GraduationCap className="ml-auto h-6 w-6 shrink-0 text-white/60" /></CardContent></Card></Link>
             </motion.div>
-          ))}
-        </div>
-      </motion.div>
+          )}
 
-      <footer className="px-4 py-4 text-center border-t border-border/50 bg-card/30">
-        <p className="text-xs text-muted-foreground">{t("app-version")} • {t("created-by")} Biniam Bogale, Ethiopia</p>
-        <p className="text-xs text-muted-foreground mt-1">{t("contact")}: +251978744724</p>
-      </footer>
+          {user && <motion.section variants={itemVariants} className="col-span-2 rounded-3xl border border-border bg-muted/50 p-5 md:col-span-2"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-muted-foreground">Your level</p><p className="mt-1 text-5xl font-display font-bold text-foreground">{user.level}</p></div><div className="text-right"><div className="flex items-center justify-end gap-1 text-warning"><Flame className="h-5 w-5 fill-current" /><span className="text-2xl font-display font-bold">{user.xp}</span></div><p className="text-xs text-muted-foreground">XP earned</p></div></div></motion.section>}
+        </motion.div>
+
+        <section className="mt-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div><p className="text-sm font-medium text-primary">Explore</p><h2 className="mt-1 text-2xl font-display font-bold">Make your next move</h2></div>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {categories.map(category => <Button key={category.id} variant={activeCategory === category.id ? "default" : "outline"} size="sm" onClick={() => setActiveCategory(category.id)} className="shrink-0 gap-1.5 rounded-full">{category.icon}{category.name}</Button>)}
+            </div>
+          </div>
+          <motion.div variants={containerVariants} initial="hidden" animate="show" className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {filteredItems.map((item) => <motion.div key={item.path + item.title} variants={itemVariants} data-guide={item.guideId}><Link to={item.path} className="block h-full"><Card className="group h-full rounded-2xl border-border bg-card transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-md"><CardContent className="p-4"><div className={`mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${item.color} text-white shadow-sm transition group-hover:scale-110`}>{item.icon}</div><h3 className="font-display text-sm font-bold">{item.title}</h3><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.description}</p></CardContent></Card></Link></motion.div>)}
+          </motion.div>
+        </section>
+      </main>
+
+      <footer className="border-t border-border/60 px-4 py-5 pb-24 text-center"><p className="text-xs text-muted-foreground">{t("app-version")} · {t("created-by")} Biniam Bogale, Ethiopia</p><p className="mt-1 text-xs text-muted-foreground">{t("contact")}: +251978744724</p></footer>
 
       {showLevelUp && user && (<LevelUpModal previousLevel={previousLevel} newLevel={user.level} onClose={() => setShowLevelUp(false)} />)}
 
       {isGuideVisible && !isGuidePaused && guideTargetRect && (
-        <div className="fixed inset-0 z-[110]">
-          <div className="absolute inset-0 bg-black/70" />
-          <div
-            className="home-guide-highlight"
-            style={{
-              top: guideTargetRect.top - 8,
-              left: guideTargetRect.left - 8,
-              width: guideTargetRect.width + 16,
-              height: guideTargetRect.height + 16,
-            }}
-          />
-          <div
-            className="absolute w-[min(92vw,360px)] rounded-2xl border border-primary/40 bg-card p-4 shadow-2xl"
-            style={{
-              top: Math.min(Math.max(guideTargetRect.bottom + 14, 16), window.innerHeight - 190),
-              left: Math.min(Math.max(guideTargetRect.left, 12), window.innerWidth - 372),
-            }}
-          >
-            <p className="text-sm font-semibold text-primary">{guideSteps[guideStepIndex]?.title}</p>
-            <p className="mt-2 text-sm text-muted-foreground">{guideSteps[guideStepIndex]?.description}</p>
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground">{guideStepIndex + 1}/{guideSteps.length}</span>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={endGuide}>Skip</Button>
-                <Button size="sm" onClick={() => runStep(guideStepIndex + 1)}>Next</Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div className="fixed inset-0 z-[110]"><div className="absolute inset-0 bg-black/70" /><div className="home-guide-highlight" style={{ top: guideTargetRect.top - 8, left: guideTargetRect.left - 8, width: guideTargetRect.width + 16, height: guideTargetRect.height + 16 }} /><div className="absolute w-[min(92vw,360px)] rounded-2xl border border-primary/40 bg-card p-4 shadow-2xl" style={{ top: Math.min(Math.max(guideTargetRect.bottom + 14, 16), window.innerHeight - 190), left: Math.min(Math.max(guideTargetRect.left, 12), window.innerWidth - 372) }}><p className="text-sm font-semibold text-primary">{guideSteps[guideStepIndex]?.title}</p><p className="mt-2 text-sm text-muted-foreground">{guideSteps[guideStepIndex]?.description}</p><div className="mt-4 flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{guideStepIndex + 1}/{guideSteps.length}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={endGuide}>Skip</Button><Button size="sm" onClick={() => runStep(guideStepIndex + 1)}>Next</Button></div></div></div></div>
       )}
-
-      {isGuidePaused && isGuideVisible && (
-        <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex items-center justify-center">
-          <Card className="p-4 border-primary/40 bg-card/95">
-            <CardContent className="p-0 flex flex-col items-center gap-3">
-              <p className="text-sm text-muted-foreground">Tutorial paused while app is in background.</p>
-              <Button size="sm" onClick={() => setIsGuidePaused(false)}>Resume</Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {isGuidePaused && isGuideVisible && (<div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm"><Card className="border-primary/40 bg-card/95 p-4"><CardContent className="flex flex-col items-center gap-3 p-0"><p className="text-sm text-muted-foreground">Tutorial paused while app is in background.</p><Button size="sm" onClick={() => setIsGuidePaused(false)}>Resume</Button></CardContent></Card></div>)}
     </div>
   );
 };
