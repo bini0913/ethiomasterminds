@@ -16,7 +16,6 @@ const StudentBottomNav: React.FC = () => {
     return <NavShell count={4}>{items.map(item=><NavItem key={item.path} {...item} active={active(item.active)} onClick={()=>navigate(item.path)}/>)}</NavShell>;
   }
   if(tier==="early"){
-    const profilePath=user?.id?`/profile/${user.id}`:"/settings";
     const items=[{icon:Home,label:"Home",path:"/",active:["/"]},{icon:Gamepad2,label:"Play",path:"/early-games",active:["/early-games"]},{icon:Sparkles,label:"Quiz",path:"/early-quiz",active:["/early-quiz"]},{icon:Trophy,label:"Ranks",path:"/leaderboard",active:["/leaderboard"]},{icon:Store,label:"Store",path:"/store",active:["/store"]}];
     const active=(paths:string[])=>paths.some(p=>p==="/" ? location.pathname==="/" : location.pathname===p||location.pathname.startsWith(`${p}/`));
     return <NavShell count={5}>{items.map(item=><NavItem key={item.path} {...item} active={active(item.active)} onClick={()=>navigate(item.path)}/>)}</NavShell>;
