@@ -25,6 +25,7 @@
     --primary-glow: var(--primary); --glow-blue: var(--info); --glow-purple: var(--tier-middle); --glow-pink: var(--accent);
     --glow-cyan: var(--primary); --glow-green: var(--success); --glow-yellow: var(--warning);
     --border: 210 14% 82%; --border-subtle: 210 18% 90%; --input: 210 14% 82%;
+    --overlay: 216 20% 13% / .52;
     --ring: 178 72% 25%; --focus-ring: 178 72% 25%;
     --tier-early: 34 88% 45%; --tier-middle: 276 62% 46%; --tier-upper: 221 83% 53%;
     --tier-early-foreground: 216 20% 13%; --tier-middle-foreground: 0 0% 100%; --tier-upper-foreground: 0 0% 100%;
@@ -59,6 +60,7 @@
     --primary-glow: var(--primary); --glow-blue: var(--info); --glow-purple: var(--tier-middle); --glow-pink: var(--accent);
     --glow-cyan: var(--primary); --glow-green: var(--success); --glow-yellow: var(--warning);
     --border: 216 12% 31%; --border-subtle: 216 13% 24%; --input: 216 12% 31%;
+    --overlay: 216 40% 2% / .66;
     --ring: 176 62% 64%; --focus-ring: 176 62% 64%;
     --shadow-sm: 0 1px 2px hsl(216 40% 2% / .22); --shadow-card: 0 4px 12px hsl(216 40% 2% / .28);
     --shadow-elevated: 0 14px 32px hsl(216 40% 2% / .42); --shadow-overlay: 0 24px 56px hsl(216 40% 2% / .56);
@@ -94,6 +96,13 @@
   .text-glow { text-shadow: none; } .xp-bar { background: hsl(var(--primary)); }
   .btn-futuristic { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
   .card-hover { transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease; } .card-hover:hover { border-color: hsl(var(--primary)); }
+
+  /* Mobile-first layout primitives: phone gutters, tablet breathing room, and nav safe area. */
+  .page-shell { width: 100%; max-width: 80rem; margin-inline: auto; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); }
+  .page-section { display: grid; gap: 1rem; }
+  .form-stack { display: grid; gap: 1rem; }
+  .bottom-safe-area { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+  @media (min-width: 640px) { .page-shell { padding: 1.5rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom)); } .page-section { gap: 1.5rem; } }
 }
 
 @layer utilities {
