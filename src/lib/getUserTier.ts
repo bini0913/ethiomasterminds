@@ -8,7 +8,8 @@ export function getUserTier(grade: string | null | undefined): UserTier | null {
   const match = /^(?:grade\s*)?(\d{1,2})\+?$/.exec(normalized);
   if (!match) return null;
   const value = Number(match[1]);
-  if (value <= 3) return 'early';
+  if (value < 1) return null;
+  if (value <= 4) return 'early';
   if (value <= 8) return 'middle';
   return 'upper';
 }

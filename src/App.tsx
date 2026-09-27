@@ -38,6 +38,7 @@ import Tournaments from "./pages/Tournaments";
 import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
 import SupabaseMigration from "./pages/SupabaseMigration";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import EarlyTierRestrictedRoute from "./components/auth/EarlyTierRestrictedRoute";
 import { UserProvider } from "./context/UserContext";
 import { TierProvider } from "./context/TierContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -88,9 +89,9 @@ const App = () => (
                               <Route path="/leaderboard" element={<Leaderboard />} />
                               <Route path="/profile" element={<SelfProfileRedirect />} />
                               <Route path="/profile/:userId" element={<UserProfilePage />} />
-                              <Route path="/friends" element={<Friends />} />
+                              <Route path="/friends" element={<EarlyTierRestrictedRoute><Friends /></EarlyTierRestrictedRoute>} />
                               <Route path="/settings" element={<Settings />} />
-                              <Route path="/chat" element={<Chat />} />
+                              <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
                               <Route 
                                 path="/teacher" 
                                 element={
@@ -119,7 +120,7 @@ const App = () => (
                               <Route path="/store" element={<StorePage />} />
                               <Route path="/tournaments" element={<Tournaments />} />
                               <Route path="/enhanced-settings" element={<EnhancedSettings />} />
-                              <Route path="/social" element={<EnhancedSocial />} />
+                              <Route path="/social" element={<EarlyTierRestrictedRoute><EnhancedSocial /></EarlyTierRestrictedRoute>} />
                               <Route path="/ai-tutor" element={<AITutor />} />
                               <Route path="/learning-dna" element={<LearningDNA />} />
                               <Route
@@ -132,13 +133,13 @@ const App = () => (
                               />
                               <Route path="/revision" element={<TimeTravelRevision />} />
                               <Route path="/avatar-creator" element={<AvatarCreator />} />
-                              <Route path="/academic" element={<AcademicMode />} />
+                              <Route path="/academic" element={<EarlyTierRestrictedRoute><AcademicMode /></EarlyTierRestrictedRoute>} />
                               <Route path="/study-mode" element={<StudyModePage />} />
-                              <Route path="/academic/flashcards" element={<FlashcardsPage />} />
-                              <Route path="/academic/topics" element={<TopicCoveragePage />} />
-                              <Route path="/academic/exam" element={<ExamModePage />} />
-                              <Route path="/academic/planner" element={<StudyPlannerPage />} />
-                              <Route path="/academic/insights" element={<AcademicInsightsPage />} />
+                              <Route path="/academic/flashcards" element={<EarlyTierRestrictedRoute><FlashcardsPage /></EarlyTierRestrictedRoute>} />
+                              <Route path="/academic/topics" element={<EarlyTierRestrictedRoute><TopicCoveragePage /></EarlyTierRestrictedRoute>} />
+                              <Route path="/academic/exam" element={<EarlyTierRestrictedRoute><ExamModePage /></EarlyTierRestrictedRoute>} />
+                              <Route path="/academic/planner" element={<EarlyTierRestrictedRoute><StudyPlannerPage /></EarlyTierRestrictedRoute>} />
+                              <Route path="/academic/insights" element={<EarlyTierRestrictedRoute><AcademicInsightsPage /></EarlyTierRestrictedRoute>} />
                               <Route
                                 path="/library"
                                 element={
