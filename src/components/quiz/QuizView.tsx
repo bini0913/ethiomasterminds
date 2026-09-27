@@ -24,13 +24,13 @@ interface QuizViewProps {
 }
 
 const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP = true }) => {
-  const { addXP, user } = useUser();
+  const { user, refreshProfile } = useUser();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(20);
   const [quizCompleted, setQuizCompleted] = useState(false);
-  const [earnedXP, setEarnedXP] = useState(0);
+  const [earnedXP, setEarnedXP] = useState(0);\n  const [submissionReady, setSubmissionReady] = useState(false);\n  const [rewardClaimed, setRewardClaimed] = useState(false);
   const [userAnswers, setUserAnswers] = useState<{[key: string]: string}>({});
   const userAnswersRef = useRef<{[key: string]: string}>({});
   const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>([]);
@@ -268,18 +268,38 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     }
   };
   
-  const handleClaimXP = () => {
+  const handleClaimXP = async () => {
     if (!allowXP) {
       toast.info("Retake detected: points are not awarded for already-attempted questions.");
       return;
     }
 
-    if (earnedXP > 0) {
-      addXP(earnedXP);
-      toast.success(`You've gained ${earnedXP} XP!`, {
-        description: "Keep playing to level up faster!"
+    if (!submissionReady || !submissionIdRef.current || rewardClaimed) {
+      if (!submissionReady) toast.info("Finalizing your quiz result...");
+      return;
+    }
+
+    try {
+      const { data, error } = await (supabase as any).rpc('claim_quiz_reward', {
+        p_submission_id: submissionIdRef.current,
       });
+      if (error) throw error;
+
+      const claimedXP = Number((data as any)?.xp_awarded ?? 0);
+      setRewardClaimed(true);
       setEarnedXP(0);
+      await refreshProfile();
+
+      if ((data as any)?.already_claimed) {
+        toast.info("Your quiz reward was already claimed.");
+      } else {
+        toast.success(`You've gained ${claimedXP} XP!`, {
+          description: "Keep learning to level up!"
+        });
+      }
+    } catch (error) {
+      console.error('Failed to claim quiz reward:', error);
+      toast.error('Unable to claim your quiz reward yet.');
     }
   };
   
@@ -292,7 +312,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     setCompletedQuestionIds([]);
     setAnsweredCorrectly(0);
     setAnsweredWrong(0);
-    submissionIdRef.current = null;
+    submissionIdRef.current = null;\n    setSubmissionReady(false);\n    setRewardClaimed(false);
   };
   
   // Calculate accuracy percentage
