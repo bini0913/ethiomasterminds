@@ -26,7 +26,7 @@ export function useEarlyReward() {
     const attemptId = crypto.randomUUID();
 
     try {
-      const { error } = await supabase.rpc("complete_early_activity", {
+      const { error } = await (supabase as any).rpc("complete_early_activity", {
         p_attempt_id: attemptId,
         p_activity_id: activityId,
         p_skill: skill,
