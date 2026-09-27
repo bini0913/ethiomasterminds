@@ -28,6 +28,18 @@ serve(async (req) => {
       });
     }
 
+    const { data: allowed, error: rateError } = await supabaseClient.rpc("consume_edge_rate_limit", {
+      p_function_name: "analyze-learning-dna",
+      p_limit: 3,
+      p_window_seconds: 600,
+    });
+    if (rateError || allowed !== true) {
+      return new Response(JSON.stringify({ error: "Too many requests. Please wait and try again." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Fetch user's question attempts
     const { data: attempts, error: attemptsError } = await supabaseClient
       .from('question_attempts')
