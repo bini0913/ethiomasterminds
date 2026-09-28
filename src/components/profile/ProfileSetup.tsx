@@ -21,10 +21,10 @@ const ProfileSetup: React.FC<ProfileSetupProps> = ({ onComplete }) => {
   const [avatar, setAvatar] = useState("avatar-1");
   const [step, setStep] = useState(1);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile({ gender, grade, educationLevel, avatar });
-    onComplete();
+    const saved = await updateProfile({ gender, grade, educationLevel, avatar });
+    if (saved) onComplete();
   };
 
   return (
