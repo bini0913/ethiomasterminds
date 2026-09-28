@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -63,7 +63,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showLevelUp, setShowLevelUp] = useState<boolean>(false);
-  const [previousLevel, setPreviousLevel] = useState<number>(1);
+  const [previousLevel, setPreviousLevel] = useState<number>(1);\n  // Prevent an in-flight session read/auth callback from restoring a session after logout.\n  const signingOutRef = useRef(false);
 
   const calculateLevel = (xp: number) => {
     return Math.floor(xp / 100) + 1;
