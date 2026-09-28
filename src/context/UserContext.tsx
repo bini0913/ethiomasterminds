@@ -153,6 +153,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
+        if (signingOutRef.current) {
+          setSession(null);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
         setSession(newSession);
         
         if (newSession?.user) {
@@ -196,6 +203,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   // Login with email (legacy)
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      signingOutRef.current = false;
       if (!email.trim() || !password.trim()) {
         toast.error("Please enter both email and password");
         return false;
@@ -228,6 +236,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   // Login with username (new)
   const loginWithUsername = async (username: string, password: string): Promise<boolean> => {
     try {
+      signingOutRef.current = false;
       if (!username.trim() || !password.trim()) {
         toast.error("Please enter both username and password");
         return false;
@@ -385,6 +394,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    signingOutRef.current = true;
+
     // Always revoke the local session before navigating away. Previously this was
     // fire-and-forget, which could let Supabase restore the session on mobile or
     // when the user immediately reopened the Early portal.
