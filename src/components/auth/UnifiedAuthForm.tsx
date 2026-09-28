@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
@@ -86,6 +87,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
 }) => {
   const { loginWithUsername, signupWithRole, isLoading: authLoading } = useUser();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [role, setRole] = useState<"student" | "teacher" | "admin" | "manager" | "parent_view">(initialTab);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -266,7 +268,38 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
       } else {
         localStorage.removeItem("masterminds_login_mode");
       }
-      onSuccess();
+      // Resolve the authenticated role and navigate directly. This avoids relying
+      // on a second React state/effect cycle after Supabase sign-in.
+      if (role === "parent_view") {
+        navigate("/parent-dashboard", { replace: true });
+      } else {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData.user?.id) {
+          const { data: roleData } = await supabase.rpc("get_user_role", {
+            _user_id: authData.user.id,
+          });
+
+          switch (roleData) {
+            case "extreme_admin":
+              navigate("/root-control-portal-9xA7", { replace: true });
+              break;
+            case "admin":
+              navigate("/admin", { replace: true });
+              break;
+            case "manager":
+              navigate("/manager-dashboard", { replace: true });
+              break;
+            case "teacher":
+              navigate("/teacher", { replace: true });
+              break;
+            default:
+              navigate("/", { replace: true });
+              break;
+          }
+        } else {
+          onSuccess();
+        }
+      }
     } catch (error) {
       console.error("Auth error:", error);
       toast.error(t("auth-failed"));
