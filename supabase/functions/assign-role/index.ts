@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
       if (role !== "student") {
         return new Response(JSON.stringify({ ok: false, error: "You cannot self-assign a privileged role" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const { data, error } = await adminClient.rpc("assign_user_role", { p_user_id: callerId, p_role: "student" });
+      const { data, error } = await adminClient.rpc("assign_user_role", { _user_id: callerId, _role: "student" });
       if (error) return new Response(JSON.stringify({ ok: false, error: "Failed to assign role" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ ok: true, role: data ?? "student" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -56,8 +56,8 @@ Deno.serve(async (req) => {
     }
 
     const { error } = await adminClient.rpc("assign_user_role", {
-      p_user_id: targetUserId,
-      p_role: role,
+      _user_id: targetUserId,
+      _role: role,
     });
 
     if (error) {
