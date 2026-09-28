@@ -98,7 +98,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Fetch user profile and role from database
-  const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  const fetchUserProfile = async (userId: string, authUser?: User): Promise<UserProfile | null> => {
     try {
       // Fetch profile
       const { data: profile, error: profileError } = await supabase
@@ -130,7 +130,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         id: profile.id,
         name: profile.name,
         username: profile.username || undefined,
-        email: session?.user?.email,
+        email: authUser?.email ?? session?.user?.email,
         role,
         gender: profile.gender || undefined,
         grade: profile.grade || undefined,
@@ -231,8 +231,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.user) {
+        // Resolve the profile immediately from the user returned by sign-in.
+        // Do not wait for React state/onAuthStateChange to catch up, otherwise
+        // the login form can remain visible even though authentication succeeded.
+        setSession(data.session);
+        const profile = await fetchUserProfile(data.user.id, data.user);
+        setUser(profile);
+        setIsLoading(false);
+
         toast.success(`Welcome back!`);
-        return true;
+        return Boolean(profile);
       }
 
       return false;
@@ -284,8 +292,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.user) {
+        // Resolve the profile immediately from the user returned by sign-in.
+        // Do not wait for React state/onAuthStateChange to catch up, otherwise
+        // the login form can remain visible even though authentication succeeded.
+        setSession(data.session);
+        const profile = await fetchUserProfile(data.user.id, data.user);
+        setUser(profile);
+        setIsLoading(false);
+
         toast.success(`Welcome back!`);
-        return true;
+        return Boolean(profile);
       }
 
       return false;
