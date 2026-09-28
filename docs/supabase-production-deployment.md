@@ -2,19 +2,20 @@
 
 The production backend is the Supabase project `mytbjkchvfybhyqcynnl`.
 
-The GitHub Actions workflow in `.github/workflows/supabase-deploy.yml` keeps the production database migrations and Edge Functions synchronized with `main`.
+## Edge Functions
 
-## Required GitHub repository secrets
+The GitHub Actions workflow in `.github/workflows/supabase-deploy.yml` automatically deploys every function under `supabase/functions` when function code changes reach `main`.
 
-Add these under **Settings → Secrets and variables → Actions**:
+Add this GitHub repository secret:
 
-- `SUPABASE_ACCESS_TOKEN`: a Supabase personal access token with access to the project.
-- `SUPABASE_DB_URL`: the production PostgreSQL connection string for project `mytbjkchvfybhyqcynnl`. Keep the database password inside this secret; never commit it.
+- `SUPABASE_ACCESS_TOKEN`: a Supabase personal access token with access to the production project.
 
-After the secrets exist, merging Supabase changes into `main` automatically:
+The workflow uses the production project ID directly and the checked-in `supabase/config.toml`.
 
-1. applies all unapplied files in `supabase/migrations` in order;
-2. deploys every Edge Function under `supabase/functions`;
-3. uses `supabase/config.toml` to keep the production project and JWT settings consistent.
+## Database migrations
 
-The workflow deliberately does not store any Supabase secret in the repository.
+The production database was created from a reconciled baseline rather than from the repository's original migration history. Because of that history drift, **do not run a blind `supabase db push` against production** until the migration history has been reconciled.
+
+The repository contains idempotent reconciliation migrations for the current production schema. They can be reviewed and applied through the project's controlled Supabase migration process.
+
+Never commit a database password, service-role key, or access token.
