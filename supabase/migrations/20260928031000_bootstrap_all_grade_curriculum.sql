@@ -18,7 +18,7 @@ DECLARE
 BEGIN
   FOR g IN 1..12 LOOP
     FOR s IN SELECT unnest(ARRAY['Math','Science','English']) LOOP
-      FOR d IN SELECT unnest(ARRAY['easy','medium','hard']) LOOP
+      FOR d IN SELECT unnest(ARRAY['easy','medium','hard','extreme']) LOOP
         quiz_title := format('Master Minds Core - Grade %s - %s - %s', g, s, initcap(d));
 
         SELECT id INTO qid
@@ -39,8 +39,8 @@ BEGIN
             s,
             g::text,
             d,
-            CASE d WHEN 'easy' THEN 1 WHEN 'medium' THEN 6 ELSE 11 END,
-            CASE d WHEN 'easy' THEN 5 WHEN 'medium' THEN 10 ELSE 20 END,
+            CASE d WHEN 'easy' THEN 1 WHEN 'medium' THEN 6 WHEN 'hard' THEN 11 ELSE 21 END,
+            CASE d WHEN 'easy' THEN 5 WHEN 'medium' THEN 10 WHEN 'hard' THEN 20 ELSE 60 END,
             gen_random_uuid(),
             true,
             true,
@@ -111,7 +111,7 @@ BEGIN
                 'Review the core %s concept for Grade %s and check each option carefully.',
                 lower(s), g
               ),
-              CASE d WHEN 'easy' THEN 5 WHEN 'medium' THEN 10 ELSE 15 END,
+              CASE d WHEN 'easy' THEN 5 WHEN 'medium' THEN 10 WHEN 'hard' THEN 15 ELSE 20 END,
               i,
               d,
               g::text,
