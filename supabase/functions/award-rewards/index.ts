@@ -18,39 +18,48 @@ serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const authHeader = req.headers.get("Authorization");
 
-    if (!authHeader?.startsWith("Bearer ")) {
-      return json({ error: "Authentication required" }, 401);
-    }
+    if (!supabaseUrl || !anonKey) return json({ error: "Server configuration error" }, 500);
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Authentication required" }, 401);
 
-    const token = authHeader.slice("Bearer ".length);
-    const admin = createClient(supabaseUrl, serviceKey);
-    const { data: authData, error: authError } = await admin.auth.getUser(token);
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    if (authError || !authData.user) {
-      return json({ error: "Invalid authentication token" }, 401);
-    }
+    const { data: authData, error: authError } = await userClient.auth.getUser();
+    if (authError || !authData.user) return json({ error: "Invalid authentication token" }, 401);
+
+    const rateLimit = await userClient.rpc("consume_edge_rate_limit", {
+      p_bucket: "award-rewards",
+      p_limit: 20,
+      p_window_seconds: 60,
+    });
+    if (rateLimit.error) throw rateLimit.error;
+    if (!rateLimit.data) return json({ error: "Too many reward requests. Please try again shortly." }, 429);
 
     const body = await req.json();
     const submissionId = body?.submissionId ?? body?.submission_id;
 
-    if (typeof submissionId !== "string" || submissionId.length > 100) {
+    if (
+      typeof submissionId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId)
+    ) {
       return json({ error: "A finalized quiz submissionId is required" }, 400);
     }
 
     // The score, correct answers, time, and XP are deliberately NOT accepted
-    // from the client. They must already exist in quiz_results and are computed
-    // by submit_quiz_result_secure from the stored answer key.
-    const { data, error } = await admin.rpc("claim_quiz_reward", {
+    // from the client. The secure quiz submission and reward RPCs own all
+    // grading and reward calculations.
+    const { data, error } = await userClient.rpc("claim_quiz_reward", {
       p_submission_id: submissionId,
     });
 
     if (error) {
-      console.error("Quiz reward claim failed:", error);
-      return json({ error: error.message }, 400);
+      console.error("Quiz reward claim failed:", error.message);
+      return json({ error: "Reward claim could not be completed" }, 400);
     }
 
     const result = Array.isArray(data) ? data[0] : data;
@@ -61,9 +70,10 @@ serve(async (req) => {
       coinsAwarded: result?.coins_awarded ?? 0,
       newLevel: result?.new_level ?? null,
       alreadyClaimed: result?.already_claimed ?? false,
+      ineligible: result?.ineligible ?? false,
     });
   } catch (error) {
-    console.error("Error claiming quiz reward:", error);
-    return json({ error: error instanceof Error ? error.message : "Reward processing failed" }, 500);
+    console.error("Error claiming quiz reward:", error instanceof Error ? error.message : "Unknown error");
+    return json({ error: "Reward processing failed" }, 500);
   }
 });
