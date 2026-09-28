@@ -221,10 +221,9 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
         p_submission_id: submissionId
       });
       if (error) throw error;
-      const xpEarned = (data as any)?.xp_earned;
-      if (xpEarned !== undefined) {
-        setEarnedXP(Number(xpEarned) || 0);
-      }
+      const xpEarned = Number((data as any)?.xp_earned ?? 0);
+      const rewardEligible = (data as any)?.reward_eligible !== false;
+      setEarnedXP(rewardEligible ? xpEarned : 0);
       setSubmissionReady(true);
 
       // Update analytics, streak, and achievements
@@ -289,11 +288,14 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       if (error) throw error;
 
       const claimedXP = Number((data as any)?.xp_awarded ?? 0);
+      const ineligible = Boolean((data as any)?.ineligible);
       setRewardClaimed(true);
       setEarnedXP(0);
       await refreshProfile();
 
-      if ((data as any)?.already_claimed) {
+      if (ineligible) {
+        toast.info("Practice complete — this set has already been attempted, so no new XP was awarded.");
+      } else if ((data as any)?.already_claimed) {
         toast.info("Your quiz reward was already claimed.");
       } else {
         toast.success(`You've gained ${claimedXP} XP!`, {
