@@ -395,29 +395,24 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     signingOutRef.current = true;
-
-    // Always revoke the local session before navigating away. Previously this was
-    // fire-and-forget, which could let Supabase restore the session on mobile or
-    // when the user immediately reopened the Early portal.
     localStorage.removeItem("masterminds_login_mode");
     setShowLevelUp(false);
-
-    const { error: localError } = await supabase.auth.signOut({ scope: "local" });
-
-    // Local sign-out is enough to terminate this device's session even when the
-    // network is unavailable. Try global revocation afterward when possible.
-    if (localError) {
-      console.error("Local logout error:", localError);
-    }
-
     setUser(null);
     setSession(null);
+    setIsLoading(false);
 
-    if (!localError) {
-      void supabase.auth.signOut({ scope: "global" }).catch((error) => {
-        // Global revocation can fail offline; the local session is already gone.
-        console.error("Global logout error:", error);
-      });
+    // Local sign-out is the app's logout operation. Do not wait for global
+    // revocation: it can be slow/offline and is unnecessary for ending this
+    // device's session. Lovable preview storage may take up to ~2 seconds to
+    // broker the removal, so bound the wait and always finish the UI logout.
+    try {
+      const signOutPromise = supabase.auth.signOut({ scope: "local" });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Local sign-out timed out")), 3500),
+      );
+      await Promise.race([signOutPromise, timeoutPromise]);
+    } catch (error) {
+      console.error("Local logout error:", error);
     }
 
     toast.success("Logged out");
