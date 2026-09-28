@@ -179,9 +179,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      // A session read can finish after logout. Never let that stale result
+      // restore the account we just logged out from.
+      if (signingOutRef.current) {
+        setSession(null);
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
       setSession(existingSession);
       if (existingSession?.user) {
         fetchUserProfile(existingSession.user.id).then(profile => {
+          if (signingOutRef.current) return;
           setUser(profile);
           setIsLoading(false);
         });
