@@ -21,6 +21,25 @@ BEGIN
 
   caller_user_role := public.get_user_role(auth.uid());
 
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.id <> auth.uid() THEN
+      RAISE EXCEPTION 'You can only create your own profile';
+    END IF;
+    IF caller_user_role IN ('admin', 'manager', 'extreme_admin') THEN
+      RETURN NEW;
+    END IF;
+    IF COALESCE(NEW.role, 'student') <> 'student' THEN
+      RAISE EXCEPTION 'New client accounts must be students';
+    END IF;
+    IF COALESCE(NEW.xp, 0) <> 0
+       OR COALESCE(NEW.total_xp, 0) <> 0
+       OR COALESCE(NEW.season_xp, 0) <> 0
+       OR COALESCE(NEW.level, 1) <> 1 THEN
+      RAISE EXCEPTION 'New client profiles cannot seed progression';
+    END IF;
+    RETURN NEW;
+  END IF;
+
   IF caller_user_role IN ('admin', 'manager', 'extreme_admin') THEN
     RETURN NEW;
   END IF;
@@ -58,7 +77,7 @@ $$;
 
 DROP TRIGGER IF EXISTS guard_student_profile_updates ON public.profiles;
 CREATE TRIGGER guard_student_profile_updates
-BEFORE UPDATE ON public.profiles
+BEFORE INSERT OR UPDATE ON public.profiles
 FOR EACH ROW
 EXECUTE FUNCTION public.guard_student_profile_updates();
 
