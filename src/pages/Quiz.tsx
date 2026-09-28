@@ -108,36 +108,32 @@ const Quiz: React.FC = () => {
       });
 
     const buildSet = (subjectQuizzes: QuizType[], category: string, questionCount: number, index: number): QuizType | null => {
-      const dedupedQuestions = new Map<string, Question>();
-      subjectQuizzes.forEach((quiz) => {
-        quiz.questions.forEach((question) => dedupedQuestions.set(question.id, question));
-      });
-      const pool = Array.from(dedupedQuestions.values());
-      if (pool.length === 0) return null;
-      const offset = (index * questionCount) % pool.length;
-      const selectedQuestions = Array.from({ length: Math.min(questionCount, pool.length) }, (_, pickIndex) => {
-        const question = pool[(offset + pickIndex) % pool.length];
-        return rotateOptionsForBalance(question, index, pickIndex);
-      });
-      const avgPoints = selectedQuestions.reduce((acc, q) => acc + (q.points || 10), 0) / Math.max(selectedQuestions.length, 1);
-      const quizDifficulty: QuizType["difficulty"] = avgPoints >= 15 ? "Hard" : avgPoints >= 10 ? "Medium" : "Easy";
-      const sourceQuizId = subjectQuizzes[0]?.id;
-      const setType = "Practice";
+      // Keep every practice set inside one real database quiz. The secure
+      // submission RPC grades by quiz_id, so mixing questions from several
+      // source quizzes would make client and server grade different sets.
+      const sourceQuiz = subjectQuizzes[index % Math.max(subjectQuizzes.length, 1)];
+      if (!sourceQuiz || sourceQuiz.questions.length < questionCount) return null;
+
+      const selectedQuestions = sourceQuiz.questions
+        .slice(0, questionCount)
+        .map((question, pickIndex) => rotateOptionsForBalance(question, index, pickIndex));
+
+      const sourceQuizId = sourceQuiz.id;
       const setNumber = index + 1;
 
       return {
         id: `practice-g${grade}-${category.toLowerCase().replace(/\s+/g, "-")}-${questionCount}-${setNumber}`,
         sourceQuizId,
-        title: `${category} Grade ${grade} ${setType} ${setNumber}`,
+        title: `${category} Grade ${grade} Practice ${setNumber}`,
         description: `${questionCount} grade-level questions for Grade ${grade} ${category}`,
         questions: selectedQuestions,
-        subject: subjectQuizzes[0]?.subject || category,
+        subject: sourceQuiz.subject || category,
         grade,
-        difficulty: quizDifficulty,
+        difficulty: sourceQuiz.difficulty,
         timeLimit: questionCount * 30,
         createdBy: sourceQuizId,
         createdAt: new Date(),
-        topics: ["General"],
+        topics: sourceQuiz.topics || ["General"],
         category,
         gradeLevel: grade
       };
@@ -249,42 +245,47 @@ const Quiz: React.FC = () => {
     };
     const targetDifficulty = difficultyMap[adaptiveDifficulty];
 
-    const matchingQuestions = quizzes
-      .filter((quiz) => {
-        const sameGrade = quiz.gradeLevel === selectedGradeNumber;
-        const sameSubject = normalizeCategory(quiz.category) === normalizeCategory(category);
-        const difficultyMatch = normalizeDifficulty(quiz.difficulty) === normalizeDifficulty(targetDifficulty);
-        return sameGrade && sameSubject && difficultyMatch;
-      })
-      .flatMap((quiz) => quiz.questions);
+    const matchingQuizzes = quizzes.filter((quiz) => {
+      const sameGrade = quiz.gradeLevel === selectedGradeNumber;
+      const sameSubject = normalizeCategory(quiz.category) === normalizeCategory(category);
+      const difficultyMatch = normalizeDifficulty(quiz.difficulty) === normalizeDifficulty(targetDifficulty);
+      return sameGrade && sameSubject && difficultyMatch;
+    });
 
-    const freshPool = matchingQuestions.filter((question) => !attemptedQuestionIds.has(question.id));
-    if (matchingQuestions.length === 0) {
+    if (matchingQuizzes.length === 0) {
       toast.error("No quiz available");
       return;
     }
-    const shuffledFreshPool = [...freshPool].sort(() => Math.random() - 0.5);
-    const selectedQuestions = shuffledFreshPool
+
+    // Quick quizzes also use one real source quiz so secure server grading
+    // matches exactly the questions shown to the student.
+    const sourceQuiz = matchingQuizzes[Math.floor(Math.random() * matchingQuizzes.length)];
+    const freshQuestions = sourceQuiz.questions.filter((question) => !attemptedQuestionIds.has(question.id));
+    const candidateQuestions = freshQuestions.length >= numQuestions ? freshQuestions : sourceQuiz.questions;
+    const shuffledQuestions = [...candidateQuestions].sort(() => Math.random() - 0.5);
+    const selectedQuestions = shuffledQuestions
       .slice(0, numQuestions)
       .map((question, index) => rotateOptionsForBalance(question, selectedGradeNumber, index));
 
     if (selectedQuestions.length < numQuestions) {
-      toast.error(`Not enough new ${category} questions available for Grade ${selectedGradeNumber} at ${targetDifficulty} level.`);
+      toast.error(`This ${category} quiz has only ${selectedQuestions.length} questions available. Choose 5 or 10 questions.`);
       return;
     }
 
     const randomQuiz: QuizType = {
       id: `quick-${category.toLowerCase().replace(/\s+/g, "-")}-g${selectedGradeNumber}-${Date.now()}`,
+      sourceQuizId: sourceQuiz.id,
       title: `Adaptive ${category} Quiz - Grade ${selectedGradeNumber}`,
       description: `${numQuestions} curriculum-aligned ${targetDifficulty.toLowerCase()} questions based on your level`,
       questions: selectedQuestions,
-      subject: category,
+      subject: sourceQuiz.subject || category,
       grade: selectedGradeNumber,
-      difficulty: targetDifficulty,
+      difficulty: sourceQuiz.difficulty,
       timeLimit: numQuestions * 30,
+      createdBy: sourceQuiz.id,
       createdAt: new Date(),
-      topics: ["General"],
-      category: category,
+      topics: sourceQuiz.topics || ["General"],
+      category,
       gradeLevel: selectedGradeNumber
     };
 
@@ -622,7 +623,7 @@ const Quiz: React.FC = () => {
                             <SelectValue placeholder="Questions" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[5, 10, 15, 20].map((num) => (
+                            {[5, 10].map((num) => (
                               <SelectItem key={num} value={num.toString()}>
                                 {num} Questions
                               </SelectItem>
