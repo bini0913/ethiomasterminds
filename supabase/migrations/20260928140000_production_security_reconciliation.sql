@@ -281,3 +281,15 @@ CREATE INDEX IF NOT EXISTS idx_quizzes_grade_subject_difficulty_approved
   ON public.quizzes (grade, subject, difficulty, is_approved);
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_order
   ON public.questions (quiz_id, order_index);
+
+
+-- Internal SECURITY DEFINER helpers are invoked by trusted functions/RLS and are
+-- not browser RPCs. Remove direct execution grants from client roles.
+REVOKE ALL ON FUNCTION public._resolve_user_identifier(text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.add_xp(uuid, integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.handle_new_user_extras() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.has_role(uuid, app_role) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.is_student_in_class(uuid, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.is_teacher_of_class(uuid, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.is_teacher_of_student(uuid, uuid) FROM PUBLIC, anon, authenticated;
