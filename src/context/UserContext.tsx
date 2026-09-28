@@ -45,7 +45,7 @@ interface UserContextType {
   signup: (email: string, password: string, name: string) => Promise<boolean>;
   signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string) => Promise<boolean>;
   logout: () => Promise<void>;
-  updateProfile: (profileData: Partial<UserProfile>) => Promise<void>;
+  updateProfile: (profileData: Partial<UserProfile>) => Promise<boolean>;
   addXP: (amount: number) => Promise<void>;
   deleteAccount: () => Promise<void>;
   getAllUsers: () => Promise<Array<Omit<UserProfile, 'password'>>>;
@@ -410,8 +410,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     toast.success("Logged out");
   };
 
-  const updateProfile = async (profileData: Partial<UserProfile>) => {
-    if (!user || !session?.user) return;
+  const updateProfile = async (profileData: Partial<UserProfile>): Promise<boolean> => {
+    if (!user || !session?.user) return false;
 
     try {
       const updateData: any = {};
@@ -435,15 +435,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (error) {
         console.error('Update profile error:', error);
         toast.error("Failed to update profile");
-        return;
+        return false;
       }
 
       // Update local state
       setUser(prev => prev ? { ...prev, ...profileData } : null);
       toast.success("Profile updated successfully!");
+      return true;
     } catch (error) {
       console.error('Update profile error:', error);
       toast.error("Failed to update profile");
+      return false;
     }
   };
 
