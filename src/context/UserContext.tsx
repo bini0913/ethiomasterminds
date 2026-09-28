@@ -254,7 +254,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
       // Get email from username using RPC
       const { data: email, error: lookupError } = await supabase
-        .rpc('get_email_by_username', { p_username: username.trim() });
+        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() });
 
       if (lookupError) {
         console.error('Username lookup error:', lookupError);
@@ -329,7 +329,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
       // Check if username is already taken
       const { data: existingEmail } = await supabase
-        .rpc('get_email_by_username', { p_username: username.trim() });
+        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() });
 
       if (existingEmail) {
         toast.error("Username is already taken");
