@@ -56,7 +56,7 @@ const Index: React.FC = () => {
       }
       
       // For students, check if profile is complete
-      if (!user.gender || !user.grade || !user.educationLevel) {
+      if (!user.grade || !user.educationLevel) {
         setAppStage(AppStage.ProfileSetup);
       } else {
         setAppStage(AppStage.MainMenu);
