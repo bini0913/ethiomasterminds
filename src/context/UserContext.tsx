@@ -41,9 +41,9 @@ interface UserContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  loginWithUsername: (username: string, password: string) => Promise<boolean>;
+  loginWithUsername: (username: string, password: string) => Promise<UserProfile | null>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
-  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string) => Promise<boolean>;
+  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string) => Promise<UserProfile | null>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<boolean>;
   addXP: (amount: number) => Promise<void>;
@@ -253,12 +253,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Login with username (new)
-  const loginWithUsername = async (username: string, password: string): Promise<boolean> => {
+  const loginWithUsername = async (username: string, password: string): Promise<UserProfile | null> => {
     try {
       signingOutRef.current = false;
       if (!username.trim() || !password.trim()) {
         toast.error("Please enter both username and password");
-        return false;
+        return null;
       }
 
       // Get email from username using RPC
@@ -268,12 +268,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (lookupError) {
         console.error('Username lookup error:', lookupError);
         toast.error("Failed to find user. Please try again.");
-        return false;
+        return null;
       }
 
       if (!email) {
         toast.error("Username not found");
-        return false;
+        return null;
       }
 
       // Login with email/password
@@ -289,7 +289,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         } else {
           toast.error(error.message || "Login failed");
         }
-        return false;
+        return null;
       }
 
       if (data.user) {
@@ -308,17 +308,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         return profile;
       }
 
-      return false;
+      return null;
     } catch (error) {
       console.error('Login error:', error);
       toast.error("Login failed. Please try again.");
-      return false;
+      return null;
     }
   };
 
   // Legacy signup (creates as student)
   const signup = async (email: string, password: string, name: string): Promise<boolean> => {
-    return signupWithRole(email, password, name, email.split('@')[0], 'student');
+    return !!await signupWithRole(email, password, name, email.split('@')[0], 'student');
   };
 
   // New signup with role selection
@@ -329,21 +329,21 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     username: string,
     role: UserRole,
     grade?: string,
-  ): Promise<boolean> => {
+  ): Promise<UserProfile | null> => {
     try {
       if (role !== 'student') {
         toast.error("Only student accounts can be created through sign up.");
-        return false;
+        return null;
       }
 
       if (!email.trim() || !password.trim() || !name.trim() || !username.trim()) {
         toast.error("Please fill all required fields");
-        return false;
+        return null;
       }
 
       if (password.length < 8) {
         toast.error("Password must be at least 8 characters");
-        return false;
+        return null;
       }
 
 
@@ -353,7 +353,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
       if (existingEmail) {
         toast.error("Username is already taken");
-        return false;
+        return null;
       }
 
       const redirectUrl = `${window.location.origin}/`;
@@ -389,7 +389,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         } else {
           toast.error(error.message || "Signup failed");
         }
-        return false;
+        return null;
       }
 
       if (data.user) {
@@ -452,11 +452,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         return profile;
       }
 
-      return false;
+      return null;
     } catch (error) {
       console.error('Signup error:', error);
       toast.error("Signup failed. Please try again.");
-      return false;
+      return null;
     }
   };
 
