@@ -294,11 +294,10 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
               break;
             case "student":
             default:
-              // The student home is already rendered by Index at "/".
-              // Calling onSuccess lets Index switch from the auth stage to the
-              // correct tier portal (early/middle/upper) instead of navigating
-              // to the same "/auth" screen and leaving the login form visible.
-              await onSuccess();
+              // Reload the app after authentication so UserProvider starts from
+              // the persisted Supabase session. This removes any remaining
+              // React state timing race that can leave the login form visible.
+              window.location.replace("/");
               break;
           }
         } else {
