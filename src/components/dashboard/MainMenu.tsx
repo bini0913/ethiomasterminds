@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 import { useAIHelper } from "@/context/AIHelperContext";
 import {
   Bot, BookOpen, Trophy, Users, Settings, GraduationCap,
-  Gamepad2, Store, Award, Zap, Target, Timer, ArrowRight, Flame, LibraryBig, LogOut
+  Gamepad2, Store, Award, Zap, Target, Timer, ArrowRight, Flame, LibraryBig, LogOut, MessageCircle
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
@@ -47,6 +47,13 @@ const MainMenu: React.FC = () => {
   const recentBadges = getRecentBadges();
 
   const studyItems = [
+    {
+      title: "Academic Mode",
+      description: "Plan your study, practice topics, and prepare for exams",
+      icon: <GraduationCap className="h-5 w-5" />,
+      path: "/academic",
+      guideId: "study-academic",
+    },
     {
       title: t("quiz"),
       description: t("test-knowledge"),
