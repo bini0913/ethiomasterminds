@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Compass, Users, Flame, BookOpen, Target, Plus } from 'lucide-react';
+import { Compass, Users, Flame, BookOpen, Target, Plus, UserPlus } from 'lucide-react';
 import BackButton from '@/components/ui/BackButton';
 import SocialFeedView from '@/components/social/SocialFeedView';
 import SocialChallenges from '@/components/social/SocialChallenges';
