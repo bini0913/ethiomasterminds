@@ -71,14 +71,15 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     return Math.floor(xp / 100) + 1;
   };
 
-  const createMissingProfile = async (userId: string) => {
+  const createMissingProfile = async (userId: string, authUser?: User) => {
+    const sourceUser = authUser ?? session?.user;
     const fallbackName =
-      session?.user?.user_metadata?.name ||
-      session?.user?.email?.split("@")[0] ||
+      sourceUser?.user_metadata?.name ||
+      sourceUser?.email?.split("@")[0] ||
       "Student";
     const fallbackUsername =
-      session?.user?.user_metadata?.username ||
-      session?.user?.email?.split("@")[0] ||
+      sourceUser?.user_metadata?.username ||
+      sourceUser?.email?.split("@")[0] ||
       `user-${userId.slice(0, 6)}`;
 
     const { error } = await (supabase as any)
@@ -109,8 +110,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
       if (profileError) {
         if (profileError.code === "PGRST116") {
-          await createMissingProfile(userId);
-          return await fetchUserProfile(userId);
+          await createMissingProfile(userId, authUser);
+          return await fetchUserProfile(userId, authUser);
         }
         console.error('Error fetching profile:', profileError);
         return null;
@@ -165,7 +166,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         if (newSession?.user) {
           // Use setTimeout to prevent deadlock
           setTimeout(() => {
-            fetchUserProfile(newSession.user.id).then(profile => {
+            fetchUserProfile(newSession.user.id, newSession.user).then(profile => {
               setUser(profile);
               setIsLoading(false);
             });
@@ -190,7 +191,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
       setSession(existingSession);
       if (existingSession?.user) {
-        fetchUserProfile(existingSession.user.id).then(profile => {
+        fetchUserProfile(existingSession.user.id, existingSession.user).then(profile => {
           if (signingOutRef.current) return;
           setUser(profile);
           setIsLoading(false);
