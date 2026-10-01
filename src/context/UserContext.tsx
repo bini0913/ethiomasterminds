@@ -389,26 +389,34 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.user) {
-        // Wait for profile to be created by trigger
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Supabase returns a user without a session when email confirmation is required.
+        // In that case the account is successfully created, but the browser is not
+        // authenticated yet. Do not call authenticated Edge Functions or redirect
+        // into the app until the user confirms the email.
+        if (!data.session) {
+          toast.success("Account created! Please check your email to confirm your account, then sign in.");
+          return false;
+        }
 
-        // Assign role via edge function
+        // Establish the authenticated state immediately instead of waiting for the
+        // auth listener to catch up.
+        setSession(data.session);
+        const profile = await fetchUserProfile(data.user.id, data.user);
+        setUser(profile);
+
+        // Assign the selected role now that an authenticated session exists.
         const { data: roleData, error: roleError } = await supabase.functions.invoke('assign-role', {
           body: { role }
         });
 
         if (roleError || !roleData?.ok) {
           console.error('Role assignment error:', roleError || roleData?.error);
-          // Role assignment failed, but account was created - they'll be without a role
-          // This shouldn't happen but we handle it gracefully
-          toast.warning("Account created but role assignment failed. Please contact support.");
-        } else {
-          toast.success(`Welcome to Master Minds, ${name}!`);
+          toast.warning("Account created, but we couldn't finish account setup. Your student account is still usable.");
         }
 
-        // Refresh profile to get updated role
+        // Refresh profile to get the final role and profile data.
         await refreshProfile();
-        return true;
+        return Boolean(profile);
       }
 
       return false;
