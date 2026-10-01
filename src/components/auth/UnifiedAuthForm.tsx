@@ -148,7 +148,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     setUsernameStatus("checking");
     const { data, error } = await supabase.rpc("get_email_by_username", {
       _username: normalized,
-    });
+    } as any);
 
     if (error) {
       setUsernameStatus("idle");
@@ -256,53 +256,35 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
 
     setLoading(true);
     try {
-      const success = await loginWithUsername(username, password);
-      if (!success) return;
+      const profile = await loginWithUsername(username, password);
+      if (!profile) return;
 
       if (role === "parent_view") {
         localStorage.setItem("masterminds_login_mode", "parent");
-        const { data: authData } = await supabase.auth.getUser();
-        if (authData.user?.id) {
-          await supabase.from("profiles").update({ login_mode: "parent" } as any).eq("id", authData.user.id);
-        }
-      } else {
-        localStorage.removeItem("masterminds_login_mode");
-      }
-      // Resolve the authenticated role and navigate directly. This avoids relying
-      // on a second React state/effect cycle after Supabase sign-in.
-      if (role === "parent_view") {
+        await supabase.from("profiles").update({ login_mode: "parent" } as any).eq("id", profile.id);
         navigate("/parent-dashboard", { replace: true });
-      } else {
-        const { data: authData } = await supabase.auth.getUser();
-        if (authData.user?.id) {
-          const { data: roleData } = await supabase.rpc("get_user_role", {
-            _user_id: authData.user.id,
-          });
+        return;
+      }
+      localStorage.removeItem("masterminds_login_mode");
 
-          switch (roleData) {
-            case "extreme_admin":
-              navigate("/root-control-portal-9xA7", { replace: true });
-              break;
-            case "admin":
-              navigate("/admin", { replace: true });
-              break;
-            case "manager":
-              navigate("/manager-dashboard", { replace: true });
-              break;
-            case "teacher":
-              navigate("/teacher", { replace: true });
-              break;
-            case "student":
-            default:
-              // Reload the app after authentication so UserProvider starts from
-              // the persisted Supabase session. This removes any remaining
-              // React state timing race that can leave the login form visible.
-              window.location.replace("/");
-              break;
-          }
-        } else {
+      // The profile (with role) is already loaded into UserContext, so route
+      // directly. Students stay on "/" where Index renders their tier portal.
+      switch (profile.role) {
+        case "extreme_admin":
+          navigate("/root-control-portal-9xA7", { replace: true });
+          break;
+        case "admin":
+          navigate("/admin", { replace: true });
+          break;
+        case "manager":
+          navigate("/manager-dashboard", { replace: true });
+          break;
+        case "teacher":
+          navigate("/teacher", { replace: true });
+          break;
+        default:
+          navigate("/", { replace: true });
           onSuccess();
-        }
       }
     } catch (error) {
       console.error("Auth error:", error);

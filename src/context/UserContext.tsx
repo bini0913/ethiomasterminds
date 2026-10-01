@@ -41,9 +41,9 @@ interface UserContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  loginWithUsername: (username: string, password: string) => Promise<boolean>;
+  loginWithUsername: (username: string, password: string) => Promise<UserProfile | null>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
-  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string) => Promise<boolean>;
+  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string) => Promise<UserProfile | null>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<boolean>;
   addXP: (amount: number) => Promise<void>;
@@ -253,27 +253,27 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Login with username (new)
-  const loginWithUsername = async (username: string, password: string): Promise<boolean> => {
+  const loginWithUsername = async (username: string, password: string): Promise<UserProfile | null> => {
     try {
       signingOutRef.current = false;
       if (!username.trim() || !password.trim()) {
         toast.error("Please enter both username and password");
-        return false;
+        return null;
       }
 
       // Get email from username using RPC
       const { data: email, error: lookupError } = await supabase
-        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() });
+        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() } as any);
 
       if (lookupError) {
         console.error('Username lookup error:', lookupError);
         toast.error("Failed to find user. Please try again.");
-        return false;
+        return null;
       }
 
       if (!email) {
         toast.error("Username not found");
-        return false;
+        return null;
       }
 
       // Login with email/password
@@ -289,33 +289,36 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         } else {
           toast.error(error.message || "Login failed");
         }
-        return false;
+        return null;
       }
 
       if (data.user) {
-        // Resolve the profile immediately from the user returned by sign-in.
-        // Do not wait for React state/onAuthStateChange to catch up, otherwise
-        // the login form can remain visible even though authentication succeeded.
+        // Resolve the profile immediately from the user returned by sign-in so
+        // callers can route on the real role without a reload.
         setSession(data.session);
         const profile = await fetchUserProfile(data.user.id, data.user);
         setUser(profile);
         setIsLoading(false);
 
+        if (!profile) {
+          toast.error("Signed in, but your profile couldn't be loaded. Please try again or contact support.");
+          return null;
+        }
         toast.success(`Welcome back!`);
-        return Boolean(profile);
+        return profile;
       }
 
-      return false;
+      return null;
     } catch (error) {
       console.error('Login error:', error);
       toast.error("Login failed. Please try again.");
-      return false;
+      return null;
     }
   };
 
   // Legacy signup (creates as student)
   const signup = async (email: string, password: string, name: string): Promise<boolean> => {
-    return signupWithRole(email, password, name, email.split('@')[0], 'student');
+    return !!await signupWithRole(email, password, name, email.split('@')[0], 'student');
   };
 
   // New signup with role selection
@@ -326,31 +329,31 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     username: string,
     role: UserRole,
     grade?: string,
-  ): Promise<boolean> => {
+  ): Promise<UserProfile | null> => {
     try {
       if (role !== 'student') {
         toast.error("Only student accounts can be created through sign up.");
-        return false;
+        return null;
       }
 
       if (!email.trim() || !password.trim() || !name.trim() || !username.trim()) {
         toast.error("Please fill all required fields");
-        return false;
+        return null;
       }
 
       if (password.length < 8) {
         toast.error("Password must be at least 8 characters");
-        return false;
+        return null;
       }
 
 
       // Check if username is already taken
       const { data: existingEmail } = await supabase
-        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() });
+        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() } as any);
 
       if (existingEmail) {
         toast.error("Username is already taken");
-        return false;
+        return null;
       }
 
       const redirectUrl = `${window.location.origin}/`;
@@ -386,70 +389,74 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         } else {
           toast.error(error.message || "Signup failed");
         }
-        return false;
+        return null;
       }
 
       if (data.user) {
-        // Supabase returns a user without a session when email confirmation is required.
-        // In that case the account is successfully created, but the browser is not
-        // authenticated yet. Do not call authenticated Edge Functions or redirect
-        // into the app until the user confirms the email.
-        if (!data.session) {
-          toast.success("Account created! Please check your email to confirm your account, then sign in.");
-          return false;
+        // With email confirmation on, Supabase hides "already registered" and
+        // returns a user with no identities instead of an error.
+        if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          toast.error("This email is already registered. Please log in instead.");
+          return null;
         }
 
-        // Establish the authenticated state immediately instead of waiting for the
-        // auth listener to catch up.
-        setSession(data.session);
-        const profile = await fetchUserProfile(data.user.id, data.user);
-        setUser(profile);
+        // Supabase returns a user without a session when email confirmation is required.
+        if (!data.session) {
+          toast.success("Account created! Please check your email to confirm your account, then sign in.");
+          return null;
+        }
 
-        // Assign the selected role now that an authenticated session exists.
+        setSession(data.session);
+
+        // Assign the student role now that an authenticated session exists.
         const { data: roleData, error: roleError } = await supabase.functions.invoke('assign-role', {
           body: { role }
         });
-
         if (roleError || !roleData?.ok) {
           console.error('Role assignment error:', roleError || roleData?.error);
-          toast.warning("Account created, but we couldn't finish account setup. Your student account is still usable.");
         }
 
-        // Persist the grade selected during signup. The auth trigger creates
-        // the base profile, while grade and education level are application
-        // profile fields that must be stored explicitly.
-        if (grade?.trim()) {
-          const normalizedGrade = grade.trim();
-          const educationLevel =
+        // Make sure the profile row exists and holds the signup fields, even if
+        // the auth trigger only stored name/username.
+        const normalizedGrade = grade?.trim();
+        const profileFields: Record<string, string> = {
+          name: name.trim(),
+          username: username.trim().toLowerCase(),
+        };
+        if (normalizedGrade) {
+          profileFields.grade = normalizedGrade;
+          profileFields.education_level =
             normalizedGrade.toLowerCase() === "k" || /^grade\s*[1-4]$/i.test(normalizedGrade)
               ? "early"
               : /^grade\s*[5-8]$/i.test(normalizedGrade)
                 ? "middle"
                 : "upper";
-
-          const { error: profileUpdateError } = await supabase
-            .from("profiles")
-            .update({
-              grade: normalizedGrade,
-              education_level: educationLevel,
-            })
-            .eq("id", data.user.id);
-
-          if (profileUpdateError) {
-            console.error("Profile grade update error:", profileUpdateError);
-          }
+        }
+        // Ensure the base row exists first (creates it if the trigger hasn't).
+        await fetchUserProfile(data.user.id, data.user);
+        const { error: profileUpdateError } = await (supabase as any)
+          .from("profiles")
+          .update(profileFields)
+          .eq("id", data.user.id);
+        if (profileUpdateError) {
+          console.error("Profile signup fields update error:", profileUpdateError);
         }
 
-        // Refresh profile to get the final role and profile data.
-        await refreshProfile();
-        return Boolean(profile);
+        // Load the final profile (with grade + role) directly from the new user.
+        const profile = await fetchUserProfile(data.user.id, data.user);
+        setUser(profile);
+        setIsLoading(false);
+        if (!profile) {
+          toast.error("Account created, but your profile couldn't be loaded. Please sign in again.");
+        }
+        return profile;
       }
 
-      return false;
+      return null;
     } catch (error) {
       console.error('Signup error:', error);
       toast.error("Signup failed. Please try again.");
-      return false;
+      return null;
     }
   };
 
