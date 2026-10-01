@@ -292,8 +292,13 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
             case "teacher":
               navigate("/teacher", { replace: true });
               break;
+            case "student":
             default:
-              navigate("/", { replace: true });
+              // The student home is already rendered by Index at "/".
+              // Calling onSuccess lets Index switch from the auth stage to the
+              // correct tier portal (early/middle/upper) instead of navigating
+              // to the same "/auth" screen and leaving the login form visible.
+              await onSuccess();
               break;
           }
         } else {
