@@ -414,6 +414,31 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           toast.warning("Account created, but we couldn't finish account setup. Your student account is still usable.");
         }
 
+        // Persist the grade selected during signup. The auth trigger creates
+        // the base profile, while grade and education level are application
+        // profile fields that must be stored explicitly.
+        if (grade?.trim()) {
+          const normalizedGrade = grade.trim();
+          const educationLevel =
+            normalizedGrade.toLowerCase() === "k" || /^grade\s*[1-4]$/i.test(normalizedGrade)
+              ? "early"
+              : /^grade\s*[5-8]$/i.test(normalizedGrade)
+                ? "middle"
+                : "upper";
+
+          const { error: profileUpdateError } = await supabase
+            .from("profiles")
+            .update({
+              grade: normalizedGrade,
+              education_level: educationLevel,
+            })
+            .eq("id", data.user.id);
+
+          if (profileUpdateError) {
+            console.error("Profile grade update error:", profileUpdateError);
+          }
+        }
+
         // Refresh profile to get the final role and profile data.
         await refreshProfile();
         return Boolean(profile);
