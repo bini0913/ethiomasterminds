@@ -148,7 +148,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     setUsernameStatus("checking");
     const { data, error } = await supabase.rpc("get_email_by_username", {
       _username: normalized,
-    });
+    } as any);
 
     if (error) {
       setUsernameStatus("idle");
