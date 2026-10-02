@@ -112,3 +112,14 @@
   .text-gradient, .text-gradient-cyan { color: hsl(var(--primary)); background: none; -webkit-text-fill-color: currentColor; }
   .bg-grid { background-image: linear-gradient(hsl(var(--border) / .25) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / .25) 1px, transparent 1px); background-size: 50px 50px; }
 }
+
+/* Early Learners feedback motion */
+@keyframes early-pop { 0% { transform: scale(.4); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@keyframes early-wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+@keyframes early-sheet { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes early-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.early-pop { animation: early-pop .45s ease-out; }
+.early-wiggle { animation: early-wiggle .5s ease-in-out 2; }
+.early-sheet { animation: early-sheet .25s ease-out; }
+.early-shake { animation: early-shake .3s ease-in-out 2; }
+@media (prefers-reduced-motion: reduce) { .early-pop, .early-wiggle, .early-sheet, .early-shake { animation: none; } }
