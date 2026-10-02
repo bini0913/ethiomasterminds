@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Brain, Check, Lightbulb, Rocket, Search, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -37,7 +37,10 @@ export default function EarlyExplorePage() {
   const [search, setSearch] = useState("");
   const [topic, setTopic] = useState(0);
   const [revealed, setRevealed] = useState(false);
-  const visible = useMemo(() => areas.filter((a) => grade >= a.min && a.title.toLowerCase().includes(search.toLowerCase())), [grade, search]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem("master-minds-early-explore-favorites") || "[]"); if (Array.isArray(saved)) setFavorites(saved); } catch {} }, []);
+  const visible = useMemo(() => areas.filter((a) => grade >= a.min && a.title.toLowerCase().includes(search.toLowerCase())).sort((a,b) => Number(favorites.includes(b.id)) - Number(favorites.includes(a.id))), [grade, search, favorites]);
+  const toggleFavorite = (id: string) => { const next = favorites.includes(id) ? favorites.filter((x) => x !== id) : [...favorites, id]; setFavorites(next); try { localStorage.setItem("master-minds-early-explore-favorites", JSON.stringify(next)); } catch {} };
   const current = topics[topic % topics.length];
 
   const next = () => { setRevealed(false); setTopic((x) => x + 1); };
@@ -53,7 +56,7 @@ export default function EarlyExplorePage() {
     <main className="mx-auto max-w-4xl space-y-6 py-6">
       <section className="rounded-[2rem] bg-primary/10 p-6 sm:p-8"><p className="font-semibold text-primary">Learn inside Master Minds</p><h1 className="mt-1 text-3xl font-display font-bold">Choose your next adventure</h1><p className="mt-2 text-muted-foreground">Pick a topic, learn something, then try a mini challenge.</p></section>
       <div className="relative"><Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" aria-hidden="true" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search topics..." aria-label="Search Explore topics" className="min-h-12 rounded-2xl pl-10" /></div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{visible.map((a) => <button key={a.id} type="button" onClick={() => { setTopic(areas.findIndex((x) => x.id === a.id)); setRevealed(false); }} className="min-h-44 rounded-[1.75rem] border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-1 active:scale-[.98]"><div className="text-4xl" aria-hidden="true">{a.icon}</div><h2 className="mt-3 font-display font-bold">{a.title}</h2><p className="mt-1 text-xs text-muted-foreground">{a.desc}</p><Badge variant="secondary" className="mt-3">{a.min === 0 ? "All early grades" : `From Grade ${a.min}`}</Badge></button>)}</div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{visible.map((a) => <button key={a.id} type="button" onClick={() => { setTopic(areas.findIndex((x) => x.id === a.id)); setRevealed(false); }} className="min-h-44 rounded-[1.75rem] border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-1 active:scale-[.98]"><div className="flex items-start justify-between"><div className="text-4xl" aria-hidden="true">{a.icon}</div><button type="button" aria-label={favorites.includes(a.id) ? "Remove favorite" : "Save favorite"} onClick={(event) => { event.stopPropagation(); toggleFavorite(a.id); }} className="rounded-xl p-2 hover:bg-muted">{favorites.includes(a.id) ? "⭐" : "☆"}</button></div><h2 className="mt-3 font-display font-bold">{a.title}</h2><p className="mt-1 text-xs text-muted-foreground">{a.desc}</p><Badge variant="secondary" className="mt-3">{a.min === 0 ? "All early grades" : `From Grade ${a.min}`}</Badge></button>)}</div>
       <Card className="rounded-[2rem]"><CardContent className="space-y-4 p-5 sm:p-7">
         <div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-warning/15"><Lightbulb className="h-6 w-6 text-warning" /></div><div><p className="text-xs font-semibold uppercase tracking-wide text-primary">Learn → Think → Answer</p><h2 className="font-display text-2xl font-bold">{current.title}</h2></div></div>
         <p className="leading-7 text-muted-foreground">{current.body}</p>
