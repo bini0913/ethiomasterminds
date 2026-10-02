@@ -1,4 +1,3 @@
-import React,{useMemo,useState}from"react";
 import{ArrowLeft,PlayCircle,Sparkles,BookOpen,Flame}from"lucide-react";
 import{useNavigate}from"react-router-dom";
 import{useUser}from"@/context/UserContext";
