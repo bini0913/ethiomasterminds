@@ -1,5 +1,4 @@
-import React,{useMemo,useState}from"react";
-import{ArrowLeft,BookOpen,Brain,Heart,Lightbulb,Map,Music,Palette,Rocket,Search,Star,Users}from"lucide-react";
+import{ArrowLeft,Brain,Lightbulb,Rocket,Search,Star}from"lucide-react";
 import{useNavigate}from"react-router-dom";
 import{useUser}from"@/context/UserContext";
 import{toEarlyGrade,getGradeProfile}from"@/features/early/engine/gradeProfile";
