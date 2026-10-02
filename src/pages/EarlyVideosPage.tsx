@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 
 type VideoResource = {
   id: string; title: string; description: string | null; subject: string | null;
-  grade_min: number; grade_max: number; provider: string | null; url: string; icon: string | null;
+  grade_min: number; grade_max: number; provider: string | null; url: string; icon: string | null; fallback_url?: string | null; status?: string;
 };
 
 const shelves = [
@@ -48,8 +48,8 @@ export default function EarlyVideosPage() {
     const load = async () => {
       setLoading(true);
       const { data, error } = await supabase.from("early_video_resources")
-        .select("id,title,description,subject,grade_min,grade_max,provider,url,icon")
-        .eq("active", true).lte("grade_min", grade).gte("grade_max", grade).order("title");
+        .select("id,title,description,subject,grade_min,grade_max,provider,url,icon,fallback_url,status")
+        .eq("active", true).eq("status", "approved").lte("grade_min", grade).gte("grade_max", grade).order("title");
       if (!mounted) return;
       if (error) { console.error("Early video resources load failed:", error); setResources([]); }
       else setResources((data ?? []) as VideoResource[]);
