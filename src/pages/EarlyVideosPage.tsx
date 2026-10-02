@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BookOpen, ExternalLink, PlayCircle, Sparkles, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, BookOpen, PlayCircle, Sparkles, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { toEarlyGrade, getGradeProfile } from "@/features/early/engine/gradeProfile";
@@ -59,7 +59,7 @@ export default function EarlyVideosPage() {
     };
     void load();
     return () => { mounted = false; };
-  }, [grade]);
+  }, [grade, user?.id]);
 
   const visible = useMemo(() => resources.filter((item) => !item.subject || item.subject.toLowerCase() === shelf.subject), [resources, shelf.subject]);
 
@@ -74,7 +74,7 @@ export default function EarlyVideosPage() {
     <main className="mx-auto max-w-4xl space-y-5 py-6">
       <section className="rounded-[2rem] bg-primary/10 p-6 sm:p-8">
         <div className="flex items-center gap-3"><span className="text-4xl" aria-hidden="true">🎬</span><div><p className="font-semibold text-primary">Watch • Wonder • Learn</p><h1 className="text-3xl font-display font-bold">Videos for {profile.label}</h1></div></div>
-        <p className="mt-3 text-sm text-muted-foreground">Only resources published in the Master Minds library are shown. Live video search is intentionally not exposed in the child experience.</p>
+        <p className="mt-3 text-sm text-muted-foreground">Only resources published in the Master Minds library are shown. Children never leave Master Minds. YouTube is used only as the embedded video player inside this learning library.</p>
       </section>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {shelves.map((item) => <button key={item.id} type="button" onClick={() => setActive(item.id)} aria-pressed={active === item.id} className={`min-h-20 rounded-2xl border p-3 text-left font-semibold transition ${active === item.id ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-muted"}`}><span className="text-2xl" aria-hidden="true">{item.icon}</span><span className="mt-1 block text-sm">{item.title}</span></button>)}
@@ -86,7 +86,7 @@ export default function EarlyVideosPage() {
           return <Card key={item.id} className="overflow-hidden rounded-[1.75rem]">
             {embed ? <div className="aspect-video bg-black"><iframe title={item.title} src={embed} className="h-full w-full" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /></div> :
               <div className="flex aspect-video items-center justify-center bg-muted/50 p-6 text-center"><div><div className="text-4xl" aria-hidden="true">{item.icon || "🎬"}</div><p className="mt-2 text-sm font-semibold">{item.provider || "Master Minds resource"}</p></div></div>}
-            <CardContent className="space-y-3 p-5"><div className="flex flex-wrap gap-2"><Badge variant="secondary">{profile.label}</Badge>{item.provider && <Badge variant="outline">{item.provider}</Badge>}</div><h2 className="font-display text-xl font-bold">{item.title}</h2>{item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}<div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" className="min-h-11 w-full" asChild><a href={item.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Open resource</a></Button><Button variant={watched.has(item.id) ? "secondary" : "default"} className="min-h-11 w-full" onClick={async () => { const next = new Set(watched); next.add(item.id); setWatched(next); await supabase.from("early_video_views").upsert({ user_id: user?.id, video_id: item.id, seconds_watched: 0, completed: true, updated_at: new Date().toISOString() }); }}><CheckCircle2 className="mr-2 h-4 w-4" />{watched.has(item.id) ? "Watched ✓" : "Mark watched"}</Button></div></CardContent>
+            <CardContent className="space-y-3 p-5"><div className="flex flex-wrap gap-2"><Badge variant="secondary">{profile.label}</Badge>{item.provider && <Badge variant="outline">{item.provider}</Badge>}</div><h2 className="font-display text-xl font-bold">{item.title}</h2>{item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}<div className="grid gap-2"><Button variant={watched.has(item.id) ? "secondary" : "default"} className="min-h-11 w-full" onClick={async () => { const next = new Set(watched); next.add(item.id); setWatched(next); await supabase.from("early_video_views").upsert({ user_id: user?.id, video_id: item.id, seconds_watched: 0, completed: true, updated_at: new Date().toISOString() }); }}><CheckCircle2 className="mr-2 h-4 w-4" />{watched.has(item.id) ? "Watched ✓" : "Mark watched"}</Button></div></CardContent>
           </Card>;
         })}</div>}
       <Button variant="outline" className="min-h-12 w-full" onClick={() => nav("/early-explore")}><Sparkles className="mr-2 h-4 w-4" />Continue to Explore</Button>
