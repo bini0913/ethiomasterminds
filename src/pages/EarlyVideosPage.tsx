@@ -1,19 +1,23 @@
-import React from "react";
-import { ArrowLeft, ExternalLink, PlayCircle, Sparkles } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
+import React,{useMemo,useState}from"react";
+import{ArrowLeft,PlayCircle,Sparkles,BookOpen,Flame}from"lucide-react";
+import{useNavigate}from"react-router-dom";
+import{useUser}from"@/context/UserContext";
+import{toEarlyGrade,getGradeProfile}from"@/features/early/engine/gradeProfile";
+import{Button}from"@/components/ui/button";
+import{Card,CardContent}from"@/components/ui/card";
+import{Badge}from"@/components/ui/badge";
 
-const resources = [
-  { title:"Math Adventures", description:"Counting, shapes, patterns, and early math practice.", icon:"🔢", href:"https://www.khanacademy.org/kids", source:"Khan Academy Kids" },
-  { title:"Reading & Stories", description:"Letters, sounds, words, stories, and read-aloud learning.", icon:"📚", href:"https://www.khanacademy.org/kids/ela", source:"Khan Academy Kids" },
-  { title:"Science & Nature", description:"Curiosity-led science, animals, nature, and discovery.", icon:"🌱", href:"https://www.pbs.org/parents/lets-play-games", source:"PBS KIDS" },
-  { title:"Creative Time", description:"Stories, art, movement, and playful learning ideas.", icon:"🎨", href:"https://www.khanacademy.org/kids", source:"Khan Academy Kids" },
+const shelves=[
+ {id:"math",title:"Math Lab",icon:"🔢",q:["early math counting for kindergarten","grade 1 addition subtraction for kids","grade 2 multiplication math for kids","grade 3 multiplication division math for kids","grade 4 fractions multiplication math for kids"]},
+ {id:"reading",title:"Read & Grow",icon:"📚",q:["phonics letter sounds for kindergarten","grade 1 reading phonics","grade 2 reading comprehension for kids","grade 3 grammar reading for kids","grade 4 vocabulary grammar for kids"]},
+ {id:"science",title:"Science Safari",icon:"🔬",q:["science animals for kindergarten","grade 1 science plants animals","grade 2 science earth space for kids","grade 3 science ecosystems for kids","grade 4 science energy matter for kids"]},
+ {id:"world",title:"World Explorer",icon:"🌍",q:["world geography for young children","grade 1 geography for kids","grade 2 geography continents for kids","grade 3 Ethiopia geography for kids","grade 4 world geography Ethiopia for kids"]},
 ];
 
-const EarlyVideosPage: React.FC = () => {
-  const navigate=useNavigate();
-  return <div className="min-h-screen bg-background px-4 pb-24"><header className="sticky top-0 z-20 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur"><div className="mx-auto flex max-w-4xl items-center justify-between"><Button variant="ghost" size="icon" onClick={()=>navigate("/")} aria-label="Back"><ArrowLeft/></Button><div className="flex items-center gap-2"><PlayCircle className="h-6 w-6 text-accent"/><h1 className="font-display text-xl font-bold">Videos & Stories</h1></div><Sparkles className="h-5 w-5 text-warning"/></div></header><main className="mx-auto max-w-4xl space-y-6 py-6"><section className="rounded-[2rem] bg-accent/15 p-6 sm:p-8"><p className="font-semibold text-accent">Watch • Wonder • Learn</p><h2 className="mt-1 text-3xl font-display font-bold">Pick something to explore</h2><p className="mt-2 text-muted-foreground">Master Minds keeps this shelf curated around early learning.</p></section><div className="grid gap-4 sm:grid-cols-2">{resources.map((item)=><Card key={item.title} className="overflow-hidden rounded-[1.75rem]"><div className="flex h-28 items-center justify-center bg-primary/10 text-6xl">{item.icon}</div><CardContent className="space-y-3 p-5"><h3 className="text-xl font-display font-bold">{item.title}</h3><p className="text-sm text-muted-foreground">{item.description}</p><p className="text-xs font-semibold text-muted-foreground">Curated source: {item.source}</p><Button className="w-full" onClick={()=>window.open(item.href,"_blank","noopener,noreferrer")}>Watch & explore <ExternalLink className="ml-2 h-4 w-4"/></Button></CardContent></Card>)}</div><p className="text-center text-xs text-muted-foreground">This curated shelf is managed by Master Minds and currently opens official learning sources. Watched progress can be added when in-app video hosting is introduced.</p></main></div>;
-};
-export default EarlyVideosPage;
+export default function EarlyVideosPage(){
+ const nav=useNavigate(),{user}=useUser(),grade=toEarlyGrade(user?.grade),profile=getGradeProfile(grade);
+ const [active,setActive]=useState(shelves[0].id);
+ const shelf=shelves.find(s=>s.id===active)??shelves[0];
+ const query=useMemo(()=>encodeURIComponent(shelf.q[grade]),[shelf,grade]);
+ return <div className="min-h-screen bg-background px-4 pb-24"><header className="sticky top-0 z-20 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur"><div className="mx-auto flex max-w-4xl items-center gap-3"><Button variant="ghost" size="icon" onClick={()=>nav("/")} aria-label="Back"><ArrowLeft/></Button><div className="flex-1"><p className="font-display text-xl font-bold">Videos & Stories</p><p className="text-xs text-muted-foreground">{profile.label} • curated learning shelf</p></div><PlayCircle className="h-6 w-6 text-primary"/></div></header><main className="mx-auto max-w-4xl space-y-5 py-6"><section className="rounded-[2rem] bg-primary/10 p-6 sm:p-8"><div className="flex items-center gap-3"><span className="text-4xl">🎬</span><div><p className="font-semibold text-primary">Watch • Wonder • Learn</p><h1 className="text-3xl font-display font-bold">Videos made for {profile.label}</h1></div></div><p className="mt-3 text-sm text-muted-foreground">Videos stay inside Master Minds. The shelf changes with the learner's grade instead of showing the same topics to everyone.</p></section><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{shelves.map(s=><button key={s.id} onClick={()=>setActive(s.id)} className={`rounded-2xl border p-3 text-left font-semibold ${active===s.id?"border-primary bg-primary/10":"border-border bg-card"}`}><span className="text-2xl">{s.icon}</span><span className="mt-1 block text-sm">{s.title}</span></button>)}</div><Card className="overflow-hidden rounded-[2rem]"><div className="aspect-video w-full bg-black"><iframe title={`${shelf.title} for ${profile.label}`} src={`https://www.youtube-nocookie.com/embed?listType=search&list=${query}&rel=0`} className="h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen/></div><CardContent className="space-y-3 p-5"><div className="flex items-center gap-2"><Badge variant="secondary">{profile.label}</Badge><Badge variant="outline">{shelf.title}</Badge></div><h2 className="font-display text-xl font-bold">Keep exploring</h2><p className="text-sm text-muted-foreground">Master Minds embeds YouTube's player here so the learner does not need to leave the app. For production, admins can replace these discovery shelves with reviewed video IDs from the Early Content manager.</p><div className="flex items-center gap-2 text-xs text-muted-foreground"><Flame className="h-4 w-4"/>Use short sessions and discuss what was learned.</div></CardContent></Card><Card><CardContent className="flex gap-3 p-4"><BookOpen className="h-5 w-5 text-primary"/><p className="text-sm text-muted-foreground">Video search results can change over time. Admin-reviewed resources should be used for the final child-safe production library.</p></CardContent></Card><Button variant="outline" className="w-full min-h-12" onClick={()=>nav("/early-explore")}><Sparkles className="mr-2 h-4 w-4"/>Continue to Explore</Button></main></div>;
+}
