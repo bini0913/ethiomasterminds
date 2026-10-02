@@ -39,6 +39,10 @@ jobs:
         run: npm run typecheck
 
       - name: Build web app
+        env:
+          VITE_SUPABASE_URL: https://mytbjkchvfybhyqcynnl.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_GtWjzcVR3XxRddFfyxqeaA_5xZ33-lM' }}
+          VITE_SUPABASE_PROJECT_ID: mytbjkchvfybhyqcynnl
         run: npx vite build
 
       - name: Sync Capacitor Android project
