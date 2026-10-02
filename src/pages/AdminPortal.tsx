@@ -789,6 +789,11 @@ const AdminPortal: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Button variant="outline" onClick={bootstrapSuperAdmin} className="hidden sm:inline-flex">
+                  <Shield className="mr-2 h-4 w-4" /> Super Admin
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" className="relative">
