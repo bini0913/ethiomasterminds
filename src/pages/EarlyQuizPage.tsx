@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Lightbulb, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -28,7 +28,7 @@ const EarlyQuizPage: React.FC = () => {
   const [streak, setStreak] = useState(0);
   const [hintsLeft, setHintsLeft] = useState(profile.hints);
   const [hidden, setHidden] = useState<string[]>([]);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(false);\n  const [secondsLeft, setSecondsLeft] = useState(profile.timerSeconds);
 
   const counts = useMemo(() => Object.fromEntries(QUIZ_SUBJECTS.map((s) => [s.id, s.id === "Math" ? "∞" : QUIZ_BANK.filter((q) => q.subject === s.id && grade >= q.gradeMin && grade <= q.gradeMax).length])), [grade]);
 
@@ -171,7 +171,7 @@ const EarlyQuizPage: React.FC = () => {
           <Button variant="ghost" onClick={useHint} className="min-h-12"><Lightbulb className="mr-2 h-5 w-5 text-warning" />Use a hint ({hintsLeft} left)</Button>
         )}
       </div>
-      {selected && <FeedbackOverlay state={selected === current.answer ? "correct" : "wrong"} answer={current.answer} explain={current.explain} onNext={next} />}
+      {selected && <FeedbackOverlay state={selected === current.answer ? "correct" : "wrong"} answer={selected === "__TIMEOUT__" ? `Time! The answer was ${current.answer}` : current.answer} explain={selected === "__TIMEOUT__" ? "The timer ended. Take a breath and try the next one." : current.explain} onNext={next} />}
     </div>
   );
 };
