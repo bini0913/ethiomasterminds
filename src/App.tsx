@@ -13,6 +13,7 @@ import Friends from "./pages/Friends";
 import Settings from "./pages/Settings";
 import EnhancedSettings from "./pages/EnhancedSettings";
 import NotFound from "./pages/NotFound";
+import NotificationSettingsPage from "./pages/NotificationSettingsPage";
 import StorePage from "./pages/StorePage";
 import TeacherPortal from "./pages/TeacherPortal";
 import AdminPortal from "./pages/AdminPortal";
@@ -65,6 +66,8 @@ import { ArrowLeft, Home, LogOut } from "lucide-react";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
 import NativeBackHandler from "./components/mobile/NativeBackHandler";
+import NotificationBootstrap from "./components/notifications/NotificationBootstrap";
+import NotificationRouteHandler from "./components/notifications/NotificationRouteHandler";
 
 const queryClient = new QueryClient();
 
@@ -100,6 +103,7 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/store", title: "Rewards Store" },
   { prefix: "/avatar-creator", title: "Avatar" },
   { prefix: "/profile/", title: "Profile" },
+  { prefix: "/notifications", title: "Notifications" },
   { prefix: "/enhanced-settings", title: "Settings" },
   { prefix: "/settings", title: "Settings" },
   { prefix: "/revision", title: "Revision" },
@@ -238,6 +242,7 @@ const App = () => (
                               <Route path="/profile/:userId" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><UserProfilePage /></ProtectedRoute>} />
                               <Route path="/friends" element={<EarlyTierRestrictedRoute><Friends /></EarlyTierRestrictedRoute>} />
                               <Route path="/settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Settings /></ProtectedRoute>} />
+                              <Route path="/notifications" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
                               <Route 
                                 path="/teacher" 
@@ -325,6 +330,8 @@ const App = () => (
                             </Routes>
                             </AppChrome>
                             <NativeBackHandler />
+                            <NotificationBootstrap />
+                            <NotificationRouteHandler />
                             <AIHelper />
                           </BrowserRouter>
                           </TooltipProvider>

@@ -273,6 +273,11 @@ const Settings: React.FC = () => {
                     />
                   </div>
                   
+                  <Button variant="outline" className="w-full" onClick={() => navigate("/notifications")}>
+                    <Bell className="h-4 w-4 mr-2" />
+                    Open notification settings
+                  </Button>
+
                   {/* Individual Toggles */}
                   <div className="space-y-3 opacity-80" style={{ opacity: notifications ? 1 : 0.5 }}>
                     {[
