@@ -10,27 +10,28 @@ const unique = (xs: string[]) => [...new Set(xs)];
 const opts = (answer: string, pool: string[], count: number) =>
   shuffle(unique([answer, ...pool.filter((x) => x !== answer)]).slice(0, count));
 
-export function gradeGameRounds(kind: GameKind, grade: EarlyGrade, count = 6): GameRound[] {
+export function gradeGameRounds(kind: GameKind, grade: EarlyGrade, count = 6, difficulty = 1): GameRound[] {
   const p = getGradeProfile(grade);
+  const d = Math.max(1, Math.min(5, Math.round(difficulty)));
   const out: GameRound[] = [];
 
   for (let i = 0; i < count; i++) {
     if (kind === "number") {
       const max = p.numberMax;
       if (grade === 0) {
-        const a = n(1, 5), b = n(1, 5), answer = a + b;
+        const cap = Math.min(10, 4 + d * 2); const a = n(1, cap), b = n(1, cap), answer = a + b;
         out.push({ prompt: "How many altogether?", answer: String(answer), options: opts(String(answer), [String(answer - 1), String(answer + 1), String(answer + 2)], p.choices), explain: `${a} and ${b} make ${answer}.`, visual: "🍎".repeat(a) + "  " + "🍎".repeat(b), skill: "math" });
       } else if (grade === 1) {
-        const a = n(5, Math.min(20, max)), b = n(1, a), answer = a - b;
+        const upper = Math.min(max, 10 + d * 4); const a = n(5, upper), b = n(1, a), answer = a - b;
         out.push({ prompt: `${a} − ${b} = ?`, answer: String(answer), options: opts(String(answer), [String(answer + 1), String(Math.max(0, answer - 1)), String(answer + 2)], p.choices), explain: `Count back ${b} from ${a} to get ${answer}.`, skill: "math" });
       } else if (grade === 2) {
-        const a = n(20, 70), b = n(10, 30), answer = a + b;
+        const a = n(20, Math.min(max, 50 + d * 10)), b = n(10, Math.min(40, 8 + d * 6)), answer = a + b;
         out.push({ prompt: `${a} + ${b} = ?`, answer: String(answer), options: opts(String(answer), [String(answer + 10), String(answer - 10), String(answer + 1)], p.choices), explain: `Add tens and ones: ${a} + ${b} = ${answer}.`, skill: "math" });
       } else if (grade === 3) {
-        const a = n(2, 10), b = n(2, 10), answer = a * b;
+        const a = n(2, Math.min(12, 6 + d)), b = n(2, Math.min(12, 6 + d)), answer = a * b;
         out.push({ prompt: `${a} × ${b} = ?`, answer: String(answer), options: opts(String(answer), [String(answer + b), String(answer - b), String(answer + 10)], p.choices), explain: `${a} groups of ${b} make ${answer}.`, skill: "math" });
       } else {
-        const a = n(12, 50), b = n(3, 9), answer = a * b;
+        const a = n(12, Math.min(80, 30 + d * 12)), b = n(3, Math.min(12, 4 + d * 2)), answer = a * b;
         out.push({ prompt: `${a} × ${b} = ?`, answer: String(answer), options: opts(String(answer), [String(answer + b), String(answer - b), String(answer + 20)], p.choices), explain: `Break the multiplication into tens and ones to check ${answer}.`, skill: "math" });
       }
     } else if (kind === "word") {
@@ -42,11 +43,12 @@ export function gradeGameRounds(kind: GameKind, grade: EarlyGrade, count = 6): G
       const s = sets[i % sets.length], answer = s[0];
       out.push({ prompt: grade < 2 ? "Which word matches the picture?" : grade === 2 ? "Which word is an animal?" : "Which word best completes the idea?", answer, options: opts(answer, s.slice(1), p.choices), visual: grade < 2 ? ["🐱", "🐶", "☀️"][i % 3] : undefined, explain: grade < 2 ? `${answer} is the word to practise.` : `${answer} is the correct vocabulary choice.`, skill: "reading" });
     } else if (kind === "pattern") {
-      const step = grade < 2 ? 2 : grade === 2 ? 5 : grade === 3 ? 3 : 4;
+      const baseStep = grade < 2 ? 2 : grade === 2 ? 5 : grade === 3 ? 3 : 4;
+      const step = baseStep + Math.max(0, d - 2);
       const start = n(1, 10), sequence = [start, start + step, start + step * 2], answer = String(start + step * 3);
       out.push({ prompt: `${sequence.join(", ")}, ?`, answer, options: opts(answer, [String(Number(answer) + step), String(Number(answer) - step), String(Number(answer) + 1)], p.choices), explain: `The pattern adds ${step} each time.`, skill: "patterns" });
     } else if (kind === "logic") {
-      const a = n(2, 9), b = n(2, 9), answer = String(Math.max(a, b));
+      const a = n(2, 8 + d * 2), b = n(2, 8 + d * 2), answer = String(Math.max(a, b));
       out.push({ prompt: `Which number is greater: ${a} or ${b}?`, answer, options: opts(answer, [String(a), String(b), String(Math.max(1, Math.min(a, b) - 1)), String(Math.max(a, b) + 1)], p.choices), explain: `Compare the numbers: ${answer} is greater.`, skill: "logic" });
     } else if (kind === "science") {
       const sets = grade < 2
@@ -63,11 +65,11 @@ export function gradeGameRounds(kind: GameKind, grade: EarlyGrade, count = 6): G
       out.push({ prompt: "Choose the command path that reaches the star.", answer, options: opts(answer, alternatives, p.choices), visual: moves.join(" "), explain: "Follow the arrows in order. Every command is one step.", skill: "sequencing" });
     } else if (kind === "clock") {
       const hour = n(1, 12);
-      const minutes = grade < 3 ? 0 : [0, 15, 30, 45][i % 4];
+      const minutes = grade < 3 ? (d >= 4 ? [0, 30][i % 2] : 0) : [0, 15, 30, 45][i % 4];
       const answer = `${hour}:${String(minutes).padStart(2, "0")}`;
       out.push({ prompt: "What time is shown?", answer, options: opts(answer, [`${hour === 12 ? 1 : hour + 1}:00`, `${hour}:30`, `${hour}:15`], p.choices), visual: "🕐", explain: `The clock shows ${answer}.`, skill: "time" });
     } else if (kind === "money") {
-      const paid = grade < 3 ? 10 : 20;
+      const paid = grade < 3 ? (d >= 4 ? 20 : 10) : 20;
       const price = n(1, Math.floor(paid / 5)) * 5;
       const change = paid - price;
       const answer = String(change);

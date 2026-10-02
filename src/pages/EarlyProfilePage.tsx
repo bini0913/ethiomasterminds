@@ -1,0 +1,13 @@
+import { useEffect, useState } from "react";
+import { ArrowLeft, BookOpen, Trophy, Sparkles, Star } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "@/context/UserContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import AvatarRenderer from "@/components/avatar/AvatarRenderer";
+export default function EarlyProfilePage(){
+ const nav=useNavigate();const {user}=useUser();const [summary,setSummary]=useState<any>({});
+ useEffect(()=>{if(!user?.id)return;(async()=>{const {data}=await(supabase as any).rpc("get_early_profile_summary",{p_user_id:user.id});setSummary(data??{})})()},[user?.id]);
+ return <div className="min-h-screen bg-background px-4 pb-24"><header className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur"><div className="mx-auto flex max-w-3xl items-center gap-3"><Button variant="ghost" size="icon" onClick={()=>nav("/")}><ArrowLeft/></Button><div className="flex-1"><h1 className="font-display text-xl font-bold">My Early Profile</h1><p className="text-xs text-muted-foreground">Your learning journey</p></div><Button variant="outline" onClick={()=>nav("/early-collection")}>Collection</Button></div></header><main className="mx-auto max-w-3xl space-y-5 py-6"><Card className="rounded-[2rem] overflow-hidden"><CardContent className="p-6"><div className="flex items-center gap-4"><AvatarRenderer avatar={user?.avatar} avatarConfig={user?.avatarConfig} size="lg"/><div><p className="text-sm text-muted-foreground">Hello!</p><h2 className="text-2xl font-display font-bold">{user?.name||user?.username||"Learner"}</h2><p className="text-sm text-muted-foreground">{user?.grade||"KG"} • Level {summary.level??1}</p></div></div><div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">{[[Sparkles,"XP",summary.xp??0],[Trophy,"Level",summary.level??1],[Star,"Stars",summary.stars??0],[BookOpen,"Discovered",summary.discovered??0]].map(([I,l,v]:any)=><div key={l} className="rounded-2xl bg-muted/60 p-4"><I className="h-5 w-5 text-primary"/><p className="mt-2 text-xs text-muted-foreground">{l}</p><p className="text-xl font-display font-bold">{Number(v).toLocaleString()}</p></div>)}</div></CardContent></Card><div className="grid gap-3 sm:grid-cols-2"><Button className="min-h-12" onClick={()=>nav("/early-progress")}>View my learning progress</Button><Button variant="outline" className="min-h-12" onClick={()=>nav("/early-collection")}>Open collection book</Button></div></main></div>;
+}

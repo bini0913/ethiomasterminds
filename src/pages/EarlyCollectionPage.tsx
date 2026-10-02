@@ -1,0 +1,17 @@
+import { useEffect, useState } from "react";
+import { ArrowLeft, Coins, Lock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "@/context/UserContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+type Item={id:string;name:string;description:string;icon:string;rarity:string;set_name:string;price_coins:number};
+export default function EarlyCollectionPage(){
+ const nav=useNavigate(); const {user}=useUser(); const [items,setItems]=useState<Item[]>([]); const [owned,setOwned]=useState<Set<string>>(new Set()); const [coins,setCoins]=useState(0); const [busy,setBusy]=useState<string|null>(null);
+ const load=async()=>{if(!user?.id)return;const [a,b,c]=await Promise.all([supabase.from("early_collectibles").select("id,name,description,icon,rarity,set_name,price_coins").eq("active",true).order("price_coins"),supabase.from("early_user_collection").select("collectible_id").eq("user_id",user.id),supabase.from("user_currency").select("coins").eq("user_id",user.id).maybeSingle()]);setItems((a.data??[]) as Item[]);setOwned(new Set((b.data??[]).map((x:any)=>x.collectible_id)));setCoins(c.data?.coins??0);};
+ useEffect(()=>{void load()},[user?.id]);
+ const buy=async(id:string)=>{setBusy(id);const {error}=await (supabase as any).rpc("purchase_early_item",{p_item_id:id});if(error)toast.error(error.message.includes("Not enough")?"You need more coins.":"Could not add that collectible.");else{toast.success("Collectible unlocked! ✨");await load()}setBusy(null)};
+ return <div className="min-h-screen bg-background px-4 pb-24"><header className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur"><div className="mx-auto flex max-w-4xl items-center gap-3"><Button variant="ghost" size="icon" onClick={()=>nav("/")}><ArrowLeft/></Button><div className="flex-1"><h1 className="font-display text-xl font-bold">My Collection</h1><p className="text-xs text-muted-foreground">Collect Early Learner treasures</p></div><Badge variant="secondary"><Coins className="mr-1 h-3.5 w-3.5"/>{coins}</Badge></div></header><main className="mx-auto max-w-4xl space-y-6 py-6"><section className="rounded-[2rem] bg-primary/10 p-6"><p className="font-semibold text-primary">Collection Book</p><h2 className="mt-1 text-3xl font-display font-bold">Build your treasure shelf</h2><p className="mt-2 text-sm text-muted-foreground">{owned.size} of {items.length} collectibles unlocked.</p></section><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{items.map(i=><Card key={i.id} className="rounded-[1.5rem]"><CardContent className="space-y-3 p-4 text-center"><div className={owned.has(i.id)?"text-5xl":"text-5xl opacity-25 grayscale"}>{owned.has(i.id)?i.icon:<Lock/>}</div><h3 className="font-display font-bold">{i.name}</h3><Badge variant="outline">{i.rarity}</Badge><p className="text-xs text-muted-foreground">{i.description}</p>{owned.has(i.id)?<p className="text-sm font-semibold text-success">Unlocked ✓</p>:<Button className="w-full" onClick={()=>buy(i.id)} disabled={busy===i.id||coins<i.price_coins}><Coins className="mr-1 h-4 w-4"/>{i.price_coins}</Button>}</CardContent></Card>)}</div></main></div>;
+}

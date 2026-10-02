@@ -1,0 +1,12 @@
+import { useEffect, useState } from "react";
+import { ArrowLeft, Medal, Trophy } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import AvatarRenderer from "@/components/avatar/AvatarRenderer";
+export default function EarlyLeaderboardPage(){
+ const nav=useNavigate();const [rows,setRows]=useState<any[]>([]);const [loading,setLoading]=useState(true);
+ useEffect(()=>{(async()=>{setLoading(true);const {data,error}=await(supabase as any).rpc("get_early_leaderboard",{p_scope:"grade",p_period:"all",p_category:"overall"});if(!error)setRows(data??[]);setLoading(false)})()},[]);
+ return <div className="min-h-screen bg-background px-4 pb-24"><header className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur"><div className="mx-auto flex max-w-3xl items-center gap-3"><Button variant="ghost" size="icon" onClick={()=>nav("/")}><ArrowLeft/></Button><div className="flex-1"><h1 className="font-display text-xl font-bold">Early Ranks</h1><p className="text-xs text-muted-foreground">Learning progress leaderboard</p></div><Trophy className="text-primary"/></div></header><main className="mx-auto max-w-3xl space-y-4 py-6"><Card className="rounded-[2rem]"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Top Early Learners</p><h2 className="text-2xl font-display font-bold">Learn, practise, grow ⭐</h2></CardContent></Card>{loading?<p className="p-5 text-center text-muted-foreground">Loading ranks…</p>:rows.map((r,i)=><Card key={r.username+"-"+i}><CardContent className="flex items-center gap-3 p-4"><div className="w-8 text-center font-bold">{i<3?<Medal className="mx-auto h-5 w-5 text-primary"/>:"#"+(i+1)}</div><AvatarRenderer avatar={r.avatar} size="sm"/><div className="flex-1"><p className="font-semibold">{r.username}</p><p className="text-xs text-muted-foreground">Level {r.level}</p></div><p className="font-display font-bold">{Number(r.score).toLocaleString()} XP</p></CardContent></Card>)}{!loading&&!rows.length&&<p className="p-6 text-center text-muted-foreground">Ranks will appear as learners start playing.</p>}</main></div>;
+}
