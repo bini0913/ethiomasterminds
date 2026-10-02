@@ -22,7 +22,7 @@ const facts:Fact[]=[
 {id:"heart",min:3,icon:"🫀",title:"Your Amazing Heart",body:"Your heart is a strong muscle that pumps blood around your body.",question:"What does the heart do?",options:["Pumps blood","Stores food","Makes bones","Sees light"],answer:"Pumps blood",subject:"Science"},
 {id:"magnet",min:4,icon:"🧲",title:"Magnet Magic",body:"Magnets attract some metals, including iron and many kinds of steel.",question:"Which object is attracted by a magnet?",options:["Iron nail","Wooden spoon","Paper cup","Plastic toy"],answer:"Iron nail",subject:"Science"},
 ];
-const speak=(text:string)=>{if("speechSynthesis"in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate:.9;speechSynthesis.speak(u)}};
+const speak=(text:string)=>{if("speechSynthesis"in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=0.9;speechSynthesis.speak(u)}};
 export default function EarlyDiscoverPage(){
  const nav=useNavigate(),{user}=useUser(),reward=useEarlyReward(),grade=toEarlyGrade(user?.grade),profile=getGradeProfile(grade);
  const pool=useMemo(()=>{const seen=readExposure(user?.id,"discover");return facts.filter(f=>grade>=f.min).sort((a,b)=>(seen[a.id]?.last??0)-(seen[b.id]?.last??0));},[grade,user?.id]);
