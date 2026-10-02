@@ -1,3 +1,4 @@
+import{useMemo,useState}from"react";
 import{ArrowLeft,Brain,Lightbulb,Rocket,Search,Star}from"lucide-react";
 import{useNavigate}from"react-router-dom";
 import{useUser}from"@/context/UserContext";
