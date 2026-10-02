@@ -436,7 +436,7 @@ BEGIN
   IF NOT public._is_extreme_admin() THEN
     RAISE EXCEPTION 'Super Admin access required';
   END IF;
-  IF p_status NOT IN ('active','suspended','banned','purged') THEN
+  IF p_status NOT IN ('active','suspended','banned') THEN
     RAISE EXCEPTION 'Invalid status';
   END IF;
   IF p_user_id=auth.uid() AND p_status<>'active' THEN
@@ -476,7 +476,7 @@ BEGIN
     INSERT INTO public.user_currency(user_id,coins,gems)
       VALUES (p_user_id,GREATEST(0,p_coin_delta),0)
       ON CONFLICT (user_id) DO UPDATE
-      SET coins=GREATEST(0,public.user_currency.coins+p_coin_delta), updated_at=now();
+      SET coins=GREATEST(0,user_currency.coins+p_coin_delta), updated_at=now();
   END IF;
 
   INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
