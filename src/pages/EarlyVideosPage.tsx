@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BookOpen, ExternalLink, PlayCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, BookOpen, ExternalLink, PlayCircle, Sparkles, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { toEarlyGrade, getGradeProfile } from "@/features/early/engine/gradeProfile";
@@ -40,6 +40,7 @@ export default function EarlyVideosPage() {
   const [active, setActive] = useState<(typeof shelves)[number]["id"]>("math");
   const [resources, setResources] = useState<VideoResource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [watched, setWatched] = useState<Set<string>>(new Set());
   const shelf = useMemo(() => shelves.find((s) => s.id === active) ?? shelves[0], [active]);
 
   useEffect(() => {
@@ -52,6 +53,8 @@ export default function EarlyVideosPage() {
       if (!mounted) return;
       if (error) { console.error("Early video resources load failed:", error); setResources([]); }
       else setResources((data ?? []) as VideoResource[]);
+      const { data: views } = await supabase.from("early_video_views").select("video_id,completed").eq("user_id", user?.id ?? "");
+      setWatched(new Set((views ?? []).filter((x: any) => x.completed).map((x: any) => x.video_id)));
       setLoading(false);
     };
     void load();
@@ -83,7 +86,7 @@ export default function EarlyVideosPage() {
           return <Card key={item.id} className="overflow-hidden rounded-[1.75rem]">
             {embed ? <div className="aspect-video bg-black"><iframe title={item.title} src={embed} className="h-full w-full" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /></div> :
               <div className="flex aspect-video items-center justify-center bg-muted/50 p-6 text-center"><div><div className="text-4xl" aria-hidden="true">{item.icon || "🎬"}</div><p className="mt-2 text-sm font-semibold">{item.provider || "Master Minds resource"}</p></div></div>}
-            <CardContent className="space-y-3 p-5"><div className="flex flex-wrap gap-2"><Badge variant="secondary">{profile.label}</Badge>{item.provider && <Badge variant="outline">{item.provider}</Badge>}</div><h2 className="font-display text-xl font-bold">{item.title}</h2>{item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}<Button variant="outline" className="min-h-11 w-full" asChild><a href={item.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Open resource</a></Button></CardContent>
+            <CardContent className="space-y-3 p-5"><div className="flex flex-wrap gap-2"><Badge variant="secondary">{profile.label}</Badge>{item.provider && <Badge variant="outline">{item.provider}</Badge>}</div><h2 className="font-display text-xl font-bold">{item.title}</h2>{item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}<div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" className="min-h-11 w-full" asChild><a href={item.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Open resource</a></Button><Button variant={watched.has(item.id) ? "secondary" : "default"} className="min-h-11 w-full" onClick={async () => { const next = new Set(watched); next.add(item.id); setWatched(next); await supabase.from("early_video_views").upsert({ user_id: user?.id, video_id: item.id, seconds_watched: 0, completed: true, updated_at: new Date().toISOString() }); }}><CheckCircle2 className="mr-2 h-4 w-4" />{watched.has(item.id) ? "Watched ✓" : "Mark watched"}</Button></div></CardContent>
           </Card>;
         })}</div>}
       <Button variant="outline" className="min-h-12 w-full" onClick={() => nav("/early-explore")}><Sparkles className="mr-2 h-4 w-4" />Continue to Explore</Button>
