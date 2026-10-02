@@ -23,6 +23,7 @@ import Chat from "./pages/Chat";
 import AITutor from "./pages/AITutor";
 import LearningDNA from "./pages/LearningDNA";
 import ParentDashboard from "./pages/ParentDashboard";
+import FinancePortal from "./pages/FinancePortal";
 import TimeTravelRevision from "./pages/TimeTravelRevision";
 import EnhancedSocial from "./pages/EnhancedSocial";
 import AvatarCreator from "./pages/AvatarCreator";
@@ -112,6 +113,7 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/admin/early-content", title: "Early Content" },
   { prefix: "/admin", title: "Admin Portal" },
   { prefix: "/manager-dashboard", title: "Manager Dashboard" },
+  { prefix: "/finance", title: "Finance Portal" },
   { prefix: "/root-control-portal-9xA7", title: "Control Portal" },
 ];
 
@@ -269,6 +271,14 @@ const App = () => (
                                 } 
                               />
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboard /></ProtectedRoute>} />
+                              <Route
+                                path="/finance"
+                                element={
+                                  <ProtectedRoute allowedRoles={["admin", "manager", "extreme_admin"]}>
+                                    <FinancePortal />
+                                  </ProtectedRoute>
+                                }
+                              />
                               <Route 
                                 path="/manager-dashboard" 
                                 element={
