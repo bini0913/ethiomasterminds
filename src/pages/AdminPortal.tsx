@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { sendRemoteNotifications } from '@/lib/staffNotifications';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/button';
@@ -379,15 +380,52 @@ const AdminPortal: React.FC = () => {
     }
 
     setLoading(true);
-    const { error } = await supabase.from('announcements').insert({ ...announcementForm, author_id: user.id });
-    setLoading(false);
+    const { data: createdAnnouncement, error } = await supabase
+      .from('announcements')
+      .insert({ ...announcementForm, author_id: user.id })
+      .select('id, title, content, target_type')
+      .single();
 
-    if (error) {
+    if (error || !createdAnnouncement) {
+      setLoading(false);
       toast.error('Failed to create announcement');
       return;
     }
 
-    toast.success('Announcement sent');
+    // Admin notifications target students and/or teachers. Managers and
+    // owner-only roles are intentionally outside this workflow.
+    const allowedRoles =
+      createdAnnouncement.target_type === 'students'
+        ? ['student']
+        : createdAnnouncement.target_type === 'teachers'
+          ? ['teacher']
+          : ['student', 'teacher'];
+
+    const { data: roleRows } = await supabase
+      .from('user_roles')
+      .select('user_id, role')
+      .in('role', allowedRoles);
+
+    const recipientIds = Array.from(
+      new Set((roleRows || []).map((row: any) => row.user_id).filter((id: string) => id && id !== user.id)),
+    );
+
+    const sentCount = await sendRemoteNotifications(
+      recipientIds.map((recipientId) => ({
+        userId: recipientId,
+        kind: 'admin_announcement',
+        title: createdAnnouncement.title,
+        body: createdAnnouncement.content,
+        data: { route: '/notifications', announcement_id: createdAnnouncement.id },
+      })),
+    );
+
+    setLoading(false);
+    toast.success(
+      sentCount > 0
+        ? `Announcement sent! ${sentCount} device(s) notified.`
+        : 'Announcement saved. No recipient device was available for push notification.',
+    );
     pushNotification(`Announcement: ${announcementForm.title}`);
     logAction('Created announcement', announcementForm.title);
     setAnnouncementForm({ title: '', content: '', target_type: 'all' });
