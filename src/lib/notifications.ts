@@ -123,8 +123,6 @@ export async function registerForPushNotifications(userId: string): Promise<bool
   const allowed = await requestNotificationPermission();
   if (!allowed) return false;
 
-  await PushNotifications.register();
-
   return new Promise((resolve) => {
     let settled = false;
     const finish = (value: boolean) => {
@@ -139,13 +137,13 @@ export async function registerForPushNotifications(userId: string): Promise<bool
     void PushNotifications.addListener("registration", async (token: Token) => {
       window.clearTimeout(timeout);
       try {
-        await supabase.rpc("upsert_notification_device" as any, {
+        const { error } = await supabase.rpc("upsert_notification_device" as any, {
           p_token: token.value,
           p_platform: Capacitor.getPlatform(),
           p_app_version: "1.0.0",
           p_enabled: true,
         });
-        finish(true);
+        finish(!error);
       } catch {
         finish(false);
       }
@@ -163,6 +161,11 @@ export async function registerForPushNotifications(userId: string): Promise<bool
     void PushNotifications.addListener("pushNotificationActionPerformed", (action: ActionPerformed) => {
       const route = typeof action.notification.data?.route === "string" ? action.notification.data.route : null;
       if (route) window.dispatchEvent(new CustomEvent("master-minds-notification-route", { detail: route }));
+    });
+
+    void PushNotifications.register().catch(() => {
+      window.clearTimeout(timeout);
+      finish(false);
     });
   });
 }
