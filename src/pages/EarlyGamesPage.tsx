@@ -23,12 +23,15 @@ export default function EarlyGamesPage() {
   const [rounds, setRounds] = useState(() => gradeGameRounds("number", grade));
   const progress = useMemo(() => Object.fromEntries(rows.map((r) => [r.activity_id, r.completions])), [rows]);
 
+  const skillForGame = (id: GameKind) => GAME_CATALOG.find((item) => item.id === id)?.id === "word" ? "reading" : id === "pattern" ? "patterns" : id === "coding" ? "sequencing" : id === "map" ? "world" : id === "fraction" ? "fractions" : id === "clock" ? "time" : id === "money" ? "money" : id;
+  const adaptiveDifficulty = (id: GameKind) => { const row = rows.find((item) => item.activity_id === `early-game-${id}`); if (!row || row.attempts < 5) return 2; const accuracy = row.correct_answers / Math.max(1, row.attempts); return accuracy >= 0.85 ? Math.min(5, 3 + Math.floor(row.attempts / 10)) : accuracy < 0.65 ? 1 : 2; };
+
   const start = (id: GameKind) => {
     setGame(id);
     setRound(0);
     setScore(0);
     setSelected(null);
-    setRounds(gradeGameRounds(id, grade, Math.max(5, profile.sessionLength - 1)));
+    setRounds(gradeGameRounds(id, grade, Math.max(5, profile.sessionLength - 1), adaptiveDifficulty(id)));
   };
 
   const current = rounds[round];
@@ -77,7 +80,7 @@ export default function EarlyGamesPage() {
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-3xl">{item.icon}</div>
             <h2 className="mt-3 font-display text-lg font-bold">{item.title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
-            <div className="mt-3 flex items-center gap-2"><Badge variant="secondary">Lv {Math.min(5, 1 + Math.floor((progress[`early-game-${item.id}`] || 0) / 2))}</Badge><span className="text-xs text-muted-foreground">{progress[`early-game-${item.id}`] || 0} plays</span></div>
+            <div className="mt-3 flex items-center gap-2"><Badge variant="secondary">Lv {Math.min(5, 1 + Math.floor((progress[`early-game-${item.id}`] || 0) / 2))}</Badge><span className="text-xs text-muted-foreground">{progress[`early-game-${item.id}`] || 0} plays</span><span className="text-[11px] text-primary">{skillForGame(item.id)} adapts</span></div>
           </button>)}
         </div>
         <Card><CardContent className="flex gap-3 p-4"><Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-warning" /><p className="text-sm text-muted-foreground">Every round changes. Keep practising to unlock harder questions and new mechanics.</p></CardContent></Card>
