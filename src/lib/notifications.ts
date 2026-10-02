@@ -98,6 +98,19 @@ export async function saveNotificationPreferences(
   });
 }
 
+export async function ensureNotificationChannel(): Promise<void> {
+  if (!isAndroid()) return;
+  await LocalNotifications.createChannel({
+    id: "master_minds_default",
+    name: "Master Minds",
+    description: "Learning reminders, achievements and social updates",
+    importance: 4,
+    visibility: 1,
+    sound: "default",
+    vibration: true,
+  });
+}
+
 export async function requestNotificationPermission(): Promise<boolean> {
   if (!isNative()) return false;
 
@@ -120,6 +133,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
 export async function registerForPushNotifications(userId: string): Promise<boolean> {
   if (!isNative()) return false;
+  await ensureNotificationChannel();
   const allowed = await requestNotificationPermission();
   if (!allowed) return false;
 
