@@ -1,69 +1,58 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Brain, Check, Lightbulb, Rocket, Search, Star } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, Check, Lightbulb, Search, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { toEarlyGrade, getGradeProfile } from "@/features/early/engine/gradeProfile";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
-const areas = [
-  { id: "animals", title: "Animal Kingdom", icon: "🦁", desc: "Habitats, animal clues, food chains and amazing adaptations.", min: 0 },
-  { id: "space", title: "Space Mission", icon: "🚀", desc: "Planets, stars, the Moon and big questions about space.", min: 1 },
-  { id: "body", title: "Amazing Body", icon: "🫀", desc: "Senses, organs, movement and how our bodies work.", min: 1 },
-  { id: "ethiopia", title: "Ethiopia & the World", icon: "🇪🇹", desc: "Places, people, culture, landmarks and geography.", min: 0 },
-  { id: "art", title: "Art Studio", icon: "🎨", desc: "Colours, patterns, shapes and creative challenges.", min: 0 },
-  { id: "music", title: "Music Room", icon: "🎵", desc: "Rhythm, instruments, sound and musical patterns.", min: 0 },
-  { id: "how", title: "How Things Work", icon: "⚙️", desc: "Simple machines, everyday science and curious explanations.", min: 2 },
-  { id: "puzzles", title: "Puzzle Planet", icon: "🧩", desc: "Logic, patterns, memory and mini brain challenges.", min: 0 },
-  { id: "stories", title: "Story Corner", icon: "📖", desc: "Short reading prompts and imagination starters.", min: 0 },
-  { id: "kindness", title: "Kindness Lab", icon: "💛", desc: "Friendship, feelings, teamwork and thoughtful choices.", min: 0 },
-  { id: "maps", title: "Map Makers", icon: "🗺️", desc: "Continents, directions and places near and far.", min: 2 },
-  { id: "invent", title: "Inventor Garage", icon: "💡", desc: "Design, build and explain your own ideas.", min: 3 },
-];
-const topics = [
-  { title: "Why do birds have feathers?", body: "Feathers help birds stay warm, protect their bodies and, for many birds, help them fly.", question: "Name one job feathers can do.", answer: "Keep a bird warm, protect it, or help it fly." },
-  { title: "Why does a shadow change?", body: "A shadow changes when the position of the light or the object changes.", question: "What can make a shadow move?", answer: "Moving the light or the object." },
-  { title: "How do plants make food?", body: "Leaves use sunlight, water and carbon dioxide to make food for the plant.", question: "What provides the energy?", answer: "Sunlight." },
-  { title: "Where is Ethiopia?", body: "Ethiopia is in the Horn of Africa, in the eastern part of the African continent.", question: "Which continent is Ethiopia in?", answer: "Africa." },
-];
-
-export default function EarlyExplorePage() {
-  const nav = useNavigate();
-  const { user } = useUser();
-  const grade = toEarlyGrade(user?.grade);
-  const profile = getGradeProfile(grade);
-  const [search, setSearch] = useState("");
-  const [topic, setTopic] = useState(0);
-  const [revealed, setRevealed] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem("master-minds-early-explore-favorites") || "[]"); if (Array.isArray(saved)) setFavorites(saved); } catch {} }, []);
-  const visible = useMemo(() => areas.filter((a) => grade >= a.min && a.title.toLowerCase().includes(search.toLowerCase())).sort((a,b) => Number(favorites.includes(b.id)) - Number(favorites.includes(a.id))), [grade, search, favorites]);
-  const toggleFavorite = (id: string) => { const next = favorites.includes(id) ? favorites.filter((x) => x !== id) : [...favorites, id]; setFavorites(next); try { localStorage.setItem("master-minds-early-explore-favorites", JSON.stringify(next)); } catch {} };
-  const current = topics[topic % topics.length];
-
-  const next = () => { setRevealed(false); setTopic((x) => x + 1); };
-
-  return <div className="min-h-screen bg-background px-4 pb-24">
-    <header className="sticky top-0 z-20 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
-      <div className="mx-auto flex max-w-4xl items-center gap-3">
-        <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted" onClick={() => nav("/")} aria-label="Back"><ArrowLeft /></button>
-        <div className="min-w-0 flex-1"><p className="truncate font-display text-xl font-bold">Explore</p><p className="truncate text-xs text-muted-foreground">{profile.label} • Master Minds resource hub</p></div>
-        <Rocket className="h-6 w-6 text-primary" aria-hidden="true" />
-      </div>
-    </header>
-    <main className="mx-auto max-w-4xl space-y-6 py-6">
-      <section className="rounded-[2rem] bg-primary/10 p-6 sm:p-8"><p className="font-semibold text-primary">Learn inside Master Minds</p><h1 className="mt-1 text-3xl font-display font-bold">Choose your next adventure</h1><p className="mt-2 text-muted-foreground">Pick a topic, learn something, then try a mini challenge.</p></section>
-      <div className="relative"><Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" aria-hidden="true" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search topics..." aria-label="Search Explore topics" className="min-h-12 rounded-2xl pl-10" /></div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{visible.map((a) => <button key={a.id} type="button" onClick={() => { setTopic(areas.findIndex((x) => x.id === a.id)); setRevealed(false); }} className="min-h-44 rounded-[1.75rem] border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-1 active:scale-[.98]"><div className="flex items-start justify-between"><div className="text-4xl" aria-hidden="true">{a.icon}</div><button type="button" aria-label={favorites.includes(a.id) ? "Remove favorite" : "Save favorite"} onClick={(event) => { event.stopPropagation(); toggleFavorite(a.id); }} className="rounded-xl p-2 hover:bg-muted">{favorites.includes(a.id) ? "⭐" : "☆"}</button></div><h2 className="mt-3 font-display font-bold">{a.title}</h2><p className="mt-1 text-xs text-muted-foreground">{a.desc}</p><Badge variant="secondary" className="mt-3">{a.min === 0 ? "All early grades" : `From Grade ${a.min}`}</Badge></button>)}</div>
-      <Card className="rounded-[2rem]"><CardContent className="space-y-4 p-5 sm:p-7">
-        <div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-warning/15"><Lightbulb className="h-6 w-6 text-warning" /></div><div><p className="text-xs font-semibold uppercase tracking-wide text-primary">Learn → Think → Answer</p><h2 className="font-display text-2xl font-bold">{current.title}</h2></div></div>
-        <p className="leading-7 text-muted-foreground">{current.body}</p>
-        <div className="rounded-2xl bg-muted/50 p-4"><p className="font-semibold">{current.question}</p>{revealed ? <p role="status" className="mt-2 flex items-start gap-2 text-sm font-semibold text-success"><Check className="mt-0.5 h-4 w-4 shrink-0" />{current.answer}</p> : <p className="mt-2 text-sm text-muted-foreground">Think first, then reveal the answer.</p>}</div>
-        {!revealed ? <Button className="min-h-11 rounded-2xl" onClick={() => setRevealed(true)}>Reveal answer</Button> : <Button variant="outline" className="min-h-11 rounded-2xl" onClick={next}>Next discovery →</Button>}
-      </CardContent></Card>
-      <div className="grid grid-cols-2 gap-3"><Card><CardContent className="p-4"><Star className="h-5 w-5 text-warning" /><p className="mt-2 font-bold">Curious streak</p><p className="text-xs text-muted-foreground">Keep discovering every day.</p></CardContent></Card><Card><CardContent className="p-4"><Brain className="h-5 w-5 text-primary" /><p className="mt-2 font-bold">Brain builder</p><p className="text-xs text-muted-foreground">Try a game after each topic.</p></CardContent></Card></div>
-    </main>
-  </div>;
+import { Input } from "@/components/ui/input";
+type Topic={id:string;category:string;icon:string;title:string;body:string;question:string;options:string[];answer:string;min:number};
+const TOPICS:Topic[]=[
+["animals","Animals","🦁","Why do cats whiskers help?","Whiskers help cats sense spaces around them and notice nearby movement.","What can whiskers help a cat judge?",["Space and movement","Its favorite color","The weather"],"Space and movement",0],
+["animals","Animals","🐝","Why are bees important?","Bees move pollen between flowers, helping many plants make seeds and fruit.","What job do bees help with?",["Pollination","Making clouds","Digging oceans"],"Pollination",1],
+["animals","Animals","🐧","How do penguins stay warm?","Dense feathers and a layer of body fat help penguins keep heat in.","Which helps keep heat in?",["Feathers and fat","Long ears","Scales"],"Feathers and fat",2],
+["space","Space","🌙","Why does the Moon look different?","The Moon travels around Earth. We see different amounts of its sunlit side.","What causes Moon phases?",["Our changing view of sunlight","The Moon changing shape","Clouds"],"Our changing view of sunlight",1],
+["space","Space","🪐","What is a planet?","A planet is a large world that travels around a star and does not make its own visible light.","Which is a planet?",["Mars","The Sun","A cloud"],"Mars",0],
+["space","Space","☀️","Where does sunlight come from?","The Sun is a star. Energy from it travels through space and reaches Earth as light and heat.","The Sun is a…",["Star","Planet","Moon"],"Star",0],
+["science","Science","🌱","How do plants make food?","Leaves use sunlight, water and carbon dioxide in photosynthesis to make food.","What provides energy?",["Sunlight","Plastic","Sand"],"Sunlight",0],
+["science","Science","💧","Why do puddles disappear?","Liquid water can evaporate into water vapor when it gains energy from the surroundings.","What is happening?",["Evaporation","Freezing","Magnetism"],"Evaporation",2],
+["science","Science","🧲","How can a magnet move something?","A magnetic force can pull some materials, such as iron, without touching them.","Which material is attracted?",["Iron","Wood","Paper"],"Iron",2],
+["body","Body","❤️","What does the heart do?","The heart pumps blood around the body so oxygen and nutrients can travel where they are needed.","What does it pump?",["Blood","Air into trees","Food into plants"],"Blood",1],
+["body","Body","🧠","Why do we need a brain?","The brain helps control movement, senses, memory, thinking and many automatic body functions.","Which is a brain job?",["Thinking","Growing leaves","Making rain"],"Thinking",2],
+["body","Body","👂","How do ears help?","Ears collect sound vibrations and help your brain understand sounds.","What do ears detect?",["Sound","Light","Taste"],"Sound",0],
+["ethiopia","Ethiopia","🇪🇹","Where is Ethiopia?","Ethiopia is in the Horn of Africa, in eastern Africa.","Which continent?",["Africa","Asia","Europe"],"Africa",0],
+["ethiopia","Ethiopia","🏔️","What are the Simien Mountains?","The Simien Mountains are a dramatic highland area in northern Ethiopia with deep valleys and wildlife.","What kind of place is Simien?",["Mountain region","Ocean trench","Desert island"],"Mountain region",2],
+["ethiopia","Ethiopia","🌊","Why is Lake Tana important?","Lake Tana is Ethiopia's largest lake and is a source of the Blue Nile.","Which river begins from Lake Tana?",["Blue Nile","Amazon","Nile Delta"],"Blue Nile",2],
+["world","World","🌍","What is a continent?","A continent is one of Earth's large land areas. Countries can be grouped within continents.","Which is a continent?",["Africa","Ethiopia","Addis Ababa"],"Africa",0],
+["world","World","🗺️","What does a map show?","Maps use symbols, lines and labels to represent places and relationships in space.","Why use a map?",["To understand locations","To make sunlight","To measure sound"],"To understand locations",1],
+["world","World","🧭","What does a compass do?","A compass helps you find directions such as north, south, east and west.","Which direction is opposite north?",["South","East","West"],"South",2],
+["art","Creative","🎨","What happens when colors mix?","Mixing colors can create new colors. Artists use color choices to communicate ideas and feelings.","What can mixing colors make?",["New colors","New planets","New sounds"],"New colors",0],
+["music","Creative","🥁","What is rhythm?","Rhythm is a pattern of beats and rests. Music can use rhythm to create movement and structure.","Rhythm is a pattern of…",["Beats","Mountains","Colors"],"Beats",1],
+["how","How Things Work","⚙️","Why do wheels help?","A wheel can reduce friction and make moving objects easier.","What can a wheel reduce?",["Friction","Gravity","Sunlight"],"Friction",2],
+["how","How Things Work","💡","How does a simple circuit work?","A closed electrical path lets electric current travel through components such as a battery and lamp.","What must the path be?",["Closed","Invisible","Frozen"],"Closed",2],
+["puzzles","Brain","🧩","Can you spot the pattern?","Look for a rule: 2, 4, 6, 8… The numbers increase by two each time.","What comes next?",["10","11","12"],"10",1],
+["puzzles","Brain","🔐","What is a code?","A code uses symbols or rules to represent information or instructions.","What can a code represent?",["Information","Rainbows only","Clouds only"],"Information",2],
+["stories","Stories","📖","Story detective","Characters, settings and problems help us understand what happens in a story.","Where does a story happen?",["Setting","Answer key","Calculator"],"Setting",0],
+["kindness","Life Skills","💛","What does teamwork mean?","Teamwork means people cooperate, communicate and share responsibility to reach a goal.","What helps teamwork?",["Cooperation","Ignoring everyone","Giving up"],"Cooperation",0],
+["invent","Invent","💡","Think like an inventor","Inventors notice problems, imagine solutions, build prototypes and test what works.","What comes after an idea?",["Build and test","Stop immediately","Hide it"],"Build and test",3],
+["invent","Invent","🚀","Design challenge","A strong design changes when testing shows a problem. Trying again is part of inventing.","What should an inventor do after a failed test?",["Improve and test again","Give up forever","Pretend it worked"],"Improve and test again",3]
+].map(([id,category,icon,title,body,question,options,answer,min],i)=>({id:`${id}-${i}`,category,icon,title,body,question,options,answer,min:min as number})) as Topic[];
+const CATS=["All",...Array.from(new Set(TOPICS.map(t=>t.category)))];
+export default function EarlyExplorePage(){
+ const nav=useNavigate();const {user}=useUser();const grade=toEarlyGrade(user?.grade);const profile=getGradeProfile(grade);
+ const [search,setSearch]=useState("");const [cat,setCat]=useState("All");const [topic,setTopic]=useState(0);const [revealed,setRevealed]=useState(false);const [favorites,setFavorites]=useState<string[]>([]);
+ const visible=useMemo(()=>TOPICS.filter(t=>grade>=t.min&&(cat==="All"||t.category===cat)&&(`${t.title} ${t.body}`.toLowerCase().includes(search.toLowerCase()))),[grade,cat,search]);
+ const current=visible[topic%Math.max(1,visible.length)]??TOPICS[0];
+ const choose=(a:string)=>{if(a===current.answer)setRevealed(true);else setRevealed(true)};
+ const next=()=>{setRevealed(false);setTopic(x=>x+1)};
+ const toggle=(id:string)=>setFavorites(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id]);
+ return <div className="min-h-screen bg-background px-4 pb-24"><header className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur"><div className="mx-auto flex max-w-5xl items-center gap-3"><button className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted" onClick={()=>nav("/")} aria-label="Back"><ArrowLeft/></button><div className="flex-1"><p className="font-display text-xl font-bold">Explore</p><p className="text-xs text-muted-foreground">{profile.label} • a Master Minds learning world</p></div><span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{visible.length} adventures</span></div></header>
+ <main className="mx-auto max-w-5xl space-y-5 py-5">
+  <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary/15 via-accent/10 to-warning/10 p-5 sm:p-7"><div className="text-4xl">🌎🚀🧠</div><p className="mt-2 font-semibold text-primary">Learn. Wonder. Build. Discover.</p><h1 className="text-3xl font-display font-bold">Your own Master Minds world</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Explore science, animals, Ethiopia, space, creativity, stories, life skills and brain challenges — all inside Master Minds.</p></section>
+  <div className="relative"><Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground"/><Input value={search} onChange={e=>{setSearch(e.target.value);setTopic(0)}} placeholder="Search your learning world..." className="min-h-12 rounded-2xl pl-10"/></div>
+  <div className="flex gap-2 overflow-x-auto pb-1">{CATS.map(c=><button key={c} onClick={()=>{setCat(c);setTopic(0)}} className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold ${cat===c?"border-primary bg-primary/10 text-primary":"border-border bg-card"}`}>{c}</button>)}</div>
+  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{visible.map((t,i)=><button key={t.id} onClick={()=>{setTopic(i);setRevealed(false)}} className="min-h-40 rounded-[1.5rem] border bg-card p-4 text-left shadow-sm transition hover:-translate-y-1"><div className="flex items-start justify-between"><span className="text-4xl">{t.icon}</span><span onClick={e=>{e.stopPropagation();toggle(t.id)}} className="rounded-lg px-2 py-1 text-lg">{favorites.includes(t.id)?"⭐":"☆"}</span></div><h2 className="mt-2 font-display font-bold">{t.title}</h2><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{t.body}</p><Badge variant="secondary" className="mt-3">{t.category}</Badge></button>)}</div>
+  <section className="rounded-[2rem] border bg-card p-5 shadow-sm sm:p-7"><div className="flex items-center gap-3"><div className="rounded-2xl bg-warning/15 p-3 text-2xl">{current.icon}</div><div><p className="text-xs font-bold uppercase tracking-wide text-primary">Learn → Think → Answer</p><h2 className="text-2xl font-display font-bold">{current.title}</h2></div></div><p className="mt-4 leading-7 text-muted-foreground">{current.body}</p><div className="mt-4 rounded-2xl bg-muted/60 p-4"><p className="font-bold">{current.question}</p>{!revealed?<div className="mt-3 grid gap-2 sm:grid-cols-3">{current.options.map(o=><Button key={o} variant="outline" onClick={()=>choose(o)} className="min-h-12 rounded-xl">{o}</Button>)}</div>:<div className="mt-3 rounded-xl bg-success/10 p-3 font-semibold text-success"><Check className="mr-2 inline h-4 w-4"/>Answer: {current.answer}</div>}</div>{revealed&&<Button className="mt-4 min-h-12 w-full rounded-xl" onClick={next}>Next adventure →</Button>}</section>
+  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground"><Lightbulb className="h-4 w-4"/>More topics can be added to the Master Minds library without changing the app.</div>
+ </main></div>;
 }
