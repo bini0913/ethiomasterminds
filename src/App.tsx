@@ -41,6 +41,9 @@ import EarlyVideosPage from "./pages/EarlyVideosPage";
 import EarlyDiscoverPage from "./pages/EarlyDiscoverPage";
 import EarlyExplorePage from "./pages/EarlyExplorePage";
 import EarlyProgressPage from "./pages/EarlyProgressPage";
+import EarlyCollectionPage from "./pages/EarlyCollectionPage";
+import EarlyProfilePage from "./pages/EarlyProfilePage";
+import EarlyLeaderboardPage from "./pages/EarlyLeaderboardPage";
 import EarlyTierOnlyRoute from "./components/auth/EarlyTierOnlyRoute";
 import EarlyContentAdminPage from "./pages/EarlyContentAdminPage";
 import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
@@ -73,6 +76,9 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/early-videos", title: "Videos & Stories" },
   { prefix: "/early-explore", title: "Explore" },
   { prefix: "/early-progress", title: "My Progress" },
+  { prefix: "/early-collection", title: "My Collection" },
+  { prefix: "/early-profile", title: "My Profile" },
+  { prefix: "/early-ranks", title: "Early Ranks" },
   { prefix: "/quiz", title: "Quiz" },
   { prefix: "/study-mode", title: "Study Mode" },
   { prefix: "/library", title: "Library" },
@@ -221,6 +227,9 @@ const App = () => (
                               <Route path="/early-discover" element={<EarlyTierOnlyRoute><EarlyDiscoverPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-explore" element={<EarlyTierOnlyRoute><EarlyExplorePage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-progress" element={<EarlyTierOnlyRoute><EarlyProgressPage /></EarlyTierOnlyRoute>} />
+                              <Route path="/early-collection" element={<EarlyTierOnlyRoute><EarlyCollectionPage /></EarlyTierOnlyRoute>} />
+                              <Route path="/early-profile" element={<EarlyTierOnlyRoute><EarlyProfilePage /></EarlyTierOnlyRoute>} />
+                              <Route path="/early-ranks" element={<EarlyTierOnlyRoute><EarlyLeaderboardPage /></EarlyTierOnlyRoute>} />
                               <Route path="/quiz/filter" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><QuizFilter /></ProtectedRoute>} />
                               <Route path="/multiplayer" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Multiplayer /></ProtectedRoute>} />
                               <Route path="/lobby" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Lobby /></ProtectedRoute>} />
