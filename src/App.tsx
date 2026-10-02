@@ -65,6 +65,8 @@ import { ArrowLeft, Home, LogOut } from "lucide-react";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
 import NativeBackHandler from "./components/mobile/NativeBackHandler";
+import NotificationBootstrap from "./components/notifications/NotificationBootstrap";
+import NotificationRouteHandler from "./components/notifications/NotificationRouteHandler";
 
 const queryClient = new QueryClient();
 
@@ -325,6 +327,8 @@ const App = () => (
                             </Routes>
                             </AppChrome>
                             <NativeBackHandler />
+                            <NotificationBootstrap />
+                            <NotificationRouteHandler />
                             <AIHelper />
                           </BrowserRouter>
                           </TooltipProvider>
