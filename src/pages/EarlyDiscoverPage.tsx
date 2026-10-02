@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Check, Globe2, Lightbulb, Sparkles, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,8 @@ export default function EarlyDiscoverPage() {
   const [selected, setSelected] = useState("");
   const [correct, setCorrect] = useState(false);
   const [rewarded, setRewarded] = useState<boolean | null>(null);
+  const [seen, setSeen] = useState<number[]>([]);
+  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem("master-minds-early-discover-seen") || "[]"); if (Array.isArray(saved)) setSeen(saved.filter((x) => Number.isInteger(x))); } catch {} }, []);
   const f = facts[i];
   const answer = f[5];
 
@@ -53,10 +55,13 @@ export default function EarlyDiscoverPage() {
   };
 
   const next = () => {
-    setSelected("");
-    setCorrect(false);
-    setRewarded(null);
-    setI((x) => (x + 1) % facts.length);
+    const nextSeen = Array.from(new Set([...seen, i]));
+    const remaining = facts.map((_, index) => index).filter((index) => !nextSeen.includes(index));
+    const nextIndex = remaining[0] ?? ((i + 1) % facts.length);
+    const normalizedSeen = remaining.length ? nextSeen : [];
+    setSeen(normalizedSeen);
+    try { localStorage.setItem("master-minds-early-discover-seen", JSON.stringify(normalizedSeen)); } catch {}
+    setSelected(""); setCorrect(false); setRewarded(null); setI(nextIndex);
   };
 
   return <div className="min-h-screen bg-background pb-24">
