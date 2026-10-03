@@ -86,6 +86,9 @@ const SuperAdminPortal: React.FC = () => {
   const [logs, setLogs] = useState<AuditRow[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [chatSearch, setChatSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
+  const [security, setSecurity] = useState<Record<string, any>>({});
+  const [systemOverview, setSystemOverview] = useState<Record<string, any>>({});
   const [targetUser, setTargetUser] = useState<RootUser | null>(null);
   const [role, setRole] = useState<UserRole>("student");
   const [status, setStatus] = useState("active");
@@ -105,18 +108,25 @@ const SuperAdminPortal: React.FC = () => {
         supabase.rpc("extreme_admin_get_dashboard" as any),
         supabase.rpc("extreme_admin_list_users" as any, {
           p_search: userSearch.trim() || null,
-          p_role: null,
+          p_role: roleFilter === "all" ? null : roleFilter,
           p_limit: 300,
           p_offset: 0,
         }),
         supabase.rpc("extreme_admin_get_audit_logs" as any, { p_limit: 120 }),
         supabase.rpc("extreme_admin_get_settings" as any),
+        supabase.rpc("extreme_admin_get_security" as any),
+        supabase.rpc("extreme_admin_get_system_overview" as any),
       ]);
 
       if (dashboard.error) throw dashboard.error;
       if (userRows.error) throw userRows.error;
       if (logRows.error) throw logRows.error;
       if (settingRows.error) throw settingRows.error;
+      if (security.error) throw security.error;
+      if (systemOverview.error) throw systemOverview.error;
+
+      setSecurity((security.data as Record<string, any>) || {});
+      setSystemOverview((systemOverview.data as Record<string, any>) || {});
 
       setStats((dashboard.data as Record<string, number>) || {});
       setUsers((userRows.data as RootUser[]) || []);
@@ -135,7 +145,7 @@ const SuperAdminPortal: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [userSearch]);
+  }, [userSearch, roleFilter]);
 
   useEffect(() => {
     if (user?.role === "extreme_admin") {
@@ -346,6 +356,8 @@ const SuperAdminPortal: React.FC = () => {
     ["Teachers", stats.teachers || 0, UserCog],
     ["Managers", stats.managers || 0, Shield],
     ["Admins", stats.admins || 0, Shield],
+    ["Finance", stats.finance || 0, Wallet],
+    ["Super Admins", stats.super_admins || 0, Shield],
     ["Messages", stats.messages || 0, MessageSquare],
     ["AI chats", stats.ai_conversations || 0, Eye],
     ["Reports", stats.pending_reports || 0, AlertTriangle],
@@ -471,12 +483,13 @@ const SuperAdminPortal: React.FC = () => {
         </div>
 
         <Tabs defaultValue="users" className="mt-5">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="chats">All Chats</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
             <TabsTrigger value="governance">Governance</TabsTrigger>
             <TabsTrigger value="system">System</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
           </TabsList>
 
@@ -492,12 +505,23 @@ const SuperAdminPortal: React.FC = () => {
                 </CardDescription>
                 <div className="relative pt-2">
                   <Search className="absolute left-3 top-4 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    value={userSearch}
-                    onChange={(event) => setUserSearch(event.target.value)}
-                    placeholder="Search users..."
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      className="pl-9"
+                      value={userSearch}
+                      onChange={(event) => setUserSearch(event.target.value)}
+                      placeholder="Search users..."
+                    />
+                    <select
+                      className="h-10 rounded-md border bg-background px-3 text-sm"
+                      value={roleFilter}
+                      onChange={(event) => setRoleFilter(event.target.value as UserRole | "all")}
+                      aria-label="Filter users by role"
+                    >
+                      <option value="all">All roles</option>
+                      {roleOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                    </select>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -875,6 +899,9 @@ const SuperAdminPortal: React.FC = () => {
                       {log.target_type || "system"}
                       {log.target_id ? " · " + log.target_id : ""}
                     </p>
+                    {log.metadata && Object.keys(log.metadata).length > 0 && (
+                      <pre className="mt-2 overflow-auto rounded-lg bg-muted p-2 text-[11px] text-muted-foreground">{JSON.stringify(log.metadata, null, 2)}</pre>
+                    )}
                   </div>
                 ))}
                 {!logs.length && (
