@@ -5,6 +5,11 @@ import {
   Coins,
   Eye,
   Lock,
+  BookOpen,
+  CheckCircle2,
+  FileText,
+  Wallet,
+  XCircle,
   MessageSquare,
   RefreshCw,
   Search,
@@ -87,6 +92,11 @@ const SuperAdminPortal: React.FC = () => {
   const [xpDelta, setXpDelta] = useState("0");
   const [coinDelta, setCoinDelta] = useState("0");
   const [settings, setSettings] = useState<Record<string, boolean>>({});
+  const [reports, setReports] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [books, setBooks] = useState<any[]>([]);
+  const [finance, setFinance] = useState<Record<string, any>>({});
+  const [governanceLoading, setGovernanceLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -253,6 +263,66 @@ const SuperAdminPortal: React.FC = () => {
     await loadChats();
   };
 
+  const loadGovernance = async () => {
+    setGovernanceLoading(true);
+    try {
+      const [reportsRes, postsRes, booksRes, financeRes] = await Promise.all([
+        supabase.rpc("extreme_admin_list_reports" as any, { p_status: null, p_limit: 100, p_offset: 0 }),
+        supabase.rpc("extreme_admin_list_posts" as any, { p_search: null, p_limit: 100, p_offset: 0 }),
+        supabase.rpc("extreme_admin_list_books" as any, { p_search: null, p_limit: 100, p_offset: 0 }),
+        supabase.rpc("extreme_admin_finance_overview" as any),
+      ]);
+      if (reportsRes.error) throw reportsRes.error;
+      if (postsRes.error) throw postsRes.error;
+      if (booksRes.error) throw booksRes.error;
+      if (financeRes.error) throw financeRes.error;
+      setReports((reportsRes.data as any[]) || []);
+      setPosts((postsRes.data as any[]) || []);
+      setBooks((booksRes.data as any[]) || []);
+      setFinance((financeRes.data as Record<string, any>) || {});
+    } catch (error: any) {
+      toast.error(error.message || "Unable to load governance controls");
+    } finally {
+      setGovernanceLoading(false);
+    }
+  };
+
+  const setReportStatus = async (id: string, nextStatus: string) => {
+    const { error } = await supabase.rpc("extreme_admin_set_report_status" as any, {
+      p_report_id: id,
+      p_status: nextStatus,
+      p_reason: "Super Admin Control Center",
+    });
+    if (error) return toast.error(error.message || "Report update failed");
+    toast.success("Report updated");
+    await loadGovernance();
+    await refresh();
+  };
+
+  const deletePost = async (id: string) => {
+    if (!window.confirm("Permanently delete this social post?")) return;
+    const { error } = await supabase.rpc("extreme_admin_delete_post" as any, {
+      p_post_id: id,
+      p_reason: "Super Admin Control Center",
+    });
+    if (error) return toast.error(error.message || "Post deletion failed");
+    toast.success("Post deleted");
+    await loadGovernance();
+    await refresh();
+  };
+
+  const deleteBook = async (id: string) => {
+    if (!window.confirm("Permanently delete this library book record?")) return;
+    const { error } = await supabase.rpc("extreme_admin_delete_book" as any, {
+      p_book_id: id,
+      p_reason: "Super Admin Control Center",
+    });
+    if (error) return toast.error(error.message || "Book deletion failed");
+    toast.success("Book deleted");
+    await loadGovernance();
+    await refresh();
+  };
+
   const toggleSetting = async (key: string, value: boolean) => {
     const { error } = await supabase.rpc(
       "extreme_admin_set_setting" as any,
@@ -400,10 +470,11 @@ const SuperAdminPortal: React.FC = () => {
         </div>
 
         <Tabs defaultValue="users" className="mt-5">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="chats">All Chats</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="governance">Governance</TabsTrigger>
             <TabsTrigger value="system">System</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
           </TabsList>
@@ -661,6 +732,74 @@ const SuperAdminPortal: React.FC = () => {
                 <p>Multiplayer chat: {stats.room_messages || 0}</p>
                 <p>Lobby messages: {stats.lobby_messages || 0}</p>
                 <p>Active users in last 10 minutes: {stats.active_users_10m || 0}</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="governance" className="mt-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Platform governance</h2>
+                <p className="text-sm text-muted-foreground">Moderate reports, social content, library records and view finance authority from one root control surface.</p>
+              </div>
+              <Button variant="outline" onClick={() => void loadGovernance()} disabled={governanceLoading}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${governanceLoading ? "animate-spin" : ""}`} />
+                Load governance
+              </Button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <Card><CardContent className="p-4"><FileText className="mb-2 h-5 w-5" /><p className="text-2xl font-bold">{reports.length}</p><p className="text-xs text-muted-foreground">Reports loaded</p></CardContent></Card>
+              <Card><CardContent className="p-4"><MessageSquare className="mb-2 h-5 w-5" /><p className="text-2xl font-bold">{posts.length}</p><p className="text-xs text-muted-foreground">Posts loaded</p></CardContent></Card>
+              <Card><CardContent className="p-4"><BookOpen className="mb-2 h-5 w-5" /><p className="text-2xl font-bold">{books.length}</p><p className="text-xs text-muted-foreground">Books loaded</p></CardContent></Card>
+              <Card><CardContent className="p-4"><Wallet className="mb-2 h-5 w-5" /><p className="text-2xl font-bold">{finance.available === false ? "—" : Number(finance.balance || 0).toLocaleString()}</p><p className="text-xs text-muted-foreground">{finance.available === false ? "Finance schema unavailable" : "Active finance balance"}</p></CardContent></Card>
+            </div>
+
+            <Card>
+              <CardHeader><CardTitle>Reports moderation</CardTitle><CardDescription>Resolve or dismiss reports with a server-side audit record.</CardDescription></CardHeader>
+              <CardContent className="space-y-2">
+                {reports.map((report) => (
+                  <div key={report.id} className="rounded-xl border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div><p className="font-medium">{report.reason || "Report"}</p><p className="text-xs text-muted-foreground">{report.reporter_name || "Unknown"} → {report.reported_name || report.reported_id} · {report.reported_type}</p></div>
+                      <Badge>{report.status}</Badge>
+                    </div>
+                    {report.description && <p className="mt-2 text-sm text-muted-foreground">{report.description}</p>}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => void setReportStatus(report.id, "reviewed")}><CheckCircle2 className="mr-1 h-4 w-4" />Review</Button>
+                      <Button size="sm" onClick={() => void setReportStatus(report.id, "resolved")}>Resolve</Button>
+                      <Button size="sm" variant="ghost" onClick={() => void setReportStatus(report.id, "dismissed")}><XCircle className="mr-1 h-4 w-4" />Dismiss</Button>
+                    </div>
+                  </div>
+                ))}
+                {!reports.length && <p className="py-6 text-center text-sm text-muted-foreground">No reports loaded. Press Load governance.</p>}
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader><CardTitle>Social moderation</CardTitle><CardDescription>Root-level post deletion is server-side and audited.</CardDescription></CardHeader>
+                <CardContent className="space-y-2">
+                  {posts.slice(0, 20).map((post) => <div key={post.id} className="rounded-xl border p-3"><div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{post.author_name || post.author_id}</span><Button size="sm" variant="destructive" onClick={() => void deletePost(post.id)}><Trash2 className="mr-1 h-4 w-4" />Delete</Button></div><p className="mt-2 line-clamp-3 text-sm">{post.content}</p></div>)}
+                  {!posts.length && <p className="py-6 text-center text-sm text-muted-foreground">No posts loaded.</p>}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Library moderation</CardTitle><CardDescription>Remove problematic library records without bypassing the audit layer.</CardDescription></CardHeader>
+                <CardContent className="space-y-2">
+                  {books.slice(0, 20).map((book) => <div key={book.id} className="rounded-xl border p-3"><div className="flex items-center justify-between gap-2"><div><p className="font-medium">{book.title}</p><p className="text-xs text-muted-foreground">{book.author || "Unknown"} · {book.subject || "General"}</p></div><Button size="sm" variant="destructive" onClick={() => void deleteBook(book.id)}><Trash2 className="mr-1 h-4 w-4" />Delete</Button></div></div>)}
+                  {!books.length && <p className="py-6 text-center text-sm text-muted-foreground">No books loaded.</p>}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader><CardTitle>Finance authority</CardTitle><CardDescription>Super Admin is included in the finance RLS guard and can open the complete Finance Portal.</CardDescription></CardHeader>
+              <CardContent className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-muted-foreground">
+                  {finance.available === false ? "Finance schema is not available." : `Accounts: ${finance.accounts || 0} · Invoices: ${finance.invoices || 0} · Payments: ${finance.payments || 0} · Transactions: ${finance.transactions || 0}`}
+                </div>
+                <Button onClick={() => window.location.assign("/finance")}><Wallet className="mr-2 h-4 w-4" />Open Finance Portal</Button>
               </CardContent>
             </Card>
           </TabsContent>
