@@ -189,7 +189,7 @@ const FinancePortal: React.FC = () => {
             ["Net cash flow", `ETB ${metrics.net.toLocaleString()}`, Wallet],
             ["Overdue invoices", metrics.overdue, FileText],
           ].map(([label, value, Icon]: any) => (
-            <Card key={label as string}><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-bold mt-1">{value}</p></div><Icon className="h-5 w-5 text-muted-foreground" /></div></Card>
+            <Card key={label as string}><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-bold mt-1">{value}</p></div><Icon className="h-5 w-5 text-muted-foreground" /></div></CardContent></Card>
           ))}
         </div>
 
@@ -218,7 +218,7 @@ const FinancePortal: React.FC = () => {
               </CardContent></Card>
             </div>
             <Card><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Finance controls</CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-3 text-sm">
-              <div className="rounded-lg border p-3"><p className="font-medium">Role restricted</p><p className="text-muted-foreground">Finance data is limited to Admin and Manager accounts.</p></div>
+              <div className="rounded-lg border p-3"><p className="font-medium">Role restricted</p><p className="text-muted-foreground">Finance data is limited to Admin, Manager and Super Admin accounts.</p></div>
               <div className="rounded-lg border p-3"><p className="font-medium">Payment guardrails</p><p className="text-muted-foreground">Payments cannot exceed an invoice balance and require an active cash/bank account.</p></div>
               <div className="rounded-lg border p-3"><p className="font-medium">Audit trail</p><p className="text-muted-foreground">Invoice creation and payment events are recorded for review.</p></div>
             </CardContent></Card>
