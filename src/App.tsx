@@ -19,6 +19,8 @@ import TeacherPortal from "./pages/TeacherPortal";
 import AdminPortal from "./pages/AdminPortal";
 import StudentDashboard from "./pages/StudentDashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
+import ManagerControlCenter from "./pages/ManagerControlCenter";
+import SuperAdminPortal from "./pages/SuperAdminPortal";
 import Chat from "./pages/Chat";
 import AITutor from "./pages/AITutor";
 import LearningDNA from "./pages/LearningDNA";
@@ -111,7 +113,9 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/teacher", title: "Teacher Portal" },
   { prefix: "/admin/early-content", title: "Early Content" },
   { prefix: "/admin", title: "Admin Portal" },
+  { prefix: "/manager", title: "Manager Control Center" },
   { prefix: "/manager-dashboard", title: "Manager Dashboard" },
+  { prefix: "/super-admin", title: "Super Admin Control Center" },
   { prefix: "/root-control-portal-9xA7", title: "Control Portal" },
 ];
 
@@ -269,6 +273,14 @@ const App = () => (
                                 } 
                               />
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboard /></ProtectedRoute>} />
+                              <Route
+                                path="/manager"
+                                element={
+                                  <ProtectedRoute allowedRoles={['manager', 'admin', 'extreme_admin']}>
+                                    <ManagerControlCenter />
+                                  </ProtectedRoute>
+                                }
+                              />
                               <Route 
                                 path="/manager-dashboard" 
                                 element={

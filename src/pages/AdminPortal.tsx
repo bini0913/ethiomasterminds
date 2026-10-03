@@ -767,6 +767,19 @@ const AdminPortal: React.FC = () => {
     fetchAllData();
   };
 
+  const bootstrapSuperAdmin = async () => {
+    if (!isAdmin || !user?.id) return;
+    const confirmed = window.confirm('Make this current admin account the one-time Super Admin? This can only run when no Super Admin exists.');
+    if (!confirmed) return;
+    const { error } = await (supabase as any).rpc('extreme_admin_bootstrap_self');
+    if (error) {
+      toast.error(error.message || 'Super Admin bootstrap failed');
+      return;
+    }
+    toast.success('Super Admin access enabled. Open the Super Admin Control Center.');
+    window.location.href = '/super-admin';
+  };
+
   const saveSystemSettings = () => {
     if (!isAdmin) {
       toast.error('Admin only: system settings');
@@ -814,6 +827,11 @@ const AdminPortal: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Button variant="outline" onClick={bootstrapSuperAdmin} className="hidden sm:inline-flex">
+                  <Shield className="mr-2 h-4 w-4" /> Super Admin
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" className="relative">
