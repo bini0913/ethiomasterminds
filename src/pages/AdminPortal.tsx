@@ -120,7 +120,7 @@ interface RewardPreviewRow {
 const AdminPortal: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useUser();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'extreme_admin';
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
