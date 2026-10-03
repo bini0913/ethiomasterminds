@@ -121,7 +121,8 @@ const SuperAdminPortal: React.FC = () => {
             <Button variant="secondary" onClick={()=>window.location.assign("/admin")}>Open Admin Portal</Button>
             <Button variant="secondary" onClick={()=>window.location.assign("/manager")}>Open Manager Control Center</Button>
             <Button variant="secondary" onClick={()=>window.location.assign("/manager-dashboard")}>Open Manager Operations</Button>
-            <span className="inline-flex items-center rounded-md border px-3 py-2 text-sm text-muted-foreground">Finance controls connect here after the Finance Portal is deployed.</span>
+            <Button variant="secondary" onClick={()=>window.location.assign("/teacher")}>Open Teacher Portal</Button>
+            <Button variant="secondary" onClick={()=>window.location.assign("/finance")}>Open Finance Portal</Button>
           </div>
         </div>
 
