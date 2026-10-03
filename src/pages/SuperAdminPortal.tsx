@@ -355,6 +355,7 @@ const SuperAdminPortal: React.FC = () => {
     "student",
     "teacher",
     "manager",
+    "finance",
     "admin",
     "extreme_admin",
   ];
