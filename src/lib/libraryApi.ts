@@ -423,7 +423,7 @@ export async function deleteBook(id: string) {
 
   await Promise.allSettled(
     pathsByBucket
-      .filter((entry) => !!entry.path && !/^https?:\\/\\//i.test(entry.path))
+      .filter((entry) => !!entry.path && !/^https?:\/\//i.test(entry.path))
       .map((entry) => supabase.storage.from(entry.bucket).remove([entry.path as string])),
   );
 }
