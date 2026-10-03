@@ -550,7 +550,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getAllUsers = async (): Promise<Array<Omit<UserProfile, 'password'>>> => {
-    if (!user || (user.role !== 'admin' && user.role !== 'manager')) {
+    if (!user || (user.role !== 'admin' && user.role !== 'manager' && user.role !== 'extreme_admin')) {
       return [];
     }
 
