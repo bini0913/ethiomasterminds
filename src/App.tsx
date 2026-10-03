@@ -25,6 +25,7 @@ import Chat from "./pages/Chat";
 import AITutor from "./pages/AITutor";
 import LearningDNA from "./pages/LearningDNA";
 import ParentDashboard from "./pages/ParentDashboard";
+import FinancePortal from "./pages/FinancePortal";
 import TimeTravelRevision from "./pages/TimeTravelRevision";
 import EnhancedSocial from "./pages/EnhancedSocial";
 import AvatarCreator from "./pages/AvatarCreator";
@@ -115,6 +116,7 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/admin", title: "Admin Portal" },
   { prefix: "/manager", title: "Manager Control Center" },
   { prefix: "/manager-dashboard", title: "Manager Dashboard" },
+  { prefix: "/finance", title: "Finance Portal" },
   { prefix: "/super-admin", title: "Super Admin Control Center" },
   { prefix: "/root-control-portal-9xA7", title: "Control Portal" },
 ];
@@ -329,6 +331,14 @@ const App = () => (
                                 grant it is the `extreme_admin_update_user_role` RPC, which itself
                                 requires an existing extreme_admin caller.
                               */}
+                              <Route
+                                path="/finance"
+                                element={
+                                  <ProtectedRoute allowedRoles={['admin', 'manager', 'extreme_admin']}>
+                                    <FinancePortal />
+                                  </ProtectedRoute>
+                                }
+                              />
                               <Route
                                 path="/super-admin"
                                 element={
