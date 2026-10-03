@@ -13,7 +13,9 @@ const AcademicMode: React.FC = () => {
   const { user } = useUser();
   const navigate = useNavigate();
 
-  // Grade values have historically been stored both as "8" and "Grade 8".\n  // Normalize both formats so valid middle/high-school students are not blocked.\n  const gradeValue = (user?.grade || "").trim();\n  const gradeMatch = gradeValue.match(/(?:grade\\s*)?(\\d{1,2})/i);\n  const gradeNum = gradeMatch ? Number(gradeMatch[1]) : 0;\n  const isEligibleGrade = gradeNum >= 5 && gradeNum <= 12;
+  // Grade values have historically been stored both as "8" and "Grade 8".\n  // Normalize both formats so valid middle/high-school students are not blocked.\n  const gradeValue = (user?.grade || "").trim();\n  const gradeMatch = gradeValue.match(/(?:grade\\s*)?(\\d{1,2})/i);\n  const gradeNum = gradeMatch ? Number(gradeMatch[1]) : 0;\n  const educationLevel = (user?.educationLevel || "").trim().toLowerCase();
+  // Preserve access for legacy profiles whose education level is already known.
+  const isEligibleGrade = (gradeNum >= 5 && gradeNum <= 12) || educationLevel === "middle" || educationLevel === "upper";
 
   if (!isEligibleGrade) {
     return (

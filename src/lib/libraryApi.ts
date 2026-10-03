@@ -403,8 +403,29 @@ export async function moderateBookUpload(payload: {
 }
 
 export async function deleteBook(id: string) {
+  const { data: book, error: fetchError } = await db
+    .from('library_books')
+    .select('id, pdf_path, thumbnail_path')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) throw fetchError;
+
   const { error } = await db.from('library_books').delete().eq('id', id);
   if (error) throw error;
+
+  // Keep Storage from accumulating orphaned PDFs/thumbnails after a successful
+  // database deletion. Storage cleanup is best-effort and never hides the DB result.
+  const pathsByBucket: Array<{ bucket: string; path: string | null }> = [
+    { bucket: 'library-files', path: book?.pdf_path || null },
+    { bucket: 'library-thumbnails', path: book?.thumbnail_path || null },
+  ];
+
+  await Promise.allSettled(
+    pathsByBucket
+      .filter((entry) => !!entry.path && !/^https?:\/\//i.test(entry.path))
+      .map((entry) => supabase.storage.from(entry.bucket).remove([entry.path as string])),
+  );
 }
 
 export async function toggleBookmark(bookId: string, userId: string, currentlyBookmarked: boolean) {
