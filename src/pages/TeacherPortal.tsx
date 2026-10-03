@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { sendRemoteNotifications } from '@/lib/staffNotifications';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/button';
@@ -188,15 +189,39 @@ const TeacherPortal: React.FC = () => {
   };
 
   const fetchResults = async () => {
+    if (!user?.id) {
+      setResults([]);
+      return;
+    }
+
+    // Teachers should only see results for quizzes they created.
+    const { data: ownQuizzes, error: quizError } = await supabase
+      .from('quizzes')
+      .select('id')
+      .eq('created_by', user.id);
+
+    if (quizError) {
+      toast.error('Failed to fetch quiz results');
+      setResults([]);
+      return;
+    }
+
+    const quizIds = (ownQuizzes || []).map((quiz) => quiz.id);
+    if (!quizIds.length) {
+      setResults([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('quiz_results')
       .select(`
         *,
         quizzes:quiz_id (title, subject)
       `)
+      .in('quiz_id', quizIds)
       .order('completed_at', { ascending: false })
-      .limit(50);
-    
+      .limit(100);
+
     if (!error && data) {
       setResults(data);
     }
@@ -496,6 +521,34 @@ const TeacherPortal: React.FC = () => {
       return;
     }
 
+    // Deliver the same announcement as a real push notification to the
+    // students targeted by this teacher. The database announcement remains
+    // the source of truth if a device is offline or has notifications disabled.
+    let recipientIds: string[] = [];
+    if (createdAnnouncement.target_type === 'class' && createdAnnouncement.target_id) {
+      const { data: members } = await supabase
+        .from('class_students')
+        .select('student_id')
+        .eq('class_id', createdAnnouncement.target_id);
+      recipientIds = (members || []).map((member) => member.student_id);
+    } else if (createdAnnouncement.target_type === 'students') {
+      const { data: memberships } = await supabase
+        .from('class_students')
+        .select('student_id, classes!inner(teacher_id)')
+        .eq('classes.teacher_id', user.id);
+      recipientIds = Array.from(new Set((memberships || []).map((member: any) => member.student_id)));
+    }
+
+    const sentCount = await sendRemoteNotifications(
+      recipientIds.map((studentId) => ({
+        userId: studentId,
+        kind: 'teacher_announcement',
+        title: createdAnnouncement.title,
+        body: createdAnnouncement.content,
+        data: { route: '/notifications', announcement_id: createdAnnouncement.id },
+      })),
+    );
+
     const shouldShareToStudentSocial = ['all', 'students', 'class'].includes(createdAnnouncement.target_type);
 
     if (shouldShareToStudentSocial) {
@@ -526,7 +579,11 @@ ${createdAnnouncement.content}`;
     }
 
     setLoading(false);
-    toast.success('Announcement sent!');
+    toast.success(
+      sentCount > 0
+        ? `Announcement sent! ${sentCount} student device(s) notified.`
+        : 'Announcement saved. No student device was available for push notification.',
+    );
     setShowAnnouncementDialog(false);
     setAnnouncementForm({ title: '', content: '', target_type: 'class', target_id: '' });
     fetchAnnouncements();
