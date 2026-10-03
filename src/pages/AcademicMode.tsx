@@ -16,7 +16,7 @@ const AcademicMode: React.FC = () => {
   // Grade values have historically been stored both as "8" and "Grade 8".
   // Normalize both formats so valid middle/high-school students are not blocked.
   const gradeValue = (user?.grade || "").trim();
-  const gradeMatch = gradeValue.match(/(?:grade\\s*)?(\\d{1,2})/i);
+  const gradeMatch = gradeValue.match(/(?:grade\s*)?(\d{1,2})/i);
   const gradeNum = gradeMatch ? Number(gradeMatch[1]) : 0;
   const educationLevel = (user?.educationLevel || "").trim().toLowerCase();
   // Preserve access for legacy profiles whose education level is already known.
