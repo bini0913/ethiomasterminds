@@ -65,7 +65,31 @@ $$;
 REVOKE ALL ON FUNCTION public.consume_edge_rate_limit(text, integer, integer) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.consume_edge_rate_limit(text, integer, integer) TO authenticated;
 
--- 2) Restore the room lifecycle RPCs expected by RoomContext.
+-- 2) Restore the room cleanup RPC expected by RoomContext.
+CREATE OR REPLACE FUNCTION public.cleanup_expired_multiplayer_rooms()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $
+DECLARE
+  v_deleted integer;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+
+  DELETE FROM public.multiplayer_rooms
+  WHERE status IN ('waiting','countdown')
+    AND created_at < now() - interval '30 minutes';
+
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.cleanup_expired_multiplayer_rooms() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cleanup_expired_multiplayer_rooms() TO authenticated;
+
+-- 3) Restore the room lifecycle RPCs expected by RoomContext.
 CREATE OR REPLACE FUNCTION public.multiplayer_create_room(
   p_name text,
   p_subject text,
