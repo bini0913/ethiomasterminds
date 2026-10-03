@@ -251,7 +251,7 @@ const App = () => (
                               <Route 
                                 path="/teacher" 
                                 element={
-                                  <ProtectedRoute allowedRoles={['teacher', 'admin', 'manager']}>
+                                  <ProtectedRoute allowedRoles={['teacher', 'admin', 'manager', 'extreme_admin']}>
                                     <TeacherPortal />
                                   </ProtectedRoute>
                                 } 
@@ -267,7 +267,7 @@ const App = () => (
                               <Route 
                                 path="/admin" 
                                 element={
-                                  <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                                  <ProtectedRoute allowedRoles={['admin', 'manager', 'extreme_admin']}>
                                     <AdminPortal />
                                   </ProtectedRoute>
                                 } 
@@ -315,7 +315,7 @@ const App = () => (
                               <Route
                                 path="/library"
                                 element={
-                                  <ProtectedRoute allowedRoles={['student', 'teacher', 'admin', 'manager']}>
+                                  <ProtectedRoute allowedRoles={['student', 'teacher', 'admin', 'manager', 'extreme_admin']}>
                                     <LibraryPage />
                                   </ProtectedRoute>
                                 }
@@ -329,13 +329,21 @@ const App = () => (
                                 grant it is the `extreme_admin_update_user_role` RPC, which itself
                                 requires an existing extreme_admin caller.
                               */}
-                              <Route 
-                                path="/root-control-portal-9xA7" 
+                              <Route
+                                path="/super-admin"
                                 element={
                                   <ProtectedRoute allowedRoles={['extreme_admin']}>
-                                    <ExtremeAdminPortal />
+                                    <SuperAdminPortal />
                                   </ProtectedRoute>
-                                } 
+                                }
+                              />
+                              <Route
+                                path="/root-control-portal-9xA7"
+                                element={
+                                  <ProtectedRoute allowedRoles={['extreme_admin']}>
+                                    <SuperAdminPortal />
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route path="/migrate-supabase" element={<ProtectedRoute allowedRoles={["admin", "manager", "extreme_admin"]}><SupabaseMigration /></ProtectedRoute>} />
                               <Route path="*" element={<NotFound />} />
