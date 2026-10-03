@@ -112,9 +112,17 @@ const SuperAdminPortal: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3"><BackButton/><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-destructive">Restricted</p><h1 className="text-2xl font-bold">Super Admin Control Center</h1><p className="text-sm text-muted-foreground">Full platform administration with audited access to private operational data.</p></div></div>
-          <Button variant="outline" onClick={refresh} disabled={loading}><RefreshCw className={"mr-2 h-4 w-4 "+(loading?"animate-spin":"")}/>Refresh</Button>
+        <div className="mb-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3"><BackButton/><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-destructive">Highest Authority</p><h1 className="text-2xl font-bold">Super Admin Control Center</h1><p className="text-sm text-muted-foreground">Full platform authority across students, teachers, managers, admins, content, chats, system controls and audited operations.</p></div></div>
+            <Button variant="outline" onClick={refresh} disabled={loading}><RefreshCw className={"mr-2 h-4 w-4 "+(loading?"animate-spin":"")}/>Refresh</Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={()=>window.location.assign("/admin")}>Open Admin Portal</Button>
+            <Button variant="secondary" onClick={()=>window.location.assign("/manager")}>Open Manager Control Center</Button>
+            <Button variant="secondary" onClick={()=>window.location.assign("/manager-dashboard")}>Open Manager Operations</Button>
+            <span className="inline-flex items-center rounded-md border px-3 py-2 text-sm text-muted-foreground">Finance controls connect here after the Finance Portal is deployed.</span>
+          </div>
         </div>
 
         <Card className="mb-5 border-destructive/30 bg-destructive/5"><CardContent className="flex items-start gap-3 p-4"><Shield className="mt-0.5 h-5 w-5 text-destructive"/><div><p className="font-semibold">High-privilege mode</p><p className="text-sm text-muted-foreground">User changes and deletions are protected by server-side role checks. Opening the chat archive creates an audit-log entry.</p></div></CardContent></Card>
