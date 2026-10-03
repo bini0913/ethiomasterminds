@@ -334,7 +334,7 @@ const App = () => (
                               <Route
                                 path="/finance"
                                 element={
-                                  <ProtectedRoute allowedRoles={['admin', 'manager', 'extreme_admin']}>
+                                  <ProtectedRoute allowedRoles={['finance', 'admin', 'manager', 'extreme_admin']}>
                                     <FinancePortal />
                                   </ProtectedRoute>
                                 }

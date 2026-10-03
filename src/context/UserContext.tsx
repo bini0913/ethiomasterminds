@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 
 // Types
-export type UserRole = "student" | "teacher" | "admin" | "manager" | "extreme_admin";
+export type UserRole = "student" | "teacher" | "admin" | "manager" | "finance" | "extreme_admin";
 
 export interface AvatarConfig {
   bodyType?: string;
