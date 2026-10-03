@@ -101,7 +101,7 @@ const SuperAdminPortal: React.FC = () => {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [dashboard, userRows, logRows, settingRows] = await Promise.all([
+      const [dashboard, userRows, logRows, settingRows, security, systemOverview] = await Promise.all([
         supabase.rpc("extreme_admin_get_dashboard" as any),
         supabase.rpc("extreme_admin_list_users" as any, {
           p_search: userSearch.trim() || null,
