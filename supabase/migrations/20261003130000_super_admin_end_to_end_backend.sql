@@ -315,3 +315,105 @@ grant execute on function public.extreme_admin_list_reports(text,integer,integer
 grant execute on function public.extreme_admin_list_posts(text,integer,integer) to authenticated;
 grant execute on function public.extreme_admin_list_books(text,integer,integer) to authenticated;
 grant execute on function public.extreme_admin_set_report_status(uuid,text,text) to authenticated;
+
+
+create or replace function public.extreme_admin_finance_overview()
+returns jsonb
+language plpgsql security definer set search_path=public
+as $$
+declare
+  v_accounts integer;
+  v_invoices integer;
+  v_payments integer;
+  v_transactions integer;
+  v_balance numeric;
+begin
+  if not public._is_extreme_admin() then raise exception 'Super Admin access required'; end if;
+
+  select count(*) into v_accounts
+  from public.finance_accounts
+  where active = true;
+
+  select count(*) into v_invoices
+  from public.finance_invoices;
+
+  select count(*) into v_payments
+  from public.finance_payments;
+
+  select count(*) into v_transactions
+  from public.finance_transactions;
+
+  select coalesce(sum(current_balance), 0) into v_balance
+  from public.finance_accounts
+  where active = true;
+
+  return jsonb_build_object(
+    'available', true,
+    'accounts', v_accounts,
+    'invoices', v_invoices,
+    'payments', v_payments,
+    'transactions', v_transactions,
+    'balance', v_balance
+  );
+end;
+$$;
+
+create or replace function public.extreme_admin_delete_post(
+  p_post_id uuid,
+  p_reason text default null
+)
+returns boolean
+language plpgsql security definer set search_path=public
+as $$
+begin
+  if not public._is_extreme_admin() then raise exception 'Super Admin access required'; end if;
+
+  delete from public.social_posts
+  where id = p_post_id;
+
+  if not found then raise exception 'Post not found'; end if;
+
+  insert into public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  values (
+    auth.uid(),
+    'delete_social_post',
+    'social_post',
+    p_post_id,
+    jsonb_build_object('reason', p_reason)
+  );
+
+  return true;
+end;
+$$;
+
+create or replace function public.extreme_admin_delete_book(
+  p_book_id uuid,
+  p_reason text default null
+)
+returns boolean
+language plpgsql security definer set search_path=public
+as $$
+begin
+  if not public._is_extreme_admin() then raise exception 'Super Admin access required'; end if;
+
+  delete from public.library_books
+  where id = p_book_id;
+
+  if not found then raise exception 'Book not found'; end if;
+
+  insert into public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  values (
+    auth.uid(),
+    'delete_library_book',
+    'library_book',
+    p_book_id,
+    jsonb_build_object('reason', p_reason)
+  );
+
+  return true;
+end;
+$$;
+
+grant execute on function public.extreme_admin_finance_overview() to authenticated;
+grant execute on function public.extreme_admin_delete_post(uuid,text) to authenticated;
+grant execute on function public.extreme_admin_delete_book(uuid,text) to authenticated;
