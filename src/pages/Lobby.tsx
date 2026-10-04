@@ -174,41 +174,6 @@ const Lobby: React.FC = () => {
   }, []);
 
   const fetchOnlinePlayers = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('user_presence')
-      .select(`
-        user_id,
-        status,
-        last_seen
-      `)
-      .eq('status', 'online')
-      .gte('last_seen', new Date(Date.now() - 5 * 60 * 1000).toISOString())
-      .limit(20);
-
-    if (!error && data) {
-      const userIds = data.map((p: any) => p.user_id);
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name, avatar, level, xp')
-          .in('id', userIds);
-
-        if (profiles) {
-          const players = profiles.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            avatar: p.avatar || 'avatar-1',
-            level: p.level || 1,
-            xp: p.xp || 0,
-            status: 'online'
-          }));
-          setOnlinePlayers(players);
-        }
-      } else {
-        setOnlinePlayers([]);
-      }
-    }
-
     if (user) {
       await supabase
         .from('user_presence')
@@ -218,6 +183,52 @@ const Lobby: React.FC = () => {
           last_seen: new Date().toISOString()
         }, { onConflict: 'user_id' });
     }
+
+    const { data, error } = await supabase
+      .from('user_presence')
+      .select('user_id, status, last_seen')
+      .eq('status', 'online')
+      .gte('last_seen', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+      .order('last_seen', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('Error loading online players:', error);
+      setOnlinePlayers([]);
+      return;
+    }
+
+    const userIds = (data || []).map((p: any) => p.user_id);
+    if (userIds.length === 0) {
+      setOnlinePlayers([]);
+      return;
+    }
+
+    const { data: profiles, error: profileError } = await supabase.rpc(
+      'get_public_student_profiles',
+      { p_user_ids: userIds },
+    );
+
+    if (profileError) {
+      console.error('Error loading public player profiles:', profileError);
+      setOnlinePlayers([]);
+      return;
+    }
+
+    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+    const players = userIds
+      .map((id: string) => profileMap.get(id))
+      .filter(Boolean)
+      .map((p: any) => ({
+        id: p.id,
+        name: p.name || p.username || 'Student',
+        avatar: p.avatar || 'avatar-1',
+        level: p.level || 1,
+        xp: p.xp || 0,
+        status: 'online',
+      }));
+
+    setOnlinePlayers(players);
   }, [user]);
 
   const fetchChatMessages = useCallback(async () => {
@@ -1398,138 +1409,3 @@ const Lobby: React.FC = () => {
                 <Label>Private Room Code</Label>
                 <Input value={newRoomData.roomCode} onChange={(e) => setNewRoomData({...newRoomData, roomCode: e.target.value})} placeholder="Enter passcode" />
               </div>
-            )}
-            <div>
-              <Label>Invite Friends</Label>
-              {friends.length === 0 ? (
-                <p className="text-sm text-muted-foreground mt-2">No friends available yet. Add friends to invite directly.</p>
-              ) : (
-                <div className="mt-2 grid grid-cols-2 gap-2 max-h-32 overflow-auto border border-border rounded-md p-2">
-                  {friends.map((friend) => {
-                    const selected = newRoomData.inviteFriendIds.includes(friend.id);
-                    return (
-                      <Button
-                        type="button"
-                        key={friend.id}
-                        size="sm"
-                        variant={selected ? "default" : "outline"}
-                        className="justify-start"
-                        onClick={() => {
-                          setNewRoomData((prev) => ({
-                            ...prev,
-                            inviteFriendIds: selected
-                              ? prev.inviteFriendIds.filter((id) => id !== friend.id)
-                              : [...prev.inviteFriendIds, friend.id]
-                          }));
-                        }}
-                      >
-                        {friend.name}
-                      </Button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateRoomOpen(false)}>Cancel</Button>
-            <Button onClick={createRoom} className="gap-2"><Plus className="h-4 w-4" /> Create Room</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={createTournamentOpen} onOpenChange={setCreateTournamentOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Trophy className="h-5 w-5" /> Create Tournament (Admin)</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Tournament Name</Label>
-              <Input value={newTournamentData.name} onChange={(e) => setNewTournamentData({ ...newTournamentData, name: e.target.value })} placeholder="e.g., Grade 8 Speed Cup" />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Input value={newTournamentData.description} onChange={(e) => setNewTournamentData({ ...newTournamentData, description: e.target.value })} placeholder="What students will compete on" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Format</Label>
-                <Select value={newTournamentData.format} onValueChange={(value: Tournament["format"]) => setNewTournamentData({ ...newTournamentData, format: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="knockout">Knockout (Football style)</SelectItem>
-                    <SelectItem value="speed_knockout">Speed Knockout</SelectItem>
-                    <SelectItem value="multiplayer_draw">Competition Draw (Multiplayer)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Scoring</Label>
-                <Select value={newTournamentData.scoreMode} onValueChange={(value: Tournament["scoreMode"]) => setNewTournamentData({ ...newTournamentData, scoreMode: value })} disabled={newTournamentData.format === "multiplayer_draw"}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="accuracy">Accuracy</SelectItem>
-                    <SelectItem value="speed">Speed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Max Players</Label>
-                <Input type="number" min={2} value={newTournamentData.maxPlayers} onChange={(e) => setNewTournamentData({ ...newTournamentData, maxPlayers: e.target.value })} />
-              </div>
-              <div>
-                <Label>Duration (hours)</Label>
-                <Input type="number" min={1} value={newTournamentData.durationHours} onChange={(e) => setNewTournamentData({ ...newTournamentData, durationHours: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Prize Coins</Label>
-                <Input type="number" min={0} value={newTournamentData.prizeCoins} onChange={(e) => setNewTournamentData({ ...newTournamentData, prizeCoins: e.target.value })} />
-              </div>
-              <div>
-                <Label>Prize Gems</Label>
-                <Input type="number" min={0} value={newTournamentData.prizeGems} onChange={(e) => setNewTournamentData({ ...newTournamentData, prizeGems: e.target.value })} />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateTournamentOpen(false)}>Cancel</Button>
-            <Button onClick={createTournament}>Create Tournament</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {incomingInvite && incomingInvite.status === "pending" && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[92vw] max-w-md">
-          <Card className="border-emerald-400/40 bg-slate-950/95 backdrop-blur-xl shadow-[0_0_40px_rgba(16,185,129,0.35)]">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <AvatarRenderer avatar={incomingInviteSender?.avatar || "avatar-1"} size="md" />
-                <div className="flex-1">
-                  <p className="font-semibold">🎮 {incomingInviteSender?.name || "A player"} invited you to a match</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <Timer className="h-3 w-3" /> Expires in {inviteSecondsLeft}s
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => respondToInvite("accepted")}>
-                  <CheckCircle2 className="h-4 w-4 mr-2" /> Accept
-                </Button>
-                <Button variant="outline" onClick={() => respondToInvite("rejected")}>
-                  <X className="h-4 w-4 mr-2" /> Reject
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default Lobby;
