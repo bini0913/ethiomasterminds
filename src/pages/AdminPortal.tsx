@@ -263,7 +263,7 @@ const AdminPortal: React.FC = () => {
     setSocialPosts(postRes.data || []);
     setBooks(bookRes.data || []);
 
-    const pendingRows = ((libraryRes.data || []) as PendingLibraryBook[]).filter((book) => book.status === 'pending');
+    const pendingRows = ((libraryRes.data || []) as unknown as PendingLibraryBook[]).filter((book) => book.status === 'pending');
     const uploaderIds = Array.from(new Set(pendingRows.map((book) => book.uploader_id).filter(Boolean)));
     if (!uploaderIds.length) {
       setPendingLibraryBooks(pendingRows);
@@ -275,7 +275,7 @@ const AdminPortal: React.FC = () => {
       .select('id,name,username')
       .in('id', uploaderIds);
 
-    const profileMap = new Map((profileRows || []).map((profile: any) => [profile.id, profile]));
+    const profileMap = new Map((profileRows || []) as Array<{ id: string; name: string | null; username: string | null }>.map((profile) => [profile.id, profile]));
     setPendingLibraryBooks(
       pendingRows.map((book) => ({
         ...book,
@@ -411,7 +411,7 @@ const AdminPortal: React.FC = () => {
     );
 
     const sentCount = await sendRemoteNotifications(
-      recipientIds.map((recipientId) => ({
+      recipientIds.map((recipientId: string) => ({
         userId: recipientId,
         kind: 'admin_announcement',
         title: createdAnnouncement.title,
