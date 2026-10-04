@@ -235,8 +235,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         // Resolve the profile immediately from the user returned by sign-in.
         // Do not wait for React state/onAuthStateChange to catch up, otherwise
         // the login form can remain visible even though authentication succeeded.
-        setSession(data.session);
-        const profile = await fetchUserProfile(data.user.id, data.user);
+        setSession(usernameSession);
+        const profile = await fetchUserProfile(authUser.id, authUser);
         setUser(profile);
         setIsLoading(false);
 
@@ -261,38 +261,28 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         return null;
       }
 
-      // Get email from username using RPC
-      const { data: email, error: lookupError } = await supabase
-        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() } as any);
-
-      if (lookupError) {
-        console.error('Username lookup error:', lookupError);
-        toast.error("Failed to find user. Please try again.");
-        return null;
-      }
-
-      if (!email) {
-        toast.error("Username not found");
-        return null;
-      }
-
-      // Login with email/password
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password.trim(),
+      const { data: loginResult, error: loginError } = await supabase.functions.invoke('login-with-username', {
+        body: {
+          username: username.trim().toLowerCase(),
+          password: password.trim(),
+        },
       });
 
-      if (error) {
-        console.error('Login error:', error);
-        if (error.message.includes('Invalid login')) {
-          toast.error("Invalid username or password");
-        } else {
-          toast.error(error.message || "Login failed");
-        }
+      if (loginError || !loginResult?.ok || !loginResult?.session?.user) {
+        console.error('Username login error:', loginError || loginResult?.error);
+        toast.error("Invalid username or password");
         return null;
       }
 
-      if (data.user) {
+      const { session: usernameSession, user: authUser } = loginResult;
+      const { error: sessionError } = await supabase.auth.setSession(usernameSession);
+      if (sessionError) {
+        console.error('Session restore error:', sessionError);
+        toast.error("Login failed. Please try again.");
+        return null;
+      }
+
+      if (authUser) {
         // Resolve the profile immediately from the user returned by sign-in so
         // callers can route on the real role without a reload.
         setSession(data.session);
@@ -348,10 +338,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
 
       // Check if username is already taken
-      const { data: existingEmail } = await supabase
-        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() } as any);
+      const { data: usernameAvailable, error: usernameAvailabilityError } = await supabase
+        .rpc('is_username_available', { _username: username.trim().toLowerCase() } as any);
 
-      if (existingEmail) {
+      if (!usernameAvailabilityError && usernameAvailable === false) {
         toast.error("Username is already taken");
         return null;
       }
