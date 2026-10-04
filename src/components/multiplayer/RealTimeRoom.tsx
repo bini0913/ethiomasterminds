@@ -39,6 +39,7 @@ interface Player {
   isReady: boolean;
   isHost: boolean;
   level: number;
+  isOnline: boolean;
 }
 
 interface ChatMessage {
@@ -188,7 +189,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }, [roomState.status, countdownEndsAt, countdownValue, isHost]);
 
   const readyCount = players.filter((p) => p.isReady).length;
-  const autoStartReady = players.length >= 2 && readyCount === players.length;
+  const nonHostPlayers = players.filter((p) => !p.isHost);
+  const autoStartReady =
+    players.length >= 2 &&
+    nonHostPlayers.length > 0 &&
+    nonHostPlayers.every((p) => p.isReady);
   useEffect(() => {
     if (roomState.status !== 'waiting') {
       autoStartTriggeredRef.current = false;
@@ -330,19 +335,33 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
     if (playersData) {
       const userIds = playersData.map((p) => p.user_id);
-      const { data: profiles } = await supabase.from('profiles').select('id, name, avatar, level').in('id', userIds);
-      const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+      const [{ data: profiles }, { data: presenceRows }] = await Promise.all([
+        supabase.rpc('get_public_student_profiles', { p_user_ids: userIds }),
+        supabase
+          .from('user_presence')
+          .select('user_id, status, last_seen')
+          .in('user_id', userIds),
+      ]);
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+      const presenceMap = new Map(
+        (presenceRows || []).map((p: any) => [
+          p.user_id,
+          p.status === 'online' && new Date(p.last_seen).getTime() >= fiveMinutesAgo,
+        ]),
+      );
 
       const mappedPlayers: Player[] = playersData.map((p) => {
         const profile = profileMap.get(p.user_id);
         return {
           id: p.user_id,
-          name: profile?.name || 'Unknown',
+          name: profile?.name || profile?.username || `Player ${p.user_id.slice(0, 6)}`,
           avatar: profile?.avatar || 'avatar-1',
           score: p.score || 0,
           isReady: p.is_ready || false,
           isHost: p.user_id === roomData?.host_id,
           level: profile?.level || 1,
+          isOnline: presenceMap.get(p.user_id) ?? false,
         };
       });
 
@@ -367,6 +386,13 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
     return [];
   };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void fetchPlayers();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [roomId]);
 
   const fetchCurrentQuestion = async (questionId: string) => {
     const { data } = await supabase
@@ -547,9 +573,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       if (error) throw error;
       await supabase.rpc('multiplayer_next_question', { p_room_id: roomId });
       playTone(660, 0.12);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error starting game:', err);
-      toast.error('Failed to start game');
+      toast.error(err?.message || 'Failed to start game');
     }
   };
 
@@ -972,6 +998,12 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     <AvatarRenderer avatar={player.avatar} size="md" className="mx-auto mb-1" />
                     <div className="text-[11px] uppercase tracking-wide text-blue-100/70">Player {players.findIndex((p) => p.id === player.id) + 1}</div>
                     <div className="text-sm font-medium truncate">{player.name}</div>
+                    <div className="flex items-center justify-center gap-1 mt-1 text-xs">
+                      <span className={cn('h-2 w-2 rounded-full', player.isOnline ? 'bg-emerald-400' : 'bg-slate-500')} />
+                      <span className={player.isOnline ? 'text-emerald-300' : 'text-slate-400'}>
+                        {player.isOnline ? 'Online' : 'Offline'}
+                      </span>
+                    </div>
                     <div className="flex items-center justify-center gap-1 mt-1 text-xs text-blue-100/75">
                       {player.isHost && <Crown className="h-3 w-3 text-yellow-400" />} Lv.{player.level}
                     </div>
