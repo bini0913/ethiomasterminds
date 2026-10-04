@@ -146,7 +146,7 @@ const TournamentHub: React.FC = () => {
         .select("id,name,status,mode,subject,settings,question_count,questions_count,start_time,starts_at,max_participants,current_players,entry_fee,entry_fee_coins,prize_coins,winner_id")
         .order("created_at", { ascending: false })
         .limit(30),
-      supabase.from("tournament_players" as any).select("tournament_id,user_id"),
+      (supabase as any).from("tournament_players").select("tournament_id,user_id"),
       supabase.from("profiles").select("id,name"),
     ]);
 
@@ -160,7 +160,7 @@ const TournamentHub: React.FC = () => {
       return acc;
     }, {});
 
-    const profileMap = new Map((profileRows || []).map((profile) => [profile.id, profile.name || "Unknown"]));
+    const profileMap = new Map<string, string>((profileRows || []).map((profile: any) => [profile.id, profile.name || "Unknown"]));
 
     const mapped = (tournamentRows || []).map((row: any): HubTournament => ({
       id: row.id,
