@@ -103,7 +103,8 @@ const FinancePortal: React.FC = () => {
     const income = transactions.filter(x => x.direction === "inflow" && x.status === "posted").reduce((sum, x) => sum + Number(x.amount), 0);
     const expenses = transactions.filter(x => x.direction === "outflow" && x.status === "posted").reduce((sum, x) => sum + Number(x.amount), 0);
     const overdue = invoices.filter(x => x.status !== "paid" && x.status !== "cancelled" && x.due_date && new Date(x.due_date) < new Date()).length;
-    return { receivables, income, expenses, net: income - expenses, overdue };
+    const paid = invoices.reduce((sum, x) => sum + Number(x.amount_paid || 0), 0);
+    return { receivables, income, expenses, net: income - expenses, overdue, paid };
   }, [invoices, transactions]);
 
   const filteredInvoices = useMemo(() => {

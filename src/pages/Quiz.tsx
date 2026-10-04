@@ -634,7 +634,7 @@ const Quiz: React.FC = () => {
                     </div>
                     
                     <Button 
-                      onClick={handleCreateRandomQuiz} 
+                      onClick={() => handleCreateRandomQuiz()} 
                       className="w-full bg-gradient-to-r from-accent to-glow-pink hover:opacity-90 h-12 text-lg"
                       disabled={!selectedCategory}
                     >
