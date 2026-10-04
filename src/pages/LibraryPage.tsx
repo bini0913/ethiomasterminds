@@ -163,7 +163,9 @@ const LibraryPage: React.FC = () => {
     load();
   }, [user?.id]);
 
-  const userGrade = Number(user?.grade || 0);
+  const gradeValue = (user?.grade || '').trim();
+  const gradeMatch = gradeValue.match(/(?:grade\s*)?(\d{1,2})/i);
+  const userGrade = gradeMatch ? Number(gradeMatch[1]) : 0;
   const userTier = getUserTier(user?.grade);
   const studentGradeMin = userTier === 'upper' ? 9 : userTier === 'middle' ? 5 : userTier === 'early' ? 1 : 1;
   const studentGradeMax = userTier === 'upper' ? 12 : userTier === 'middle' ? 8 : userTier === 'early' ? 4 : 12;
