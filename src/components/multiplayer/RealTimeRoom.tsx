@@ -331,7 +331,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (playersData) {
       const userIds = playersData.map((p) => p.user_id);
       const { data: profiles } = await supabase.from('profiles').select('id, name, avatar, level').in('id', userIds);
-      const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+      const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.id, p]));
 
       const mappedPlayers: Player[] = playersData.map((p) => {
         const profile = profileMap.get(p.user_id);
