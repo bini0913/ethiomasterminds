@@ -285,8 +285,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (authUser) {
         // Resolve the profile immediately from the user returned by sign-in so
         // callers can route on the real role without a reload.
-        setSession(data.session);
-        const profile = await fetchUserProfile(data.user.id, data.user);
+        setSession(usernameSession);
+        const profile = await fetchUserProfile(authUser.id, authUser);
         setUser(profile);
         setIsLoading(false);
 
