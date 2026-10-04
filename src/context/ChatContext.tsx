@@ -144,7 +144,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .select('id, name, avatar')
         .in('id', senderIds);
 
-      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.id, p]));
 
       const enrichedMessages: GroupMessage[] = (data || []).map(m => ({
         ...m,
