@@ -21,6 +21,7 @@ end $$;
 revoke all on function public.multiplayer_question_payload(uuid,integer) from public,anon;
 grant execute on function public.multiplayer_question_payload(uuid,integer) to authenticated;
 
+drop function if exists public.multiplayer_start_game(uuid);
 create or replace function public.multiplayer_start_game(p_room_id uuid)
 returns jsonb language plpgsql security definer set search_path=''
 as $$
