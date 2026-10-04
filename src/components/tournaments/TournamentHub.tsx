@@ -146,7 +146,7 @@ const TournamentHub: React.FC = () => {
         .select("id,name,status,mode,subject,settings,question_count,questions_count,start_time,starts_at,max_participants,current_players,entry_fee,entry_fee_coins,prize_coins,winner_id")
         .order("created_at", { ascending: false })
         .limit(30),
-      supabase.from("tournament_players" as any).select("tournament_id,user_id"),
+      (supabase as any).from("tournament_players").select("tournament_id,user_id"),
       supabase.from("profiles").select("id,name"),
     ]);
 
@@ -160,7 +160,8 @@ const TournamentHub: React.FC = () => {
       return acc;
     }, {});
 
-    const profileMap = new Map((profileRows || []).map((profile) => [profile.id, profile.name || "Unknown"]));
+    const typedProfiles = (profileRows || []) as Array<{ id: string; name: string | null }>;
+     const profileMap = new Map(typedProfiles.map((profile) => [profile.id, profile.name || "Unknown"]));
 
     const mapped = (tournamentRows || []).map((row: any): HubTournament => ({
       id: row.id,
@@ -176,7 +177,7 @@ const TournamentHub: React.FC = () => {
       entryFee: row.entry_fee ?? row.entry_fee_coins ?? 0,
       prize: row.prize_coins ?? 0,
       winnerId: row.winner_id,
-      winnerName: row.winner_id ? profileMap.get(row.winner_id) ?? null : null,
+      winnerName: row.winner_id ? String(profileMap.get(row.winner_id) ?? "Unknown") : null,
     }));
 
     setTournaments(mapped);
