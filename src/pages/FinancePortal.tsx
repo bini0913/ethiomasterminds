@@ -124,7 +124,12 @@ const FinancePortal: React.FC = () => {
       status: "issued", notes: invoiceForm.notes || null, created_by: user.id
     });
     if (error) return toast.error(error.message);
-    await db.from("finance_audit_log").insert({ actor_id: user.id, action: "create_invoice", entity_type: "invoice", details: { invoice_number: invoiceNumber } });
+    await db.rpc("finance_log_audit", {
+      p_action: "create_invoice",
+      p_entity_type: "invoice",
+      p_entity_id: null,
+      p_details: { invoice_number: invoiceNumber, student_id: invoiceForm.student_id },
+    });
     toast.success(`Invoice ${invoiceNumber} created`);
     setInvoiceOpen(false);
     setInvoiceForm({ student_id: "", description: "Tuition & Fees", subtotal: "", discount: "", due_date: "", notes: "" });
