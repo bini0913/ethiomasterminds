@@ -2,9 +2,10 @@ import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
-import { Crown, Users, ShieldCheck, GraduationCap, Sparkles, BookOpen, Trophy, Zap, Globe, Info, Play } from "lucide-react";
+import { Crown, Users, ShieldCheck, GraduationCap, Sparkles, Trophy, Zap, Globe, Info, Play } from "lucide-react";
 import LanguageSelector from "@/components/common/LanguageSelector";
 import AnimatedBackground from "@/components/ui/AnimatedBackground";
+import MasterMindsLogo from "@/components/brand/MasterMindsLogo";
 import {
   Dialog,
   DialogContent,
@@ -59,48 +60,16 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
 
             <div className="relative">
               <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ duration: 1, type: "spring", bounce: 0.4 }}
-              className="relative">
-
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.9, type: "spring", bounce: 0.25 }}
+              className="relative flex flex-col items-center">
                 <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: 'linear-gradient(135deg, hsl(250 89% 67%), hsl(320 100% 60%))',
-                  filter: 'blur(30px)'
-                }}
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 0.8, 0.5]
-                }}
-                transition={{ duration: 2, repeat: Infinity }} />
-
-                <div className="relative w-40 h-40 rounded-full neon-border p-1">
-                  <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
-                    <motion.span
-                    className="text-5xl font-display font-black text-gradient"
-                    animate={{
-                      textShadow: [
-                      '0 0 20px hsl(250 89% 67%)',
-                      '0 0 40px hsl(320 100% 60%)',
-                      '0 0 20px hsl(250 89% 67%)']
-                    }}
-                    transition={{ duration: 2, repeat: Infinity }}>
-                      MM
-                    </motion.span>
-                  </div>
-                </div>
-
-                <motion.div
-                className="absolute inset-0"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}>
-                  <BookOpen className="absolute -top-6 left-1/2 -translate-x-1/2 w-8 h-8 text-primary" />
-                  <Trophy className="absolute top-1/2 -right-6 -translate-y-1/2 w-8 h-8 text-accent" />
-                  <Sparkles className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-8 h-8 text-secondary" />
-                  <Zap className="absolute top-1/2 -left-6 -translate-y-1/2 w-8 h-8 text-glow-yellow" />
-                </motion.div>
+                  className="absolute inset-0 rounded-full bg-[#0055FF]/20 blur-3xl"
+                  animate={{ scale: [1, 1.18, 1], opacity: [0.35, 0.55, 0.35] }}
+                  transition={{ duration: 2.4, repeat: Infinity }}
+                />
+                <MasterMindsLogo variant="light" layout="symbol" symbolClassName="h-40 w-40 drop-shadow-[0_0_28px_rgba(0,229,255,0.28)]" />
               </motion.div>
 
               {[...Array(6)].map((_, i) =>
@@ -154,34 +123,20 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           </div>
         </motion.div>
 
-        {/* Main Logo */}
+        {/* Master Minds Brand Mark */}
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={{ scale: 0.92, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.8, type: "spring" }}
-          className="mb-10">
-          <div className="relative">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary via-accent to-secondary blur-2xl opacity-50 animate-pulse-glow" />
-            <div className="relative w-36 h-36 rounded-full neon-border p-1 pulse-glow">
-              <div className="w-full h-full rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center">
-                <motion.div
-                  animate={{ rotateY: [0, 360] }}
-                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                  className="text-6xl font-display font-black text-gradient">
-                  MM
-                </motion.div>
-              </div>
-            </div>
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-[-20px]">
-              <BookOpen className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-6 text-primary drop-shadow-lg" />
-              <Trophy className="absolute top-1/2 -right-2 -translate-y-1/2 w-6 h-6 text-accent drop-shadow-lg" />
-              <Sparkles className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 text-secondary drop-shadow-lg" />
-              <Zap className="absolute top-1/2 -left-2 -translate-y-1/2 w-6 h-6 text-glow-yellow drop-shadow-lg" />
-            </motion.div>
-          </div>
+          transition={{ delay: 0.45, duration: 0.7, type: "spring", bounce: 0.2 }}
+          className="mb-10"
+        >
+          <MasterMindsLogo
+            variant="light"
+            layout="stacked"
+            showTagline
+            symbolClassName="h-28 w-28 sm:h-32 sm:w-32"
+            className="text-white"
+          />
         </motion.div>
 
         {/* Title */}
