@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: "Master Minds",
   webDir: "dist",
   server: {
-    url: "https://mastermind08.vercel.app",
+    url: "https://masterminds08.vercel.app",
     cleartext: false,
   },
 };
