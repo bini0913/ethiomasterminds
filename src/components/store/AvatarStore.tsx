@@ -95,10 +95,10 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
 
     const channel = supabase
       .channel(`store-live-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_items', filter: `user_id=eq.${user.id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_inventory', filter: `user_id=eq.${user.id}` }, () => {
         void fetchStoreItems();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_items' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'avatar_items' }, () => {
         void fetchStoreItems();
       })
       .subscribe();
