@@ -358,7 +358,7 @@ const Multiplayer: React.FC = () => {
               rankedLeaderboard.map((entry) => (
                 <div key={entry.user_id} className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${entry.user_id === user?.id ? "border-primary bg-primary/5" : "border-border"}`}>
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 text-center font-black">{entry.position <= 3 ? ["🥇","🥈","🥉"][Number(entry.position)-1] : `#${entry.position}`}</div>
+                    <div className="w-8 text-center font-black">{entry.rank_position <= 3 ? ["🥇","🥈","🥉"][Number(entry.rank_position)-1] : `#${entry.rank_position}`}</div>
                     <div className="min-w-0">
                       <p className="font-semibold truncate">{entry.player_name}{entry.user_id === user?.id ? " (You)" : ""}</p>
                       <p className="text-xs text-muted-foreground">{entry.matches_played} matches · {entry.wins} wins · {entry.podiums} podiums</p>
