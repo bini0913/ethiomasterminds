@@ -276,7 +276,8 @@ const ManagerDashboard: React.FC = () => {
       supabase.from('profiles').select('id,name'),
     ]);
 
-    const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile.name || 'Student']));
+    const typedProfiles = (profiles || []) as Array<{ id: string; name: string | null }>;
+     const profileMap = new Map(typedProfiles.map((profile) => [profile.id, profile.name || 'Student']));
     const participantsByTournament = (participants || []).reduce<Record<string, TournamentParticipantRow[]>>((acc, row) => {
       if (!acc[row.tournament_id]) acc[row.tournament_id] = [];
       acc[row.tournament_id].push(row as TournamentParticipantRow);
@@ -399,7 +400,7 @@ const ManagerDashboard: React.FC = () => {
 
     setDailyUsers(dUsers);
     setWeeklyLearning(dLearning);
-    setSubjectMix(Object.entries(subjectCounts).slice(0, 6).map(([subject, value]) => ({ subject, value })));
+    setSubjectMix(Object.entries(subjectCounts).slice(0, 6).map(([subject, value]) => ({ subject, value: Number(value) })));
 
     const { data: topStudents } = await supabase
       .from('profiles')
@@ -681,7 +682,7 @@ const ManagerDashboard: React.FC = () => {
       return acc;
     }, []);
 
-    const { error: clearError } = await supabase.from('tournament_matches' as any).delete().eq('tournament_id', selectedTournament.id);
+    const { error: clearError } = await (supabase as any).from('tournament_matches').delete().eq('tournament_id', selectedTournament.id);
     if (clearError) return toast.error('Failed to reset previous bracket');
 
     const { error } = await supabase.from('tournament_matches' as any).insert(matchRows);
