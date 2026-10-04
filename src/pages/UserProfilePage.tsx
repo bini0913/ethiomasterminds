@@ -205,7 +205,8 @@ const UserProfilePage = () => {
       .select("achievement_id,completed,unlocked_at")
       .eq("user_id", authUser.id)
       .in("achievement_id", achievementIds);
-    const existingMap = new Map((existing ?? []).map((row) => [row.achievement_id, row]));
+    const typedExisting = (existing ?? []) as Array<{ achievement_id: string; completed: boolean | null; unlocked_at: string | null }>;
+    const existingMap = new Map(typedExisting.map((row) => [row.achievement_id, row]));
 
     const payload = rules
       .filter((rule) => idsByName.has(rule.name))
@@ -300,8 +301,8 @@ const UserProfilePage = () => {
       setStatsJson((statsRes.data ?? {}) as Record<string, any>);
       await syncMilestoneAchievements((statsRes.data ?? {}) as Record<string, any>);
 
-      const strong = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.strong_topics) ? item.strong_topics : []));
-      const weak = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.weak_topics) ? item.weak_topics : []));
+      const strong = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.strong_topics) ? item.strong_topics as string[] : []));
+      const weak = (analyticsRes.data ?? []).flatMap((item: any) => (Array.isArray(item.weak_topics) ? item.weak_topics as string[] : []));
       setInsights({ strong: strong.slice(0, 3), weak: weak.slice(0, 3), recommended: [...new Set(weak)].slice(0, 3) });
 
       setActivities(
