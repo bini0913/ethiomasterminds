@@ -185,11 +185,11 @@ const Chat: React.FC = () => {
         .eq('group_id', roomId)
         .order('created_at', { ascending: true }).limit(200);
 
-      const senderIds = [...new Set((data || []).map(m => m.sender_id))];
+      const senderIds: string[] = [...new Set<string>((data || []).map((m: any) => m.sender_id as string))];
       await loadProfiles(senderIds);
 
       // Load reply-to messages
-      const replyIds = (data || []).filter(m => m.reply_to_id).map(m => m.reply_to_id!);
+      const replyIds: string[] = (data || []).filter((m: any) => m.reply_to_id).map((m: any) => m.reply_to_id as string);
       let replyMap: Record<string, any> = {};
       if (replyIds.length) {
         const { data: replies } = await supabase
