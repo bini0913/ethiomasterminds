@@ -16,8 +16,8 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  AlertTriangle, Award, BookOpen, CalendarClock, Check, Clock3, Flame, Heart, Home,
-  LogOut, MessageCircle, Plus, Save, Send, Sparkles, Target, Trash2, TrendingDown,
+  AlertTriangle, Award, BookOpen, CalendarClock, Check, CheckCircle2, Clock3, Flame, Heart, Home,
+  LogOut, MessageCircle, Plus, RefreshCw, Save, Send, Sparkles, Target, Trash2, TrendingDown,
   TrendingUp, Trophy, UserCheck, Zap,
 } from "lucide-react";
 import {
@@ -37,7 +37,7 @@ const toDateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
 const ParentDashboard: React.FC = () => {
   const { user, isAuthenticated, isLoading, logout } = useUser();
-  const [loadingData, setLoadingData] = useState(true);
+  const [loadingData, setLoadingData] = useState(true);\n  const [refreshing, setRefreshing] = useState(false);
   const [quizResults, setQuizResults] = useState<QuizRow[]>([]);
   const [studySessions, setStudySessions] = useState<StudySessionRow[]>([]);
   const [tasks, setTasks] = useState<ParentTask[]>([]);
@@ -155,6 +155,15 @@ const ParentDashboard: React.FC = () => {
   const completedTasks = tasks.filter(t => t.status === "completed").length;
   const pendingTasks = tasks.filter(t => t.status === "pending").length;
   const overdueTasks = tasks.filter(t => t.status === "pending" && t.deadline && new Date(t.deadline) < new Date()).length;
+  const weeklyQuizCount = useMemo(() => {
+    const since = Date.now() - 7 * 86400000;
+    return quizResults.filter(q => q.completed_at && new Date(q.completed_at).getTime() >= since).length;
+  }, [quizResults]);
+  const weeklyQuizProgress = Math.min(100, Math.round((weeklyQuizCount / Math.max(1, goals.weekly_quiz_target)) * 100));
+  const studyDays = useMemo(() => {
+    const since = Date.now() - 7 * 86400000;
+    return new Set(studySessions.filter(s => new Date(s.created_at).getTime() >= since).map(s => toDateOnly(s.created_at))).size;
+  }, [studySessions]);
   const dailyXP = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     return quizResults.reduce((s, r) => r.completed_at && toDateOnly(r.completed_at) === today ? s + (r.xp_earned ?? 0) : s, 0);
@@ -175,6 +184,7 @@ const ParentDashboard: React.FC = () => {
   }, [studySessions, quizResults]);
 
   const performanceStatus = accuracyPercent >= 85 && weeklyStudyMinutes >= 300 ? "Excellent" : accuracyPercent >= 60 && weeklyStudyMinutes >= 120 ? "On track" : "Needs attention";
+  const statusTone = performanceStatus === "Excellent" ? "text-emerald-600" : performanceStatus === "On track" ? "text-primary" : "text-amber-600";
   const quickAlerts = useMemo(() => {
     const a: string[] = [];
     if (weeklyStudyMinutes < 120) a.push("Low activity: less than 2 study hours this week.");
@@ -277,6 +287,9 @@ const ParentDashboard: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="hidden sm:inline-flex">Parent View</Badge>
+            <Button variant="outline" size="sm" onClick={() => void loadAll(true)} disabled={refreshing}>
+              <RefreshCw className={"h-4 w-4 mr-2 " + (refreshing ? "animate-spin" : "")} />Refresh
+            </Button>
             <Button variant="outline" size="sm" onClick={handleLeaveParentPortal}><Home className="h-4 w-4 mr-2" />Exit</Button>
             <Button variant="destructive" size="sm" onClick={handleSignOut}><LogOut className="h-4 w-4 mr-2" />Sign out</Button>
           </div>
@@ -328,7 +341,7 @@ const ParentDashboard: React.FC = () => {
                     <div className="flex justify-between text-xs mb-1"><span>Daily XP goal</span><span className="font-bold">{xpGoalProgress}%</span></div>
                     <Progress value={xpGoalProgress} className="h-2" />
                   </div>
-                  <Badge variant={performanceStatus === "Excellent" ? "default" : performanceStatus === "On track" ? "secondary" : "destructive"} className="w-full justify-center py-1">
+                  <Badge variant={performanceStatus === "Excellent" ? "default" : performanceStatus === "On track" ? "secondary" : "destructive"} className={"w-full justify-center py-1 " + statusTone}>
                     {performanceStatus}
                   </Badge>
                 </div>
@@ -337,11 +350,18 @@ const ParentDashboard: React.FC = () => {
           </Card>
         </motion.div>
 
-        {/* Alerts */}
+        {/* Parent command center */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Card><CardContent className="p-4"><CheckCircle2 className="mb-2 h-5 w-5 text-emerald-600" /><p className="text-2xl font-bold">{weeklyQuizCount}/{goals.weekly_quiz_target}</p><p className="text-xs text-muted-foreground">Weekly quizzes</p><Progress value={weeklyQuizProgress} className="mt-2 h-1.5" /></CardContent></Card>
+          <Card><CardContent className="p-4"><Flame className="mb-2 h-5 w-5 text-amber-500" /><p className="text-2xl font-bold">{studyDays}/7</p><p className="text-xs text-muted-foreground">Study days</p><Progress value={Math.round(studyDays / 7 * 100)} className="mt-2 h-1.5" /></CardContent></Card>
+          <Card><CardContent className="p-4"><UserCheck className="mb-2 h-5 w-5 text-primary" /><p className="text-2xl font-bold">{pendingTasks}</p><p className="text-xs text-muted-foreground">Open tasks</p><p className="mt-1 text-xs text-muted-foreground">{overdueTasks} overdue</p></CardContent></Card>
+          <Card><CardContent className="p-4"><MessageCircle className="mb-2 h-5 w-5 text-primary" /><p className="text-2xl font-bold">{messages.filter(m => !m.read).length}</p><p className="text-xs text-muted-foreground">Unread notes</p><p className="mt-1 text-xs text-muted-foreground">{messages.length} total notes</p></CardContent></Card>
+        </div>
+
         {quickAlerts.length > 0 && (
           <Card className="border-amber-500/40 bg-amber-500/5">
-            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-amber-600 text-base"><AlertTriangle className="h-4 w-4" />Smart Alerts</CardTitle></CardHeader>
-            <CardContent className="space-y-1 text-sm">{quickAlerts.map(a => <p key={a}>• {a}</p>)}</CardContent>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-amber-600 text-base"><AlertTriangle className="h-4 w-4" />Parent attention</CardTitle></CardHeader>
+            <CardContent className="grid gap-2 text-sm md:grid-cols-2">{quickAlerts.map(a => <p key={a} className="rounded-lg bg-background/70 p-3">• {a}</p>)}</CardContent>
           </Card>
         )}
 
