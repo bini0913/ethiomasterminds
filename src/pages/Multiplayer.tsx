@@ -169,12 +169,12 @@ const Multiplayer: React.FC = () => {
             <CardContent className="space-y-4">
               <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
-                  { label: "XP gained", value: `+${matchSummary.xpGained}` },
-                  { label: "Rank change", value: `${matchSummary.rankChange > 0 ? "+" : ""}${matchSummary.rankChange}` },
+                  { label: "Match rank", value: `#${matchSummary.playerRank} / ${matchSummary.playerCount}` },
+                  { label: "Score", value: String(matchSummary.score) },
                   { label: "Accuracy", value: `${matchSummary.accuracy}%` },
-                  { label: "Avg speed", value: `${matchSummary.avgResponseTime}s` },
-                  { label: "Best streak", value: `${matchSummary.streak}` },
-                  { label: "Coins earned", value: `+${Math.max(10, Math.round(matchSummary.xpGained / 2))}` },
+                  { label: "Correct", value: `${matchSummary.correctAnswers}/${matchSummary.answeredQuestions}` },
+                  { label: "XP earned", value: `+${matchSummary.xpGained}` },
+                  { label: "Coins earned", value: `+${matchSummary.coinsGained}` },
                 ].map((stat) => (
                   <Card key={stat.label} className="bg-muted/50">
                     <CardContent className="p-3 text-sm">
@@ -183,6 +183,38 @@ const Multiplayer: React.FC = () => {
                   </Card>
                 ))}
               </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5" /> Match Standings
+                  </CardTitle>
+                  <CardDescription>Final ranking, score and rewards for every player.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {matchSummary.players.map((player) => (
+                    <div
+                      key={player.id}
+                      className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${player.id === user.id ? "border-primary bg-primary/5" : "border-border"}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-muted grid place-items-center font-bold">
+                          {player.placement <= 3 ? ["🥇", "🥈", "🥉"][player.placement - 1] : `#${player.placement}`}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{player.name}{player.id === user.id ? " (You)" : ""}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {player.score} pts · {player.correctAnswers}/{player.answeredQuestions} correct · {player.accuracy}%
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-semibold">+{player.xpEarned} XP</p>
+                        <p className="text-xs text-muted-foreground">+{player.coinsEarned} coins</p>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
               <div className="grid md:grid-cols-2 gap-4">
                 <Card className="bg-muted/50">
                   <CardHeader><CardTitle className="text-base">Match Analytics</CardTitle></CardHeader>
