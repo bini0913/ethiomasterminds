@@ -81,6 +81,8 @@ const Multiplayer: React.FC = () => {
   const [selectedMode, setSelectedMode] = useState(multiplayerModes[0]);
   const [matchSummary, setMatchSummary] = useState<MatchSummary | null>(null);
   const [recentHistory, setRecentHistory] = useState<any[]>([]);
+  const [rankedLeaderboard, setRankedLeaderboard] = useState<any[]>([]);
+  const [rankedLoading, setRankedLoading] = useState(true);
 
   const roomId = searchParams.get("room");
 
@@ -100,6 +102,14 @@ const Multiplayer: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchOnlineCount]);
   useEffect(() => {
+    const loadRankedLeaderboard = async () => {
+      setRankedLoading(true);
+      const { data, error } = await supabase.rpc('multiplayer_ranked_leaderboard', { p_limit: 10 });
+      if (!error && data) setRankedLeaderboard(data);
+      setRankedLoading(false);
+    };
+    void loadRankedLeaderboard();
+
     if (!user?.id) return;
     const loadHistory = async () => {
       const { data, error } = await (supabase as any)
@@ -329,6 +339,41 @@ const Multiplayer: React.FC = () => {
               </div>
               <Progress value={xpProgress} className="h-2" />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-500" /> Ranked Points Leaderboard
+            </CardTitle>
+            <CardDescription>Players are ranked by total multiplayer points earned across completed matches — not XP.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {rankedLoading ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">Loading rankings…</div>
+            ) : rankedLeaderboard.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">No ranked matches yet. Be the first to score!</div>
+            ) : (
+              rankedLeaderboard.map((entry) => (
+                <div key={entry.user_id} className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${entry.user_id === user?.id ? "border-primary bg-primary/5" : "border-border"}`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 text-center font-black">{entry.rank_position <= 3 ? ["🥇","🥈","🥉"][Number(entry.rank_position)-1] : `#${entry.rank_position}`}</div>
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{entry.player_name}{entry.user_id === user?.id ? " (You)" : ""}</p>
+                      <p className="text-xs text-muted-foreground">{entry.matches_played} matches · {entry.wins} wins · {entry.podiums} podiums</p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-black text-cyan-500">{Number(entry.total_points).toLocaleString()} pts</p>
+                    <p className="text-xs text-muted-foreground">Total points</p>
+                  </div>
+                </div>
+              ))
+            )}
+            <Button variant="outline" className="w-full" onClick={() => navigate("/leaderboard")}>
+              View Full Leaderboard
+            </Button>
           </CardContent>
         </Card>
 
