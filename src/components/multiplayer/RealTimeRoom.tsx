@@ -406,7 +406,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }, [roomId, roomState.status]);
 
   const loadMatchResults = async () => {
-    const { data: results, error } = await supabase
+    const { data: results, error } = await (supabase as any)
       .from('multiplayer_match_results')
       .select('user_id, placement, player_count, score, correct_answers, answered_questions, total_questions, accuracy, xp_earned, coins_earned')
       .eq('room_id', roomId)
