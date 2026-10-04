@@ -205,7 +205,7 @@ const UserProfilePage = () => {
       .select("achievement_id,completed,unlocked_at")
       .eq("user_id", authUser.id)
       .in("achievement_id", achievementIds);
-    const existingMap = new Map((existing ?? []).map((row) => [row.achievement_id, row]));
+    const existingMap = new Map<string, any>((existing ?? []).map((row: any) => [row.achievement_id, row]));
 
     const payload = rules
       .filter((rule) => idsByName.has(rule.name))
