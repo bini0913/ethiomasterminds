@@ -174,41 +174,6 @@ const Lobby: React.FC = () => {
   }, []);
 
   const fetchOnlinePlayers = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('user_presence')
-      .select(`
-        user_id,
-        status,
-        last_seen
-      `)
-      .eq('status', 'online')
-      .gte('last_seen', new Date(Date.now() - 5 * 60 * 1000).toISOString())
-      .limit(20);
-
-    if (!error && data) {
-      const userIds = data.map((p: any) => p.user_id);
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name, avatar, level, xp')
-          .in('id', userIds);
-
-        if (profiles) {
-          const players = profiles.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            avatar: p.avatar || 'avatar-1',
-            level: p.level || 1,
-            xp: p.xp || 0,
-            status: 'online'
-          }));
-          setOnlinePlayers(players);
-        }
-      } else {
-        setOnlinePlayers([]);
-      }
-    }
-
     if (user) {
       await supabase
         .from('user_presence')
@@ -218,6 +183,52 @@ const Lobby: React.FC = () => {
           last_seen: new Date().toISOString()
         }, { onConflict: 'user_id' });
     }
+
+    const { data, error } = await supabase
+      .from('user_presence')
+      .select('user_id, status, last_seen')
+      .eq('status', 'online')
+      .gte('last_seen', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+      .order('last_seen', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.error('Error loading online players:', error);
+      setOnlinePlayers([]);
+      return;
+    }
+
+    const userIds = (data || []).map((p: any) => p.user_id);
+    if (userIds.length === 0) {
+      setOnlinePlayers([]);
+      return;
+    }
+
+    const { data: profiles, error: profileError } = await supabase.rpc(
+      'get_public_student_profiles',
+      { p_user_ids: userIds },
+    );
+
+    if (profileError) {
+      console.error('Error loading public player profiles:', profileError);
+      setOnlinePlayers([]);
+      return;
+    }
+
+    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+    const players = userIds
+      .map((id: string) => profileMap.get(id))
+      .filter(Boolean)
+      .map((p: any) => ({
+        id: p.id,
+        name: p.name || p.username || 'Student',
+        avatar: p.avatar || 'avatar-1',
+        level: p.level || 1,
+        xp: p.xp || 0,
+        status: 'online',
+      }));
+
+    setOnlinePlayers(players);
   }, [user]);
 
   const fetchChatMessages = useCallback(async () => {
