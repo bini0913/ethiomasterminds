@@ -62,7 +62,7 @@ const FlashcardsPage: React.FC = () => {
 
     if (cardsRes.data) {
       setFlashcards(cardsRes.data);
-      setSubjects(Array.from(new Set(cardsRes.data.map((card) => card.subject))).sort());
+      setSubjects(Array.from(new Set<string>((cardsRes.data as any[]).map((card) => String(card.subject ?? "General")))).sort());
     }
     if (progressRes.error) {
       console.error(progressRes.error);
