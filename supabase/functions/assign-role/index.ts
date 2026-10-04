@@ -24,8 +24,6 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData.user) {
@@ -33,7 +31,6 @@ Deno.serve(async (req) => {
     }
 
     const callerId = authData.user.id;
-    const adminClient = createClient(supabaseUrl, serviceKey);
     const { data: callerRole } = await userClient.rpc("get_user_role", { _user_id: callerId });
 
     // Self-assignment is only allowed for the normal student role.
