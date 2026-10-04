@@ -406,12 +406,12 @@ const AdminPortal: React.FC = () => {
       .select('user_id, role')
       .in('role', allowedRoles);
 
-    const recipientIds = Array.from(
-      new Set((roleRows || []).map((row: any) => row.user_id).filter((id: string) => id && id !== user.id)),
+    const recipientIds: string[] = Array.from(
+      new Set<string>((roleRows || []).map((row: any) => row.user_id as string).filter((id: string) => Boolean(id && id !== user.id))),
     );
 
     const sentCount = await sendRemoteNotifications(
-      recipientIds.map((recipientId) => ({
+      recipientIds.map((recipientId: string) => ({
         userId: recipientId,
         kind: 'admin_announcement',
         title: createdAnnouncement.title,
