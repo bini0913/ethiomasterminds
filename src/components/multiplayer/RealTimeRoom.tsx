@@ -250,10 +250,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     return () => clearTimeout(timer);
   }, [isOffline, offlineSeconds, onLeave]);
 
-  useEffect(() => {
-    setLatencyMs((current) => current);
-  }, [roomId]);
-
   const playTone = (frequency: number, duration: number) => {
     if (!soundEnabled || typeof window === 'undefined') return;
     const context = new window.AudioContext();
@@ -570,7 +566,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       });
 
       if (error) throw error;
-      await supabase.rpc('multiplayer_next_question', { p_room_id: roomId });
+      await loadPlayerQuestion();
       playTone(660, 0.12);
     } catch (err: any) {
       console.error('Error starting game:', err);
@@ -860,8 +856,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                       <Select value={roomConfig.gameMode} onValueChange={(value) => void updateRoomConfig({ gameMode: value })}>
                         <SelectTrigger><SelectValue placeholder="Mode" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="speed">⚡ Speed</SelectItem>
-                          <SelectItem value="accuracy">🎯 Accuracy</SelectItem>
+                          <SelectItem value="accuracy">🎯 Accuracy — fixed questions</SelectItem>
+                          <SelectItem value="speed">⚡ 1 Minute Speed — most questions</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
