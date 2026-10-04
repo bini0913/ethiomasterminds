@@ -209,7 +209,7 @@ export async function scheduleDailyLearningReminder(preferences: NotificationPre
       body: "A quick learning session today can keep your streak going!",
       schedule: { on: { hour, minute: 0 }, repeats: true },
       extra: { route: "/" },
-      smallIcon: "ic_stat_icon_config_sample",
+      smallIcon: "ic_stat_master_minds",
     }],
   });
 }
