@@ -114,6 +114,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [timeRemaining, setTimeRemaining] = useState(30);
   const [matchStartedAt, setMatchStartedAt] = useState<string | null>(null);
   const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
+  const [playerQuestionNumber, setPlayerQuestionNumber] = useState(1);
   const [showChat, setShowChat] = useState(true);
   const [loading, setLoading] = useState(true);
   const [totalQuestions, setTotalQuestions] = useState(10);
@@ -147,7 +148,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     void loadRoomData();
     const cleanup = setupRealtimeSubscriptions();
     return cleanup;
-  }, [roomId, currentUserId, onLeave]);
+  }, [roomId, currentUserId, onLeave, roomState.status]);
 
   useEffect(() => {
     if (roomState.status !== 'playing') return;
@@ -250,24 +251,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }, [isOffline, offlineSeconds, onLeave]);
 
   useEffect(() => {
-    let isMounted = true;
-    const checkLatency = async () => {
-      const start = performance.now();
-      await supabase.from('multiplayer_rooms').select('id').eq('id', roomId).maybeSingle();
-      const ping = Math.round(performance.now() - start);
-      if (isMounted) {
-        setLatencyMs(ping);
-      }
-    };
-    void checkLatency();
-    const interval = setInterval(() => {
-      void checkLatency();
-    }, 9000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    setLatencyMs((current) => current);
   }, [roomId]);
 
   const playTone = (frequency: number, duration: number) => {
@@ -290,7 +274,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     try {
       const { data: room } = await supabase
         .from('multiplayer_rooms')
-        .select('host_id, question_count, subject, difficulty, max_players, game_mode')
+        .select('host_id, question_count, subject, difficulty, max_players, game_mode, status, started_at')
         .eq('id', roomId)
         .single();
 
@@ -396,11 +380,12 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   };
 
   useEffect(() => {
+    if (roomState.status === 'playing') return;
     const interval = setInterval(() => {
       void fetchPlayers();
     }, 30000);
     return () => clearInterval(interval);
-  }, [roomId]);
+  }, [roomId, roomState.status]);
 
   const loadPlayerQuestion = async () => {
     const { data, error } = await supabase.rpc('multiplayer_get_current_question', { p_room_id: roomId });
@@ -417,6 +402,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     });
     setTotalQuestions(data.total || totalQuestions);
     setQuestionStartedAt(Date.now());
+    setPlayerQuestionNumber((data.index ?? 0) + 1);
     setSelectedAnswer(null);
     setAnswerResult(null);
   };
@@ -481,7 +467,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           filter: `room_id=eq.${roomId}`,
         },
         () => {
-          void fetchPlayers();
+          if (roomState.status === 'waiting' || roomState.status === 'finished') {
+            void fetchPlayers();
+          }
         },
       )
       .on(
@@ -595,7 +583,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
     setSelectedAnswer(answerIndex);
     const lagCompensation = Math.min(2, Math.max(0, latencyMs / 1000 / 2));
-    const timeUsed = Math.max(0, 30 - timeRemaining - lagCompensation);
+    const timeUsed = Math.max(0, Math.round((Date.now() - (questionStartedAt ?? Date.now())) / 1000));
 
     try {
       const { data, error } = await supabase.rpc('multiplayer_submit_answer', {
@@ -651,6 +639,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       });
       setTotalQuestions(data.total || totalQuestions);
       setQuestionStartedAt(Date.now());
+      setPlayerQuestionNumber((data.index ?? 0) + 1);
       setSelectedAnswer(null);
       setAnswerResult(null);
     } catch (err: any) {
@@ -912,7 +901,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
               <Card className={cn('p-6 bg-white/5 border-white/10 transition-all', answerShake && 'animate-pulse')}>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center gap-2 flex-wrap">
-                    <Badge variant="secondary">Question {Math.max(1, roomState.status === 'playing' ? (roomConfig.gameMode === 'speed' ? 'current' : 'current') : 1)}{roomConfig.gameMode === 'accuracy' ? ` / ${totalQuestions}` : ' • as many as possible'}</Badge>
+                    <Badge variant="secondary">{roomConfig.gameMode === 'accuracy' ? `Question ${playerQuestionNumber}/${totalQuestions}` : `Question ${playerQuestionNumber} • as many as possible`}</Badge>
                     <div className="flex items-center gap-2">
                       <Clock className={cn('h-4 w-4', timeRemaining <= 5 && 'text-amber-300 animate-pulse')} />
                       <span className={cn('font-mono font-bold', timeRemaining <= 5 ? 'text-amber-300 animate-pulse' : 'text-white')}>
