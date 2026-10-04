@@ -140,12 +140,6 @@ const TournamentHub: React.FC = () => {
   }, [matches]);
 
   const loadTournaments = async () => {
-    // Best-effort auto-start. This should never block tournament loading.
-    const { error: autoStartError } = await supabase.rpc("auto_start_due_tournaments" as any);
-    if (autoStartError) {
-      console.warn("auto_start_due_tournaments unavailable:", autoStartError.message);
-    }
-
     const [{ data: tournamentRows, error: tError }, { data: playerRows }, { data: profileRows }] = await Promise.all([
       supabase
         .from("tournaments")

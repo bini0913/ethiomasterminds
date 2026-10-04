@@ -24,8 +24,6 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData.user) {
@@ -33,15 +31,14 @@ Deno.serve(async (req) => {
     }
 
     const callerId = authData.user.id;
-    const adminClient = createClient(supabaseUrl, serviceKey);
-    const { data: callerRole } = await adminClient.rpc("get_user_role", { _user_id: callerId });
+    const { data: callerRole } = await userClient.rpc("get_user_role", { _user_id: callerId });
 
     // Self-assignment is only allowed for the normal student role.
     if (!targetUserId || targetUserId === callerId) {
       if (role !== "student") {
         return new Response(JSON.stringify({ ok: false, error: "You cannot self-assign a privileged role" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const { data, error } = await adminClient.rpc("assign_user_role", { _user_id: callerId, _role: "student" });
+      const { data, error } = await userClient.rpc("assign_user_role", { _user_id: callerId, _role: "student" });
       if (error) return new Response(JSON.stringify({ ok: false, error: "Failed to assign role" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ ok: true, role: data ?? "student" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -55,7 +52,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: false, error: "Only admins can grant admin or manager roles" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { error } = await adminClient.rpc("assign_user_role", {
+    const { error } = await userClient.rpc("assign_user_role", {
       _user_id: targetUserId,
       _role: role,
     });

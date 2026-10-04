@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, Bell, CheckCircle2, ChevronRight, MessageSquare, RefreshCw, Search, Shield, ShieldCheck, UserCog, Users, XCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import BackButton from "@/components/ui/BackButton";
 import { Button } from "@/components/ui/button";

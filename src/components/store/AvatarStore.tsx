@@ -95,10 +95,10 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
 
     const channel = supabase
       .channel(`store-live-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_items', filter: `user_id=eq.${user.id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_inventory', filter: `user_id=eq.${user.id}` }, () => {
         void fetchStoreItems();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_items' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'avatar_items' }, () => {
         void fetchStoreItems();
       })
       .subscribe();
@@ -126,10 +126,9 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
     setLoading(true);
     try {
       const { data: items, error: itemsError } = await (supabase as any)
-        .from('store_items')
+        .from('avatar_items')
         .select('*')
-        .eq('is_active', true)
-        .order('price', { ascending: true });
+        .order('created_at', { ascending: true });
 
       if (itemsError) throw itemsError;
 
@@ -138,7 +137,7 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
 
       if (user?.id) {
         const { data: inventory } = await (supabase as any)
-          .from('user_items')
+          .from('user_inventory')
           .select('item_id, equipped')
           .eq('user_id', user.id);
 
@@ -149,9 +148,13 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
       const mappedItems: StoreItem[] = (items || []).map((item: any) => ({
         id: item.id,
         name: item.name,
-        section: item.section,
-        price: item.price || 0,
-        currency: item.currency,
+        section:
+          item.category === 'clothing' ? 'clothes' :
+          item.category === 'backgrounds' ? 'houses' :
+          item.category === 'accessories' ? 'avatars' :
+          'effects',
+        price: item.price_gems > 0 ? item.price_gems : item.price_coins || 0,
+        currency: item.price_gems > 0 ? 'gems' : 'coins',
         rarity: item.rarity,
         preview: item.preview || '🛍️',
         description: item.description || '',
