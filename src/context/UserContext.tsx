@@ -235,8 +235,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         // Resolve the profile immediately from the user returned by sign-in.
         // Do not wait for React state/onAuthStateChange to catch up, otherwise
         // the login form can remain visible even though authentication succeeded.
-        setSession(usernameSession);
-        const profile = await fetchUserProfile(authUser.id, authUser);
+        setSession(data.session);
+        const profile = await fetchUserProfile(data.user.id, data.user);
         setUser(profile);
         setIsLoading(false);
 
