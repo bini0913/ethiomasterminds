@@ -111,7 +111,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [answerResult, setAnswerResult] = useState<{ correct: boolean; points: number } | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(30);
+  const [matchStartedAt, setMatchStartedAt] = useState<string | null>(null);
+  const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
   const [showChat, setShowChat] = useState(true);
   const [loading, setLoading] = useState(true);
   const [totalQuestions, setTotalQuestions] = useState(10);
@@ -138,6 +140,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const advancingQuestionRef = useRef(false);
   const prevPlayersRef = useRef<Player[]>([]);
   const autoStartTriggeredRef = useRef(false);
+  const matchFinishedHandledRef = useRef(false);
   const { onlineFriends } = useFriends();
 
   useEffect(() => {
@@ -147,26 +150,29 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }, [roomId, currentUserId, onLeave]);
 
   useEffect(() => {
-    if (roomState.status === 'playing' && roomState.question_ends_at) {
-      const interval = setInterval(() => {
-        const now = new Date().getTime();
-        const endTime = new Date(roomState.question_ends_at!).getTime();
-        const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
-        setTimeRemaining(remaining);
+    if (roomState.status !== 'playing') return;
 
-        if (remaining <= 0) {
-          clearInterval(interval);
-        }
-      }, 100);
+    const tick = () => {
+      if (roomConfig.gameMode === 'speed') {
+        const start = matchStartedAt ? new Date(matchStartedAt).getTime() : Date.now();
+        setTimeRemaining(Math.max(0, Math.ceil(60 - (Date.now() - start) / 1000)));
+      } else {
+        const start = questionStartedAt ?? Date.now();
+        setTimeRemaining(Math.max(0, Math.ceil(30 - (Date.now() - start) / 1000)));
+      }
+    };
 
-      return () => clearInterval(interval);
-    }
-  }, [roomState.status, roomState.question_ends_at]);
+    tick();
+    const interval = window.setInterval(tick, 250);
+    return () => window.clearInterval(interval);
+  }, [roomState.status, roomConfig.gameMode, matchStartedAt, questionStartedAt]);
 
   useEffect(() => {
-    if (!isHost || roomState.status !== 'playing' || timeRemaining > 0) return;
-    void nextQuestion();
-  }, [isHost, roomState.status, timeRemaining]);
+    if (roomState.status !== 'playing' || roomConfig.gameMode !== 'speed' || timeRemaining > 0) return;
+    if (matchFinishedHandledRef.current) return;
+    matchFinishedHandledRef.current = true;
+    void supabase.rpc('multiplayer_finish_game', { p_room_id: roomId });
+  }, [roomState.status, roomConfig.gameMode, timeRemaining, roomId]);
 
   useEffect(() => {
     if (roomState.status !== 'countdown' && roomState.status !== 'starting') return;
@@ -310,14 +316,16 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
       const { data: state } = await supabase.from('room_state').select('*').eq('room_id', roomId).single();
 
+      if (room.started_at) setMatchStartedAt(room.started_at);
       if (state) {
         setRoomState(state as RoomState);
         if (state.status === 'countdown' || state.status === 'starting') {
           setCountdownEndsAt(state.question_ends_at);
         }
-        if (state.current_question_id) {
-          await fetchCurrentQuestion(state.current_question_id);
-        }
+      }
+      if (room.status === 'playing') {
+        matchFinishedHandledRef.current = false;
+        await loadPlayerQuestion();
       }
 
       await fetchChatMessages();
@@ -394,19 +402,23 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     return () => clearInterval(interval);
   }, [roomId]);
 
-  const fetchCurrentQuestion = async (questionId: string) => {
-    const { data } = await supabase
-      .from('questions')
-      .select('id, question_text, options, points')
-      .eq('id', questionId)
-      .single();
-
-    if (data) {
-      setCurrentQuestion({
-        ...data,
-        options: Array.isArray(data.options) ? (data.options as string[]) : [],
-      });
+  const loadPlayerQuestion = async () => {
+    const { data, error } = await supabase.rpc('multiplayer_get_current_question', { p_room_id: roomId });
+    if (error) throw error;
+    if (data?.done) {
+      setCurrentQuestion(null);
+      return;
     }
+    setCurrentQuestion({
+      id: data.id,
+      question_text: data.question_text,
+      options: Array.isArray(data.options) ? data.options : [],
+      points: data.points || 100,
+    });
+    setTotalQuestions(data.total || totalQuestions);
+    setQuestionStartedAt(Date.now());
+    setSelectedAnswer(null);
+    setAnswerResult(null);
   };
 
   const fetchChatMessages = async () => {
@@ -457,6 +469,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             questionCount: nextRoom.question_count || prev.questionCount,
           }));
           setTotalQuestions(nextRoom.question_count || 10);
+          if (nextRoom.started_at) setMatchStartedAt(nextRoom.started_at);
         },
       )
       .on(
@@ -489,10 +502,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             setCountdownEndsAt(null);
           }
 
-          if (newState.current_question_id) {
-            await fetchCurrentQuestion(newState.current_question_id);
-            setSelectedAnswer(null);
-            setAnswerResult(null);
+          if (newState.status === 'playing' && newState.current_question_id === null) {
+            void loadPlayerQuestion();
           }
 
           if (newState.status === 'finished') {
@@ -596,9 +607,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
       if (error) throw error;
 
-      const result = data as { is_correct: boolean; points: number; correct_answer: string };
-      setAnswerResult({ correct: result.is_correct, points: result.points });
-
+      const result = data as { is_correct: boolean; points: number };
+      setAnswerResult(null);
       if (result.is_correct) {
         setConsecutiveCorrect((prev) => {
           const next = prev + 1;
@@ -607,38 +617,45 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         });
         setFloatingXp(result.points);
         setTimeout(() => setFloatingXp(null), 900);
-        playTone(820, 0.12);
-        toast.success(`Correct! +${result.points} points`);
+        playTone(820, 0.08);
       } else {
         setConsecutiveCorrect(0);
         setAnswerShake(true);
-        setTimeout(() => setAnswerShake(false), 300);
-        playTone(220, 0.15);
-        toast.error(`Wrong! Correct answer: ${result.correct_answer}`);
+        setTimeout(() => setAnswerShake(false), 250);
+        playTone(220, 0.08);
       }
 
-      await fetchPlayers();
+      if (roomConfig.gameMode === 'speed') {
+        await loadPlayerQuestion();
+      }
     } catch (err) {
       console.error('Error submitting answer:', err);
     }
   };
 
   const nextQuestion = async () => {
-    if (!isHost || advancingQuestionRef.current) return;
-
+    if (advancingQuestionRef.current || roomConfig.gameMode !== 'accuracy') return;
     try {
       advancingQuestionRef.current = true;
-      const { data, error } = await supabase.rpc('multiplayer_next_question', {
-        p_room_id: roomId,
-      });
-
+      const { data, error } = await supabase.rpc('multiplayer_advance_player', { p_room_id: roomId });
       if (error) throw error;
-      const result = data as { status: string };
-      if (result.status === 'finished') {
-        // handled by realtime state update
+      if (data?.done) {
+        setCurrentQuestion(null);
+        return;
       }
-    } catch (err) {
+      setCurrentQuestion({
+        id: data.id,
+        question_text: data.question_text,
+        options: Array.isArray(data.options) ? data.options : [],
+        points: data.points || 100,
+      });
+      setTotalQuestions(data.total || totalQuestions);
+      setQuestionStartedAt(Date.now());
+      setSelectedAnswer(null);
+      setAnswerResult(null);
+    } catch (err: any) {
       console.error('Error advancing question:', err);
+      toast.error(err?.message || 'Could not load the next question');
     } finally {
       advancingQuestionRef.current = false;
     }
@@ -738,6 +755,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   const readyPlayers = players.filter((p) => p.isReady).length;
   const canAutoStart = players.length >= 2 && readyPlayers === players.length;
+  const modeLabel = roomConfig.gameMode === 'speed' ? '1 Minute Speed' : 'Accuracy';
   const roomPhaseLabel =
     roomState.status === 'countdown' || roomState.status === 'starting'
       ? 'starting'
@@ -784,7 +802,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
           <div>
             <h1 className="text-2xl font-display font-bold">{roomName}</h1>
-            <p className="text-sm text-blue-100/75">Room ID: {roomId.slice(0, 8)}... · Subject: {roomConfig.subject} · Mode: {roomConfig.gameMode}</p>
+            <p className="text-sm text-blue-100/75">Room ID: {roomId.slice(0, 8)}... · Subject: {roomConfig.subject} · Mode: {modeLabel}</p>
           </div>
           <div className={`text-xs rounded-md border border-white/20 bg-black/25 px-2 py-1 flex items-center gap-2 ${connectionColor}`}>
             <Signal className="h-3 w-3" /> {connectionQuality} · {latencyMs}ms
@@ -894,7 +912,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
               <Card className={cn('p-6 bg-white/5 border-white/10 transition-all', answerShake && 'animate-pulse')}>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center gap-2 flex-wrap">
-                    <Badge variant="secondary">Question {Math.max(1, roomState.question_index)}/{totalQuestions}</Badge>
+                    <Badge variant="secondary">Question {Math.max(1, roomState.status === 'playing' ? (roomConfig.gameMode === 'speed' ? 'current' : 'current') : 1)}{roomConfig.gameMode === 'accuracy' ? ` / ${totalQuestions}` : ' • as many as possible'}</Badge>
                     <div className="flex items-center gap-2">
                       <Clock className={cn('h-4 w-4', timeRemaining <= 5 && 'text-amber-300 animate-pulse')} />
                       <span className={cn('font-mono font-bold', timeRemaining <= 5 ? 'text-amber-300 animate-pulse' : 'text-white')}>
@@ -909,15 +927,10 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     </motion.div>
                   )}
 
-                  <Progress value={(timeRemaining / 30) * 100} className="h-2" />
+                  <Progress value={(timeRemaining / (roomConfig.gameMode === 'speed' ? 60 : 30)) * 100} className="h-2" />
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    {players.map((p) => (
-                      <div key={p.id} className="rounded-lg border border-white/15 px-3 py-2 flex items-center justify-between">
-                        <span className="truncate">{p.name}</span>
-                        <span className="font-semibold text-cyan-300">{p.score} pts</span>
-                      </div>
-                    ))}
+                  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-blue-100/75">
+                    Results are hidden until the match ends.
                   </div>
 
                   {strongestOpponent && strongestOpponent.level >= (currentPlayer?.level || 1) + 3 && (
@@ -962,12 +975,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     })}
                   </div>
 
-                  {selectedAnswer !== null && answerResult && (
-                    <div className={cn('p-4 rounded-lg text-center', answerResult.correct ? 'bg-green-500/20' : 'bg-red-500/20')}>
-                      <div className="flex items-center justify-center gap-2">
-                        {answerResult.correct ? <CheckCircle className="h-5 w-5 text-green-400" /> : <XCircle className="h-5 w-5 text-red-300" />}
-                        <span className="font-bold">{answerResult.correct ? `+${answerResult.points} points!` : 'Wrong answer!'}</span>
-                      </div>
+                  {selectedAnswer !== null && roomConfig.gameMode === 'accuracy' && timeRemaining > 0 && (
+                    <div className="p-3 rounded-lg text-center bg-white/5 text-blue-100/80">
+                      Answer locked. Continue when you're ready.
                     </div>
                   )}
 
@@ -977,11 +987,16 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     </div>
                   )}
 
-                  {isHost && timeRemaining <= 0 && (
+                  {roomConfig.gameMode === 'accuracy' && (selectedAnswer !== null || timeRemaining <= 0) && (
                     <div className="text-center">
-                      <Button onClick={nextQuestion} className="bg-cyan-500 hover:bg-cyan-600 min-h-11 px-6">
-                        Next Question
+                      <Button onClick={nextQuestion} className="bg-cyan-500 hover:bg-cyan-600 min-h-11 px-6" disabled={advancingQuestionRef.current}>
+                        Next Question →
                       </Button>
+                    </div>
+                  )}
+                  {roomConfig.gameMode === 'speed' && (
+                    <div className="text-center text-sm text-blue-100/70">
+                      Answer as many as you can before the 1:00 timer ends.
                     </div>
                   )}
                 </div>
@@ -1009,7 +1024,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     </div>
                     <div className={cn('flex justify-center items-center gap-1 mt-1 text-xs', connectionColor)}><Signal className="h-3 w-3" /> {connectionQuality}</div>
                     <div className="mt-1 text-xs">{player.isReady ? 'Ready ✅' : 'Waiting ⏳'}</div>
-                    {roomState.status !== 'waiting' && <div className="text-sm font-bold text-cyan-300 mt-1">{player.score} pts</div>}
+                    {roomState.status === 'finished' && <div className="text-sm font-bold text-cyan-300 mt-1">{player.score} pts</div>}
                     {isHost && player.id !== currentUserId && roomState.status === 'waiting' && (
                       <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => void kickPlayer(player.id, player.name)}>
                         Kick
