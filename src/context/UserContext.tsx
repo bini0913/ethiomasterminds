@@ -165,8 +165,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         
         if (newSession?.user) {
           // Use setTimeout to prevent deadlock
+          const callbackUserId = newSession.user.id;
           setTimeout(() => {
-            fetchUserProfile(newSession.user.id, newSession.user).then(profile => {
+            if (signingOutRef.current) return;
+            fetchUserProfile(callbackUserId, newSession.user).then(profile => {
+              if (signingOutRef.current) return;
               setUser(profile);
               setIsLoading(false);
             });
