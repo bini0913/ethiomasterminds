@@ -279,7 +279,7 @@ const AdminPortal: React.FC = () => {
     setPendingLibraryBooks(
       pendingRows.map((book) => ({
         ...book,
-        profiles: profileMap.get(book.uploader_id) || null,
+        profiles: (profileMap.get(book.uploader_id) || null) as PendingLibraryBook['profiles'],
       })),
     );
   };
