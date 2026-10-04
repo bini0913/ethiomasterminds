@@ -276,7 +276,7 @@ const ManagerDashboard: React.FC = () => {
       supabase.from('profiles').select('id,name'),
     ]);
 
-    const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile.name || 'Student']));
+    const profileMap = new Map<string, string>((profiles || []).map((profile: any) => [profile.id, profile.name || 'Student']));
     const participantsByTournament = (participants || []).reduce<Record<string, TournamentParticipantRow[]>>((acc, row) => {
       if (!acc[row.tournament_id]) acc[row.tournament_id] = [];
       acc[row.tournament_id].push(row as TournamentParticipantRow);
@@ -392,14 +392,14 @@ const ManagerDashboard: React.FC = () => {
       };
     });
 
-    const subjectCounts = (quizzes || []).reduce<Record<string, number>>((acc, quiz) => {
+    const subjectCounts = (quizzes || []).reduce<Record<string, number>>((acc, quiz: any) => {
       acc[quiz.subject] = (acc[quiz.subject] || 0) + 1;
       return acc;
     }, {});
 
     setDailyUsers(dUsers);
     setWeeklyLearning(dLearning);
-    setSubjectMix(Object.entries(subjectCounts).slice(0, 6).map(([subject, value]) => ({ subject, value })));
+    setSubjectMix(Object.entries(subjectCounts).slice(0, 6).map(([subject, value]) => ({ subject, value: Number(value) })));
 
     const { data: topStudents } = await supabase
       .from('profiles')
