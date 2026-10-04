@@ -87,7 +87,8 @@ const TimeTravelRevision: React.FC = () => {
         .select('*')
         .eq('user_id', user.id);
 
-      const scheduleMap = new Map(schedules?.map(s => [s.question_id, s]) || []);
+      const typedSchedules = (schedules || []) as Array<{ question_id: string; times_reviewed: number | null; last_reviewed_at: string | null; scheduled_for: string | null }>;
+      const scheduleMap = new Map(typedSchedules.map(s => [s.question_id, s]));
 
       // Group by question (only keep unique questions)
       const questionMap = new Map<string, MissedQuestion>();
