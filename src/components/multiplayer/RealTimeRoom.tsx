@@ -65,15 +65,35 @@ interface RoomState {
   question_ends_at: string | null;
 }
 
+export interface MatchPlayerResult {
+  id: string;
+  name: string;
+  placement: number;
+  score: number;
+  correctAnswers: number;
+  answeredQuestions: number;
+  totalQuestions: number;
+  accuracy: number;
+  xpEarned: number;
+  coinsEarned: number;
+}
+
 export interface MatchSummary {
   playerRank: number;
+  playerCount: number;
+  score: number;
+  correctAnswers: number;
+  answeredQuestions: number;
+  totalQuestions: number;
   xpGained: number;
+  coinsGained: number;
   rankChange: number;
   accuracy: number;
   avgResponseTime: number;
   streak: number;
   strongTopics: string[];
   weakTopics: string[];
+  players: MatchPlayerResult[];
 }
 
 interface RealTimeRoomProps {
@@ -306,6 +326,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       if (room.status === 'playing') {
         matchFinishedHandledRef.current = false;
         await loadPlayerQuestion();
+      } else if (room.status === 'finished') {
+        await loadMatchResults();
       }
 
       await fetchChatMessages();
@@ -383,6 +405,58 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     return () => clearInterval(interval);
   }, [roomId, roomState.status]);
 
+  const loadMatchResults = async () => {
+    const { data: results, error } = await (supabase as any)
+      .from('multiplayer_match_results')
+      .select('user_id, placement, player_count, score, correct_answers, answered_questions, total_questions, accuracy, xp_earned, coins_earned')
+      .eq('room_id', roomId)
+      .order('placement', { ascending: true });
+
+    if (error) {
+      console.error('Error loading multiplayer results:', error);
+      toast.error('Could not load the final match results');
+      return;
+    }
+
+    if (!results?.length) return;
+
+    const finalPlayers = await fetchPlayers();
+    const names = new Map(finalPlayers.map((p) => [p.id, p.name]));
+    const mapped = results.map((result: any): MatchPlayerResult => ({
+      id: result.user_id,
+      name: names.get(result.user_id) || 'Player ' + result.user_id.slice(0, 6),
+      placement: result.placement,
+      score: result.score || 0,
+      correctAnswers: result.correct_answers || 0,
+      answeredQuestions: result.answered_questions || 0,
+      totalQuestions: result.total_questions || 0,
+      accuracy: Number(result.accuracy || 0),
+      xpEarned: result.xp_earned || 0,
+      coinsEarned: result.coins_earned || 0,
+    }));
+
+    const me = mapped.find((player) => player.id === currentUserId);
+    if (!me || matchFinishedHandledRef.current) return;
+
+    matchFinishedHandledRef.current = true;
+    onGameEnd({
+      playerRank: me.placement,
+      playerCount: results.length,
+      score: me.score,
+      correctAnswers: me.correctAnswers,
+      answeredQuestions: me.answeredQuestions,
+      totalQuestions: me.totalQuestions,
+      xpGained: me.xpEarned,
+      coinsGained: me.coinsEarned,
+      rankChange: me.placement === 1 ? 18 : me.placement <= 3 ? 6 : -4,
+      accuracy: me.accuracy,
+      avgResponseTime: Number((me.answeredQuestions > 0 ? 60 / me.answeredQuestions : 0).toFixed(2)),
+      streak: Math.max(bestStreak, consecutiveCorrect),
+      strongTopics: ['Logic', 'Mental Math'],
+      weakTopics: ['Vocabulary', 'History'],
+      players: mapped,
+    });
+  };
   const loadPlayerQuestion = async () => {
     const { data, error } = await supabase.rpc('multiplayer_get_current_question', { p_room_id: roomId });
     if (error) throw error;
@@ -491,24 +565,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           }
 
           if (newState.status === 'finished') {
-            const finalPlayers = await fetchPlayers();
-            const sortedPlayers = [...finalPlayers].sort((a, b) => b.score - a.score);
-            const me = sortedPlayers.find((p) => p.id === currentUserId);
-            const meRank = sortedPlayers.findIndex((p) => p.id === currentUserId) + 1;
-
-            const summary: MatchSummary = {
-              playerRank: meRank || sortedPlayers.length,
-              xpGained: Math.max(20, (me?.score || 0) * 2),
-              rankChange: meRank === 1 ? 18 : meRank <= 3 ? 6 : -4,
-              accuracy: Math.min(99, Math.max(55, Math.round(((me?.score || 0) / (totalQuestions * 100)) * 100))),
-              avgResponseTime: Number((Math.max(1.3, 5 - (me?.score || 0) / 500)).toFixed(2)),
-              streak: Math.max(bestStreak, consecutiveCorrect),
-              strongTopics: ['Logic', 'Mental Math'],
-              weakTopics: ['Vocabulary', 'History'],
-            };
-
+            await loadMatchResults();
             playTone(760, 0.2);
-            onGameEnd(summary);
           }
         },
       )
@@ -710,12 +768,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
     setSendingInviteTo(friendId);
     try {
-      const { error } = await (supabase as any).rpc('create_multiplayer_invite', {
-        p_receiver_id: friendId,
-        p_room_id: roomId,
-        p_max_players: maxPlayers,
-        p_subject: roomConfig.subject,
-        p_difficulty: roomConfig.difficulty,
+      const { error } = await supabase.rpc('create_multiplayer_invite', {
+        _receiver_id: friendId,
+        _room_id: roomId,
       });
 
       if (error) {
