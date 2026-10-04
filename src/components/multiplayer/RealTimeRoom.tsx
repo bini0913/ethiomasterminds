@@ -1079,7 +1079,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     )}>
                       <p className="font-bold text-base">
                         {answerResult.correct ? 'Correct! 🎉' : 'Not quite'}
-                        {answerResult.points > 0 ? \` +\${answerResult.points} points\` : ' +0 points'}
+                        {answerResult.points > 0 ? ` +${answerResult.points} points` : ' +0 points'}
                       </p>
                       {!answerResult.correct && answerResult.correctAnswer && (
                         <p className="text-sm mt-1 text-blue-100/85">
