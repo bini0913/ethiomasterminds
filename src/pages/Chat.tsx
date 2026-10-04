@@ -185,7 +185,7 @@ const Chat: React.FC = () => {
         .eq('group_id', roomId)
         .order('created_at', { ascending: true }).limit(200);
 
-      const senderIds = [...new Set((data || []).map(m => m.sender_id))];
+      const senderIds = [...new Set((data || []).map((m) => m.sender_id as string))];
       await loadProfiles(senderIds);
 
       // Load reply-to messages
