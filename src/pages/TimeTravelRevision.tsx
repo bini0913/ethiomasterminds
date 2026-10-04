@@ -95,7 +95,7 @@ const TimeTravelRevision: React.FC = () => {
       for (const attempt of attempts || []) {
         if (!attempt.questions || questionMap.has(attempt.question_id)) continue;
         
-        const schedule = scheduleMap.get(attempt.question_id);
+        const schedule: any = scheduleMap.get(attempt.question_id);
         const options = Array.isArray(attempt.questions.options) 
           ? attempt.questions.options as string[]
           : [];
