@@ -70,5 +70,5 @@ $$;
 revoke all on function public.is_username_available(text) from public;
 grant execute on function public.is_username_available(text) to anon, authenticated;
 
-revoke all on function public.has_role(uuid, app_role) from public, anon;
-grant execute on function public.has_role(uuid, app_role) to authenticated;
+revoke all on function public.has_role(uuid, app_role) from public;
+grant execute on function public.has_role(uuid, app_role) to anon, authenticated;
