@@ -27,12 +27,15 @@ jobs:
         run: npm install --save-dev electron@31 @electron/packager@18 --legacy-peer-deps
 
       - name: Build web app for Electron
-        run: npx vite build
         env:
+          VITE_SUPABASE_URL: https://mytbjkchvfybhyqcynnl.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_GtWjzcVR3XxRddFfyxqeaA_5xZ33-lM' }}
+          VITE_SUPABASE_PROJECT_ID: mytbjkchvfybhyqcynnl
           ELECTRON_BUILD: '1'
+        run: npx vite build
 
       - name: Package Windows EXE
-        run: npx @electron/packager . MasterMinds --platform=win32 --arch=x64 --out=release --overwrite --ignore="^/src$" --ignore="^/public$" --ignore="^/release$" --ignore="^/electron-release$" --ignore="^/supabase$" --ignore="^/\.github$" --ignore="^/android$"
+        run: npx @electron/packager . MasterMinds --platform=win32 --arch=x64 --out=release --overwrite --ignore="^/src$" --ignore="^/public$" --ignore="^/release$" --ignore="^/electron-release$" --ignore="^/supabase$" --ignore="^/\\.github$" --ignore="^/android$"
 
       - name: Zip the build
         run: Compress-Archive -Path release/MasterMinds-win32-x64/* -DestinationPath MasterMinds-Windows.zip
