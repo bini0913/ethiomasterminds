@@ -130,7 +130,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   });
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [answerResult, setAnswerResult] = useState<{ correct: boolean; points: number } | null>(null);
+  const [answerResult, setAnswerResult] = useState<{ correct: boolean; points: number; correctAnswer?: string; correctAnswerIndex?: number } | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(30);
   const [matchStartedAt, setMatchStartedAt] = useState<string | null>(null);
   const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
@@ -146,7 +146,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [isOffline, setIsOffline] = useState(false);
   const [consecutiveCorrect, setConsecutiveCorrect] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
-  const [floatingXp, setFloatingXp] = useState<number | null>(null);
+  const [floatingPoints, setFloatingPoints] = useState<number | null>(null);
+  const [playerFinished, setPlayerFinished] = useState(false);
   const [answerShake, setAnswerShake] = useState(false);
   const [latencyMs, setLatencyMs] = useState(42);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -168,7 +169,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     void loadRoomData();
     const cleanup = setupRealtimeSubscriptions();
     return cleanup;
-  }, [roomId, currentUserId, onLeave, roomState.status]);
+  }, [roomId, currentUserId, onLeave]);
 
   useEffect(() => {
     if (roomState.status !== 'playing') return;
@@ -325,6 +326,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       }
       if (room.status === 'playing') {
         matchFinishedHandledRef.current = false;
+        setPlayerFinished(false);
         await loadPlayerQuestion();
       } else if (room.status === 'finished') {
         await loadMatchResults();
@@ -404,6 +406,38 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     }, 30000);
     return () => clearInterval(interval);
   }, [roomId, roomState.status]);
+
+  useEffect(() => {
+    if (!playerFinished || roomState.status === 'finished') return;
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const poll = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      const { data: room } = await supabase
+        .from('multiplayer_rooms')
+        .select('status')
+        .eq('id', roomId)
+        .single();
+
+      if (room?.status === 'finished') {
+        setRoomState((prev) => ({ ...prev, status: 'finished' }));
+        await loadMatchResults();
+        return;
+      }
+
+      if (attempts >= 5) {
+        await supabase.rpc('multiplayer_finish_game', { p_room_id: roomId });
+        attempts = 0;
+      }
+      window.setTimeout(poll, 1000);
+    };
+
+    void poll();
+    return () => { cancelled = true; };
+  }, [playerFinished, roomState.status, roomId]);
 
   const loadMatchResults = async () => {
     const { data: results, error } = await (supabase as any)
@@ -649,26 +683,45 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
       if (error) throw error;
 
-      const result = data as { is_correct: boolean; points: number };
-      setAnswerResult(null);
+      const result = data as {
+        is_correct: boolean;
+        points: number;
+        correct_answer?: string;
+        correct_index?: number;
+        score?: number;
+        finished?: boolean;
+      };
+
+      setAnswerResult({
+        correct: result.is_correct,
+        points: result.points,
+        correctAnswer: result.correct_answer,
+        correctAnswerIndex: result.correct_index,
+      });
+
       if (result.is_correct) {
         setConsecutiveCorrect((prev) => {
           const next = prev + 1;
           setBestStreak((current) => Math.max(current, next));
           return next;
         });
-        setFloatingXp(result.points);
-        setTimeout(() => setFloatingXp(null), 900);
+        setFloatingPoints(result.points);
+        window.setTimeout(() => setFloatingPoints(null), 700);
         playTone(820, 0.08);
       } else {
         setConsecutiveCorrect(0);
         setAnswerShake(true);
-        setTimeout(() => setAnswerShake(false), 250);
+        window.setTimeout(() => setAnswerShake(false), 250);
         playTone(220, 0.08);
       }
 
+      if (result.finished) {
+        setPlayerFinished(true);
+        return;
+      }
+
       if (roomConfig.gameMode === 'speed') {
-        await loadPlayerQuestion();
+        window.setTimeout(() => { void loadPlayerQuestion(); }, 550);
       }
     } catch (err) {
       console.error('Error submitting answer:', err);
@@ -683,6 +736,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       if (error) throw error;
       if (data?.done) {
         setCurrentQuestion(null);
+        setPlayerFinished(true);
+        void supabase.rpc('multiplayer_finish_game', { p_room_id: roomId });
         return;
       }
       setCurrentQuestion({
@@ -961,16 +1016,16 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     </div>
                   </div>
 
-                  {floatingXp !== null && (
-                    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: -6 }} className="text-center text-emerald-300 font-bold">
-                      +{floatingXp} XP
+                  {floatingPoints !== null && (
+                    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: -6 }} className="text-center text-emerald-300 font-bold text-lg">
+                      +{floatingPoints} POINTS
                     </motion.div>
                   )}
 
                   <Progress value={(timeRemaining / (roomConfig.gameMode === 'speed' ? 60 : 30)) * 100} className="h-2" />
 
                   <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-sm text-blue-100/75">
-                    Results are hidden until the match ends.
+                    <span className="font-semibold text-cyan-200">Points decide the match.</span> XP is a reward after the battle.
                   </div>
 
                   {strongestOpponent && strongestOpponent.level >= (currentPlayer?.level || 1) + 3 && (
@@ -988,12 +1043,12 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                       let buttonClass = 'border-white/15 hover:border-cyan-300/70 bg-white/5';
 
                       if (selectedAnswer !== null) {
-                        if (answerResult?.correct && selectedAnswer === index) {
+                        if (answerResult?.correctAnswerIndex === index) {
                           buttonClass = 'border-green-500 bg-green-500/20 shadow-[0_0_18px_rgba(16,185,129,0.45)]';
-                        } else if (!answerResult?.correct && selectedAnswer === index) {
+                        } else if (selectedAnswer === index && !answerResult?.correct) {
                           buttonClass = 'border-red-400 bg-red-500/20';
                         } else {
-                          buttonClass = 'border-white/10 bg-white/5 opacity-55';
+                          buttonClass = 'border-white/10 bg-white/5 opacity-60';
                         }
                       }
 
@@ -1014,6 +1069,25 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                       );
                     })}
                   </div>
+
+                  {answerResult && selectedAnswer !== null && (
+                    <div className={cn(
+                      'rounded-xl border p-3 text-center',
+                      answerResult.correct
+                        ? 'border-emerald-400/40 bg-emerald-500/10'
+                        : 'border-red-400/40 bg-red-500/10'
+                    )}>
+                      <p className="font-bold text-base">
+                        {answerResult.correct ? 'Correct! 🎉' : 'Not quite'}
+                        {answerResult.points > 0 ? \` +\${answerResult.points} points\` : ' +0 points'}
+                      </p>
+                      {!answerResult.correct && answerResult.correctAnswer && (
+                        <p className="text-sm mt-1 text-blue-100/85">
+                          Correct answer: <span className="font-semibold text-white">{answerResult.correctAnswer}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {selectedAnswer !== null && roomConfig.gameMode === 'accuracy' && timeRemaining > 0 && (
                     <div className="p-3 rounded-lg text-center bg-white/5 text-blue-100/80">
@@ -1043,6 +1117,22 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
               </Card>
             )}
 
+            {roomState.status === 'playing' && playerFinished && (
+              <Card className="p-6 bg-white/5 border-cyan-300/20 text-center">
+                <div className="space-y-3">
+                  <CheckCircle className="h-10 w-10 mx-auto text-emerald-400" />
+                  <h2 className="text-2xl font-bold">You finished!</h2>
+                  <p className="text-blue-100/80">
+                    Your final score is locked in. Waiting briefly for the other players to finish so we can calculate the final standings.
+                  </p>
+                  <div className="text-3xl font-black text-cyan-300">{currentPlayer?.score ?? 0} POINTS</div>
+                  <Button variant="outline" onClick={() => void supabase.rpc('multiplayer_finish_game', { p_room_id: roomId })}>
+                    Refresh Result
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             <Card className="p-4 bg-white/5 border-white/10">
               <h3 className="font-bold mb-3 flex items-center gap-2">
                 <Users className="h-4 w-4" /> Players ({players.length}/{maxPlayers})
@@ -1064,7 +1154,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     </div>
                     <div className={cn('flex justify-center items-center gap-1 mt-1 text-xs', connectionColor)}><Signal className="h-3 w-3" /> {connectionQuality}</div>
                     <div className="mt-1 text-xs">{player.isReady ? 'Ready ✅' : 'Waiting ⏳'}</div>
-                    {roomState.status === 'finished' && <div className="text-sm font-bold text-cyan-300 mt-1">{player.score} pts</div>}
+                    <div className="text-sm font-bold text-cyan-300 mt-1">{player.score} pts</div>
                     {isHost && player.id !== currentUserId && roomState.status === 'waiting' && (
                       <Button size="sm" variant="outline" className="mt-2 h-7 text-xs" onClick={() => void kickPlayer(player.id, player.name)}>
                         Kick
