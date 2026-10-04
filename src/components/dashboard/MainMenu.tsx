@@ -20,6 +20,7 @@ import CurrencyDisplay from "@/components/currency/CurrencyDisplay";
 import { supabase } from "@/integrations/supabase/client";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import LearningDNASummary from "@/components/learning/LearningDNASummary";
+import { useLearningDNA } from "@/hooks/useLearningDNA";
 
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 
@@ -37,6 +38,7 @@ const MainMenu: React.FC = () => {
   const { getRecentBadges } = useAchievements();
   const { openHelper } = useAIHelper();
   const { t } = useLanguage();
+  const { learningData, isLoading: learningDNALoading, error: learningDNAError, reload: reloadLearningDNA } = useLearningDNA(user?.id);
 
   const [guideStepIndex, setGuideStepIndex] = useState<number>(-1);
   const [guideTargetRect, setGuideTargetRect] = useState<DOMRect | null>(null);
@@ -393,7 +395,7 @@ const MainMenu: React.FC = () => {
           )}
 
           <motion.section variants={itemVariants}>
-            <LearningDNASummary />
+            <LearningDNASummary data={learningData} isLoading={learningDNALoading} error={learningDNAError} onRetry={() => void reloadLearningDNA()} />
           </motion.section>
 
           <motion.section variants={itemVariants} data-guide="study-section">
