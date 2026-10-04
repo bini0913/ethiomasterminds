@@ -67,14 +67,25 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await admin.auth.getUser(bearer);
     if (authError || !authData.user) return json({ error: "Unauthorized" }, 401);
 
-    const { data: callerRole, error: roleError } = await admin.rpc("get_user_role", { _user_id: authData.user.id });
+    // Use the already-authenticated user id and the service-role client to
+    // read the caller's role directly. Do not call get_user_role() here:
+    // that SECURITY DEFINER RPC intentionally relies on auth.uid(), while
+    // this admin client is authenticated with the service-role key.
+    const { data: callerRoleRow, error: roleError } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", authData.user.id)
+      .order("role")
+      .limit(1)
+      .maybeSingle();
+
     if (roleError) {
       console.error("Notification caller role lookup failed:", roleError);
       return json({ error: "Unable to verify notification permissions" }, 500);
     }
 
     const allowedRoles = new Set(["teacher", "admin", "manager", "extreme_admin"]);
-    if (!allowedRoles.has(String(callerRole))) {
+    if (!callerRoleRow || !allowedRoles.has(String(callerRoleRow.role))) {
       return json({ error: "Not authorized to send push notifications" }, 403);
     }
 
