@@ -355,7 +355,7 @@ returns table(
   matches_played integer,
   wins integer,
   podiums integer,
-  position bigint
+  rank_position bigint
 )
 language sql
 security definer
@@ -368,7 +368,7 @@ as $$
     s.matches_played,
     s.wins,
     s.podiums,
-    row_number() over(order by s.total_points desc, s.wins desc, s.updated_at asc) as position
+    row_number() over(order by s.total_points desc, s.wins desc, s.updated_at asc) as rank_position
   from public.multiplayer_ranked_stats s
   left join public.profiles p on p.id = s.user_id
   order by s.total_points desc, s.wins desc, s.updated_at asc
