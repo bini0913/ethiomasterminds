@@ -103,10 +103,10 @@ Deno.serve(async (req) => {
 
     for (const device of devices) {
       const response = await fetch(
-        \`https://fcm.googleapis.com/v1/projects/\${serviceAccount.project_id}/messages:send\`,
+        "https://fcm.googleapis.com/v1/projects/" + serviceAccount.project_id + "/messages:send",
         {
           method: "POST",
-          headers: { Authorization: \`Bearer \${accessToken}\`, "Content-Type": "application/json" },
+          headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
           body: JSON.stringify({
             message: {
               token: device.token,
