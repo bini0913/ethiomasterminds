@@ -66,8 +66,8 @@ const FlashcardsPage: React.FC = () => {
     }
 
     if (cardsRes.data) {
-      const filteredByProfile = profileSubjects.length
-        ? cardsRes.data.filter((card) => profileSubjects.includes(card.subject.trim().toLowerCase()))
+      const filteredByProfile = allowedSubjects.length
+        ? cardsRes.data.filter((card) => allowedSubjects.includes(card.subject.trim().toLowerCase()))
         : cardsRes.data;
       setFlashcards(filteredByProfile);
       setSubjects(Array.from(new Set(filteredByProfile.map((card) => card.subject))).sort());
