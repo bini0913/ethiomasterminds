@@ -41,9 +41,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, initialTab = "student"
       transition={{ duration: 0.5 }}
       className="max-w-md w-full mx-auto bg-white rounded-xl shadow-lg overflow-hidden"
     >
-      <div className="bg-gradient-to-r from-primary to-purple-600 p-6 text-white text-center">
+      <div className="bg-[#0A1526] p-6 text-white text-center">
+        <img src="/brand/master-minds-icon.svg" alt="Master Minds" className="mx-auto mb-3 h-16 w-16 rounded-2xl" />
         <h1 className="text-2xl font-bold">Master Minds</h1>
-        <p className="opacity-90">Learn. Challenge. Grow.</p>
+        <p className="text-white/70">Learn. Challenge. Grow.</p>
       </div>
       
       <form onSubmit={handleLogin} className="p-6 space-y-4">
