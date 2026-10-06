@@ -321,8 +321,8 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
               <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-accent/10" />
               <div className="relative flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
-                    <ActiveIcon className="h-6 w-6" />
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl shadow-sm ring-1 ring-primary/20">
+                    <img src="/brand/master-minds-icon.svg" alt="Master Minds" className="h-full w-full" />
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Master Minds</p>
