@@ -13,7 +13,7 @@ export default function EarlyEncouragement(){
  const[i,setI]=useState(0),[open,setOpen]=useState(false),[notify,setNotify]=useState(()=>localStorage.getItem("early-notifications")!=="off");
  useEffect(()=>{const id=window.setInterval(()=>setI(x=>(x+1)%messages.length),30000);return()=>window.clearInterval(id)},[]);
  const[m,t,d]=messages[i];
- const speak=()=>{"speechSynthesis"in window&&(speechSynthesis.cancel(),speechSynthesis.speak(new SpeechSynthesisUtterance(t)))};
+ const speak=()=>{if("speechSynthesis"in window){speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(t));}};
  const enableNotifications=async()=>{
    if(!("Notification"in window)){setNotify(true);localStorage.setItem("early-notifications","on");return}
    const permission=Notification.permission==="granted"? "granted":await Notification.requestPermission();
