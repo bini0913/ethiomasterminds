@@ -53,7 +53,7 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
       <AnimatePresence>
         {showIntro &&
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A1526]"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1 }}>
@@ -94,7 +94,7 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
             )}
 
               <motion.h1
-              className="text-center mt-8 text-4xl font-display font-black text-gradient"
+              className="text-center mt-8 text-4xl font-display font-black text-white"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.5 }}>
@@ -113,11 +113,11 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="mb-6">
-          <div className="text-center glass rounded-2xl p-4 border border-primary/30">
-            <h4 className="text-xl font-display font-bold text-gradient">
+          <div className="text-center rounded-2xl p-4 border border-white/10 bg-white/[0.06] backdrop-blur-xl">
+            <h4 className="text-xl font-display font-bold text-white">
               {t("smart-quiz-world")}
             </h4>
-            <p className="text-sm text-foreground/80 mt-1">
+            <p className="text-sm text-white/70 mt-1">
               {t("created-by")} <span className="text-primary font-semibold">Biniam Bogale</span>, from Ethiopia 🇪🇹
             </p>
           </div>
@@ -145,10 +145,10 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
           className="text-center mb-10">
-          <h1 className="text-5xl md:text-6xl font-display font-black text-gradient mb-3">
+          <h1 className="text-5xl md:text-6xl font-display font-black text-white mb-3">
             {t("app-name")}
           </h1>
-          <p className="text-lg text-foreground/70 max-w-md">
+          <p className="text-lg text-white/70 max-w-md">
             {t("app-tagline")}
           </p>
         </motion.div>
@@ -210,9 +210,9 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
 
       {/* About Dialog */}
       <Dialog open={showAbout} onOpenChange={setShowAbout}>
-        <DialogContent className="glass border-primary/30 max-w-md">
+        <DialogContent className="bg-[#0A1526] border-white/10 text-white max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-display text-gradient text-center">
+            <DialogTitle className="text-2xl font-display text-white text-center">
               {t("about-master-minds")}
             </DialogTitle>
           </DialogHeader>
@@ -249,8 +249,8 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
 
       {/* Role Selection Dialog */}
       <Dialog open={showRoleSelect} onOpenChange={setShowRoleSelect}>
-        <DialogContent className="glass border-primary/30 max-w-lg p-0 overflow-hidden">
-          <div className="bg-gradient-to-r from-primary/20 via-accent/20 to-secondary/20 p-6">
+        <DialogContent className="bg-[#0A1526] border-white/10 text-white max-w-lg p-0 overflow-hidden">
+          <div className="bg-gradient-to-r from-[#0055FF]/25 via-[#00E5FF]/15 to-[#0055FF]/25 p-6">
             <DialogTitle className="text-2xl font-display text-gradient text-center">
               {t("choose-role")}
             </DialogTitle>
