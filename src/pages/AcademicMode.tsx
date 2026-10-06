@@ -16,6 +16,15 @@ const AcademicMode: React.FC = () => {
   const [setupLoading, setSetupLoading] = React.useState(true);
   const [setup, setSetup] = React.useState<any>(null);
 
+  // Grade values have historically been stored both as "8" and "Grade 8".
+  // Normalize both formats so valid middle/high-school students are not blocked.
+  const gradeValue = (user?.grade || "").trim();
+  const gradeMatch = gradeValue.match(/(?:grade\s*)?(\d{1,2})/i);
+  const gradeNum = gradeMatch ? Number(gradeMatch[1]) : 0;
+  const isEligibleGrade = gradeNum >= 5 && gradeNum <= 12;
+  const isHighSchool = gradeNum >= 9 && gradeNum <= 12;
+  const academicLabel = isHighSchool ? "Academic Prep" : "Academic Mode";
+
   React.useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -28,15 +37,8 @@ const AcademicMode: React.FC = () => {
     return () => { cancelled = true; };
   }, [user?.id, navigate]);
 
-  if (setupLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Preparing Academic Mode…</div>;
+  if (setupLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Preparing {academicLabel}…</div>;
   if (!setup) return null;
-
-  // Grade values have historically been stored both as "8" and "Grade 8".
-  // Normalize both formats so valid middle/high-school students are not blocked.
-  const gradeValue = (user?.grade || "").trim();
-  const gradeMatch = gradeValue.match(/(?:grade\s*)?(\d{1,2})/i);
-  const gradeNum = gradeMatch ? Number(gradeMatch[1]) : 0;
-  const isEligibleGrade = gradeNum >= 5 && gradeNum <= 12;
 
   if (!isEligibleGrade) {
     return (
@@ -44,9 +46,9 @@ const AcademicMode: React.FC = () => {
         <Card className="max-w-md w-full">
           <CardContent className="p-8 text-center">
             <GraduationCap className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-bold mb-2">Academic Mode</h2>
+            <h2 className="text-xl font-bold mb-2">{academicLabel}</h2>
             <p className="text-muted-foreground mb-4">
-              Academic Mode is available for Grades 5–12. Update your grade in Settings to access this feature.
+              {academicLabel} is available for Grades 5–12. Update your grade in Settings to access this feature.
             </p>
             <Button onClick={() => navigate("/settings")}>Go to Settings</Button>
           </CardContent>
@@ -112,7 +114,7 @@ const AcademicMode: React.FC = () => {
           </Button>
           <div className="flex-1">
             <h1 className="text-lg font-bold text-white flex items-center gap-2">
-              <GraduationCap className="h-5 w-5" /> Academic Mode
+              <GraduationCap className="h-5 w-5" /> {academicLabel}
             </h1>
             <p className="text-xs text-white/60">Grade {user?.grade} • {academicRank.title}</p>
           </div>
@@ -123,7 +125,7 @@ const AcademicMode: React.FC = () => {
         </div>
       </header>
 
-      <div className="px-4 pt-4 max-w-4xl mx-auto">\n        <Card className="border-primary/20 bg-primary/5">\n          <CardContent className="p-4">\n            <div className="flex items-start justify-between gap-3">\n              <div>\n                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your study profile</p>\n                <h2 className="mt-1 text-base font-bold">Grade {setup.grade} • {goalLabels[setup.study_goal] || setup.study_goal}</h2>\n                <p className="mt-1 text-sm text-muted-foreground">{curriculumLabel} • {(setup.subjects || []).join(", ")}</p>\n                <p className="mt-1 text-sm text-muted-foreground">Book: {setup.book_title || "Not specified"}</p>\n              </div>\n              <Button variant="outline" size="sm" onClick={() => navigate("/academic/setup")}>Edit</Button>\n            </div>\n            <p className="mt-3 text-xs text-muted-foreground">Your Academic Mode tools will use this profile to select the right level, subjects, revision and exam practice.</p>\n          </CardContent>\n        </Card>\n      </div>\n\n      {/* Academic Rank Card */}
+      <div className="px-4 pt-4 max-w-4xl mx-auto">\n        <Card className="border-primary/20 bg-primary/5">\n          <CardContent className="p-4">\n            <div className="flex items-start justify-between gap-3">\n              <div>\n                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your study profile</p>\n                <h2 className="mt-1 text-base font-bold">Grade {setup.grade} • {goalLabels[setup.study_goal] || setup.study_goal}</h2>\n                <p className="mt-1 text-sm text-muted-foreground">{curriculumLabel} • {(setup.subjects || []).join(", ")}</p>\n                <p className="mt-1 text-sm text-muted-foreground">Book: {setup.book_title || "Not specified"}</p>\n              </div>\n              <Button variant="outline" size="sm" onClick={() => navigate("/academic/setup")}>Edit</Button>\n            </div>\n            <p className="mt-3 text-xs text-muted-foreground">Your {academicLabel} will use this profile to select the right grade level, curriculum, subjects, textbook context, revision and exam practice.</p>\n          </CardContent>\n        </Card>\n      </div>\n\n      {/* Academic Rank Card */}
       <div className="px-4 py-4 max-w-4xl mx-auto">
         <motion.div
           initial={{ y: -10, opacity: 0 }}
