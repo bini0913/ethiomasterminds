@@ -30,6 +30,7 @@ import TimeTravelRevision from "./pages/TimeTravelRevision";
 import EnhancedSocial from "./pages/EnhancedSocial";
 import AvatarCreator from "./pages/AvatarCreator";
 import AcademicMode from "./pages/AcademicMode";
+import AcademicSetup from "./pages/AcademicSetup";
 import FlashcardsPage from "./pages/FlashcardsPage";
 import TopicCoveragePage from "./pages/TopicCoveragePage";
 import ExamModePage from "./pages/ExamModePage";
@@ -309,7 +310,7 @@ const App = () => (
                               <Route path="/avatar-creator" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AvatarCreator /></ProtectedRoute>} />
                               <Route path="/academic" element={<EarlyTierRestrictedRoute><AcademicMode /></EarlyTierRestrictedRoute>} />
                               <Route path="/study-mode" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><StudyModePage /></ProtectedRoute>} />
-                              <Route path="/academic/flashcards" element={<EarlyTierRestrictedRoute><FlashcardsPage /></EarlyTierRestrictedRoute>} />
+                              <Route path="/academic/setup" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AcademicSetup /></ProtectedRoute>} />\n                              <Route path="/academic/flashcards" element={<EarlyTierRestrictedRoute><FlashcardsPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/topics" element={<EarlyTierRestrictedRoute><TopicCoveragePage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/exam" element={<EarlyTierRestrictedRoute><ExamModePage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/planner" element={<EarlyTierRestrictedRoute><StudyPlannerPage /></EarlyTierRestrictedRoute>} />
