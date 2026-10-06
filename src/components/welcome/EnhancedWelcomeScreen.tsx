@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 import { Crown, Users, ShieldCheck, GraduationCap, Sparkles, Trophy, Zap, Globe, Info, Play } from "lucide-react";
 import LanguageSelector from "@/components/common/LanguageSelector";
-import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import MasterMindsLogo from "@/components/brand/MasterMindsLogo";
 import {
   Dialog,
