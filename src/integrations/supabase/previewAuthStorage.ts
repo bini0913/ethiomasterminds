@@ -43,6 +43,7 @@ export function brokeredPreviewStorage() {
         window.removeEventListener('message', onMessage);
         resolve(r);
       };
+      timer = setTimeout(() => finish(null), TIMEOUT);
       const onMessage = (e: MessageEvent) => {
         if (editorOrigins.indexOf(e.origin) < 0) return;
         const d = e.data;
