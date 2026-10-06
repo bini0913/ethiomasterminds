@@ -295,7 +295,8 @@ const App = () => (
                               <Route path="/store" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><StorePage /></ProtectedRoute>} />
                               <Route path="/tournaments" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Tournaments /></ProtectedRoute>} />
                               <Route path="/enhanced-settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><EnhancedSettings /></ProtectedRoute>} />
-                              <Route path="/social" element={<EarlyTierRestrictedRoute><EnhancedSocial /></EarlyTierRestrictedRoute>} />
+                              <Route path="/social" element={<EarlyTierRestrictedRoute><SocialHub /></EarlyTierRestrictedRoute>} />
+                              <Route path="/social/community" element={<EarlyTierRestrictedRoute><EnhancedSocial /></EarlyTierRestrictedRoute>} />
                               <Route path="/ai-tutor" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AITutor /></ProtectedRoute>} />
                               <Route path="/learning-dna" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><LearningDNA /></ProtectedRoute>} />
                               <Route
