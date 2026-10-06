@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { ArrowLeft, Clock, Target, AlertTriangle, Trophy, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { normalizeGrade, getAcademicProfile } from "@/lib/academicProfile";
 
 interface Question {
   id: string;
@@ -34,7 +35,17 @@ const ExamModePage: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [results, setResults] = useState<{ correct: number; total: number; details: Array<{ q: Question; answer: string; correct: boolean }> } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
-  const userGrade = parseInt(user?.grade || "5");
+  const userGrade = normalizeGrade(user?.grade, 5);
+  const [profileSubjects, setProfileSubjects] = useState<string[]>(["math", "science", "english", "history"]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getAcademicProfile(user.id).then((profile) => {
+      if (!profile?.subjects?.length) return;
+      setProfileSubjects(profile.subjects.map((s) => s.toLowerCase()));
+      setSubject(profile.subjects[0].toLowerCase());
+    }).catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     if (examState !== "running" || timeLeft <= 0) return;

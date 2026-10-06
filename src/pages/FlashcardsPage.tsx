@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, RotateCcw, BookOpen, Brain, ChevronRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { normalizeGrade, getAcademicProfile } from "@/lib/academicProfile";
 
 interface Flashcard {
   id: string;
@@ -39,13 +40,17 @@ const FlashcardsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [studyMode, setStudyMode] = useState<"browse" | "review">("browse");
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [profileSubjects, setProfileSubjects] = useState<string[]>([]);
 
-  const gradeNum = parseInt(user?.grade || "5");
+  const gradeNum = normalizeGrade(user?.grade, 5);
 
   const fetchData = useCallback(async () => {
     const auth = await supabase.auth.getUser();
     if (!user || !auth.data.user?.id) return;
     setIsLoading(true);
+    const profile = await getAcademicProfile(user.id).catch(() => null);
+    const allowedSubjects = profile?.subjects?.map((s) => s.trim().toLowerCase()) || [];
+    setProfileSubjects(allowedSubjects);
 
     const [cardsRes, progressRes] = await Promise.all([
       supabase
@@ -61,8 +66,11 @@ const FlashcardsPage: React.FC = () => {
     }
 
     if (cardsRes.data) {
-      setFlashcards(cardsRes.data);
-      setSubjects(Array.from(new Set(cardsRes.data.map((card) => card.subject))).sort());
+      const filteredByProfile = allowedSubjects.length
+        ? cardsRes.data.filter((card) => allowedSubjects.includes(card.subject.trim().toLowerCase()))
+        : cardsRes.data;
+      setFlashcards(filteredByProfile);
+      setSubjects(Array.from(new Set(filteredByProfile.map((card) => card.subject))).sort());
     }
     if (progressRes.error) {
       console.error(progressRes.error);
@@ -94,7 +102,7 @@ const FlashcardsPage: React.FC = () => {
     };
   }, [fetchData, user?.id]);
 
-  const filteredCards = selectedSubject
+  const filteredCards = selectedSubject && selectedSubject !== "all"
     ? flashcards.filter(f => f.subject === selectedSubject)
     : flashcards;
 
