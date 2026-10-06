@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   BookOpen, Brain, Target, Calendar, BarChart3, 
   ArrowLeft, GraduationCap, Sparkles, TrendingUp
@@ -12,6 +13,23 @@ import {
 const AcademicMode: React.FC = () => {
   const { user } = useUser();
   const navigate = useNavigate();
+  const [setupLoading, setSetupLoading] = React.useState(true);
+  const [setup, setSetup] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    supabase.from("academic_profiles").select("*").eq("user_id", user.id).maybeSingle().then(({ data }) => {
+      if (cancelled) return;
+      setSetup(data);
+      setSetupLoading(false);
+      if (!data) navigate("/academic/setup", { replace: true });
+    });
+    return () => { cancelled = true; };
+  }, [user?.id, navigate]);
+
+  if (setupLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Preparing Academic Mode…</div>;
+  if (!setup) return null;
 
   // Grade values have historically been stored both as "8" and "Grade 8".
   // Normalize both formats so valid middle/high-school students are not blocked.
@@ -71,14 +89,6 @@ const AcademicMode: React.FC = () => {
       badge: "📅"
     },
     {
-      title: "AI Study Coach",
-      description: "Personalized recommendations",
-      icon: <Brain className="h-7 w-7" />,
-      path: "/ai-tutor",
-      color: "from-violet-600 to-purple-600",
-      badge: "🧠"
-    },
-    {
       title: "Academic Insights",
       description: "Performance trends & analytics",
       icon: <TrendingUp className="h-7 w-7" />,
@@ -89,6 +99,8 @@ const AcademicMode: React.FC = () => {
   ];
 
   const academicRank = getAcademicRank(user?.xp || 0);
+  const curriculumLabel = setup.curriculum === "oromia" ? "Oromia Curriculum" : "Addis Ababa Curriculum";
+  const goalLabels: Record<string, string> = { class: "School / Class", ministry_exam: "Ministry Exam", university_entrance: "University Entrance", national_exam: "National / Regional Exam", custom: setup.study_goal_detail || "Custom Goal" };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -111,7 +123,7 @@ const AcademicMode: React.FC = () => {
         </div>
       </header>
 
-      {/* Academic Rank Card */}
+      <div className="px-4 pt-4 max-w-4xl mx-auto">\n        <Card className="border-primary/20 bg-primary/5">\n          <CardContent className="p-4">\n            <div className="flex items-start justify-between gap-3">\n              <div>\n                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your study profile</p>\n                <h2 className="mt-1 text-base font-bold">Grade {setup.grade} • {goalLabels[setup.study_goal] || setup.study_goal}</h2>\n                <p className="mt-1 text-sm text-muted-foreground">{curriculumLabel} • {(setup.subjects || []).join(", ")}</p>\n                <p className="mt-1 text-sm text-muted-foreground">Book: {setup.book_title || "Not specified"}</p>\n              </div>\n              <Button variant="outline" size="sm" onClick={() => navigate("/academic/setup")}>Edit</Button>\n            </div>\n            <p className="mt-3 text-xs text-muted-foreground">Your Academic Mode tools will use this profile to select the right level, subjects, revision and exam practice.</p>\n          </CardContent>\n        </Card>\n      </div>\n\n      {/* Academic Rank Card */}
       <div className="px-4 py-4 max-w-4xl mx-auto">
         <motion.div
           initial={{ y: -10, opacity: 0 }}
