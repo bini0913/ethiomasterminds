@@ -93,8 +93,8 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({
           <div className="p-4 border-b border-border/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-                  <GraduationCap className="h-5 w-5 text-white" />
+                <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm ring-1 ring-black/5">
+                  <img src="/brand/master-minds-icon.svg" alt="Master Minds" className="h-full w-full" />
                 </div>
                 <div>
                   <h2 className="font-display font-bold text-sm">Teacher Portal</h2>
