@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Calendar, Plus, Check, X, Sparkles, Brain, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
+import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
 
 interface StudyPlan {
   id: string;
@@ -33,8 +34,8 @@ const StudyPlannerPage: React.FC = () => {
   const [newTopic, setNewTopic] = useState("");
   const [newDate, setNewDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [newPriority, setNewPriority] = useState("medium");
-
-  const subjects = ["math", "science", "english", "history"];
+  const [subjects, setSubjects] = useState<string[]>(["math", "science", "english", "history"]);
+  const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string } | null>(null);
 
   const fetchPlans = useCallback(async () => {
     const auth = await supabase.auth.getUser();
@@ -56,6 +57,21 @@ const StudyPlannerPage: React.FC = () => {
   }, [user]);
 
   useEffect(() => { if (user) fetchPlans(); }, [fetchPlans, user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getAcademicProfile(user.id).then((profile) => {
+      if (!profile) return;
+      setSubjects(profile.subjects.map((s) => s.toLowerCase()));
+      setNewSubject(profile.subjects[0]?.toLowerCase() || "math");
+      setAcademicContext({
+        grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 5)),
+        curriculum: profile.curriculum,
+        goal: profile.study_goal_detail || profile.study_goal,
+        book: profile.book_title || "Not specified",
+      });
+    }).catch(() => {});
+  }, [user?.id, user?.grade]);
 
   const addPlan = async () => {
     const auth = await supabase.auth.getUser();
@@ -111,7 +127,11 @@ const StudyPlannerPage: React.FC = () => {
         body: {
           weakTopics,
           analytics,
-          grade: user.grade || "12",
+          grade: academicContext?.grade || normalizeGrade(user.grade, 12),
+          curriculum: academicContext?.curriculum,
+          studyGoal: academicContext?.goal,
+          book: academicContext?.book,
+          subjects,
           existingPlans: plans.map(p => ({ subject: p.subject, topic: p.topic, scheduled_date: p.scheduled_date })),
         },
       });
