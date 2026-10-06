@@ -28,6 +28,7 @@ import ParentDashboard from "./pages/ParentDashboard";
 import FinancePortal from "./pages/FinancePortal";
 import TimeTravelRevision from "./pages/TimeTravelRevision";
 import EnhancedSocial from "./pages/EnhancedSocial";
+import SocialHub from "./pages/SocialHub";
 import AvatarCreator from "./pages/AvatarCreator";
 import AcademicMode from "./pages/AcademicMode";
 import AcademicSetup from "./pages/AcademicSetup";
