@@ -286,7 +286,7 @@ const Multiplayer: React.FC = () => {
       <RealTimeRoom
         roomId={roomId}
         roomName={currentRoom?.name || "Game Room"}
-        maxPlayers={currentRoom?.maxPlayers || 4}
+        initialMaxPlayers={currentRoom?.maxPlayers || 4}
         currentUserId={user.id}
         currentUserName={user.name || "Player"}
         onLeave={handleLeaveRoom}
