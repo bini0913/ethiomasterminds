@@ -16,6 +16,15 @@ const AcademicMode: React.FC = () => {
   const [setupLoading, setSetupLoading] = React.useState(true);
   const [setup, setSetup] = React.useState<any>(null);
 
+  // Grade values have historically been stored both as "8" and "Grade 8".
+  // Normalize both formats so valid middle/high-school students are not blocked.
+  const gradeValue = (user?.grade || "").trim();
+  const gradeMatch = gradeValue.match(/(?:grade\s*)?(\d{1,2})/i);
+  const gradeNum = gradeMatch ? Number(gradeMatch[1]) : 0;
+  const isEligibleGrade = gradeNum >= 5 && gradeNum <= 12;
+  const isHighSchool = gradeNum >= 9 && gradeNum <= 12;
+  const academicLabel = isHighSchool ? "Academic Prep" : "Academic Mode";
+
   React.useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -31,22 +40,13 @@ const AcademicMode: React.FC = () => {
   if (setupLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Preparing {academicLabel}…</div>;
   if (!setup) return null;
 
-  // Grade values have historically been stored both as "8" and "Grade 8".
-  // Normalize both formats so valid middle/high-school students are not blocked.
-  const gradeValue = (user?.grade || "").trim();
-  const gradeMatch = gradeValue.match(/(?:grade\s*)?(\d{1,2})/i);
-  const gradeNum = gradeMatch ? Number(gradeMatch[1]) : 0;
-  const isEligibleGrade = gradeNum >= 5 && gradeNum <= 12;
-  const isHighSchool = gradeNum >= 9 && gradeNum <= 12;
-  const academicLabel = isHighSchool ? "Academic Prep" : "Academic Mode";
-
   if (!isEligibleGrade) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
           <CardContent className="p-8 text-center">
             <GraduationCap className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-bold mb-2">Academic Mode</h2>
+            <h2 className="text-xl font-bold mb-2">{academicLabel}</h2>
             <p className="text-muted-foreground mb-4">
               {academicLabel} is available for Grades 5–12. Update your grade in Settings to access this feature.
             </p>
