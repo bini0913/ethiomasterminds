@@ -2,11 +2,6 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
-createRoot(document.getElementById("root")!).render(
-  <AppErrorBoundary>
-    <App />
-  </AppErrorBoundary>,
-);
 import React, { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import MasterMindsLogo from "@/components/brand/MasterMindsLogo";
@@ -56,3 +51,8 @@ class AppErrorBoundary extends Component<Props, State> {
   }
 }
 
+createRoot(document.getElementById("root")!).render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>,
+);
