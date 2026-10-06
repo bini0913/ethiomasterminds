@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Compass, Users, Flame, BookOpen, Target, Plus, UserPlus } from 'lucide-react';
+import { Compass, Users, Flame, BookOpen, Target, Plus, UsersRound } from 'lucide-react';
 import BackButton from '@/components/ui/BackButton';
 import SocialFeedView from '@/components/social/SocialFeedView';
 import SocialChallenges from '@/components/social/SocialChallenges';
@@ -30,8 +30,9 @@ const EnhancedSocial: React.FC = () => {
       <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border/40">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <BackButton />
-            <h1 className="text-lg font-bold text-foreground tracking-tight">Community</h1>
+            <BackButton to="/social" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><UsersRound className="h-5 w-5" /></div>
+            <div><h1 className="text-lg font-bold text-foreground tracking-tight">Community</h1><p className="text-[11px] text-muted-foreground">Learn, share and challenge each other</p></div>
           </div>
         </div>
       </header>
@@ -65,7 +66,7 @@ const EnhancedSocial: React.FC = () => {
       </div>
 
       {/* Content */}
-      <main className="max-w-2xl mx-auto pb-24">
+      <main className="max-w-2xl mx-auto pb-24"><section className="mx-4 mt-4 rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-cyan-500/10 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-primary">Community</p><h2 className="mt-1 text-lg font-bold">What are students learning today?</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Explore ideas, study posts, challenges and conversations from the Master Minds community.</p></div><Button variant="outline" size="sm" onClick={() => navigate("/friends")} className="shrink-0"><Users className="mr-1.5 h-4 w-4" /> Friends</Button></div></section>
         {activeTab === 'explore' && <SocialFeedView mode="explore" />}
         {activeTab === 'following' && <SocialFeedView mode="following" />}
         {activeTab === 'trending' && <SocialFeedView mode="trending" />}
