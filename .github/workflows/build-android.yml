@@ -38,6 +38,9 @@ jobs:
       - name: TypeScript check
         run: npm run typecheck
 
+      - name: Lint
+        run: npm run lint
+
       - name: Build web app
         env:
           VITE_SUPABASE_URL: https://mytbjkchvfybhyqcynnl.supabase.co
