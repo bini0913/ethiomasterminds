@@ -53,9 +53,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
       transition={{ duration: 0.5 }}
       className="max-w-md w-full mx-auto bg-white rounded-xl shadow-lg overflow-hidden"
     >
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white text-center">
+      <div className="bg-[#0A1526] p-6 text-white text-center">
+        <img src="/brand/master-minds-icon.svg" alt="Master Minds" className="mx-auto mb-3 h-16 w-16 rounded-2xl" />
         <h1 className="text-2xl font-bold">Create Account</h1>
-        <p className="opacity-90">Join Master Minds today</p>
+        <p className="text-white/70">Join Master Minds today</p>
       </div>
       
       <form onSubmit={handleSignup} className="p-6 space-y-4">
