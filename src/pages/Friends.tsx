@@ -172,22 +172,22 @@ const Friends: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-teal-600 via-cyan-600 to-blue-600 px-4 py-3 shadow-xl">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <BackButton to="/" className="text-white hover:bg-white/20" />
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-2">
-              <Users className="h-6 w-6 text-white" />
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <BackButton />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Users className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">💬🧠 MASTER MINDS — CHAT SYSTEM</h1>
-              <p className="text-xs text-white/70">{friends.length} friends • learn, chat & compete</p>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold">Friends</h1>
+              <p className="truncate text-xs text-muted-foreground">{friends.length} friends • {onlineFriends.length} online now</p>
             </div>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2">
-            <Home className="h-4 w-4" /> Menu
+          <Button variant="outline" size="sm" onClick={() => navigate("/social")} className="gap-2">
+            <Home className="h-4 w-4" /> Social
           </Button>
         </div>
       </header>
