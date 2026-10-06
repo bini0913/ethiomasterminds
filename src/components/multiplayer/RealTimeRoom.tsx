@@ -331,6 +331,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       }
       if (room.status === 'playing') {
         finishRequestedRef.current = false;
+        resultsHandledRef.current = false;
         setPlayerFinished(false);
         await loadPlayerQuestion();
       } else if (room.status === 'finished') {
