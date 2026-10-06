@@ -254,8 +254,8 @@ const MainMenu: React.FC = () => {
       <header className="sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <Link to={user?.id ? `/profile/${user.id}` : "/settings"} className="flex min-w-0 items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-xl text-primary-foreground shadow-sm">
-              🧠
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5">
+              <img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-display font-bold text-foreground">Master Minds</h1>
