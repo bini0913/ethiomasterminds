@@ -941,8 +941,11 @@ const Lobby: React.FC = () => {
       });
       if (inviteError) throw inviteError;
 
+      // The challenger is already the room host, so enter the newly-created room immediately.
+      // The invited player will join the same room after accepting.
       toast.success(`Invite sent to ${playerName}`);
       pushActivity(`${playerName} was invited to a multiplayer challenge`);
+      navigate(`/multiplayer?room=${room.id}`);
     } catch (error: any) {
       console.error("Error sending multiplayer challenge:", error);
       toast.error(error?.message || "Could not send invite");
@@ -968,6 +971,12 @@ const Lobby: React.FC = () => {
       if (response === "accepted" && roomId) {
         const success = await contextJoinRoom(roomId, user.name || "Player");
         if (!success) throw new Error("Could not join the invited game room");
+
+        // An accepted direct challenge is a ready-to-play action. Mark the invitee ready
+        // so the host can automatically start the match as soon as both players are present.
+        const { error: readyError } = await supabase.rpc("multiplayer_toggle_ready", { p_room_id: roomId });
+        if (readyError) throw readyError;
+
         navigate(`/multiplayer?room=${roomId}`);
       } else {
         toast.success("Invite declined");
