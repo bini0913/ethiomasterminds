@@ -190,7 +190,7 @@ const Chat: React.FC = () => {
 
       // Load reply-to messages
       const replyIds = (data || []).filter(m => m.reply_to_id).map(m => m.reply_to_id!);
-      let replyMap: Record<string, any> = {};
+      const replyMap: Record<string, any> = {};
       if (replyIds.length) {
         const { data: replies } = await supabase
           .from('group_messages').select('id, content, sender_id').in('id', replyIds);
