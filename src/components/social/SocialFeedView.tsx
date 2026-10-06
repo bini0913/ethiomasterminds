@@ -263,7 +263,7 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
       await supabase.from('social_post_reactions').insert({ post_id: postId, user_id: auth.data.user.id, reaction_type: reactionType });
       setShowReactions(null);
       loadPosts();
-    } catch {}
+    } catch { loadPosts(); }
   };
 
   const toggleSave = async (postId: string) => {

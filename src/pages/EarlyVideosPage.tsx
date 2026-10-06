@@ -28,7 +28,7 @@ const youtubeEmbed = (url: string) => {
       return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0` : null;
     }
     if (parsed.hostname === "youtu.be") return `https://www.youtube-nocookie.com/embed/${parsed.pathname.slice(1)}?rel=0`;
-  } catch {}
+  } catch (error) { console.warn("Invalid video URL:", error); }
   return null;
 };
 

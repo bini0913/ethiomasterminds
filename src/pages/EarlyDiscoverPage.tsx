@@ -40,7 +40,7 @@ export default function EarlyDiscoverPage() {
   const [rewarded, setRewarded] = useState<boolean | null>(null);
   const [seen, setSeen] = useState<number[]>([]);
   const [contentIds, setContentIds] = useState<Record<number,string>>({});
-  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem("master-minds-early-discover-seen") || "[]"); if (Array.isArray(saved)) setSeen(saved.filter((x) => Number.isInteger(x))); } catch {} const load = async () => { const { data } = await supabase.from("early_content_items").select("id,activity_id").eq("activity_type","discover").eq("active",true); const map: Record<number,string> = {}; (data ?? []).forEach((row:any) => { const m = /^early-discover-(\d+)$/.exec(row.activity_id); if (m) map[Number(m[1])] = row.id; }); setContentIds(map); }; void load(); }, []);
+  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem("master-minds-early-discover-seen") || "[]"); if (Array.isArray(saved)) setSeen(saved.filter((x) => Number.isInteger(x))); } catch (error) { console.warn("Could not restore discover history", error); } const load = async () => { const { data } = await supabase.from("early_content_items").select("id,activity_id").eq("activity_type","discover").eq("active",true); const map: Record<number,string> = {}; (data ?? []).forEach((row:any) => { const m = /^early-discover-(\d+)$/.exec(row.activity_id); if (m) map[Number(m[1])] = row.id; }); setContentIds(map); }; void load(); }, []);
   const f = facts[i];
   const answer = f[5];
 
@@ -63,7 +63,7 @@ export default function EarlyDiscoverPage() {
     const nextIndex = remaining[0] ?? ((i + 1) % facts.length);
     const normalizedSeen = remaining.length ? nextSeen : [];
     setSeen(normalizedSeen);
-    try { localStorage.setItem("master-minds-early-discover-seen", JSON.stringify(normalizedSeen)); } catch {}
+    try { localStorage.setItem("master-minds-early-discover-seen", JSON.stringify(normalizedSeen)); } catch (error) { console.warn("Could not save discover history", error); }
     setSelected(""); setCorrect(false); setRewarded(null); setI(nextIndex);
   };
 

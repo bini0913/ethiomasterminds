@@ -1,59 +1,60 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Routes, Route, useLocation, useNavigate } from "react-router-dom";
-import Index from "./pages/Index";
-import Quiz from "./pages/Quiz";
-import QuizFilter from "./pages/QuizFilter";
-import Multiplayer from "./pages/Multiplayer";
-import Lobby from "./pages/Lobby";
-import Leaderboard from "./pages/Leaderboard";
-import Friends from "./pages/Friends";
-import Settings from "./pages/Settings";
-import EnhancedSettings from "./pages/EnhancedSettings";
-import NotFound from "./pages/NotFound";
-import NotificationSettingsPage from "./pages/NotificationSettingsPage";
-import StorePage from "./pages/StorePage";
-import TeacherPortal from "./pages/TeacherPortal";
-import AdminPortal from "./pages/AdminPortal";
-import StudentDashboard from "./pages/StudentDashboard";
-import ManagerDashboard from "./pages/ManagerDashboard";
-import ManagerControlCenter from "./pages/ManagerControlCenter";
-import SuperAdminPortal from "./pages/SuperAdminPortal";
-import Chat from "./pages/Chat";
-import AITutor from "./pages/AITutor";
-import LearningDNA from "./pages/LearningDNA";
-import ParentDashboard from "./pages/ParentDashboard";
-import FinancePortal from "./pages/FinancePortal";
-import TimeTravelRevision from "./pages/TimeTravelRevision";
-import EnhancedSocial from "./pages/EnhancedSocial";
-import SocialHub from "./pages/SocialHub";
-import AvatarCreator from "./pages/AvatarCreator";
-import AcademicMode from "./pages/AcademicMode";
-import AcademicSetup from "./pages/AcademicSetup";
-import FlashcardsPage from "./pages/FlashcardsPage";
-import TopicCoveragePage from "./pages/TopicCoveragePage";
-import ExamModePage from "./pages/ExamModePage";
-import StudyPlannerPage from "./pages/StudyPlannerPage";
-import AcademicInsightsPage from "./pages/AcademicInsightsPage";
-import LibraryPage from "./pages/LibraryPage";
-import StudyModePage from "./pages/StudyModePage";
-import UserProfilePage from "./pages/UserProfilePage";
-import Tournaments from "./pages/Tournaments";
-import EarlyGamesPage from "./pages/EarlyGamesPage";
-import EarlyQuizPage from "./pages/EarlyQuizPage";
-import EarlyVideosPage from "./pages/EarlyVideosPage";
-import EarlyDiscoverPage from "./pages/EarlyDiscoverPage";
-import EarlyExplorePage from "./pages/EarlyExplorePage";
-import EarlyProgressPage from "./pages/EarlyProgressPage";
-import EarlyCollectionPage from "./pages/EarlyCollectionPage";
-import EarlyProfilePage from "./pages/EarlyProfilePage";
-import EarlyLeaderboardPage from "./pages/EarlyLeaderboardPage";
+const Index = lazy(() => import("./pages/Index"));
+const Quiz = lazy(() => import("./pages/Quiz"));
+const QuizFilter = lazy(() => import("./pages/QuizFilter"));
+const Multiplayer = lazy(() => import("./pages/Multiplayer"));
+const Lobby = lazy(() => import("./pages/Lobby"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const Friends = lazy(() => import("./pages/Friends"));
+const Settings = lazy(() => import("./pages/Settings"));
+const EnhancedSettings = lazy(() => import("./pages/EnhancedSettings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
+const StorePage = lazy(() => import("./pages/StorePage"));
+const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
+const AdminPortal = lazy(() => import("./pages/AdminPortal"));
+const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
+const ManagerDashboard = lazy(() => import("./pages/ManagerDashboard"));
+const ManagerControlCenter = lazy(() => import("./pages/ManagerControlCenter"));
+const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
+const Chat = lazy(() => import("./pages/Chat"));
+const AITutor = lazy(() => import("./pages/AITutor"));
+const LearningDNA = lazy(() => import("./pages/LearningDNA"));
+const ParentDashboard = lazy(() => import("./pages/ParentDashboard"));
+const FinancePortal = lazy(() => import("./pages/FinancePortal"));
+const TimeTravelRevision = lazy(() => import("./pages/TimeTravelRevision"));
+const EnhancedSocial = lazy(() => import("./pages/EnhancedSocial"));
+const SocialHub = lazy(() => import("./pages/SocialHub"));
+const AvatarCreator = lazy(() => import("./pages/AvatarCreator"));
+const AcademicMode = lazy(() => import("./pages/AcademicMode"));
+const AcademicSetup = lazy(() => import("./pages/AcademicSetup"));
+const FlashcardsPage = lazy(() => import("./pages/FlashcardsPage"));
+const TopicCoveragePage = lazy(() => import("./pages/TopicCoveragePage"));
+const ExamModePage = lazy(() => import("./pages/ExamModePage"));
+const StudyPlannerPage = lazy(() => import("./pages/StudyPlannerPage"));
+const AcademicInsightsPage = lazy(() => import("./pages/AcademicInsightsPage"));
+const LibraryPage = lazy(() => import("./pages/LibraryPage"));
+const StudyModePage = lazy(() => import("./pages/StudyModePage"));
+const UserProfilePage = lazy(() => import("./pages/UserProfilePage"));
+const Tournaments = lazy(() => import("./pages/Tournaments"));
+const EarlyGamesPage = lazy(() => import("./pages/EarlyGamesPage"));
+const EarlyQuizPage = lazy(() => import("./pages/EarlyQuizPage"));
+const EarlyVideosPage = lazy(() => import("./pages/EarlyVideosPage"));
+const EarlyDiscoverPage = lazy(() => import("./pages/EarlyDiscoverPage"));
+const EarlyExplorePage = lazy(() => import("./pages/EarlyExplorePage"));
+const EarlyProgressPage = lazy(() => import("./pages/EarlyProgressPage"));
+const EarlyCollectionPage = lazy(() => import("./pages/EarlyCollectionPage"));
+const EarlyProfilePage = lazy(() => import("./pages/EarlyProfilePage"));
+const EarlyLeaderboardPage = lazy(() => import("./pages/EarlyLeaderboardPage"));
 import EarlyTierOnlyRoute from "./components/auth/EarlyTierOnlyRoute";
-import EarlyContentAdminPage from "./pages/EarlyContentAdminPage";
-import ExtremeAdminPortal from "./pages/ExtremeAdminPortal";
-import SupabaseMigration from "./pages/SupabaseMigration";
+const EarlyContentAdminPage = lazy(() => import("./pages/EarlyContentAdminPage"));
+const ExtremeAdminPortal = lazy(() => import("./pages/ExtremeAdminPortal"));
+const SupabaseMigration = lazy(() => import("./pages/SupabaseMigration"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import EarlyTierRestrictedRoute from "./components/auth/EarlyTierRestrictedRoute";
 import { UserProvider } from "./context/UserContext";
@@ -230,6 +231,14 @@ const App = () => (
                           <Sonner />
                           <BrowserRouter>
                             <AppChrome>
+                            <Suspense fallback={
+                              <div className="min-h-screen flex items-center justify-center bg-background">
+                                <div className="text-center">
+                                  <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                                  <p className="text-sm text-muted-foreground">Loading Master Minds…</p>
+                                </div>
+                              </div>
+                            }>
                             <Routes>
                               <Route path="/" element={<Index />} />
                               <Route path="/quiz" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Quiz /></ProtectedRoute>} />
@@ -362,6 +371,7 @@ const App = () => (
                               <Route path="/migrate-supabase" element={<ProtectedRoute allowedRoles={["admin", "manager", "extreme_admin"]}><SupabaseMigration /></ProtectedRoute>} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
+                            </Suspense>
                             </AppChrome>
                             <NativeBackHandler />
                             <NotificationBootstrap />
