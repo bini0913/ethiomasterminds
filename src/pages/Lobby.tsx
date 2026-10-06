@@ -544,6 +544,38 @@ const Lobby: React.FC = () => {
   }, [contextJoinRoom, fetchOnlinePlayers, fetchTournaments, navigate, pushActivity, refreshRooms, user?.id, user?.name]);
 
   useEffect(() => {
+    if (!user?.id || incomingInvite) return;
+
+    const loadPendingInvite = async () => {
+      const { data, error } = await (supabase as any)
+        .from("multiplayer_invites")
+        .select("id, sender_id, receiver_id, room_id, status, created_at, expires_at")
+        .eq("receiver_id", user.id)
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) return;
+
+      const { data: senderProfile } = await supabase
+        .from("profiles")
+        .select("name, avatar")
+        .eq("id", data.sender_id)
+        .single();
+
+      setIncomingInvite(data as MultiplayerInvite);
+      setIncomingInviteSender({
+        name: senderProfile?.name || "A player",
+        avatar: senderProfile?.avatar || "avatar-1",
+      });
+    };
+
+    void loadPendingInvite();
+  }, [user?.id, incomingInvite]);
+
+  useEffect(() => {
     if (!incomingInvite) return;
     const interval = setInterval(() => {
       const remaining = Math.max(
@@ -882,50 +914,68 @@ const Lobby: React.FC = () => {
   const challengePlayer = async (playerId: string, playerName: string) => {
     if (!user) return;
     setSendingInviteForUserId(playerId);
-    const { data, error } = await (supabase as any).rpc("create_multiplayer_invite", {
-      p_receiver_id: playerId,
-      p_room_id: null,
-      p_max_players: 2,
-      p_subject: "Mixed",
-      p_difficulty: "Medium",
-    });
-    setSendingInviteForUserId(null);
+    try {
+      const { data: room, error: roomError } = await supabase.rpc("multiplayer_create_room", {
+        p_name: `${user.name || "Player"}'s Challenge`,
+        p_subject: "Mixed",
+        p_difficulty: "Medium",
+        p_question_count: 10,
+        p_max_players: 2,
+        p_password: null,
+      });
+      if (roomError) throw roomError;
 
-    if (error) {
-      toast.error(error.message || "Could not send invite");
-      return;
-    }
+      const { error: settingsError } = await supabase.rpc("multiplayer_update_room", {
+        p_room_id: room.id,
+        p_subject: "Mixed",
+        p_difficulty: "Medium",
+        p_game_mode: "accuracy",
+        p_question_count: 10,
+        p_max_players: 2,
+      });
+      if (settingsError) throw settingsError;
 
-    if (data?.room_id) {
-      const joined = await contextJoinRoom(data.room_id, user.name || "Player");
-      if (joined) {
-        navigate(`/multiplayer?room=${data.room_id}`);
-      }
+      const { error: inviteError } = await supabase.rpc("create_multiplayer_invite", {
+        _receiver_id: playerId,
+        _room_id: room.id,
+      });
+      if (inviteError) throw inviteError;
+
+      toast.success(`Invite sent to ${playerName}`);
+      pushActivity(`${playerName} was invited to a multiplayer challenge`);
+    } catch (error: any) {
+      console.error("Error sending multiplayer challenge:", error);
+      toast.error(error?.message || "Could not send invite");
+    } finally {
+      setSendingInviteForUserId(null);
     }
-    toast.success(`Invite sent to ${playerName}`);
   };
 
   const respondToInvite = async (response: "accepted" | "rejected") => {
     if (!incomingInvite || !user) return;
 
-    const { data, error } = await (supabase as any).rpc("respond_multiplayer_invite", {
-      p_invite_id: incomingInvite.id,
-      p_response: response,
-    });
+    try {
+      const { data, error } = await (supabase as any).rpc("respond_multiplayer_invite", {
+        _invite_id: incomingInvite.id,
+        _accept: response === "accepted",
+      });
 
-    if (error) {
-      toast.error(error.message || "Invite response failed");
-      return;
-    }
+      if (error) throw error;
 
-    if (response === "accepted" && data?.room_id) {
-      const success = await contextJoinRoom(data.room_id, user.name || "Player");
-      if (success) {
-        navigate(`/multiplayer?room=${data.room_id}`);
+      const roomId = data?.room_id || incomingInvite.room_id;
+      setIncomingInvite(null);
+
+      if (response === "accepted" && roomId) {
+        const success = await contextJoinRoom(roomId, user.name || "Player");
+        if (!success) throw new Error("Could not join the invited game room");
+        navigate(`/multiplayer?room=${roomId}`);
+      } else {
+        toast.success("Invite declined");
       }
+    } catch (error: any) {
+      console.error("Error responding to multiplayer invite:", error);
+      toast.error(error?.message || "Invite response failed");
     }
-
-    setIncomingInvite(null);
   };
 
   const formatTimeRemaining = (startTime: Date) => {
