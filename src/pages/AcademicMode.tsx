@@ -125,7 +125,24 @@ const AcademicMode: React.FC = () => {
         </div>
       </header>
 
-      <div className="px-4 pt-4 max-w-4xl mx-auto">\n        <Card className="border-primary/20 bg-primary/5">\n          <CardContent className="p-4">\n            <div className="flex items-start justify-between gap-3">\n              <div>\n                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your study profile</p>\n                <h2 className="mt-1 text-base font-bold">Grade {setup.grade} • {goalLabels[setup.study_goal] || setup.study_goal}</h2>\n                <p className="mt-1 text-sm text-muted-foreground">{curriculumLabel} • {(setup.subjects || []).join(", ")}</p>\n                <p className="mt-1 text-sm text-muted-foreground">Book: {setup.book_title || "Not specified"}</p>\n              </div>\n              <Button variant="outline" size="sm" onClick={() => navigate("/academic/setup")}>Edit</Button>\n            </div>\n            <p className="mt-3 text-xs text-muted-foreground">Your {academicLabel} will use this profile to select the right grade level, curriculum, subjects, textbook context, revision and exam practice.</p>\n          </CardContent>\n        </Card>\n      </div>\n\n      {/* Academic Rank Card */}
+      <div className="px-4 pt-4 max-w-4xl mx-auto">
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Your study profile</p>
+                <h2 className="mt-1 text-base font-bold">Grade {setup.grade} • {goalLabels[setup.study_goal] || setup.study_goal}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{curriculumLabel} • {(setup.subjects || []).join(", ")}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Book: {setup.book_title || "Not specified"}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate("/academic/setup")}>Edit</Button>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">Your {academicLabel} will use this profile to select the right grade level, curriculum, subjects, textbook context, revision and exam practice.</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Academic Rank Card */}
       <div className="px-4 py-4 max-w-4xl mx-auto">
         <motion.div
           initial={{ y: -10, opacity: 0 }}
