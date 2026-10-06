@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { ArrowLeft, TrendingUp, Target, Zap, Brain, Calendar, Award, Loader2, Sparkles, BookOpen, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
 
 const AcademicInsightsPage: React.FC = () => {
   const { user } = useUser();
@@ -19,9 +20,19 @@ const AcademicInsightsPage: React.FC = () => {
   const [aiInsights, setAiInsights] = useState<string | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
+    getAcademicProfile(user.id).then((profile) => {
+      if (!profile) return;
+      setAcademicContext({
+        grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 12)),
+        curriculum: profile.curriculum,
+        goal: profile.study_goal_detail || profile.study_goal,
+        book: profile.book_title || "Not specified",
+      });
+    }).catch(() => {});
     const fetchAll = async () => {
       const [statsRes, topicsRes, streakRes] = await Promise.all([
         supabase.rpc("get_user_stats", { p_user_id: user.id }),
@@ -45,7 +56,10 @@ const AcademicInsightsPage: React.FC = () => {
           stats,
           topicData,
           streak,
-          grade: user.grade || "12",
+          grade: academicContext?.grade || normalizeGrade(user.grade, 12),
+          curriculum: academicContext?.curriculum,
+          studyGoal: academicContext?.goal,
+          book: academicContext?.book,
           xp: user.xp || 0,
         },
       });
