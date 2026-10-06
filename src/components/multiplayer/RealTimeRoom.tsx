@@ -99,7 +99,7 @@ export interface MatchSummary {
 interface RealTimeRoomProps {
   roomId: string;
   roomName: string;
-  maxPlayers: number;
+  initialMaxPlayers: number;
   currentUserId: string;
   currentUserName: string;
   onLeave: () => void;
@@ -112,13 +112,14 @@ const QUICK_EMOTES = ['🔥', '😎', '💡'];
 const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   roomId,
   roomName,
-  maxPlayers,
+  initialMaxPlayers,
   currentUserId,
   currentUserName,
   onLeave,
   onGameEnd,
 }) => {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [roomMaxPlayers, setRoomMaxPlayers] = useState(initialMaxPlayers);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [roomState, setRoomState] = useState<RoomState>({
@@ -157,12 +158,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     difficulty: 'Medium',
     gameMode: 'speed',
     questionCount: 10,
+    maxPlayers: initialMaxPlayers,
   });
 
   const advancingQuestionRef = useRef(false);
   const prevPlayersRef = useRef<Player[]>([]);
   const autoStartTriggeredRef = useRef(false);
-  const matchFinishedHandledRef = useRef(false);
+  const finishRequestedRef = useRef(false);
+  const resultsHandledRef = useRef(false);
   const { onlineFriends } = useFriends();
 
   useEffect(() => {
@@ -191,8 +194,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   useEffect(() => {
     if (roomState.status !== 'playing' || roomConfig.gameMode !== 'speed' || timeRemaining > 0) return;
-    if (matchFinishedHandledRef.current) return;
-    matchFinishedHandledRef.current = true;
+    if (finishRequestedRef.current) return;
+    finishRequestedRef.current = true;
     void supabase.rpc('multiplayer_finish_game', { p_room_id: roomId });
   }, [roomState.status, roomConfig.gameMode, timeRemaining, roomId]);
 
@@ -302,12 +305,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       }
 
       setIsHost(room.host_id === currentUserId);
+      setRoomMaxPlayers(room.max_players || initialMaxPlayers);
       setTotalQuestions(room.question_count || 10);
       setRoomConfig({
         subject: room.subject || 'Math',
         difficulty: room.difficulty || 'Medium',
         gameMode: room.game_mode || 'speed',
         questionCount: room.question_count || 10,
+        maxPlayers: room.max_players || initialMaxPlayers,
       });
 
       const { error: membershipError } = await supabase.rpc('multiplayer_ensure_membership', { p_room_id: roomId });
@@ -325,7 +330,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         }
       }
       if (room.status === 'playing') {
-        matchFinishedHandledRef.current = false;
+        finishRequestedRef.current = false;
+        resultsHandledRef.current = false;
         setPlayerFinished(false);
         await loadPlayerQuestion();
       } else if (room.status === 'finished') {
@@ -440,11 +446,19 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }, [playerFinished, roomState.status, roomId]);
 
   const loadMatchResults = async () => {
-    const { data: results, error } = await (supabase as any)
-      .from('multiplayer_match_results')
+    let results: any[] | null = null;
+    let error: any = null;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const response = await (supabase as any)
+        .from('multiplayer_match_results')
       .select('user_id, placement, player_count, score, correct_answers, answered_questions, total_questions, accuracy, xp_earned, coins_earned')
-      .eq('room_id', roomId)
-      .order('placement', { ascending: true });
+        .eq('room_id', roomId)
+        .order('placement', { ascending: true });
+      results = response.data;
+      error = response.error;
+      if (error || (results && results.length > 0)) break;
+      await new Promise((resolve) => window.setTimeout(resolve, 400));
+    }
 
     if (error) {
       console.error('Error loading multiplayer results:', error);
@@ -452,7 +466,10 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       return;
     }
 
-    if (!results?.length) return;
+    if (!results?.length) {
+      toast.error('Final results are still processing. Please refresh the result.');
+      return;
+    }
 
     const finalPlayers = await fetchPlayers();
     const names = new Map(finalPlayers.map((p) => [p.id, p.name]));
@@ -470,9 +487,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     }));
 
     const me = mapped.find((player) => player.id === currentUserId);
-    if (!me || matchFinishedHandledRef.current) return;
+    if (!me || resultsHandledRef.current) return;
 
-    matchFinishedHandledRef.current = true;
+    resultsHandledRef.current = true;
     onGameEnd({
       playerRank: me.placement,
       playerCount: results.length,
@@ -486,8 +503,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       accuracy: me.accuracy,
       avgResponseTime: Number((me.answeredQuestions > 0 ? 60 / me.answeredQuestions : 0).toFixed(2)),
       streak: Math.max(bestStreak, consecutiveCorrect),
-      strongTopics: ['Logic', 'Mental Math'],
-      weakTopics: ['Vocabulary', 'History'],
+      strongTopics: [],
+      weakTopics: [],
       players: mapped,
     });
   };
@@ -551,12 +568,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           const nextRoom = payload.new as any;
           if (!nextRoom) return;
           setIsHost(nextRoom.host_id === currentUserId);
+          setRoomMaxPlayers(nextRoom.max_players || roomMaxPlayers);
           setRoomConfig((prev) => ({
             ...prev,
             subject: nextRoom.subject || prev.subject,
             difficulty: nextRoom.difficulty || prev.difficulty,
             gameMode: nextRoom.game_mode || prev.gameMode,
             questionCount: nextRoom.question_count || prev.questionCount,
+            maxPlayers: nextRoom.max_players || prev.maxPlayers,
           }));
           setTotalQuestions(nextRoom.question_count || 10);
           if (nextRoom.started_at) setMatchStartedAt(nextRoom.started_at);
@@ -776,12 +795,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (!isHost) return;
     const merged = { ...roomConfig, ...nextConfig };
     setRoomConfig(merged);
+    setRoomMaxPlayers(merged.maxPlayers);
     const { error } = await supabase.rpc('multiplayer_update_room', {
       p_room_id: roomId,
       p_subject: merged.subject,
       p_difficulty: merged.difficulty,
       p_game_mode: merged.gameMode,
       p_question_count: merged.questionCount,
+      p_max_players: merged.maxPlayers,
     });
     if (error) throw error;
     toast.success('Room settings updated');
@@ -930,8 +951,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
               <Card className="p-6 bg-white/5 border-white/10 shadow-[0_0_40px_rgba(99,102,241,0.22)]">
                 <div className="text-center space-y-4">
                   <h2 className="text-xl font-bold">Lobby Ready Check</h2>
-                  <p className="text-blue-100/80">{players.length}/{maxPlayers} players connected</p>
-                  <Progress value={(players.length / maxPlayers) * 100} className="h-2" />
+                  <p className="text-blue-100/80">{players.length}/{roomMaxPlayers} players connected</p>
+                  <Progress value={(players.length / roomMaxPlayers) * 100} className="h-2" />
 
                   <div className="rounded-lg border border-cyan-300/35 bg-cyan-500/10 px-3 py-2 text-sm">
                     Room State: <span className="font-semibold uppercase">{roomPhaseLabel}</span>
@@ -942,10 +963,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     <div className="rounded-lg border border-white/15 p-2">Topic: {roomConfig.subject}</div>
                     <div className="rounded-lg border border-white/15 p-2">Ready: {readyPlayers}/{players.length || 1}</div>
                     <div className="rounded-lg border border-white/15 p-2">Mode: {roomConfig.gameMode}</div>
+                    <div className="rounded-lg border border-white/15 p-2">Players: {roomMaxPlayers}</div>
                   </div>
 
                   {isHost && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
                       <Select value={roomConfig.subject} onValueChange={(value) => void updateRoomConfig({ subject: value })}>
                         <SelectTrigger><SelectValue placeholder="Subject" /></SelectTrigger>
                         <SelectContent>
@@ -955,12 +977,30 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                           <SelectItem value="GK">GK</SelectItem>
                         </SelectContent>
                       </Select>
+                      <Select value={roomConfig.difficulty} onValueChange={(value) => void updateRoomConfig({ difficulty: value })}>
+                        <SelectTrigger><SelectValue placeholder="Difficulty" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Easy">Easy</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="Hard">Hard</SelectItem>
+                          <SelectItem value="Mixed">Mixed</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Select value={String(roomConfig.questionCount)} onValueChange={(value) => void updateRoomConfig({ questionCount: Number(value) })}>
                         <SelectTrigger><SelectValue placeholder="Questions" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="5">5 Questions</SelectItem>
                           <SelectItem value="10">10 Questions</SelectItem>
                           <SelectItem value="20">20 Questions</SelectItem>
+                          <SelectItem value="30">30 Questions</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={String(roomConfig.maxPlayers)} onValueChange={(value) => void updateRoomConfig({ maxPlayers: Number(value) })}>
+                        <SelectTrigger><SelectValue placeholder="Players" /></SelectTrigger>
+                        <SelectContent>
+                          {[2,3,4,5,6,7,8].map((count) => (
+                            <SelectItem key={count} value={String(count)}>{count} Players</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <Select value={roomConfig.gameMode} onValueChange={(value) => void updateRoomConfig({ gameMode: value })}>
@@ -1135,7 +1175,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
             <Card className="p-4 bg-white/5 border-white/10">
               <h3 className="font-bold mb-3 flex items-center gap-2">
-                <Users className="h-4 w-4" /> Players ({players.length}/{maxPlayers})
+                <Users className="h-4 w-4" /> Players ({players.length}/{roomMaxPlayers})
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {players.map((player) => (
