@@ -143,16 +143,16 @@ const AcademicSetup: React.FC = () => {
 
     if (error) {
       console.error("Academic setup save failed:", error);
-      toast.error("We couldn't save your Academic Prep setup. Please try again.");
+      toast.error(`We couldn't save your ${academicLabel} setup. Please try again.`);
       return;
     }
 
-    toast.success("Academic Prep is ready for you.");
+    toast.success(`${academicLabel} is ready for you.`);
     navigate("/academic", { replace: true });
   };
 
   if (loadingProfile) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading your Academic Prep setup…</div>;
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading your {academicLabel} setup…</div>;
   }
 
   const selectedBook = books.find((book) => book.id === bookId);
@@ -167,7 +167,7 @@ const AcademicSetup: React.FC = () => {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5 text-primary" />
-              <h1 className="text-xl font-bold">Set up Academic Prep</h1>
+              <h1 className="text-xl font-bold">Set up {academicLabel}</h1>
             </div>
             <p className="text-sm text-muted-foreground">We will use these answers to personalize your study experience for your grade, goal, curriculum, subjects, and textbook.</p>
           </div>
