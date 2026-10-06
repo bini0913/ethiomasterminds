@@ -270,7 +270,7 @@ const Lobby: React.FC = () => {
 
     if (!error && data) {
       const tournamentIds = data.map((t: any) => t.id);
-      let participantCounts: Record<string, number> = {};
+      const participantCounts: Record<string, number> = {};
       
       if (tournamentIds.length > 0) {
         const { data: participants } = await supabase
