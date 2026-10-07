@@ -37,7 +37,7 @@ export function useLearningDNA(userId?: string) {
       .from("learning_dna")
       .select("*")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
     if (queryError && queryError.code !== "PGRST116") {
       setError(new Error(queryError.message));
