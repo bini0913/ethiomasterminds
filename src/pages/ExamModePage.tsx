@@ -60,11 +60,14 @@ const ExamModePage: React.FC = () => {
 
   const startExam = async () => {
     const normalizedSubject = normalizeSubject(subject);
-    const { data: questionsData, error } = await supabase
+    const { data: rawQuestions, error } = await supabase
       .from("questions")
       .select("*")
-      .eq("subject", normalizedSubject === "math" ? "Math" : normalizedSubject === "english" ? "English" : normalizedSubject === "science" ? "Science" : normalizedSubject)
       .eq("grade", String(userGrade));
+
+    const questionsData = (rawQuestions || []).filter((q) =>
+      normalizeSubject(q.subject || "") === normalizedSubject
+    );
 
     if (error) {
       console.error("Exam question load failed:", error);
