@@ -21,6 +21,7 @@ export function normalizeSubject(value: string) {
   const key = value.trim().toLowerCase();
   const aliases: Record<string, string> = {
     mathematics: "math",
+    maths: "math",
     math: "math",
     physics: "physics",
     chemistry: "chemistry",
@@ -29,6 +30,7 @@ export function normalizeSubject(value: string) {
     amharic: "amharic",
     "afaan oromo": "afaan oromo",
     "general science": "science",
+    "science (physics/chemistry/biology)": "science",
     science: "science",
     "social studies": "social studies",
     civics: "civics",
@@ -36,11 +38,12 @@ export function normalizeSubject(value: string) {
     geography: "geography",
     history: "history",
     economics: "economics",
+    "history & civics": "history",
   };
   return aliases[key] || key;
 }
 
-export async function getAcademicProfile(userId: string) {
+export function subjectsMatch(profileSubject: string, contentSubject: string) {\n  return normalizeSubject(profileSubject) === normalizeSubject(contentSubject);\n}\n\nexport async function getAcademicProfile(userId: string) {
   const { data, error } = await supabase
     .from("academic_profiles")
     .select("user_id,grade,study_goal,study_goal_detail,curriculum,subjects,book_id,book_title")
