@@ -1,332 +1,257 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useUser } from "@/context/UserContext";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, Clock3, GraduationCap, RotateCcw, Trophy, XCircle } from "lucide-react";
+import { useUser } from "@/context/UserContext";
+import { useQuiz, Question, Quiz } from "@/context/QuizContext";
+import { getAcademicProfile, normalizeGrade, normalizeSubject, subjectsMatch } from "@/lib/academicProfile";
+import { recordAcademicProgress } from "@/lib/academicProgress";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { motion } from "framer-motion";
-import { ArrowLeft, Clock, Target, AlertTriangle, Trophy, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { normalizeGrade, getAcademicProfile, normalizeSubject } from "@/lib/academicProfile";
-
-interface Question {
-  id: string;
-  question_text: string;
-  options: string[];
-  correct_answer: string;
-  explanation?: string;
-}
 
 type ExamState = "setup" | "running" | "results";
+type ExamQuestion = Question & { sourceQuizId: string; sourceQuizTitle: string };
+
+const difficultyOrder: Record<string, string[]> = {
+  Easy: ["Easy", "Medium", "Hard", "Extreme"],
+  Medium: ["Medium", "Easy", "Hard", "Extreme"],
+  Hard: ["Hard", "Medium", "Extreme", "Easy"],
+  Extreme: ["Extreme", "Hard", "Medium", "Easy"],
+};
+
+const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 const ExamModePage: React.FC = () => {
   const { user } = useUser();
+  const { quizzes, loading: quizzesLoading } = useQuiz();
   const navigate = useNavigate();
   const [examState, setExamState] = useState<ExamState>("setup");
+  const [grade, setGrade] = useState(normalizeGrade(user?.grade, 9));
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [subject, setSubject] = useState("math");
+  const [difficulty, setDifficulty] = useState("Medium");
   const [questionCount, setQuestionCount] = useState(20);
-  const [timeLimit, setTimeLimit] = useState(30); // minutes
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [timeLimit, setTimeLimit] = useState(35);
+  const [questions, setQuestions] = useState<ExamQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [current, setCurrent] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [results, setResults] = useState<{ correct: number; total: number; details: Array<{ q: Question; answer: string; correct: boolean }> } | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-  const userGrade = normalizeGrade(user?.grade, 5);
-  const [profileSubjects, setProfileSubjects] = useState<string[]>(["math", "science", "english", "history"]);
+  const [results, setResults] = useState<{ correct: number; total: number; details: Array<{ q: ExamQuestion; answer: string; correct: boolean }> } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const submitted = useRef(false);
+  const startedAt = useRef(Date.now());
+  const questionTimes = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!user?.id) return;
-    getAcademicProfile(user.id).then((profile) => {
-      if (!profile?.subjects?.length) return;
-      setProfileSubjects(profile.subjects.map(normalizeSubject));
-      setSubject(normalizeSubject(profile.subjects[0]));
+    getAcademicProfile(user.id).then(async (profile) => {
+      const nextGrade = normalizeGrade(profile?.grade, normalizeGrade(user.grade, 9));
+      const nextSubjects = (profile?.subjects || []).map(normalizeSubject);
+      setGrade(nextGrade);
+      setSubjects(nextSubjects);
+      if (nextSubjects.length) setSubject(nextSubjects[0]);
+
+      const { data } = await supabase.from("quiz_results")
+        .select("correct_answers,total_questions")
+        .eq("student_id", user.id)
+        .order("completed_at", { ascending: false })
+        .limit(8);
+      const total = (data || []).reduce((n, row) => n + Number(row.total_questions || 0), 0);
+      const correct = (data || []).reduce((n, row) => n + Number(row.correct_answers || 0), 0);
+      const accuracy = total ? correct / total * 100 : 65;
+      setDifficulty(accuracy >= 85 ? "Hard" : accuracy >= 70 ? "Medium" : "Easy");
     }).catch(() => {});
-  }, [user?.id]);
+  }, [user?.id, user?.grade]);
 
   useEffect(() => {
-    if (examState !== "running" || timeLeft <= 0) return;
-    timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) { submitExam(); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerRef.current);
+    if (examState !== "running") return;
+    const id = window.setInterval(() => setTimeLeft((v) => Math.max(0, v - 1)), 1000);
+    return () => window.clearInterval(id);
+  }, [examState]);
+
+  useEffect(() => {
+    if (examState === "running" && timeLeft === 0) submitExam();
   }, [examState, timeLeft]);
 
-  const startExam = async () => {
-    const normalizedSubject = normalizeSubject(subject);
-    const { data: rawQuestions, error } = await supabase
-      .from("questions")
-      .select("*")
-      .eq("grade", String(userGrade));
+  const subjectQuizzes = useMemo(() => quizzes.filter((quiz) =>
+    quiz.grade === grade && subjects.some((s) => subjectsMatch(s, quiz.subject)) && subjectsMatch(subject, quiz.subject)
+  ), [quizzes, grade, subjects, subject]);
 
-    const questionsData = (rawQuestions || []).filter((q) =>
-      normalizeSubject(q.subject || "") === normalizedSubject
-    );
+  const availableQuestions = useMemo(() => subjectQuizzes.reduce((n, q) => n + q.questions.length, 0), [subjectQuizzes]);
 
-    if (error) {
-      console.error("Exam question load failed:", error);
-      toast.error("We couldn't load this exam. Please try again.");
-      return;
-    }
+  const formatTime = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
-    if (!questionsData?.length) {
-      toast.error(`No Grade ${userGrade} questions are available for ${subject} yet.`);
-      return;
-    }
-
-    const available = questionsData.length;
-    const count = Math.min(questionCount, available);
-    if (available < questionCount) {
-      toast.info(`Only ${available} approved questions are currently available, so this exam will use ${available}.`);
-    }
-
-    const shuffled = [...questionsData].sort(() => Math.random() - 0.5).slice(0, count);
-    const parsed = shuffled.map(q => {
-      const options = Array.isArray(q.options) && q.options.length
-        ? q.options
-        : [q.option_a, q.option_b, q.option_c, q.option_d].filter(Boolean);
-      return {
-        id: q.id,
-        question_text: q.question_text,
-        options,
-        correct_answer: q.correct_answer,
-        explanation: q.explanation || undefined,
-      };
+  const buildExam = (count: number) => {
+    const grouped = new Map<string, Quiz[]>();
+    (difficultyOrder[difficulty] || difficultyOrder.Medium).forEach((d) => grouped.set(d, []));
+    subjectQuizzes.forEach((quiz) => {
+      const key = label(quiz.difficulty);
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(quiz);
     });
 
-    setQuestions(parsed);
-    setTimeLeft(Math.max(5, Math.round(timeLimit * 60 * (count / Math.max(questionCount, 1)))));
+    const pool: ExamQuestion[] = [];
+    const seen = new Set<string>();
+    for (const level of difficultyOrder[difficulty] || difficultyOrder.Medium) {
+      const source = [...(grouped.get(level) || [])].sort(() => Math.random() - 0.5);
+      for (const quiz of source) {
+        for (const question of [...quiz.questions].sort(() => Math.random() - 0.5)) {
+          if (seen.has(question.id)) continue;
+          seen.add(question.id);
+          pool.push({ ...question, sourceQuizId: quiz.id, sourceQuizTitle: quiz.title });
+        }
+      }
+    }
+    return pool.slice(0, count);
+  };
+
+  const startExam = () => {
+    if (!subjectQuizzes.length) {
+      toast.error(`No approved Grade ${grade} content is available for this subject yet.`);
+      return;
+    }
+    const count = Math.min(questionCount, availableQuestions);
+    if (count < 10) {
+      toast.error("At least 10 approved questions are required to start an exam.");
+      return;
+    }
+    if (count < questionCount) toast.info(`Using ${count} questions, the current approved content limit.`);
+
+    const exam = buildExam(count);
+    if (!exam.length) return toast.error("We couldn't build this exam from the approved quiz bank.");
+
+    setQuestions(exam);
+    setQuestionCount(exam.length);
+    setTimeLeft(Math.max(600, Math.round(timeLimit * 60 * (exam.length / Math.max(questionCount, 1)))));
     setAnswers({});
-    setCurrentQ(0);
+    setCurrent(0);
+    setResults(null);
+    questionTimes.current = {};
+    submitted.current = false;
+    startedAt.current = Date.now();
     setExamState("running");
   };
 
-  const submitExam = useCallback(() => {
-    clearInterval(timerRef.current);
-    let correct = 0;
-    const details = questions.map((q, i) => {
-      const userAnswer = answers[i] || "";
-      const isCorrect = userAnswer === q.correct_answer;
-      if (isCorrect) correct++;
-      return { q, answer: userAnswer, correct: isCorrect };
+  const chooseAnswer = (answer: string) => {
+    const q = questions[current];
+    if (!q) return;
+    questionTimes.current[q.id] = Math.max(1, Math.round((Date.now() - startedAt.current) / 1000));
+    setAnswers((prev) => ({ ...prev, [q.id]: answer }));
+  };
+
+  const submitExam = async () => {
+    if (submitted.current || !questions.length) return;
+    submitted.current = true;
+    setSaving(true);
+
+    const details = questions.map((q) => {
+      const answer = answers[q.id] || "";
+      return { q, answer, correct: answer === q.correctAnswer };
     });
+    const correct = details.filter((x) => x.correct).length;
+    const score = Math.round(correct / questions.length * 100);
+    const totalTime = Object.values(questionTimes.current).reduce((a, b) => a + b, 0);
+    const xp = correct * 5;
+
     setResults({ correct, total: questions.length, details });
     setExamState("results");
 
-    // Save results
-    if (user) {
-      supabase.from("quiz_results").insert({
-        quiz_id: questions[0]?.id || "exam",
-        student_id: user.id,
-        score: Math.round((correct / questions.length) * 100),
-        total_questions: questions.length,
-        correct_answers: correct,
-        time_taken: timeLimit * 60 - timeLeft,
-        xp_earned: correct * 5,
-      }).then(() => {
-        supabase.rpc("add_xp", { p_user_id: user.id, p_amount: correct * 5 });
-      });
-    }
-  }, [answers, questions, user, timeLeft, timeLimit]);
+    if (user?.id) {
+      try {
+        const { error } = await supabase.from("quiz_results").insert({
+          quiz_id: details[0].q.sourceQuizId,
+          student_id: user.id,
+          score,
+          total_questions: questions.length,
+          correct_answers: correct,
+          time_taken: totalTime,
+          xp_earned: xp,
+          completed_at: new Date().toISOString(),
+          answers: Object.fromEntries(details.map((x) => [x.q.id, { answer: x.answer, correct: x.correct, source_quiz_id: x.q.sourceQuizId }])),
+        });
+        if (error) console.error("Exam result save failed:", error);
 
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
+        const { error: attemptsError } = await supabase.from("question_attempts").insert(details.map((x) => ({
+          user_id: user.id,
+          question_id: x.q.id,
+          quiz_id: x.q.sourceQuizId,
+          selected_answer: x.answer || "no_answer",
+          is_correct: x.correct,
+          time_taken_seconds: questionTimes.current[x.q.id] || 0,
+          attempt_number: 1,
+        })));
+        if (attemptsError) console.error("Exam attempts save failed:", attemptsError);
+
+        await recordAcademicProgress({ userId: user.id, subject, correct, total: questions.length, timeSeconds: totalTime });
+        await supabase.rpc("update_user_streak", { p_user_id: user.id });
+        if (xp) await supabase.rpc("add_xp", { p_user_id: user.id, p_amount: xp });
+      } catch (error) {
+        console.error("Exam persistence failed:", error);
+        toast.error("The exam finished, but some progress could not be saved.");
+      }
+    }
+    setSaving(false);
   };
 
-  // Setup screen
-  if (examState === "setup") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-        <header className="sticky top-0 z-50 bg-gradient-to-r from-red-700 to-rose-700 px-4 py-3 shadow-xl">
-          <div className="flex items-center gap-3 max-w-4xl mx-auto">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className="text-white hover:bg-white/10">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-lg font-bold text-white flex items-center gap-2">
-              <Target className="h-5 w-5" /> Exam Mode
-            </h1>
+  if (quizzesLoading || !subjects.length) return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="text-center"><div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /><p className="text-sm text-muted-foreground">Loading your academic question bank…</p></div>
+    </div>
+  );
+
+  if (examState === "setup") return (
+    <div className="min-h-screen bg-muted/20">
+      <header className="border-b bg-background"><div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button>
+        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Grade {grade}</p><h1 className="text-xl font-bold">Exam Mode</h1></div>
+      </div></header>
+      <main className="mx-auto max-w-5xl space-y-5 px-4 py-6 pb-24">
+        <Card><CardContent className="p-6 sm:p-8">
+          <Badge variant="secondary">Same content as Quiz</Badge>
+          <h2 className="mt-3 text-2xl font-bold">Build a real practice exam</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Every question is taken from the approved Grade {grade} quiz bank. Your recent accuracy controls the difficulty mix, so Academic Prep and normal Quiz always share the same source content.</p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border bg-muted/30 p-4"><p className="text-xs text-muted-foreground">Subject pool</p><p className="mt-1 text-2xl font-bold">{availableQuestions}</p><p className="text-xs text-muted-foreground">approved questions</p></div>
+            <div className="rounded-xl border bg-muted/30 p-4"><p className="text-xs text-muted-foreground">Adaptive level</p><p className="mt-1 text-2xl font-bold">{difficulty}</p><p className="text-xs text-muted-foreground">from recent results</p></div>
+            <div className="rounded-xl border bg-muted/30 p-4"><p className="text-xs text-muted-foreground">Data connection</p><p className="mt-1 text-2xl font-bold">Live</p><p className="text-xs text-muted-foreground">results + progress</p></div>
           </div>
-        </header>
+        </CardContent></Card>
 
-        <div className="px-4 py-6 max-w-md mx-auto space-y-4">
-          <Card className="bg-card/80 border-border/50">
-            <CardContent className="p-6 space-y-4">
-              <h2 className="font-bold text-lg">Configure Your Exam</h2>
-
-              <div>
-                <label className="text-sm font-medium mb-1 block">Subject</label>
-                <Select value={subject} onValueChange={setSubject}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {profileSubjects.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {value === "math" ? "Mathematics" : value === "science" ? "Science" : value.replace(/\b\w/g, (m) => m.toUpperCase())}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1 block">Questions</label>
-                <Select value={String(questionCount)} onValueChange={v => setQuestionCount(Number(v))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10 questions</SelectItem>
-                    <SelectItem value="20">20 questions</SelectItem>
-                    <SelectItem value="30">30 questions</SelectItem>
-                    <SelectItem value="50">50 questions</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1 block">Time Limit</label>
-                <Select value={String(timeLimit)} onValueChange={v => setTimeLimit(Number(v))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="15">15 minutes</SelectItem>
-                    <SelectItem value="30">30 minutes</SelectItem>
-                    <SelectItem value="45">45 minutes</SelectItem>
-                    <SelectItem value="60">60 minutes</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button onClick={startExam} className="w-full h-12 text-base bg-gradient-to-r from-red-600 to-rose-600">
-                Start Exam
-              </Button>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card><CardContent className="p-5"><p className="text-sm font-medium">Subject</p><Select value={subject} onValueChange={setSubject}><SelectTrigger className="mt-3"><SelectValue /></SelectTrigger><SelectContent>{subjects.map((s) => <SelectItem key={s} value={s}>{s === "math" ? "Mathematics" : s.replace(/\b\w/g, (m) => m.toUpperCase())}</SelectItem>)}</SelectContent></Select></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-sm font-medium">Questions</p><Select value={String(questionCount)} onValueChange={(v) => setQuestionCount(Number(v))}><SelectTrigger className="mt-3"><SelectValue /></SelectTrigger><SelectContent>{[10,20,30,40].map((n) => <SelectItem key={n} value={String(n)}>{n} questions</SelectItem>)}</SelectContent></Select></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-sm font-medium">Time</p><Select value={String(timeLimit)} onValueChange={(v) => setTimeLimit(Number(v))}><SelectTrigger className="mt-3"><SelectValue /></SelectTrigger><SelectContent>{[20,35,50,65].map((n) => <SelectItem key={n} value={String(n)}>{n} minutes</SelectItem>)}</SelectContent></Select></CardContent></Card>
         </div>
-      </div>
-    );
-  }
 
-  // Results screen
+        <Card className="border-primary/20 bg-primary/5"><CardContent className="p-5 flex gap-3"><GraduationCap className="h-5 w-5 shrink-0 text-primary" /><div><p className="font-semibold">Fully connected preparation</p><p className="mt-1 text-sm text-muted-foreground">Exam answers are saved against their real question and source quiz IDs, then sent into Academic Insights, subject progress, streaks and XP.</p></div></CardContent></Card>
+        <Button className="h-12 w-full text-base" onClick={startExam}>Start Grade {grade} {subject === "math" ? "Mathematics" : subject} Exam</Button>
+      </main>
+    </div>
+  );
+
   if (examState === "results" && results) {
-    const pct = Math.round((results.correct / results.total) * 100);
+    const pct = Math.round(results.correct / results.total * 100);
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-        <header className="sticky top-0 z-50 bg-gradient-to-r from-red-700 to-rose-700 px-4 py-3 shadow-xl">
-          <div className="flex items-center gap-3 max-w-4xl mx-auto">
-            <Button variant="ghost" size="icon" onClick={() => setExamState("setup")} className="text-white hover:bg-white/10">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-lg font-bold text-white">Exam Results</h1>
-          </div>
-        </header>
-
-        <div className="px-4 py-6 max-w-md mx-auto space-y-4">
-          <Card className="bg-card/80 border-border/50">
-            <CardContent className="p-6 text-center">
-              <Trophy className={`h-16 w-16 mx-auto mb-4 ${pct >= 80 ? "text-yellow-500" : pct >= 50 ? "text-primary" : "text-muted-foreground"}`} />
-              <h2 className="text-3xl font-bold">{pct}%</h2>
-              <p className="text-muted-foreground">{results.correct}/{results.total} correct</p>
-              <Badge className="mt-2">{pct >= 80 ? "Excellent!" : pct >= 60 ? "Good Job" : "Keep Practicing"}</Badge>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {results.details.map((d, i) => (
-              <Card key={i} className={`border-l-4 ${d.correct ? "border-l-green-500" : "border-l-red-500"} bg-card/80`}>
-                <CardContent className="p-3">
-                  <div className="flex items-start gap-2">
-                    {d.correct ? <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> : <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />}
-                    <div className="min-w-0">
-                      <p className="text-sm">{d.q.question_text}</p>
-                      {!d.correct && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Correct: <span className="text-green-600 font-medium">{d.q.correct_answer}</span>
-                          {d.answer && <> • Your answer: <span className="text-red-600">{d.answer}</span></>}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <Button className="w-full" onClick={() => setExamState("setup")}>Try Another Exam</Button>
-        </div>
+      <div className="min-h-screen bg-muted/20">
+        <header className="border-b bg-background"><div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4"><div className="flex items-center gap-3"><Trophy className="h-5 w-5 text-primary" /><div><p className="text-xs text-muted-foreground">Grade {grade} • {subject}</p><h1 className="font-bold">Exam results</h1></div></div><Button variant="outline" onClick={() => setExamState("setup")}><RotateCcw className="mr-2 h-4 w-4" />New exam</Button></div></header>
+        <main className="mx-auto max-w-5xl space-y-5 px-4 py-6 pb-24">
+          <Card><CardContent className="p-7 text-center"><div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary"><Trophy className="h-10 w-10" /></div><p className="mt-5 text-5xl font-bold">{pct}%</p><p className="mt-1 text-muted-foreground">{results.correct} of {results.total} correct</p><Badge className="mt-4">{pct >= 85 ? "Excellent" : pct >= 70 ? "Strong progress" : "Keep practicing"}</Badge>{saving && <p className="mt-3 text-xs text-muted-foreground">Saving progress…</p>}</CardContent></Card>
+          <Card><CardContent className="p-4 sm:p-6"><h2 className="font-semibold">Review your exam</h2><p className="mb-4 text-sm text-muted-foreground">These are the same approved questions used by normal Quiz.</p><div className="space-y-2">{results.details.map((x, i) => <div key={x.q.id} className="rounded-xl border p-4"><div className="flex gap-3">{x.correct ? <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" /> : <XCircle className="h-5 w-5 shrink-0 text-destructive" />}<div><p className="text-sm font-medium">{i + 1}. {x.q.text}</p><p className="mt-2 text-xs text-muted-foreground">Your answer: <span className="font-medium text-foreground">{x.answer || "No answer"}</span></p>{!x.correct && <p className="mt-1 text-xs text-muted-foreground">Correct: <span className="font-medium text-green-600">{x.q.correctAnswer}</span></p>}{x.q.explanation && <p className="mt-2 text-xs leading-5 text-muted-foreground">{x.q.explanation}</p>}</div></div></div>)}</div></CardContent></Card>
+        </main>
       </div>
     );
   }
 
-  // Running exam
-  const question = questions[currentQ];
-  if (!question) return null;
-
+  const q = questions[current];
+  if (!q) return null;
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
-      {/* Timer Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-red-700 to-rose-700 px-4 py-3 shadow-xl">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <div className="flex items-center gap-2">
-            <span className="text-white text-sm font-medium">Q {currentQ + 1}/{questions.length}</span>
-          </div>
-          <div className={`flex items-center gap-1 px-3 py-1 rounded-full ${timeLeft < 60 ? "bg-red-900 animate-pulse" : "bg-white/10"}`}>
-            <Clock className="h-4 w-4 text-white" />
-            <span className="text-white font-mono font-bold">{formatTime(timeLeft)}</span>
-          </div>
-          <Button size="sm" variant="secondary" onClick={submitExam} className="text-xs">
-            Submit
-          </Button>
-        </div>
-      </header>
-
-      <div className="px-4 py-2 max-w-4xl mx-auto w-full">
-        <Progress value={((currentQ + 1) / questions.length) * 100} className="h-1" />
-      </div>
-
-      {/* Question */}
-      <div className="flex-1 px-4 py-4 max-w-md mx-auto w-full">
-        <Card className="bg-card/80 border-border/50 mb-4">
-          <CardContent className="p-5">
-            <p className="text-base font-medium">{question.question_text}</p>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-2">
-          {question.options.map((opt, i) => (
-            <motion.div key={i} whileTap={{ scale: 0.98 }}>
-              <Button
-                variant={answers[currentQ] === opt ? "default" : "outline"}
-                className="w-full justify-start h-auto py-3 px-4 text-left text-sm"
-                onClick={() => setAnswers(prev => ({ ...prev, [currentQ]: opt }))}
-              >
-                <span className="font-semibold mr-2 text-xs">{String.fromCharCode(65 + i)}.</span>
-                {opt}
-              </Button>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <div className="px-4 pb-6 max-w-md mx-auto w-full flex gap-3">
-        <Button variant="outline" className="flex-1" disabled={currentQ === 0} onClick={() => setCurrentQ(i => i - 1)}>
-          Previous
-        </Button>
-        <Button
-          className="flex-1"
-          onClick={() => {
-            if (currentQ < questions.length - 1) setCurrentQ(i => i + 1);
-            else submitExam();
-          }}
-        >
-          {currentQ < questions.length - 1 ? "Next" : "Submit"}
-        </Button>
-      </div>
+    <div className="min-h-screen bg-muted/20">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur"><div className="mx-auto max-w-4xl px-4 py-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs text-muted-foreground">{subject} • Grade {grade}</p><p className="font-semibold">Question {current + 1} of {questions.length}</p></div><div className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono font-semibold ${timeLeft <= 60 ? "border-destructive/40 text-destructive" : ""}`}><Clock3 className="h-4 w-4" />{formatTime(timeLeft)}</div></div><Progress value={(current + 1) / questions.length * 100} className="mt-3 h-1.5" /></div></header>
+      <main className="mx-auto max-w-2xl px-4 py-6 pb-24"><Card><CardContent className="p-5 sm:p-7"><div className="mb-5 flex flex-wrap gap-2"><Badge variant="secondary">{q.difficulty}</Badge><Badge variant="outline">{q.sourceQuizTitle}</Badge></div><h2 className="text-lg font-semibold leading-7 sm:text-xl">{q.text}</h2><div className="mt-6 space-y-3">{q.options.map((option, i) => { const selected = answers[q.id] === option; return <button key={q.id + i} type="button" onClick={() => chooseAnswer(option)} className={`w-full rounded-xl border p-4 text-left text-sm transition ${selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"}`}><span className="mr-3 inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold">{String.fromCharCode(65 + i)}</span>{option}</button>; })}</div></CardContent></Card><div className="mt-4 flex items-center justify-between gap-3"><Button variant="outline" disabled={current === 0} onClick={() => { setCurrent((v) => v - 1); startedAt.current = Date.now(); }}>Previous</Button>{current < questions.length - 1 ? <Button onClick={() => { setCurrent((v) => v + 1); startedAt.current = Date.now(); }}>Next</Button> : <Button onClick={submitExam} disabled={saving}>Submit exam</Button>}</div></main>
     </div>
   );
 };
