@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useRoom } from "@/context/RoomContext";
 import { useFriends } from "@/context/FriendsContext";
@@ -106,6 +106,7 @@ interface NewTournamentForm {
 
 const Lobby: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useUser();
   const { rooms, createRoom: contextCreateRoom, joinRoom: contextJoinRoom, refreshRooms } = useRoom();
   const { friends, onlineFriends } = useFriends();
@@ -163,6 +164,17 @@ const Lobby: React.FC = () => {
   const [incomingInviteSender, setIncomingInviteSender] = useState<{ name: string; avatar: string } | null>(null);
   const [inviteSecondsLeft, setInviteSecondsLeft] = useState(0);
   const [sendingInviteForUserId, setSendingInviteForUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const requestedMode = searchParams.get("mode");
+    if (!requestedMode) return;
+    setNewRoomData((prev) => {
+      const mode = requestedMode === "2v2" || requestedMode === "Battle Royale" ? requestedMode : "1v1";
+      const maxPlayers = mode === "2v2" ? "4" : mode === "Battle Royale" ? "8" : prev.maxPlayers;
+      return { ...prev, gameMode: mode, maxPlayers };
+    });
+    setCreateRoomOpen(true);
+  }, [searchParams]);
 
   const pushActivity = useCallback((message: string) => {
     const item: ActivityItem = {
@@ -653,10 +665,13 @@ const Lobby: React.FC = () => {
       return;
     }
 
+    const scoreMode = newRoomData.gameMode === "2v2" ? "accuracy" : "speed";
+    const playerLimit = newRoomData.gameMode === "2v2" ? 4 : newRoomData.gameMode === "Battle Royale" ? 8 : 2;
+
     const room = await contextCreateRoom(
       newRoomData.name,
-      gameSettings,
-      parseInt(newRoomData.maxPlayers),
+      { ...gameSettings, gameMode: scoreMode },
+      playerLimit,
       roomPassword || undefined
     );
 
@@ -773,6 +788,7 @@ const Lobby: React.FC = () => {
           difficulty: "Medium",
           questionCount: 10,
           timePerQuestion: 30,
+          gameMode: "speed",
         },
         2,
       );

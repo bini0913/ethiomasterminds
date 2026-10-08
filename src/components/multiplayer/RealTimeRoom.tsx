@@ -522,7 +522,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       points: data.points || 100,
     });
     setTotalQuestions(data.total || totalQuestions);
-    setQuestionStartedAt(Date.now());
+    setQuestionStartedAt(data.question_started_at ? new Date(data.question_started_at).getTime() : Date.now());
     setPlayerQuestionNumber((data.index ?? 0) + 1);
     setSelectedAnswer(null);
     setAnswerResult(null);
@@ -647,7 +647,12 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           ]);
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Multiplayer realtime subscription:', status);
+          toast.error('Realtime connection degraded — reconnecting…');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -689,7 +694,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (selectedAnswer !== null || !currentQuestion) return;
 
     setSelectedAnswer(answerIndex);
-    const lagCompensation = Math.min(2, Math.max(0, latencyMs / 1000 / 2));
     const timeUsed = Math.max(0, Math.round((Date.now() - (questionStartedAt ?? Date.now())) / 1000));
 
     try {
@@ -709,6 +713,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         correct_index?: number;
         score?: number;
         finished?: boolean;
+        timed_out?: boolean;
       };
 
       setAnswerResult({
@@ -717,6 +722,10 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         correctAnswer: result.correct_answer,
         correctAnswerIndex: result.correct_index,
       });
+
+      if (result.timed_out) {
+        toast.warning('Time is up — that answer counts as incorrect.');
+      }
 
       if (result.is_correct) {
         setConsecutiveCorrect((prev) => {
@@ -766,7 +775,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         points: data.points || 100,
       });
       setTotalQuestions(data.total || totalQuestions);
-      setQuestionStartedAt(Date.now());
+      setQuestionStartedAt(data.question_started_at ? new Date(data.question_started_at).getTime() : Date.now());
       setPlayerQuestionNumber((data.index ?? 0) + 1);
       setSelectedAnswer(null);
       setAnswerResult(null);

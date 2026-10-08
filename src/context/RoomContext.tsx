@@ -16,6 +16,7 @@ export interface Room {
     difficulty: 'Easy' | 'Medium' | 'Hard';
     questionCount: number;
     timePerQuestion: number;
+    gameMode: 'speed' | 'accuracy';
   };
   status: 'waiting' | 'starting' | 'playing' | 'finished';
   createdAt: Date;
@@ -42,68 +43,57 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const cleanupExpiredRooms = useCallback(async () => {
-    await supabase.rpc('cleanup_expired_multiplayer_rooms' as any);
+    const { error } = await supabase.rpc('cleanup_expired_multiplayer_rooms' as any);
+    if (error) console.error('Room cleanup failed:', error);
   }, []);
 
   const fetchRooms = useCallback(async () => {
     try {
       await cleanupExpiredRooms();
-
       const { data, error } = await supabase
         .from('multiplayer_rooms')
         .select('*')
         .in('status', ['waiting', 'countdown'])
         .is('password', null)
         .order('created_at', { ascending: false });
-
       if (error) throw error;
 
-      const roomIds = (data || []).map(r => r.id);
-      
-      if (roomIds.length > 0) {
-        // Get player counts
-        const { data: playerData } = await supabase
-          .from('room_players')
-          .select('room_id, user_id')
-          .in('room_id', roomIds);
-
-        const playerMap = new Map<string, string[]>();
-        playerData?.forEach(p => {
-          const existing = playerMap.get(p.room_id) || [];
-          playerMap.set(p.room_id, [...existing, p.user_id]);
-        });
-
-        // Get host names
-        const hostIds = [...new Set((data || []).map(r => r.host_id))];
-        const { data: hostProfiles } = await supabase
-          .from('profiles')
-          .select('id, name')
-          .in('id', hostIds);
-
-        const hostNameMap = new Map(hostProfiles?.map(h => [h.id, h.name]) || []);
-
-        const mappedRooms: Room[] = (data || []).map(r => ({
-          id: r.id,
-          name: r.name,
-          host: r.host_id,
-          hostName: hostNameMap.get(r.host_id) || 'Unknown',
-          players: playerMap.get(r.id) || [],
-          maxPlayers: r.max_players,
-          password: r.password || undefined,
-          gameSettings: {
-            subject: r.subject || 'Mixed',
-            difficulty: (r.difficulty || 'Medium') as 'Easy' | 'Medium' | 'Hard',
-            questionCount: r.question_count || 10,
-            timePerQuestion: 30
-          },
-          status: r.status as Room['status'],
-          createdAt: new Date(r.created_at)
-        }));
-
-        setRooms(mappedRooms);
-      } else {
+      const roomIds = (data || []).map((r) => r.id);
+      if (!roomIds.length) {
         setRooms([]);
+        return;
       }
+
+      const [{ data: playerData }, { data: hostProfiles }] = await Promise.all([
+        supabase.from('room_players').select('room_id, user_id').in('room_id', roomIds),
+        supabase.from('profiles').select('id, name').in('id', [...new Set((data || []).map((r) => r.host_id))]),
+      ]);
+
+      const playerMap = new Map<string, string[]>();
+      (playerData || []).forEach((p) => {
+        const players = playerMap.get(p.room_id) || [];
+        playerMap.set(p.room_id, [...players, p.user_id]);
+      });
+      const hostNameMap = new Map((hostProfiles || []).map((h) => [h.id, h.name]));
+
+      setRooms((data || []).map((r) => ({
+        id: r.id,
+        name: r.name,
+        host: r.host_id,
+        hostName: hostNameMap.get(r.host_id) || 'Unknown',
+        players: playerMap.get(r.id) || [],
+        maxPlayers: r.max_players,
+        password: r.password || undefined,
+        gameSettings: {
+          subject: r.subject || 'Mixed',
+          difficulty: (r.difficulty || 'Medium') as Room['gameSettings']['difficulty'],
+          questionCount: r.question_count || 10,
+          timePerQuestion: 30,
+          gameMode: r.game_mode === 'speed' ? 'speed' : 'accuracy',
+        },
+        status: r.status as Room['status'],
+        createdAt: new Date(r.created_at),
+      })));
     } catch (err) {
       console.error('Error fetching rooms:', err);
     } finally {
@@ -112,44 +102,23 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   }, [cleanupExpiredRooms]);
 
   useEffect(() => {
-    fetchRooms();
-    const cleanupInterval = setInterval(() => {
-      void cleanupExpiredRooms();
-    }, 60000);
-
-    // Set up realtime subscription
+    void fetchRooms();
+    const cleanupInterval = window.setInterval(() => void cleanupExpiredRooms(), 60000);
     const channel = supabase
       .channel('rooms-realtime')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'multiplayer_rooms'
-      }, () => {
-        fetchRooms();
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'room_players'
-      }, () => {
-        fetchRooms();
-      })
-      .subscribe();
-
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'multiplayer_rooms' }, () => void fetchRooms())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_players' }, () => void fetchRooms())
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.error('Rooms realtime:', status);
+      });
     return () => {
-      clearInterval(cleanupInterval);
+      window.clearInterval(cleanupInterval);
       supabase.removeChannel(channel);
     };
   }, [fetchRooms, cleanupExpiredRooms]);
 
-  const createRoom = async (
-    name: string, 
-    settings: Room['gameSettings'], 
-    maxPlayers: number, 
-    password?: string
-  ): Promise<Room | null> => {
+  const createRoom = async (name: string, settings: Room['gameSettings'], maxPlayers: number, password?: string): Promise<Room | null> => {
     if (!user?.id) return null;
-
     try {
       const { data, error } = await supabase.rpc('multiplayer_create_room', {
         p_name: name,
@@ -159,8 +128,17 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         p_max_players: maxPlayers,
         p_password: password || null,
       });
-
       if (error) throw error;
+
+      const { error: settingsError } = await supabase.rpc('multiplayer_update_room', {
+        p_room_id: data.id,
+        p_subject: settings.subject,
+        p_difficulty: settings.difficulty,
+        p_game_mode: settings.gameMode,
+        p_question_count: settings.questionCount,
+        p_max_players: maxPlayers,
+      });
+      if (settingsError) throw settingsError;
 
       const room: Room = {
         id: data.id,
@@ -172,24 +150,21 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         password: data.password || undefined,
         gameSettings: settings,
         status: data.status as Room['status'],
-        createdAt: new Date(data.created_at)
+        createdAt: new Date(data.created_at),
       };
-
       setCurrentRoom(room);
       toast.success('Room created!');
       await fetchRooms();
-      
       return room;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating room:', err);
-      toast.error('Failed to create room');
+      toast.error(err?.message || 'Failed to create room');
       return null;
     }
   };
 
   const joinRoom = async (roomId: string, playerName: string, password?: string): Promise<boolean> => {
     if (!user?.id) return false;
-
     try {
       const { data: roomData, error: roomError } = await supabase
         .from('multiplayer_rooms')
@@ -197,54 +172,56 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', roomId)
         .in('status', ['waiting', 'countdown', 'playing'])
         .single();
-
       if (roomError || !roomData) {
         toast.error('Room is no longer available');
         return false;
       }
+
+      const { data: existingRow } = await supabase
+        .from('room_players')
+        .select('user_id')
+        .eq('room_id', roomId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const existingMembership = Boolean(existingRow);
 
       const { error: joinError } = await supabase.rpc('multiplayer_join_room', {
         p_room_id: roomId,
         p_password: password || null,
       });
       if (joinError) throw joinError;
-      const existingMembership = false;
+
       const room: Room = {
         id: roomData.id,
         name: roomData.name,
         host: roomData.host_id,
+        hostName: undefined,
         players: [],
         maxPlayers: roomData.max_players,
         password: roomData.password || undefined,
         gameSettings: {
           subject: roomData.subject || 'Mixed',
-          difficulty: (roomData.difficulty || 'Medium') as 'Easy' | 'Medium' | 'Hard',
+          difficulty: (roomData.difficulty || 'Medium') as Room['gameSettings']['difficulty'],
           questionCount: roomData.question_count || 10,
-          timePerQuestion: 30
+          timePerQuestion: 30,
+          gameMode: roomData.game_mode === 'speed' ? 'speed' : 'accuracy',
         },
         status: roomData.status as Room['status'],
-        createdAt: new Date(roomData.created_at)
+        createdAt: new Date(roomData.created_at),
       };
-
       setCurrentRoom(room);
       toast.success(existingMembership ? `Rejoined ${roomData.name}!` : `Joined ${roomData.name}!`);
       await fetchRooms();
-      
       return true;
     } catch (err: any) {
-      if (err.code === '23505') {
-        toast.error('Already in this room');
-      } else {
-        console.error('Error joining room:', err);
-        toast.error('Failed to join room');
-      }
+      console.error('Error joining room:', err);
+      toast.error(err?.message || 'Failed to join room');
       return false;
     }
   };
 
   const leaveRoom = async (roomId: string, playerName: string) => {
     if (!user?.id) return;
-
     try {
       const { error } = await supabase.rpc('multiplayer_leave_room', { p_room_id: roomId });
       if (error) throw error;
@@ -256,18 +233,6 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const getRoomById = (roomId: string) => {
-    return rooms.find(r => r.id === roomId);
-  };
-
-  const getPublicRooms = () => {
-    return rooms.filter(r => !r.password && r.status === 'waiting');
-  };
-
-  const refreshRooms = async () => {
-    await fetchRooms();
-  };
-
   return (
     <RoomContext.Provider value={{
       rooms,
@@ -276,9 +241,9 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       createRoom,
       joinRoom,
       leaveRoom,
-      getRoomById,
-      getPublicRooms,
-      refreshRooms
+      getRoomById: (roomId) => rooms.find((room) => room.id === roomId),
+      getPublicRooms: () => rooms.filter((room) => !room.password && room.status === 'waiting'),
+      refreshRooms: fetchRooms,
     }}>
       {children}
     </RoomContext.Provider>
@@ -287,8 +252,6 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
 
 export const useRoom = () => {
   const context = useContext(RoomContext);
-  if (!context) {
-    throw new Error('useRoom must be used within a RoomProvider');
-  }
+  if (!context) throw new Error('useRoom must be used within a RoomProvider');
   return context;
 };

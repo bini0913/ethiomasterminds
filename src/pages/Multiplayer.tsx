@@ -158,12 +158,12 @@ const Multiplayer: React.FC = () => {
   const xpProgress = Math.max(5, Math.min(100, (xpInLevel / 1000) * 100));
 
   const joinMode = (mode: HubMode) => {
-    toast.success(`Queued for ${mode.title}`);
     if (mode.id === "tournament") {
       navigate("/tournaments");
       return;
     }
-    navigate("/lobby");
+    const target = mode.id === "2v2" ? "2v2" : mode.id === "private" ? "private" : "1v1";
+    navigate(`/lobby?mode=${target}`);
   };
 
   const handleLeaveRoom = useCallback(() => {
@@ -407,10 +407,10 @@ const Multiplayer: React.FC = () => {
         {/* Quick actions */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: "⚔️ Quick Match", desc: "Fast balanced duel", onClick: () => navigate("/lobby") },
-            { label: "👥 Team Up", desc: "Play with friends", onClick: () => navigate("/lobby") },
-            { label: "🏆 Tournaments", desc: "Competitive cups", onClick: () => navigate("/lobby") },
-            { label: "🔐 Private Room", desc: "Code-protected", onClick: () => navigate("/lobby") },
+            { label: "⚔️ Quick Match", desc: "Fast balanced duel", onClick: () => navigate("/lobby?mode=1v1") },
+            { label: "👥 Team Up", desc: "Play with friends", onClick: () => navigate("/lobby?mode=2v2") },
+            { label: "🏆 Tournaments", desc: "Competitive cups", onClick: () => navigate("/tournaments") },
+            { label: "🔐 Private Room", desc: "Code-protected", onClick: () => navigate("/lobby?mode=private") },
           ].map((card) => (
             <button
               key={card.label}
