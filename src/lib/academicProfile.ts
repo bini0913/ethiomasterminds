@@ -43,7 +43,11 @@ export function normalizeSubject(value: string) {
   return aliases[key] || key;
 }
 
-export function subjectsMatch(profileSubject: string, contentSubject: string) {\n  return normalizeSubject(profileSubject) === normalizeSubject(contentSubject);\n}\n\nexport async function getAcademicProfile(userId: string) {
+export function subjectsMatch(profileSubject: string, contentSubject: string) {
+  return normalizeSubject(profileSubject) === normalizeSubject(contentSubject);
+}
+
+export async function getAcademicProfile(userId: string) {
   const { data, error } = await supabase
     .from("academic_profiles")
     .select("user_id,grade,study_goal,study_goal_detail,curriculum,subjects,book_id,book_title")
