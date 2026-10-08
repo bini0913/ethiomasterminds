@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Calendar, Plus, Check, X, Sparkles, Brain, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
-import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
+import { getAcademicProfile, normalizeGrade, normalizeSubject } from "@/lib/academicProfile";
 
 interface StudyPlan {
   id: string;
@@ -62,8 +62,8 @@ const StudyPlannerPage: React.FC = () => {
     if (!user?.id) return;
     getAcademicProfile(user.id).then((profile) => {
       if (!profile) return;
-      setSubjects(profile.subjects.map((s) => s.toLowerCase()));
-      setNewSubject(profile.subjects[0]?.toLowerCase() || "math");
+      setSubjects(profile.subjects.map(normalizeSubject));
+      setNewSubject(normalizeSubject(profile.subjects[0] || "math"));
       setAcademicContext({
         grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 5)),
         curriculum: profile.curriculum,
@@ -194,7 +194,7 @@ const StudyPlannerPage: React.FC = () => {
     });
 
     // Fill remaining days with subject rotation
-    const allSubjects = ["math", "science", "english", "history"];
+    const allSubjects = subjects.length ? subjects : ["math", "science", "english", "history"];
     for (let i = plans.length; i < 7; i++) {
       const subj = allSubjects[i % allSubjects.length];
       plans.push({

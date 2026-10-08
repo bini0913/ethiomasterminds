@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { ArrowLeft, Clock, Target, AlertTriangle, Trophy, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { normalizeGrade, getAcademicProfile } from "@/lib/academicProfile";
+import { normalizeGrade, getAcademicProfile, normalizeSubject } from "@/lib/academicProfile";
 
 interface Question {
   id: string;
@@ -42,8 +42,8 @@ const ExamModePage: React.FC = () => {
     if (!user?.id) return;
     getAcademicProfile(user.id).then((profile) => {
       if (!profile?.subjects?.length) return;
-      setProfileSubjects(profile.subjects.map((s) => s.toLowerCase()));
-      setSubject(profile.subjects[0].toLowerCase());
+      setProfileSubjects(profile.subjects.map(normalizeSubject));
+      setSubject(normalizeSubject(profile.subjects[0]));
     }).catch(() => {});
   }, [user?.id]);
 
@@ -59,45 +59,49 @@ const ExamModePage: React.FC = () => {
   }, [examState, timeLeft]);
 
   const startExam = async () => {
-    const { data: quizzes } = await supabase
-      .from("quizzes")
-      .select("id, grade")
-      .eq("subject", subject)
-      .eq("is_approved", true);
-
-    if (!quizzes || quizzes.length === 0) {
-      toast.error("No approved quizzes found for this subject");
-      return;
-    }
-
-    const gradeMatchedQuizzes = quizzes.filter(q => parseInt(q.grade || "0") === userGrade);
-    if (gradeMatchedQuizzes.length === 0) {
-      toast.error(`No approved Grade ${userGrade} questions are available for this subject yet.`);
-      return;
-    }
-    const quizIds = gradeMatchedQuizzes.map(q => q.id);
-    const { data: questionsData } = await supabase
+    const normalizedSubject = normalizeSubject(subject);
+    const { data: rawQuestions, error } = await supabase
       .from("questions")
       .select("*")
-      .in("quiz_id", quizIds);
+      .eq("grade", String(userGrade));
 
-    if (!questionsData || questionsData.length < 5) {
-      toast.error(`Not enough Grade ${userGrade} questions available for this subject`);
+    const questionsData = (rawQuestions || []).filter((q) =>
+      normalizeSubject(q.subject || "") === normalizedSubject
+    );
+
+    if (error) {
+      console.error("Exam question load failed:", error);
+      toast.error("We couldn't load this exam. Please try again.");
       return;
     }
 
-    // Shuffle and pick
-    const shuffled = questionsData.sort(() => Math.random() - 0.5).slice(0, questionCount);
-    const parsed = shuffled.map(q => ({
-      id: q.id,
-      question_text: q.question_text,
-      options: (q.options as string[]) || [],
-      correct_answer: q.correct_answer,
-      explanation: q.explanation || undefined,
-    }));
+    if (!questionsData?.length) {
+      toast.error(`No Grade ${userGrade} questions are available for ${subject} yet.`);
+      return;
+    }
+
+    const available = questionsData.length;
+    const count = Math.min(questionCount, available);
+    if (available < questionCount) {
+      toast.info(`Only ${available} approved questions are currently available, so this exam will use ${available}.`);
+    }
+
+    const shuffled = [...questionsData].sort(() => Math.random() - 0.5).slice(0, count);
+    const parsed = shuffled.map(q => {
+      const options = Array.isArray(q.options) && q.options.length
+        ? q.options
+        : [q.option_a, q.option_b, q.option_c, q.option_d].filter(Boolean);
+      return {
+        id: q.id,
+        question_text: q.question_text,
+        options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation || undefined,
+      };
+    });
 
     setQuestions(parsed);
-    setTimeLeft(timeLimit * 60);
+    setTimeLeft(Math.max(5, Math.round(timeLimit * 60 * (count / Math.max(questionCount, 1)))));
     setAnswers({});
     setCurrentQ(0);
     setExamState("running");
@@ -162,10 +166,11 @@ const ExamModePage: React.FC = () => {
                 <Select value={subject} onValueChange={setSubject}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="math">Mathematics</SelectItem>
-                    <SelectItem value="science">Science (Physics/Chemistry/Biology)</SelectItem>
-                    <SelectItem value="english">English</SelectItem>
-                    <SelectItem value="history">History & Civics</SelectItem>
+                    {profileSubjects.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value === "math" ? "Mathematics" : value === "science" ? "Science" : value.replace(/\b\w/g, (m) => m.toUpperCase())}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

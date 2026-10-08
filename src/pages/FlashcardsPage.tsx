@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, RotateCcw, BookOpen, Brain, ChevronRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { normalizeGrade, getAcademicProfile } from "@/lib/academicProfile";
+import { normalizeGrade, getAcademicProfile, subjectsMatch } from "@/lib/academicProfile";
 
 interface Flashcard {
   id: string;
@@ -49,7 +49,7 @@ const FlashcardsPage: React.FC = () => {
     if (!user || !auth.data.user?.id) return;
     setIsLoading(true);
     const profile = await getAcademicProfile(user.id).catch(() => null);
-    const allowedSubjects = profile?.subjects?.map((s) => s.trim().toLowerCase()) || [];
+    const allowedSubjects = profile?.subjects || [];
     setProfileSubjects(allowedSubjects);
 
     const [cardsRes, progressRes] = await Promise.all([
@@ -67,7 +67,7 @@ const FlashcardsPage: React.FC = () => {
 
     if (cardsRes.data) {
       const filteredByProfile = allowedSubjects.length
-        ? cardsRes.data.filter((card) => allowedSubjects.includes(card.subject.trim().toLowerCase()))
+        ? cardsRes.data.filter((card) => allowedSubjects.some((subject) => subjectsMatch(subject, card.subject)))
         : cardsRes.data;
       setFlashcards(filteredByProfile);
       setSubjects(Array.from(new Set(filteredByProfile.map((card) => card.subject))).sort());
