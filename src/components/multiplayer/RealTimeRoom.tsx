@@ -689,7 +689,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (selectedAnswer !== null || !currentQuestion) return;
 
     setSelectedAnswer(answerIndex);
-    const lagCompensation = Math.min(2, Math.max(0, latencyMs / 1000 / 2));
     const timeUsed = Math.max(0, Math.round((Date.now() - (questionStartedAt ?? Date.now())) / 1000));
 
     try {
@@ -709,6 +708,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         correct_index?: number;
         score?: number;
         finished?: boolean;
+        timed_out?: boolean;
       };
 
       setAnswerResult({
