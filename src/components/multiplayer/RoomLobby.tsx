@@ -31,10 +31,11 @@ const RoomLobby: React.FC = () => {
       subject,
       difficulty: difficulty as 'Easy' | 'Medium' | 'Hard',
       questionCount: parseInt(questionCount),
-      timePerQuestion: 30
+      timePerQuestion: 30,
+      gameMode: 'speed'
     };
 
-    createRoom(roomName, gameSettings, parseInt(maxPlayers), password || undefined);
+    void createRoom(roomName, gameSettings, parseInt(maxPlayers), password || undefined);
     setShowCreateRoom(false);
     setRoomName('');
     setPassword('');
