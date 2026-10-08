@@ -522,7 +522,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       points: data.points || 100,
     });
     setTotalQuestions(data.total || totalQuestions);
-    setQuestionStartedAt(Date.now());
+    setQuestionStartedAt(data.question_started_at ? new Date(data.question_started_at).getTime() : Date.now());
     setPlayerQuestionNumber((data.index ?? 0) + 1);
     setSelectedAnswer(null);
     setAnswerResult(null);
@@ -718,6 +718,10 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         correctAnswerIndex: result.correct_index,
       });
 
+      if (result.timed_out) {
+        toast.warning('Time is up — that answer counts as incorrect.');
+      }
+
       if (result.is_correct) {
         setConsecutiveCorrect((prev) => {
           const next = prev + 1;
@@ -766,7 +770,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         points: data.points || 100,
       });
       setTotalQuestions(data.total || totalQuestions);
-      setQuestionStartedAt(Date.now());
+      setQuestionStartedAt(data.question_started_at ? new Date(data.question_started_at).getTime() : Date.now());
       setPlayerQuestionNumber((data.index ?? 0) + 1);
       setSelectedAnswer(null);
       setAnswerResult(null);
