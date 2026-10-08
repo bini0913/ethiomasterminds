@@ -647,7 +647,12 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           ]);
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Multiplayer realtime subscription:', status);
+          toast.error('Realtime connection degraded — reconnecting…');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
