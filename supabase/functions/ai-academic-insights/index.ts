@@ -27,8 +27,8 @@ serve(async (req) => {
     if (!Array.isArray(topicData) || topicData.length > 100) return new Response(JSON.stringify({ error: "Invalid topic data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (JSON.stringify({ stats, topicData, streak, xp }).length > 20000) return new Response(JSON.stringify({ error: "Request data is too large" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured");
 
     const prompt = `You are an academic advisor for a Grade ${grade} Ethiopian student preparing for university entrance exams.
 
@@ -47,14 +47,14 @@ Provide a personalized academic analysis with:
 
 Use emojis for visual appeal. Be encouraging but honest. Keep it concise and actionable.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "openai/gpt-oss-20b",
         messages: [
           { role: "system", content: "You are a supportive Ethiopian academic advisor. Be encouraging, specific, and actionable." },
           { role: "user", content: prompt },
