@@ -61,6 +61,44 @@ export const tierStyle = (level: number) => {
  * Quiz-period scores only reflect real question_attempts records.
  */
 export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
+  // Prefer the server-side projection so the leaderboard is not dependent on
+  // broad SELECT access to profiles, attempts, streaks, or multiplayer tables.
+  const { data: leaderboardData, error: leaderboardError } = await supabase.rpc("get_student_leaderboard");
+
+  if (!leaderboardError && Array.isArray(leaderboardData)) {
+    return leaderboardData.map((row: any) => {
+      const totalXp = Number(row.total_xp ?? row.xp ?? 0);
+      const level = Math.max(Number(row.level ?? 1), Math.floor(totalXp / 100) + 1);
+      return {
+        id: row.id,
+        username: row.username ?? row.name ?? "user",
+        name: row.name ?? row.username ?? "Unknown User",
+        avatar: row.avatar ?? null,
+        avatarConfig: (row.avatar_config as Record<string, unknown> | null) ?? null,
+        grade: typeof row.grade === "number" ? row.grade : toGradeNumber(row.grade == null ? null : String(row.grade)),
+        xp: Number(row.xp ?? totalXp),
+        level,
+        rank: row.rank ?? (totalXp >= 10000 ? "Legend" : totalXp >= 5000 ? "Master" : totalXp >= 2000 ? "Diamond" : totalXp >= 1000 ? "Platinum" : totalXp >= 500 ? "Gold" : totalXp >= 200 ? "Silver" : "Bronze"),
+        badges: Array.isArray(row.badges) ? row.badges : [],
+        streak: Number(row.streak ?? 0),
+        accuracy: Number(row.accuracy ?? 0),
+        matchesPlayed: Number(row.matches_played ?? 0),
+        wins: Number(row.wins ?? 0),
+        losses: Number(row.losses ?? 0),
+        contributions: Number(row.contributions ?? 0),
+        weeklyScore: Number(row.weekly_score ?? 0),
+        monthlyScore: Number(row.monthly_score ?? 0),
+        totalXp,
+        seasonXp: Number(row.season_xp ?? totalXp),
+        coins: Number(row.coins ?? 0),
+        activeTitle: row.active_title ?? null,
+      } as LeaderboardUser;
+    });
+  }
+
+  if (leaderboardError) {
+    console.warn("Secure leaderboard RPC unavailable; using legacy loader", leaderboardError);
+  }
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
