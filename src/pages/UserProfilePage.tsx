@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   BadgeCheck,
+  Camera,
+  ImagePlus,
   Car,
   Clock3,
   Crown,
@@ -90,6 +92,8 @@ const UserProfilePage = () => {
   const [joinedAt, setJoinedAt] = useState<string | null>(null);
   const [aboutText, setAboutText] = useState("");
   const [avatarReacting, setAvatarReacting] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [profileMissing, setProfileMissing] = useState(false);
@@ -185,6 +189,42 @@ const UserProfilePage = () => {
       coins: 0,
       activeTitle: null,
     });
+  };
+
+  const handleProfilePhoto = async (file?: File) => {
+    if (!file || !isSelf || !userId) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Choose an image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Please choose a photo smaller than 5 MB.");
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const path = `${userId}/profile-${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, {
+        upsert: true,
+        cacheControl: "3600",
+        contentType: file.type,
+      });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      const photoUrl = data.publicUrl;
+      const { error: profileError } = await supabase.from("profiles").update({ avatar: photoUrl }).eq("id", userId);
+      if (profileError) throw profileError;
+      setUsers((previous) => previous.map((item) => item.id === userId ? { ...item, avatar: photoUrl } : item));
+      setFallbackProfile((previous) => previous?.id === userId ? { ...previous, avatar: photoUrl } : previous);
+      toast.success("Profile photo updated.");
+    } catch (error) {
+      console.error("Profile photo upload failed", error);
+      toast.error("Photo upload failed. Check that the Supabase 'avatars' storage bucket exists and allows your account to upload.");
+    } finally {
+      setPhotoUploading(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
   };
 
   const syncMilestoneAchievements = async (stats: Record<string, any>) => {
@@ -740,7 +780,7 @@ const UserProfilePage = () => {
           <div className="pointer-events-none absolute -left-20 top-10 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
           <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-500/20 blur-3xl" />
 
-          <div className="relative flex flex-col gap-5 p-5 md:flex-row md:items-center md:gap-6 md:p-6">
+          <div className="relative flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-5 sm:p-5 md:p-6">
             <motion.button
               type="button"
               onClick={() => {
@@ -750,22 +790,46 @@ const UserProfilePage = () => {
               whileTap={{ scale: 0.96 }}
               animate={avatarReacting ? { scale: [1, 1.04, 1], y: [0, -4, 0] } : { y: [0, -6, 0] }}
               transition={avatarReacting ? { duration: 0.42 } : { duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
-              className="relative mx-auto md:mx-0"
+              className="relative mx-auto shrink-0 md:mx-0"
             >
-              <div className={`absolute inset-0 rounded-full blur-2xl ${tierStyle(profile.level)} opacity-45`} />
-              <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={190} autoRotate={false} />
+              <div className={`absolute inset-0 rounded-full blur-xl ${tierStyle(profile.level)} opacity-30`} />
+              {profile.avatar && /^https?:\/\//i.test(profile.avatar) ? (
+                <img
+                  src={profile.avatar}
+                  alt={`${profile.name || profile.username}'s profile`}
+                  className="relative h-28 w-28 rounded-full border-2 border-white/70 object-cover shadow-lg sm:h-32 sm:w-32"
+                />
+              ) : (
+                <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={116} autoRotate={false} className="[&>p]:hidden" />
+              )}
+              {isSelf ? (
+                <>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    className="hidden"
+                    onChange={(event) => void handleProfilePhoto(event.target.files?.[0])}
+                    aria-label="Choose or take a profile photo"
+                  />
+                  <span className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-md">
+                    {photoUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                  </span>
+                </>
+              ) : null}
             </motion.button>
 
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-3xl font-black tracking-tight md:text-4xl">{profile.name || profile.username}</h1>
+                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profile.name || profile.username}</h1>
                 <Badge className={`bg-gradient-to-r ${tierStyle(profile.level)} px-3 py-1 text-xs shadow-[0_0_18px_rgba(168,85,247,0.35)]`}>
                   {currentTier.icon} {currentTier.name}
                 </Badge>
               </div>
               <p className="text-sm text-white/80">@{profile.username}</p>
 
-              <div className="space-y-1">
+              <div className="max-w-2xl space-y-1">
                 <div className="flex items-center justify-between text-xs text-white/85">
                   <span>Level {profile.level}</span>
                   <span>{xpProgress.current}/220 XP</span>
@@ -780,9 +844,16 @@ const UserProfilePage = () => {
 
               {isSelf ? (
                 <div className="pt-1">
-                  <Button onClick={() => navigate("/avatar-creator")} className="gap-2 bg-white text-black hover:bg-white/90">
-                    <Pencil className="h-4 w-4" /> Edit Avatar
-                  </Button>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button onClick={() => navigate("/avatar-creator")} size="sm" className="gap-2">
+                      <Pencil className="h-4 w-4" /> Customize avatar
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" disabled={photoUploading} onClick={() => photoInputRef.current?.click()} className="gap-2">
+                      {photoUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                      {photoUploading ? "Uploading…" : "Add profile photo"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-white/65">Upload a photo or take one with your camera. JPG, PNG or WebP · up to 5 MB.</p>
                 </div>
               ) : null}
             </div>
