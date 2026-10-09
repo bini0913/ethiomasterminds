@@ -23,10 +23,12 @@ const LearningDNA: React.FC = () => {
     try {
       const { data, error: functionError } = await supabase.functions.invoke("analyze-learning-dna");
       if (functionError) throw functionError;
-      if (data.success) {
-        setLearningData(data.data as LearningData);
-        toast.success("Learning DNA updated!");
+      if (!data?.success || !data?.data) {
+        throw new Error(data?.error || "The analysis could not be completed. Please try again.");
       }
+      setLearningData(data.data as LearningData);
+      toast.success("Learning DNA updated!");
+      await reload();
     } catch (analysisError: unknown) {
       console.error("Error analyzing learning DNA:", analysisError);
       toast.error(analysisError instanceof Error ? analysisError.message : "Failed to analyze learning DNA");
