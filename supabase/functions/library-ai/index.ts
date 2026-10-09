@@ -65,14 +65,14 @@ Deno.serve(async (req) => {
 
     const prompt = buildPrompt(payload);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+        Authorization: `Bearer ${Deno.env.get("GROQ_API_KEY")}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "openai/gpt-oss-20b",
         messages: [
           {
             role: "system",
@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       const text = await response.text();
       console.error("library-ai gateway error:", response.status, text.slice(0, 300));
-      throw new Error(`AI Gateway error: ${response.status}`);
+      throw new Error(`Groq API error: ${response.status}`);
     }
 
     const data = await response.json();
