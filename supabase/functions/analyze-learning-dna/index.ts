@@ -189,6 +189,10 @@ Provide a JSON response with:
 
     if (upsertError) {
       console.error('Error saving learning DNA:', upsertError);
+      return new Response(JSON.stringify({ error: 'Analysis was calculated but could not be saved. Please try again.' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     return new Response(JSON.stringify({

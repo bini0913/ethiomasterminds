@@ -33,11 +33,17 @@ export function useLearningDNA(userId?: string) {
 
     setIsLoading(true);
     setError(null);
-    const { data, error: queryError } = await supabase
-      .from("learning_dna")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
+    const [{ data, error: queryError }, { count: attemptCount, error: attemptsError }] = await Promise.all([
+      supabase
+        .from("learning_dna")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("question_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId),
+    ]);
 
     if (queryError && queryError.code !== "PGRST116") {
       setError(new Error(queryError.message));
@@ -49,11 +55,12 @@ export function useLearningDNA(userId?: string) {
         weaknesses: (data.weaknesses as string[]) || [],
         learningStyle: data.learning_style || "balanced",
         predictedPath: data.predicted_path as LearningData["predictedPath"],
-        totalAttempts: 0,
+        totalAttempts: attemptsError ? 0 : (attemptCount ?? 0),
       });
     } else {
       setLearningData(null);
     }
+    if (attemptsError) console.warn("Learning DNA attempt count unavailable", attemptsError);
     setIsLoading(false);
   }, [userId]);
 
