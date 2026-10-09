@@ -772,6 +772,7 @@ const LibraryPage: React.FC = () => {
                                                 : book.grade_level || (user?.role === 'student' ? studentGradeMin : 9)
                                             ),
                                             type: book.type,
+                                            bookCategory: book.book_category || 'academic',
                                             file: null,
                                           });
                                           setOpenUpload(true);
@@ -888,7 +889,7 @@ const LibraryPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="p-3 border-t grid gap-2 md:grid-cols-2">
+              {selectedBook?.book_category === "academic" && <div className="p-3 border-t grid gap-2 md:grid-cols-2">
                 <Input placeholder="Paste selected text here for highlight/AI" value={selectedText} onChange={(e) => setSelectedText(e.target.value)} />
                 <Input placeholder="Paste current page text (for better AI output)" value={readerPageText} onChange={(e) => setReaderPageText(e.target.value)} />
                 <div className="flex flex-wrap gap-2 items-center">
@@ -900,7 +901,7 @@ const LibraryPage: React.FC = () => {
                   <Input placeholder="Add note" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
                   <Button size="sm" onClick={saveHighlight}>Save</Button>
                 </div>
-              </div>
+              </div>}
             </div>
 
             {selectedBook?.book_category === "academic" && aiPanelOpen && <div className="h-full min-h-0 overflow-y-auto overscroll-contain p-3 space-y-3 border-l bg-background">
