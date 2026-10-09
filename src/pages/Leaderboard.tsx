@@ -41,7 +41,7 @@ const Leaderboard = () => {
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("global");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const leaderboardTier = getUserTier(user?.grade);
-  const leaderboardGradeMin = leaderboardTier === "early" ? 1 : leaderboardTier === "middle" ? 5 : leaderboardTier === "upper" ? 9 : 1;
+  const leaderboardGradeMin = leaderboardTier === "early" ? 0 : leaderboardTier === "middle" ? 5 : leaderboardTier === "upper" ? 9 : 0;
   const leaderboardGradeMax = leaderboardTier === "early" ? 4 : leaderboardTier === "middle" ? 8 : leaderboardTier === "upper" ? 12 : 12;
   const leaderboardGrades = Array.from(
     { length: leaderboardGradeMax - leaderboardGradeMin + 1 },
@@ -128,9 +128,16 @@ const Leaderboard = () => {
     return rankScore(u);
   };
 
+  // Keep the student leaderboard within the viewer's school tier. Unknown-grade
+  // accounts are not silently mixed into a grade-bounded tier ranking.
+  const tierUsers = useMemo(
+    () => users.filter((entry) => entry.grade !== null && entry.grade >= leaderboardGradeMin && entry.grade <= leaderboardGradeMax),
+    [users, leaderboardGradeMin, leaderboardGradeMax],
+  );
+
   const rankedUsers = useMemo(
-    () => [...users].sort((a, b) => scoreFor(b) - scoreFor(a)),
-    [users, timeframe],
+    () => [...tierUsers].sort((a, b) => scoreFor(b) - scoreFor(a)),
+    [tierUsers, timeframe],
   );
 
   const leaderboardData = useMemo(() => {
@@ -143,11 +150,11 @@ const Leaderboard = () => {
     }
 
     if (activeTab === "weekly") {
-      return [...users].sort((a, b) => b.weeklyScore - a.weeklyScore);
+      return [...tierUsers].sort((a, b) => b.weeklyScore - a.weeklyScore);
     }
 
     return rankedUsers;
-  }, [activeTab, following, rankedUsers, selectedGrade, user?.id, users]);
+  }, [activeTab, following, rankedUsers, selectedGrade, user?.id, tierUsers]);
 
   const withRank = leaderboardData.map((entry, index) => ({
     ...entry,
@@ -207,8 +214,8 @@ const Leaderboard = () => {
       <div className="mx-auto max-w-6xl space-y-6 pb-24">
         <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">Live database rankings only • no demo accounts</p>
-            <h1 className="text-3xl font-bold tracking-tight">Master Minds Leaderboard</h1>
+            <p className="text-sm text-muted-foreground">Live rankings for your school tier • no demo accounts</p>
+            <h1 className="text-3xl font-bold tracking-tight">{leaderboardTier === "upper" ? "Grades 9–12 Leaderboard" : leaderboardTier === "middle" ? "Grades 5–8 Leaderboard" : "KG–Grade 4 Leaderboard"}</h1>
             <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs">
               <Trophy className="h-3.5 w-3.5 text-yellow-400" />
               <span className="font-semibold">{season.name}</span>
@@ -225,7 +232,7 @@ const Leaderboard = () => {
           <Card className="border-primary/20 bg-card/80">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="rounded-xl bg-primary/10 p-3"><Users className="h-5 w-5 text-primary" /></div>
-              <div><p className="text-xs text-muted-foreground">Learners ranked</p><p className="text-2xl font-bold tabular-nums">{users.length.toLocaleString()}</p></div>
+              <div><p className="text-xs text-muted-foreground">Tier learners ranked</p><p className="text-2xl font-bold tabular-nums">{tierUsers.length.toLocaleString()}</p></div>
             </CardContent>
           </Card>
           <Card className="border-primary/20 bg-card/80">
@@ -283,7 +290,7 @@ const Leaderboard = () => {
                   <Select value={selectedGrade} onValueChange={setSelectedGrade}>
                     <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All grades</SelectItem>
+                      <SelectItem value="all">{leaderboardTier === "early" ? "KG–Grade 4" : leaderboardTier === "middle" ? "Grades 5–8" : "Grades 9–12"}</SelectItem>
                       {leaderboardGrades.map((grade) => (
                         <SelectItem key={grade} value={String(grade)}>
                           Grade {grade}
