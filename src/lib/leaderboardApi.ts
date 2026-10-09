@@ -34,12 +34,6 @@ export interface ClassCompetitionRow {
   classScore: number;
 }
 
-const toGradeNumber = (grade: string | null): number | null => {
-  if (!grade) return null;
-  const parsed = Number(grade);
-  return Number.isNaN(parsed) ? null : parsed;
-};
-
 export const rankScore = (user: LeaderboardUser) => {
   const performance = user.matchesPlayed > 0 ? user.wins / user.matchesPlayed : 0;
   return user.seasonXp + user.accuracy * 15 + performance * 300 + user.contributions * 2;
@@ -52,6 +46,12 @@ export const tierStyle = (level: number) => {
   return `${tierConfig.colorClass} ${tierConfig.glowClass}`;
 };
 
+/**
+ * Load a safe, aggregated leaderboard through a SECURITY DEFINER RPC.
+ * Direct profile and attempt reads are correctly restricted by RLS to each
+ * user's own records, so querying those tables directly cannot produce a
+ * complete global leaderboard for regular students.
+ */
 export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -69,9 +69,9 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
     supabase.from("multiplayer_ranked_stats").select("user_id,total_points,matches_played,wins"),
   ]);
 
-  if (profilesRes.error) {
-    console.error("fetchLeaderboardUsers profiles error", profilesRes.error);
-    throw profilesRes.error;
+  if (error) {
+    console.error("fetchLeaderboardUsers RPC error", error);
+    throw error;
   }
 
   const streakByUser = new Map<string, number>();
@@ -195,7 +195,6 @@ export async function createFollowChallenge(challengerId: string, challengedId: 
 
   if (error) throw error;
 }
-
 
 export async function fetchClassCompetitionLeaderboard(limit = 10): Promise<ClassCompetitionRow[]> {
   const { data, error } = await (supabase as any).rpc("get_class_competition_leaderboard", { p_limit: limit });
