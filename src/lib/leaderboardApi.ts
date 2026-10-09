@@ -34,12 +34,6 @@ export interface ClassCompetitionRow {
   classScore: number;
 }
 
-const toGradeNumber = (grade: string | null): number | null => {
-  if (!grade) return null;
-  const parsed = Number(grade);
-  return Number.isNaN(parsed) ? null : parsed;
-};
-
 export const rankScore = (user: LeaderboardUser) => {
   const performance = user.matchesPlayed > 0 ? user.wins / user.matchesPlayed : 0;
   return user.seasonXp + user.accuracy * 15 + performance * 300 + user.contributions * 2;
@@ -52,79 +46,45 @@ export const tierStyle = (level: number) => {
   return `${tierConfig.colorClass} ${tierConfig.glowClass}`;
 };
 
+/**
+ * Load a safe, aggregated leaderboard through a SECURITY DEFINER RPC.
+ * Direct profile and attempt reads are correctly restricted by RLS to each
+ * user's own records, so querying those tables directly cannot produce a
+ * complete global leaderboard for regular students.
+ */
 export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await (supabase as any).rpc("get_student_leaderboard");
 
-  const [profilesRes, streakRes, attemptsRes, currencyRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id,name,username,avatar,avatar_config,grade,xp,season_xp,level,rank,badges"),
-    supabase.from("user_streaks").select("user_id,current_streak"),
-    supabase
-      .from("question_attempts")
-      .select("user_id,is_correct,created_at")
-      .gte("created_at", monthAgo),
-    supabase.from("user_currency").select("user_id,coins"),
-  ]);
-
-  if (profilesRes.error) {
-    console.error("fetchLeaderboardUsers profiles error", profilesRes.error);
-    throw profilesRes.error;
+  if (error) {
+    console.error("fetchLeaderboardUsers RPC error", error);
+    throw error;
   }
 
-  const streakByUser = new Map<string, number>();
-  (streakRes.data ?? []).forEach((row) => streakByUser.set(row.user_id, row.current_streak));
-
-  const coinsByUser = new Map<string, number>();
-  (currencyRes.data ?? []).forEach((row) => coinsByUser.set(row.user_id, row.coins ?? 0));
-
-  const weeklyByUser = new Map<string, { attempts: number; correct: number }>();
-  const monthlyByUser = new Map<string, { attempts: number; correct: number }>();
-  (attemptsRes.data ?? []).forEach((row) => {
-    const m = monthlyByUser.get(row.user_id) ?? { attempts: 0, correct: 0 };
-    m.attempts += 1;
-    if (row.is_correct) m.correct += 1;
-    monthlyByUser.set(row.user_id, m);
-    if (row.created_at >= weekAgo) {
-      const w = weeklyByUser.get(row.user_id) ?? { attempts: 0, correct: 0 };
-      w.attempts += 1;
-      if (row.is_correct) w.correct += 1;
-      weeklyByUser.set(row.user_id, w);
-    }
-  });
-
-  const users: LeaderboardUser[] = (profilesRes.data ?? []).map((profile) => {
-    const weekly = weeklyByUser.get(profile.id) ?? { attempts: 0, correct: 0 };
-    const monthly = monthlyByUser.get(profile.id) ?? { attempts: 0, correct: 0 };
-    const accuracy = monthly.attempts > 0 ? Number(((monthly.correct / monthly.attempts) * 100).toFixed(1)) : 0;
-    return {
-      id: profile.id,
-      username: profile.username ?? profile.name ?? "user",
-      name: profile.name ?? profile.username ?? "Unknown User",
-      avatar: profile.avatar ?? null,
-      avatarConfig: (profile.avatar_config as Record<string, unknown> | null) ?? null,
-      grade: toGradeNumber(profile.grade),
-      xp: Number(profile.xp ?? 0),
-      level: profile.level ?? 1,
-      rank: profile.rank ?? null,
-      badges: profile.badges ?? [],
-      streak: streakByUser.get(profile.id) ?? 0,
-      accuracy,
-      matchesPlayed: 0,
-      wins: 0,
-      losses: 0,
-      contributions: 0,
-      weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
-      monthlyScore: monthly.attempts * 10 + monthly.correct * 5,
-      totalXp: Number(profile.xp ?? 0),
-      seasonXp: Number((profile as any).season_xp ?? 0),
-      coins: coinsByUser.get(profile.id) ?? 0,
-      activeTitle: null,
-    } as LeaderboardUser;
-  });
-
-  return users;
+  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    id: String(row.id),
+    username: String(row.username ?? row.name ?? "learner"),
+    name: String(row.name ?? row.username ?? "Learner"),
+    avatar: (row.avatar as string | null) ?? null,
+    avatarConfig: (row.avatar_config as Record<string, unknown> | null) ?? null,
+    grade: row.grade == null ? null : Number(row.grade),
+    xp: Number(row.xp ?? 0),
+    level: Number(row.level ?? 1),
+    rank: (row.rank as string | null) ?? null,
+    badges: Array.isArray(row.badges) ? (row.badges as string[]) : [],
+    streak: Number(row.streak ?? 0),
+    accuracy: Number(row.accuracy ?? 0),
+    matchesPlayed: Number(row.matches_played ?? 0),
+    wins: Number(row.wins ?? 0),
+    losses: Number(row.losses ?? 0),
+    contributions: Number(row.contributions ?? 0),
+    weeklyScore: Number(row.weekly_score ?? 0),
+    monthlyScore: Number(row.monthly_score ?? 0),
+    totalXp: Number(row.total_xp ?? row.xp ?? 0),
+    seasonXp: Number(row.season_xp ?? row.xp ?? 0),
+    // Currency and title are private/profile-specific features, not leaderboard data.
+    coins: Number(row.coins ?? 0),
+    activeTitle: (row.active_title as string | null) ?? null,
+  }));
 }
 
 export async function fetchFollowing(userId: string): Promise<string[]> {
@@ -178,7 +138,6 @@ export async function createFollowChallenge(challengerId: string, challengedId: 
 
   if (error) throw error;
 }
-
 
 export async function fetchClassCompetitionLeaderboard(limit = 10): Promise<ClassCompetitionRow[]> {
   const { data, error } = await (supabase as any).rpc("get_class_competition_leaderboard", { p_limit: limit });
