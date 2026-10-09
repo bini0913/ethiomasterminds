@@ -1,6 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getRankTierByLevel } from "@/lib/rankSystem";
 
+const toGradeNumber = (grade: string | null): number | null => {
+  if (!grade) return null;
+  const match = grade.match(/\d+/);
+  if (match) return Number(match[0]);
+  if (/^(k|kg|kindergarten)$/i.test(grade.trim())) return 0;
+  const parsed = Number(grade);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
 export interface LeaderboardUser {
   id: string;
   username: string;
@@ -47,10 +56,9 @@ export const tierStyle = (level: number) => {
 };
 
 /**
- * Load a safe, aggregated leaderboard through a SECURITY DEFINER RPC.
- * Direct profile and attempt reads are correctly restricted by RLS to each
- * user's own records, so querying those tables directly cannot produce a
- * complete global leaderboard for regular students.
+ * Load leaderboard data from Supabase. Profile XP is the base ranking source;
+ * ranked multiplayer statistics contribute match results and points when available.
+ * Quiz-period scores only reflect real question_attempts records.
  */
 export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -69,9 +77,9 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
     supabase.from("multiplayer_ranked_stats").select("user_id,total_points,matches_played,wins"),
   ]);
 
-  if (error) {
-    console.error("fetchLeaderboardUsers RPC error", error);
-    throw error;
+  if (profilesRes.error) {
+    console.error("fetchLeaderboardUsers profiles error", profilesRes.error);
+    throw profilesRes.error;
   }
 
   const streakByUser = new Map<string, number>();
@@ -135,7 +143,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
       weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
       monthlyScore: monthly.attempts * 10 + monthly.correct * 5,
       totalXp,
-      seasonXp: Number((profile as any).season_xp ?? totalXp),
+      seasonXp: Number((profile as any).season_xp ?? (rankedStats.points || totalXp)),
       coins: coinsByUser.get(profile.id) ?? 0,
       activeTitle: null,
     } as LeaderboardUser;
