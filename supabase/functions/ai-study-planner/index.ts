@@ -44,8 +44,8 @@ serve(async (req) => {
     if (!Array.isArray(weakTopics) || weakTopics.length > 50 || !Array.isArray(analytics) || analytics.length > 100 || !Array.isArray(existingPlans) || existingPlans.length > 50) return new Response(JSON.stringify({ error: "Invalid planning data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (JSON.stringify({ weakTopics, analytics, existingPlans }).length > 30000) return new Response(JSON.stringify({ error: "Request data is too large" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured");
 
     const prompt = `You are an academic study planner for a Grade ${serverGrade} Ethiopian student preparing for university entrance exams.
 
@@ -63,14 +63,14 @@ Generate a 7-day study plan. Return ONLY a JSON object with a "suggestions" arra
 
 Prioritize weak areas. Include variety. Focus on entrance exam topics.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "openai/gpt-oss-20b",
         messages: [
           { role: "system", content: "You are an expert Ethiopian academic tutor. Return only valid JSON." },
           { role: "user", content: prompt },

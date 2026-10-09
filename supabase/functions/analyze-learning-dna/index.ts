@@ -105,15 +105,15 @@ serve(async (req) => {
     else learningStyle = 'balanced';
 
     // Call AI for personalized insights
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
     let predictedPath = null;
     
-    if (LOVABLE_API_KEY && Object.keys(topicMastery).length > 0) {
+    if (GROQ_API_KEY && Object.keys(topicMastery).length > 0) {
       try {
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        const aiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
