@@ -118,6 +118,7 @@ const TournamentHub: React.FC = () => {
   });
   const [matchWinnerById, setMatchWinnerById] = useState<Record<string, string>>({});
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [joiningTournamentId, setJoiningTournamentId] = useState<string | null>(null);
   const [navigatedMatchRoomId, setNavigatedMatchRoomId] = useState<string | null>(null);
   const isManager = user?.role === "manager" || user?.role === "admin" || user?.role === "extreme_admin";
 
@@ -308,17 +309,23 @@ const TournamentHub: React.FC = () => {
       toast.error("Please sign in to join tournaments");
       return;
     }
+    if (joiningTournamentId) return;
 
-    const { error } = await supabase.rpc("join_tournament" as any, { p_tournament_id: tournamentId });
-    if (error) {
-      toast.error(error.message || "Unable to join tournament");
-      return;
+    setJoiningTournamentId(tournamentId);
+    try {
+      const { error } = await supabase.rpc("join_tournament" as any, { p_tournament_id: tournamentId });
+      if (error) throw error;
+
+      toast.success("Joined tournament successfully");
+      await loadTournaments();
+      await loadTournamentDetails(tournamentId);
+      setSelectedTournamentId(tournamentId);
+    } catch (error) {
+      console.error("Tournament registration failed", error);
+      toast.error(error instanceof Error ? error.message : "Unable to join tournament. Please try again.");
+    } finally {
+      setJoiningTournamentId(null);
     }
-
-    toast.success("Joined tournament successfully");
-    await loadTournaments();
-    await loadTournamentDetails(tournamentId);
-    setSelectedTournamentId(tournamentId);
   };
 
   const runManagerAction = async (
@@ -340,6 +347,10 @@ const TournamentHub: React.FC = () => {
       }
 
       return true;
+    } catch (error) {
+      console.error("Tournament manager action failed", error);
+      toast.error(error instanceof Error ? error.message : "Manager action failed. Please try again.");
+      return false;
     } finally {
       setIsSubmittingAction(false);
     }
@@ -371,7 +382,7 @@ const TournamentHub: React.FC = () => {
       return;
     }
 
-    await runManagerAction(
+    const created = await runManagerAction(
       () =>
         supabase.rpc("create_tournament_workflow" as any, {
           p_name: createForm.name.trim(),
@@ -386,7 +397,7 @@ const TournamentHub: React.FC = () => {
       `${createForm.name.trim()} created`,
     );
 
-    setCreateForm((prev) => ({ ...prev, name: "", entryFee: 0 }));
+    if (created) setCreateForm((prev) => ({ ...prev, name: "", entryFee: 0 }));
   };
 
   const removePlayerAsManager = async (playerUserId: string, playerName: string) => {
@@ -464,8 +475,11 @@ const TournamentHub: React.FC = () => {
 
   const liveMatch = matches.find((m) => m.status === "playing" || m.status === "live") || null;
   const isRegistrationOpen = (tournament: HubTournament) => {
+    if (!["waiting", "upcoming"].includes(tournament.status)) return false;
+    if (tournament.currentPlayers >= tournament.maxPlayers) return false;
     if (!tournament.registrationDeadline) return true;
-    return new Date(tournament.registrationDeadline).getTime() > Date.now();
+    const deadline = new Date(tournament.registrationDeadline).getTime();
+    return Number.isFinite(deadline) && deadline > Date.now();
   };
 
   return (
@@ -522,7 +536,7 @@ const TournamentHub: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <Button className="w-full bg-red-500 text-white hover:bg-red-400" onClick={() => joinTournament(tournament.id)} disabled={!isRegistrationOpen(tournament)}>
+                <Button className="w-full bg-red-500 text-white hover:bg-red-400" onClick={() => joinTournament(tournament.id)} disabled={!isRegistrationOpen(tournament) || joiningTournamentId !== null}>
                   {isRegistrationOpen(tournament) ? "Register" : "Registration Closed"}
                 </Button>
               </CardContent>
