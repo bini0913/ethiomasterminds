@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { BookOpen, Brain, Target, CalendarDays, ChartNoAxesCombined, GraduationCap, TrendingUp, ArrowUpRight, Settings2, ClipboardCheck, Sparkles, Loader2 } from "lucide-react";
+import { BookOpen, Brain, Target, CalendarDays, BarChart3, GraduationCap, TrendingUp, ArrowUpRight, Settings2, ClipboardCheck, Sparkles, Loader2 } from "lucide-react";
 import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
 
 const features = [
   { title: "Exam practice", eyebrow: "PREPARE", description: "Timed practice using approved quizzes and real question sets.", icon: Target, path: "/academic/exam", action: "Start an exam", featured: true },
   { title: "Flashcards", eyebrow: "REMEMBER", description: "Review concepts with active recall and spaced practice.", icon: BookOpen, path: "/academic/flashcards", action: "Review cards" },
-  { title: "Topic coverage", eyebrow: "MASTER", description: "Track your progress and find topics that need attention.", icon: ChartNoAxesCombined, path: "/academic/topics", action: "View topics" },
+  { title: "Topic coverage", eyebrow: "MASTER", description: "Track your progress and find topics that need attention.", icon: BarChart3, path: "/academic/topics", action: "View topics" },
   { title: "Study planner", eyebrow: "ORGANIZE", description: "Turn your study goal into realistic daily tasks.", icon: CalendarDays, path: "/academic/planner", action: "Plan your week" },
   { title: "Academic insights", eyebrow: "IMPROVE", description: "See your performance, strengths and areas to improve.", icon: TrendingUp, path: "/academic/insights", action: "See progress" },
 ];
@@ -27,7 +27,7 @@ const AcademicMode: React.FC = () => {
   const [todayCount, setTodayCount] = useState(0);
   const [todayCompleted, setTodayCompleted] = useState(0);
   const [weekDone, setWeekDone] = useState(0);
-  const [recentResult, setRecentResult] = useState<{ score: number; total_questions: number; created_at?: string } | null>(null);
+  const [recentResult, setRecentResult] = useState<{ score: number; total_questions: number; completed_at?: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
