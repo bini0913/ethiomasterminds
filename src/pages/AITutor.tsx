@@ -214,7 +214,7 @@ const AITutor: React.FC = () => {
                     <CardTitle className="text-base">Plus · {subj.name} Coach</CardTitle>
                     <p className="text-xs text-muted-foreground">Encouraging, patient, step-by-step</p>
                   </div>
-                  <Badge variant="secondary"><Sparkles className="h-3 w-3 mr-1" />Gemini powered</Badge>
+                  <Badge variant="secondary"><Sparkles className="h-3 w-3 mr-1" />Groq powered</Badge>
                 </div>
               </CardHeader>
 
