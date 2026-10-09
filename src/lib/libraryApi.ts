@@ -10,6 +10,7 @@ export interface LibraryBook {
   description: string;
   grade_level: number | null;
   type: 'textbook' | 'notes' | 'practice' | 'reference';
+  book_category: 'academic' | 'general';
   status: UploadStatus;
   pdf_path: string;
   thumbnail_path: string | null;
@@ -86,6 +87,7 @@ export interface CreateBookPayload {
   description: string;
   gradeLevel: number | null;
   type: LibraryBook['type'];
+  bookCategory: LibraryBook['book_category'];
   pdfFile: File;
   uploaderId: string;
   uploaderRole: LibraryBook['uploader_role'];
@@ -287,6 +289,7 @@ export async function createBook(payload: CreateBookPayload) {
       description: payload.description,
       grade_level: payload.gradeLevel,
       type: payload.type,
+      book_category: payload.bookCategory,
       status,
       pdf_path: pdfPath,
       thumbnail_path: thumbnailPath,
@@ -338,7 +341,7 @@ export async function createBook(payload: CreateBookPayload) {
   return createdBook;
 }
 
-export async function updateBook(id: string, patch: Partial<Pick<LibraryBook, 'title' | 'author' | 'subject' | 'description' | 'grade_level' | 'type' | 'status'>>) {
+export async function updateBook(id: string, patch: Partial<Pick<LibraryBook, 'title' | 'author' | 'subject' | 'description' | 'grade_level' | 'type' | 'book_category' | 'status'>>) {
   const { data, error } = await db
     .from('library_books')
     .update(patch)
