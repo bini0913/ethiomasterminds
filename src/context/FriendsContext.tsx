@@ -291,7 +291,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       const { data, error } = await supabase
-        .rpc('find_student_by_username', { search_username: query });
+        .rpc('find_student_by_username', { _username: query.trim() });
       
       if (error) throw error;
       
