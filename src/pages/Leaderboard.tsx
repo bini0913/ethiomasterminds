@@ -49,6 +49,7 @@ const Leaderboard = () => {
   );
   const [timeframe, setTimeframe] = useState<Timeframe>("all");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [classRows, setClassRows] = useState<ClassCompetitionRow[]>([]);
   const [visibleRows, setVisibleRows] = useState(16);
   const [previewUser, setPreviewUser] = useState<(LeaderboardUser & { rankPos: number; score: number; tier: any }) | null>(null);
@@ -59,9 +60,16 @@ const Leaderboard = () => {
 
   const loadLeaderboard = async () => {
     setLoading(true);
-    const rows = await fetchLeaderboardUsers();
-    setUsers(rows);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const rows = await fetchLeaderboardUsers();
+      setUsers(rows);
+    } catch (error) {
+      console.error("Leaderboard load failed", error);
+      setLoadError("We couldn't load rankings from Supabase. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadClassCompetition = async () => {
@@ -213,6 +221,27 @@ const Leaderboard = () => {
           <Button variant="outline" onClick={() => navigate("/")}>Back to home</Button>
         </header>
 
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-3" aria-label="Leaderboard overview">
+          <Card className="border-primary/20 bg-card/80">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="rounded-xl bg-primary/10 p-3"><Users className="h-5 w-5 text-primary" /></div>
+              <div><p className="text-xs text-muted-foreground">Learners ranked</p><p className="text-2xl font-bold tabular-nums">{users.length.toLocaleString()}</p></div>
+            </CardContent>
+          </Card>
+          <Card className="border-primary/20 bg-card/80">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="rounded-xl bg-amber-500/10 p-3"><Trophy className="h-5 w-5 text-amber-500" /></div>
+              <div><p className="text-xs text-muted-foreground">Your position</p><p className="text-2xl font-bold tabular-nums">{user?.id && rankedUsers.some((entry) => entry.id === user.id) ? `#${rankedUsers.findIndex((entry) => entry.id === user.id) + 1}` : "—"}</p></div>
+            </CardContent>
+          </Card>
+          <Card className="border-primary/20 bg-card/80">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="rounded-xl bg-emerald-500/10 p-3"><Zap className="h-5 w-5 text-emerald-500" /></div>
+              <div><p className="text-xs text-muted-foreground">Your weekly score</p><p className="text-2xl font-bold tabular-nums">{(users.find((entry) => entry.id === user?.id)?.weeklyScore ?? 0).toLocaleString()}</p></div>
+            </CardContent>
+          </Card>
+        </section>
+
         <Card className="border-primary/30 bg-background/80 backdrop-blur-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -283,7 +312,9 @@ const Leaderboard = () => {
               </section>
             ) : (
               <>
-            {loading ? <p className="text-sm text-muted-foreground">Loading leaderboard…</p> : null}
+            {loading ? <div className="rounded-xl border bg-muted/30 p-6 text-sm text-muted-foreground animate-pulse">Loading live rankings…</div> : null}
+            {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4"><p className="text-sm text-destructive">{loadError}</p><Button variant="outline" size="sm" onClick={loadLeaderboard}>Try again</Button></div>}
+            {!loading && !loadError && users.length === 0 && <div className="rounded-xl border border-dashed p-8 text-center"><Trophy className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-semibold">Your leaderboard starts here</p><p className="mt-1 text-sm text-muted-foreground">Complete quizzes to earn points and appear in the rankings.</p></div>}
 
             <section className="space-y-3">
               <div className="hidden gap-4 md:grid md:grid-cols-3">

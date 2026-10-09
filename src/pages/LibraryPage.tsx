@@ -98,6 +98,7 @@ const LibraryPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionKey>('community');
   const [selectedBook, setSelectedBook] = useState<LibraryBook | null>(null);
   const [readerOpen, setReaderOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(true);
   const [readerUrl, setReaderUrl] = useState<string | null>(null);
   const [readerRetry, setReaderRetry] = useState(0);
   const [readerLoading, setReaderLoading] = useState(false);
@@ -125,6 +126,7 @@ const LibraryPage: React.FC = () => {
     description: '',
     gradeLevel: '9',
     type: 'textbook' as LibraryBook['type'],
+    bookCategory: 'academic' as LibraryBook['book_category'],
     file: null as File | null,
   });
 
@@ -213,7 +215,7 @@ const LibraryPage: React.FC = () => {
     const defaultGrade = user?.role === 'student'
       ? Math.min(studentGradeMax, Math.max(studentGradeMin, userGrade || studentGradeMin))
       : 9;
-    setForm({ title: '', author: '', subject: '', description: '', gradeLevel: String(defaultGrade), type: 'textbook', file: null });
+    setForm({ title: '', author: '', subject: '', description: '', gradeLevel: String(defaultGrade), type: 'textbook', bookCategory: 'academic', file: null });
     setEditingBookId(null);
   };
 
@@ -252,6 +254,7 @@ const LibraryPage: React.FC = () => {
           description: form.description,
           grade_level: Number(form.gradeLevel),
           type: form.type,
+          book_category: form.bookCategory,
         });
         toast.success('Book details updated.');
       } else {
@@ -276,6 +279,7 @@ const LibraryPage: React.FC = () => {
           description: form.description,
           gradeLevel: Number(form.gradeLevel),
           type: form.type,
+          bookCategory: form.bookCategory,
           pdfFile: form.file,
           uploaderId: user.id,
           uploaderRole: user.role as 'admin' | 'manager' | 'student' | 'teacher',
@@ -534,7 +538,17 @@ const LibraryPage: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <Label>Type</Label>
+                    <Label>Book type</Label>
+                    <Select value={form.bookCategory} onValueChange={(value: LibraryBook['book_category']) => setForm((p) => ({ ...p, bookCategory: value }))}>
+                      <SelectTrigger><SelectValue placeholder="Choose reading experience" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="academic">Academic book — textbook and study tools</SelectItem>
+                        <SelectItem value="general">General book — distraction-free reading</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Content category</Label>
                     <Select value={form.type} onValueChange={(value: LibraryBook['type']) => setForm((p) => ({ ...p, type: value }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -758,6 +772,7 @@ const LibraryPage: React.FC = () => {
                                                 : book.grade_level || (user?.role === 'student' ? studentGradeMin : 9)
                                             ),
                                             type: book.type,
+                                            bookCategory: book.book_category || 'academic',
                                             file: null,
                                           });
                                           setOpenUpload(true);
@@ -820,8 +835,8 @@ const LibraryPage: React.FC = () => {
       </div>
 
       <Dialog open={readerOpen} onOpenChange={setReaderOpen}>
-        <DialogContent className="max-w-6xl h-[90vh] p-0 overflow-hidden">
-          <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_320px]">
+        <DialogContent className="fixed inset-0 left-0 top-0 translate-x-0 translate-y-0 w-screen max-w-none h-[100dvh] rounded-none p-0 overflow-hidden">
+          <div className={`h-full min-h-0 grid grid-cols-1 ${selectedBook?.book_category === "academic" && aiPanelOpen ? "lg:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1"}`}>
             <div className="flex flex-col h-full border-r">
               <div className="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -829,6 +844,7 @@ const LibraryPage: React.FC = () => {
                   <p className="text-xs text-muted-foreground">Progress: {Math.round(readerProgress)}%</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {selectedBook?.book_category === "academic" && <Button size="sm" variant="outline" onClick={() => setAiPanelOpen((open) => !open)}><Brain className="h-4 w-4 mr-1" />{aiPanelOpen ? "Hide AI tools" : "Study tools"}</Button>}
                   <Button size="sm" variant="outline" onClick={() => markReaderProgress(Math.min(100, readerProgress + 10))}>+10%</Button>
                   <Button size="sm" variant="outline" onClick={() => markReaderProgress(Math.max(0, readerProgress - 10))}>-10%</Button>
                 </div>
@@ -873,7 +889,7 @@ const LibraryPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="p-3 border-t grid gap-2 md:grid-cols-2">
+              {selectedBook?.book_category === "academic" && <div className="p-3 border-t grid gap-2 md:grid-cols-2">
                 <Input placeholder="Paste selected text here for highlight/AI" value={selectedText} onChange={(e) => setSelectedText(e.target.value)} />
                 <Input placeholder="Paste current page text (for better AI output)" value={readerPageText} onChange={(e) => setReaderPageText(e.target.value)} />
                 <div className="flex flex-wrap gap-2 items-center">
@@ -885,10 +901,10 @@ const LibraryPage: React.FC = () => {
                   <Input placeholder="Add note" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
                   <Button size="sm" onClick={saveHighlight}>Save</Button>
                 </div>
-              </div>
+              </div>}
             </div>
 
-            <div className="h-full overflow-auto p-3 space-y-3">
+            {selectedBook?.book_category === "academic" && aiPanelOpen && <div className="h-full min-h-0 overflow-y-auto overscroll-contain p-3 space-y-3 border-l bg-background">
               <p className="font-semibold flex items-center gap-2"><Brain className="h-4 w-4" />AI Tools</p>
               <div className="grid grid-cols-2 gap-2">
                 <Button size="sm" variant="outline" onClick={() => runAi('summary')}>Summarize</Button>
@@ -930,7 +946,7 @@ const LibraryPage: React.FC = () => {
                   ))}
                 </CardContent>
               </Card>
-            </div>
+            </div>}
           </div>
         </DialogContent>
       </Dialog>
