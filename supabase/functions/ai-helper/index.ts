@@ -75,11 +75,11 @@ Current mode: ${mode}
       if (safeContext.correctAnswer) systemPrompt += `\n- Correct Answer: ${safeContext.correctAnswer}`;
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("GROQ_API_KEY")}` },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "openai/gpt-oss-20b",
         messages: [{ role: "system", content: systemPrompt }, ...messages.map((m) => ({ role: m.role, content: m.content }))],
         max_tokens: 1000,
         temperature: 0.7,
@@ -88,7 +88,7 @@ Current mode: ${mode}
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI Gateway error:", errorText.slice(0, 500));
+      console.error("Groq API error:", errorText.slice(0, 500));
       return new Response(JSON.stringify({ error: response.status === 429 ? "AI rate limit reached" : "AI service error" }), { status: response.status === 429 ? 429 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
