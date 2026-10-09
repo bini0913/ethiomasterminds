@@ -33,35 +33,43 @@ export function useLearningDNA(userId?: string) {
 
     setIsLoading(true);
     setError(null);
-    const [{ data, error: queryError }, { count: attemptCount, error: attemptsError }] = await Promise.all([
-      supabase
-        .from("learning_dna")
-        .select("*")
-        .eq("user_id", userId)
-        .maybeSingle(),
-      supabase
-        .from("question_attempts")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId),
-    ]);
+    try {
+      const [{ data, error: queryError }, { count: attemptCount, error: attemptsError }] = await Promise.all([
+        supabase
+          .from("learning_dna")
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("question_attempts")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId),
+      ]);
 
-    if (queryError && queryError.code !== "PGRST116") {
-      setError(new Error(queryError.message));
+      if (queryError && queryError.code !== "PGRST116") {
+        throw new Error(queryError.message);
+      }
+
+      if (data) {
+        setLearningData({
+          topicMastery: (data.topic_mastery as unknown as Record<string, TopicMastery>) || {},
+          strengths: (data.strengths as string[]) || [],
+          weaknesses: (data.weaknesses as string[]) || [],
+          learningStyle: data.learning_style || "balanced",
+          predictedPath: data.predicted_path as LearningData["predictedPath"],
+          totalAttempts: attemptsError ? 0 : (attemptCount ?? 0),
+        });
+      } else {
+        setLearningData(null);
+      }
+      if (attemptsError) console.warn("Learning DNA attempt count unavailable", attemptsError);
+    } catch (loadError) {
+      console.error("Learning DNA load failed", loadError);
+      setError(loadError instanceof Error ? loadError : new Error("Unable to load Learning DNA."));
       setLearningData(null);
-    } else if (data) {
-      setLearningData({
-        topicMastery: (data.topic_mastery as unknown as Record<string, TopicMastery>) || {},
-        strengths: (data.strengths as string[]) || [],
-        weaknesses: (data.weaknesses as string[]) || [],
-        learningStyle: data.learning_style || "balanced",
-        predictedPath: data.predicted_path as LearningData["predictedPath"],
-        totalAttempts: attemptsError ? 0 : (attemptCount ?? 0),
-      });
-    } else {
-      setLearningData(null);
+    } finally {
+      setIsLoading(false);
     }
-    if (attemptsError) console.warn("Learning DNA attempt count unavailable", attemptsError);
-    setIsLoading(false);
   }, [userId]);
 
   useEffect(() => {
