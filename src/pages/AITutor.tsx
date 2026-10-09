@@ -167,7 +167,7 @@ const AITutor: React.FC = () => {
         </div>
       </header>
 
-      <div className="container max-w-6xl mx-auto py-6 px-4 relative z-10">
+      <div className="container max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-4 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1 space-y-4">
             <Card className="glass border-border/50">
@@ -204,7 +204,7 @@ const AITutor: React.FC = () => {
           </div>
 
           <div className="lg:col-span-3">
-            <Card className="glass border-border/50 h-[calc(100vh-180px)] min-h-[600px] flex flex-col">
+            <Card className="glass border-border/50 h-[calc(100dvh-150px)] min-h-[520px] flex flex-col">
               <CardHeader className="pb-3 border-b border-border/50">
                 <div className="flex items-center gap-3">
                   <div className={cn("w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center", subj.color)}>
@@ -244,12 +244,12 @@ const AITutor: React.FC = () => {
                       {messages.map((msg, idx) => (
                         <motion.div key={idx} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                           className={cn('flex group', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                          <div className={cn('max-w-[85%] rounded-2xl px-4 py-3 relative',
+                          <div className={cn('max-w-[92%] sm:max-w-[85%] rounded-2xl px-4 py-3 relative min-w-0',
                             msg.role === 'user'
                               ? 'bg-primary text-primary-foreground rounded-tr-sm'
                               : 'bg-muted/70 backdrop-blur rounded-tl-sm border border-border/50')}>
                             {msg.role === 'assistant' ? (
-                              <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-headings:mt-3 prose-headings:mb-2 prose-ul:my-2 prose-li:my-0.5 prose-code:text-primary prose-code:bg-background/50 prose-code:px-1 prose-code:rounded prose-pre:bg-background/70">
+                              <div className="prose prose-sm dark:prose-invert max-w-none text-[15px] leading-7 prose-p:my-2 prose-p:leading-7 prose-headings:text-base prose-headings:font-semibold prose-headings:leading-6 prose-headings:mt-4 prose-headings:mb-2 prose-h1:text-lg prose-h2:text-base prose-h3:text-sm prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-strong:font-semibold prose-code:text-primary prose-code:bg-background/50 prose-code:px-1 prose-code:rounded prose-pre:bg-background/70">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                               </div>
                             ) : (
