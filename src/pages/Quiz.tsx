@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useQuiz, Quiz as QuizType, Question } from "@/context/QuizContext";
 import QuizView from "@/components/quiz/QuizView";
@@ -15,8 +16,10 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { adjustDifficulty, difficultyFromLevel, normalizeDifficulty, QuizDifficulty, xpPerCorrectByDifficulty } from "@/lib/quizDifficulty";
+import { normalizeSubject } from "@/lib/academicProfile";
 
 const Quiz: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const { quizzes } = useQuiz();
   const { user } = useUser();
   const tier = useTier();
@@ -93,6 +96,14 @@ const Quiz: React.FC = () => {
     )],
     [quizzes, selectedGradeNumber]
   );
+
+  // Topic Coverage can deep-link into regular Quizzes with a subject preselected.
+  useEffect(() => {
+    const requestedSubject = searchParams.get("subject");
+    if (!requestedSubject || !categories.length) return;
+    const match = categories.find((category) => normalizeSubject(category) === normalizeSubject(requestedSubject));
+    if (match) setSelectedCategory(match);
+  }, [searchParams, categories]);
 
   // Create 10 practice sets per grade+subject with 10 questions each.
   const generatedPracticeQuizzes = useMemo(() => {
