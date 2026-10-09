@@ -88,7 +88,7 @@ const ExamModePage: React.FC = () => {
         }
         const { data: questionRows, error: questionError } = await supabase
           .from("questions")
-          .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,topic,order_index")
+          .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index")
           .in("quiz_id", matching.map((quiz: any) => quiz.id))
           .order("order_index", { ascending: true });
         if (questionError) throw questionError;
@@ -192,7 +192,7 @@ const ExamModePage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from("questions")
-        .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,topic,order_index")
+        .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index")
         .eq("quiz_id", selectedQuiz.id)
         .order("order_index", { ascending: true });
       if (error) throw error;
