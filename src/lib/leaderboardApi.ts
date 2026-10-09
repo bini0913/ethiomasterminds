@@ -56,7 +56,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [profilesRes, streakRes, attemptsRes, currencyRes] = await Promise.all([
+  const [profilesRes, streakRes, attemptsRes, currencyRes, rankedStatsRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("id,name,username,avatar,avatar_config,grade,xp,season_xp,level,rank,badges"),
@@ -66,6 +66,7 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
       .select("user_id,is_correct,created_at")
       .gte("created_at", monthAgo),
     supabase.from("user_currency").select("user_id,coins"),
+    supabase.from("multiplayer_ranked_stats").select("user_id,total_points,matches_played,wins"),
   ]);
 
   if (profilesRes.error) {
@@ -78,6 +79,18 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
 
   const coinsByUser = new Map<string, number>();
   (currencyRes.data ?? []).forEach((row) => coinsByUser.set(row.user_id, row.coins ?? 0));
+
+  if (streakRes.error) console.warn("Leaderboard streak data unavailable", streakRes.error);
+  if (attemptsRes.error) console.warn("Leaderboard quiz-attempt data unavailable", attemptsRes.error);
+  if (currencyRes.error) console.warn("Leaderboard currency data unavailable", currencyRes.error);
+  if (rankedStatsRes.error) console.warn("Leaderboard multiplayer stats unavailable", rankedStatsRes.error);
+
+  const rankedStatsByUser = new Map<string, { points: number; matches: number; wins: number }>();
+  (rankedStatsRes.data ?? []).forEach((row) => rankedStatsByUser.set(row.user_id, {
+    points: Number(row.total_points ?? 0),
+    matches: Number(row.matches_played ?? 0),
+    wins: Number(row.wins ?? 0),
+  }));
 
   const weeklyByUser = new Map<string, { attempts: number; correct: number }>();
   const monthlyByUser = new Map<string, { attempts: number; correct: number }>();
@@ -98,6 +111,10 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
     const weekly = weeklyByUser.get(profile.id) ?? { attempts: 0, correct: 0 };
     const monthly = monthlyByUser.get(profile.id) ?? { attempts: 0, correct: 0 };
     const accuracy = monthly.attempts > 0 ? Number(((monthly.correct / monthly.attempts) * 100).toFixed(1)) : 0;
+    const rankedStats = rankedStatsByUser.get(profile.id) ?? { points: 0, matches: 0, wins: 0 };
+    const totalXp = Number(profile.xp ?? 0);
+    const computedLevel = Math.max(Number(profile.level ?? 1), Math.floor(totalXp / 100) + 1);
+    const computedRank = profile.rank ?? (totalXp >= 10000 ? "Legend" : totalXp >= 5000 ? "Master" : totalXp >= 2000 ? "Diamond" : totalXp >= 1000 ? "Platinum" : totalXp >= 500 ? "Gold" : totalXp >= 200 ? "Silver" : "Bronze");
     return {
       id: profile.id,
       username: profile.username ?? profile.name ?? "user",
@@ -106,19 +123,19 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
       avatarConfig: (profile.avatar_config as Record<string, unknown> | null) ?? null,
       grade: toGradeNumber(profile.grade),
       xp: Number(profile.xp ?? 0),
-      level: profile.level ?? 1,
-      rank: profile.rank ?? null,
+      level: computedLevel,
+      rank: computedRank,
       badges: profile.badges ?? [],
       streak: streakByUser.get(profile.id) ?? 0,
       accuracy,
-      matchesPlayed: 0,
-      wins: 0,
-      losses: 0,
+      matchesPlayed: rankedStats.matches,
+      wins: rankedStats.wins,
+      losses: Math.max(0, rankedStats.matches - rankedStats.wins),
       contributions: 0,
       weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
       monthlyScore: monthly.attempts * 10 + monthly.correct * 5,
-      totalXp: Number(profile.xp ?? 0),
-      seasonXp: Number((profile as any).season_xp ?? 0),
+      totalXp,
+      seasonXp: Number((profile as any).season_xp ?? totalXp),
       coins: coinsByUser.get(profile.id) ?? 0,
       activeTitle: null,
     } as LeaderboardUser;
