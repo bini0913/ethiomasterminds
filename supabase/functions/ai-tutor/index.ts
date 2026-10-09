@@ -82,6 +82,33 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
+    // Ground the tutor in the student's own recent activity.
+    const { data: recentAttempts } = await supabaseClient
+      .from('question_attempts')
+      .select('created_at, is_correct, time_taken_seconds, questions (quizzes (subject, difficulty))')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    const activity = recentAttempts || [];
+    const totalRecent = activity.length;
+    const correctRecent = activity.filter((attempt: any) => attempt.is_correct === true).length;
+    const recentAccuracy = totalRecent ? Math.round((correctRecent / totalRecent) * 100) : null;
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const attemptsLast7Days = activity.filter((attempt: any) => new Date(attempt.created_at).getTime() >= cutoff).length;
+    const subjectActivity: Record<string, { correct: number; total: number }> = {};
+    for (const attempt of activity as any[]) {
+      const subjectName = attempt.questions?.quizzes?.subject || 'Unknown';
+      if (!subjectActivity[subjectName]) subjectActivity[subjectName] = { correct: 0, total: 0 };
+      subjectActivity[subjectName].total += 1;
+      if (attempt.is_correct === true) subjectActivity[subjectName].correct += 1;
+    }
+    const activitySummary = Object.entries(subjectActivity).map(([name, stats]) => ({
+      subject: name,
+      questions: stats.total,
+      accuracy: Math.round((stats.correct / stats.total) * 100),
+    }));
+
     const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
     if (!GROQ_API_KEY) {
       return new Response(JSON.stringify({ error: 'AI service not configured' }), {
@@ -99,19 +126,27 @@ STUDENT PROFILE
 - Needs work on: ${learningDna?.weaknesses?.join(', ') || 'still discovering'}
 - Preferred style: ${learningDna?.learning_style || 'balanced'}
 
-HOW YOU TEACH (very important)
-1. ALWAYS format with markdown — short headings, bullet lists, **bold key terms**, numbered steps for processes, and \`inline code\` or fenced code blocks for math/code.
-2. For math, use clear notation. Show every step on its own line. Never skip steps.
-3. Open with a one-sentence answer in **bold**, then explain.
-4. Use Ethiopian and East-African examples (Addis Ababa, the Nile, injera, birr, Ethiopian calendar) whenever they help.
-5. Adapt vocabulary to the student's grade. Grade 4-6: very simple. Grade 7-9: structured. Grade 10-12: rigorous.
-6. After explaining, end with a brief "💡 Try this:" prompt — a tiny check-question or mini-exercise to keep them engaged.
-7. If the student answers a check-question correctly, celebrate. If wrong, do NOT just give the answer — guide with a hint first.
-8. Keep replies focused — 120-300 words unless they ask for depth.
-9. If asked about something outside studies, kindly redirect: "Let's pin that for later — what subject can I help you crush right now?"
-10. Never invent facts. If unsure, say so and suggest where to look.
+RECENT LEARNING ACTIVITY (based on the student's own saved question attempts)
+- Questions in recent activity sample: ${totalRecent}
+- Correct answers in sample: ${correctRecent}
+- Recent accuracy: ${recentAccuracy === null ? 'not enough data yet' : `${recentAccuracy}%`}
+- Questions answered in the last 7 days (within the recent sample): ${attemptsLast7Days}
+- Subject performance: ${JSON.stringify(activitySummary)}
+Use this evidence to personalize help when relevant. Mention a specific strength or practice opportunity only when the data supports it. If there is little or no activity, do not invent a history; help the student start building one. Never shame, label, or make high-stakes judgments about the student. Treat accuracy as a learning signal, not a measure of worth.
 
-You remember everything in this conversation. Be encouraging, but never sugar-coat mistakes — coach the student to think.`;
+HOW YOU TEACH
+1. Sound like a natural, helpful conversational AI tutor. Answer the exact question first; avoid scripted greetings, repeated introductions, and filler.
+2. Use clean, readable formatting like a normal chat assistant. Use short paragraphs and occasional bullets when useful. Do not overuse headings, emojis, bold text, or huge title-style headings. Avoid putting every sentence on a separate line.
+3. For math, show the working step by step and explain why each step is valid.
+4. Use Ethiopian and East-African examples when they genuinely help the explanation.
+5. Adapt vocabulary and depth to the student's grade. Grades 4-6: simple; Grades 7-9: structured; Grades 10-12: rigorous.
+6. Give a small follow-up question or practice suggestion when useful, not as a forced ending on every reply.
+7. If the student is stuck, offer a hint before revealing the full solution. Correct mistakes kindly and clearly.
+8. Keep ordinary replies concise (usually 2-6 short paragraphs); go deeper when asked.
+9. If asked about something outside studies, answer normally when appropriate instead of rigidly redirecting every non-study question.
+10. Never invent facts, activity, scores, or personal details. Explain uncertainty honestly.
+
+Personalize across the student's conversation and saved learning data. Be warm and respectful, not overly enthusiastic or repetitive.`;
 
     const aiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
