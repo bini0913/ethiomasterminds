@@ -102,14 +102,20 @@ const UserProfilePage = () => {
       setFallbackProfile(null);
       return;
     }
-    const rows = await fetchLeaderboardUsers();
-    setUsers(rows);
-
-    const found = rows.find((row) => row.id === userId);
-    if (found) {
-      setFallbackProfile(null);
-      setProfileMissing(false);
-      return;
+    // The profile route must remain usable even if leaderboard aggregation
+    // is temporarily unavailable. Resolve the requested profile independently.
+    try {
+      const rows = await fetchLeaderboardUsers();
+      setUsers(rows);
+      const found = rows.find((row) => row.id === userId);
+      if (found) {
+        setFallbackProfile(null);
+        setProfileMissing(false);
+        return;
+      }
+    } catch (error) {
+      console.warn("Leaderboard data unavailable while resolving profile", error);
+      setUsers([]);
     }
 
     const { data: fallback, error: fallbackError } = await supabase
