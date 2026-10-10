@@ -139,6 +139,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [showChat, setShowChat] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [questionLoadError, setQuestionLoadError] = useState<string | null>(null);
+  const [questionAdvanceError, setQuestionAdvanceError] = useState<string | null>(null);
   const [resultsLoadError, setResultsLoadError] = useState<string | null>(null);
   const [retryingResults, setRetryingResults] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(10);
@@ -530,6 +532,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       if (!data?.id || !data?.question_text) {
         throw new Error('The next question is not available yet. Please try again.');
       }
+      setQuestionAdvanceError(null);
       setCurrentQuestion({
         id: data.id,
         question_text: data.question_text,
@@ -784,11 +787,13 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   const nextQuestion = async () => {
     if (advancingQuestionRef.current || roomConfig.gameMode !== 'accuracy') return;
+    setQuestionAdvanceError(null);
     try {
       advancingQuestionRef.current = true;
       const { data, error } = await supabase.rpc('multiplayer_advance_player', { p_room_id: roomId });
       if (error) throw error;
       if (data?.done) {
+        setQuestionAdvanceError(null);
         setCurrentQuestion(null);
         setPlayerFinished(true);
         void supabase.rpc('multiplayer_finish_game', { p_room_id: roomId });
@@ -807,7 +812,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       setAnswerResult(null);
     } catch (err: any) {
       console.error('Error advancing question:', err);
-      toast.error(err?.message || 'Could not load the next question');
+      const message = err instanceof Error ? err.message : 'Check your connection and try again.';
+      setQuestionAdvanceError(message);
+      toast.error('Could not load the next question', { description: message });
     } finally {
       advancingQuestionRef.current = false;
     }
@@ -1116,6 +1123,18 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
               </Card>
             )}
 
+            {roomState.status === 'playing' && !currentQuestion && !playerFinished && (
+              <Card className="p-6 bg-white/5 border-white/10 text-center space-y-3" role="status" aria-live="polite">
+                <h2 className="text-lg font-semibold">Reconnecting to your question</h2>
+                <p className="text-sm text-white/70">
+                  {questionLoadError || 'Your question is loading. If your connection was interrupted, try again.'}
+                </p>
+                <Button onClick={() => { void loadPlayerQuestion(); }}>
+                  <Wifi className="h-4 w-4 mr-2" /> Retry question
+                </Button>
+              </Card>
+            )}
+
             {roomState.status === 'playing' && currentQuestion && (
               <Card className={cn('p-6 bg-white/5 border-white/10 transition-all', answerShake && 'animate-pulse')}>
                 <div className="space-y-4">
@@ -1215,9 +1234,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                   )}
 
                   {roomConfig.gameMode === 'accuracy' && (selectedAnswer !== null || timeRemaining <= 0) && (
-                    <div className="text-center">
+                    <div className="text-center space-y-2">
+                      {questionAdvanceError && (
+                        <p className="text-sm text-red-200" role="alert">
+                          Could not advance to the next question: {questionAdvanceError}
+                        </p>
+                      )}
                       <Button onClick={nextQuestion} className="bg-cyan-500 hover:bg-cyan-600 min-h-11 px-6" disabled={advancingQuestionRef.current}>
-                        Next Question →
+                        {questionAdvanceError ? 'Retry Next Question' : 'Next Question →'}
                       </Button>
                     </div>
                   )}
