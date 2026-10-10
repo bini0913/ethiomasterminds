@@ -22,15 +22,22 @@ serve(async (req) => {
     if (!rateLimit.data) return new Response(JSON.stringify({ error: "Please wait before generating another analysis." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const body = await req.json();
-    const { stats, topicData, streak, grade, xp } = body;
+    const { stats, topicData, streak, grade, xp, curriculum, studyGoal, book, subjects } = body;
     if (typeof grade !== "string" || grade.length > 40) return new Response(JSON.stringify({ error: "Invalid grade" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (!Array.isArray(topicData) || topicData.length > 100) return new Response(JSON.stringify({ error: "Invalid topic data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    if (JSON.stringify({ stats, topicData, streak, xp }).length > 20000) return new Response(JSON.stringify({ error: "Request data is too large" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (JSON.stringify({ stats, topicData, streak, xp, curriculum, studyGoal, book, subjects }).length > 20000) return new Response(JSON.stringify({ error: "Request data is too large" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured");
 
-    const prompt = `You are an academic advisor for a Grade ${grade} Ethiopian student preparing for university entrance exams.
+    const safeSubjects = Array.isArray(subjects) ? subjects.filter((s: unknown) => typeof s === "string").slice(0, 20) : [];
+    const prompt = `You are the adaptive Academic Prep advisor for a Grade ${grade} student. Do not assume university entrance preparation unless the saved goal explicitly calls for it.
+
+Personal learning context:
+- Goal: ${String(studyGoal || "general academic progress").slice(0, 200)}
+- Curriculum: ${String(curriculum || "not specified").slice(0, 120)}
+- Selected subjects: ${JSON.stringify(safeSubjects)}
+- Library resources: ${String(book || "not specified").slice(0, 500)}
 
 Student data:
 - XP: ${xp}, Overall accuracy: ${stats?.accuracy || 0}%, Quizzes completed: ${stats?.total_quizzes || 0}
@@ -42,10 +49,10 @@ Provide a personalized academic analysis with:
 2. Strongest areas and why
 3. Weakest areas with specific improvement strategies
 4. Study consistency evaluation
-5. 4-5 actionable recommendations for entrance exam preparation
-6. Predicted readiness level (percentage) for the entrance exam
+5. 4-5 actionable recommendations aligned with the saved goal, grade, subjects, curriculum, Library resources, and weak areas
+6. Give a readiness estimate only for a specific exam goal with enough relevant practice data; otherwise explain what evidence is missing instead of inventing a percentage
 
-Use emojis for visual appeal. Be encouraging but honest. Keep it concise and actionable.`;
+Separate measured results from hypotheses. If little data exists, say so and recommend a short diagnostic. Be encouraging, specific, and concise.`;
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",

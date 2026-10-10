@@ -68,7 +68,7 @@ const StudyPlannerPage: React.FC = () => {
         grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 5)),
         curriculum: profile.curriculum,
         goal: profile.study_goal_detail || profile.study_goal,
-        book: profile.book_title || "Not specified",
+        book: [profile.book_title, ...(profile.book_ids || []).map((id: string) => id)].filter(Boolean).join(", ") || "Not specified",
       });
     }).catch(() => {});
   }, [user?.id, user?.grade]);
@@ -127,7 +127,7 @@ const StudyPlannerPage: React.FC = () => {
         body: {
           weakTopics,
           analytics,
-          grade: academicContext?.grade || normalizeGrade(user.grade, 12),
+          grade: String(academicContext?.grade || normalizeGrade(user.grade, 12)),
           curriculum: academicContext?.curriculum,
           studyGoal: academicContext?.goal,
           book: academicContext?.book,
