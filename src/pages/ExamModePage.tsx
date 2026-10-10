@@ -12,10 +12,10 @@ import { toast } from "sonner";
 import { getAcademicProfile, normalizeGrade, normalizeSubject, subjectsMatch } from "@/lib/academicProfile";
 
 type ExamState = "setup" | "running" | "results";
-type SourceQuiz = { id: string; title: string; description?: string; subject: string; grade: number; difficulty?: string; time_limit?: number | null; questionCount: number };
+type SourceQuiz = { id: string; title: string; description?: string; subject: string; grade: number; difficulty?: string; time_limit?: number | null; exam_type?: string; questionCount: number };
 type ExamQuestion = { id: string; question_text: string; options: string[]; correct_answer: string; explanation?: string; topic?: string };
 function goalRelevance(quiz: SourceQuiz, goal: string): number {
-  const text = `${quiz.title} ${quiz.description || ""} ${quiz.difficulty || ""}`.toLowerCase();
+  const text = `${quiz.title} ${quiz.description || ""} ${quiz.difficulty || ""} ${(quiz.exam_type || "general").replace(/[_-]+/g, " ")}`.toLowerCase();
   const target = goal.toLowerCase().replace(/[_-]+/g, " ");
   const groups: Array<{ terms: string[]; keywords: string[] }> = [
     { terms: ["exit", "grade 12", "national exam", "school leaving"], keywords: ["exit exam", "grade 12", "school leaving", "national exam", "matriculation"] },
@@ -88,7 +88,7 @@ const ExamModePage: React.FC = () => {
         // Academic Prep and regular Quizzes share the same approved quizzes + linked question bank.
         const { data: quizRows, error: quizError } = await supabase
           .from("quizzes")
-          .select("id,title,description,subject,grade,difficulty,time_limit")
+          .select("id,title,description,subject,grade,difficulty,time_limit,exam_type")
           .eq("is_approved", true);
         if (quizError) throw quizError;
         const matching = (quizRows || []).filter((quiz: any) =>
@@ -322,7 +322,7 @@ const ExamModePage: React.FC = () => {
               </div>
               <div className="mt-7 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2"><label className="text-sm font-medium">Subject</label><Select value={subject} onValueChange={setSubject}><SelectTrigger className="h-12"><SelectValue placeholder="Choose subject" /></SelectTrigger><SelectContent>{profileSubjects.map((value) => <SelectItem key={value} value={value}>{prettySubject(value)}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><label className="text-sm font-medium">Approved quiz set</label><Select value={selectedQuiz?.id || ""} onValueChange={setSourceQuizId} disabled={!subjectQuizzes.length}><SelectTrigger className="h-12"><SelectValue placeholder="Choose quiz set" /></SelectTrigger><SelectContent>{subjectQuizzes.map((quiz, index) => <SelectItem key={quiz.id} value={quiz.id}>{index === 0 && goalRelevance(quiz, goal) > 0 ? "Recommended · " : ""}{quiz.title} · {quiz.questionCount} Q</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><label className="text-sm font-medium">Approved quiz set</label><Select value={selectedQuiz?.id || ""} onValueChange={setSourceQuizId} disabled={!subjectQuizzes.length}><SelectTrigger className="h-12"><SelectValue placeholder="Choose quiz set" /></SelectTrigger><SelectContent>{subjectQuizzes.map((quiz, index) => <SelectItem key={quiz.id} value={quiz.id}>{index === 0 && goalRelevance(quiz, goal) > 0 ? "Recommended · " : ""}{quiz.title}{quiz.exam_type && quiz.exam_type !== "general" ? ` · ${quiz.exam_type.replace(/[_-]+/g, " ")}` : ""} · {quiz.questionCount} Q</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Question count</label><Select value={String(questionCount)} onValueChange={(value) => setQuestionCount(Number(value))}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent>{[10,20,30,50].map((count) => <SelectItem key={count} value={String(count)}>{count} questions</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Time limit</label><Select value={String(timeLimit)} onValueChange={(value) => setTimeLimit(Number(value))}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent>{[15,30,45,60].map((minutes) => <SelectItem key={minutes} value={String(minutes)}>{minutes} minutes</SelectItem>)}</SelectContent></Select></div>
               </div>
