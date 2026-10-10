@@ -119,7 +119,7 @@ const StudyPlannerPage: React.FC = () => {
         supabase.from("topic_progress").select("subject, topic, accuracy_percentage, questions_attempted").eq("user_id", user.id).order("accuracy_percentage", { ascending: true }).limit(20),
       ]);
 
-      const weakTopics = (topicRes.data || []).filter(t => t.accuracy_percentage < 70);
+      const weakTopics = (topicRes.data || []).filter(t => t.accuracy_percentage < 70 && subjects.some(subject => normalizeSubject(subject) === normalizeSubject(t.subject)));
       const analytics = analyticsRes.data || [];
 
       // Call AI edge function
@@ -138,7 +138,13 @@ const StudyPlannerPage: React.FC = () => {
 
       if (aiError) throw aiError;
 
-      const suggestions: Array<{ subject: string; topic: string; priority: string; day_offset: number; notes: string }> = aiData?.suggestions || [];
+      const allowedSubjects = new Set(subjects.map(normalizeSubject));
+      const existingKeys = new Set(plans.map((p) => `${normalizeSubject(p.subject)}::${p.topic.trim().toLowerCase()}`));
+      const suggestions: Array<{ subject: string; topic: string; priority: string; day_offset: number; notes: string }> = (aiData?.suggestions || []).filter((item: any) =>
+        item && typeof item.subject === "string" && typeof item.topic === "string" &&
+        allowedSubjects.has(normalizeSubject(item.subject)) &&
+        !existingKeys.has(`${normalizeSubject(item.subject)}::${item.topic.trim().toLowerCase()}`)
+      );
 
       if (suggestions.length === 0) {
         // Fallback: generate based on weak topics
@@ -167,7 +173,7 @@ const StudyPlannerPage: React.FC = () => {
         supabase.from("topic_progress").select("*").eq("user_id", user.id).order("accuracy_percentage", { ascending: true }).limit(10),
         supabase.from("analytics").select("*").eq("user_id", user.id),
       ]);
-      const fallbackPlans = generateFallbackPlan(topicRes.data || [], analyticsRes.data || []);
+      const fallbackPlans = generateFallbackPlan((topicRes.data || []).filter(t => subjects.some(subject => normalizeSubject(subject) === normalizeSubject(t.subject))), analyticsRes.data || []);
       await insertPlans(fallbackPlans);
     } finally {
       setIsGenerating(false);
