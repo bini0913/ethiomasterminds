@@ -139,6 +139,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [showChat, setShowChat] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [questionLoadError, setQuestionLoadError] = useState<string | null>(null);
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [isHost, setIsHost] = useState(false);
   const [countdownValue, setCountdownValue] = useState(5);
@@ -514,23 +515,34 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     });
   };
   const loadPlayerQuestion = async () => {
-    const { data, error } = await supabase.rpc('multiplayer_get_current_question', { p_room_id: roomId });
-    if (error) throw error;
-    if (data?.done) {
-      setCurrentQuestion(null);
-      return;
+    setQuestionLoadError(null);
+    try {
+      const { data, error } = await supabase.rpc('multiplayer_get_current_question', { p_room_id: roomId });
+      if (error) throw error;
+      if (data?.done) {
+        setCurrentQuestion(null);
+        return;
+      }
+      if (!data?.id || !data?.question_text) {
+        throw new Error('The next question is not available yet. Please try again.');
+      }
+      setCurrentQuestion({
+        id: data.id,
+        question_text: data.question_text,
+        options: Array.isArray(data.options) ? data.options : [],
+        points: data.points || 100,
+      });
+      setTotalQuestions(data.total || totalQuestions);
+      setQuestionStartedAt(data.question_started_at ? new Date(data.question_started_at).getTime() : Date.now());
+      setPlayerQuestionNumber((data.index ?? 0) + 1);
+      setSelectedAnswer(null);
+      setAnswerResult(null);
+    } catch (err) {
+      console.error('Error loading multiplayer question:', err);
+      const message = err instanceof Error ? err.message : 'Check your connection and retry.';
+      setQuestionLoadError(message);
+      toast.error('Could not load the question');
     }
-    setCurrentQuestion({
-      id: data.id,
-      question_text: data.question_text,
-      options: Array.isArray(data.options) ? data.options : [],
-      points: data.points || 100,
-    });
-    setTotalQuestions(data.total || totalQuestions);
-    setQuestionStartedAt(data.question_started_at ? new Date(data.question_started_at).getTime() : Date.now());
-    setPlayerQuestionNumber((data.index ?? 0) + 1);
-    setSelectedAnswer(null);
-    setAnswerResult(null);
   };
 
   const fetchChatMessages = async () => {
@@ -1079,6 +1091,18 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                   {countdownValue}
                 </motion.div>
                 <p className="text-xl mt-4">Match Starting… Syncing both players now</p>
+              </Card>
+            )}
+
+            {roomState.status === 'playing' && !currentQuestion && !playerFinished && (
+              <Card className="p-6 bg-white/5 border-white/10 text-center space-y-3" role="status" aria-live="polite">
+                <h2 className="text-lg font-semibold">Reconnecting to your question</h2>
+                <p className="text-sm text-white/70">
+                  {questionLoadError || 'Your question is loading. If your connection was interrupted, try again.'}
+                </p>
+                <Button onClick={() => { void loadPlayerQuestion(); }}>
+                  <Wifi className="h-4 w-4 mr-2" /> Retry question
+                </Button>
               </Card>
             )}
 
