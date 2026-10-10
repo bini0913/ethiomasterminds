@@ -70,9 +70,20 @@ const TopicCoveragePage: React.FC = () => {
 
   const getPath = (subject: string) => {
     const normalized = normalizeSubject(subject);
-    return COMMON_PATHS[normalized] || [
+    const foundation = COMMON_PATHS[normalized] || [
       "Foundations", "Core Concepts", "Key Terms", "Practice", "Applications", "Advanced Concepts", "Revision", "Exam Practice",
     ];
+    // Include topics the student has actually practiced, even when they are not in
+    // the generic starter path. This makes coverage reflect real course activity.
+    const observed = topics
+      .filter((item) => normalizeSubject(item.subject) === normalized && item.topic?.trim())
+      .sort((a, b) => {
+        const accuracyA = Number(a.accuracy_percentage) || 0;
+        const accuracyB = Number(b.accuracy_percentage) || 0;
+        return accuracyA - accuracyB;
+      })
+      .map((item) => item.topic.trim());
+    return Array.from(new Set([...foundation, ...observed]));
   };
 
   const getStatus = (subject: string, topicName: string) => {
