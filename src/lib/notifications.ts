@@ -159,7 +159,6 @@ export async function registerForPushNotifications(userId: string): Promise<bool
 
   return new Promise((resolve) => {
     let settled = false;
-    let timeout: number;
     const listeners: Array<{ remove: () => Promise<void> }> = [];
     const finish = (value: boolean) => {
       if (settled) return;
@@ -169,7 +168,7 @@ export async function registerForPushNotifications(userId: string): Promise<bool
       resolve(value);
     };
 
-    timeout = window.setTimeout(() => finish(false), 15000);
+    const timeout = window.setTimeout(() => finish(false), 15000);
     void (async () => {
       try {
         listeners.push(await PushNotifications.addListener("registration", async (token: Token) => {
