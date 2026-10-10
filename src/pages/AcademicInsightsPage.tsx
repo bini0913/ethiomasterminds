@@ -20,7 +20,7 @@ const AcademicInsightsPage: React.FC = () => {
   const [aiInsights, setAiInsights] = useState<string | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string } | null>(null);
+  const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string; subjects: string[] } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -30,7 +30,8 @@ const AcademicInsightsPage: React.FC = () => {
         grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 12)),
         curriculum: profile.curriculum,
         goal: profile.study_goal_detail || profile.study_goal,
-        book: profile.book_title || "Not specified",
+        book: [profile.book_title, ...(profile.book_ids || []).map((id: string) => id)].filter(Boolean).join(", ") || "Not specified",
+        subjects: profile.subjects || [],
       });
     }).catch(() => {});
     const fetchAll = async () => {
@@ -60,6 +61,7 @@ const AcademicInsightsPage: React.FC = () => {
           curriculum: academicContext?.curriculum,
           studyGoal: academicContext?.goal,
           book: academicContext?.book,
+          subjects: academicContext?.subjects || [],
           xp: user.xp || 0,
         },
       });
