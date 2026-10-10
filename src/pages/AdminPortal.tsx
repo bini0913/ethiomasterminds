@@ -813,6 +813,16 @@ const AdminPortal: React.FC = () => {
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()), [quizzes, flashcards, questions, socialPosts]);
 
   const filteredLogs = useMemo(() => activityLog.filter((log) => `${log.actor} ${log.action} ${log.target}`.toLowerCase().includes(logSearch.toLowerCase())), [activityLog, logSearch]);
+  const approvedExamQuizzes = useMemo(() => quizzes.filter((quiz: any) => quiz.is_approved === true), [quizzes]);
+  const examTypeCoverage = useMemo(() => {
+    const types = ['school_exam', 'coursework', 'grade12_exit', 'entrance_exam', 'past_paper', 'mock_exam'];
+    return {
+      approved: approvedExamQuizzes.length,
+      classified: approvedExamQuizzes.filter((quiz: any) => quiz.exam_type && quiz.exam_type !== 'general').length,
+      general: approvedExamQuizzes.filter((quiz: any) => !quiz.exam_type || quiz.exam_type === 'general').length,
+      byType: types.map((type) => ({ type, count: approvedExamQuizzes.filter((quiz: any) => quiz.exam_type === type).length })),
+    };
+  }, [approvedExamQuizzes]);
 
   const contentMix = [
     { name: 'Quizzes', value: stats.totalQuizzes, color: '#ef4444' },
@@ -1145,6 +1155,19 @@ const AdminPortal: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>Exam Bank Coverage</CardTitle><CardDescription>Track how many approved quiz sets have explicit exam classifications. General or unclassified sets remain available to students.</CardDescription></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div className="rounded-lg border p-3"><p className="text-sm text-muted-foreground">Approved sets</p><p className="text-2xl font-semibold">{examTypeCoverage.approved}</p></div>
+                    <div className="rounded-lg border p-3"><p className="text-sm text-muted-foreground">Classified</p><p className="text-2xl font-semibold">{examTypeCoverage.classified}</p></div>
+                    <div className="rounded-lg border p-3"><p className="text-sm text-muted-foreground">General / unclassified</p><p className="text-2xl font-semibold">{examTypeCoverage.general}</p></div>
+                    <div className="rounded-lg border p-3"><p className="text-sm text-muted-foreground">Classification coverage</p><p className="text-2xl font-semibold">{examTypeCoverage.approved ? Math.round(examTypeCoverage.classified / examTypeCoverage.approved * 100) : 0}%</p></div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">{examTypeCoverage.byType.map((item) => <Badge key={item.type} variant="outline">{item.type.replace(/_/g, ' ')}: {item.count}</Badge>)}</div>
                 </CardContent>
               </Card>
 

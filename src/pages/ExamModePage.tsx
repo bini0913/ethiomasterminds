@@ -51,6 +51,7 @@ const ExamModePage: React.FC = () => {
   const navigate = useNavigate();
   const [examState, setExamState] = useState<ExamState>("setup");
   const [subject, setSubject] = useState("math");
+  const [examTypeFilter, setExamTypeFilter] = useState("all");
   const [questionCount, setQuestionCount] = useState(20);
   const [timeLimit, setTimeLimit] = useState(30);
   const [sourceQuizId, setSourceQuizId] = useState("");
@@ -130,7 +131,7 @@ const ExamModePage: React.FC = () => {
     return () => { cancelled = true; };
   }, [user?.id, user?.grade]);
 
-  const subjectQuizzes = useMemo(() => sourceQuizzes.filter((quiz) => subjectsMatch(subject, quiz.subject)).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title)), [sourceQuizzes, subject, goal]);
+  const subjectQuizzes = useMemo(() => sourceQuizzes.filter((quiz) => subjectsMatch(subject, quiz.subject) && (examTypeFilter === "all" || (quiz.exam_type || "general") === examTypeFilter)).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title)), [sourceQuizzes, subject, goal, examTypeFilter]);
   const selectedQuiz = useMemo(() => subjectQuizzes.find((quiz) => quiz.id === sourceQuizId) || subjectQuizzes[0] || null, [subjectQuizzes, sourceQuizId]);
   const currentQuestion = questions[currentQ];
   const unansweredCount = questions.length - Object.keys(answers).length;
@@ -160,6 +161,8 @@ const ExamModePage: React.FC = () => {
       const { error } = await supabase.from("quiz_results").insert({
         quiz_id: selectedQuiz.id,
         student_id: user.id,
+        exam_type: selectedQuiz.exam_type || "general",
+        subject: selectedQuiz.subject,
         score: Math.round((correct / questions.length) * 100),
         total_questions: questions.length,
         correct_answers: correct,
@@ -322,6 +325,7 @@ const ExamModePage: React.FC = () => {
               </div>
               <div className="mt-7 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2"><label className="text-sm font-medium">Subject</label><Select value={subject} onValueChange={setSubject}><SelectTrigger className="h-12"><SelectValue placeholder="Choose subject" /></SelectTrigger><SelectContent>{profileSubjects.map((value) => <SelectItem key={value} value={value}>{prettySubject(value)}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><label className="text-sm font-medium">Exam type</label><Select value={examTypeFilter} onValueChange={setExamTypeFilter}><SelectTrigger className="h-12"><SelectValue placeholder="All exam types" /></SelectTrigger><SelectContent><SelectItem value="all">All approved practice</SelectItem><SelectItem value="school_exam">School exam</SelectItem><SelectItem value="coursework">Coursework</SelectItem><SelectItem value="grade12_exit">Grade 12 exit exam</SelectItem><SelectItem value="entrance_exam">Entrance exam</SelectItem><SelectItem value="past_paper">Past paper</SelectItem><SelectItem value="mock_exam">Mock exam</SelectItem><SelectItem value="general">General practice</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Approved quiz set</label><Select value={selectedQuiz?.id || ""} onValueChange={setSourceQuizId} disabled={!subjectQuizzes.length}><SelectTrigger className="h-12"><SelectValue placeholder="Choose quiz set" /></SelectTrigger><SelectContent>{subjectQuizzes.map((quiz, index) => <SelectItem key={quiz.id} value={quiz.id}>{index === 0 && goalRelevance(quiz, goal) > 0 ? "Recommended · " : ""}{quiz.title}{quiz.exam_type && quiz.exam_type !== "general" ? ` · ${quiz.exam_type.replace(/[_-]+/g, " ")}` : ""} · {quiz.questionCount} Q</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Question count</label><Select value={String(questionCount)} onValueChange={(value) => setQuestionCount(Number(value))}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent>{[10,20,30,50].map((count) => <SelectItem key={count} value={String(count)}>{count} questions</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Time limit</label><Select value={String(timeLimit)} onValueChange={(value) => setTimeLimit(Number(value))}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent>{[15,30,45,60].map((minutes) => <SelectItem key={minutes} value={String(minutes)}>{minutes} minutes</SelectItem>)}</SelectContent></Select></div>
