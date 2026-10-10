@@ -21,7 +21,7 @@ serve(async (req) => {
     if (rateLimit.error) throw rateLimit.error;
     if (!rateLimit.data) return new Response(JSON.stringify({ error: "Please wait before generating another study plan." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const { weakTopics, analytics, grade, existingPlans } = await req.json();
+    const { weakTopics, analytics, grade, existingPlans, curriculum, studyGoal, book, subjects } = await req.json();
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -42,12 +42,20 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Grade does not match your profile" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (!Array.isArray(weakTopics) || weakTopics.length > 50 || !Array.isArray(analytics) || analytics.length > 100 || !Array.isArray(existingPlans) || existingPlans.length > 50) return new Response(JSON.stringify({ error: "Invalid planning data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    if (JSON.stringify({ weakTopics, analytics, existingPlans }).length > 30000) return new Response(JSON.stringify({ error: "Request data is too large" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (JSON.stringify({ weakTopics, analytics, existingPlans, curriculum, studyGoal, book, subjects }).length > 30000) return new Response(JSON.stringify({ error: "Request data is too large" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not configured");
 
-    const prompt = `You are an academic study planner for a Grade ${serverGrade} Ethiopian student preparing for university entrance exams.
+    const safeSubjects = Array.isArray(subjects) ? subjects.filter((s: unknown) => typeof s === "string").slice(0, 20) : [];
+    const prompt = `You are the adaptive Academic Prep study planner for a Grade ${serverGrade} student. Do not assume university entrance preparation unless the saved goal explicitly says so.
+
+Personalization context:
+- Goal: ${String(studyGoal || "general academic progress").slice(0, 200)}
+- Curriculum: ${String(curriculum || "not specified").slice(0, 120)}
+- Selected subjects (use exact names): ${JSON.stringify(safeSubjects)}
+- Library resources: ${String(book || "not specified").slice(0, 500)}`;
+
 
 Based on their performance data:
 - Weak topics: ${JSON.stringify(weakTopics?.slice(0, 10) || [])}
@@ -55,13 +63,13 @@ Based on their performance data:
 - Existing plans: ${JSON.stringify(existingPlans?.slice(0, 5) || [])}
 
 Generate a 7-day study plan. Return ONLY a JSON object with a "suggestions" array. Each item must have:
-- subject: "math", "science", "english", or "history"
+- subject: one of the student's selected subjects, using the exact name when provided
 - topic: specific topic to study
 - priority: "high", "medium", or "low"
 - day_offset: 0-6 (0=today)
 - notes: brief study tip
 
-Prioritize weak areas. Include variety. Focus on entrance exam topics.`;
+Prioritize weak topics and low-accuracy subjects, spaced review, and realistic practice. Respect the saved goal: coursework goals focus on current lessons; entrance/exit goals include exam-style practice; past-paper/mock goals include timed practice and review; general goals build balanced understanding. Use Library resources when relevant. Do not invent performance data. Avoid unnecessary duplicates of existing plans.`;
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -88,7 +96,7 @@ Prioritize weak areas. Include variety. Focus on entrance exam topics.`;
                   items: {
                     type: "object",
                     properties: {
-                      subject: { type: "string", enum: ["math", "science", "english", "history"] },
+                      subject: { type: "string" },
                       topic: { type: "string" },
                       priority: { type: "string", enum: ["high", "medium", "low"] },
                       day_offset: { type: "number" },
