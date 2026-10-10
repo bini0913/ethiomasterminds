@@ -112,7 +112,19 @@ const FlashcardsPage: React.FC = () => {
     return new Date(p.next_review_date) <= new Date();
   });
 
-  const reviewCards = studyMode === "review" ? dueCards : filteredCards;
+  const reviewCards = studyMode === "review"
+    ? [...dueCards].sort((a, b) => {
+        const pa = progress[a.id];
+        const pb = progress[b.id];
+        // New cards and cards repeatedly marked hard are reviewed before easier cards.
+        const score = (card: Flashcard, item?: FlashcardProgress) => {
+          if (!item) return -2;
+          if (item.status === "learning") return -1;
+          return item.interval_days || 0;
+        };
+        return score(a, pa) - score(b, pb);
+      })
+    : filteredCards;
   const currentCard = reviewCards[currentIndex];
 
   const getStatusCounts = () => {
