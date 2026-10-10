@@ -14,6 +14,20 @@ import { getAcademicProfile, normalizeGrade, normalizeSubject, subjectsMatch } f
 type ExamState = "setup" | "running" | "results";
 type SourceQuiz = { id: string; title: string; description?: string; subject: string; grade: number; difficulty?: string; time_limit?: number | null; questionCount: number };
 type ExamQuestion = { id: string; question_text: string; options: string[]; correct_answer: string; explanation?: string; topic?: string };
+function goalRelevance(quiz: SourceQuiz, goal: string): number {
+  const text = `${quiz.title} ${quiz.description || ""} ${quiz.difficulty || ""}`.toLowerCase();
+  const target = goal.toLowerCase().replace(/[_-]+/g, " ");
+  const groups: Array<{ terms: string[]; keywords: string[] }> = [
+    { terms: ["exit", "grade 12", "national exam", "school leaving"], keywords: ["exit exam", "grade 12", "school leaving", "national exam", "matriculation"] },
+    { terms: ["university entrance", "entrance exam", "college entrance"], keywords: ["entrance", "university", "college", "admission"] },
+    { terms: ["past paper", "past papers", "mock exam", "mock test"], keywords: ["past paper", "past exam", "mock", "practice paper"] },
+    { terms: ["school", "class", "coursework", "class exam"], keywords: ["school", "class exam", "coursework", "unit test", "chapter test"] },
+  ];
+  const group = groups.find((item) => item.terms.some((term) => target.includes(term)));
+  if (!group) return 0;
+  return group.keywords.reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
+}
+
 
 function answerText(answer: unknown, options: string[]) {
   const value = String(answer ?? "").trim();
@@ -69,7 +83,7 @@ const ExamModePage: React.FC = () => {
         setGrade(activeGrade);
         setProfileSubjects(allowed);
         setSubject((current) => allowed.includes(current) ? current : allowed[0] || "math");
-        setGoal(profile?.study_goal_detail || profile?.study_goal || "School / Class");
+        setGoal([profile?.study_goal || "School / Class", profile?.study_goal_detail || ""].filter(Boolean).join(" "));
 
         // Academic Prep and regular Quizzes share the same approved quizzes + linked question bank.
         const { data: quizRows, error: quizError } = await supabase
@@ -102,7 +116,7 @@ const ExamModePage: React.FC = () => {
         const available = matching
           .map((quiz: any) => ({ ...quiz, subject: normalizeSubject(quiz.subject || ""), grade: activeGrade, questionCount: countByQuiz.get(quiz.id) || 0 }))
           .filter((quiz: SourceQuiz) => quiz.questionCount > 0)
-          .sort((a: SourceQuiz, b: SourceQuiz) => b.questionCount - a.questionCount || a.title.localeCompare(b.title));
+          .sort((a: SourceQuiz, b: SourceQuiz) => goalRelevance(b, [profile?.study_goal || "", profile?.study_goal_detail || ""].join(" ")) - goalRelevance(a, [profile?.study_goal || "", profile?.study_goal_detail || ""].join(" ")) || b.questionCount - a.questionCount || a.title.localeCompare(b.title));
         if (cancelled) return;
         setSourceQuizzes(available);
         setSourceQuizId((current) => available.some((quiz) => quiz.id === current) ? current : available[0]?.id || "");
@@ -116,7 +130,7 @@ const ExamModePage: React.FC = () => {
     return () => { cancelled = true; };
   }, [user?.id, user?.grade]);
 
-  const subjectQuizzes = useMemo(() => sourceQuizzes.filter((quiz) => subjectsMatch(subject, quiz.subject)), [sourceQuizzes, subject]);
+  const subjectQuizzes = useMemo(() => sourceQuizzes.filter((quiz) => subjectsMatch(subject, quiz.subject)).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title)), [sourceQuizzes, subject, goal]);
   const selectedQuiz = useMemo(() => subjectQuizzes.find((quiz) => quiz.id === sourceQuizId) || subjectQuizzes[0] || null, [subjectQuizzes, sourceQuizId]);
   const currentQuestion = questions[currentQ];
   const unansweredCount = questions.length - Object.keys(answers).length;
@@ -308,7 +322,7 @@ const ExamModePage: React.FC = () => {
               </div>
               <div className="mt-7 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2"><label className="text-sm font-medium">Subject</label><Select value={subject} onValueChange={setSubject}><SelectTrigger className="h-12"><SelectValue placeholder="Choose subject" /></SelectTrigger><SelectContent>{profileSubjects.map((value) => <SelectItem key={value} value={value}>{prettySubject(value)}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><label className="text-sm font-medium">Approved quiz set</label><Select value={selectedQuiz?.id || ""} onValueChange={setSourceQuizId} disabled={!subjectQuizzes.length}><SelectTrigger className="h-12"><SelectValue placeholder="Choose quiz set" /></SelectTrigger><SelectContent>{subjectQuizzes.map((quiz) => <SelectItem key={quiz.id} value={quiz.id}>{quiz.title} · {quiz.questionCount} Q</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><label className="text-sm font-medium">Approved quiz set</label><Select value={selectedQuiz?.id || ""} onValueChange={setSourceQuizId} disabled={!subjectQuizzes.length}><SelectTrigger className="h-12"><SelectValue placeholder="Choose quiz set" /></SelectTrigger><SelectContent>{subjectQuizzes.map((quiz, index) => <SelectItem key={quiz.id} value={quiz.id}>{index === 0 && goalRelevance(quiz, goal) > 0 ? "Recommended · " : ""}{quiz.title} · {quiz.questionCount} Q</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Question count</label><Select value={String(questionCount)} onValueChange={(value) => setQuestionCount(Number(value))}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent>{[10,20,30,50].map((count) => <SelectItem key={count} value={String(count)}>{count} questions</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Time limit</label><Select value={String(timeLimit)} onValueChange={(value) => setTimeLimit(Number(value))}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent>{[15,30,45,60].map((minutes) => <SelectItem key={minutes} value={String(minutes)}>{minutes} minutes</SelectItem>)}</SelectContent></Select></div>
               </div>
