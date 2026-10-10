@@ -758,6 +758,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       }
     } catch (err) {
       console.error('Error submitting answer:', err);
+      // The answer was not confirmed by the server. Let the student retry
+      // instead of leaving the selected option permanently locked.
+      setSelectedAnswer(null);
+      const message = err instanceof Error ? err.message : 'Please check your connection and try again.';
+      toast.error('Answer was not submitted', { description: message });
     }
   };
 
