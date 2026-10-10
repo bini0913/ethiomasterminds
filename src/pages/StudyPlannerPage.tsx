@@ -127,7 +127,7 @@ const StudyPlannerPage: React.FC = () => {
         body: {
           weakTopics,
           analytics,
-          grade: academicContext?.grade || normalizeGrade(user.grade, 12),
+          grade: String(academicContext?.grade || normalizeGrade(user.grade, 12)),
           curriculum: academicContext?.curriculum,
           studyGoal: academicContext?.goal,
           book: academicContext?.book,
