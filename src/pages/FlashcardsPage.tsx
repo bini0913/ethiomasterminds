@@ -117,12 +117,12 @@ const FlashcardsPage: React.FC = () => {
         const pa = progress[a.id];
         const pb = progress[b.id];
         // New cards and cards repeatedly marked hard are reviewed before easier cards.
-        const score = (card: Flashcard, item?: FlashcardProgress) => {
+        const score = (item?: FlashcardProgress) => {
           if (!item) return -2;
           if (item.status === "learning") return -1;
           return item.interval_days || 0;
         };
-        return score(a, pa) - score(b, pb);
+        return score(pa) - score(pb);
       })
     : filteredCards;
   const currentCard = reviewCards[currentIndex];
