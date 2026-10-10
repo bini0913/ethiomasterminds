@@ -77,6 +77,7 @@ const AcademicSetup: React.FC = () => {
 
       if (!cancelled && data) {
         setGrade(data.grade);
+        setStep(Number(data.grade) >= 9 ? 2 : 1);
         if (Number(data.grade) >= 9) setStep((current) => current === 1 ? 2 : current);
         setGoal(data.study_goal as Goal);
         setGoalDetail(data.study_goal_detail || "");
@@ -142,7 +143,7 @@ const AcademicSetup: React.FC = () => {
         grade,
         study_goal: goal,
         study_goal_detail: goalDetail.trim() || null,
-        curriculum: band === "middle" ? curriculum : null,
+        curriculum,
         subjects,
         book_ids: bookIds,
         book_id: bookIds[0] || bookId || null,
@@ -173,7 +174,7 @@ const AcademicSetup: React.FC = () => {
     <div className="min-h-screen bg-background px-4 py-6 pb-24">
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-5 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => step === 1 ? navigate("/academic") : setStep((current) => current - 1)} aria-label="Go back">
+          <Button variant="ghost" size="icon" onClick={() => (step === 1 || (band === "high" && step === 2)) ? navigate("/academic") : setStep((current) => current - 1)} aria-label="Go back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
