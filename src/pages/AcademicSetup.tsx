@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, BookOpen, Check, GraduationCap, Library, Target } from "lucide-react";
 import { toast } from "sonner";
 
-type Goal = "class" | "ministry_exam" | "university_entrance" | "national_exam" | "custom";
+type Goal = "class" | "ministry_exam" | "university_entrance" | "national_exam" | "entrance_exam" | "exit_exam" | "mock_exam" | "past_papers" | "custom";
 type Curriculum = "oromia" | "addis_ababa";
 
 type BookOption = {
@@ -18,7 +18,15 @@ type BookOption = {
   grade_level?: number | null;
 };
 
-const goalOptions: Array<{ value: Goal; title: string; description: string }> = [
+const upperGoalOptions: Array<{ value: Goal; title: string; description: string }> = [
+  { value: "class", title: "Class exams & coursework", description: "Stay on top of lessons, assignments and school exams." },
+  { value: "entrance_exam", title: "Entrance exams", description: "Prepare for university and other entrance exams." },
+  { value: "exit_exam", title: "Grade 12 exit exam", description: "Prepare systematically for the Grade 12 exit exam." },
+  { value: "mock_exam", title: "Mock exams", description: "Practise under timed, exam-like conditions." },
+  { value: "past_papers", title: "Past papers", description: "Practise previous papers and review mistakes." },
+  { value: "custom", title: "Another goal", description: "Tell Master Minds what you are preparing for." },
+];
+const middleGoalOptions: Array<{ value: Goal; title: string; description: string }> = [
   { value: "class", title: "School / Class", description: "Keep up with my current classes and assignments." },
   { value: "ministry_exam", title: "Ministry Exam", description: "Prepare for a national or regional Ministry examination." },
   { value: "university_entrance", title: "University Entrance", description: "Prepare for university entrance and competitive exams." },
@@ -41,7 +49,7 @@ const AcademicSetup: React.FC = () => {
   const navigate = useNavigate();
   const gradeFromUser = Number((user?.grade || "").match(/\d+/)?.[0] || 9);
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(gradeFromUser >= 9 ? 2 : 1);
   const [grade, setGrade] = useState(Math.min(12, Math.max(5, gradeFromUser)));
   const [goal, setGoal] = useState<Goal>("class");
   const [goalDetail, setGoalDetail] = useState("");
@@ -49,6 +57,7 @@ const AcademicSetup: React.FC = () => {
   const [subjects, setSubjects] = useState<string[]>([]);
   const [books, setBooks] = useState<BookOption[]>([]);
   const [bookId, setBookId] = useState("");
+  const [bookIds, setBookIds] = useState<string[]>([]);
   const [bookTitle, setBookTitle] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -56,6 +65,8 @@ const AcademicSetup: React.FC = () => {
   const band = grade <= 8 ? "middle" : "high";
   const academicLabel = grade >= 9 ? "Academic Prep" : "Academic Mode";
   const subjectOptions = subjectsByBand[band];
+  const activeGoalOptions = band === "high" ? upperGoalOptions : middleGoalOptions;
+  const totalSteps = band === "high" ? 4 : 5;
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -69,11 +80,14 @@ const AcademicSetup: React.FC = () => {
 
       if (!cancelled && data) {
         setGrade(data.grade);
+        setStep(Number(data.grade) >= 9 ? 2 : 1);
+        if (Number(data.grade) >= 9) setStep((current) => current === 1 ? 2 : current);
         setGoal(data.study_goal as Goal);
         setGoalDetail(data.study_goal_detail || "");
         setCurriculum(data.curriculum as Curriculum);
         setSubjects(data.subjects || []);
         setBookId(data.book_id || "");
+        setBookIds(Array.isArray(data.book_ids) ? data.book_ids : (data.book_id ? [data.book_id] : []));
         setBookTitle(data.book_title || "");
       }
       if (!cancelled) setLoadingProfile(false);
@@ -100,7 +114,7 @@ const AcademicSetup: React.FC = () => {
     setSubjects((current) => current.filter((subject) => subjectOptions.includes(subject)));
   }, [grade]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const progress = useMemo(() => (step / 5) * 100, [step]);
+  const progress = useMemo(() => (step / totalSteps) * 100, [step, totalSteps]);
 
   const toggleSubject = (subject: string) => {
     setSubjects((current) => current.includes(subject)
@@ -109,21 +123,22 @@ const AcademicSetup: React.FC = () => {
   };
 
   const next = () => {
-    if (step === 1 && !grade) return toast.error("Choose your grade.");
+    if (band === "middle" && step === 1 && !grade) return toast.error("Choose your grade.");
     if (step === 2 && !goal) return toast.error("Choose what you are studying for.");
-    if (step === 3 && !curriculum) return toast.error("Choose your curriculum.");
-    if (step === 4 && subjects.length === 0) return toast.error("Choose at least one subject.");
-    if (step === 5 && !bookTitle.trim() && !bookId) return toast.error("Choose a book or enter your book title.");
-    setStep((current) => Math.min(5, current + 1));
+    if (band === "middle" && step === 3 && !curriculum) return toast.error("Choose your curriculum.");
+    if (step === (band === "high" ? 3 : 4) && subjects.length === 0) return toast.error("Choose at least one subject.");
+    if (step === totalSteps && !bookTitle.trim() && bookIds.length === 0 && !bookId) return toast.error("Choose at least one Library resource or enter a book title.");
+    setStep((current) => Math.min(totalSteps, current + 1));
   };
 
   const save = async () => {
     if (!session?.user?.id) return;
     if (subjects.length === 0) return toast.error("Choose at least one subject.");
-    if (!bookTitle.trim() && !bookId) return toast.error("Choose a book or enter your book title.");
+    if (!bookTitle.trim() && bookIds.length === 0 && !bookId) return toast.error("Choose at least one Library resource or enter a book title.");
 
     setLoading(true);
-    const selectedBook = books.find((book) => book.id === bookId);
+    const selectedBooks = books.filter((book) => bookIds.includes(book.id));
+    const selectedBook = books.find((book) => book.id === bookId) || selectedBooks[0];
     const { error } = await supabase
       .from("academic_profiles")
       .upsert({
@@ -133,8 +148,9 @@ const AcademicSetup: React.FC = () => {
         study_goal_detail: goalDetail.trim() || null,
         curriculum,
         subjects,
-        book_id: bookId || null,
-        book_title: (selectedBook?.title || bookTitle).trim(),
+        book_ids: bookIds,
+        book_id: bookIds[0] || bookId || null,
+        book_title: selectedBooks.length ? selectedBooks.map((book) => book.title).join(", ") : (selectedBook?.title || bookTitle).trim(),
         onboarding_completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
@@ -161,7 +177,7 @@ const AcademicSetup: React.FC = () => {
     <div className="min-h-screen bg-background px-4 py-6 pb-24">
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-5 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => step === 1 ? navigate("/academic") : setStep((current) => current - 1)} aria-label="Go back">
+          <Button variant="ghost" size="icon" onClick={() => (step === 1 || (band === "high" && step === 2)) ? navigate("/academic") : setStep((current) => current - 1)} aria-label="Go back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
@@ -169,7 +185,7 @@ const AcademicSetup: React.FC = () => {
               <GraduationCap className="h-5 w-5 text-primary" />
               <h1 className="text-xl font-bold">Set up {academicLabel}</h1>
             </div>
-            <p className="text-sm text-muted-foreground">We will use these answers to personalize your study experience for your grade, goal, curriculum, subjects, and textbook.</p>
+            <p className="text-sm text-muted-foreground">We use your saved grade and learning activity to tailor your study path, goals, subjects and Library resources.</p>
           </div>
         </div>
 
@@ -177,7 +193,7 @@ const AcademicSetup: React.FC = () => {
           <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
         </div>
 
-        {step === 1 && (
+        {band === "middle" && step === 1 && (
           <Card>
             <CardHeader>
               <CardTitle>What grade are you in?</CardTitle>
@@ -200,7 +216,7 @@ const AcademicSetup: React.FC = () => {
               <p className="text-sm text-muted-foreground">This changes the balance between daily learning, revision and exam practice.</p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {goalOptions.map((option) => (
+              {activeGoalOptions.map((option) => (
                 <button key={option.value} type="button" onClick={() => setGoal(option.value)}
                   className={`w-full rounded-xl border p-4 text-left transition ${goal === option.value ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"}`}>
                   <div className="flex items-start gap-3">
@@ -217,7 +233,7 @@ const AcademicSetup: React.FC = () => {
           </Card>
         )}
 
-        {step === 3 && (
+        {band === "middle" && step === 3 && (
           <Card>
             <CardHeader>
               <CardTitle>Which curriculum do you study?</CardTitle>
@@ -237,11 +253,11 @@ const AcademicSetup: React.FC = () => {
           </Card>
         )}
 
-        {step === 4 && (
+        {step === (band === "high" ? 3 : 4) && (
           <Card>
             <CardHeader>
               <CardTitle>What subjects are you studying?</CardTitle>
-              <p className="text-sm text-muted-foreground">Choose everything you want Academic Mode to prepare for.</p>
+              <p className="text-sm text-muted-foreground">Choose all subjects you want Academic Prep to support.</p>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {subjectOptions.map((subject) => (
@@ -255,21 +271,29 @@ const AcademicSetup: React.FC = () => {
           </Card>
         )}
 
-        {step === 5 && (
+        {step === totalSteps && (
           <Card>
             <CardHeader>
-              <CardTitle>Which book do you study from?</CardTitle>
-              <p className="text-sm text-muted-foreground">Use an approved Master Minds book when available, or enter the exact textbook you use at school.</p>
+              <CardTitle>Which Library books and resources do you use?</CardTitle>
+              <p className="text-sm text-muted-foreground">Select as many approved Library books as you use. These resources guide revision and recommendations.</p>
             </CardHeader>
             <CardContent className="space-y-4">
               {books.length > 0 && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Master Minds library</label>
-                  <select value={bookId} onChange={(event) => { setBookId(event.target.value); if (event.target.value) setBookTitle(""); }}
-                    className="w-full rounded-xl border bg-background px-4 py-3">
-                    <option value="">Select a textbook</option>
-                    {books.map((book) => <option key={book.id} value={book.id}>{book.title}{book.author ? ` — ${book.author}` : ""}</option>)}
-                  </select>
+                  <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border p-3">
+                    {books.map((book) => {
+                      const checked = bookIds.includes(book.id);
+                      return <label key={book.id} className="flex cursor-pointer items-start gap-3 rounded-lg p-2 hover:bg-muted/50">
+                        <input type="checkbox" checked={checked} onChange={() => {
+                          setBookIds((current) => checked ? current.filter((id) => id !== book.id) : [...current, book.id]);
+                          setBookId("");
+                          setBookTitle("");
+                        }} className="mt-1 h-4 w-4 accent-primary" />
+                        <span className="min-w-0"><span className="block font-medium">{book.title}</span><span className="text-xs text-muted-foreground">{[book.author, book.subject, book.grade_level ? "Grade " + book.grade_level : ""].filter(Boolean).join(" · ")}</span></span>
+                      </label>;
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -279,14 +303,15 @@ const AcademicSetup: React.FC = () => {
                   onChange={(event) => { setBookId(""); setBookTitle(event.target.value); }}
                   placeholder="Enter the exact book / textbook name"
                   className="w-full rounded-xl border bg-background px-4 py-3 outline-none focus:ring-2 focus:ring-primary" />
-                {books.length === 0 && <p className="mt-2 text-xs text-muted-foreground">No approved textbook is in the Master Minds library yet, so you can enter your book now. We can connect it to the library later.</p>}
+                {books.length === 0 && <p className="mt-2 text-xs text-muted-foreground">No approved resources are listed for your grade yet, so you can enter a textbook name.</p>}
+              {bookIds.length > 0 && <p className="mt-2 text-sm text-primary">{bookIds.length} Library resource{bookIds.length === 1 ? "" : "s"} selected</p>}
               </div>
             </CardContent>
           </Card>
         )}
 
         <div className="mt-5 flex justify-end">
-          {step < 5 ? (
+          {step < totalSteps ? (
             <Button onClick={next} size="lg">Continue <ArrowRight className="ml-2 h-4 w-4" /></Button>
           ) : (
             <Button onClick={save} disabled={loading} size="lg">{loading ? "Saving…" : "Finish setup"} <Check className="ml-2 h-4 w-4" /></Button>
