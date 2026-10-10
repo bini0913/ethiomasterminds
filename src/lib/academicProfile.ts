@@ -8,6 +8,7 @@ export type AcademicProfile = {
   curriculum: "oromia" | "addis_ababa";
   subjects: string[];
   book_id: string | null;
+  book_ids?: string[];
   book_title: string | null;
 };
 
@@ -50,7 +51,7 @@ export function subjectsMatch(profileSubject: string, contentSubject: string) {
 export async function getAcademicProfile(userId: string) {
   const { data, error } = await supabase
     .from("academic_profiles")
-    .select("user_id,grade,study_goal,study_goal_detail,curriculum,subjects,book_id,book_title")
+    .select("user_id,grade,study_goal,study_goal_detail,curriculum,subjects,book_id,book_ids,book_title")
     .eq("user_id", userId)
     .maybeSingle();
 
