@@ -607,9 +607,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           filter: `room_id=eq.${roomId}`,
         },
         () => {
-          if (roomState.status === 'waiting' || roomState.status === 'finished') {
-            void fetchPlayers();
-          }
+          // Room-player rows also carry live score and readiness changes.
+          // Refresh in every phase so opponents see updates during a match.
+          void fetchPlayers();
         },
       )
       .on(
