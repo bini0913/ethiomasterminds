@@ -88,7 +88,7 @@ const ExamModePage: React.FC = () => {
         }
         const { data: questionRows, error: questionError } = await supabase
           .from("questions")
-          .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index")
+          .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index,topic")
           .in("quiz_id", matching.map((quiz: any) => quiz.id))
           .order("order_index", { ascending: true });
         if (questionError) throw questionError;
@@ -156,12 +156,57 @@ const ExamModePage: React.FC = () => {
         console.error("Could not save exam result:", error);
         toast.error("Your result is shown, but couldn't be saved to your progress. Please try again later.");
       } else {
+        // Feed the same topic_progress data used by Topic Coverage, the Study Planner,
+        // and Academic Insights so exam practice improves future recommendations.
+        const byTopic = new Map<string, { attempted: number; correct: number }>();
+        details.forEach(({ q, correct: isCorrect }) => {
+          const topic = (q.topic || "General").trim() || "General";
+          const key = topic.toLocaleLowerCase();
+          const current = byTopic.get(key) || { attempted: 0, correct: 0 };
+          current.attempted += 1;
+          if (isCorrect) current.correct += 1;
+          byTopic.set(key, current);
+        });
+
+        for (const [topicKey, counts] of byTopic) {
+          const topic = details.find(({ q }) => (q.topic || "General").trim().toLocaleLowerCase() === topicKey)?.q.topic?.trim() || "General";
+          const { data: existing, error: lookupError } = await supabase
+            .from("topic_progress")
+            .select("id,questions_attempted,questions_correct")
+            .eq("user_id", user.id)
+            .eq("subject", selectedQuiz.subject)
+            .ilike("topic", topic)
+            .maybeSingle();
+          if (lookupError) {
+            console.error("Could not load topic progress for exam result:", lookupError);
+            continue;
+          }
+
+          const previousAttempted = Number(existing?.questions_attempted || 0);
+          const previousCorrect = Number(existing?.questions_correct || 0);
+          const questionsAttempted = previousAttempted + counts.attempted;
+          const questionsCorrect = previousCorrect + counts.correct;
+          const progressUpdate = {
+            user_id: user.id,
+            subject: selectedQuiz.subject,
+            topic,
+            questions_attempted: questionsAttempted,
+            questions_correct: questionsCorrect,
+            accuracy_percentage: questionsAttempted ? Math.round((questionsCorrect / questionsAttempted) * 100) : 0,
+            completion_percentage: Math.min(100, Math.round((questionsAttempted / 5) * 100)),
+          };
+          const { error: progressError } = existing
+            ? await supabase.from("topic_progress").update(progressUpdate).eq("id", existing.id)
+            : await supabase.from("topic_progress").insert(progressUpdate);
+          if (progressError) console.error("Could not save topic progress for exam result:", progressError);
+        }
+
         if (correct > 0) {
           const { error: xpError } = await supabase.rpc("add_xp", { p_user_id: user.id, p_amount: correct * 5 });
           if (xpError) console.error("Exam XP award failed:", xpError);
         }
         await refreshProfile?.();
-        toast.success("Exam result saved to your academic progress.");
+        toast.success("Exam result saved. Topic mastery is being updated for your study recommendations.");
       }
     }
     setIsSaving(false);
@@ -192,7 +237,7 @@ const ExamModePage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from("questions")
-        .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index")
+        .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index,topic")
         .eq("quiz_id", selectedQuiz.id)
         .order("order_index", { ascending: true });
       if (error) throw error;
