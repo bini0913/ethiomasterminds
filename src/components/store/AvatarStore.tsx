@@ -19,6 +19,7 @@ interface StoreItem {
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   preview: string;
   description: string;
+  unlockLevel: number;
   owned: boolean;
   equipped: boolean;
 }
@@ -76,6 +77,7 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
   const { user } = useUser();
   const { coins, gems, refreshCurrency } = useCurrency();
   const [storeItems, setStoreItems] = useState<StoreItem[]>([]);
+  const [currentLevel, setCurrentLevel] = useState(1);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [autoEquip, setAutoEquip] = useState(true);
@@ -125,6 +127,13 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
   const fetchStoreItems = async () => {
     setLoading(true);
     try {
+      if (user?.id) {
+        const { data: profile } = await supabase.from('profiles').select('level').eq('id', user.id).maybeSingle();
+        setCurrentLevel(Math.max(1, Number(profile?.level ?? 1)));
+      } else {
+        setCurrentLevel(1);
+      }
+
       const { data: items, error: itemsError } = await (supabase as any)
         .from('store_items')
         .select('*')
@@ -155,6 +164,7 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
         rarity: item.rarity,
         preview: item.preview || '🛍️',
         description: item.description || '',
+        unlockLevel: Math.max(1, Number(item.unlock_level ?? 1)),
         owned: ownedItemIds.has(item.id),
         equipped: equippedItemIds.has(item.id),
       }));
@@ -250,7 +260,8 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
   };
 
   const renderStoreItem = (item: StoreItem, limited = false, exclusive = false) => {
-    const hasEnough = item.currency === 'coins' ? coins >= item.price : gems >= item.price;
+    const hasEnough = (item.currency === 'coins' ? coins >= item.price : gems >= item.price) && currentLevel >= item.unlockLevel;
+    const levelLocked = currentLevel < item.unlockLevel;
     const style = rarityStyle[item.rarity];
 
     return (
@@ -283,8 +294,9 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
 
           <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-white">
             {item.currency === 'coins' ? <Coins className="h-4 w-4 text-yellow-400" /> : <Gem className="h-4 w-4 text-purple-400" />}
-            {item.price.toLocaleString()}
+            {item.price === 0 ? 'Free level reward' : item.price.toLocaleString()}
           </div>
+          <div className="text-xs text-zinc-400">{levelLocked ? `Unlocks at Level ${item.unlockLevel}` : `Available from Level ${item.unlockLevel}`}</div>
 
           <div className="flex flex-wrap justify-center gap-1.5">
             <Badge variant="outline" className={`border ${style.chip}`}>
@@ -301,19 +313,15 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
                 <Eye className="mr-1.5 h-3.5 w-3.5" />
                 Preview
               </Button>
-              <Button size="sm" className="w-full" onClick={() => handlePurchase(item)} disabled={purchasing === item.id || !hasEnough}>
+              <Button size="sm" className="w-full" onClick={() => handlePurchase(item)} disabled={purchasing === item.id || !hasEnough || levelLocked}>
                 {purchasing === item.id ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
+                ) : levelLocked ? (
+                  <><Lock className="mr-1 h-3.5 w-3.5" />Level {item.unlockLevel}</>
                 ) : !hasEnough ? (
-                  <>
-                    <Lock className="mr-1 h-3.5 w-3.5" />
-                    Locked
-                  </>
+                  <><Lock className="mr-1 h-3.5 w-3.5" />Need more {item.currency}</>
                 ) : (
-                  <>
-                    <Sparkles className="mr-1 h-3.5 w-3.5" />
-                    Buy
-                  </>
+                  <><Sparkles className="mr-1 h-3.5 w-3.5" />{item.price === 0 ? 'Claim reward' : 'Buy with ' + item.currency}</>
                 )}
               </Button>
             </div>
