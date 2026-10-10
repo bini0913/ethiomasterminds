@@ -24,16 +24,44 @@ const AcademicInsightsPage: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    getAcademicProfile(user.id).then((profile) => {
-      if (!profile) return;
-      setAcademicContext({
-        grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 12)),
-        curriculum: profile.curriculum,
-        goal: profile.study_goal_detail || profile.study_goal,
-        book: [profile.book_title, ...(profile.book_ids || []).map((id: string) => id)].filter(Boolean).join(", ") || "Not specified",
-        subjects: profile.subjects || [],
-      });
-    }).catch(() => {});
+    let cancelled = false;
+    const loadAcademicContext = async () => {
+      try {
+        const profile = await getAcademicProfile(user.id);
+        if (!profile || cancelled) return;
+        const selectedBookIds = Array.from(new Set([
+          ...(profile.book_ids || []),
+          ...(profile.book_id ? [profile.book_id] : []),
+        ]));
+        let selectedBookTitles: string[] = [];
+        if (selectedBookIds.length) {
+          const { data: books, error } = await supabase
+            .from("library_books")
+            .select("id,title,author,subject")
+            .in("id", selectedBookIds);
+          if (!error && books) {
+            selectedBookTitles = books.map((book: any) =>
+              [book.title, book.author, book.subject].filter(Boolean).join(" — ")
+            );
+          }
+        }
+        if (cancelled) return;
+        const resources = Array.from(new Set([
+          ...selectedBookTitles,
+          ...(profile.book_title ? [profile.book_title] : []),
+        ]));
+        setAcademicContext({
+          grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 12)),
+          curriculum: profile.curriculum,
+          goal: [profile.study_goal, profile.study_goal_detail].filter(Boolean).join(" — "),
+          book: resources.join("; ") || "Not specified",
+          subjects: profile.subjects || [],
+        });
+      } catch (error) {
+        console.error("Academic insights profile context failed:", error);
+      }
+    };
+    void loadAcademicContext();
     const fetchAll = async () => {
       const [statsRes, topicsRes, streakRes] = await Promise.all([
         supabase.rpc("get_user_stats", { p_user_id: user.id }),
@@ -46,6 +74,7 @@ const AcademicInsightsPage: React.FC = () => {
       setIsLoading(false);
     };
     fetchAll();
+    return () => { cancelled = true; };
   }, [user]);
 
   const generateAIInsights = async () => {
