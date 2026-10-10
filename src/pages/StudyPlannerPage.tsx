@@ -60,17 +60,46 @@ const StudyPlannerPage: React.FC = () => {
 
   useEffect(() => {
     if (!user?.id) return;
-    getAcademicProfile(user.id).then((profile) => {
-      if (!profile) return;
-      setSubjects(profile.subjects.map(normalizeSubject));
-      setNewSubject(normalizeSubject(profile.subjects[0] || "math"));
-      setAcademicContext({
-        grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 5)),
-        curriculum: profile.curriculum,
-        goal: profile.study_goal_detail || profile.study_goal,
-        book: [profile.book_title, ...(profile.book_ids || []).map((id: string) => id)].filter(Boolean).join(", ") || "Not specified",
-      });
-    }).catch(() => {});
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await getAcademicProfile(user.id);
+        if (!profile || cancelled) return;
+        setSubjects(profile.subjects.map(normalizeSubject));
+        setNewSubject(normalizeSubject(profile.subjects[0] || "math"));
+
+        const selectedBookIds = Array.from(new Set([
+          ...(profile.book_ids || []),
+          ...(profile.book_id ? [profile.book_id] : []),
+        ]));
+        let selectedBookTitles: string[] = [];
+        if (selectedBookIds.length) {
+          const { data: books, error } = await supabase
+            .from("library_books")
+            .select("id,title,author,subject")
+            .in("id", selectedBookIds);
+          if (!error && books) {
+            selectedBookTitles = books.map((book: any) =>
+              [book.title, book.author, book.subject].filter(Boolean).join(" — ")
+            );
+          }
+        }
+        if (cancelled) return;
+        const resourceContext = Array.from(new Set([
+          ...selectedBookTitles,
+          ...(profile.book_title ? [profile.book_title] : []),
+        ]));
+        setAcademicContext({
+          grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 5)),
+          curriculum: profile.curriculum,
+          goal: [profile.study_goal, profile.study_goal_detail].filter(Boolean).join(" — "),
+          book: resourceContext.join("; ") || "Not specified",
+        });
+      } catch (error) {
+        console.error("Academic planner profile context failed:", error);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [user?.id, user?.grade]);
 
   const addPlan = async () => {
