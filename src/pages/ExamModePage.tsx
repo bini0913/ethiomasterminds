@@ -16,7 +16,7 @@ type SourceQuiz = { id: string; title: string; description?: string; subject: st
 type ExamQuestion = { id: string; question_text: string; options: string[]; correct_answer: string; explanation?: string; topic?: string };
 function goalRelevance(quiz: SourceQuiz, goal: string): number {
   const text = `${quiz.title} ${quiz.description || ""} ${quiz.difficulty || ""}`.toLowerCase();
-  const target = goal.toLowerCase();
+  const target = goal.toLowerCase().replace(/[_-]+/g, " ");
   const groups: Array<{ terms: string[]; keywords: string[] }> = [
     { terms: ["exit", "grade 12", "national exam", "school leaving"], keywords: ["exit exam", "grade 12", "school leaving", "national exam", "matriculation"] },
     { terms: ["university entrance", "entrance exam", "college entrance"], keywords: ["entrance", "university", "college", "admission"] },
