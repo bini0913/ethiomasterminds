@@ -194,7 +194,6 @@ const ExamModePage: React.FC = () => {
             questions_correct: questionsCorrect,
             accuracy_percentage: questionsAttempted ? Math.round((questionsCorrect / questionsAttempted) * 100) : 0,
             completion_percentage: Math.min(100, Math.round((questionsAttempted / 5) * 100)),
-            updated_at: new Date().toISOString(),
           };
           const { error: progressError } = existing
             ? await supabase.from("topic_progress").update(progressUpdate).eq("id", existing.id)
@@ -238,7 +237,7 @@ const ExamModePage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from("questions")
-        .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index")
+        .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index,topic")
         .eq("quiz_id", selectedQuiz.id)
         .order("order_index", { ascending: true });
       if (error) throw error;
