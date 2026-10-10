@@ -37,8 +37,7 @@ Personal learning context:
 - Goal: ${String(studyGoal || "general academic progress").slice(0, 200)}
 - Curriculum: ${String(curriculum || "not specified").slice(0, 120)}
 - Selected subjects: ${JSON.stringify(safeSubjects)}
-- Library resources: ${String(book || "not specified").slice(0, 500)}`;
-
+- Library resources: ${String(book || "not specified").slice(0, 500)}
 
 Student data:
 - XP: ${xp}, Overall accuracy: ${stats?.accuracy || 0}%, Quizzes completed: ${stats?.total_quizzes || 0}
