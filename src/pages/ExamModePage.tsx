@@ -160,6 +160,8 @@ const ExamModePage: React.FC = () => {
       const { error } = await supabase.from("quiz_results").insert({
         quiz_id: selectedQuiz.id,
         student_id: user.id,
+        exam_type: selectedQuiz.exam_type || "general",
+        subject: selectedQuiz.subject,
         score: Math.round((correct / questions.length) * 100),
         total_questions: questions.length,
         correct_answers: correct,
