@@ -531,6 +531,17 @@ const AdminPortal: React.FC = () => {
     fetchStatsAndCharts();
   };
 
+  const handleExamTypeChange = async (quizId: string, examType: string) => {
+    const { error } = await supabase.from('quizzes').update({ exam_type: examType } as never).eq('id', quizId);
+    if (error) {
+      toast.error('Failed to update exam type. Confirm the typed exam bank migration is applied.');
+      return;
+    }
+    toast.success('Exam type updated');
+    logAction('Updated exam type', quizId);
+    fetchContent();
+  };
+
   const handleApproveContent = async (type: 'quiz' | 'question' | 'flashcard' | 'social', id: string) => {
     if (type === 'quiz') {
       const { error } = await supabase
@@ -795,7 +806,7 @@ const AdminPortal: React.FC = () => {
     .filter((u) => (roleFilter === 'all' ? true : u.role === roleFilter)), [users, searchQuery, gradeFilter, roleFilter]);
 
   const contentRows = useMemo(() => [
-    ...quizzes.map((x: any) => ({ id: x.id, type: 'quiz', title: x.title, grade: x.grade, subject: x.subject, created_at: x.created_at })),
+    ...quizzes.map((x: any) => ({ id: x.id, type: 'quiz', title: x.title, grade: x.grade, subject: x.subject, exam_type: x.exam_type || 'general', created_at: x.created_at })),
     ...flashcards.map((x: any) => ({ id: x.id, type: 'flashcard', title: x.term || x.question || 'Flashcard', grade: x.grade, subject: x.subject, created_at: x.created_at })),
     ...questions.map((x: any) => ({ id: x.id, type: 'question', title: x.question_text || x.question || 'Question', grade: x.grade, subject: x.subject, created_at: x.created_at })),
     ...socialPosts.map((x: any) => ({ id: x.id, type: 'social', title: x.content?.slice(0, 80) || 'Social Post', grade: 'all', subject: x.post_type, created_at: x.created_at })),
@@ -1137,7 +1148,7 @@ const AdminPortal: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Manage quizzes, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => handleApproveContent(item.type, item.id)} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Manage quizzes, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Exam type</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3">{item.type === 'quiz' ? <Select value={item.exam_type || 'general'} onValueChange={(value) => handleExamTypeChange(item.id, value)}><SelectTrigger className="h-9 min-w-[150px]"><SelectValue placeholder="Exam type" /></SelectTrigger><SelectContent><SelectItem value="general">General practice</SelectItem><SelectItem value="school_exam">School exam</SelectItem><SelectItem value="coursework">Coursework</SelectItem><SelectItem value="grade12_exit">Grade 12 exit exam</SelectItem><SelectItem value="entrance_exam">Entrance exam</SelectItem><SelectItem value="past_paper">Past paper</SelectItem><SelectItem value="mock_exam">Mock exam</SelectItem></SelectContent></Select> : '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => handleApproveContent(item.type, item.id)} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-4">
