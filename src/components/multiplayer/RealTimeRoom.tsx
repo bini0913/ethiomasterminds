@@ -138,6 +138,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [playerQuestionNumber, setPlayerQuestionNumber] = useState(1);
   const [showChat, setShowChat] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [isHost, setIsHost] = useState(false);
   const [countdownValue, setCountdownValue] = useState(5);
@@ -291,6 +292,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   };
 
   const loadRoomData = async () => {
+    setLoadError(null);
     try {
       const { data: room } = await supabase
         .from('multiplayer_rooms')
@@ -341,6 +343,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       await fetchChatMessages();
     } catch (err) {
       console.error('Error loading room data:', err);
+      const message = err instanceof Error ? err.message : 'A network or permission error occurred.';
+      setLoadError(message);
+      toast.error('Could not load this multiplayer room');
     } finally {
       setLoading(false);
     }
@@ -907,8 +912,28 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center gap-3 text-foreground" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span>Connecting to multiplayer room…</span>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-6 space-y-4">
+          <h2 className="text-xl font-semibold">Could not connect to this room</h2>
+          <p className="text-sm text-muted-foreground">Your match has not been removed. Check your connection and try again.</p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button className="flex-1" onClick={() => { setLoading(true); void loadRoomData(); }}>
+              <Wifi className="h-4 w-4 mr-2" /> Retry connection
+            </Button>
+            <Button className="flex-1" variant="outline" onClick={onLeave}>
+              <LogOut className="h-4 w-4 mr-2" /> Leave room
+            </Button>
+          </div>
+        </Card>
       </div>
     );
   }
