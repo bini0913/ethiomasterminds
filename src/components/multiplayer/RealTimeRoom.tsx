@@ -139,6 +139,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [showChat, setShowChat] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [resultsLoadError, setResultsLoadError] = useState<string | null>(null);
+  const [retryingResults, setRetryingResults] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [isHost, setIsHost] = useState(false);
   const [countdownValue, setCountdownValue] = useState(5);
@@ -451,6 +453,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }, [playerFinished, roomState.status, roomId]);
 
   const loadMatchResults = async () => {
+    setResultsLoadError(null);
     let results: any[] | null = null;
     let error: any = null;
     for (let attempt = 0; attempt < 6; attempt += 1) {
@@ -467,12 +470,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
     if (error) {
       console.error('Error loading multiplayer results:', error);
+      setResultsLoadError('We could not retrieve the final match results. Check your connection and try again.');
       toast.error('Could not load the final match results');
       return;
     }
 
     if (!results?.length) {
-      toast.error('Final results are still processing. Please refresh the result.');
+      setResultsLoadError('Final results are still processing. You can safely retry in a moment.');
+      toast.error('Final results are still processing');
       return;
     }
 
@@ -1079,6 +1084,24 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                   {countdownValue}
                 </motion.div>
                 <p className="text-xl mt-4">Match Starting… Syncing both players now</p>
+              </Card>
+            )}
+
+            {roomState.status === 'finished' && resultsLoadError && (
+              <Card className="p-6 bg-white/5 border-white/10 text-center space-y-3" role="status" aria-live="polite">
+                <h2 className="text-lg font-semibold">Match finished — results not ready</h2>
+                <p className="text-sm text-white/70">{resultsLoadError}</p>
+                <Button disabled={retryingResults} onClick={async () => {
+                  setRetryingResults(true);
+                  try {
+                    await loadMatchResults();
+                  } finally {
+                    setRetryingResults(false);
+                  }
+                }}>
+                  {retryingResults ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
+                  {retryingResults ? 'Checking results…' : 'Retry match results'}
+                </Button>
               </Card>
             )}
 
