@@ -519,23 +519,34 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     });
   };
   const loadPlayerQuestion = async () => {
-    const { data, error } = await supabase.rpc('multiplayer_get_current_question', { p_room_id: roomId });
-    if (error) throw error;
-    if (data?.done) {
-      setCurrentQuestion(null);
-      return;
+    setQuestionLoadError(null);
+    try {
+      const { data, error } = await supabase.rpc('multiplayer_get_current_question', { p_room_id: roomId });
+      if (error) throw error;
+      if (data?.done) {
+        setCurrentQuestion(null);
+        return;
+      }
+      if (!data?.id || !data?.question_text) {
+        throw new Error('The next question is not available yet. Please try again.');
+      }
+      setCurrentQuestion({
+        id: data.id,
+        question_text: data.question_text,
+        options: Array.isArray(data.options) ? data.options : [],
+        points: data.points || 100,
+      });
+      setTotalQuestions(data.total || totalQuestions);
+      setQuestionStartedAt(data.question_started_at ? new Date(data.question_started_at).getTime() : Date.now());
+      setPlayerQuestionNumber((data.index ?? 0) + 1);
+      setSelectedAnswer(null);
+      setAnswerResult(null);
+    } catch (err) {
+      console.error('Error loading multiplayer question:', err);
+      const message = err instanceof Error ? err.message : 'Check your connection and retry.';
+      setQuestionLoadError(message);
+      toast.error('Could not load the question');
     }
-    setCurrentQuestion({
-      id: data.id,
-      question_text: data.question_text,
-      options: Array.isArray(data.options) ? data.options : [],
-      points: data.points || 100,
-    });
-    setTotalQuestions(data.total || totalQuestions);
-    setQuestionStartedAt(data.question_started_at ? new Date(data.question_started_at).getTime() : Date.now());
-    setPlayerQuestionNumber((data.index ?? 0) + 1);
-    setSelectedAnswer(null);
-    setAnswerResult(null);
   };
 
   const fetchChatMessages = async () => {
