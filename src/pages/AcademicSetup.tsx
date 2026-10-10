@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, BookOpen, Check, GraduationCap, Library, Target } from "lucide-react";
 import { toast } from "sonner";
 
-type Goal = "class" | "entrance_exam" | "exit_exam" | "mock_exam" | "past_papers" | "custom";
+type Goal = "class" | "ministry_exam" | "university_entrance" | "national_exam" | "entrance_exam" | "exit_exam" | "mock_exam" | "past_papers" | "custom";
 type Curriculum = "oromia" | "addis_ababa";
 
 type BookOption = {
@@ -28,6 +28,9 @@ const upperGoalOptions: Array<{ value: Goal; title: string; description: string 
 ];
 const middleGoalOptions: Array<{ value: Goal; title: string; description: string }> = [
   { value: "class", title: "School / Class", description: "Keep up with my current classes and assignments." },
+  { value: "ministry_exam", title: "Ministry Exam", description: "Prepare for a national or regional Ministry examination." },
+  { value: "university_entrance", title: "University Entrance", description: "Prepare for university entrance and competitive exams." },
+  { value: "national_exam", title: "National / Regional Exam", description: "Build a structured revision plan for an upcoming exam." },
   { value: "custom", title: "Something else", description: "Tell Master Minds what you are preparing for." },
 ];
 
