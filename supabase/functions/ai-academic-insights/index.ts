@@ -49,10 +49,10 @@ Provide a personalized academic analysis with:
 2. Strongest areas and why
 3. Weakest areas with specific improvement strategies
 4. Study consistency evaluation
-5. 4-5 actionable recommendations for entrance exam preparation
-6. Predicted readiness level (percentage) for the entrance exam
+5. 4-5 actionable recommendations aligned with the saved goal, grade, subjects, curriculum, Library resources, and weak areas
+6. Give a readiness estimate only for a specific exam goal with enough relevant practice data; otherwise explain what evidence is missing instead of inventing a percentage
 
-Use emojis for visual appeal. Be encouraging but honest. Keep it concise and actionable.`;
+Separate measured results from hypotheses. If little data exists, say so and recommend a short diagnostic. Be encouraging, specific, and concise.`;
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
