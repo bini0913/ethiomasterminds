@@ -54,8 +54,7 @@ Personalization context:
 - Goal: ${String(studyGoal || "general academic progress").slice(0, 200)}
 - Curriculum: ${String(curriculum || "not specified").slice(0, 120)}
 - Selected subjects (use exact names): ${JSON.stringify(safeSubjects)}
-- Library resources: ${String(book || "not specified").slice(0, 500)}`;
-
+- Library resources: ${String(book || "not specified").slice(0, 500)}
 
 Based on their performance data:
 - Weak topics: ${JSON.stringify(weakTopics?.slice(0, 10) || [])}
