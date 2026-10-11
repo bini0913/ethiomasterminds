@@ -172,11 +172,11 @@ const StudyPlannerPage: React.FC = () => {
             const textContent = await page.getTextContent();
             const lines = (textContent.items || []).map((item: any) => String(item.str || "").trim()).filter(Boolean);
             for (const line of lines) {
-              const normalized = line.replace(/\\s+/g, " ").trim();
+              const normalized = line.replace(/\s+/g, " ").trim();
               if (normalized.length < 4 || normalized.length > 110) continue;
-              if (/^(chapter|unit|lesson|module|topic|section)\\s+([0-9ivxlcdm]+|[a-z])([.:\\s-]|$)/i.test(normalized) ||
-                  /^\\d+(?:\\.\\d+){0,2}[.)]?\\s+[A-Z][^.!?]{3,90}$/.test(normalized)) {
-                const heading = normalized.replace(/\\s+/g, " ");
+              if (/^(chapter|unit|lesson|module|topic|section)\s+([0-9ivxlcdm]+|[a-z])([.:\s-]|$)/i.test(normalized) ||
+                  /^\d+(?:\.\d+){0,2}[.)]?\s+[A-Z][^.!?]{3,90}$/.test(normalized)) {
+                const heading = normalized.replace(/\s+/g, " ");
                 if (!headings.some((existing) => existing.toLowerCase() === heading.toLowerCase())) headings.push(heading);
               }
             }
