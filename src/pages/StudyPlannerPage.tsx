@@ -193,7 +193,7 @@ const StudyPlannerPage: React.FC = () => {
           next[book.id] = { units: [], pageCount: 0, method: "estimated", message: error instanceof Error ? error.message : "Could not read this PDF." };
         }
       }
-      setBookAnalysis((current) => ({ ...current, ...next }));
+      setBookAnalysis((current) => { const merged = { ...current, ...next }; if (user?.id) localStorage.setItem("masterminds:book-analysis:" + user.id, JSON.stringify(merged)); return merged; });
       const headingCount = Object.values(next).filter((item) => item.method === "headings").length;
       const rangeCount = Object.values(next).filter((item) => item.method === "page-ranges").length;
       toast.success("Analyzed " + selectedBooks.length + " books: " + headingCount + " with extracted headings, " + rangeCount + " using page ranges.");
@@ -203,6 +203,14 @@ const StudyPlannerPage: React.FC = () => {
     } finally {
       setIsAnalyzingBooks(false);
     }
+  };
+
+  const toggleBookSelection = (bookId: string, checked: boolean) => {
+    setSelectedBooks((current) => {
+      const next = checked ? [...current.filter((book) => book.id !== bookId), ...availableBooks.filter((book) => book.id === bookId)] : current.filter((book) => book.id !== bookId);
+      if (user?.id) localStorage.setItem("masterminds:study-plan-books:" + user.id, JSON.stringify(next.map((book) => book.id)));
+      return next;
+    });
   };
 
   const savePlanSettings = () => {
