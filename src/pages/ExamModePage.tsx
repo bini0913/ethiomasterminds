@@ -13,7 +13,7 @@ import { getAcademicProfile, normalizeGrade, normalizeSubject, subjectsMatch } f
 
 type ExamState = "setup" | "running" | "results";
 type SourceQuiz = { id: string; title: string; description?: string; subject: string; grade: number; difficulty?: string; time_limit?: number | null; exam_type?: string; questionCount: number };
-type ExamQuestion = { id: string; question_text: string; options: string[]; correct_answer: string; explanation?: string; topic?: string };
+type ExamQuestion = { id: string; quiz_id?: string; subject?: string; sourceKind: "past_paper" | "topic_practice"; sourceTitle: string; question_text: string; options: string[]; correct_answer: string; explanation?: string; topic?: string };
 function goalRelevance(quiz: SourceQuiz, goal: string): number {
   const text = `${quiz.title} ${quiz.description || ""} ${quiz.difficulty || ""} ${(quiz.exam_type || "general").replace(/[_-]+/g, " ")}`.toLowerCase();
   const target = goal.toLowerCase().replace(/[_-]+/g, " ");
@@ -50,8 +50,8 @@ const ExamModePage: React.FC = () => {
   const { user, refreshProfile } = useUser();
   const navigate = useNavigate();
   const [examState, setExamState] = useState<ExamState>("setup");
-  const [subject, setSubject] = useState("math");
-  const [examTypeFilter, setExamTypeFilter] = useState("all");
+  const [subject, setSubject] = useState("all_selected");
+  const [examTypeFilter, setExamTypeFilter] = useState("mixed");
   const [questionCount, setQuestionCount] = useState(20);
   const [timeLimit, setTimeLimit] = useState(30);
   const [sourceQuizId, setSourceQuizId] = useState("");
@@ -83,7 +83,7 @@ const ExamModePage: React.FC = () => {
         const allowed = (profile?.subjects?.length ? profile.subjects : ["math", "science", "english", "history"]).map(normalizeSubject);
         setGrade(activeGrade);
         setProfileSubjects(allowed);
-        setSubject((current) => allowed.includes(current) ? current : allowed[0] || "math");
+        setSubject("all_selected");
         setGoal([profile?.study_goal || "School / Class", profile?.study_goal_detail || ""].filter(Boolean).join(" "));
 
         // Academic Prep and regular Quizzes share the same approved quizzes + linked question bank.
@@ -131,18 +131,15 @@ const ExamModePage: React.FC = () => {
     return () => { cancelled = true; };
   }, [user?.id, user?.grade]);
 
-  const subjectQuizzes = useMemo(() => sourceQuizzes.filter((quiz) => subjectsMatch(subject, quiz.subject) && (examTypeFilter === "all" || (quiz.exam_type || "general") === examTypeFilter)).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title)), [sourceQuizzes, subject, goal, examTypeFilter]);
-  const selectedQuiz = useMemo(() => subjectQuizzes.find((quiz) => quiz.id === sourceQuizId) || subjectQuizzes[0] || null, [subjectQuizzes, sourceQuizId]);
+  const subjectQuizzes = useMemo(() => sourceQuizzes.filter((quiz) => (subject === "all_selected" || subjectsMatch(subject, quiz.subject)) && (examTypeFilter === "mixed" || (examTypeFilter === "past_paper" ? quiz.exam_type === "past_paper" : quiz.exam_type !== "past_paper"))).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title)), [sourceQuizzes, subject, goal, examTypeFilter]);
+  const selectedQuiz = useMemo(() => subjectQuizzes[0] || null, [subjectQuizzes]);
   const currentQuestion = questions[currentQ];
   const unansweredCount = questions.length - Object.keys(answers).length;
 
   useEffect(() => {
-    if (!subjectQuizzes.length) {
-      setSourceQuizId("");
-      return;
-    }
-    if (!subjectQuizzes.some((quiz) => quiz.id === sourceQuizId)) setSourceQuizId(subjectQuizzes[0].id);
-  }, [subjectQuizzes, sourceQuizId]);
+    if (!subjectQuizzes.length) setSourceQuizId("");
+    else setSourceQuizId(subjectQuizzes[0].id);
+  }, [subjectQuizzes]);
 
   const submitExam = useCallback(async () => {
     if (examState !== "running" || submittedRef.current || !questions.length) return;
@@ -161,8 +158,8 @@ const ExamModePage: React.FC = () => {
       const { error } = await supabase.from("quiz_results").insert({
         quiz_id: selectedQuiz.id,
         student_id: user.id,
-        exam_type: selectedQuiz.exam_type || "general",
-        subject: selectedQuiz.subject,
+        exam_type: examTypeFilter === "mixed" ? "mixed_practice" : selectedQuiz.exam_type || "general",
+        subject: subject === "all_selected" ? "mixed" : selectedQuiz.subject,
         score: Math.round((correct / questions.length) * 100),
         total_questions: questions.length,
         correct_answers: correct,
@@ -178,7 +175,7 @@ const ExamModePage: React.FC = () => {
         const byTopic = new Map<string, { attempted: number; correct: number }>();
         details.forEach(({ q, correct: isCorrect }) => {
           const topic = (q.topic || "General").trim() || "General";
-          const key = topic.toLocaleLowerCase();
+          const key = `${q.subject || selectedQuiz.subject}::${topic.toLocaleLowerCase()}`;
           const current = byTopic.get(key) || { attempted: 0, correct: 0 };
           current.attempted += 1;
           if (isCorrect) current.correct += 1;
@@ -186,12 +183,14 @@ const ExamModePage: React.FC = () => {
         });
 
         for (const [topicKey, counts] of byTopic) {
-          const topic = details.find(({ q }) => (q.topic || "General").trim().toLocaleLowerCase() === topicKey)?.q.topic?.trim() || "General";
+          const matchedQuestion = details.find(({ q }) => `${q.subject || selectedQuiz.subject}::${(q.topic || "General").trim().toLocaleLowerCase()}` === topicKey)?.q;
+          const topic = matchedQuestion?.topic?.trim() || "General";
+          const progressSubject = matchedQuestion?.subject || selectedQuiz.subject;
           const { data: existing, error: lookupError } = await supabase
             .from("topic_progress")
             .select("id,questions_attempted,questions_correct")
             .eq("user_id", user.id)
-            .eq("subject", selectedQuiz.subject)
+            .eq("subject", progressSubject)
             .ilike("topic", topic)
             .maybeSingle();
           if (lookupError) {
@@ -205,7 +204,7 @@ const ExamModePage: React.FC = () => {
           const questionsCorrect = previousCorrect + counts.correct;
           const progressUpdate = {
             user_id: user.id,
-            subject: selectedQuiz.subject,
+            subject: progressSubject,
             topic,
             questions_attempted: questionsAttempted,
             questions_correct: questionsCorrect,
@@ -246,8 +245,8 @@ const ExamModePage: React.FC = () => {
   }, [examState]);
 
   const startExam = async () => {
-    if (!user?.id || !selectedQuiz) {
-      toast.error("Choose a subject and an approved question set first.");
+    if (!user?.id || !subjectQuizzes.length) {
+      toast.error("No approved questions are available for this setup yet.");
       return;
     }
     setIsStarting(true);
@@ -255,13 +254,20 @@ const ExamModePage: React.FC = () => {
       const { data, error } = await supabase
         .from("questions")
         .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index,topic")
-        .eq("quiz_id", selectedQuiz.id)
+        .in("quiz_id", subjectQuizzes.map((quiz) => quiz.id))
         .order("order_index", { ascending: true });
       if (error) throw error;
+      const quizById = new Map(subjectQuizzes.map((quiz) => [quiz.id, quiz]));
       const parsed = (data || []).map((row: any) => {
         const options = parseOptions(row);
+        const quiz = quizById.get(row.quiz_id);
+        const sourceKind = quiz?.exam_type === "past_paper" ? "past_paper" as const : "topic_practice" as const;
         return {
           id: row.id,
+          quiz_id: row.quiz_id,
+          subject: quiz?.subject || "general",
+          sourceKind,
+          sourceTitle: quiz?.title || "Approved quiz bank",
           question_text: String(row.question_text || ""),
           options,
           correct_answer: answerText(row.correct_answer, options),
@@ -273,8 +279,23 @@ const ExamModePage: React.FC = () => {
         toast.error("This approved quiz doesn't have usable questions yet.");
         return;
       }
-      const count = Math.min(questionCount, parsed.length);
-      const selected = [...parsed].sort(() => Math.random() - 0.5).slice(0, count);
+      const pastPaperPool = parsed.filter((question: ExamQuestion) => question.sourceKind === "past_paper");
+      const topicPool = parsed.filter((question: ExamQuestion) => question.sourceKind === "topic_practice" && Boolean(question.topic));
+      const pool = examTypeFilter === "past_paper" ? pastPaperPool : examTypeFilter === "topic_practice" ? topicPool : [...pastPaperPool, ...topicPool];
+      if (!pool.length) {
+        toast.error(examTypeFilter === "past_paper" ? "No approved quiz sets are classified as past papers for this scope." : "No usable topic-tagged questions are available for this scope yet.");
+        return;
+      }
+      const count = Math.min(questionCount, pool.length);
+      const shuffledPast = [...pastPaperPool].sort(() => Math.random() - 0.5);
+      const shuffledTopics = [...topicPool].sort(() => Math.random() - 0.5);
+      const selected: ExamQuestion[] = [];
+      if (examTypeFilter === "mixed") {
+        while (selected.length < count && (shuffledPast.length || shuffledTopics.length)) {
+          if (shuffledPast.length && (selected.length % 2 === 0 || !shuffledTopics.length)) selected.push(shuffledPast.shift()!);
+          else if (shuffledTopics.length) selected.push(shuffledTopics.shift()!);
+        }
+      } else selected.push(...[...pool].sort(() => Math.random() - 0.5).slice(0, count));
       if (parsed.length < questionCount) toast.info(`This quiz has ${parsed.length} usable questions, so your exam will use all ${parsed.length}.`);
       setQuestions(selected);
       setAnswers({});
@@ -315,23 +336,23 @@ const ExamModePage: React.FC = () => {
   if (examState === "setup") {
     return (
       <div className="min-h-screen bg-muted/30">
-        <Header title="Exam practice" subtitle="Practice with the same approved questions used in Quizzes." />
+        <Header title="Exam practice" subtitle="Build a configurable practice set across your selected subjects." />
         <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:py-10">
           <section className="space-y-5">
             <div className="rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
               <div className="flex items-start gap-4">
                 <div className="rounded-2xl bg-primary/10 p-3 text-primary"><GraduationCap className="h-7 w-7" /></div>
-                <div><p className="text-sm font-semibold text-primary">Your exam workspace</p><h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Prepare with purpose.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Questions come from approved Grade {grade} quizzes, so your exam practice, curriculum subjects and regular quiz content stay aligned.</p></div>
+                <div><p className="text-sm font-semibold text-primary">Your exam workspace</p><h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Prepare with purpose.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Mix approved past-paper-classified quiz sets with topic-tagged practice across your saved subjects. Source labels stay visible so practice is not mistaken for an official paper.</p></div>
               </div>
               <div className="mt-7 grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><label className="text-sm font-medium">Subject</label><Select value={subject} onValueChange={setSubject}><SelectTrigger className="h-12"><SelectValue placeholder="Choose subject" /></SelectTrigger><SelectContent>{profileSubjects.map((value) => <SelectItem key={value} value={value}>{prettySubject(value)}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><label className="text-sm font-medium">Exam type</label><Select value={examTypeFilter} onValueChange={setExamTypeFilter}><SelectTrigger className="h-12"><SelectValue placeholder="All exam types" /></SelectTrigger><SelectContent><SelectItem value="all">All approved practice</SelectItem><SelectItem value="school_exam">School exam</SelectItem><SelectItem value="coursework">Coursework</SelectItem><SelectItem value="grade12_exit">Grade 12 exit exam</SelectItem><SelectItem value="entrance_exam">Entrance exam</SelectItem><SelectItem value="past_paper">Past paper</SelectItem><SelectItem value="mock_exam">Mock exam</SelectItem><SelectItem value="general">General practice</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><label className="text-sm font-medium">Approved quiz set</label><Select value={selectedQuiz?.id || ""} onValueChange={setSourceQuizId} disabled={!subjectQuizzes.length}><SelectTrigger className="h-12"><SelectValue placeholder="Choose quiz set" /></SelectTrigger><SelectContent>{subjectQuizzes.map((quiz, index) => <SelectItem key={quiz.id} value={quiz.id}>{index === 0 && goalRelevance(quiz, goal) > 0 ? "Recommended · " : ""}{quiz.title}{quiz.exam_type && quiz.exam_type !== "general" ? ` · ${quiz.exam_type.replace(/[_-]+/g, " ")}` : ""} · {quiz.questionCount} Q</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><label className="text-sm font-medium">Subject scope</label><Select value={subject} onValueChange={setSubject}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all_selected">All selected subjects</SelectItem>{profileSubjects.map((value) => <SelectItem key={value} value={value}>{prettySubject(value)}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><label className="text-sm font-medium">Question source</label><Select value={examTypeFilter} onValueChange={setExamTypeFilter}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="mixed">Mixed: past-paper sets + topic questions</SelectItem><SelectItem value="past_paper">Past-paper-classified sets only</SelectItem><SelectItem value="topic_practice">Topic-tagged questions only</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><label className="text-sm font-medium">Question bank</label><div className="flex h-12 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">{isLoadingBank ? "Checking available questions…" : `${subjectQuizzes.length} approved sets · ${subjectQuizzes.reduce((sum, quiz) => sum + quiz.questionCount, 0)} available questions`}</div></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Question count</label><Select value={String(questionCount)} onValueChange={(value) => setQuestionCount(Number(value))}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent>{[10,20,30,50].map((count) => <SelectItem key={count} value={String(count)}>{count} questions</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Time limit</label><Select value={String(timeLimit)} onValueChange={(value) => setTimeLimit(Number(value))}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent>{[15,30,45,60].map((minutes) => <SelectItem key={minutes} value={String(minutes)}>{minutes} minutes</SelectItem>)}</SelectContent></Select></div>
               </div>
               <div className="mt-6 flex flex-col gap-3 rounded-2xl bg-muted/60 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3"><BookOpen className="h-5 w-5 text-primary" /><div><p className="font-semibold">{isLoadingBank ? "Checking your question bank…" : selectedQuiz ? selectedQuiz.title : "No matching quiz set yet"}</p><p className="text-sm text-muted-foreground">{isLoadingBank ? "Loading approved content" : selectedQuiz ? `${selectedQuiz.questionCount} usable questions · ${prettySubject(selectedQuiz.subject)} · Grade ${grade}` : "Try another subject or ask your teacher to publish an approved quiz."}</p></div></div>
+                <div className="flex items-center gap-3"><BookOpen className="h-5 w-5 text-primary" /><div><p className="font-semibold">{isLoadingBank ? "Checking your question bank…" : subjectQuizzes.length ? `${subjectQuizzes.length} matching approved sets` : "No matching question sets yet"}</p><p className="text-sm text-muted-foreground">{isLoadingBank ? "Loading approved content" : `${subjectQuizzes.reduce((sum, quiz) => sum + quiz.questionCount, 0)} questions across ${subject === "all_selected" ? "all selected subjects" : prettySubject(subject)}`}</p></div></div>
                 <Badge variant="secondary">{goal}</Badge>
               </div>
               <Button className="mt-6 h-12 w-full text-base" onClick={startExam} disabled={isLoadingBank || isStarting || !selectedQuiz}>{isStarting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Preparing exam…</> : <><Target className="mr-2 h-4 w-4" />Start exam</>}</Button>
@@ -365,7 +386,7 @@ const ExamModePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur"><div className="mx-auto max-w-4xl px-4 py-4 sm:px-6"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Timed practice</p><h1 className="font-bold sm:text-lg">{selectedQuiz?.title || "Exam mode"}</h1></div><div className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono font-semibold tabular-nums ${timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card"}`}><Clock3 className="h-4 w-4" />{formatTime(timeLeft)}</div></div><div className="mt-4 flex items-center justify-between text-sm text-muted-foreground"><span>Question {currentQ + 1} of {questions.length}</span><span>{Object.keys(answers).length} answered · {unansweredCount} remaining</span></div><Progress value={((currentQ + 1) / questions.length) * 100} className="mt-2 h-2" /></div></header>
-      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10"><Card className="rounded-3xl shadow-sm"><CardContent className="p-5 sm:p-8"><div className="flex items-center gap-2 text-sm text-muted-foreground"><CircleHelp className="h-4 w-4 text-primary" />{currentQuestion.topic || prettySubject(subject)}</div><h2 className="mt-4 text-xl font-semibold leading-8 sm:text-2xl">{currentQuestion.question_text}</h2><div className="mt-6 grid gap-3">{currentQuestion.options.map((option, index) => {const selected = answers[currentQ] === option; return <button key={`${currentQuestion.id}-${index}`} type="button" onClick={() => setAnswers((previous) => ({ ...previous, [currentQ]: option }))} className={`flex min-h-14 items-start gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-background hover:bg-muted/60"}`}><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{String.fromCharCode(65 + index)}</span><span className="pt-0.5 text-sm leading-6">{option}</span></button>;})}</div></CardContent></Card><div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><Button variant="outline" className="sm:min-w-32" disabled={currentQ === 0} onClick={() => setCurrentQ((index) => index - 1)}><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><div className="flex gap-3"><Button variant="outline" onClick={() => setCurrentQ((index) => Math.min(questions.length - 1, index + 1))} disabled={currentQ === questions.length - 1}>Skip <ChevronRight className="ml-1 h-4 w-4" /></Button><Button className="flex-1 sm:min-w-36" onClick={() => currentQ < questions.length - 1 ? setCurrentQ((index) => index + 1) : void submitExam()}>{currentQ < questions.length - 1 ? <>Next question <ChevronRight className="ml-1 h-4 w-4" /></> : "Submit exam"}</Button></div></div><p className="mt-4 text-center text-xs text-muted-foreground">Your answers are not revealed until you submit the exam.</p></main>
+      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10"><Card className="rounded-3xl shadow-sm"><CardContent className="p-5 sm:p-8"><div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><CircleHelp className="h-4 w-4 text-primary" />{currentQuestion.topic || prettySubject(currentQuestion.subject || subject)}<Badge variant="outline">{currentQuestion.sourceKind === "past_paper" ? "Past-paper-classified set · approved" : "Topic practice · approved quiz bank"}</Badge></div><h2 className="mt-4 text-xl font-semibold leading-8 sm:text-2xl">{currentQuestion.question_text}</h2><div className="mt-6 grid gap-3">{currentQuestion.options.map((option, index) => {const selected = answers[currentQ] === option; return <button key={`${currentQuestion.id}-${index}`} type="button" onClick={() => setAnswers((previous) => ({ ...previous, [currentQ]: option }))} className={`flex min-h-14 items-start gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-background hover:bg-muted/60"}`}><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{String.fromCharCode(65 + index)}</span><span className="pt-0.5 text-sm leading-6">{option}</span></button>;})}</div></CardContent></Card><div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><Button variant="outline" className="sm:min-w-32" disabled={currentQ === 0} onClick={() => setCurrentQ((index) => index - 1)}><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><div className="flex gap-3"><Button variant="outline" onClick={() => setCurrentQ((index) => Math.min(questions.length - 1, index + 1))} disabled={currentQ === questions.length - 1}>Skip <ChevronRight className="ml-1 h-4 w-4" /></Button><Button className="flex-1 sm:min-w-36" onClick={() => currentQ < questions.length - 1 ? setCurrentQ((index) => index + 1) : void submitExam()}>{currentQ < questions.length - 1 ? <>Next question <ChevronRight className="ml-1 h-4 w-4" /></> : "Submit exam"}</Button></div></div><p className="mt-4 text-center text-xs text-muted-foreground">Your answers are not revealed until you submit the exam.</p></main>
     </div>
   );
 };
