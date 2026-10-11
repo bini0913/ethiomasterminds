@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { getAcademicProfile, normalizeGrade, normalizeSubject } from "@/lib/academicProfile";
 import { getPdfPublicUrl } from "@/lib/libraryApi";
+import { loadBookAnalyses, saveBookAnalyses } from "@/lib/bookAnalysis";
 
 interface StudyPlan {
   id: string;
@@ -84,7 +85,19 @@ const StudyPlannerPage: React.FC = () => {
         const selected = normalizedBooks.filter((book) => selectedIds.includes(book.id));
         setSelectedBooks(selected);
         const selectedBookTitles = selected.map((book) => book.title + " — " + book.subject);
-        try { const savedAnalysis = localStorage.getItem("masterminds:book-analysis:" + user.id); if (savedAnalysis) setBookAnalysis(JSON.parse(savedAnalysis)); } catch { /* ignore invalid cached analysis */ }
+        let cachedAnalysis: typeof bookAnalysis = {};
+        try { const savedAnalysis = localStorage.getItem("masterminds:book-analysis:" + user.id); if (savedAnalysis) cachedAnalysis = JSON.parse(savedAnalysis); } catch { /* ignore invalid cached analysis */ }
+        try {
+          const persistedAnalysis = await loadBookAnalyses(user.id);
+          if (!cancelled) {
+            const mergedAnalysis = { ...cachedAnalysis, ...persistedAnalysis };
+            setBookAnalysis(mergedAnalysis);
+            localStorage.setItem("masterminds:book-analysis:" + user.id, JSON.stringify(mergedAnalysis));
+          }
+        } catch (analysisError) {
+          console.warn("Could not load saved textbook analysis from Supabase; using this device's cache.", analysisError);
+          if (!cancelled) setBookAnalysis(cachedAnalysis);
+        }
         if (cancelled) return;
         const resourceContext = Array.from(new Set([
           ...selectedBookTitles,
@@ -197,7 +210,17 @@ const StudyPlannerPage: React.FC = () => {
           next[book.id] = { units: [], pageCount: 0, method: "estimated", message: error instanceof Error ? error.message : "Could not read this PDF." };
         }
       }
-      setBookAnalysis((current) => { const merged = { ...current, ...next }; if (user?.id) localStorage.setItem("masterminds:book-analysis:" + user.id, JSON.stringify(merged)); return merged; });
+      const merged = { ...bookAnalysis, ...next };
+      setBookAnalysis(merged);
+      if (user?.id) {
+        localStorage.setItem("masterminds:book-analysis:" + user.id, JSON.stringify(merged));
+        try {
+          await saveBookAnalyses(user.id, next);
+        } catch (persistError) {
+          console.error("Textbook analysis was cached locally but could not be synced to the account.", persistError);
+          toast.error("Analysis is saved on this device, but account sync failed. Please retry after checking your connection.");
+        }
+      }
       const headingCount = Object.values(next).filter((item) => item.method === "headings").length;
       const rangeCount = Object.values(next).filter((item) => item.method === "page-ranges").length;
       toast.success("Analyzed " + selectedBooks.length + " books: " + headingCount + " with extracted headings, " + rangeCount + " using page ranges.");

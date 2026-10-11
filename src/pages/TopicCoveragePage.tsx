@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { ArrowLeft, BarChart3, CheckCircle, Lock, Star, Trophy, BookOpen, LibraryBig, GraduationCap } from "lucide-react";
 import { getAcademicProfile, normalizeSubject } from "@/lib/academicProfile";
+import { loadBookAnalyses } from "@/lib/bookAnalysis";
 
 interface TopicData {
   subject: string;
@@ -55,7 +56,19 @@ const TopicCoveragePage: React.FC = () => {
       ]);
       if (cancelled) return;
       setProfileSubjects((profileRes?.subjects || []).map(normalizeSubject));
-      try { const savedAnalysis = localStorage.getItem("masterminds:book-analysis:" + user.id); if (savedAnalysis) setBookUnits(JSON.parse(savedAnalysis)); } catch { /* ignore invalid cached analysis */ }
+      let cachedAnalysis: typeof bookUnits = {};
+      try { const savedAnalysis = localStorage.getItem("masterminds:book-analysis:" + user.id); if (savedAnalysis) cachedAnalysis = JSON.parse(savedAnalysis); } catch { /* ignore invalid cached analysis */ }
+      try {
+        const persistedAnalysis = await loadBookAnalyses(user.id);
+        if (!cancelled) {
+          const mergedAnalysis = { ...cachedAnalysis, ...persistedAnalysis };
+          setBookUnits(mergedAnalysis);
+          localStorage.setItem("masterminds:book-analysis:" + user.id, JSON.stringify(mergedAnalysis));
+        }
+      } catch (analysisError) {
+        console.warn("Could not load account textbook analysis; using this device's cache.", analysisError);
+        if (!cancelled) setBookUnits(cachedAnalysis);
+      }
       setTopics((progressRes.data || []) as TopicData[]);
       let bookIds = Array.from(new Set([...(profileRes?.book_ids || []), ...(profileRes?.book_id ? [profileRes.book_id] : [])]));
       try { const selected = localStorage.getItem("masterminds:study-plan-books:" + user.id); if (selected !== null) bookIds = JSON.parse(selected) as string[]; } catch { /* keep Academic Prep selection */ }
