@@ -37,6 +37,7 @@ const StudyPlannerPage: React.FC = () => {
   const [newPriority, setNewPriority] = useState("medium");
   const [subjects, setSubjects] = useState<string[]>(["math", "science", "english", "history"]);
   const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string } | null>(null);
+  const [availableBooks, setAvailableBooks] = useState<Array<{id:string;title:string;subject:string;pdf_path:string}>>([]);
   const [selectedBooks, setSelectedBooks] = useState<Array<{id:string;title:string;subject:string;pdf_path:string}>>([]);
   const [bookAnalysis, setBookAnalysis] = useState<Record<string, { units: string[]; pageCount: number; method: "headings" | "page-ranges" | "estimated"; message?: string }>>({});
   const [isAnalyzingBooks, setIsAnalyzingBooks] = useState(false);
