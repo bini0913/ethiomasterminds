@@ -65,6 +65,9 @@ const ExamModePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [results, setResults] = useState<{ correct: number; total: number; details: Array<{ q: ExamQuestion; answer: string; correct: boolean }> } | null>(null);
   const [profileSubjects, setProfileSubjects] = useState<string[]>([]);
+  const [bankSubjects, setBankSubjects] = useState<string[]>([]);
+  const [bankLoadError, setBankLoadError] = useState<string | null>(null);
+  const [bankReload, setBankReload] = useState(0);
   const [grade, setGrade] = useState(9);
   const [goal, setGoal] = useState("School / Class");
   const startedAtRef = useRef<number>(0);
@@ -76,6 +79,7 @@ const ExamModePage: React.FC = () => {
     let cancelled = false;
     (async () => {
       setIsLoadingBank(true);
+      setBankLoadError(null);
       try {
         const profile = await getAcademicProfile(user.id);
         if (cancelled) return;
@@ -92,10 +96,14 @@ const ExamModePage: React.FC = () => {
           .select("id,title,description,subject,grade,difficulty,time_limit,exam_type")
           .eq("is_approved", true);
         if (quizError) throw quizError;
-        const matching = (quizRows || []).filter((quiz: any) =>
-          normalizeGrade(quiz.grade, activeGrade) === activeGrade &&
+        const gradeQuizzes = (quizRows || []).filter((quiz: any) => normalizeGrade(quiz.grade, activeGrade) === activeGrade);
+        const profileMatching = gradeQuizzes.filter((quiz: any) =>
           allowed.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject || ""))
         );
+        // Some profiles contain subjects not yet represented in the approved bank.
+        // Keep the gap visible, but let students practice subjects that really exist.
+        const matching = profileMatching.length ? profileMatching : gradeQuizzes;
+        setBankSubjects(Array.from(new Set(matching.map((quiz: any) => normalizeSubject(quiz.subject || "")).filter(Boolean))).sort());
         if (!matching.length) {
           setSourceQuizzes([]);
           setSourceQuizId("");
@@ -123,15 +131,26 @@ const ExamModePage: React.FC = () => {
         setSourceQuizId((current) => available.some((quiz) => quiz.id === current) ? current : available[0]?.id || "");
       } catch (error) {
         console.error("Academic exam bank load failed:", error);
-        if (!cancelled) toast.error("We couldn't load the approved quiz bank. Please try again.");
+        if (!cancelled) {
+          setBankLoadError(error instanceof Error ? error.message : "The approved quiz bank request failed.");
+          toast.error("We couldn't load the approved quiz bank. Please retry.");
+        }
       } finally {
         if (!cancelled) setIsLoadingBank(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [user?.id, user?.grade]);
+  }, [user?.id, user?.grade, bankReload]);
 
-  const subjectQuizzes = useMemo(() => sourceQuizzes.filter((quiz) => (subject === "all_selected" || subjectsMatch(subject, quiz.subject)) && (examTypeFilter === "mixed" || (examTypeFilter === "past_paper" ? quiz.exam_type === "past_paper" : quiz.exam_type !== "past_paper"))).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title)), [sourceQuizzes, subject, goal, examTypeFilter]);
+  const subjectQuizzes = useMemo(() => {
+    const profileHasBankCoverage = sourceQuizzes.some((quiz) => profileSubjects.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject)));
+    return sourceQuizzes.filter((quiz) =>
+      (subject === "all_selected"
+        ? (!profileHasBankCoverage || profileSubjects.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject)))
+        : subjectsMatch(subject, quiz.subject)) &&
+      (examTypeFilter === "mixed" || (examTypeFilter === "past_paper" ? quiz.exam_type === "past_paper" : quiz.exam_type !== "past_paper"))
+    ).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title));
+  }, [sourceQuizzes, profileSubjects, subject, goal, examTypeFilter]);
   const selectedQuiz = useMemo(() => subjectQuizzes[0] || null, [subjectQuizzes]);
   const currentQuestion = questions[currentQ];
   const unansweredCount = questions.length - Object.keys(answers).length;
@@ -346,7 +365,7 @@ const ExamModePage: React.FC = () => {
                 <div><p className="text-sm font-semibold text-primary">Your exam workspace</p><h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{examTypeFilter === "mock_exam" ? "Simulate an exam session." : "Prepare with purpose."}</h2><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Choose mixed practice or a timed mock exam across your saved subjects. Mock exams use available approved quiz-bank questions and topic practice; they are not presented as official national exam papers.</p></div>
               </div>
               <div className="mt-7 grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><label className="text-sm font-medium">Subject scope</label><Select value={subject} onValueChange={setSubject}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all_selected">All selected subjects</SelectItem>{profileSubjects.map((value) => <SelectItem key={value} value={value}>{prettySubject(value)}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><label className="text-sm font-medium">Subject scope</label><Select value={subject} onValueChange={setSubject}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all_selected">{sourceQuizzes.some((quiz) => profileSubjects.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject))) ? "All selected subjects" : "All available Grade " + grade + " subjects"}</SelectItem>{Array.from(new Set([...profileSubjects, ...bankSubjects])).map((value) => <SelectItem key={value} value={value}>{prettySubject(value)}{!profileSubjects.some((profileSubject) => subjectsMatch(profileSubject, value)) ? " · available bank" : ""}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Question source</label><Select value={examTypeFilter} onValueChange={setExamTypeFilter}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="mixed">Mixed: past-paper sets + topic questions</SelectItem><SelectItem value="mock_exam">Mock exam: timed mixed assessment</SelectItem><SelectItem value="past_paper">Past-paper-classified sets only</SelectItem><SelectItem value="topic_practice">Topic-tagged questions only</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Question bank</label><div className="flex h-12 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">{isLoadingBank ? "Checking available questions…" : `${subjectQuizzes.length} approved sets · ${subjectQuizzes.reduce((sum, quiz) => sum + quiz.questionCount, 0)} available questions`}</div></div>
                 <div className="space-y-2"><label className="text-sm font-medium">Question count</label><Select value={String(questionCount)} onValueChange={(value) => setQuestionCount(Number(value))}><SelectTrigger className="h-12"><SelectValue /></SelectTrigger><SelectContent>{[10,20,30,50].map((count) => <SelectItem key={count} value={String(count)}>{count} questions</SelectItem>)}</SelectContent></Select></div>
@@ -357,7 +376,9 @@ const ExamModePage: React.FC = () => {
                 <Badge variant="secondary">{goal}</Badge>
               </div>
               <Button className="mt-6 h-12 w-full text-base" onClick={startExam} disabled={isLoadingBank || isStarting || !selectedQuiz}>{isStarting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Preparing exam…</> : <><Target className="mr-2 h-4 w-4" />Start exam</>}</Button>
-              {!isLoadingBank && !sourceQuizzes.length && <p className="mt-3 text-sm text-muted-foreground">No approved Grade {grade} quizzes with usable questions match your saved subjects yet. The exam will become available when matching quizzes are approved and published.</p>}
+              {!isLoadingBank && bankLoadError && <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm"><p className="font-medium">The question bank could not be loaded.</p><p className="mt-1 text-muted-foreground">Check your connection and retry. Your settings will be kept.</p><Button className="mt-2" variant="outline" size="sm" onClick={() => setBankReload((value) => value + 1)}>Retry question bank</Button></div>}
+              {!isLoadingBank && !bankLoadError && !sourceQuizzes.length && <p className="mt-3 text-sm text-muted-foreground">No approved Grade {grade} quizzes with usable questions are available. The exam will become available when matching quizzes are approved and published.</p>}
+              {!isLoadingBank && sourceQuizzes.length > 0 && !sourceQuizzes.some((quiz) => profileSubjects.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject))) && <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">Your saved subjects ({profileSubjects.map(prettySubject).join(", ")}) do not yet have approved Grade {grade} questions. You can practice the available bank subjects shown in the selector; missing subjects are not substituted with invented questions.</p>}
             </div>
           </section>
           <aside className="space-y-4">
