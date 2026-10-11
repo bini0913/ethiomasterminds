@@ -29,7 +29,8 @@ import {
   LogOut,
   CheckCircle,
   Gift,
-  Bot
+  Bot,
+  GraduationCap
 } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import CurrencyDisplay from '@/components/currency/CurrencyDisplay';
