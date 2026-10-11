@@ -104,6 +104,9 @@ const Friends: React.FC = () => {
       return { friend, lastMessage };
     })
     .sort((a, b) => {
+      const aOnline = onlineFriends.some((friend) => friend.id === a.friend.id);
+      const bOnline = onlineFriends.some((friend) => friend.id === b.friend.id);
+      if (aOnline !== bOnline) return aOnline ? -1 : 1;
       if (!a.lastMessage && !b.lastMessage) return 0;
       if (!a.lastMessage) return 1;
       if (!b.lastMessage) return -1;
