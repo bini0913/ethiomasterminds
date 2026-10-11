@@ -74,6 +74,7 @@ import AIHelper from "./components/ai/AIHelper";
 import NativeBackHandler from "./components/mobile/NativeBackHandler";
 import NotificationBootstrap from "./components/notifications/NotificationBootstrap";
 import NotificationRouteHandler from "./components/notifications/NotificationRouteHandler";
+import SocialRealtimeNotifications from "./components/notifications/SocialRealtimeNotifications";
 
 const queryClient = new QueryClient();
 
@@ -376,6 +377,7 @@ const App = () => (
                             <NativeBackHandler />
                             <NotificationBootstrap />
                             <NotificationRouteHandler />
+                            <SocialRealtimeNotifications />
                             <AIHelper />
                           </BrowserRouter>
                           </TooltipProvider>
