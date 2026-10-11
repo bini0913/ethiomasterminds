@@ -75,23 +75,16 @@ const StudyPlannerPage: React.FC = () => {
         setSubjects(profile.subjects.map(normalizeSubject));
         setNewSubject(normalizeSubject(profile.subjects[0] || "math"));
 
-        const selectedBookIds = Array.from(new Set([
-          ...(profile.book_ids || []),
-          ...(profile.book_id ? [profile.book_id] : []),
-        ]));
-        let selectedBookTitles: string[] = [];
-        if (selectedBookIds.length) {
-          const { data: books, error } = await supabase
-            .from("library_books")
-            .select("id,title,author,subject,pdf_path")
-            .in("id", selectedBookIds);
-          if (!error && books) {
-            selectedBookTitles = books.map((book: any) =>
-              [book.title, book.author, book.subject].filter(Boolean).join(" — ")
-            );
-            setSelectedBooks(books.map((book: any) => ({ id: book.id, title: String(book.title || "Untitled book"), subject: normalizeSubject(String(book.subject || profile.subjects[0] || "general")), pdf_path: String(book.pdf_path || "") })));
-          }
-        }
+        const selectedBookIds = Array.from(new Set([...(profile.book_ids || []), ...(profile.book_id ? [profile.book_id] : [])]));
+        const { data: books, error: booksError } = await supabase.from("library_books").select("id,title,author,subject,pdf_path").limit(500);
+        if (booksError) throw booksError;
+        const normalizedBooks = (books || []).map((book: any) => ({ id: String(book.id), title: String(book.title || "Untitled book"), subject: normalizeSubject(String(book.subject || profile.subjects[0] || "general")), pdf_path: String(book.pdf_path || "") }));
+        const selectedIds = selectedBookIds.length ? selectedBookIds : normalizedBooks.filter((book) => profile.subjects.some((subject: string) => normalizeSubject(subject) === book.subject)).map((book) => book.id);
+        setAvailableBooks(normalizedBooks);
+        const selected = normalizedBooks.filter((book) => selectedIds.includes(book.id));
+        setSelectedBooks(selected);
+        const selectedBookTitles = selected.map((book) => book.title + " — " + book.subject);
+        try { const savedAnalysis = localStorage.getItem("masterminds:book-analysis:" + user.id); if (savedAnalysis) setBookAnalysis(JSON.parse(savedAnalysis)); } catch { /* ignore invalid cached analysis */ }
         if (cancelled) return;
         const resourceContext = Array.from(new Set([
           ...selectedBookTitles,
