@@ -225,7 +225,14 @@ const StudyPlannerPage: React.FC = () => {
     if (!selectedBooks.length) { toast.error("Select at least one book in Academic Prep first."); return; }
     const finishDays = Math.max(1, Math.min(365, planSettings.finishDays));
     const sessionsPerWeek = Math.max(1, Math.min(7, planSettings.daysPerWeek)) * Math.max(1, Math.min(4, planSettings.sessionsPerDay));
-    const capacity = Math.ceil(finishDays / 7) * sessionsPerWeek;
+    // Count the actual eligible calendar days. A rounded-up number of weeks can
+    // overstate capacity near a deadline and make the warning disagree with the schedule.
+    const eligibleDays = Array.from({ length: finishDays }, (_, day) => {
+      const date = addDays(new Date(), day);
+      const weekday = date.getDay() === 0 ? 7 : date.getDay();
+      return weekday <= Math.max(1, Math.min(7, planSettings.daysPerWeek));
+    }).filter(Boolean).length;
+    const capacity = eligibleDays * Math.max(1, Math.min(4, planSettings.sessionsPerDay));
     const unitsByBook = selectedBooks.map((book) => ({ book, units: bookAnalysis[book.id]?.units?.length ? bookAnalysis[book.id].units : Array.from({ length: Math.max(1, planSettings.unitsPerBook) }, (_, index) => "Estimated study unit " + (index + 1)) }));
     const totalUnits = unitsByBook.reduce((total, item) => total + item.units.length, 0);
     const requiredSessions = totalUnits * 3;
@@ -236,7 +243,7 @@ const StudyPlannerPage: React.FC = () => {
     for (let day = 0; day < finishDays && sessionIndex < requiredSessions; day++) {
       const date = addDays(new Date(), day);
       const activeDay = date.getDay() === 0 ? 7 : date.getDay();
-      if (activeDay > planSettings.daysPerWeek) continue;
+      if (activeDay > Math.max(1, Math.min(7, planSettings.daysPerWeek))) continue;
       for (let session = 0; session < planSettings.sessionsPerDay && sessionIndex < requiredSessions; session++) {
         const unitOrdinal = Math.floor(sessionIndex / 3);
         let unitsBefore = 0;
