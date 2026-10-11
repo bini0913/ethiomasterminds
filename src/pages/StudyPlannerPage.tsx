@@ -37,6 +37,7 @@ const StudyPlannerPage: React.FC = () => {
   const [newPriority, setNewPriority] = useState("medium");
   const [subjects, setSubjects] = useState<string[]>(["math", "science", "english", "history"]);
   const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string } | null>(null);
+  const [availableBooks, setAvailableBooks] = useState<Array<{id:string;title:string;subject:string;pdf_path:string}>>([]);
   const [selectedBooks, setSelectedBooks] = useState<Array<{id:string;title:string;subject:string;pdf_path:string}>>([]);
   const [bookAnalysis, setBookAnalysis] = useState<Record<string, { units: string[]; pageCount: number; method: "headings" | "page-ranges" | "estimated"; message?: string }>>({});
   const [isAnalyzingBooks, setIsAnalyzingBooks] = useState(false);
@@ -74,23 +75,16 @@ const StudyPlannerPage: React.FC = () => {
         setSubjects(profile.subjects.map(normalizeSubject));
         setNewSubject(normalizeSubject(profile.subjects[0] || "math"));
 
-        const selectedBookIds = Array.from(new Set([
-          ...(profile.book_ids || []),
-          ...(profile.book_id ? [profile.book_id] : []),
-        ]));
-        let selectedBookTitles: string[] = [];
-        if (selectedBookIds.length) {
-          const { data: books, error } = await supabase
-            .from("library_books")
-            .select("id,title,author,subject,pdf_path")
-            .in("id", selectedBookIds);
-          if (!error && books) {
-            selectedBookTitles = books.map((book: any) =>
-              [book.title, book.author, book.subject].filter(Boolean).join(" — ")
-            );
-            setSelectedBooks(books.map((book: any) => ({ id: book.id, title: String(book.title || "Untitled book"), subject: normalizeSubject(String(book.subject || profile.subjects[0] || "general")), pdf_path: String(book.pdf_path || "") })));
-          }
-        }
+        const selectedBookIds = Array.from(new Set([...(profile.book_ids || []), ...(profile.book_id ? [profile.book_id] : [])]));
+        const { data: books, error: booksError } = await supabase.from("library_books").select("id,title,author,subject,pdf_path").limit(500);
+        if (booksError) throw booksError;
+        const normalizedBooks = (books || []).map((book: any) => ({ id: String(book.id), title: String(book.title || "Untitled book"), subject: normalizeSubject(String(book.subject || profile.subjects[0] || "general")), pdf_path: String(book.pdf_path || "") }));
+        const selectedIds = selectedBookIds.length ? selectedBookIds : normalizedBooks.filter((book) => profile.subjects.some((subject: string) => normalizeSubject(subject) === book.subject)).map((book) => book.id);
+        setAvailableBooks(normalizedBooks);
+        const selected = normalizedBooks.filter((book) => selectedIds.includes(book.id));
+        setSelectedBooks(selected);
+        const selectedBookTitles = selected.map((book) => book.title + " — " + book.subject);
+        try { const savedAnalysis = localStorage.getItem("masterminds:book-analysis:" + user.id); if (savedAnalysis) setBookAnalysis(JSON.parse(savedAnalysis)); } catch { /* ignore invalid cached analysis */ }
         if (cancelled) return;
         const resourceContext = Array.from(new Set([
           ...selectedBookTitles,
@@ -199,7 +193,7 @@ const StudyPlannerPage: React.FC = () => {
           next[book.id] = { units: [], pageCount: 0, method: "estimated", message: error instanceof Error ? error.message : "Could not read this PDF." };
         }
       }
-      setBookAnalysis((current) => ({ ...current, ...next }));
+      setBookAnalysis((current) => { const merged = { ...current, ...next }; if (user?.id) localStorage.setItem("masterminds:book-analysis:" + user.id, JSON.stringify(merged)); return merged; });
       const headingCount = Object.values(next).filter((item) => item.method === "headings").length;
       const rangeCount = Object.values(next).filter((item) => item.method === "page-ranges").length;
       toast.success("Analyzed " + selectedBooks.length + " books: " + headingCount + " with extracted headings, " + rangeCount + " using page ranges.");
@@ -209,6 +203,14 @@ const StudyPlannerPage: React.FC = () => {
     } finally {
       setIsAnalyzingBooks(false);
     }
+  };
+
+  const toggleBookSelection = (bookId: string, checked: boolean) => {
+    setSelectedBooks((current) => {
+      const next = checked ? [...current.filter((book) => book.id !== bookId), ...availableBooks.filter((book) => book.id === bookId)] : current.filter((book) => book.id !== bookId);
+      if (user?.id) localStorage.setItem("masterminds:study-plan-books:" + user.id, JSON.stringify(next.map((book) => book.id)));
+      return next;
+    });
   };
 
   const savePlanSettings = () => {
@@ -443,6 +445,10 @@ const StudyPlannerPage: React.FC = () => {
         </div>
         {showPlanSettings && <Card className="mt-3"><CardContent className="p-4 space-y-4">
           <div><h3 className="font-semibold">Finish your selected books</h3><p className="text-sm text-muted-foreground">Analyze readable PDF text for chapter/unit headings first. If headings cannot be extracted, the planner uses page ranges or clearly marked estimates.</p></div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">Choose which books to finish</p><div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { const next = availableBooks.filter((book) => !subjects.length || subjects.some((subject) => normalizeSubject(subject) === book.subject)); setSelectedBooks(next); if (user?.id) localStorage.setItem("masterminds:study-plan-books:" + user.id, JSON.stringify(next.map((book) => book.id))); }}>Select all matching subjects</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setSelectedBooks([]); if (user?.id) localStorage.setItem("masterminds:study-plan-books:" + user.id, "[]"); }}>Clear</Button></div></div>
+            <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border p-3">{availableBooks.length ? availableBooks.map((book) => <label key={book.id} className="flex cursor-pointer items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={selectedBooks.some((item) => item.id === book.id)} onChange={(event) => toggleBookSelection(book.id, event.target.checked)} /><span className="min-w-0 flex-1"><span className="font-medium">{book.title}</span><span className="block text-xs text-muted-foreground">{book.subject}{book.pdf_path ? " · PDF attached" : " · No PDF attached"}</span></span></label>) : <p className="text-sm text-muted-foreground">No library books are available to select.</p>}</div>
+          </div>
           <div className="space-y-2"><Button type="button" variant="outline" onClick={analyzeSelectedBookPdfs} disabled={isAnalyzingBooks}>{isAnalyzingBooks ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BookOpen className="mr-2 h-4 w-4"/>}Analyze selected book PDFs</Button>{selectedBooks.map((book) => { const analysis = bookAnalysis[book.id]; return <div key={book.id} className="rounded border p-2 text-sm"><p className="font-medium">{book.title}</p><p className="text-xs text-muted-foreground">{!analysis ? "Not analyzed yet" : analysis.method === "headings" ? analysis.units.length + " headings extracted from PDF text · " + analysis.pageCount + " pages" : analysis.method === "page-ranges" ? analysis.units.length + " page ranges · " + analysis.pageCount + " pages" : "Using estimated units"}{analysis?.message ? " · " + analysis.message : ""}</p></div>; })}</div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <label className="text-sm">Sessions/day<Input type="number" min={1} max={4} value={planSettings.sessionsPerDay} onChange={e=>setPlanSettings(p=>({...p,sessionsPerDay:Math.max(1,Math.min(4,Number(e.target.value)||1))}))}/></label>

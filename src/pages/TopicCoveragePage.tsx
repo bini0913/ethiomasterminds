@@ -43,6 +43,7 @@ const TopicCoveragePage: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedBooks, setSelectedBooks] = useState<Array<{id:string;title:string;author:string;subject:string;description:string}>>([]);
+  const [bookUnits, setBookUnits] = useState<Record<string, { units: string[]; pageCount: number; method: string; message?: string }>>({});
 
   useEffect(() => {
     if (!user?.id) return;
@@ -54,8 +55,10 @@ const TopicCoveragePage: React.FC = () => {
       ]);
       if (cancelled) return;
       setProfileSubjects((profileRes?.subjects || []).map(normalizeSubject));
+      try { const savedAnalysis = localStorage.getItem("masterminds:book-analysis:" + user.id); if (savedAnalysis) setBookUnits(JSON.parse(savedAnalysis)); } catch { /* ignore invalid cached analysis */ }
       setTopics((progressRes.data || []) as TopicData[]);
-      const bookIds = Array.from(new Set([...(profileRes?.book_ids || []), ...(profileRes?.book_id ? [profileRes.book_id] : [])]));
+      let bookIds = Array.from(new Set([...(profileRes?.book_ids || []), ...(profileRes?.book_id ? [profileRes.book_id] : [])]));
+      try { const selected = localStorage.getItem("masterminds:study-plan-books:" + user.id); if (selected !== null) bookIds = JSON.parse(selected) as string[]; } catch { /* keep Academic Prep selection */ }
       if (bookIds.length) {
         const { data: books, error: booksError } = await supabase.from("library_books").select("id,title,author,subject,description").in("id", bookIds);
         if (booksError) console.warn("Could not load selected Library books for Topic Coverage", booksError);
@@ -160,6 +163,7 @@ const TopicCoveragePage: React.FC = () => {
         <Card className="mb-5 border-primary/20"><CardContent className="p-4 space-y-3">
           <div className="flex items-start gap-3"><LibraryBig className="h-5 w-5 text-primary mt-0.5"/><div className="flex-1"><h2 className="font-semibold">Read and learn from your selected books</h2><p className="text-sm text-muted-foreground">Open the Library reader for the actual book PDF, notes, highlights, and reading progress. Topic names below are learning pathways, not claims about a book’s exact chapter titles.</p></div></div>
           {selectedBooks.length ? <div className="space-y-2">{selectedBooks.map(book=><div key={book.id} className="rounded-lg border p-3 flex items-center gap-3"><BookOpen className="h-4 w-4 shrink-0 text-primary"/><div className="min-w-0 flex-1"><p className="text-sm font-medium truncate">{book.title}</p><p className="text-xs text-muted-foreground">{book.author} · {labelFor(book.subject)}</p></div><Button size="sm" variant="outline" onClick={()=>navigate("/library")}>Open Library</Button></div>)}</div> : <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">No selected books were found in Academic Prep. You can still study topic pathways and practice questions, or select books in Academic Prep.</div>}
+          {selectedBooks.some((book) => (bookUnits[book.id]?.units || []).length > 0) && <div className="space-y-3 rounded-xl border p-3"><div><h3 className="font-semibold">Units from your selected book PDFs</h3><p className="text-xs text-muted-foreground">These are extracted PDF headings or page ranges, not generic topic suggestions. Page ranges are identified when reliable headings could not be extracted.</p></div>{selectedBooks.map((book) => { const analysis = bookUnits[book.id]; if (!analysis?.units?.length) return null; return <div key={book.id} className="space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{book.title}</p><Badge variant="outline">{analysis.method === "headings" ? "PDF headings" : analysis.method === "page-ranges" ? "PDF page ranges" : "Estimated"}</Badge></div>{analysis.units.map((unit, index) => <div key={book.id + unit + index} className="flex items-center gap-2 rounded-lg bg-muted/50 p-2"><span className="min-w-0 flex-1 text-sm">{index + 1}. {unit}</span><Button size="sm" variant="outline" onClick={() => navigate(`/quiz?subject=${encodeURIComponent(normalizeSubject(book.subject))}&topic=${encodeURIComponent(unit)}`)}>Practice unit</Button></div>)}</div>; })}</div>}
           <div className="flex flex-wrap gap-2"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Read in Library</Button><Button variant="outline" onClick={()=>navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(path[0] || "")}`)}><GraduationCap className="mr-2 h-4 w-4"/>Practice questions</Button></div>
         </CardContent></Card>
         <div className="space-y-3">
