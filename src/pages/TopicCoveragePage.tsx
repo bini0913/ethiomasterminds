@@ -80,9 +80,17 @@ const TopicCoveragePage: React.FC = () => {
 
   const getPath = (subject: string) => {
     const normalized = normalizeSubject(subject);
-    const foundation = COMMON_PATHS[normalized] || [
-      "Foundations", "Core Concepts", "Key Terms", "Practice", "Applications", "Advanced Concepts", "Revision", "Exam Practice",
-    ];
+    // When a selected textbook has analyzed units, use those as the syllabus rather
+    // than mixing in unrelated generic paths. Generic paths remain a fallback only.
+    const bookDerived = selectedBooks
+      .filter((book) => normalizeSubject(book.subject) === normalized)
+      .flatMap((book) => (bookUnits[book.id]?.units || []).map((unit) => unit.trim()))
+      .filter(Boolean);
+    const foundation = bookDerived.length
+      ? Array.from(new Set(bookDerived))
+      : (COMMON_PATHS[normalized] || [
+          "Foundations", "Core Concepts", "Key Terms", "Practice", "Applications", "Advanced Concepts", "Revision", "Exam Practice",
+        ]);
     // Include topics the student has actually practiced, even when they are not in
     // the generic starter path. This makes coverage reflect real course activity.
     const observed = topics
@@ -124,7 +132,7 @@ const TopicCoveragePage: React.FC = () => {
         <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 py-3">
           <div className="mx-auto flex max-w-4xl items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button>
-            <div><h1 className="text-lg font-bold flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /> Topic Coverage</h1><p className="text-xs text-muted-foreground">Your personalized Grade-level mastery paths</p></div>
+            <div><h1 className="text-lg font-bold flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /> Topic Coverage</h1><p className="text-xs text-muted-foreground">Book-based units when available; otherwise suggested learning paths</p></div>
           </div>
         </header>
         <main className="mx-auto max-w-4xl space-y-4 px-4 py-5 pb-24">
@@ -161,9 +169,9 @@ const TopicCoveragePage: React.FC = () => {
       <main className="mx-auto max-w-2xl px-4 py-5 pb-24">
         <Progress value={progress.pct} className="mb-5 h-2" />
         <Card className="mb-5 border-primary/20"><CardContent className="p-4 space-y-3">
-          <div className="flex items-start gap-3"><LibraryBig className="h-5 w-5 text-primary mt-0.5"/><div className="flex-1"><h2 className="font-semibold">Read and learn from your selected books</h2><p className="text-sm text-muted-foreground">Open the Library reader for the actual book PDF, notes, highlights, and reading progress. Topic names below are learning pathways, not claims about a book’s exact chapter titles.</p></div></div>
+          <div className="flex items-start gap-3"><LibraryBig className="h-5 w-5 text-primary mt-0.5"/><div className="flex-1"><h2 className="font-semibold">Read and learn from your selected books</h2><p className="text-sm text-muted-foreground">When PDF analysis is available, coverage follows the selected book’s extracted headings or page ranges. Otherwise, suggested learning paths are shown separately and are not verified textbook chapters.</p></div></div>
           {selectedBooks.length ? <div className="space-y-2">{selectedBooks.map(book=><div key={book.id} className="rounded-lg border p-3 flex items-center gap-3"><BookOpen className="h-4 w-4 shrink-0 text-primary"/><div className="min-w-0 flex-1"><p className="text-sm font-medium truncate">{book.title}</p><p className="text-xs text-muted-foreground">{book.author} · {labelFor(book.subject)}</p></div><Button size="sm" variant="outline" onClick={()=>navigate("/library")}>Open Library</Button></div>)}</div> : <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">No selected books were found in Academic Prep. You can still study topic pathways and practice questions, or select books in Academic Prep.</div>}
-          {selectedBooks.some((book) => (bookUnits[book.id]?.units || []).length > 0) && <div className="space-y-3 rounded-xl border p-3"><div><h3 className="font-semibold">Units from your selected book PDFs</h3><p className="text-xs text-muted-foreground">These are extracted PDF headings or page ranges, not generic topic suggestions. Page ranges are identified when reliable headings could not be extracted.</p></div>{selectedBooks.map((book) => { const analysis = bookUnits[book.id]; if (!analysis?.units?.length) return null; return <div key={book.id} className="space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{book.title}</p><Badge variant="outline">{analysis.method === "headings" ? "PDF headings" : analysis.method === "page-ranges" ? "PDF page ranges" : "Estimated"}</Badge></div>{analysis.units.map((unit, index) => <div key={book.id + unit + index} className="flex items-center gap-2 rounded-lg bg-muted/50 p-2"><span className="min-w-0 flex-1 text-sm">{index + 1}. {unit}</span><Button size="sm" variant="outline" onClick={() => navigate(`/quiz?subject=${encodeURIComponent(normalizeSubject(book.subject))}&topic=${encodeURIComponent(unit)}`)}>Practice unit</Button></div>)}</div>; })}</div>}
+          {selectedBooks.some((book) => (bookUnits[book.id]?.units || []).length > 0) && <div className="space-y-3 rounded-xl border p-3"><div><h3 className="font-semibold">Units from your selected book PDFs</h3><p className="text-xs text-muted-foreground">These are extracted PDF headings or page ranges, not generic topic suggestions. Page ranges are identified when reliable headings could not be extracted.</p></div>{selectedBooks.map((book) => { const analysis = bookUnits[book.id]; if (!analysis?.units?.length) return null; return <div key={book.id} className="space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{book.title}</p><Badge variant="outline">{analysis.method === "headings" ? "PDF headings" : analysis.method === "page-ranges" ? "PDF page ranges" : "Estimated"}</Badge></div>{analysis.units.map((unit, index) => <div key={book.id + unit + index} className="flex items-center gap-2 rounded-lg bg-muted/50 p-2"><span className="min-w-0 flex-1 text-sm">{index + 1}. {unit}</span><Button size="sm" variant="outline" onClick={() => navigate(`/quiz?subject=${encodeURIComponent(normalizeSubject(book.subject))}&topic=${encodeURIComponent(unit)}`)}>Find practice</Button></div>)}</div>; })}</div>}
           <div className="flex flex-wrap gap-2"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Read in Library</Button><Button variant="outline" onClick={()=>navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(path[0] || "")}`)}><GraduationCap className="mr-2 h-4 w-4"/>Practice questions</Button></div>
         </CardContent></Card>
         <div className="space-y-3">
