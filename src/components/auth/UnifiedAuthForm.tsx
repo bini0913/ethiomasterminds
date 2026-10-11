@@ -7,6 +7,7 @@ import { useUser } from "@/context/UserContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import AvatarCreator from "@/components/profile/AvatarCreator";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -94,6 +95,9 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "">("");
+  const [avatar, setAvatar] = useState("avatar-1");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
@@ -121,6 +125,15 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   const validateIdentity = () => {
     if (!name.trim()) {
       toast.error("Tell us your name first.");
+      return false;
+    }
+    if (!gender) {
+      toast.error("Choose male or female.");
+      return false;
+    }
+    const parsedAge = Number(age);
+    if (!age || !Number.isInteger(parsedAge) || parsedAge < 3 || parsedAge > 120) {
+      toast.error("Enter a valid age between 3 and 120.");
       return false;
     }
     if (!email.trim()) {
@@ -206,6 +219,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
         username,
         "student",
         grade,
+        { age: Number(age), gender: gender as "male" | "female", avatar },
       );
 
       if (success) {
@@ -394,6 +408,24 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-age">Age</Label>
+                        <Input id="signup-age" type="number" inputMode="numeric" min={3} max={120} step={1} value={age} onChange={(e) => setAge(e.target.value)} placeholder="Your age" className="h-13 rounded-xl" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-gender">Gender</Label>
+                        <select id="signup-gender" value={gender} onChange={(e) => setGender(e.target.value as "male" | "female" | "")} className="h-13 w-full rounded-xl border border-input bg-background px-3 text-sm">
+                          <option value="">Choose gender</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Choose your avatar</Label>
+                      <AvatarCreator onSelect={setAvatar} selectedAvatar={avatar} />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-email">Email address</Label>
                       <div className="relative">
