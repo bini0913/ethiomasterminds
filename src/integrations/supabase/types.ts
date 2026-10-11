@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_book_analyses: {
+        Row: {
+          user_id: string
+          book_id: string
+          units: Json
+          page_count: number
+          method: string
+          message: string | null
+          analyzed_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          book_id: string
+          units?: Json
+          page_count?: number
+          method?: string
+          message?: string | null
+          analyzed_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          book_id?: string
+          units?: Json
+          page_count?: number
+          method?: string
+          message?: string | null
+          analyzed_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       academic_profiles: {
         Row: {
           user_id: string
