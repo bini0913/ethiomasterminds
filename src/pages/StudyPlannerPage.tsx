@@ -401,6 +401,16 @@ const StudyPlannerPage: React.FC = () => {
     fetchPlans();
   };
 
+  const bookPlanUnitCount = selectedBooks.reduce((sum, book) => sum + (bookAnalysis[book.id]?.units?.length || planSettings.unitsPerBook), 0);
+  const bookPlanRequiredSessions = bookPlanUnitCount * 3;
+  const bookPlanEligibleDays = Array.from({ length: Math.max(1, Math.min(365, planSettings.finishDays)) }, (_, day) => {
+    const date = addDays(new Date(), day);
+    const weekday = date.getDay() === 0 ? 7 : date.getDay();
+    return weekday <= Math.max(1, Math.min(7, planSettings.daysPerWeek));
+  }).filter(Boolean).length;
+  const bookPlanCapacity = bookPlanEligibleDays * Math.max(1, Math.min(4, planSettings.sessionsPerDay));
+  const bookPlanFeasible = selectedBooks.length > 0 && bookPlanCapacity >= bookPlanRequiredSessions;
+  const bookPlanMinimumDays = Math.ceil(bookPlanRequiredSessions / Math.max(1, Math.min(4, planSettings.sessionsPerDay)) * 7 / Math.max(1, Math.min(7, planSettings.daysPerWeek)));
   const todayPlans = plans.filter(p => isSameDay(new Date(p.scheduled_date), new Date()));
   const completedToday = todayPlans.filter(p => p.completed).length;
 
@@ -468,8 +478,8 @@ const StudyPlannerPage: React.FC = () => {
             <label className="text-sm">Finish in (days)<Input type="number" min={1} max={365} value={planSettings.finishDays} onChange={e=>setPlanSettings(p=>({...p,finishDays:Math.max(1,Math.min(365,Number(e.target.value)||1))}))}/></label>
           </div>
           <label className="block text-sm">Fallback estimated units per book <Input type="number" min={1} max={200} value={planSettings.unitsPerBook} onChange={e=>setPlanSettings(p=>({...p,unitsPerBook:Math.max(1,Math.min(200,Number(e.target.value)||1))}))}/><span className="text-xs text-muted-foreground">Used only when a PDF has no usable text or no attached PDF. Analyzed headings/page ranges override this fallback.</span></label>
-          <div className="rounded-lg bg-muted p-3 text-sm"><p className="font-medium">{selectedBooks.length} selected books · {selectedBooks.reduce((sum, book) => sum + (bookAnalysis[book.id]?.units?.length || planSettings.unitsPerBook), 0)} units</p><p className="text-muted-foreground">{planSettings.sessionsPerDay} sessions/day × {planSettings.daysPerWeek} days/week × {planSettings.minutesPerSession} min. Planned finish target: {format(addDays(new Date(),planSettings.finishDays),"PPP")}.</p></div>
-          <div className="flex gap-2"><Button className="flex-1" onClick={generateBookCompletionPlan} disabled={isGenerating}>{isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Target className="mr-2 h-4 w-4"/>}Generate book schedule</Button><Button variant="outline" onClick={savePlanSettings}>Save preferences</Button></div>
+          <div className="rounded-lg bg-muted p-3 text-sm"><p className="font-medium">{selectedBooks.length} selected books · {bookPlanUnitCount} units · {bookPlanRequiredSessions} reading/practice/review sessions needed</p><p className="text-muted-foreground">{planSettings.sessionsPerDay} sessions/day × {planSettings.daysPerWeek} days/week × {planSettings.minutesPerSession} min. Planned finish target: {format(addDays(new Date(),planSettings.finishDays),"PPP")}.</p><p className="mt-1 text-muted-foreground">This deadline fits about {bookPlanCapacity} sessions across eligible days.</p>{selectedBooks.length > 0 && !bookPlanFeasible && <p role="status" className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 font-medium text-amber-900 dark:text-amber-200">This schedule cannot fit all selected books yet. Add more finish days or sessions per day. At the current pace, plan for roughly {bookPlanMinimumDays} calendar days; the exact minimum can vary with the starting weekday.</p>}{selectedBooks.length === 0 && <p className="mt-2 text-muted-foreground">Select at least one book to calculate a completion schedule.</p>}</div>
+          <div className="flex gap-2"><Button className="flex-1" onClick={generateBookCompletionPlan} disabled={isGenerating || !bookPlanFeasible}>{isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Target className="mr-2 h-4 w-4"/>}Generate book schedule</Button><Button variant="outline" onClick={savePlanSettings}>Save preferences</Button></div>
         </CardContent></Card>}
         <p className="text-xs text-center text-muted-foreground mt-1">AI weak-topic recommendations and a separate book-completion schedule are available. Book sections are estimates until you match them to each book’s contents.</p>
       </div>
