@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { ArrowLeft, BarChart3, CheckCircle, Lock, Star, Trophy, BookOpen } from "lucide-react";
+import { ArrowLeft, BarChart3, CheckCircle, Lock, Star, Trophy, BookOpen, LibraryBig, GraduationCap } from "lucide-react";
 import { getAcademicProfile, normalizeSubject } from "@/lib/academicProfile";
 
 interface TopicData {
@@ -42,6 +42,7 @@ const TopicCoveragePage: React.FC = () => {
   const [profileSubjects, setProfileSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedBooks, setSelectedBooks] = useState<Array<{id:string;title:string;author:string;subject:string;description:string}>>([]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -54,6 +55,12 @@ const TopicCoveragePage: React.FC = () => {
       if (cancelled) return;
       setProfileSubjects((profileRes?.subjects || []).map(normalizeSubject));
       setTopics((progressRes.data || []) as TopicData[]);
+      const bookIds = Array.from(new Set([...(profileRes?.book_ids || []), ...(profileRes?.book_id ? [profileRes.book_id] : [])]));
+      if (bookIds.length) {
+        const { data: books, error: booksError } = await supabase.from("library_books").select("id,title,author,subject,description").in("id", bookIds);
+        if (booksError) console.warn("Could not load selected Library books for Topic Coverage", booksError);
+        if (!cancelled) setSelectedBooks((books || []) as Array<{id:string;title:string;author:string;subject:string;description:string}>);
+      }
       setIsLoading(false);
     })().catch((error) => {
       console.error(error);
@@ -150,6 +157,11 @@ const TopicCoveragePage: React.FC = () => {
       </header>
       <main className="mx-auto max-w-2xl px-4 py-5 pb-24">
         <Progress value={progress.pct} className="mb-5 h-2" />
+        <Card className="mb-5 border-primary/20"><CardContent className="p-4 space-y-3">
+          <div className="flex items-start gap-3"><LibraryBig className="h-5 w-5 text-primary mt-0.5"/><div className="flex-1"><h2 className="font-semibold">Read and learn from your selected books</h2><p className="text-sm text-muted-foreground">Open the Library reader for the actual book PDF, notes, highlights, and reading progress. Topic names below are learning pathways, not claims about a book’s exact chapter titles.</p></div></div>
+          {selectedBooks.length ? <div className="space-y-2">{selectedBooks.map(book=><div key={book.id} className="rounded-lg border p-3 flex items-center gap-3"><BookOpen className="h-4 w-4 shrink-0 text-primary"/><div className="min-w-0 flex-1"><p className="text-sm font-medium truncate">{book.title}</p><p className="text-xs text-muted-foreground">{book.author} · {labelFor(book.subject)}</p></div><Button size="sm" variant="outline" onClick={()=>navigate("/library")}>Open Library</Button></div>)}</div> : <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">No selected books were found in Academic Prep. You can still study topic pathways and practice questions, or select books in Academic Prep.</div>}
+          <div className="flex flex-wrap gap-2"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Read in Library</Button><Button variant="outline" onClick={()=>navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(path[0] || "")}`)}><GraduationCap className="mr-2 h-4 w-4"/>Practice questions</Button></div>
+        </Card>
         <div className="space-y-3">
           {path.map((topic, index) => {
             const status = getStatus(selectedSubject, topic);
@@ -161,7 +173,7 @@ const TopicCoveragePage: React.FC = () => {
                     {status.status === "mastered" ? <CheckCircle className="h-5 w-5" /> : unlocked ? <Star className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                   </div>
                   <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{index + 1}. {topic}</p>{status.attempted > 0 && <p className="text-xs text-muted-foreground">{status.attempted} questions • {Math.round(status.accuracy)}% accuracy</p>}</div>
-                  {unlocked && status.status !== "mastered" && <Button size="sm" variant="outline"><BookOpen className="mr-1 h-3 w-3" />Practice</Button>}
+                  {unlocked && status.status !== "mastered" && <Button size="sm" variant="outline" onClick={(event:any)=>{event.stopPropagation();navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(topic)}`);}}><BookOpen className="mr-1 h-3 w-3" />Practice</Button>}
                 </CardContent>
               </Card>
             </motion.div>;
