@@ -29,7 +29,8 @@ import {
   LogOut,
   CheckCircle,
   Gift,
-  Bot
+  Bot,
+  GraduationCap
 } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import CurrencyDisplay from '@/components/currency/CurrencyDisplay';
@@ -554,6 +555,35 @@ const StudentDashboard: React.FC = () => {
                   </CardContent>
                 </Card>
               </motion.div>
+
+              {/* Grade 9–12 Academic Prep hub */}
+              {Number(String(user?.grade ?? "").match(/\d+/)?.[0] || 0) >= 9 && (
+                <motion.div variants={itemVariants}>
+                  <Card className="glass border-border/30">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="font-display text-lg flex items-center gap-2">
+                        <GraduationCap className="h-5 w-5 text-primary" />
+                        Academic Prep
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">Your Grade 9–12 study tools, connected in one place.</p>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-2">
+                      <Button className="min-h-11 justify-start" onClick={() => navigate('/academic')}>
+                        <Target className="mr-2 h-4 w-4" /> Study hub
+                      </Button>
+                      <Button variant="outline" className="min-h-11 justify-start" onClick={() => navigate('/library')}>
+                        <BookOpen className="mr-2 h-4 w-4" /> Library
+                      </Button>
+                      <Button variant="outline" className="min-h-11 justify-start" onClick={() => navigate('/learning-dna')}>
+                        <Brain className="mr-2 h-4 w-4" /> Learning DNA
+                      </Button>
+                      <Button variant="outline" className="min-h-11 justify-start" onClick={() => navigate('/multiplayer')}>
+                        <Gamepad2 className="mr-2 h-4 w-4" /> Multiplayer
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
 
               {/* Recent Achievements */}
               <motion.div variants={itemVariants}>

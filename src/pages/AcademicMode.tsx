@@ -12,6 +12,7 @@ import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
 const features = [
   { title: "Exam practice", eyebrow: "PREPARE", description: "Timed practice using approved quizzes and real question sets.", icon: Target, path: "/academic/exam", action: "Start an exam", featured: true },
   { title: "Flashcards", eyebrow: "REMEMBER", description: "Review concepts with active recall and spaced practice.", icon: BookOpen, path: "/academic/flashcards", action: "Review cards" },
+  { title: "Library", eyebrow: "LEARN", description: "Open your learning resources and selected textbooks without leaving Academic Prep.", icon: BookOpen, path: "/library", action: "Open library" },
   { title: "Topic coverage", eyebrow: "MASTER", description: "Track your progress and find topics that need attention.", icon: BarChart3, path: "/academic/topics", action: "View topics" },
   { title: "Study planner", eyebrow: "ORGANIZE", description: "Turn your study goal into realistic daily tasks.", icon: CalendarDays, path: "/academic/planner", action: "Plan your week" },
   { title: "Academic insights", eyebrow: "IMPROVE", description: "See your performance, strengths and areas to improve.", icon: TrendingUp, path: "/academic/insights", action: "See progress" },
