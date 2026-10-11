@@ -286,6 +286,7 @@ const ExamModePage: React.FC = () => {
         toast.error(examTypeFilter === "past_paper" ? "No approved quiz sets are classified as past papers for this scope." : "No usable topic-tagged questions are available for this scope yet.");
         return;
       }
+      if (examTypeFilter === "mixed" && (!pastPaperPool.length || !topicPool.length)) toast.info(!pastPaperPool.length ? "No past-paper-classified sets are available; this session will use topic-tagged practice only." : "No topic-tagged questions are available; this session will use past-paper-classified questions only.");
       const count = Math.min(questionCount, pool.length);
       const shuffledPast = [...pastPaperPool].sort(() => Math.random() - 0.5);
       const shuffledTopics = [...topicPool].sort(() => Math.random() - 0.5);
@@ -296,7 +297,7 @@ const ExamModePage: React.FC = () => {
           else if (shuffledTopics.length) selected.push(shuffledTopics.shift()!);
         }
       } else selected.push(...[...pool].sort(() => Math.random() - 0.5).slice(0, count));
-      if (parsed.length < questionCount) toast.info(`This quiz has ${parsed.length} usable questions, so your exam will use all ${parsed.length}.`);
+      if (pool.length < questionCount) toast.info(`This setup has ${pool.length} usable questions, so your practice will use all ${pool.length}.`);
       setQuestions(selected);
       setAnswers({});
       setCurrentQ(0);
