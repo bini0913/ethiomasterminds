@@ -155,37 +155,40 @@ const StudyPlannerPage: React.FC = () => {
   const generateBookCompletionPlan = async () => {
     if (!user?.id) return;
     if (!selectedBooks.length) { toast.error("Select at least one book in Academic Prep first."); return; }
+    const finishDays = Math.max(1, Math.min(365, planSettings.finishDays));
     const sessionsPerWeek = Math.max(1, Math.min(7, planSettings.daysPerWeek)) * Math.max(1, Math.min(4, planSettings.sessionsPerDay));
-    const totalSessions = Math.max(1, Math.ceil(Math.max(1, planSettings.finishDays) / 7 * sessionsPerWeek));
+    const capacity = Math.ceil(finishDays / 7) * sessionsPerWeek;
     const totalUnits = selectedBooks.length * Math.max(1, planSettings.unitsPerBook);
+    const requiredSessions = totalUnits * 3;
+    if (capacity < requiredSessions) { toast.error("This deadline fits about " + capacity + " sessions, but finishing all books with reading, practice, and review needs " + requiredSessions + ". Increase finish days or sessions per day."); return; }
     const tasks: Array<{subject:string;topic:string;scheduled_date:string;priority:string;notes:string;user_id:string}> = [];
-    let unitIndex = 0;
-    for (let day = 0; day < Math.max(1, planSettings.finishDays); day++) {
+    const phases = ["Read and make notes", "Practice questions and correct mistakes", "Review and self-test"];
+    let sessionIndex = 0;
+    for (let day = 0; day < finishDays && sessionIndex < requiredSessions; day++) {
       const date = addDays(new Date(), day);
       const activeDay = date.getDay() === 0 ? 7 : date.getDay();
       if (activeDay > planSettings.daysPerWeek) continue;
-      for (let session = 0; session < planSettings.sessionsPerDay && unitIndex < totalUnits; session++) {
-        const bookIndex = unitIndex % selectedBooks.length;
+      for (let session = 0; session < planSettings.sessionsPerDay && sessionIndex < requiredSessions; session++) {
+        const bookIndex = Math.floor(sessionIndex / 3) % selectedBooks.length;
+        const unitNumber = Math.floor(sessionIndex / (3 * selectedBooks.length)) + 1;
         const book = selectedBooks[bookIndex];
-        const unitNumber = Math.floor(unitIndex / selectedBooks.length) + 1;
-        const phase = unitNumber % 4 === 0 ? "Review and self-test" : unitNumber % 3 === 0 ? "Practice questions and correct mistakes" : "Read and make notes";
-        tasks.push({ user_id: user.id, subject: book.subject || subjects[0] || "general", topic: `${book.title} — study unit ${unitNumber}: ${phase}`, scheduled_date: format(date, "yyyy-MM-dd"), priority: unitNumber % 4 === 0 ? "high" : "medium", notes: `Book-completion plan · ${planSettings.minutesPerSession} min session · Unit ${unitNumber} of ${planSettings.unitsPerBook}. Units are planning estimates, not verified chapter names.` });
-        unitIndex++;
+        const phase = phases[sessionIndex % 3];
+        tasks.push({ user_id: user.id, subject: book.subject || subjects[0] || "general", topic: book.title + " — study unit " + unitNumber + ": " + phase, scheduled_date: format(date, "yyyy-MM-dd"), priority: sessionIndex % 3 === 2 ? "high" : "medium", notes: "Book-completion plan · " + planSettings.minutesPerSession + " min session · Unit " + unitNumber + " of " + planSettings.unitsPerBook + ". Unit names are estimates, not verified chapter titles." });
+        sessionIndex++;
       }
     }
-    if (!tasks.length) { toast.error("Your schedule settings do not create any sessions. Increase days or sessions per day."); return; }
+    if (sessionIndex < requiredSessions) { toast.error("The selected schedule cannot fit every reading, practice, and review session. Increase finish days or sessions per day."); return; }
     setIsGenerating(true);
     try {
       const { error } = await supabase.from("study_plans").insert(tasks);
       if (error) throw error;
-      localStorage.setItem(`masterminds:study-plan-settings:${user.id}`, JSON.stringify(planSettings));
-      toast.success(`Created ${tasks.length} book-study sessions across ${selectedBooks.length} selected books.`);
+      localStorage.setItem("masterminds:study-plan-settings:" + user.id, JSON.stringify(planSettings));
+      toast.success("Created " + tasks.length + " study sessions across " + selectedBooks.length + " selected books.");
       setShowPlanSettings(false);
       await fetchPlans();
     } catch (error) { console.error(error); toast.error("Could not save the book completion plan."); }
     finally { setIsGenerating(false); }
   };
-
   const generateAIPlan = async () => {
     if (!user) return;
     setIsGenerating(true);
