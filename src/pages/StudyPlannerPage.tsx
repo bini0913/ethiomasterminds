@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar, Plus, Check, X, Sparkles, Brain, Loader2, Wand2 } from "lucide-react";
+import { ArrowLeft, Calendar, Plus, Check, X, Sparkles, Brain, Loader2, Wand2, BookOpen, Clock3, Target } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { getAcademicProfile, normalizeGrade, normalizeSubject } from "@/lib/academicProfile";
@@ -36,12 +36,15 @@ const StudyPlannerPage: React.FC = () => {
   const [newPriority, setNewPriority] = useState("medium");
   const [subjects, setSubjects] = useState<string[]>(["math", "science", "english", "history"]);
   const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string } | null>(null);
+  const [selectedBooks, setSelectedBooks] = useState<Array<{id:string;title:string;subject:string}>>([]);
+  const [planSettings, setPlanSettings] = useState({ sessionsPerDay: 2, daysPerWeek: 5, minutesPerSession: 40, finishDays: 30, unitsPerBook: 12 });
+  const [showPlanSettings, setShowPlanSettings] = useState(false);
 
   const fetchPlans = useCallback(async () => {
     const auth = await supabase.auth.getUser();
     if (!user || !auth.data.user?.id) return;
     const weekStart = format(startOfWeek(new Date()), "yyyy-MM-dd");
-    const weekEnd = format(addDays(startOfWeek(new Date()), 13), "yyyy-MM-dd");
+    const weekEnd = format(addDays(startOfWeek(new Date()), 89), "yyyy-MM-dd");
 
     const { data, error } = await supabase
       .from("study_plans")
@@ -82,6 +85,7 @@ const StudyPlannerPage: React.FC = () => {
             selectedBookTitles = books.map((book: any) =>
               [book.title, book.author, book.subject].filter(Boolean).join(" — ")
             );
+            setSelectedBooks(books.map((book: any) => ({ id: book.id, title: String(book.title || "Untitled book"), subject: normalizeSubject(String(book.subject || profile.subjects[0] || "general")) })));
           }
         }
         if (cancelled) return;
@@ -89,6 +93,10 @@ const StudyPlannerPage: React.FC = () => {
           ...selectedBookTitles,
           ...(profile.book_title ? [profile.book_title] : []),
         ]));
+        try {
+          const saved = localStorage.getItem(`masterminds:study-plan-settings:${user.id}`);
+          if (saved) setPlanSettings((current) => ({ ...current, ...JSON.parse(saved) }));
+        } catch { /* use defaults when local settings are unavailable */ }
         setAcademicContext({
           grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 5)),
           curriculum: profile.curriculum,
@@ -135,6 +143,47 @@ const StudyPlannerPage: React.FC = () => {
   const deletePlan = async (id: string) => {
     await supabase.from("study_plans").delete().eq("id", id);
     fetchPlans();
+  };
+
+  const savePlanSettings = () => {
+    if (!user?.id) return;
+    localStorage.setItem(`masterminds:study-plan-settings:${user.id}`, JSON.stringify(planSettings));
+    setShowPlanSettings(false);
+    toast.success("Study schedule preferences saved on this device.");
+  };
+
+  const generateBookCompletionPlan = async () => {
+    if (!user?.id) return;
+    if (!selectedBooks.length) { toast.error("Select at least one book in Academic Prep first."); return; }
+    const sessionsPerWeek = Math.max(1, Math.min(7, planSettings.daysPerWeek)) * Math.max(1, Math.min(4, planSettings.sessionsPerDay));
+    const totalSessions = Math.max(1, Math.ceil(Math.max(1, planSettings.finishDays) / 7 * sessionsPerWeek));
+    const totalUnits = selectedBooks.length * Math.max(1, planSettings.unitsPerBook);
+    const tasks: Array<{subject:string;topic:string;scheduled_date:string;priority:string;notes:string;user_id:string}> = [];
+    let unitIndex = 0;
+    for (let day = 0; day < Math.max(1, planSettings.finishDays); day++) {
+      const date = addDays(new Date(), day);
+      const activeDay = date.getDay() === 0 ? 7 : date.getDay();
+      if (activeDay > planSettings.daysPerWeek) continue;
+      for (let session = 0; session < planSettings.sessionsPerDay && unitIndex < totalUnits; session++) {
+        const bookIndex = unitIndex % selectedBooks.length;
+        const book = selectedBooks[bookIndex];
+        const unitNumber = Math.floor(unitIndex / selectedBooks.length) + 1;
+        const phase = unitNumber % 4 === 0 ? "Review and self-test" : unitNumber % 3 === 0 ? "Practice questions and correct mistakes" : "Read and make notes";
+        tasks.push({ user_id: user.id, subject: book.subject || subjects[0] || "general", topic: `${book.title} — study unit ${unitNumber}: ${phase}`, scheduled_date: format(date, "yyyy-MM-dd"), priority: unitNumber % 4 === 0 ? "high" : "medium", notes: `Book-completion plan · ${planSettings.minutesPerSession} min session · Unit ${unitNumber} of ${planSettings.unitsPerBook}. Units are planning estimates, not verified chapter names.` });
+        unitIndex++;
+      }
+    }
+    if (!tasks.length) { toast.error("Your schedule settings do not create any sessions. Increase days or sessions per day."); return; }
+    setIsGenerating(true);
+    try {
+      const { error } = await supabase.from("study_plans").insert(tasks);
+      if (error) throw error;
+      localStorage.setItem(`masterminds:study-plan-settings:${user.id}`, JSON.stringify(planSettings));
+      toast.success(`Created ${tasks.length} book-study sessions across ${selectedBooks.length} selected books.`);
+      setShowPlanSettings(false);
+      await fetchPlans();
+    } catch (error) { console.error(error); toast.error("Could not save the book completion plan."); }
+    finally { setIsGenerating(false); }
   };
 
   const generateAIPlan = async () => {
@@ -300,8 +349,10 @@ const StudyPlannerPage: React.FC = () => {
 
       {/* AI Generate Button */}
       <div className="px-4 py-4 max-w-4xl mx-auto">
+        <div className="grid gap-2 sm:grid-cols-2">
+        <Button variant="outline" className="h-12" onClick={() => setShowPlanSettings((open) => !open)}><BookOpen className="h-4 w-4 mr-2" /> Plan all selected books</Button>
         <Button
-          className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"
+          className="h-12 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"
           onClick={generateAIPlan}
           disabled={isGenerating}
         >
@@ -311,9 +362,20 @@ const StudyPlannerPage: React.FC = () => {
             <><Wand2 className="h-5 w-5 mr-2" /> Generate AI Study Plan</>
           )}
         </Button>
-        <p className="text-xs text-center text-muted-foreground mt-1">
-          AI analyzes your quiz results & weak topics to create a personalized plan
-        </p>
+        </div>
+        {showPlanSettings && <Card className="mt-3"><CardContent className="p-4 space-y-4">
+          <div><h3 className="font-semibold">Finish your selected books</h3><p className="text-sm text-muted-foreground">Set your real study routine. The planner distributes estimated study units across your selected books; it does not invent chapter titles.</p></div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <label className="text-sm">Sessions/day<Input type="number" min={1} max={4} value={planSettings.sessionsPerDay} onChange={e=>setPlanSettings(p=>({...p,sessionsPerDay:Math.max(1,Math.min(4,Number(e.target.value)||1))}))}/></label>
+            <label className="text-sm">Days/week<Input type="number" min={1} max={7} value={planSettings.daysPerWeek} onChange={e=>setPlanSettings(p=>({...p,daysPerWeek:Math.max(1,Math.min(7,Number(e.target.value)||1))}))}/></label>
+            <label className="text-sm">Minutes/session<Input type="number" min={10} max={240} step={5} value={planSettings.minutesPerSession} onChange={e=>setPlanSettings(p=>({...p,minutesPerSession:Math.max(10,Math.min(240,Number(e.target.value)||10))}))}/></label>
+            <label className="text-sm">Finish in (days)<Input type="number" min={1} max={365} value={planSettings.finishDays} onChange={e=>setPlanSettings(p=>({...p,finishDays:Math.max(1,Math.min(365,Number(e.target.value)||1))}))}/></label>
+          </div>
+          <label className="block text-sm">Estimated study units per book <Input type="number" min={1} max={200} value={planSettings.unitsPerBook} onChange={e=>setPlanSettings(p=>({...p,unitsPerBook:Math.max(1,Math.min(200,Number(e.target.value)||1))}))}/><span className="text-xs text-muted-foreground">Use chapters, sections, or page ranges based on each actual book’s table of contents. This estimate applies to each selected book.</span></label>
+          <div className="rounded-lg bg-muted p-3 text-sm"><p className="font-medium">{selectedBooks.length} selected books · {selectedBooks.length * planSettings.unitsPerBook} estimated units</p><p className="text-muted-foreground">{planSettings.sessionsPerDay} sessions/day × {planSettings.daysPerWeek} days/week × {planSettings.minutesPerSession} min. Planned finish target: {format(addDays(new Date(),planSettings.finishDays),"PPP")}.</p></div>
+          <div className="flex gap-2"><Button className="flex-1" onClick={generateBookCompletionPlan} disabled={isGenerating}>{isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Target className="mr-2 h-4 w-4"/>}Generate book schedule</Button><Button variant="outline" onClick={savePlanSettings}>Save preferences</Button></div>
+        </CardContent></Card>}
+        <p className="text-xs text-center text-muted-foreground mt-1">AI weak-topic recommendations and a separate book-completion schedule are available. Book sections are estimates until you match them to each book’s contents.</p>
       </div>
 
       {/* Today's Progress */}
