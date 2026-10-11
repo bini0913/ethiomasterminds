@@ -25,6 +25,7 @@ export type UserProfile = {
   username?: string;
   role: UserRole;
   gender?: string;
+  age?: number;
   grade?: string;
   educationLevel?: string;
   xp: number;
@@ -43,7 +44,7 @@ interface UserContextType {
   login: (email: string, password: string) => Promise<boolean>;
   loginWithUsername: (username: string, password: string) => Promise<UserProfile | null>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
-  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string) => Promise<UserProfile | null>;
+  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string, profileDetails?: { age: number; gender: "male" | "female"; avatar: string }) => Promise<UserProfile | null>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<boolean>;
   addXP: (amount: number) => Promise<void>;
@@ -134,6 +135,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         email: authUser?.email ?? session?.user?.email,
         role,
         gender: profile.gender || undefined,
+        age: profile.age == null ? undefined : Number(profile.age),
         grade: profile.grade || undefined,
         educationLevel: profile.education_level || undefined,
         xp: profile.xp || 0,
@@ -332,6 +334,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     username: string,
     role: UserRole,
     grade?: string,
+    profileDetails?: { age: number; gender: "male" | "female"; avatar: string },
   ): Promise<UserProfile | null> => {
     try {
       if (role !== 'student') {
@@ -370,6 +373,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           data: {
             name: name.trim(),
             username: username.trim().toLowerCase(),
+            ...(profileDetails ? { age: profileDetails.age, gender: profileDetails.gender, avatar: profileDetails.avatar } : {}),
             ...(grade?.trim()
               ? {
                   grade: grade.trim(),
@@ -422,10 +426,15 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         // Make sure the profile row exists and holds the signup fields, even if
         // the auth trigger only stored name/username.
         const normalizedGrade = grade?.trim();
-        const profileFields: Record<string, string> = {
+        const profileFields: Record<string, string | number> = {
           name: name.trim(),
           username: username.trim().toLowerCase(),
         };
+        if (profileDetails) {
+          profileFields.age = profileDetails.age;
+          profileFields.gender = profileDetails.gender;
+          profileFields.avatar = profileDetails.avatar;
+        }
         if (normalizedGrade) {
           profileFields.grade = normalizedGrade;
           profileFields.education_level =

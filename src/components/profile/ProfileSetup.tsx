@@ -72,7 +72,6 @@ const ProfileSetup: React.FC<ProfileSetupProps> = ({ onComplete }) => {
                   <SelectContent>
                     <SelectItem value="male">{t("male")}</SelectItem>
                     <SelectItem value="female">{t("female")}</SelectItem>
-                    <SelectItem value="other">{t("other")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
