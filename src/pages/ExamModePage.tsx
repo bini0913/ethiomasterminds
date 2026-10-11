@@ -54,7 +54,7 @@ const ExamModePage: React.FC = () => {
   const [examTypeFilter, setExamTypeFilter] = useState("mixed");
   const [questionCount, setQuestionCount] = useState(20);
   const [timeLimit, setTimeLimit] = useState(30);
-  const [sourceQuizId, setSourceQuizId] = useState("");
+  const [, setSourceQuizId] = useState("");
   const [sourceQuizzes, setSourceQuizzes] = useState<SourceQuiz[]>([]);
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [currentQ, setCurrentQ] = useState(0);
@@ -272,7 +272,7 @@ const ExamModePage: React.FC = () => {
           options,
           correct_answer: answerText(row.correct_answer, options),
           explanation: row.explanation || undefined,
-          topic: row.topic || "General",
+          topic: row.topic || undefined,
         };
       }).filter((question: ExamQuestion) => question.question_text && question.options.length >= 2 && question.options.includes(question.correct_answer));
       if (!parsed.length) {
