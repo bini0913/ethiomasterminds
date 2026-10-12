@@ -43,7 +43,7 @@ export default function StudyCallBar() {
   }, [user?.id, loadInvitations]);
 
   const connect = async (id: string) => {
-    if (!user || connecting) return;
+    if (!user) return;
     setConnecting(true);
     try {
       const { data: session } = await supabase.auth.getSession();
