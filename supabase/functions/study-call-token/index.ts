@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
     .select("room_id")
     .eq("room_id", roomName)
     .eq("user_id", user.id)
+    .eq("status", "accepted")
     .maybeSingle();
   if (membershipError || !membership) return json({ error: "You are not invited to this study call." }, 403);
 
