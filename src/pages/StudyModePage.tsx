@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import StudyCallBar from "@/components/study/StudyCallBar";
 import { useUser } from "@/context/UserContext";
 import { ArrowLeft, Brain, Check, Clock, Flame, Pause, Play, RotateCcw, StopCircle, Trophy, Users, Zap } from "lucide-react";
 
@@ -642,6 +643,7 @@ const StudyModePage: React.FC = () => {
               <CardTitle className="text-white flex items-center gap-2"><Users className="h-5 w-5 text-emerald-300" /> Studying Now</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              <StudyCallBar />
               {liveStatuses.length === 0 && <p className="text-sm text-white/60">No one is currently studying.</p>}
               {liveStatuses.map((entry) => (
                 <div key={entry.user_id} className="bg-white/5 border border-white/10 rounded-lg p-2 text-sm">

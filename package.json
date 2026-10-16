@@ -71,7 +71,8 @@
     "vaul": "^0.9.3",
     "zod": "^3.23.8",
     "@capacitor/push-notifications": "^8.0.0",
-    "@capacitor/local-notifications": "^8.0.0"
+    "@capacitor/local-notifications": "^8.0.0",
+    "livekit-client": "^2.15.6"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",

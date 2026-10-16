@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.library-ai]
 verify_jwt = true
+
+[functions.study-call-token]
+verify_jwt = true
