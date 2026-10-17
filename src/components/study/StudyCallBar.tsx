@@ -25,7 +25,7 @@ export default function StudyCallBar() {
   const [members, setMembers] = useState(0);
   const roomRef = useRef<Room | null>(null);
   const videoRef = useRef<HTMLDivElement>(null);
-  const displayName = (friend: Friend) => friend.name?.trim() || friend.username?.trim() || "Friend";
+  const displayName = (friend: Friend) => friend.username?.trim() || (friend.name?.trim() && !/^User [0-9a-f]{8}$/i.test(friend.name.trim()) ? friend.name.trim() : "Friend (profile unavailable)");
   const presenceLabel = (presence?: FriendPresence) => {
     if (!presence?.lastSeen) return "Offline";
     const age = Date.now() - new Date(presence.lastSeen).getTime();
