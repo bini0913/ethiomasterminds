@@ -92,7 +92,7 @@ export default function StudyCallBar() {
       catch { setMuted(true); toast.error("Call connected, but microphone access was blocked. Allow microphone access in browser site settings."); }
       setRoomId(id); setMembers(room.remoteParticipants.size + 1); setCallStatus("Connected");
       toast.success("Joined study call. Turn your camera on when ready.");
-        } catch (e) {
+    } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not join call.");
     } finally { setConnecting(false); }
   };
@@ -105,8 +105,6 @@ export default function StudyCallBar() {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       const authUser = authData.user;
       if (authError || !authUser?.id) throw new Error("Your sign-in session is unavailable. Please log out and sign in again.");
-      const callerId = authUser.id;
-
       const { data: createdRoomId, error: inviteError } = await db.rpc("create_study_call_invite", { _friend_id: selectedFriend });
       if (inviteError || !createdRoomId) {
         const detail = inviteError?.message || "The server did not return a call room.";
@@ -135,7 +133,7 @@ export default function StudyCallBar() {
     }
     if (roomId && user) await db.from("study_call_participants").update({ status: "left", responded_at: new Date().toISOString() }).eq("room_id", roomId).eq("user_id", user.id);
     setRoomId(null); setMembers(0); setCameraOn(false); setMuted(false);
-    videoRef.current?.replaceChildren();
+    setCallStatus("Call ended");
   };
 
   useEffect(() => () => { roomRef.current?.disconnect(); document.querySelectorAll("[data-study-call-audio]").forEach(element => element.remove()); }, []);
