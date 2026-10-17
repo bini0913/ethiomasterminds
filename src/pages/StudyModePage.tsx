@@ -131,7 +131,7 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    const { data, error } = await db.from("profiles").select("id,name,username").in("id", uniqueIds);
+    const { data, error } = await db.rpc("get_friend_profiles", { _user_ids: uniqueIds });
     if (error || !data) return;
 
     const nextNames = data.reduce((acc: Record<string, string>, row: { id: string; name: string | null; username: string | null }) => {
@@ -647,7 +647,7 @@ const StudyModePage: React.FC = () => {
               {liveStatuses.length === 0 && <p className="text-sm text-white/60">No one is currently studying.</p>}
               {liveStatuses.map((entry) => (
                 <div key={entry.user_id} className="bg-white/5 border border-white/10 rounded-lg p-2 text-sm">
-                  <p>{memberNames[entry.user_id] ?? entry.user_id.slice(0, 8)} is studying 🔥</p>
+                  <p>{memberNames[entry.user_id] ?? "A student"} is studying 🔥</p>
                 </div>
               ))}
             </CardContent>
