@@ -524,8 +524,8 @@ const StudyModePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white pb-[env(safe-area-inset-bottom)]">
+      <div className="max-w-7xl mx-auto px-3 py-4 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <header>
           <Link to="/" className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white mb-2">
             <ArrowLeft className="h-4 w-4" /> Back to Master Minds
@@ -543,8 +543,8 @@ const StudyModePage: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4 items-center">
-                <div className="relative w-64 h-64 mx-auto">
-                  <svg className="w-64 h-64 -rotate-90" viewBox="0 0 120 120">
+                <div className="relative w-56 h-56 sm:w-64 sm:h-64 mx-auto">
+                  <svg className="w-56 h-56 sm:w-64 sm:h-64 -rotate-90" viewBox="0 0 120 120">
                     <circle cx="60" cy="60" r="54" stroke="rgba(255,255,255,0.12)" strokeWidth="8" fill="none" />
                     <circle
                       cx="60"
@@ -567,7 +567,7 @@ const StudyModePage: React.FC = () => {
                   </svg>
                   <div className="absolute inset-0 grid place-items-center text-center">
                     <p className="text-xs text-white/60 uppercase tracking-wide">{timerState === "break" ? "Break" : "Focus"}</p>
-                    <p className="text-3xl font-bold tracking-wider">{formatSeconds(countdownSeconds)}</p>
+                    <p className="text-2xl sm:text-3xl font-bold tracking-wider text-white tabular-nums">{formatSeconds(countdownSeconds)}</p>
                     <p className="text-xs text-white/60">{mode.toUpperCase()} • {timerState}</p>
                   </div>
                 </div>
@@ -628,7 +628,7 @@ const StudyModePage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Today</p><p className="font-bold">{todayMinutes}m</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Week</p><p className="font-bold">{weekMinutes}m</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Streak</p><p className="font-bold">{streakDays} 🔥</p></CardContent></Card>
@@ -660,9 +660,9 @@ const StudyModePage: React.FC = () => {
               <CardTitle className="text-white flex items-center gap-2"><Check className="h-5 w-5 text-emerald-300" /> Study Tasks</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Add a study task" className="bg-white/5 border-white/20" />
-                <Button onClick={() => void addTask()}>Add</Button>
+                <Button className="min-h-11 w-full sm:w-auto" onClick={() => void addTask()}>Add</Button>
               </div>
               <div className="space-y-2 max-h-72 overflow-auto">
                 {tasks.length === 0 && <p className="text-sm text-white/60">No tasks yet.</p>}
@@ -684,9 +684,9 @@ const StudyModePage: React.FC = () => {
               <CardTitle className="text-white flex items-center gap-2"><Trophy className="h-5 w-5 text-amber-300" /> Competitions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input value={competitionName} onChange={(e) => setCompetitionName(e.target.value)} placeholder="Competition name" className="bg-white/5 border-white/20" />
-                <Button onClick={() => void createCompetition()}>Create</Button>
+                <Button className="min-h-11 w-full sm:w-auto" onClick={() => void createCompetition()}>Create</Button>
               </div>
               <select value={selectedCompetitionId} onChange={(e) => setSelectedCompetitionId(e.target.value)} className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-2 text-sm">
                 <option value="">Select competition</option>
