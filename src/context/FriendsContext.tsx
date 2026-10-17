@@ -109,10 +109,8 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
       if (allUserIds.length > 0) {
         // Fetch all profiles at once
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name, username, avatar, level, xp')
-          .in('id', allUserIds);
+        const { data: profiles } = await (supabase as any)
+          .rpc('get_friend_profiles', { _user_ids: allUserIds });
 
         profiles?.forEach(p => profilesMap.set(p.id, p));
 
