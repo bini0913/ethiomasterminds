@@ -85,16 +85,28 @@ export default function StudyCallBar() {
   };
 
   const startCall = async () => {
-    if (!user || !selectedFriend) { toast.error("Choose a friend first."); return; }
+    if (!selectedFriend) { toast.error("Choose a friend first."); return; }
     setConnecting(true);
     try {
-      const { data: room, error: roomError } = await db.from("study_call_rooms").insert({ created_by: user.id }).select("id").single();
-      if (roomError) throw new Error("Could not create call room: " + roomError.message);
+      // Use the authenticated Supabase identity for RLS checks, not cached profile state.
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authUser = authData.user;
+      if (authError || !authUser?.id) throw new Error("Your sign-in session is unavailable. Please log out and sign in again.");
+      const callerId = authUser.id;
+
+      const { data: room, error: roomError } = await db.from("study_call_rooms")
+        .insert({ created_by: callerId }).select("id").single();
+      if (roomError) {
+        if (roomError.code === "42501" || /row-level security/i.test(roomError.message)) {
+          throw new Error("Supabase rejected this account when creating the call room. Please refresh your session and try again; if it repeats, the room-creation policy needs a database fix.");
+        }
+        throw new Error("Could not create call room: " + roomError.message);
+      }
       const { error: selfError } = await db.from("study_call_participants").insert({
-        room_id: room.id, user_id: user.id, invited_by: user.id, status: "accepted", responded_at: new Date().toISOString(),
+        room_id: room.id, user_id: callerId, invited_by: callerId, status: "accepted", responded_at: new Date().toISOString(),
       });
       if (selfError) throw new Error("Could not join your call room: " + selfError.message);
-      const { error: inviteError } = await db.from("study_call_participants").insert({ room_id: room.id, user_id: selectedFriend, invited_by: user.id, status: "invited" });
+      const { error: inviteError } = await db.from("study_call_participants").insert({ room_id: room.id, user_id: selectedFriend, invited_by: callerId, status: "invited" });
       if (inviteError) throw new Error("Could not invite this friend: " + inviteError.message);
       await connect(room.id);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start call."); }
