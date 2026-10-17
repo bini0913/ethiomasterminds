@@ -227,6 +227,38 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user?.id, user]);
 
+  // Keep real online presence fresh while the authenticated app is open.
+  useEffect(() => {
+    if (!user?.id) return;
+    let disposed = false;
+    const publishPresence = async (status: "online" | "offline") => {
+      if (disposed) return;
+      const payload = { user_id: user.id, status, last_seen: new Date().toISOString() };
+      const { error } = await (supabase as any).from("user_presence").upsert(payload, { onConflict: "user_id" });
+      if (error && status === "online") console.warn("Could not update online presence", error.message);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void publishPresence("online");
+    };
+    void publishPresence("online");
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState === "visible") void publishPresence("online");
+    }, 30000);
+    document.addEventListener("visibilitychange", onVisibility);
+    const onPageHide = () => { void publishPresence("offline"); };
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      disposed = true;
+      window.clearInterval(heartbeat);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      void (supabase as any).from("user_presence").upsert(
+        { user_id: user.id, status: "offline", last_seen: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+    };
+  }, [user?.id]);
+
   useEffect(() => {
     fetchFriends();
 
