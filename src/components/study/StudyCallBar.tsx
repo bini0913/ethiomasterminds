@@ -170,10 +170,41 @@ export default function StudyCallBar() {
         </div>
       </>}
       {expanded && roomId && <div className="space-y-3"><div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-        <Button className="min-h-11" size="sm" variant={muted ? "destructive" : "secondary"} onClick={async () => { const next = !muted; await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); setMuted(next); }}>{muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}{muted ? "Unmute" : "Mute"}</Button>
-        <Button size="sm" variant="outline" onClick={async () => { try { const next = !cameraOn; await roomRef.current?.localParticipant.setCameraEnabled(next); setCameraOn(next); } catch { toast.error("Camera permission denied or camera unavailable."); } }}>{cameraOn ? <VideoOff className="mr-1 h-4 w-4" /> : <Video className="mr-1 h-4 w-4" />}{cameraOn ? "Camera off" : "Turn camera on"}</Button>
+        <Button className="min-h-11" size="sm" variant={muted ? "destructive" : "secondary"} onClick={async () => { const next = !muted; try { await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); setMuted(next); } catch { toast.error("Microphone unavailable. Check browser site permissions and device settings."); } }}>{muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}{muted ? "Unmute" : "Mute"}</Button>
+        <Button className="min-h-11" size="sm" variant="outline" onClick={async () => {
+          try {
+            const next = !cameraOn;
+            setDeviceError(null);
+            if (next && !navigator.mediaDevices?.getUserMedia) throw new Error("Camera access is unavailable in this browser. Open Master Minds over HTTPS in a supported browser.");
+            await roomRef.current?.localParticipant.setCameraEnabled(next);
+            setCameraOn(next);
+            if (next && roomRef.current) {
+              const publication = Array.from(roomRef.current.localParticipant.videoTrackPublications.values()).find(item => item.track);
+              if (publication?.track) setVideoTracks(current => [...current.filter(item => item.identity !== "You"), { track: publication.track!, identity: "You" }]);
+            } else setVideoTracks(current => current.filter(item => item.identity !== "You"));
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Camera permission denied or camera unavailable.";
+            setDeviceError(message);
+            toast.error(message);
+          }
+        }}>{cameraOn ? <VideoOff className="mr-1 h-4 w-4" /> : <Video className="mr-1 h-4 w-4" />}{cameraOn ? "Camera off" : "Camera on"}</Button>
         <Button className="col-span-2 sm:col-span-1 min-h-11" size="sm" variant="destructive" onClick={() => void leave()}><PhoneOff className="mr-1 h-4 w-4" />Leave call</Button>
-      </div><div ref={videoRef} className="grid grid-cols-1 sm:grid-cols-2 gap-2 empty:hidden" aria-label="Call video participants" /></div>}
+      </div>
+      <p className="text-xs text-white/70" role="status">{callStatus} · {members} participant{members === 1 ? "" : "s"}</p>
+      {deviceError && <p className="text-sm text-amber-200" role="alert">{deviceError}</p>}
+      <div ref={videoRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Call video participants">
+        {videoTracks.map(({ track, identity }) => <div key={identity} className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-black">
+          <div className="px-3 py-1 text-xs text-white/80 bg-white/10">{identity === "You" ? "You" : identity}</div>
+          <div className="aspect-video w-full" ref={node => {
+            if (node && !node.hasChildNodes()) {
+              const element = track.attach();
+              element.className = "block h-full w-full object-cover";
+              node.appendChild(element);
+            }
+          }} />
+        </div>)}
+        {videoTracks.length === 0 && <div className="rounded-xl border border-dashed border-white/20 p-4 text-center text-sm text-white/60">Camera video is off. Turn on your camera to share video with your study partner.</div>}
+      </div></div>}
     </CardContent>
   </Card>;
 }
