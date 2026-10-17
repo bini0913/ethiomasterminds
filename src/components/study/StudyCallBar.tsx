@@ -70,6 +70,7 @@ export default function StudyCallBar() {
           videoRef.current.appendChild(element);
         } else if (track.kind === Track.Kind.Audio) {
           element.autoplay = true;
+          element.setAttribute("data-study-call-audio", "true");
           document.body.appendChild(element);
         }
       });
@@ -159,16 +160,16 @@ export default function StudyCallBar() {
           </button>)}
         </div> : <p className="text-xs text-white/55">No friends currently online. Refresh or choose a friend to invite anyway.</p>}
         <div className="flex flex-col sm:flex-row gap-2">
-          <select value={selectedFriend} onChange={e => setSelectedFriend(e.target.value)} className="min-w-0 flex-1 rounded-md border border-white/20 bg-slate-900 px-3 py-2 text-sm" disabled={!friends.length}>
+          <select value={selectedFriend} onChange={e => setSelectedFriend(e.target.value)} className="min-w-0 w-full sm:flex-1 min-h-12 rounded-md border border-white/20 bg-slate-900 px-3 py-3 text-base" disabled={!friends.length}>
             <option value="">Choose a friend…</option>{(friends as Friend[]).map(f => <option key={f.id} value={f.id}>{displayName(f)} · {friendPresence[f.id]?.status === "online" ? "Online" : "Offline"}</option>)}
-          </select><Button onClick={() => void startCall()} disabled={!selectedFriend || connecting || !chosenFriend}><Phone className="mr-2 h-4 w-4" />{connecting ? "Connecting…" : "Start call"}</Button>
+          </select><Button className="w-full sm:w-auto min-h-12" onClick={() => void startCall()} disabled={!selectedFriend || connecting || !chosenFriend}><Phone className="mr-2 h-4 w-4" />{connecting ? "Connecting…" : "Start call"}</Button>
         </div>
       </>}
-      {expanded && roomId && <div className="space-y-3"><div className="flex flex-wrap gap-2">
-        <Button size="sm" variant={muted ? "destructive" : "secondary"} onClick={async () => { const next = !muted; await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); setMuted(next); }}>{muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}{muted ? "Unmute" : "Mute"}</Button>
+      {expanded && roomId && <div className="space-y-3"><div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+        <Button className="min-h-11" size="sm" variant={muted ? "destructive" : "secondary"} onClick={async () => { const next = !muted; await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); setMuted(next); }}>{muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}{muted ? "Unmute" : "Mute"}</Button>
         <Button size="sm" variant="outline" onClick={async () => { try { const next = !cameraOn; await roomRef.current?.localParticipant.setCameraEnabled(next); setCameraOn(next); } catch { toast.error("Camera permission denied or camera unavailable."); } }}>{cameraOn ? <VideoOff className="mr-1 h-4 w-4" /> : <Video className="mr-1 h-4 w-4" />}{cameraOn ? "Camera off" : "Turn camera on"}</Button>
-        <Button size="sm" variant="destructive" onClick={() => void leave()}><PhoneOff className="mr-1 h-4 w-4" />Leave call</Button>
-      </div><div ref={videoRef} className="flex flex-wrap gap-2 empty:hidden" aria-label="Call video participants" /></div>}
+        <Button className="col-span-2 sm:col-span-1 min-h-11" size="sm" variant="destructive" onClick={() => void leave()}><PhoneOff className="mr-1 h-4 w-4" />Leave call</Button>
+      </div><div ref={videoRef} className="grid grid-cols-1 sm:grid-cols-2 gap-2 empty:hidden" aria-label="Call video participants" /></div>}
     </CardContent>
   </Card>;
 }
