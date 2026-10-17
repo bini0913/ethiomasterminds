@@ -23,6 +23,9 @@ export default function StudyCallBar() {
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [members, setMembers] = useState(0);
+  const [callStatus, setCallStatus] = useState("Ready to connect");
+  const [videoTracks, setVideoTracks] = useState<Array<{ track: Track; identity: string }>>([]);
+  const [deviceError, setDeviceError] = useState<string | null>(null);
   const roomRef = useRef<Room | null>(null);
   const videoRef = useRef<HTMLDivElement>(null);
   const displayName = (friend: Friend) => friend.username?.trim() || (friend.name?.trim() && !/^User [0-9a-f]{8}$/i.test(friend.name.trim()) ? friend.name.trim() : "Friend (profile unavailable)");
@@ -63,23 +66,32 @@ export default function StudyCallBar() {
       const room = new Room({ adaptiveStream: true, dynacast: true });
       room.on(RoomEvent.ParticipantConnected, () => setMembers(room.remoteParticipants.size + 1));
       room.on(RoomEvent.ParticipantDisconnected, () => setMembers(room.remoteParticipants.size + 1));
-      room.on(RoomEvent.TrackSubscribed, (track) => {
-        const element = track.attach();
-        if (track.kind === Track.Kind.Video && videoRef.current) {
-          element.className = "w-full max-w-xs rounded-lg bg-black";
-          videoRef.current.appendChild(element);
+      room.on(RoomEvent.ConnectionStateChanged, state => setCallStatus("Call " + state.toLowerCase()));
+      room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+        if (track.kind === Track.Kind.Video) {
+          setVideoTracks(current => current.some(item => item.track === track) ? current : [...current, { track, identity: participant.identity }]);
         } else if (track.kind === Track.Kind.Audio) {
+          const element = track.attach();
           element.autoplay = true;
           element.setAttribute("data-study-call-audio", "true");
           document.body.appendChild(element);
         }
       });
-      room.on(RoomEvent.Disconnected, () => { setRoomId(null); setMembers(0); });
+      room.on(RoomEvent.TrackUnsubscribed, track => {
+        track.detach().forEach(element => element.remove());
+        setVideoTracks(current => current.filter(item => item.track !== track));
+      });
+      room.on(RoomEvent.Disconnected, () => {
+        setRoomId(null); setMembers(0); setCameraOn(false); setCallStatus("Disconnected"); setVideoTracks([]);
+        document.querySelectorAll("[data-study-call-audio]").forEach(element => element.remove());
+      });
+      setCallStatus("Connecting…");
       await room.connect(data.serverUrl, data.token);
-      await room.localParticipant.setMicrophoneEnabled(true);
       roomRef.current = room;
-      setRoomId(id); setMuted(false); setMembers(room.remoteParticipants.size + 1);
-      toast.success("Joined study call. Camera is off until you enable it.");
+      try { await room.localParticipant.setMicrophoneEnabled(true); setMuted(false); }
+      catch { setMuted(true); toast.error("Call connected, but microphone access was blocked. Allow microphone access in browser site settings."); }
+      setRoomId(id); setMembers(room.remoteParticipants.size + 1); setCallStatus("Connected");
+      toast.success("Joined study call. Turn your camera on when ready.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not join call.");
     } finally { setConnecting(false); }
@@ -93,23 +105,13 @@ export default function StudyCallBar() {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       const authUser = authData.user;
       if (authError || !authUser?.id) throw new Error("Your sign-in session is unavailable. Please log out and sign in again.");
-      const callerId = authUser.id;
-
-      const { data: room, error: roomError } = await db.from("study_call_rooms")
-        .insert({ created_by: callerId }).select("id").single();
-      if (roomError) {
-        if (roomError.code === "42501" || /row-level security/i.test(roomError.message)) {
-          throw new Error("Supabase rejected this account when creating the call room. Please refresh your session and try again; if it repeats, the room-creation policy needs a database fix.");
-        }
-        throw new Error("Could not create call room: " + roomError.message);
+      const { data: createdRoomId, error: inviteError } = await db.rpc("create_study_call_invite", { _friend_id: selectedFriend });
+      if (inviteError || !createdRoomId) {
+        const detail = inviteError?.message || "The server did not return a call room.";
+        if (/permission denied|row-level security|42501/i.test(detail)) throw new Error("The database denied creating the call invitation. Refresh and sign in again. Details: " + detail);
+        throw new Error("Could not invite friend: " + detail);
       }
-      const { error: selfError } = await db.from("study_call_participants").insert({
-        room_id: room.id, user_id: callerId, invited_by: callerId, status: "accepted", responded_at: new Date().toISOString(),
-      });
-      if (selfError) throw new Error("Could not join your call room: " + selfError.message);
-      const { error: inviteError } = await db.from("study_call_participants").insert({ room_id: room.id, user_id: selectedFriend, invited_by: callerId, status: "invited" });
-      if (inviteError) throw new Error("Could not invite this friend: " + inviteError.message);
-      await connect(room.id);
+      await connect(createdRoomId);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start call."); }
     finally { setConnecting(false); }
   };
@@ -131,7 +133,7 @@ export default function StudyCallBar() {
     }
     if (roomId && user) await db.from("study_call_participants").update({ status: "left", responded_at: new Date().toISOString() }).eq("room_id", roomId).eq("user_id", user.id);
     setRoomId(null); setMembers(0); setCameraOn(false); setMuted(false);
-    videoRef.current?.replaceChildren();
+    setCallStatus("Call ended");
   };
 
   useEffect(() => () => { roomRef.current?.disconnect(); document.querySelectorAll("[data-study-call-audio]").forEach(element => element.remove()); }, []);
@@ -166,10 +168,41 @@ export default function StudyCallBar() {
         </div>
       </>}
       {expanded && roomId && <div className="space-y-3"><div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-        <Button className="min-h-11" size="sm" variant={muted ? "destructive" : "secondary"} onClick={async () => { const next = !muted; await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); setMuted(next); }}>{muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}{muted ? "Unmute" : "Mute"}</Button>
-        <Button size="sm" variant="outline" onClick={async () => { try { const next = !cameraOn; await roomRef.current?.localParticipant.setCameraEnabled(next); setCameraOn(next); } catch { toast.error("Camera permission denied or camera unavailable."); } }}>{cameraOn ? <VideoOff className="mr-1 h-4 w-4" /> : <Video className="mr-1 h-4 w-4" />}{cameraOn ? "Camera off" : "Turn camera on"}</Button>
+        <Button className="min-h-11" size="sm" variant={muted ? "destructive" : "secondary"} onClick={async () => { const next = !muted; try { await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); setMuted(next); } catch { toast.error("Microphone unavailable. Check browser site permissions and device settings."); } }}>{muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}{muted ? "Unmute" : "Mute"}</Button>
+        <Button className="min-h-11" size="sm" variant="outline" onClick={async () => {
+          try {
+            const next = !cameraOn;
+            setDeviceError(null);
+            if (next && !navigator.mediaDevices?.getUserMedia) throw new Error("Camera access is unavailable in this browser. Open Master Minds over HTTPS in a supported browser.");
+            await roomRef.current?.localParticipant.setCameraEnabled(next);
+            setCameraOn(next);
+            if (next && roomRef.current) {
+              const publication = Array.from(roomRef.current.localParticipant.videoTrackPublications.values()).find(item => item.track);
+              if (publication?.track) setVideoTracks(current => [...current.filter(item => item.identity !== "You"), { track: publication.track!, identity: "You" }]);
+            } else setVideoTracks(current => current.filter(item => item.identity !== "You"));
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Camera permission denied or camera unavailable.";
+            setDeviceError(message);
+            toast.error(message);
+          }
+        }}>{cameraOn ? <VideoOff className="mr-1 h-4 w-4" /> : <Video className="mr-1 h-4 w-4" />}{cameraOn ? "Camera off" : "Camera on"}</Button>
         <Button className="col-span-2 sm:col-span-1 min-h-11" size="sm" variant="destructive" onClick={() => void leave()}><PhoneOff className="mr-1 h-4 w-4" />Leave call</Button>
-      </div><div ref={videoRef} className="grid grid-cols-1 sm:grid-cols-2 gap-2 empty:hidden" aria-label="Call video participants" /></div>}
+      </div>
+      <p className="text-xs text-white/70" role="status">{callStatus} · {members} participant{members === 1 ? "" : "s"}</p>
+      {deviceError && <p className="text-sm text-amber-200" role="alert">{deviceError}</p>}
+      <div ref={videoRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Call video participants">
+        {videoTracks.map(({ track, identity }) => <div key={identity} className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-black">
+          <div className="px-3 py-1 text-xs text-white/80 bg-white/10">{identity === "You" ? "You" : identity}</div>
+          <div className="aspect-video w-full" ref={node => {
+            if (node && !node.hasChildNodes()) {
+              const element = track.attach();
+              element.className = "block h-full w-full object-cover";
+              node.appendChild(element);
+            }
+          }} />
+        </div>)}
+        {videoTracks.length === 0 && <div className="rounded-xl border border-dashed border-white/20 p-4 text-center text-sm text-white/60">Camera video is off. Turn on your camera to share video with your study partner.</div>}
+      </div></div>}
     </CardContent>
   </Card>;
 }

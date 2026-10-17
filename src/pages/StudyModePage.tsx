@@ -669,7 +669,7 @@ const StudyModePage: React.FC = () => {
                 {tasks.map((task) => (
                   <div key={task.id} className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between gap-2">
                     <p className={task.completed ? "line-through text-white/50" : ""}>{task.task_title}</p>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Button size="sm" variant={task.completed ? "secondary" : "default"} onClick={() => void toggleTask(task)}>{task.completed ? "Undo" : "Complete"}</Button>
                       <Button size="sm" variant="destructive" onClick={() => void deleteTask(task)}>Delete</Button>
                     </div>
