@@ -40,13 +40,6 @@ jobs:
       - name: Zip the build
         run: Compress-Archive -Path release/MasterMinds-win32-x64/* -DestinationPath MasterMinds-Windows.zip
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: MasterMinds-Windows
-          path: MasterMinds-Windows.zip
-          retention-days: 30
-
       - name: Create Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2

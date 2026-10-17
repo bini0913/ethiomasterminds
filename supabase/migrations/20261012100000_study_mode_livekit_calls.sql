@@ -28,7 +28,7 @@ drop policy if exists "users invite friends to own call" on public.study_call_pa
 create policy "users invite friends to own call" on public.study_call_participants for insert to authenticated
 with check (invited_by = auth.uid() and exists (select 1 from public.study_call_rooms r where r.id = room_id and r.created_by = auth.uid())
  and (user_id = auth.uid() or exists (select 1 from public.friends f where f.status = 'accepted'
- and ((f.user_id = auth.uid() and f.friend_id = user_id) or (f.friend_id = auth.uid() and f.user_id = user_id)))));
+ and ((f.user_id = auth.uid() and f.friend_id = study_call_participants.user_id) or (f.friend_id = auth.uid() and f.user_id = study_call_participants.user_id)))));
 drop policy if exists "invitee responds to own call invitation" on public.study_call_participants;
 create policy "invitee responds to own call invitation" on public.study_call_participants for update to authenticated
 using (user_id = auth.uid()) with check (user_id = auth.uid() and status in ('accepted','declined','left'));
