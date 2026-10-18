@@ -25,6 +25,7 @@ export default function StudyCallBar() {
   const [selectedFriend, setSelectedFriend] = useState("");
   const [incoming, setIncoming] = useState<Invitation[]>([]);
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [outgoingRoomId, setOutgoingRoomId] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
@@ -33,6 +34,7 @@ export default function StudyCallBar() {
   const [videoTracks, setVideoTracks] = useState<Array<{ track: Track; identity: string }>>([]);
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const roomRef = useRef<Room | null>(null);
+  const roomIdRef = useRef<string | null>(null);
   const videoRef = useRef<HTMLDivElement>(null);
   const displayName = (friend: Friend) => friend.username?.trim() || (friend.name?.trim() && !/^User [0-9a-f]{8}$/i.test(friend.name.trim()) ? friend.name.trim() : "Friend (profile unavailable)");
   const presenceLabel = (presence?: FriendPresence) => {
@@ -58,8 +60,8 @@ export default function StudyCallBar() {
     return () => { void supabase.removeChannel(channel); };
   }, [user?.id, loadInvitations]);
 
-  const connect = async (id: string) => {
-    if (!user) return;
+  const connect = useCallback(async (id: string, outgoing = false) => {
+    if (!user?.id) return;
     setConnecting(true);
     try {
       const { data: session } = await supabase.auth.getSession();
@@ -70,8 +72,15 @@ export default function StudyCallBar() {
       });
       if (error || !data?.token || !data?.serverUrl) throw new Error(data?.error || error?.message || "Calling is not configured yet.");
       const room = new Room({ adaptiveStream: true, dynacast: true });
-      room.on(RoomEvent.ParticipantConnected, () => setMembers(room.remoteParticipants.size + 1));
-      room.on(RoomEvent.ParticipantDisconnected, () => setMembers(room.remoteParticipants.size + 1));
+      room.on(RoomEvent.ParticipantConnected, () => {
+        setMembers(room.remoteParticipants.size + 1);
+        setCallStatus("Friend joined");
+        setOutgoingRoomId(null);
+      });
+      room.on(RoomEvent.ParticipantDisconnected, () => {
+        setMembers(room.remoteParticipants.size + 1);
+        if (room.remoteParticipants.size === 0) setCallStatus("Friend left the call");
+      });
       room.on(RoomEvent.ConnectionStateChanged, state => setCallStatus("Call " + state.toLowerCase()));
       room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
         if (track.kind === Track.Kind.Video) {
@@ -88,7 +97,8 @@ export default function StudyCallBar() {
         setVideoTracks(current => current.filter(item => item.track !== track));
       });
       room.on(RoomEvent.Disconnected, () => {
-        setRoomId(null); setMembers(0); setCameraOn(false); setCallStatus("Disconnected"); setVideoTracks([]);
+        roomIdRef.current = null;
+        setRoomId(null); setOutgoingRoomId(null); setMembers(0); setCameraOn(false); setCallStatus("Disconnected"); setVideoTracks([]);
         document.querySelectorAll("[data-study-call-audio]").forEach(element => element.remove());
       });
       setCallStatus("Connecting…");
@@ -96,12 +106,19 @@ export default function StudyCallBar() {
       roomRef.current = room;
       try { await room.localParticipant.setMicrophoneEnabled(true); setMuted(false); }
       catch { setMuted(true); toast.error("Call connected, but microphone access was blocked. Allow microphone access in browser site settings."); }
-      setRoomId(id); setMembers(room.remoteParticipants.size + 1); setCallStatus("Connected");
-      toast.success("Joined study call. Turn your camera on when ready.");
+      roomIdRef.current = id;
+      setRoomId(id);
+      setMembers(room.remoteParticipants.size + 1);
+      const hasRemoteParticipant = room.remoteParticipants.size > 0;
+      setCallStatus(outgoing && !hasRemoteParticipant ? "Waiting for your friend to answer…" : "Connected");
+      if (hasRemoteParticipant) setOutgoingRoomId(null);
+      toast.success(outgoing && !hasRemoteParticipant ? "Call started. Waiting for your friend to accept." : "Joined study call. Turn your camera on when ready.");
     } catch (e) {
+      setOutgoingRoomId(null);
+      setCallStatus("Could not connect");
       toast.error(e instanceof Error ? e.message : "Could not join call.");
     } finally { setConnecting(false); }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     const startAcceptedCall = (roomIdToJoin: string | undefined) => {
@@ -134,11 +151,13 @@ export default function StudyCallBar() {
         if (/permission denied|row-level security|42501/i.test(detail)) throw new Error("The database denied creating the call invitation. Refresh and sign in again. Details: " + detail);
         throw new Error("Could not invite friend: " + detail);
       }
+      setOutgoingRoomId(createdRoomId);
+      setCallStatus("Ringing your friend…");
       const { error: pushError } = await supabase.functions.invoke("send-push-notification", {
         body: { kind: "study_call_invite", event_id: createdRoomId },
       });
       if (pushError) console.warn("Study call push could not be sent:", pushError.message);
-      await connect(createdRoomId);
+      await connect(createdRoomId, true);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start call."); }
     finally { setConnecting(false); }
   };
@@ -151,19 +170,89 @@ export default function StudyCallBar() {
     if (accept) await connect(invitation.room_id);
   };
 
-  const leave = async () => {
+  const leave = useCallback(async (finalStatus = "Call ended") => {
+    const activeRoomId = roomIdRef.current ?? roomId;
     const room = roomRef.current;
     if (room) {
       await room.localParticipant.setMicrophoneEnabled(false).catch(() => undefined);
       await room.localParticipant.setCameraEnabled(false).catch(() => undefined);
-      room.disconnect(); roomRef.current = null;
+      room.disconnect();
+      roomRef.current = null;
     }
-    if (roomId && user) await db.from("study_call_participants").update({ status: "left", responded_at: new Date().toISOString() }).eq("room_id", roomId).eq("user_id", user.id);
-    setRoomId(null); setMembers(0); setCameraOn(false); setMuted(false);
-    setCallStatus("Call ended");
-  };
+    if (activeRoomId && user?.id) {
+      const { error: participantError } = await db.from("study_call_participants")
+        .update({ status: "left", responded_at: new Date().toISOString() })
+        .eq("room_id", activeRoomId).eq("user_id", user.id);
+      if (participantError) console.warn("Could not update study call participant status:", participantError.message);
+      const { error: endError } = await db.rpc("end_study_call_room", { p_room_id: activeRoomId });
+      if (endError) console.warn("Could not end study call room:", endError.message);
+    }
+    roomIdRef.current = null;
+    setRoomId(null); setOutgoingRoomId(null); setMembers(0); setCameraOn(false); setMuted(false); setVideoTracks([]);
+    setCallStatus(finalStatus);
+  }, [roomId, user?.id]);
 
-  useEffect(() => () => { roomRef.current?.disconnect(); document.querySelectorAll("[data-study-call-audio]").forEach(element => element.remove()); }, []);
+  useEffect(() => {
+    if (!roomId || !user?.id) return;
+    const handleParticipantUpdate = (row: Invitation) => {
+      if (row.user_id === user.id || row.invited_by !== user.id) return;
+      if (row.status === "accepted") setCallStatus("Friend accepted · joining…");
+      else if (row.status === "declined") {
+        setOutgoingRoomId(null);
+        toast.info("Your friend declined the study call.");
+        void leave("Friend declined the call");
+      } else if (row.status === "expired") {
+        setOutgoingRoomId(null);
+        toast.info("No answer. The study call invitation expired.");
+        void leave("No answer");
+      } else if (row.status === "left") setCallStatus("Friend left the call");
+    };
+    const channel = supabase.channel(`study-call-room-state-${roomId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "study_call_participants", filter: `room_id=eq.${roomId}` }, payload => handleParticipantUpdate(payload.new as Invitation))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "study_call_rooms", filter: `id=eq.${roomId}` }, payload => {
+        const updatedRoom = payload.new as { ended_at?: string | null };
+        if (!updatedRoom.ended_at) return;
+        const activeRoom = roomRef.current;
+        roomRef.current = null;
+        roomIdRef.current = null;
+        activeRoom?.disconnect();
+        document.querySelectorAll("[data-study-call-audio]").forEach(element => element.remove());
+        setRoomId(null); setOutgoingRoomId(null); setMembers(0); setCameraOn(false); setMuted(false); setVideoTracks([]);
+        setCallStatus("Call ended");
+      }).subscribe();
+    void db.from("study_call_participants").select("room_id,user_id,invited_by,status")
+      .eq("room_id", roomId).neq("user_id", user.id)
+      .then(({ data, error }: { data: Invitation[] | null; error: { message: string } | null }) => {
+        if (!error) (data ?? []).forEach(handleParticipantUpdate);
+      });
+    return () => { void supabase.removeChannel(channel); };
+  }, [roomId, user?.id, leave]);
+
+  useEffect(() => {
+    if (!outgoingRoomId || roomId !== outgoingRoomId) return;
+    const timer = window.setTimeout(async () => {
+      const { error } = await db.rpc("expire_study_call_invites", { p_room_id: outgoingRoomId });
+      if (error) {
+        console.warn("Could not expire unanswered study call:", error.message);
+        setCallStatus("Waiting for your friend to answer…");
+      }
+    }, 60_000);
+    return () => window.clearTimeout(timer);
+  }, [outgoingRoomId, roomId]);
+
+  useEffect(() => {
+    const uid = user?.id;
+    return () => {
+      const activeRoomId = roomIdRef.current;
+      if (activeRoomId && uid) {
+        void db.from("study_call_participants").update({ status: "left", responded_at: new Date().toISOString() })
+          .eq("room_id", activeRoomId).eq("user_id", uid);
+        void db.rpc("end_study_call_room", { p_room_id: activeRoomId });
+      }
+      roomRef.current?.disconnect();
+      document.querySelectorAll("[data-study-call-audio]").forEach(element => element.remove());
+    };
+  }, [user?.id]);
   const chosenFriend = friends.find(friend => friend.id === selectedFriend);
 
   return <Card className={`overflow-hidden border-white/10 text-white ${roomId ? "bg-slate-950/90 shadow-xl shadow-black/20" : "bg-white/5"}`}>

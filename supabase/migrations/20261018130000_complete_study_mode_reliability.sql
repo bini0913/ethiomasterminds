@@ -480,3 +480,72 @@ $$;
 
 revoke all on function public.expire_study_competitions() from public, anon;
 grant execute on function public.expire_study_competitions() to authenticated;
+
+
+-- Study-call lifecycle: unanswered invitations expire and leaving the host ends the room for everyone.
+alter table public.study_call_participants
+  drop constraint if exists study_call_participants_status_check;
+alter table public.study_call_participants
+  add constraint study_call_participants_status_check
+  check (status = any (array['invited'::text, 'accepted'::text, 'declined'::text, 'left'::text, 'expired'::text]));
+
+create or replace function public.expire_study_call_invites(p_room_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_expired integer := 0;
+begin
+  if v_uid is null then raise exception 'Authentication required'; end if;
+  if not exists (select 1 from public.study_call_rooms where id = p_room_id and created_by = v_uid) then
+    raise exception 'Only the call host can expire its invitations';
+  end if;
+  update public.study_call_participants
+    set status = 'expired', responded_at = now()
+    where room_id = p_room_id and invited_by = v_uid and user_id <> v_uid
+      and status = 'invited' and created_at <= now() - interval '60 seconds';
+  get diagnostics v_expired = row_count;
+  if v_expired > 0 and not exists (
+    select 1 from public.study_call_participants
+    where room_id = p_room_id and user_id <> v_uid and status in ('invited', 'accepted')
+  ) then
+    update public.study_call_rooms set ended_at = coalesce(ended_at, now()) where id = p_room_id;
+  end if;
+  return v_expired > 0;
+end;
+$$;
+
+create or replace function public.end_study_call_room(p_room_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_host uuid;
+begin
+  if v_uid is null then raise exception 'Authentication required'; end if;
+  select created_by into v_host from public.study_call_rooms where id = p_room_id for update;
+  if not found then return false; end if;
+  if v_host <> v_uid then return false; end if;
+  update public.study_call_rooms set ended_at = coalesce(ended_at, now()) where id = p_room_id;
+  update public.study_call_participants
+    set status = 'left', responded_at = now()
+    where room_id = p_room_id and user_id <> v_uid and status in ('invited', 'accepted');
+  return true;
+end;
+$$;
+
+revoke all on function public.expire_study_call_invites(uuid) from public, anon;
+grant execute on function public.expire_study_call_invites(uuid) to authenticated;
+revoke all on function public.end_study_call_room(uuid) from public, anon;
+grant execute on function public.end_study_call_room(uuid) to authenticated;
+
+do $$
+begin
+  begin alter publication supabase_realtime add table public.study_call_rooms; exception when duplicate_object then null; end;
+end $$;
