@@ -221,9 +221,14 @@ const StudyModePage: React.FC = () => {
 
     await loadNames(idsToLoad);
 
-    if (!selectedCompetitionId && (competitionsRes.data ?? []).length > 0) {
-      setSelectedCompetitionId(((competitionsRes.data ?? [])[0] as StudyCompetition).id);
-    }
+    const availableCompetitions = ((competitionsRes.data ?? []) as StudyCompetition[]).filter(
+      (competition) => competition.status === "active" && (!competition.end_time || new Date(competition.end_time).getTime() > Date.now())
+    );
+    setSelectedCompetitionId((current) =>
+      current && availableCompetitions.some((competition) => competition.id === current)
+        ? current
+        : availableCompetitions[0]?.id ?? ""
+    );
 
     setLoading(false);
   };
