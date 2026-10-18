@@ -262,7 +262,7 @@ export default function StudyCallBar() {
           <p className="font-semibold flex items-center gap-2"><Users className="h-4 w-4 text-emerald-300 shrink-0" />{roomId ? "Study call" : "Study Friends"}</p>
           <p className="text-xs text-white/60">{roomId ? `${callStatus} · ${members} participant${members === 1 ? "" : "s"}` : incoming.length ? `${incoming.length} incoming invitation(s)` : "Study together without leaving your timer."}</p>
         </div>
-        <Button size="sm" variant="outline" className="shrink-0 min-h-10" onClick={() => setExpanded(v => !v)}>{expanded ? "Hide" : roomId ? "Show controls" : "Find friends"}</Button>
+        <Button size="sm" variant="outline" className="shrink-0 min-h-10" onClick={() => setExpanded(v => !v)}>{roomId ? (expanded ? "Hide video" : "Show video") : (expanded ? "Hide" : "Find friends")}</Button>
       </div>
       <div className={roomId ? "space-y-4 p-3 sm:p-5" : "space-y-3"}>
       {incoming.map(invite => <div key={invite.room_id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/5 p-3">
@@ -289,13 +289,13 @@ export default function StudyCallBar() {
           <div className="flex items-end"><Button className="min-h-12 w-full sm:w-auto" onClick={() => void startCall()} disabled={!selectedFriend || connecting || !chosenFriend}><Phone className="mr-2 h-4 w-4" />{connecting ? "Connecting…" : "Start call"}</Button></div>
         </div>
       </>}
-      {expanded && roomId && <>
+      {roomId && <>
         <div className="flex items-center justify-between gap-2">
           <div><p className="text-sm font-semibold">{callStatus === "Connected" ? "You're connected" : callStatus}</p><p className="text-xs text-white/60">Keep studying while you talk</p></div>
           <span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs text-emerald-200">{members} here</span>
         </div>
         {deviceError && <p className="rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100" role="alert">{deviceError}</p>}
-        <div ref={videoRef} className={`grid gap-3 ${videoTracks.length > 1 ? "grid-cols-2" : "grid-cols-1"}`} aria-label="Call video participants">
+        {expanded && <div ref={videoRef} className={`grid gap-3 ${videoTracks.length > 1 ? "grid-cols-2" : "grid-cols-1"}`} aria-label="Call video participants">
           {videoTracks.map(({ track, identity }) => <div key={identity} className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-lg">
             <div className="flex items-center justify-between bg-slate-900 px-3 py-2 text-xs text-white/80"><span>{identity === "You" ? "You" : identity}</span><span className="text-emerald-300">● Live</span></div>
             <div className="aspect-video w-full" ref={node => {
@@ -310,8 +310,8 @@ export default function StudyCallBar() {
             <div className="mb-2 rounded-full bg-white/10 p-3"><Video className="h-6 w-6 text-white/70" /></div>
             <p className="text-sm font-medium">Cameras are off</p><p className="mt-1 max-w-xs text-xs text-white/55">Turn on your camera if you want to see each other. Audio can keep working without video.</p>
           </div>}
-        </div>
-        <div className="sticky bottom-0 z-10 -mx-3 border-t border-white/10 bg-slate-950/95 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-md sm:-mx-5 sm:px-5">
+        </div>}
+        <div data-study-call-controls="true" aria-label="Study call controls" className="fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-xl rounded-2xl border border-white/10 bg-slate-950/95 px-3 pb-3 pt-3 shadow-2xl shadow-black/30 backdrop-blur-md sm:sticky sm:bottom-0 sm:mx-0 sm:max-w-none sm:rounded-none sm:border-x-0 sm:border-b-0 sm:px-5 sm:shadow-none">
           <div className="grid grid-cols-3 gap-2">
             <Button className="min-h-12 flex-col gap-1 sm:flex-row" variant={muted ? "destructive" : "secondary"} onClick={async () => { const next = !muted; try { await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); setMuted(next); } catch { toast.error("Microphone unavailable. Check browser site permissions and device settings."); } }}>{muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}<span className="text-xs sm:text-sm">{muted ? "Unmute" : "Mute"}</span></Button>
             <Button className="min-h-12 flex-col gap-1 sm:flex-row" variant={cameraOn ? "secondary" : "outline"} onClick={async () => {
