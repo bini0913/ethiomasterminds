@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, Gamepad2, Globe2, Trophy, Gift, BookOpen, User, Swords, MessageCircle } from "lucide-react";
+import { Home, Gamepad2, Globe2, Gift, BookOpen, Swords, MessageCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
 
@@ -9,11 +9,9 @@ const StudentBottomNav: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUser();
-  const profilePath = user?.id ? "/profile/" + user.id : "/settings";
   const tier = getUserTier(user?.grade);
 
   const early = tier === "early";
-  const middle = tier === "middle";
 
   // Primary navigation should represent destinations, not every feature.
   // Keep profile/settings available from the dashboard header so study, play,
