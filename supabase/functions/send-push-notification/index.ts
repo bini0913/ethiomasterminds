@@ -139,9 +139,19 @@ Deno.serve(async (req) => {
 
     if (title.length > 160 || body.length > 2000) return json({ error: "Notification payload is too large" }, 400);
     const { data: prefs, error: prefsError } = await admin.from("notification_preferences")
-      .select("enabled").eq("user_id", recipientId).maybeSingle();
+      .select("enabled,social,game_invites").eq("user_id", recipientId).maybeSingle();
     if (prefsError) return json({ error: "Could not read notification preferences" }, 500);
     if (prefs?.enabled === false) return json({ skipped: true, reason: "notifications_disabled", sent: 0 });
+
+    // Apply category preferences on the server too, so they are respected when
+    // the app is backgrounded or closed (not only by foreground UI listeners).
+    const socialKinds = new Set(["friend_request", "direct_message"]);
+    if (socialKinds.has(payload.kind) && prefs?.social === false) {
+      return json({ skipped: true, reason: "social_notifications_disabled", sent: 0 });
+    }
+    if (payload.kind === "study_call_invite" && prefs?.game_invites === false) {
+      return json({ skipped: true, reason: "game_invites_disabled", sent: 0 });
+    }
 
     const { data: devices, error: devicesError } = await admin.from("notification_devices")
       .select("id, token, platform, app_version").eq("user_id", recipientId).eq("enabled", true);
