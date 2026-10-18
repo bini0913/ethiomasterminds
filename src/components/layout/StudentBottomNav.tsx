@@ -38,7 +38,7 @@ const StudentBottomNav: React.FC = () => {
           { icon: Home, label: "Home", path: "/", match: ["/"] },
           { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision", "/learning-dna"] },
           { icon: Swords, label: "Play", path: "/lobby", match: ["/lobby", "/multiplayer", "/tournaments"] },
-          { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/friends", "/chat", "/profile/"] },
+          { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/friends", "/chat"] },
         ];
 
   const active = (paths: string[]) =>
