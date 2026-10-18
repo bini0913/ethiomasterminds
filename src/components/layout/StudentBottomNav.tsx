@@ -15,9 +15,9 @@ const StudentBottomNav: React.FC = () => {
   const early = tier === "early";
   const middle = tier === "middle";
 
-  // Grade 5–8 uses the app's social-first navigation:
-  // Home → Study → Play → Social → Profile.
-  // Keep the existing navigation for early and high-school tiers.
+  // Navigation adapts to each learner tier while sharing the same accessible component.
+  // Early learners get discovery and rewards; middle learners get social-first navigation;
+  // high-school learners get a quieter four-destination navigation bar.
   const items = early
     ? [
         { icon: Home, label: "Home", path: "/", match: ["/"] },
@@ -36,17 +36,19 @@ const StudentBottomNav: React.FC = () => {
         ]
       : [
           { icon: Home, label: "Home", path: "/", match: ["/"] },
-          { icon: BookOpen, label: "Study", path: "/quiz", match: ["/quiz", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision"] },
+          { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision", "/learning-dna"] },
           { icon: Swords, label: "Play", path: "/lobby", match: ["/lobby", "/multiplayer", "/tournaments"] },
-          { icon: Trophy, label: "Ranks", path: "/leaderboard", match: ["/leaderboard"] },
-          { icon: User, label: "Profile", path: profilePath, match: ["/profile/", "/friends", "/store", "/settings", "/enhanced-settings", "/avatar-creator"] },
+          { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/friends", "/chat", "/profile/"] },
         ];
 
   const active = (paths: string[]) =>
     paths.some((p) => (p === "/" ? location.pathname === "/" : location.pathname.startsWith(p)));
 
   return (
-    <div data-guide="bottom-nav" className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/60 bg-background/95 pb-safe backdrop-blur-xl">
+    <div
+      data-guide="bottom-nav"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+    >
       <nav aria-label="Primary" className="mx-auto flex h-16 max-w-lg items-center justify-around px-1 sm:h-[68px]">
         {items.map((item) => {
           const Icon = item.icon;
@@ -56,8 +58,9 @@ const StudentBottomNav: React.FC = () => {
               key={item.label}
               type="button"
               onClick={() => navigate(item.path)}
-              whileTap={{ scale: 0.94 }}
-              className={`flex min-w-14 min-h-12 flex-1 max-w-24 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${is ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              whileTap={{ scale: 0.97 }}
+              className={`flex min-h-11 min-w-0 flex-1 max-w-28 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${is ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              aria-label={`Go to ${item.label}`}
               aria-current={is ? "page" : undefined}
             >
               <Icon className={`h-5 w-5 ${is ? "stroke-[2.5]" : ""}`} aria-hidden="true" />
