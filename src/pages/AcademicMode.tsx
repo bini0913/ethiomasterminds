@@ -30,6 +30,7 @@ const AcademicMode: React.FC = () => {
   const [weekDone, setWeekDone] = useState(0);
   const [recentResult, setRecentResult] = useState<{ score: number; total_questions: number; completed_at?: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -54,7 +55,7 @@ const AcademicMode: React.FC = () => {
         supabase.from("quiz_results").select("score,total_questions,created_at").eq("student_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
       if (cancelled) return;
-      if (todayRes.error || weekRes.error) setLoadError(true);
+      if (todayRes.error || weekRes.error || resultsRes.error) setLoadError(true);
       setProfile(p);
       setTodayCount(todayRes.data?.length || 0);
       setTodayCompleted(todayRes.data?.filter((item) => item.completed).length || 0);
@@ -63,7 +64,7 @@ const AcademicMode: React.FC = () => {
       setIsLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [user?.id, navigate]);
+  }, [user?.id, navigate, reloadKey]);
 
   if (isLoading) return <div className="flex min-h-[60vh] items-center justify-center gap-3 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Loading your study space…</div>;
 
@@ -119,7 +120,7 @@ const AcademicMode: React.FC = () => {
           <Card className="rounded-2xl"><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-primary/10 p-3 text-primary"><BookOpen className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Study subjects</p><p className="font-semibold">{subjects.length} selected</p></div></CardContent></Card>
           <Card className="rounded-2xl"><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-primary/10 p-3 text-primary"><Sparkles className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Weekly tasks completed</p><p className="font-semibold">{weekDone} completed</p></div></CardContent></Card>
         </section>
-        {loadError && <p className="text-sm text-muted-foreground">Some dashboard totals couldn't load. Your study tools are still available; refresh to try again.</p>}
+        {loadError && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-muted-foreground">Some dashboard totals couldn't load. Your study tools are still available; try loading the totals again.</p><Button variant="outline" size="sm" className="min-h-10 shrink-0" onClick={() => setReloadKey((key) => key + 1)}>Retry dashboard data</Button></div>}
         <div className="flex items-start gap-3 rounded-2xl border bg-card p-4 text-sm"><Brain className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><p className="leading-6 text-muted-foreground"><span className="font-semibold text-foreground">Personalized, connected practice.</span> Exam results feed your progress, topics show your mastery, and your planner helps you focus on the next useful task. AI Tutor is unchanged.</p></div>
       </main>
     </div>
