@@ -15,6 +15,7 @@ type LeaderboardRow = {
   total_minutes: number;
   focus_sessions: number;
   updated_at: string | null;
+  rank?: number | null;
 };
 
 const db = supabase as any;
@@ -110,6 +111,7 @@ export default function StudyLeaderboard() {
   const { user } = useUser();
   const [period, setPeriod] = useState<Period>("day");
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
+  const [mySummary, setMySummary] = useState<LeaderboardRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -123,17 +125,30 @@ export default function StudyLeaderboard() {
       return;
     }
     setLoading(true);
-    const { data, error } = await db.rpc("get_study_period_leaderboard", {
-      p_start_at: range.start,
-      p_end_at: new Date().toISOString(),
-      p_limit: 50,
-    });
-    if (error) {
-      console.error("Study leaderboard load failed", error);
+    const endAt = new Date().toISOString();
+    const [leaderboardResult, summaryResult] = await Promise.all([
+      db.rpc("get_study_period_leaderboard", {
+        p_start_at: range.start,
+        p_end_at: endAt,
+        p_limit: 50,
+      }),
+      db.rpc("get_my_study_period_summary", {
+        p_start_at: range.start,
+        p_end_at: endAt,
+      }),
+    ]);
+    if (leaderboardResult.error) {
+      console.error("Study leaderboard load failed", leaderboardResult.error);
       toast.error("Could not load the Study Mode leaderboard. Please refresh and try again.");
       setRows([]);
     } else {
-      setRows((data ?? []) as LeaderboardRow[]);
+      setRows((leaderboardResult.data ?? []) as LeaderboardRow[]);
+    }
+    if (summaryResult.error) {
+      console.error("Personal study rank load failed", summaryResult.error);
+      setMySummary(null);
+    } else {
+      setMySummary(((summaryResult.data ?? [])[0] ?? null) as LeaderboardRow | null);
     }
     setLoading(false);
   }, [user?.id, range.start]);
@@ -148,8 +163,8 @@ export default function StudyLeaderboard() {
     return () => { void supabase.removeChannel(channel); };
   }, [user?.id, loadLeaderboard]);
 
-  const mine = rows.find((row) => row.user_id === user?.id);
-  const myRank = mine ? rows.findIndex((row) => row.user_id === user?.id) + 1 : null;
+  const mine = mySummary ?? rows.find((row) => row.user_id === user?.id) ?? null;
+  const myRank = mySummary?.rank ? Number(mySummary.rank) : mine ? rows.findIndex((row) => row.user_id === user?.id) + 1 || null : null;
   const caption = mine
     ? `I studied ${formatStudyTime(mine.total_minutes)} ${periodLabels[period].toLowerCase()} in Master Minds Study Mode${myRank ? ` and ranked #${myRank}` : ""}! 📚✨`
     : `I'm building my study streak in Master Minds Study Mode! 📚✨`;

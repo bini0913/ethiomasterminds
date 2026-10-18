@@ -25,6 +25,8 @@ type StudySession = {
   status: "active" | "completed";
   created_at: string;
   competition_id: string | null;
+  paused_at?: string | null;
+  paused_seconds?: number | null;
 };
 
 type StudyTask = {
@@ -65,6 +67,15 @@ type StudySettings = {
   auto_start_break: boolean;
 };
 
+type StudyStats = {
+  today_minutes: number;
+  week_minutes: number;
+  streak_days: number;
+  pomodoros_today: number;
+};
+
+const EMPTY_STUDY_STATS: StudyStats = { today_minutes: 0, week_minutes: 0, streak_days: 0, pomodoros_today: 0 };
+
 const db = supabase as any;
 
 const formatSeconds = (seconds: number) => {
@@ -75,19 +86,12 @@ const formatSeconds = (seconds: number) => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 };
 
-const startOfDay = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-
 const clampMinutes = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(v)));
 
 const StudyModePage: React.FC = () => {
   const { user } = useUser();
 
   const [loading, setLoading] = useState(true);
-  const [sessions, setSessions] = useState<StudySession[]>([]);
   const [tasks, setTasks] = useState<StudyTask[]>([]);
   const [competitions, setCompetitions] = useState<StudyCompetition[]>([]);
   const [participants, setParticipants] = useState<StudyParticipant[]>([]);
@@ -101,8 +105,9 @@ const StudyModePage: React.FC = () => {
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [sessionTargetSeconds, setSessionTargetSeconds] = useState(25 * 60);
   const [breakTargetSeconds, setBreakTargetSeconds] = useState(5 * 60);
+  const [breakDeadlineMs, setBreakDeadlineMs] = useState<number | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(25 * 60);
-  const [completedPomodoros, setCompletedPomodoros] = useState(0);
+  const [studyStats, setStudyStats] = useState<StudyStats>(EMPTY_STUDY_STATS);
 
   const [activeSession, setActiveSession] = useState<StudySession | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string>("");
@@ -113,7 +118,7 @@ const StudyModePage: React.FC = () => {
   const [selectedCompetitionId, setSelectedCompetitionId] = useState<string>("");
 
   const activeCompetitions = useMemo(
-    () => competitions.filter((competition) => competition.status === "active"),
+    () => competitions.filter((competition) => competition.status === "active" && (!competition.end_time || new Date(competition.end_time).getTime() > Date.now())),
     [competitions]
   );
 
@@ -146,14 +151,17 @@ const StudyModePage: React.FC = () => {
   const loadData = async () => {
     if (!user) return;
     setLoading(true);
+    const { error: expiryError } = await db.rpc("expire_study_competitions");
+    if (expiryError) console.error("Could not expire old study competitions", expiryError);
 
-    const [sessionsRes, tasksRes, competitionsRes, participantsRes, liveRes, settingsRes] = await Promise.all([
+    const [sessionsRes, tasksRes, competitionsRes, participantsRes, liveRes, settingsRes, statsRes] = await Promise.all([
       db.from("study_sessions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100),
       db.from("study_tasks").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
       db.from("study_competitions").select("*").order("created_at", { ascending: false }).limit(50),
       db.from("study_participants").select("*").order("total_study_time", { ascending: false }),
-      db.from("study_live_status").select("*").eq("is_studying", true),
+      db.from("study_live_status").select("*").eq("is_studying", true).gte("updated_at", new Date(Date.now() - 90_000).toISOString()),
       db.from("study_settings").select("*").eq("user_id", user.id).maybeSingle(),
+      db.rpc("get_study_mode_stats", { p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }),
     ]);
 
     if (sessionsRes.error) toast.error(sessionsRes.error.message);
@@ -162,11 +170,19 @@ const StudyModePage: React.FC = () => {
     if (participantsRes.error) toast.error(participantsRes.error.message);
     if (liveRes.error) toast.error(liveRes.error.message);
     if (settingsRes.error) toast.error(settingsRes.error.message);
+    if (statsRes.error) console.error("Study statistics load failed", statsRes.error);
+    if (!statsRes.error && statsRes.data) {
+      setStudyStats({
+        today_minutes: Number(statsRes.data.today_minutes) || 0,
+        week_minutes: Number(statsRes.data.week_minutes) || 0,
+        streak_days: Number(statsRes.data.streak_days) || 0,
+        pomodoros_today: Number(statsRes.data.pomodoros_today) || 0,
+      });
+    }
 
     const nextSessions = (sessionsRes.data ?? []) as StudySession[];
     const currentActive = nextSessions.find((session) => session.status === "active") ?? null;
 
-    setSessions(nextSessions);
     setTasks((tasksRes.data ?? []) as StudyTask[]);
     setCompetitions((competitionsRes.data ?? []) as StudyCompetition[]);
     setParticipants((participantsRes.data ?? []) as StudyParticipant[]);
@@ -185,10 +201,14 @@ const StudyModePage: React.FC = () => {
 
     setActiveSession(currentActive);
     if (currentActive) {
-      setTimerState("running");
+      const isPaused = Boolean(currentActive.paused_at);
+      setTimerState(isPaused ? "paused" : "running");
       setMode((currentActive.mode as StudyMode) ?? "pomodoro");
       const planned = (currentActive.planned_duration ?? 25) * 60;
-      const elapsed = Math.max(0, Math.floor((Date.now() - new Date(currentActive.start_time).getTime()) / 1000));
+      const wallElapsed = Math.max(0, (Date.now() - new Date(currentActive.start_time).getTime()) / 1000);
+      const currentPause = currentActive.paused_at ? Math.max(0, (Date.now() - new Date(currentActive.paused_at).getTime()) / 1000) : 0;
+      const pausedSeconds = Math.max(0, Number(currentActive.paused_seconds) || 0) + currentPause;
+      const elapsed = Math.max(0, Math.floor(wallElapsed - pausedSeconds));
       setSessionTargetSeconds(planned);
       setCountdownSeconds(Math.max(0, planned - elapsed));
     }
@@ -201,9 +221,14 @@ const StudyModePage: React.FC = () => {
 
     await loadNames(idsToLoad);
 
-    if (!selectedCompetitionId && (competitionsRes.data ?? []).length > 0) {
-      setSelectedCompetitionId(((competitionsRes.data ?? [])[0] as StudyCompetition).id);
-    }
+    const availableCompetitions = ((competitionsRes.data ?? []) as StudyCompetition[]).filter(
+      (competition) => competition.status === "active" && (!competition.end_time || new Date(competition.end_time).getTime() > Date.now())
+    );
+    setSelectedCompetitionId((current) =>
+      current && availableCompetitions.some((competition) => competition.id === current)
+        ? current
+        : availableCompetitions[0]?.id ?? ""
+    );
 
     setLoading(false);
   };
@@ -232,30 +257,58 @@ const StudyModePage: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!activeSession) return;
-
-    if (timerState !== "running" && timerState !== "break") return;
+    if (timerState === "break") {
+      if (breakDeadlineMs === null) return;
+      const tick = () => setCountdownSeconds(Math.max(0, Math.ceil((breakDeadlineMs - Date.now()) / 1000)));
+      tick();
+      const timer = window.setInterval(tick, 250);
+      return () => window.clearInterval(timer);
+    }
+    if (timerState !== "running" || !activeSession) return;
     const timer = window.setInterval(() => {
       setCountdownSeconds((prev) => Math.max(0, prev - 1));
     }, 1000);
-
     return () => window.clearInterval(timer);
-  }, [activeSession?.id, timerState]);
+  }, [activeSession?.id, timerState, breakDeadlineMs]);
 
   useEffect(() => {
-    if (countdownSeconds > 0 || !activeSession) return;
-
-    if (timerState === "running") {
+    if (countdownSeconds > 0) return;
+    if (timerState === "running" && activeSession) {
       void onStopStudy(true);
       return;
     }
-
     if (timerState === "break") {
       setTimerState("completed");
+      setBreakDeadlineMs(null);
       setCountdownSeconds(sessionTargetSeconds);
       toast.success("Break complete. Ready for next focus round 🚀");
     }
-  }, [countdownSeconds, timerState, activeSession]);
+  }, [countdownSeconds, timerState, activeSession?.id, sessionTargetSeconds]);
+
+  useEffect(() => {
+    if (!user?.id || !activeSession?.id) return;
+    const heartbeat = () => { void db.rpc("heartbeat_study_presence", { p_session_id: activeSession.id }); };
+    heartbeat();
+    const timer = window.setInterval(heartbeat, 30_000);
+    return () => window.clearInterval(timer);
+  }, [user?.id, activeSession?.id]);
+
+  useEffect(() => {
+    const syncTimer = () => {
+      if (document.visibilityState !== "visible") return;
+      if (timerState === "break" && breakDeadlineMs !== null) {
+        setCountdownSeconds(Math.max(0, Math.ceil((breakDeadlineMs - Date.now()) / 1000)));
+        return;
+      }
+      if (timerState !== "running" || !activeSession) return;
+      const planned = (activeSession.planned_duration ?? 25) * 60;
+      const wallElapsed = Math.max(0, (Date.now() - new Date(activeSession.start_time).getTime()) / 1000);
+      const pausedSeconds = Math.max(0, Number(activeSession.paused_seconds) || 0);
+      setCountdownSeconds(Math.max(0, planned - Math.floor(wallElapsed - pausedSeconds)));
+    };
+    document.addEventListener("visibilitychange", syncTimer);
+    return () => document.removeEventListener("visibilitychange", syncTimer);
+  }, [activeSession?.id, activeSession?.start_time, activeSession?.planned_duration, activeSession?.paused_seconds, timerState, breakDeadlineMs]);
 
   const saveSettings = async (nextStudyMinutes: number, nextBreakMinutes: number) => {
     if (!user) return;
@@ -293,25 +346,30 @@ const StudyModePage: React.FC = () => {
 
     const session = data as StudySession;
     setActiveSession(session);
-    setSessions((prev) => [session, ...prev]);
     setTimerState("running");
+    setBreakDeadlineMs(null);
     setSessionTargetSeconds(plannedDuration * 60);
     setCountdownSeconds(plannedDuration * 60);
 
-    const { error: liveError } = await db.from("study_live_status").upsert({
-      user_id: user.id,
-      is_studying: true,
-      current_session_start: session.start_time,
-    });
-
-    if (liveError) toast.error(liveError.message);
     await saveSettings(studyMinutes, breakMinutes);
     toast.success("Study session started 🔥");
   };
 
-  const onPauseStudy = () => {
+  const onPauseStudy = async () => {
     if (!activeSession) return;
-    setTimerState((prev) => (prev === "paused" ? "running" : "paused"));
+    const isPaused = timerState === "paused";
+    const { error } = await db.rpc(isPaused ? "resume_study_session" : "pause_study_session", { p_session_id: activeSession.id });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const now = new Date().toISOString();
+    setActiveSession((current) => current ? {
+      ...current,
+      paused_at: isPaused ? null : now,
+      paused_seconds: (Number(current.paused_seconds) || 0) + (isPaused && current.paused_at ? Math.max(0, Math.floor((Date.now() - new Date(current.paused_at).getTime()) / 1000)) : 0),
+    } : current);
+    setTimerState(isPaused ? "running" : "paused");
   };
 
   const onStopStudy = async (autoBreak = false) => {
@@ -330,7 +388,7 @@ const StudyModePage: React.FC = () => {
 
     const { data, error } = await db.rpc("complete_study_session", {
       p_session_id: activeSession.id,
-      p_duration_override: minutesCompleted,
+      p_duration_override: null,
       p_task_id: selectedTaskId || null,
       p_mark_task_complete: markTaskOnComplete,
     });
@@ -349,12 +407,14 @@ const StudyModePage: React.FC = () => {
 
     const shouldStartBreak = mode === "pomodoro" && (settings?.auto_start_break ?? true) && autoBreak;
     if (shouldStartBreak) {
+      const nextBreakSeconds = clampMinutes(breakMinutes, 1, 30) * 60;
       setTimerState("break");
-      setBreakTargetSeconds(clampMinutes(breakMinutes, 1, 30) * 60);
-      setCountdownSeconds(clampMinutes(breakMinutes, 1, 30) * 60);
-      setCompletedPomodoros((prev) => prev + 1);
-      toast.success(`Focus complete 🎉 +${rewardXp} XP +${rewardCoins} coins. Break started.`);
+      setBreakTargetSeconds(nextBreakSeconds);
+      setBreakDeadlineMs(Date.now() + nextBreakSeconds * 1000);
+      setCountdownSeconds(nextBreakSeconds);
+       toast.success(`Focus complete 🎉 +${rewardXp} XP +${rewardCoins} coins. Break started.`);
     } else {
+      setBreakDeadlineMs(null);
       toast.success(`Session completed ✅ +${rewardXp} XP +${rewardCoins} coins.`);
     }
 
@@ -372,6 +432,7 @@ const StudyModePage: React.FC = () => {
     const next = clampMinutes(studyMinutes, 5, 180) * 60;
     setSessionTargetSeconds(next);
     setCountdownSeconds(next);
+    setBreakDeadlineMs(null);
     setTimerState("idle");
   };
 
@@ -390,6 +451,19 @@ const StudyModePage: React.FC = () => {
     setBreakMinutes(clamped);
     setBreakTargetSeconds(clamped * 60);
     await saveSettings(studyMinutes, clamped);
+  };
+
+  const updateAutoStartBreak = async (enabled: boolean) => {
+    if (!user) return;
+    const payload = {
+      user_id: user.id,
+      default_study_time: clampMinutes(studyMinutes, 5, 180),
+      default_break_time: clampMinutes(breakMinutes, 1, 30),
+      auto_start_break: enabled,
+    };
+    const { error } = await db.from("study_settings").upsert(payload, { onConflict: "user_id" });
+    if (error) toast.error(error.message);
+    else setSettings(payload);
   };
 
   const addTask = async () => {
@@ -434,14 +508,7 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    const now = new Date();
-    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-    const { data, error } = await db
-      .from("study_competitions")
-      .insert({ name: competitionName.trim(), created_by: user.id, start_time: now.toISOString(), end_time: in24h.toISOString(), status: "active" })
-      .select("*")
-      .single();
+    const { data, error } = await db.rpc("create_study_competition", { p_name: competitionName.trim() });
 
     if (error) {
       toast.error(error.message);
@@ -452,10 +519,7 @@ const StudyModePage: React.FC = () => {
     setCompetitionName("");
     setSelectedCompetitionId(created.id);
 
-    const { error: joinError } = await db.from("study_participants").upsert({ competition_id: created.id, user_id: user.id, total_study_time: 0 });
-    if (joinError) toast.error(joinError.message);
-
-    toast.success("Competition created.");
+    toast.success("Competition created and joined.");
     await loadData();
   };
 
@@ -465,7 +529,7 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    const { error } = await db.from("study_participants").upsert({ competition_id: selectedCompetitionId, user_id: user.id, total_study_time: 0 });
+    const { error } = await db.rpc("join_study_competition", { p_competition_id: selectedCompetitionId });
     if (error) {
       toast.error(error.message);
       return;
@@ -475,33 +539,9 @@ const StudyModePage: React.FC = () => {
     await loadData();
   };
 
-  const completedSessions = sessions.filter((session) => session.status === "completed");
-
-  const todayMinutes = useMemo(() => {
-    const dayStart = startOfDay();
-    return completedSessions
-      .filter((session) => new Date(session.created_at) >= dayStart)
-      .reduce((sum, session) => sum + (session.duration ?? 0), 0);
-  }, [completedSessions]);
-
-  const weekMinutes = useMemo(() => {
-    const start = startOfDay();
-    start.setDate(start.getDate() - 6);
-    return completedSessions
-      .filter((session) => new Date(session.created_at) >= start)
-      .reduce((sum, session) => sum + (session.duration ?? 0), 0);
-  }, [completedSessions]);
-
-  const streakDays = useMemo(() => {
-    const sessionDays = new Set(completedSessions.map((s) => new Date(s.created_at).toDateString()));
-    let streak = 0;
-    const d = new Date();
-    while (sessionDays.has(d.toDateString())) {
-      streak += 1;
-      d.setDate(d.getDate() - 1);
-    }
-    return streak;
-  }, [completedSessions]);
+  const todayMinutes = studyStats.today_minutes;
+  const weekMinutes = studyStats.week_minutes;
+  const streakDays = studyStats.streak_days;
 
   const selectedCompetitionLeaderboard = useMemo(() => {
     if (!selectedCompetitionId) return [] as StudyParticipant[];
@@ -613,6 +653,11 @@ const StudyModePage: React.FC = () => {
                     </div>
                   </div>
 
+                  <label className="flex items-center gap-2 text-xs text-white/80">
+                    <input type="checkbox" checked={settings?.auto_start_break ?? true} onChange={(e) => void updateAutoStartBreak(e.target.checked)} disabled={!editableTimer || mode !== "pomodoro"} />
+                    Automatically start a break after Pomodoro
+                  </label>
+
                   <div>
                     <p className="text-xs text-white/60 mb-1">Link task to session</p>
                     <select value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)} className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-2 text-sm">
@@ -633,7 +678,7 @@ const StudyModePage: React.FC = () => {
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Today</p><p className="font-bold">{todayMinutes}m</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Week</p><p className="font-bold">{weekMinutes}m</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Streak</p><p className="font-bold">{streakDays} 🔥</p></CardContent></Card>
-                <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Pomodoros</p><p className="font-bold">{completedPomodoros}/4</p></CardContent></Card>
+                <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Pomodoros</p><p className="font-bold">{studyStats.pomodoros_today}/4</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Live Studying</p><p className="font-bold flex items-center justify-center gap-1">{liveStatuses.length} <Flame className="h-4 w-4 text-orange-400" /></p></CardContent></Card>
               </div>
             </CardContent>
