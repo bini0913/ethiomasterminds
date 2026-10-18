@@ -457,3 +457,26 @@ begin
   begin alter publication supabase_realtime add table public.study_settings; exception when duplicate_object then null; end;
   begin alter publication supabase_realtime add table public.study_call_participants; exception when duplicate_object then null; end;
 end $$;
+
+
+-- Mark expired competitions as ended instead of leaving them indefinitely active.
+create or replace function public.expire_study_competitions()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count integer;
+begin
+  if auth.uid() is null then raise exception 'Authentication required'; end if;
+  update public.study_competitions
+    set status = 'ended'
+    where status = 'active' and end_time is not null and end_time <= now();
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+revoke all on function public.expire_study_competitions() from public, anon;
+grant execute on function public.expire_study_competitions() to authenticated;
