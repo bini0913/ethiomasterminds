@@ -287,14 +287,13 @@ const StudyModePage: React.FC = () => {
   }, [user?.id, activeSession?.id]);
 
   useEffect(() => {
-    if (!activeSession?.id) return;
     const syncTimer = () => {
       if (document.visibilityState !== "visible") return;
       if (timerState === "break" && breakDeadlineMs !== null) {
         setCountdownSeconds(Math.max(0, Math.ceil((breakDeadlineMs - Date.now()) / 1000)));
         return;
       }
-      if (timerState !== "running") return;
+      if (timerState !== "running" || !activeSession) return;
       const planned = (activeSession.planned_duration ?? 25) * 60;
       const wallElapsed = Math.max(0, (Date.now() - new Date(activeSession.start_time).getTime()) / 1000);
       const pausedSeconds = Math.max(0, Number(activeSession.paused_seconds) || 0);
