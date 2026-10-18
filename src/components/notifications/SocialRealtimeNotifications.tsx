@@ -29,9 +29,24 @@ export default function SocialRealtimeNotifications() {
             .maybeSingle();
           const senderName = profile?.name?.trim() || profile?.username?.trim() || "Someone";
           toast(`New friend request from ${senderName}`, {
-            description: "Open Friends to accept or decline the request.",
-            action: { label: "View", onClick: () => navigate("/friends?tab=requests") },
-            duration: 10000,
+            description: "Accept or decline without leaving your current page.",
+            action: {
+              label: "Accept",
+              onClick: async () => {
+                const { error } = await supabase.rpc("respond_friend_request", { p_request_id: request.id, p_accept: true });
+                if (error) { toast.error("Could not accept this friend request. Open Friends and try again."); return; }
+                toast.success("Friend request accepted.");
+              },
+            },
+            cancel: {
+              label: "Decline",
+              onClick: async () => {
+                const { error } = await supabase.rpc("respond_friend_request", { p_request_id: request.id, p_accept: false });
+                if (error) { toast.error("Could not decline this friend request. Open Friends and try again."); return; }
+                toast.info("Friend request declined.");
+              },
+            },
+            duration: 15000,
           });
         },
       )
@@ -68,6 +83,19 @@ export default function SocialRealtimeNotifications() {
                 } else {
                   toast.error("Could not accept this invite.");
                 }
+              },
+            },
+            cancel: {
+              label: "Decline",
+              onClick: async () => {
+                const { data, error } = await supabase.rpc("respond_multiplayer_invite", {
+                  _invite_id: invite.id,
+                  _accept: false,
+                });
+                if (error) { toast.error("Could not decline this invite."); return; }
+                const result = data as { status?: string } | null;
+                if (result?.status === "declined") toast.info("Invitation declined.");
+                else toast.error("This invitation could not be declined.");
               },
             },
             duration: 15000,
