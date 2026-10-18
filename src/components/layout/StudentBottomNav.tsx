@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, Gamepad2, Globe2, Trophy, Gift, BookOpen, User, Swords, MessageCircle } from "lucide-react";
+import { Home, Gamepad2, Globe2, BookOpen, User, Swords, MessageCircle, Users } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
 
@@ -16,15 +16,15 @@ const StudentBottomNav: React.FC = () => {
   const middle = tier === "middle";
 
   // Navigation adapts to each learner tier while sharing the same accessible component.
-  // Early learners get discovery and rewards; middle learners get social-first navigation;
+  // Early learners get discovery and social connections; middle learners get social-first navigation;
   // high-school learners get a quieter four-destination navigation bar.
   const items = early
     ? [
         { icon: Home, label: "Home", path: "/", match: ["/"] },
         { icon: Gamepad2, label: "Play", path: "/early-games", match: ["/early-games", "/early-quiz"] },
         { icon: Globe2, label: "Discover", path: "/early-discover", match: ["/early-discover", "/early-videos", "/early-explore"] },
-        { icon: Trophy, label: "Ranks", path: "/early-ranks", match: ["/early-ranks", "/early-progress"] },
-        { icon: Gift, label: "Rewards", path: "/store", match: ["/store"] },
+        { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/chat"] },
+        { icon: Users, label: "Friends", path: "/friends", match: ["/friends"] },
       ]
     : middle
       ? [
