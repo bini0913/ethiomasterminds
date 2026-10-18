@@ -111,6 +111,10 @@ export default function StudyCallBar() {
         if (/permission denied|row-level security|42501/i.test(detail)) throw new Error("The database denied creating the call invitation. Refresh and sign in again. Details: " + detail);
         throw new Error("Could not invite friend: " + detail);
       }
+      const { error: pushError } = await supabase.functions.invoke("send-push-notification", {
+        body: { kind: "study_call_invite", event_id: createdRoomId },
+      });
+      if (pushError) console.warn("Study call push could not be sent:", pushError.message);
       await connect(createdRoomId);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start call."); }
     finally { setConnecting(false); }
