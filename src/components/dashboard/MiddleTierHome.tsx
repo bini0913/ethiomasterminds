@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, BookOpen, Brain, Flame, Gamepad2, GraduationCap, LibraryBig, LogOut, MessageCircle, Settings, Sparkles, Swords, Timer, Trophy, Users, Zap } from "lucide-react";
+import { ArrowRight, Flame, GraduationCap, LibraryBig, LogOut, MessageCircle, Settings, Sparkles, Swords, Timer, Trophy, Users, Zap } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAchievements } from "@/context/AchievementsContext";
@@ -66,7 +66,7 @@ const MiddleTierHome: React.FC = () => {
         <Link to="/leaderboard" className="flex min-h-24 items-center gap-4 rounded-2xl border bg-card p-4 transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Trophy className="h-6 w-6"/></span><span className="min-w-0 flex-1"><span className="block font-bold">Your rankings</span><span className="mt-1 block text-sm text-muted-foreground">See how your practice is adding up.</span></span><ArrowRight className="h-5 w-5 text-muted-foreground"/></Link>
         <Link to="/store" className="flex min-h-24 items-center gap-4 rounded-2xl border bg-card p-4 transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning"><Trophy className="h-6 w-6"/></span><span className="min-w-0 flex-1"><span className="block font-bold">Rewards store</span><span className="mt-1 block text-sm text-muted-foreground">Use your coins and celebrate milestones.</span></span><ArrowRight className="h-5 w-5 text-muted-foreground"/></Link>
       </section>
-      {unlockedBadges.length > 0 && <section className="rounded-2xl border bg-card p-4 sm:p-5"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Trophy className="h-5 w-5"/></span><div><h2 className="font-bold">Recent achievements</h2><p className="text-sm text-muted-foreground">Keep up the great work.</p></div></div><div className="mt-3 flex flex-wrap gap-2">{unlockedBadges.slice(0,5).map((badge,index)=><span key={badge.id ?? badge.name ?? index} className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-2 text-sm"><span>{badge.icon}</span><span>{badge.name}</span></span>)}</div></section>}
+      {unlockedBadges.length > 0 && <section className="rounded-2xl border bg-card p-4 sm:p-5"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Trophy className="h-5 w-5"/></span><div><h2 className="font-bold">Recent achievements</h2><p className="text-sm text-muted-foreground">Keep up the great work.</p></div></div><div className="mt-3 flex flex-wrap gap-2">{unlockedBadges.slice(0,5).map((badge,index)=><span key={badge.name ?? index} className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-2 text-sm"><span>{badge.icon}</span><span>{badge.name}</span></span>)}</div></section>}
     </main>
   </div>;
 };
