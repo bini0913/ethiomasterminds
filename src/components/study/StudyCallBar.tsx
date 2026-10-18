@@ -139,70 +139,87 @@ export default function StudyCallBar() {
   useEffect(() => () => { roomRef.current?.disconnect(); document.querySelectorAll("[data-study-call-audio]").forEach(element => element.remove()); }, []);
   const chosenFriend = friends.find(friend => friend.id === selectedFriend);
 
-  return <Card className="bg-white/5 border-white/10 text-white">
-    <CardContent className="p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0"><p className="font-semibold flex items-center gap-2"><Users className="h-4 w-4 text-emerald-300" /> Study Friends</p>
-          <p className="text-xs text-white/60">{roomId ? `In call · ${members} participant(s)` : incoming.length ? `${incoming.length} incoming invitation(s)` : "See which friends are online and call them without leaving your timer."}</p></div>
-        <Button size="sm" variant="outline" onClick={() => setExpanded(v => !v)}>{expanded ? "Hide" : roomId ? "Call controls" : "Call friends"}</Button>
+  return <Card className={`overflow-hidden border-white/10 text-white ${roomId ? "bg-slate-950/90 shadow-xl shadow-black/20" : "bg-white/5"}`}>
+    <CardContent className={roomId ? "p-0" : "p-4 space-y-3"}>
+      <div className={`flex items-center justify-between gap-3 ${roomId ? "border-b border-white/10 bg-slate-900/90 px-4 py-3 sm:px-5" : ""}`}>
+        <div className="min-w-0">
+          <p className="font-semibold flex items-center gap-2"><Users className="h-4 w-4 text-emerald-300 shrink-0" />{roomId ? "Study call" : "Study Friends"}</p>
+          <p className="text-xs text-white/60">{roomId ? `${callStatus} · ${members} participant${members === 1 ? "" : "s"}` : incoming.length ? `${incoming.length} incoming invitation(s)` : "Study together without leaving your timer."}</p>
+        </div>
+        <Button size="sm" variant="outline" className="shrink-0 min-h-10" onClick={() => setExpanded(v => !v)}>{expanded ? "Hide" : roomId ? "Show controls" : "Find friends"}</Button>
       </div>
-      {incoming.map(invite => <div key={invite.room_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
+      <div className={roomId ? "space-y-4 p-3 sm:p-5" : "space-y-3"}>
+      {incoming.map(invite => <div key={invite.room_id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/5 p-3">
         <span className="text-sm">Incoming study call</span><div className="flex gap-2">
-          <Button size="sm" onClick={() => void respond(invite, true)}><Check className="mr-1 h-4 w-4" />Accept</Button>
-          <Button size="sm" variant="outline" onClick={() => void respond(invite, false)}><X className="mr-1 h-4 w-4" />Decline</Button>
+          <Button className="min-h-10" size="sm" onClick={() => void respond(invite, true)}><Check className="mr-1 h-4 w-4" />Accept</Button>
+          <Button className="min-h-10" size="sm" variant="outline" onClick={() => void respond(invite, false)}><X className="mr-1 h-4 w-4" />Decline</Button>
         </div></div>)}
       {expanded && !roomId && <>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-white/75">Friends online <span className="text-emerald-300">({onlineFriends.length})</span></p>
-          <Button size="sm" variant="ghost" onClick={() => void refreshFriends()} disabled={friendsLoading}><RefreshCw className="mr-1 h-3 w-3" />Refresh</Button>
+          <p className="text-sm font-medium text-white/80">Friends online <span className="text-emerald-300">({onlineFriends.length})</span></p>
+          <Button size="sm" variant="ghost" className="min-h-10" onClick={() => void refreshFriends()} disabled={friendsLoading}><RefreshCw className="mr-1 h-3 w-3" />Refresh</Button>
         </div>
-        {onlineFriends.length > 0 ? <div className="flex flex-wrap gap-2">
-          {onlineFriends.map(friend => <button type="button" key={friend.id} onClick={() => setSelectedFriend(friend.id)} className="rounded-full border border-emerald-300 bg-emerald-400/10 px-3 py-1.5 text-xs">
-            <span className="inline-flex items-center gap-1.5"><Circle className="h-2 w-2 fill-emerald-400 text-emerald-400" />{displayName(friend)}</span>
+        {onlineFriends.length > 0 ? <div className="flex gap-2 overflow-x-auto pb-1">
+          {onlineFriends.map(friend => <button type="button" key={friend.id} onClick={() => setSelectedFriend(friend.id)} aria-pressed={selectedFriend === friend.id} className={`shrink-0 rounded-full border px-3 py-2 text-sm transition-colors ${selectedFriend === friend.id ? "border-emerald-300 bg-emerald-400/20 text-white" : "border-white/15 bg-white/5 text-white/75"}`}>
+            <span className="inline-flex items-center gap-2"><Circle className="h-2 w-2 fill-emerald-400 text-emerald-400" />{displayName(friend)}</span>
           </button>)}
-        </div> : <p className="text-xs text-white/55">No friends currently online. Refresh or choose a friend to invite anyway.</p>}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <select value={selectedFriend} onChange={e => setSelectedFriend(e.target.value)} className="min-w-0 w-full sm:flex-1 min-h-12 rounded-md border border-white/20 bg-slate-900 px-3 py-3 text-base" disabled={!friends.length}>
-            <option value="">Choose a friend…</option>{(friends as Friend[]).map(f => <option key={f.id} value={f.id}>{displayName(f)} · {friendPresence[f.id]?.status === "online" ? "Online" : "Offline"}</option>)}
-          </select><Button className="w-full sm:w-auto min-h-12" onClick={() => void startCall()} disabled={!selectedFriend || connecting || !chosenFriend}><Phone className="mr-2 h-4 w-4" />{connecting ? "Connecting…" : "Start call"}</Button>
+        </div> : <p className="rounded-lg bg-white/5 p-3 text-sm text-white/60">No friends are online right now. You can still invite an offline friend.</p>}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <label className="min-w-0"><span className="mb-1 block text-xs text-white/60">Choose a friend</span>
+            <select value={selectedFriend} onChange={e => setSelectedFriend(e.target.value)} className="min-h-12 w-full rounded-xl border border-white/20 bg-slate-900 px-3 py-3 text-base" disabled={!friends.length}>
+              <option value="">Choose a friend…</option>{(friends as Friend[]).map(f => <option key={f.id} value={f.id}>{displayName(f)} · {presenceLabel(friendPresence[f.id])}</option>)}
+            </select>
+          </label>
+          <div className="flex items-end"><Button className="min-h-12 w-full sm:w-auto" onClick={() => void startCall()} disabled={!selectedFriend || connecting || !chosenFriend}><Phone className="mr-2 h-4 w-4" />{connecting ? "Connecting…" : "Start call"}</Button></div>
         </div>
       </>}
-      {expanded && roomId && <div className="space-y-3"><div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-        <Button className="min-h-11" size="sm" variant={muted ? "destructive" : "secondary"} onClick={async () => { const next = !muted; try { await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); setMuted(next); } catch { toast.error("Microphone unavailable. Check browser site permissions and device settings."); } }}>{muted ? <MicOff className="mr-1 h-4 w-4" /> : <Mic className="mr-1 h-4 w-4" />}{muted ? "Unmute" : "Mute"}</Button>
-        <Button className="min-h-11" size="sm" variant="outline" onClick={async () => {
-          try {
-            const next = !cameraOn;
-            setDeviceError(null);
-            if (next && !navigator.mediaDevices?.getUserMedia) throw new Error("Camera access is unavailable in this browser. Open Master Minds over HTTPS in a supported browser.");
-            await roomRef.current?.localParticipant.setCameraEnabled(next);
-            setCameraOn(next);
-            if (next && roomRef.current) {
-              const publication = Array.from(roomRef.current.localParticipant.videoTrackPublications.values()).find(item => item.track);
-              if (publication?.track) setVideoTracks(current => [...current.filter(item => item.identity !== "You"), { track: publication.track!, identity: "You" }]);
-            } else setVideoTracks(current => current.filter(item => item.identity !== "You"));
-          } catch (error) {
-            const message = error instanceof Error ? error.message : "Camera permission denied or camera unavailable.";
-            setDeviceError(message);
-            toast.error(message);
-          }
-        }}>{cameraOn ? <VideoOff className="mr-1 h-4 w-4" /> : <Video className="mr-1 h-4 w-4" />}{cameraOn ? "Camera off" : "Camera on"}</Button>
-        <Button className="col-span-2 sm:col-span-1 min-h-11" size="sm" variant="destructive" onClick={() => void leave()}><PhoneOff className="mr-1 h-4 w-4" />Leave call</Button>
+      {expanded && roomId && <>
+        <div className="flex items-center justify-between gap-2">
+          <div><p className="text-sm font-semibold">{callStatus === "Connected" ? "You're connected" : callStatus}</p><p className="text-xs text-white/60">Keep studying while you talk</p></div>
+          <span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs text-emerald-200">{members} here</span>
+        </div>
+        {deviceError && <p className="rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100" role="alert">{deviceError}</p>}
+        <div ref={videoRef} className={`grid gap-3 ${videoTracks.length > 1 ? "grid-cols-2" : "grid-cols-1"}`} aria-label="Call video participants">
+          {videoTracks.map(({ track, identity }) => <div key={identity} className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-lg">
+            <div className="flex items-center justify-between bg-slate-900 px-3 py-2 text-xs text-white/80"><span>{identity === "You" ? "You" : identity}</span><span className="text-emerald-300">● Live</span></div>
+            <div className="aspect-video w-full" ref={node => {
+              if (node && !node.hasChildNodes()) {
+                const element = track.attach();
+                element.className = "block h-full w-full object-cover";
+                node.appendChild(element);
+              }
+            }} />
+          </div>)}
+          {videoTracks.length === 0 && <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-white/20 bg-black/20 p-5 text-center sm:min-h-48">
+            <div className="mb-2 rounded-full bg-white/10 p-3"><Video className="h-6 w-6 text-white/70" /></div>
+            <p className="text-sm font-medium">Cameras are off</p><p className="mt-1 max-w-xs text-xs text-white/55">Turn on your camera if you want to see each other. Audio can keep working without video.</p>
+          </div>}
+        </div>
+        <div className="sticky bottom-0 z-10 -mx-3 border-t border-white/10 bg-slate-950/95 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-md sm:-mx-5 sm:px-5">
+          <div className="grid grid-cols-3 gap-2">
+            <Button className="min-h-12 flex-col gap-1 sm:flex-row" variant={muted ? "destructive" : "secondary"} onClick={async () => { const next = !muted; try { await roomRef.current?.localParticipant.setMicrophoneEnabled(!next); setMuted(next); } catch { toast.error("Microphone unavailable. Check browser site permissions and device settings."); } }}>{muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}<span className="text-xs sm:text-sm">{muted ? "Unmute" : "Mute"}</span></Button>
+            <Button className="min-h-12 flex-col gap-1 sm:flex-row" variant={cameraOn ? "secondary" : "outline"} onClick={async () => {
+              try {
+                const next = !cameraOn;
+                setDeviceError(null);
+                if (next && !navigator.mediaDevices?.getUserMedia) throw new Error("Camera access is unavailable in this browser. Open Master Minds over HTTPS in a supported browser.");
+                await roomRef.current?.localParticipant.setCameraEnabled(next);
+                setCameraOn(next);
+                if (next && roomRef.current) {
+                  const publication = Array.from(roomRef.current.localParticipant.videoTrackPublications.values()).find(item => item.track);
+                  if (publication?.track) setVideoTracks(current => [...current.filter(item => item.identity !== "You"), { track: publication.track!, identity: "You" }]);
+                } else setVideoTracks(current => current.filter(item => item.identity !== "You"));
+              } catch (error) {
+                const message = error instanceof Error ? error.message : "Camera permission denied or camera unavailable.";
+                setDeviceError(message);
+                toast.error(message);
+              }
+            }}>{cameraOn ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}<span className="text-xs sm:text-sm">{cameraOn ? "Camera off" : "Camera on"}</span></Button>
+            <Button className="min-h-12 flex-col gap-1 sm:flex-row" variant="destructive" onClick={() => void leave()}><PhoneOff className="h-4 w-4" /><span className="text-xs sm:text-sm">Leave call</span></Button>
+          </div>
+        </div>
+      </>}
       </div>
-      <p className="text-xs text-white/70" role="status">{callStatus} · {members} participant{members === 1 ? "" : "s"}</p>
-      {deviceError && <p className="text-sm text-amber-200" role="alert">{deviceError}</p>}
-      <div ref={videoRef} className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Call video participants">
-        {videoTracks.map(({ track, identity }) => <div key={identity} className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-black">
-          <div className="px-3 py-1 text-xs text-white/80 bg-white/10">{identity === "You" ? "You" : identity}</div>
-          <div className="aspect-video w-full" ref={node => {
-            if (node && !node.hasChildNodes()) {
-              const element = track.attach();
-              element.className = "block h-full w-full object-cover";
-              node.appendChild(element);
-            }
-          }} />
-        </div>)}
-        {videoTracks.length === 0 && <div className="rounded-xl border border-dashed border-white/20 p-4 text-center text-sm text-white/60">Camera video is off. Turn on your camera to share video with your study partner.</div>}
-      </div></div>}
     </CardContent>
   </Card>;
 }
