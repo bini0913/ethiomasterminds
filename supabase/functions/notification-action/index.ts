@@ -45,10 +45,9 @@ Deno.serve(async (req) => {
       if (error) return json({ error: "Could not load the friend request." }, 500);
       if (!request || request.friend_id !== userId) return json({ error: "This friend request is not addressed to your account." }, 403);
       if (request.status !== "pending") return json({ error: "This friend request has already been handled." }, 409);
-      const { error: updateError } = await admin.rpc("respond_friend_request", {
-        p_request_id: request.id,
-        p_accept: payload.action === "friend_accept",
-      }, { });
+      const { error: updateError } = await admin.from("friends").update({
+        status: payload.action === "friend_accept" ? "accepted" : "declined",
+      }).eq("id", request.id).eq("friend_id", userId).eq("status", "pending");
       if (updateError) return json({ error: "Could not update the friend request." }, 409);
       return json({ ok: true, action: payload.action });
     }
@@ -85,11 +84,22 @@ Deno.serve(async (req) => {
         .or("and(user_id.eq." + userId + ",friend_id.eq." + message.sender_id + "),and(user_id.eq." + message.sender_id + ",friend_id.eq." + userId + ")")
         .maybeSingle();
       if (friendshipError || !friendship) return json({ error: "Replies are only available to accepted friends." }, 403);
-      const { data: inserted, error: insertError } = await admin.rpc("send_direct_message", {
-        p_receiver_id: message.sender_id,
-        p_content: reply,
-      });
+      const { data: inserted, error: insertError } = await admin.from("messages").insert({
+        sender_id: userId,
+        receiver_id: message.sender_id,
+        content: reply,
+      }).select("id").single();
       if (insertError || !inserted) return json({ error: "Your reply could not be sent." }, 409);
+
+      // Notify the original sender using the same verified-event delivery path.
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+      if (anonKey) {
+        await fetch(url + "/functions/v1/send-push-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": anonKey, "Authorization": "Bearer " + token },
+          body: JSON.stringify({ kind: "direct_message", event_id: inserted.id }),
+        }).catch(() => undefined);
+      }
       return json({ ok: true, action: "message_reply", message_id: inserted.id });
     }
 
