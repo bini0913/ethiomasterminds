@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
@@ -9,6 +9,7 @@ import { useUser } from "@/context/UserContext";
 export default function SocialRealtimeNotifications() {
   const { user, isAuthenticated } = useUser();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
@@ -102,6 +103,32 @@ export default function SocialRealtimeNotifications() {
           });
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `receiver_id=eq.${user.id}` },
+        async (payload) => {
+          const message = payload.new as { id?: string; sender_id?: string; receiver_id?: string; content?: string };
+          if (!message.id || !message.sender_id || message.sender_id === user.id) return;
+          const activeFriendId = new URLSearchParams(location.search).get("friend");
+          if (location.pathname === "/friends" && activeFriendId === message.sender_id) return;
+
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("name, username")
+            .eq("id", message.sender_id)
+            .maybeSingle();
+          const senderName = profile?.name?.trim() || profile?.username?.trim() || "Your friend";
+          const preview = String(message.content ?? "").trim();
+          toast(`Message from ${senderName}`, {
+            description: preview.length > 120 ? `${preview.slice(0, 117)}…` : preview || "You received a new message.",
+            action: {
+              label: "Reply",
+              onClick: () => navigate(`/friends?friend=${encodeURIComponent(message.sender_id!)}`),
+            },
+            duration: 10000,
+          });
+        },
+      )
       .subscribe((status) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           console.error("Social notification realtime subscription:", status);
@@ -111,7 +138,7 @@ export default function SocialRealtimeNotifications() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [isAuthenticated, user?.id, navigate]);
+  }, [isAuthenticated, user?.id, navigate, location.pathname, location.search]);
 
   return null;
 }

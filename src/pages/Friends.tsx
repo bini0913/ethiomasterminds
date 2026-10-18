@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Send, UserPlus, Check, X, Users, Home, MessageCircle, Search, Loader2, Swords, Gamepad2, BookOpen, Bell, ShieldBan, VolumeX } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFriends, FriendRequest } from "@/context/FriendsContext";
 import { useUser, UserProfile } from "@/context/UserContext";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ const Friends: React.FC = () => {
     friendPresence
   } = useFriends();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   const [activeTab, setActiveTab] = useState<string>("friends");
   const [selectedFriend, setSelectedFriend] = useState<UserProfile | null>(null);
@@ -58,6 +59,19 @@ const Friends: React.FC = () => {
     const sentIds = new Set(outgoingRequests.map(r => r.receiver.id));
     setPendingSentRequests(sentIds);
   }, [outgoingRequests]);
+
+  // Deep-link into a friend's conversation from a message notification.
+  useEffect(() => {
+    const friendId = searchParams.get("friend");
+    if (!friendId) return;
+    const friend = friends.find((candidate) => candidate.id === friendId);
+    if (!friend) return;
+    setActiveTab("friends");
+    setSelectedFriend(friend);
+    getMessagesWithUser(friend.id)
+      .filter((message) => message.sender === friend.id && !message.read)
+      .forEach((message) => markMessageAsRead(message.id));
+  }, [searchParams, friends, getMessagesWithUser, markMessageAsRead]);
   
   // Handle add friend search with debounce
   useEffect(() => {
@@ -131,6 +145,7 @@ const Friends: React.FC = () => {
   
   const handleSelectFriend = (friend: UserProfile) => {
     setSelectedFriend(friend);
+    navigate(`/friends?friend=${encodeURIComponent(friend.id)}`, { replace: true });
     // Mark unread messages as read
     const conversation = getMessagesWithUser(friend.id);
     conversation
@@ -199,7 +214,7 @@ const Friends: React.FC = () => {
         {/* Sidebar */}
         <div className="w-full md:w-1/3 border-r">
           <Tabs 
-            defaultValue="friends" 
+            value={activeTab}
             className="w-full"
             onValueChange={setActiveTab}
           >
