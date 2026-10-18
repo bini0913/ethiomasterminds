@@ -145,6 +145,7 @@ const Friends: React.FC = () => {
   
   const handleSelectFriend = (friend: UserProfile) => {
     setSelectedFriend(friend);
+    navigate(`/friends?friend=${encodeURIComponent(friend.id)}`, { replace: true });
     // Mark unread messages as read
     const conversation = getMessagesWithUser(friend.id);
     conversation
@@ -214,7 +215,6 @@ const Friends: React.FC = () => {
         <div className="w-full md:w-1/3 border-r">
           <Tabs 
             value={activeTab}
-            defaultValue="friends" 
             className="w-full"
             onValueChange={setActiveTab}
           >
