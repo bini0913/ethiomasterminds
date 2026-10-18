@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import StudyCallBar from "@/components/study/StudyCallBar";
+import StudyLeaderboard from "@/components/study/StudyLeaderboard";
 import { useUser } from "@/context/UserContext";
 import { ArrowLeft, Brain, Check, Clock, Flame, Pause, Play, RotateCcw, StopCircle, Trophy, Users, Zap } from "lucide-react";
 
@@ -653,6 +654,8 @@ const StudyModePage: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+
+        <StudyLeaderboard />
 
         <div className="grid lg:grid-cols-3 gap-4">
           <Card className="lg:col-span-2 bg-white/5 border-white/10">
