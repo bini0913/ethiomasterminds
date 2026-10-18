@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Award, CalendarDays, Check, Clock3, Copy, Download, ExternalLink, Loader2, RefreshCw, Share2, Trophy } from "lucide-react";
+import { Award, CalendarDays, Check, Copy, Download, ExternalLink, Loader2, RefreshCw, Share2, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
