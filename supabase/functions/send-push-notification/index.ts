@@ -162,9 +162,10 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             message: {
               token: device.token,
-              notification: { title, body },
-              data: { ...eventData, kind: payload.kind },
-              android: { priority: "HIGH", notification: { channel_id: "master_minds_default", icon: "ic_stat_master_minds" } },
+              // Data-only payloads are rendered by the native service so social
+              // notifications can expose Accept/Decline and inline Reply actions.
+              data: { ...eventData, kind: payload.kind, title, body },
+              android: { priority: "HIGH" },
             },
           }),
         },
