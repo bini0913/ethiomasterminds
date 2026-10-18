@@ -334,6 +334,7 @@ declare
   v_uid uuid := auth.uid();
   v_timezone text := coalesce(nullif(trim(p_timezone), ''), 'UTC');
   v_today date;
+  v_week_start date;
   v_today_minutes bigint := 0;
   v_week_minutes bigint := 0;
   v_streak integer := 0;
@@ -344,6 +345,7 @@ begin
     v_timezone := 'UTC';
   end if;
   v_today := (now() at time zone v_timezone)::date;
+  v_week_start := v_today - (extract(isodow from v_today)::integer - 1);
 
   select coalesce(sum(duration), 0), count(*) filter (where mode = 'pomodoro')
     into v_today_minutes, v_pomodoros
@@ -355,7 +357,7 @@ begin
     into v_week_minutes
   from public.study_sessions
   where user_id = v_uid and status = 'completed' and duration > 0
-    and (coalesce(end_time, created_at) at time zone v_timezone)::date between v_today - 6 and v_today;
+    and (coalesce(end_time, created_at) at time zone v_timezone)::date between v_week_start and v_today;
 
   with studied_days as (
     select distinct (coalesce(end_time, created_at) at time zone v_timezone)::date as study_date
