@@ -8,7 +8,6 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 
-import androidx.core.app.CallStyle;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.Person;
 import androidx.core.app.RemoteInput;
@@ -72,7 +71,7 @@ public class MasterMindsMessagingService extends FirebaseMessagingService {
                         .setName(title)
                         .setImportant(true)
                         .build();
-                builder.setStyle(CallStyle.forIncomingCall(caller, declineIntent, answerIntent));
+                builder.setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declineIntent, answerIntent));
             } else {
                 // Keep actionable buttons on Android versions without CallStyle.
                 builder.setStyle(new NotificationCompat.BigTextStyle().bigText(body))
