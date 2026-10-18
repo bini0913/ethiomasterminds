@@ -8,6 +8,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
 import { useFriends, type FriendPresence } from "@/context/FriendsContext";
 
+declare global {
+  interface Window {
+    __masterMindsPendingStudyCallRoom?: string;
+  }
+}
+
 const db = supabase as any;
 type Invitation = { room_id: string; user_id: string; invited_by: string; status: string };
 type Friend = { id: string; name?: string; username?: string };
@@ -96,6 +102,23 @@ export default function StudyCallBar() {
       toast.error(e instanceof Error ? e.message : "Could not join call.");
     } finally { setConnecting(false); }
   };
+
+  useEffect(() => {
+    const startAcceptedCall = (roomIdToJoin: string | undefined) => {
+      if (!roomIdToJoin || roomId) return;
+      if (window.__masterMindsPendingStudyCallRoom === roomIdToJoin) {
+        delete window.__masterMindsPendingStudyCallRoom;
+      }
+      void connect(roomIdToJoin);
+    };
+    const handler = (event: Event) => {
+      const roomIdToJoin = (event as CustomEvent<string>).detail;
+      startAcceptedCall(roomIdToJoin);
+    };
+    window.addEventListener("master-minds-study-call-accepted", handler);
+    startAcceptedCall(window.__masterMindsPendingStudyCallRoom);
+    return () => window.removeEventListener("master-minds-study-call-accepted", handler);
+  }, [connect, roomId]);
 
   const startCall = async () => {
     if (!selectedFriend) { toast.error("Choose a friend first."); return; }
