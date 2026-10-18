@@ -86,13 +86,12 @@ const formatSeconds = (seconds: number) => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 };
 
- const clampMinutes = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(v)));
+const clampMinutes = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(v)));
 
 const StudyModePage: React.FC = () => {
   const { user } = useUser();
 
   const [loading, setLoading] = useState(true);
-  const [sessions, setSessions] = useState<StudySession[]>([]);
   const [tasks, setTasks] = useState<StudyTask[]>([]);
   const [competitions, setCompetitions] = useState<StudyCompetition[]>([]);
   const [participants, setParticipants] = useState<StudyParticipant[]>([]);
@@ -181,7 +180,6 @@ const StudyModePage: React.FC = () => {
     const nextSessions = (sessionsRes.data ?? []) as StudySession[];
     const currentActive = nextSessions.find((session) => session.status === "active") ?? null;
 
-    setSessions(nextSessions);
     setTasks((tasksRes.data ?? []) as StudyTask[]);
     setCompetitions((competitionsRes.data ?? []) as StudyCompetition[]);
     setParticipants((participantsRes.data ?? []) as StudyParticipant[]);
@@ -329,7 +327,6 @@ const StudyModePage: React.FC = () => {
 
     const session = data as StudySession;
     setActiveSession(session);
-    setSessions((prev) => [session, ...prev]);
     setTimerState("running");
     setSessionTargetSeconds(plannedDuration * 60);
     setCountdownSeconds(plannedDuration * 60);
