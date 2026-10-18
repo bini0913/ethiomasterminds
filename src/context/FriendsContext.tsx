@@ -348,6 +348,17 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { error } = await supabase.rpc('send_friend_request', { p_target_user_id: targetUserId });
       if (error) throw error;
+      // Look up the newly-created request so the server can validate it before
+      // sending a push; recipient and message copy are derived server-side.
+      const { data: request } = await supabase.from('friends').select('id')
+        .eq('user_id', user.id).eq('friend_id', targetUserId).eq('status', 'pending')
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (request?.id) {
+        const { error: pushError } = await supabase.functions.invoke('send-push-notification', {
+          body: { kind: 'friend_request', event_id: request.id },
+        });
+        if (pushError) console.warn('Friend request push could not be sent:', pushError.message);
+      }
       toast.success('Friend request sent!');
       await fetchFriends();
     } catch (err: any) {
@@ -406,6 +417,10 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
           read: false,
           timestamp: new Date(data.created_at)
         }]);
+        const { error: pushError } = await supabase.functions.invoke('send-push-notification', {
+          body: { kind: 'direct_message', event_id: data.id },
+        });
+        if (pushError) console.warn('Message push could not be sent:', pushError.message);
       }
     } catch (err) {
       console.error('Error sending message:', err);
