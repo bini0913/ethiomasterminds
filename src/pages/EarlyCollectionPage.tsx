@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import EarlyCollectibleCard from "@/features/early/components/EarlyCollectibleCard";
 type Item={id:string;name:string;description:string;icon:string;rarity:string;set_name:string;price_coins:number};
@@ -12,7 +13,10 @@ export default function EarlyCollectionPage(){
  const nav=useNavigate(); const {user}=useUser(); const [items,setItems]=useState<Item[]>([]); const [owned,setOwned]=useState<Set<string>>(new Set()); const [coins,setCoins]=useState(0); const [busy,setBusy]=useState<string|null>(null); const [loading,setLoading]=useState(true); const [loadError,setLoadError]=useState(false); const [filter,setFilter]=useState<CollectionFilter>("all");
  const load=async()=>{if(!user?.id){setItems([]);setOwned(new Set());setCoins(0);setLoading(false);return;}setLoading(true);setLoadError(false);try{const [a,b,c]=await Promise.all([supabase.from("early_collectibles").select("id,name,description,icon,rarity,set_name,price_coins").eq("active",true).order("price_coins"),supabase.from("early_user_collection").select("collectible_id").eq("user_id",user.id),supabase.from("user_currency").select("coins").eq("user_id",user.id).maybeSingle()]);if(a.error||b.error||c.error){setLoadError(true);toast.error("Could not load your collection. Please try again.");return;}setItems((a.data??[]) as Item[]);setOwned(new Set((b.data??[]).map((x:any)=>x.collectible_id)));setCoins(c.data?.coins??0);}catch{setLoadError(true);toast.error("Could not load your collection. Please check your connection.");}finally{setLoading(false);}};
  useEffect(()=>{void load()},[user?.id]);
- const visibleItems=items.filter(item=>filter==="all"||(filter==="owned"?owned.has(item.id):!owned.has(item.id)));\n const ownedCount=items.filter(item=>owned.has(item.id)).length;\n const completion=items.length?Math.round((ownedCount/items.length)*100):0;\n const buy=async(id:string)=>{if(!user?.id||busy)return;setBusy(id);try{const {error}=await (supabase as any).rpc("purchase_early_item",{p_item_id:id});if(error)toast.error(error.message.includes("Not enough")?"You need more coins.":"Could not add that collectible.");else{toast.success("✨ Treasure unlocked!");await load();}}catch{toast.error("Could not complete the purchase. Please try again.");}finally{setBusy(null);}};
+ const visibleItems=items.filter(item=>filter==="all"||(filter==="owned"?owned.has(item.id):!owned.has(item.id)));
+ const ownedCount=items.filter(item=>owned.has(item.id)).length;
+ const completion=items.length?Math.round((ownedCount/items.length)*100):0;
+ const buy=async(id:string)=>{if(!user?.id||busy)return;setBusy(id);try{const {error}=await (supabase as any).rpc("purchase_early_item",{p_item_id:id});if(error)toast.error(error.message.includes("Not enough")?"You need more coins.":"Could not add that collectible.");else{toast.success("✨ Treasure unlocked!");await load();}}catch{toast.error("Could not complete the purchase. Please try again.");}finally{setBusy(null);}};
  return <div className="min-h-screen bg-background px-4 pb-24">
   <header className="sticky top-0 z-20 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur"><div className="mx-auto flex max-w-5xl items-center gap-3"><button className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted" onClick={()=>nav("/")} aria-label="Back"><ArrowLeft/></button><div className="flex-1"><p className="font-display text-xl font-bold">Treasure Collection</p><p className="text-xs text-muted-foreground">Your little museum of wins</p></div><Badge variant="secondary" className="px-3 py-2"><Coins className="mr-1 h-4 w-4"/>{coins}</Badge></div></header>
   <main className="mx-auto max-w-5xl space-y-5 py-6">
