@@ -8,6 +8,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
 import { useFriends, type FriendPresence } from "@/context/FriendsContext";
 
+declare global {
+  interface Window {
+    __masterMindsPendingStudyCallRoom?: string;
+  }
+}
+
 const db = supabase as any;
 type Invitation = { room_id: string; user_id: string; invited_by: string; status: string };
 type Friend = { id: string; name?: string; username?: string };
@@ -96,6 +102,23 @@ export default function StudyCallBar() {
       toast.error(e instanceof Error ? e.message : "Could not join call.");
     } finally { setConnecting(false); }
   };
+
+  useEffect(() => {
+    const startAcceptedCall = (roomIdToJoin: string | undefined) => {
+      if (!roomIdToJoin || roomId) return;
+      if (window.__masterMindsPendingStudyCallRoom === roomIdToJoin) {
+        delete window.__masterMindsPendingStudyCallRoom;
+      }
+      void connect(roomIdToJoin);
+    };
+    const handler = (event: Event) => {
+      const roomIdToJoin = (event as CustomEvent<string>).detail;
+      startAcceptedCall(roomIdToJoin);
+    };
+    window.addEventListener("master-minds-study-call-accepted", handler);
+    startAcceptedCall(window.__masterMindsPendingStudyCallRoom);
+    return () => window.removeEventListener("master-minds-study-call-accepted", handler);
+  }, [connect, roomId]);
 
   const startCall = async () => {
     if (!selectedFriend) { toast.error("Choose a friend first."); return; }
@@ -206,13 +229,66 @@ export default function StudyCallBar() {
               try {
                 const next = !cameraOn;
                 setDeviceError(null);
-                if (next && !navigator.mediaDevices?.getUserMedia) throw new Error("Camera access is unavailable in this browser. Open Master Minds over HTTPS in a supported browser.");
-                await roomRef.current?.localParticipant.setCameraEnabled(next);
+                if (next && !navigator.mediaDevices?.getUserMedia) {
+                  throw new Error("Camera access is unavailable in this browser. Open Master Minds over HTTPS in a supported browser.");
+                }
+                const activeRoom = roomRef.current;
+                if (!activeRoom) throw new Error("The call is no longer connected. Rejoin the call and try again.");
+
+                if (next) {
+                  // Request permission first, then enumerate real devices. This avoids reusing
+                  // a stale device ID cached by the browser or a previous call session.
+                  let probe: MediaStream | undefined;
+                  try {
+                    probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                  } catch {
+                    throw new Error("Camera permission was blocked or no camera is available. Allow camera access for this site and close other apps using the camera.");
+                  } finally {
+                    probe?.getTracks().forEach(track => track.stop());
+                  }
+
+                  const devices = await navigator.mediaDevices.enumerateDevices();
+                  const cameras = devices.filter(device => device.kind === "videoinput" && device.deviceId);
+                  let cameraStarted = false;
+                  let lastCameraError: unknown;
+
+                  for (const camera of cameras) {
+                    try {
+                      await activeRoom.localParticipant.setCameraEnabled(true, { deviceId: camera.deviceId });
+                      cameraStarted = true;
+                      break;
+                    } catch (cameraError) {
+                      lastCameraError = cameraError;
+                    }
+                  }
+
+                  // Last fallback lets LiveKit/browser pick the current default camera.
+                  if (!cameraStarted) {
+                    try {
+                      await activeRoom.localParticipant.setCameraEnabled(true);
+                      cameraStarted = true;
+                    } catch (cameraError) {
+                      lastCameraError = cameraError;
+                    }
+                  }
+
+                  if (!cameraStarted) {
+                    const detail = lastCameraError instanceof Error ? lastCameraError.message : "";
+                    throw new Error(detail.includes("Requested device not found")
+                      ? "No usable camera was found. Check that your webcam is connected, enabled in Windows, and not being used exclusively by another app."
+                      : detail || "Could not start the camera. Check browser permissions and your camera connection.");
+                  }
+                } else {
+                  await activeRoom.localParticipant.setCameraEnabled(false);
+                }
+
                 setCameraOn(next);
-                if (next && roomRef.current) {
-                  const publication = Array.from(roomRef.current.localParticipant.videoTrackPublications.values()).find(item => item.track);
+                if (next) {
+                  const publication = Array.from(activeRoom.localParticipant.videoTrackPublications.values()).find(item => item.track);
                   if (publication?.track) setVideoTracks(current => [...current.filter(item => item.identity !== "You"), { track: publication.track!, identity: "You" }]);
-                } else setVideoTracks(current => current.filter(item => item.identity !== "You"));
+                } else {
+                  setVideoTracks(current => current.filter(item => item.identity !== "You"));
+                }
               } catch (error) {
                 const message = error instanceof Error ? error.message : "Camera permission denied or camera unavailable.";
                 setDeviceError(message);
