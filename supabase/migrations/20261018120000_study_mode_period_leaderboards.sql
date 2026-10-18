@@ -41,7 +41,6 @@ begin
     where ss.status = 'completed'
       and coalesce(ss.end_time, ss.created_at) >= p_start_at
       and coalesce(ss.end_time, ss.created_at) < p_end_at
-      and coalesce(ss.type, 'focus') <> 'break'
       and coalesce(ss.duration, 0) > 0
     group by ss.user_id
   )
