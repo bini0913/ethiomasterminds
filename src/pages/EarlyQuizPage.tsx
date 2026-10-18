@@ -48,7 +48,8 @@ const EarlyQuizPage: React.FC = () => {
       }
     });
     const ordered = pick === "Mix" ? freshnessOrder(pool, store) : pool;
-    return ordered.slice(0, profile.sessionLength).sort((a, b) => a.difficulty - b.difficulty).map((q) => {
+    // Keep the freshness order intact so recently seen questions do not jump back to the front just because of difficulty.
+    return ordered.slice(0, profile.sessionLength).map((q) => {
       // Trim choices to the grade's choice count while keeping the answer.
       const others = shuffle(q.options.filter((o) => o !== q.answer)).slice(0, profile.choices - 1);
       return { ...q, options: shuffle([q.answer, ...others]) };
