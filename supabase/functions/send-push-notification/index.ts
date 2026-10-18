@@ -14,7 +14,7 @@ const json = (body: unknown, status = 200) =>
   });
 
 type ServiceAccount = { client_email: string; private_key: string; project_id: string };
-type Payload = { user_id: string; kind: string; title: string; body: string; data?: Record<string, string> };
+type Payload = { user_id?: string; kind: string; title?: string; body?: string; data?: Record<string, string>; event_id?: string };
 
 function b64(value: Uint8Array | string) {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
@@ -67,43 +67,84 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await admin.auth.getUser(bearer);
     if (authError || !authData.user) return json({ error: "Unauthorized" }, 401);
 
-    // Use the already-authenticated user id and the service-role client to
-    // read the caller's role directly. Do not call get_user_role() here:
-    // that SECURITY DEFINER RPC intentionally relies on auth.uid(), while
-    // this admin client is authenticated with the service-role key.
-    const { data: callerRoleRow, error: roleError } = await admin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", authData.user.id)
-      .order("role")
-      .limit(1)
-      .maybeSingle();
-
-    if (roleError) {
-      console.error("Notification caller role lookup failed:", roleError);
-      return json({ error: "Unable to verify notification permissions" }, 500);
-    }
-
-    const allowedRoles = new Set(["teacher", "admin", "manager", "extreme_admin"]);
-    if (!callerRoleRow || !allowedRoles.has(String(callerRoleRow.role))) {
-      return json({ error: "Not authorized to send push notifications" }, 403);
-    }
-
     const payload = await req.json() as Payload;
-    if (!payload.user_id || !payload.kind || !payload.title || !payload.body) {
-      return json({ error: "user_id, kind, title and body are required" }, 400);
-    }
-    if (payload.title.length > 160 || payload.body.length > 2000 || payload.kind.length > 100) {
-      return json({ error: "Notification payload is too large" }, 400);
+    if (!payload.kind || payload.kind.length > 100) return json({ error: "kind is required" }, 400);
+
+    // Staff may send approved operational notifications. Students may only
+    // notify the other participant of a real social event they created.
+    const { data: callerRoleRow, error: roleError } = await admin
+      .from("user_roles").select("role").eq("user_id", authData.user.id)
+      .order("role").limit(1).maybeSingle();
+    if (roleError) return json({ error: "Unable to verify notification permissions" }, 500);
+    const allowedRoles = new Set(["teacher", "admin", "manager", "extreme_admin"]);
+    const isStaff = !!callerRoleRow && allowedRoles.has(String(callerRoleRow.role));
+
+    let recipientId = "";
+    let title = payload.title?.trim() ?? "";
+    let body = payload.body?.trim() ?? "";
+    let route = "/";
+    let eventData: Record<string, string> = { ...(payload.data ?? {}) };
+
+    if (isStaff) {
+      if (!payload.user_id || !title || !body) return json({ error: "user_id, title and body are required for staff notifications" }, 400);
+      recipientId = payload.user_id;
+    } else {
+      if (!payload.event_id) return json({ error: "A valid social event_id is required" }, 400);
+      if (payload.kind === "friend_request") {
+        const { data: event, error } = await admin.from("friends").select("id,user_id,friend_id,status")
+          .eq("id", payload.event_id).maybeSingle();
+        if (error || !event || event.user_id !== authData.user.id || event.status !== "pending") {
+          return json({ error: "Friend request not found or not authorized" }, 403);
+        }
+        recipientId = event.friend_id;
+        const { data: profile } = await admin.from("profiles").select("name,username").eq("id", authData.user.id).maybeSingle();
+        const senderName = profile?.name || profile?.username || "A student";
+        title = "New friend request";
+        body = senderName + " sent you a friend request.";
+        route = "/friends";
+        eventData = { request_id: event.id, route, action: "friend_request" };
+      } else if (payload.kind === "direct_message") {
+        const { data: event, error } = await admin.from("messages").select("id,sender_id,receiver_id,content")
+          .eq("id", payload.event_id).maybeSingle();
+        if (error || !event || event.sender_id !== authData.user.id) {
+          return json({ error: "Message not found or not authorized" }, 403);
+        }
+        const { data: friendship } = await admin.from("friends").select("id")
+          .eq("status", "accepted")
+          .or("and(user_id.eq." + event.sender_id + ",friend_id.eq." + event.receiver_id + "),and(user_id.eq." + event.receiver_id + ",friend_id.eq." + event.sender_id + ")")
+          .maybeSingle();
+        if (!friendship) return json({ error: "Messages can only notify accepted friends" }, 403);
+        recipientId = event.receiver_id;
+        const { data: profile } = await admin.from("profiles").select("name,username").eq("id", authData.user.id).maybeSingle();
+        const senderName = profile?.name || profile?.username || "Your friend";
+        title = senderName;
+        body = String(event.content ?? "").slice(0, 180);
+        route = "/friends";
+        eventData = { message_id: event.id, sender_id: event.sender_id, route, action: "reply" };
+      } else if (payload.kind === "study_call_invite") {
+        const { data: event, error } = await admin.from("study_call_participants")
+          .select("room_id,user_id,invited_by,status").eq("room_id", payload.event_id)
+          .eq("invited_by", authData.user.id).eq("status", "invited").maybeSingle();
+        if (error || !event) return json({ error: "Call invitation not found or not authorized" }, 403);
+        recipientId = event.user_id;
+        title = "Incoming study call";
+        body = "Your friend invited you to a Study Mode call.";
+        route = "/study-mode";
+        eventData = { room_id: event.room_id, route, action: "call_invite" };
+      } else {
+        return json({ error: "Students can only send notifications for verified social events" }, 403);
+      }
+      if (payload.user_id && payload.user_id !== recipientId) return json({ error: "Recipient does not match the social event" }, 403);
     }
 
+    if (title.length > 160 || body.length > 2000) return json({ error: "Notification payload is too large" }, 400);
     const { data: prefs, error: prefsError } = await admin.from("notification_preferences")
-      .select("enabled").eq("user_id", payload.user_id).maybeSingle();
+      .select("enabled").eq("user_id", recipientId).maybeSingle();
     if (prefsError) return json({ error: "Could not read notification preferences" }, 500);
     if (prefs?.enabled === false) return json({ skipped: true, reason: "notifications_disabled", sent: 0 });
 
     const { data: devices, error: devicesError } = await admin.from("notification_devices")
-      .select("id, token, platform, app_version").eq("user_id", payload.user_id).eq("enabled", true);
+      .select("id, token, platform, app_version").eq("user_id", recipientId).eq("enabled", true);
     if (devicesError) return json({ error: "Could not read notification devices" }, 500);
     if (!devices?.length) return json({ sent: 0, reason: "no_devices" });
 
@@ -121,8 +162,8 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             message: {
               token: device.token,
-              notification: { title: payload.title, body: payload.body },
-              data: { ...(payload.data ?? {}), kind: payload.kind },
+              notification: { title, body },
+              data: { ...eventData, kind: payload.kind },
               android: { priority: "HIGH", notification: { channel_id: "master_minds_default", icon: "ic_stat_master_minds" } },
             },
           }),
@@ -142,12 +183,12 @@ Deno.serve(async (req) => {
     }
 
     const { error: eventError } = await admin.from("notification_events").insert({
-      user_id: payload.user_id,
+      user_id: recipientId,
       kind: payload.kind,
-      title: payload.title,
-      body: payload.body,
+      title,
+      body,
       data: {
-        ...(payload.data ?? {}),
+        ...eventData,
         delivery_status: sent > 0 ? "sent" : "failed",
         sent,
         attempted: devices.length,
