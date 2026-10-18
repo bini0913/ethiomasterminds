@@ -21,22 +21,22 @@ const StudentBottomNav: React.FC = () => {
   const items = early
     ? [
         { icon: Home, label: "Home", path: "/", match: ["/"] },
-        { icon: Gamepad2, label: "Play", path: "/early-games", match: ["/early-games"] },
+        { icon: Gamepad2, label: "Play", path: "/early-games", match: ["/early-games", "/early-quiz"] },
         { icon: Globe2, label: "Discover", path: "/early-discover", match: ["/early-discover", "/early-videos", "/early-explore"] },
-        { icon: Trophy, label: "Ranks", path: "/leaderboard", match: ["/leaderboard"] },
+        { icon: Trophy, label: "Ranks", path: "/early-ranks", match: ["/early-ranks", "/early-progress"] },
         { icon: Gift, label: "Rewards", path: "/store", match: ["/store"] },
       ]
     : middle
       ? [
           { icon: Home, label: "Home", path: "/", match: ["/"] },
-          { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision"] },
+          { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/quiz/filter", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision", "/learning-dna"] },
           { icon: Swords, label: "Play", path: "/lobby", match: ["/lobby", "/multiplayer", "/tournaments"] },
           { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/friends", "/chat"] },
           { icon: User, label: "Profile", path: profilePath, match: ["/profile/", "/settings", "/enhanced-settings", "/avatar-creator"] },
         ]
       : [
           { icon: Home, label: "Home", path: "/", match: ["/"] },
-          { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision", "/learning-dna"] },
+          { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/quiz/filter", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision", "/learning-dna", "/academic/setup", "/academic/flashcards", "/academic/topics", "/academic/exam", "/academic/planner", "/academic/insights"] },
           { icon: Swords, label: "Play", path: "/lobby", match: ["/lobby", "/multiplayer", "/tournaments"] },
           { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/friends", "/chat"] },
         ];
