@@ -45,10 +45,15 @@ Deno.serve(async (req) => {
       if (error) return json({ error: "Could not load the friend request." }, 500);
       if (!request || request.friend_id !== userId) return json({ error: "This friend request is not addressed to your account." }, 403);
       if (request.status !== "pending") return json({ error: "This friend request has already been handled." }, 409);
-      const { error: updateError } = await admin.from("friends").update({
-        status: payload.action === "friend_accept" ? "accepted" : "declined",
-      }).eq("id", request.id).eq("friend_id", userId).eq("status", "pending");
-      if (updateError) return json({ error: "Could not update the friend request." }, 409);
+      if (payload.action === "friend_accept") {
+        const { data: updated, error: updateError } = await admin.from("friends").update({ status: "accepted", updated_at: new Date().toISOString() })
+          .eq("id", request.id).eq("friend_id", userId).eq("status", "pending").select("id").maybeSingle();
+        if (updateError || !updated) return json({ error: "This friend request has already been handled." }, 409);
+      } else {
+        const { data: deleted, error: deleteError } = await admin.from("friends").delete()
+          .eq("id", request.id).eq("friend_id", userId).eq("status", "pending").select("id").maybeSingle();
+        if (deleteError || !deleted) return json({ error: "This friend request has already been handled." }, 409);
+      }
       return json({ ok: true, action: payload.action });
     }
 
