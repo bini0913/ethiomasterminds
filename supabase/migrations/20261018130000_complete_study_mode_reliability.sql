@@ -1,6 +1,9 @@
 -- Complete Study Mode reliability, server-authoritative time, statistics and permissions.
 -- Safe additive migration: preserves existing study history and the current Supabase project.
 
+alter table public.profiles
+  add column if not exists total_study_time integer not null default 0;
+
 alter table public.study_sessions
   add column if not exists paused_at timestamptz,
   add column if not exists paused_seconds integer not null default 0;
