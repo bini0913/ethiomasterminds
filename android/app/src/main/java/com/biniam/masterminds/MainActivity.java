@@ -53,7 +53,7 @@ public class MainActivity extends BridgeActivity {
 
         try {
             JSONObject payload = new JSONObject();
-            payload.put("actionId", action + ":" + (requestId != null ? requestId : messageId != null ? messageId : roomId));
+            payload.put("actionId", action + ":" + (requestId != null ? requestId : messageId != null ? messageId : roomId) + ":" + System.currentTimeMillis());
             payload.put("action", action);
             if (kind != null) payload.put("kind", kind);
             if (route != null) payload.put("route", route);
