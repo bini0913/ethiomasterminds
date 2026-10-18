@@ -325,47 +325,41 @@ export default function StudyCallBar() {
                 if (!activeRoom) throw new Error("The call is no longer connected. Rejoin the call and try again.");
 
                 if (next) {
-                  // Request permission first, then enumerate real devices. This avoids reusing
-                  // a stale device ID cached by the browser or a previous call session.
-                  let probe: MediaStream | undefined;
-                  try {
-                    probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                  } catch {
-                    throw new Error("Camera permission was blocked or no camera is available. Allow camera access for this site and close other apps using the camera.");
-                  } finally {
-                    probe?.getTracks().forEach(track => track.stop());
-                  }
-
-                  const devices = await navigator.mediaDevices.enumerateDevices();
-                  const cameras = devices.filter(device => device.kind === "videoinput" && device.deviceId);
+                  // Let LiveKit/browser choose the default camera first. Device IDs returned
+                  // by enumerateDevices can be stale or unavailable in some browsers/WebViews.
                   let cameraStarted = false;
                   let lastCameraError: unknown;
-
-                  for (const camera of cameras) {
-                    try {
-                      await activeRoom.localParticipant.setCameraEnabled(true, { deviceId: camera.deviceId });
-                      cameraStarted = true;
-                      break;
-                    } catch (cameraError) {
-                      lastCameraError = cameraError;
-                    }
+                  try {
+                    await activeRoom.localParticipant.setCameraEnabled(true);
+                    cameraStarted = true;
+                  } catch (cameraError) {
+                    lastCameraError = cameraError;
                   }
 
-                  // Last fallback lets LiveKit/browser pick the current default camera.
+                  // If the default device failed, retry explicit devices as a fallback.
                   if (!cameraStarted) {
-                    try {
-                      await activeRoom.localParticipant.setCameraEnabled(true);
-                      cameraStarted = true;
-                    } catch (cameraError) {
-                      lastCameraError = cameraError;
+                    const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+                    const cameras = devices.filter(device => device.kind === "videoinput" && device.deviceId);
+                    for (const camera of cameras) {
+                      try {
+                        await activeRoom.localParticipant.setCameraEnabled(true, { deviceId: camera.deviceId });
+                        cameraStarted = true;
+                        break;
+                      } catch (cameraError) {
+                        lastCameraError = cameraError;
+                      }
                     }
                   }
 
                   if (!cameraStarted) {
                     const detail = lastCameraError instanceof Error ? lastCameraError.message : "";
-                    throw new Error(detail.includes("Requested device not found")
-                      ? "No usable camera was found. Check that your webcam is connected, enabled in Windows, and not being used exclusively by another app."
-                      : detail || "Could not start the camera. Check browser permissions and your camera connection.");
+                    if (/permission|denied|not allowed|security/i.test(detail)) {
+                      throw new Error("Camera permission was blocked. Allow camera access for Master Minds in your browser/site settings, then try again.");
+                    }
+                    if (/requested device not found|no device|notfounderror/i.test(detail)) {
+                      throw new Error("No usable camera was found. Check that your webcam is connected and enabled in Windows, that browser camera access is allowed, and that another app is not holding the camera.");
+                    }
+                    throw new Error(detail || "Could not start the camera. Check browser permissions and your camera connection.");
                   }
                 } else {
                   await activeRoom.localParticipant.setCameraEnabled(false);
