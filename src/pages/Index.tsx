@@ -132,7 +132,7 @@ const Index: React.FC = () => {
   };
   
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-[calc(5rem+env(safe-area-inset-bottom))]">
       {renderContent()}
     </div>
   );
