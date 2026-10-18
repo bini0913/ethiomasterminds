@@ -48,20 +48,19 @@ public class MasterMindsMessagingService extends FirebaseMessagingService {
                 .setContentIntent(actionIntent(data, "open", false));
 
         if ("friend_request".equals(kind) && data.get("request_id") != null) {
-            builder.addAction(0, "Accept", actionIntent(data, "friend_accept", false));
-            builder.addAction(0, "Decline", actionIntent(data, "friend_decline", false));
+            builder.addAction(android.R.drawable.ic_menu_add, "Accept", actionIntent(data, "friend_accept", false));
+            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", actionIntent(data, "friend_decline", false));
         } else if ("study_call_invite".equals(kind) && data.get("room_id") != null) {
             builder.setCategory(NotificationCompat.CATEGORY_CALL)
-                    .addAction(0, "Answer", actionIntent(data, "call_accept", false))
-                    .addAction(0, "Decline", actionIntent(data, "call_decline", false));
+                    .addAction(android.R.drawable.ic_menu_call, "Answer", actionIntent(data, "call_accept", false))
+                    .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", actionIntent(data, "call_decline", false));
         } else if ("direct_message".equals(kind) && data.get("message_id") != null) {
-            Intent replyIntent = actionIntent(data, "message_reply", true).getIntentSender() == null
-                    ? new Intent(this, MainActivity.class) : new Intent(this, MainActivity.class);
+            Intent replyIntent = new Intent(this, MainActivity.class);
             fillActionIntent(replyIntent, data, "message_reply");
             PendingIntent replyPending = PendingIntent.getActivity(this, requestCode(data, "message_reply"), replyIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
             RemoteInput remoteInput = new RemoteInput.Builder(REPLY_KEY).setLabel("Reply to your friend").build();
-            builder.addAction(new NotificationCompat.Action.Builder(0, "Reply", replyPending)
+            builder.addAction(new NotificationCompat.Action.Builder(android.R.drawable.ic_menu_send, "Reply", replyPending)
                     .addRemoteInput(remoteInput)
                     .setAllowGeneratedReplies(true)
                     .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
