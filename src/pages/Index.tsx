@@ -6,6 +6,7 @@ import ProfileSetup from "@/components/profile/ProfileSetup";
 import MainMenu from "@/components/dashboard/MainMenu";
 import EarlyTierHome from "@/components/dashboard/EarlyTierHome";
 import UpperTierHome from "@/components/dashboard/UpperTierHome";
+import MiddleTierHome from "@/components/dashboard/MiddleTierHome";
 import EarlyEncouragement from "@/components/early/EarlyEncouragement";
 import StudentBottomNav from "@/components/layout/StudentBottomNav";
 import { useUser } from "@/context/UserContext";
@@ -114,6 +115,11 @@ const Index: React.FC = () => {
         return (
           tier === "early" ? (
             <><EarlyTierHome /><EarlyEncouragement /><StudentBottomNav /></>
+          ) : tier === "middle" ? (
+            <>
+              <MiddleTierHome />
+              <StudentBottomNav />
+            </>
           ) : tier === "upper" ? (
             <>
               <UpperTierHome />
