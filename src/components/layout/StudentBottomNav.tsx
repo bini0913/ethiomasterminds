@@ -29,7 +29,7 @@ const StudentBottomNav: React.FC = () => {
     : middle
       ? [
           { icon: Home, label: "Home", path: "/", match: ["/"] },
-          { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/quiz/filter", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision", "/learning-dna"] },
+          { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision", "/learning-dna"] },
           { icon: Swords, label: "Play", path: "/lobby", match: ["/lobby", "/multiplayer", "/tournaments"] },
           { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/friends", "/chat"] },
           { icon: User, label: "Profile", path: profilePath, match: ["/profile/", "/settings", "/enhanced-settings", "/avatar-creator"] },
