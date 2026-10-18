@@ -151,6 +151,8 @@ const StudyModePage: React.FC = () => {
   const loadData = async () => {
     if (!user) return;
     setLoading(true);
+    const { error: expiryError } = await db.rpc("expire_study_competitions");
+    if (expiryError) console.error("Could not expire old study competitions", expiryError);
 
     const [sessionsRes, tasksRes, competitionsRes, participantsRes, liveRes, settingsRes, statsRes] = await Promise.all([
       db.from("study_sessions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100),
