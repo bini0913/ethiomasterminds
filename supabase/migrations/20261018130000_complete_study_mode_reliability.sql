@@ -11,6 +11,14 @@ alter table public.study_sessions
 create index if not exists idx_study_sessions_user_status_end
   on public.study_sessions (user_id, status, end_time desc);
 
+-- The live schema is missing these uniqueness constraints; add them before using ON CONFLICT.
+create unique index if not exists idx_study_participants_competition_user
+  on public.study_participants (competition_id, user_id);
+
+create unique index if not exists idx_study_sessions_one_active_per_user
+  on public.study_sessions (user_id)
+  where status = 'active';
+
 -- Only authenticated users can start their own session through this RPC.
 create or replace function public.start_study_session(
   p_competition_id uuid default null,
