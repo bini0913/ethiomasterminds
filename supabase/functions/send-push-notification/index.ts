@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             message: {
               token: device.token,
-              notification: { title: payload.title, body: payload.body },
+              notification: { title, body },
               data: { ...eventData, kind: payload.kind },
               android: { priority: "HIGH", notification: { channel_id: "master_minds_default", icon: "ic_stat_master_minds" } },
             },
