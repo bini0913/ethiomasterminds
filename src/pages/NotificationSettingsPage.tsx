@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Bell, CheckCircle2, Clock3, Gamepad2, Gift, MessageCircle, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +32,7 @@ export default function NotificationSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!user?.id) return;
     setLoadError(false);
     try {
@@ -40,11 +40,11 @@ export default function NotificationSettingsPage() {
     } catch {
       setLoadError(true);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     if (user?.id) void load();
-  }, [user?.id]);
+  }, [load, user?.id]);
 
   const update = async (key: keyof NotificationPreferences, value: boolean) => {
     if (!user?.id || !prefs) return;
