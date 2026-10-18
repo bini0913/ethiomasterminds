@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Bell, CheckCircle2, Clock3, Gamepad2, Gift, MessageCircle, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,13 +30,25 @@ export default function NotificationSettingsPage() {
   const { user } = useUser();
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!user?.id) return;
+    setLoadError(false);
+    try {
+      setPrefs(await loadNotificationPreferences(user.id));
+    } catch {
+      setLoadError(true);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
-    if (user?.id) void loadNotificationPreferences(user.id).then(setPrefs);
-  }, [user?.id]);
+    if (user?.id) void load();
+  }, [load, user?.id]);
 
   const update = async (key: keyof NotificationPreferences, value: boolean) => {
     if (!user?.id || !prefs) return;
+    const previous = prefs;
     const next = { ...prefs, [key]: value };
     setPrefs(next);
     setSaving(true);
@@ -54,13 +66,25 @@ export default function NotificationSettingsPage() {
         if (value && next.enabled) await scheduleDailyLearningReminder(next);
         else await cancelDailyLearningReminder();
       }
+      toast.success("Notification settings saved.");
+    } catch {
+      setPrefs(previous);
+      toast.error("Could not save notification settings. Your previous choices were restored.");
     } finally {
       setSaving(false);
     }
   };
 
   if (!prefs) {
-    return <div className="min-h-screen bg-background p-6 text-muted-foreground">Loading notification settings…</div>;
+    return (
+      <main className="flex min-h-[50vh] flex-col items-center justify-center gap-3 bg-background p-6 text-center" role="status" aria-live="polite">
+        {loadError ? <>
+          <p className="font-semibold text-foreground">Notification settings couldn’t be loaded.</p>
+          <p className="text-sm text-muted-foreground">Check your connection and try again.</p>
+          <Button variant="outline" onClick={() => void load()}>Try again</Button>
+        </> : <p className="text-sm text-muted-foreground">Loading notification settings…</p>}
+      </main>
+    );
   }
 
   return (
@@ -108,15 +132,26 @@ export default function NotificationSettingsPage() {
               type="time"
               value={String(prefs.reminderHour).padStart(2, "0") + ":00"}
               onChange={async (e) => {
-                if (!user?.id) return;
+                if (!user?.id || saving) return;
+                const previous = prefs;
                 const hour = Number(e.target.value.split(":")[0]);
                 const next = { ...prefs, reminderHour: hour };
                 setPrefs(next);
-                await saveNotificationPreferences(user.id, next);
-                if (next.enabled && next.dailyReminders) await scheduleDailyLearningReminder(next);
-                toast.success("Reminder time updated");
+                setSaving(true);
+                try {
+                  await saveNotificationPreferences(user.id, next);
+                  if (next.enabled && next.dailyReminders) await scheduleDailyLearningReminder(next);
+                  toast.success("Reminder time updated.");
+                } catch {
+                  setPrefs(previous);
+                  toast.error("Could not save the reminder time. Your previous time was restored.");
+                } finally {
+                  setSaving(false);
+                }
               }}
-              className="h-11 w-full rounded-xl border bg-background px-3"
+              disabled={saving}
+              aria-label="Daily learning reminder time"
+              className="h-11 w-full rounded-xl border bg-background px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </CardContent>
         </Card>
