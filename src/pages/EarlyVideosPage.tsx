@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 type VideoResource = {
   id: string; title: string; description: string | null; subject: string | null;
@@ -109,8 +110,9 @@ export default function EarlyVideosPage() {
             setSavingWatched((current) => new Set(current).add(item.id));
             const { error } = await supabase.from("early_video_views").upsert({ user_id: user.id, video_id: item.id, seconds_watched: 0, completed: true, updated_at: new Date().toISOString() }, { onConflict: "user_id,video_id" });
             setSavingWatched((current) => { const next = new Set(current); next.delete(item.id); return next; });
-            if (error) { return; }
+            if (error) { toast.error("Could not save watched progress. Please try again."); return; }
             setWatched((current) => new Set(current).add(item.id));
+            toast.success("Watched progress saved.");
           }}><CheckCircle2 className="mr-2 h-4 w-4" />{savingWatched.has(item.id) ? "Saving…" : watched.has(item.id) ? "Watched ✓" : "Mark watched"}</Button></div></CardContent>
           </Card>;
         })}</div>}
