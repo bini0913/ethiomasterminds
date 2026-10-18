@@ -22,6 +22,8 @@ public class MasterMindsMessagingService extends FirebaseMessagingService {
 
     @Override
     public void onMessageReceived(RemoteMessage message) {
+        // Preserve Capacitor's in-app push event delivery for existing app listeners.
+        com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin.sendRemoteMessage(message);
         Map<String, String> data = message.getData();
         String kind = data.get("kind");
         String title = message.getNotification() != null ? message.getNotification().getTitle() : data.get("title");
@@ -112,6 +114,7 @@ public class MasterMindsMessagingService extends FirebaseMessagingService {
         // Capacitor's registration flow obtains the token on sign-in and stores it in Supabase.
         // Do not log tokens or credentials here.
         super.onNewToken(token);
+        com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin.onNewToken(token);
     }
 
     public static Bundle remoteInputResults(Intent intent) {
