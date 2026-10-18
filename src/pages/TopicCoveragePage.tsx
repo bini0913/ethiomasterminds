@@ -20,19 +20,7 @@ interface TopicData {
   questions_correct: number;
 }
 
-const COMMON_PATHS: Record<string, string[]> = {
-  math: ["Numbers & Operations", "Algebra", "Linear Equations", "Quadratic Equations", "Functions", "Trigonometry", "Statistics", "Calculus"],
-  science: ["Scientific Method", "Mechanics", "Energy", "Waves", "Electricity", "Atomic Structure", "Chemistry", "Biology"],
-  physics: ["Mechanics", "Energy", "Waves", "Electricity", "Magnetism", "Thermodynamics", "Modern Physics"],
-  chemistry: ["Atomic Structure", "Chemical Bonding", "Stoichiometry", "Acids & Bases", "Organic Chemistry", "Equilibrium", "Electrochemistry"],
-  biology: ["Cells", "Genetics", "Evolution", "Human Biology", "Ecology", "Plant Biology", "Microbiology"],
-  english: ["Grammar", "Vocabulary", "Reading Comprehension", "Writing", "Literature", "Critical Analysis", "Research Writing"],
-  history: ["Ancient History", "Medieval History", "Modern Ethiopia", "World History", "African History", "Civics & Governance"],
-  geography: ["Maps & Location", "Physical Geography", "Climate", "Population", "Resources", "Ethiopian Geography"],
-  economics: ["Basic Economics", "Demand & Supply", "Markets", "National Income", "Development", "International Trade"],
-  civics: ["Citizenship", "Constitution", "Rights & Duties", "Governance", "Democracy", "Ethiopian Institutions"],
-  ict: ["Digital Basics", "Computer Systems", "Networks", "Data", "Programming", "Digital Safety"],
-};
+
 
 const labelFor = (value: string) => value.replace(/\b\w/g, (m) => m.toUpperCase());
 
@@ -93,28 +81,17 @@ const TopicCoveragePage: React.FC = () => {
 
   const getPath = (subject: string) => {
     const normalized = normalizeSubject(subject);
-    // When a selected textbook has analyzed units, use those as the syllabus rather
-    // than mixing in unrelated generic paths. Generic paths remain a fallback only.
+    // Coverage contains only units extracted from selected book analyses and topics
+    // the learner has actually practised. Generic suggestions must not inflate mastery.
     const bookDerived = selectedBooks
       .filter((book) => normalizeSubject(book.subject) === normalized)
       .flatMap((book) => (bookUnits[book.id]?.units || []).map((unit) => unit.trim()))
       .filter(Boolean);
-    const foundation = bookDerived.length
-      ? Array.from(new Set(bookDerived))
-      : (COMMON_PATHS[normalized] || [
-          "Foundations", "Core Concepts", "Key Terms", "Practice", "Applications", "Advanced Concepts", "Revision", "Exam Practice",
-        ]);
-    // Include topics the student has actually practiced, even when they are not in
-    // the generic starter path. This makes coverage reflect real course activity.
     const observed = topics
       .filter((item) => normalizeSubject(item.subject) === normalized && item.topic?.trim())
-      .sort((a, b) => {
-        const accuracyA = Number(a.accuracy_percentage) || 0;
-        const accuracyB = Number(b.accuracy_percentage) || 0;
-        return accuracyA - accuracyB;
-      })
+      .sort((a, b) => (Number(a.accuracy_percentage) || 0) - (Number(b.accuracy_percentage) || 0))
       .map((item) => item.topic.trim());
-    return Array.from(new Set([...foundation, ...observed]));
+    return Array.from(new Set([...bookDerived, ...observed]));
   };
 
   const getStatus = (subject: string, topicName: string) => {
@@ -188,7 +165,7 @@ const TopicCoveragePage: React.FC = () => {
           <div className="flex flex-wrap gap-2"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Read in Library</Button><Button variant="outline" onClick={()=>navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(path[0] || "")}`)}><GraduationCap className="mr-2 h-4 w-4"/>Practice questions</Button></div>
         </CardContent></Card>
         <div className="space-y-3">
-          {path.map((topic, index) => {
+          {path.length === 0 ? <Card><CardContent className="space-y-3 p-6 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground"/><h2 className="font-semibold">No verified units yet</h2><p className="text-sm text-muted-foreground">Topic Coverage will show units extracted from your selected book analysis and topics you have actually practised. Select or analyze a book, or complete a topic practice, to build your real coverage map. Suggested topics are not counted as covered units.</p><div className="flex flex-col justify-center gap-2 sm:flex-row"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Choose a book</Button><Button variant="outline" onClick={()=>navigate("/academic/setup")}>Academic Prep setup</Button></div></CardContent></Card> : path.map((topic, index) => {
             const status = getStatus(selectedSubject, topic);
             const unlocked = index === 0 || getStatus(selectedSubject, path[index - 1]).status !== "new";
             return <motion.div key={topic} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:index*.04}}>
