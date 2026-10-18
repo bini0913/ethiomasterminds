@@ -125,7 +125,7 @@ export default function StudyLeaderboard() {
     setLoading(true);
     const { data, error } = await db.rpc("get_study_period_leaderboard", {
       p_start_at: range.start,
-      p_end_at: range.end,
+      p_end_at: new Date().toISOString(),
       p_limit: 50,
     });
     if (error) {
@@ -136,7 +136,7 @@ export default function StudyLeaderboard() {
       setRows((data ?? []) as LeaderboardRow[]);
     }
     setLoading(false);
-  }, [user?.id, range.start, range.end]);
+  }, [user?.id, range.start]);
 
   useEffect(() => { void loadLeaderboard(); }, [loadLeaderboard]);
 
