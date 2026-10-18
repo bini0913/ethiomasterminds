@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.Person;
 import androidx.core.app.RemoteInput;
 
 import com.google.firebase.messaging.FirebaseMessagingService;
@@ -32,9 +33,10 @@ public class MasterMindsMessagingService extends FirebaseMessagingService {
         if (body == null) body = "";
 
         ensureChannel();
-        int notificationId = (data.get("message_id") != null ? data.get("message_id")
+        String notificationKey = data.get("message_id") != null ? data.get("message_id")
                 : data.get("request_id") != null ? data.get("request_id")
-                : data.get("room_id") != null ? data.get("room_id") : String.valueOf(System.currentTimeMillis())).hashCode();
+                : data.get("room_id") != null ? data.get("room_id") : String.valueOf(System.currentTimeMillis());
+        int notificationId = notificationKey.hashCode();
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(getResources().getIdentifier("ic_stat_master_minds", "drawable", getPackageName()) != 0
@@ -53,9 +55,29 @@ public class MasterMindsMessagingService extends FirebaseMessagingService {
             builder.addAction(android.R.drawable.ic_menu_add, "Accept", actionIntent(data, "friend_accept", false));
             builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", actionIntent(data, "friend_decline", false));
         } else if ("study_call_invite".equals(kind) && data.get("room_id") != null) {
+            PendingIntent declineIntent = actionIntent(data, "call_decline", false);
+            PendingIntent answerIntent = actionIntent(data, "call_accept", false);
+
             builder.setCategory(NotificationCompat.CATEGORY_CALL)
-                    .addAction(android.R.drawable.ic_menu_call, "Answer", actionIntent(data, "call_accept", false))
-                    .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", actionIntent(data, "call_decline", false));
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setPriority(NotificationCompat.PRIORITY_MAX);
+
+            // Android 12+ has a dedicated incoming-call notification style. Unlike
+            // ordinary notification actions, it surfaces Answer/Decline prominently
+            // in the collapsed notification and heads-up UI.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Person caller = new Person.Builder()
+                        .setName(title)
+                        .setImportant(true)
+                        .build();
+                builder.setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declineIntent, answerIntent));
+            } else {
+                // Keep actionable buttons on Android versions without CallStyle.
+                builder.setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                        .addAction(android.R.drawable.ic_menu_call, "Answer", answerIntent)
+                        .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declineIntent);
+            }
         } else if ("direct_message".equals(kind) && data.get("message_id") != null) {
             Intent replyIntent = new Intent(this, MainActivity.class);
             fillActionIntent(replyIntent, data, "message_reply");
