@@ -105,6 +105,7 @@ const StudyModePage: React.FC = () => {
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [sessionTargetSeconds, setSessionTargetSeconds] = useState(25 * 60);
   const [breakTargetSeconds, setBreakTargetSeconds] = useState(5 * 60);
+  const [breakDeadlineMs, setBreakDeadlineMs] = useState<number | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(25 * 60);
   const [studyStats, setStudyStats] = useState<StudyStats>(EMPTY_STUDY_STATS);
 
@@ -249,13 +250,19 @@ const StudyModePage: React.FC = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (timerState !== "running" && timerState !== "break") return;
-    if (timerState === "running" && !activeSession) return;
+    if (timerState === "break") {
+      if (breakDeadlineMs === null) return;
+      const tick = () => setCountdownSeconds(Math.max(0, Math.ceil((breakDeadlineMs - Date.now()) / 1000)));
+      tick();
+      const timer = window.setInterval(tick, 250);
+      return () => window.clearInterval(timer);
+    }
+    if (timerState !== "running" || !activeSession) return;
     const timer = window.setInterval(() => {
       setCountdownSeconds((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [activeSession?.id, timerState]);
+  }, [activeSession?.id, timerState, breakDeadlineMs]);
 
   useEffect(() => {
     if (countdownSeconds > 0) return;
@@ -265,10 +272,11 @@ const StudyModePage: React.FC = () => {
     }
     if (timerState === "break") {
       setTimerState("completed");
+      setBreakDeadlineMs(null);
       setCountdownSeconds(sessionTargetSeconds);
       toast.success("Break complete. Ready for next focus round 🚀");
     }
-  }, [countdownSeconds, timerState, activeSession?.id]);
+  }, [countdownSeconds, timerState, activeSession?.id, sessionTargetSeconds]);
 
   useEffect(() => {
     if (!user?.id || !activeSession?.id) return;
@@ -281,7 +289,12 @@ const StudyModePage: React.FC = () => {
   useEffect(() => {
     if (!activeSession?.id) return;
     const syncTimer = () => {
-      if (document.visibilityState !== "visible" || timerState !== "running") return;
+      if (document.visibilityState !== "visible") return;
+      if (timerState === "break" && breakDeadlineMs !== null) {
+        setCountdownSeconds(Math.max(0, Math.ceil((breakDeadlineMs - Date.now()) / 1000)));
+        return;
+      }
+      if (timerState !== "running") return;
       const planned = (activeSession.planned_duration ?? 25) * 60;
       const wallElapsed = Math.max(0, (Date.now() - new Date(activeSession.start_time).getTime()) / 1000);
       const pausedSeconds = Math.max(0, Number(activeSession.paused_seconds) || 0);
@@ -289,7 +302,7 @@ const StudyModePage: React.FC = () => {
     };
     document.addEventListener("visibilitychange", syncTimer);
     return () => document.removeEventListener("visibilitychange", syncTimer);
-  }, [activeSession?.id, activeSession?.start_time, activeSession?.planned_duration, activeSession?.paused_seconds, timerState]);
+  }, [activeSession?.id, activeSession?.start_time, activeSession?.planned_duration, activeSession?.paused_seconds, timerState, breakDeadlineMs]);
 
   const saveSettings = async (nextStudyMinutes: number, nextBreakMinutes: number) => {
     if (!user) return;
@@ -328,6 +341,7 @@ const StudyModePage: React.FC = () => {
     const session = data as StudySession;
     setActiveSession(session);
     setTimerState("running");
+    setBreakDeadlineMs(null);
     setSessionTargetSeconds(plannedDuration * 60);
     setCountdownSeconds(plannedDuration * 60);
 
@@ -387,11 +401,14 @@ const StudyModePage: React.FC = () => {
 
     const shouldStartBreak = mode === "pomodoro" && (settings?.auto_start_break ?? true) && autoBreak;
     if (shouldStartBreak) {
+      const nextBreakSeconds = clampMinutes(breakMinutes, 1, 30) * 60;
       setTimerState("break");
-      setBreakTargetSeconds(clampMinutes(breakMinutes, 1, 30) * 60);
-      setCountdownSeconds(clampMinutes(breakMinutes, 1, 30) * 60);
+      setBreakTargetSeconds(nextBreakSeconds);
+      setBreakDeadlineMs(Date.now() + nextBreakSeconds * 1000);
+      setCountdownSeconds(nextBreakSeconds);
        toast.success(`Focus complete 🎉 +${rewardXp} XP +${rewardCoins} coins. Break started.`);
     } else {
+      setBreakDeadlineMs(null);
       toast.success(`Session completed ✅ +${rewardXp} XP +${rewardCoins} coins.`);
     }
 
@@ -409,6 +426,7 @@ const StudyModePage: React.FC = () => {
     const next = clampMinutes(studyMinutes, 5, 180) * 60;
     setSessionTargetSeconds(next);
     setCountdownSeconds(next);
+    setBreakDeadlineMs(null);
     setTimerState("idle");
   };
 
