@@ -2,6 +2,8 @@ package com.biniam.masterminds;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.WebView;
 
 import androidx.activity.OnBackPressedCallback;
@@ -62,23 +64,33 @@ public class MainActivity extends BridgeActivity {
             if (roomId != null) payload.put("room_id", roomId);
             if (reply != null) payload.put("reply", reply);
             final String scriptPayload = payload.toString();
-            WebView webView = getBridge() == null ? null : getBridge().getWebView();
-            if (webView != null) {
-                webView.postDelayed(new Runnable() {
-                    int attempts = 0;
-                    @Override public void run() {
-                        if (getBridge() == null || getBridge().getWebView() == null) return;
-                        getBridge().getWebView().evaluateJavascript(
-                            "(function(){if(typeof window.__handleMasterMindsNotificationAction==='function'){window.__handleMasterMindsNotificationAction(" +
-                            JSONObject.quote(scriptPayload) + ");return true;}return false;})()",
-                            value -> {
-                                if (!"true".equals(value) && attempts++ < 20 && getBridge() != null && getBridge().getWebView() != null) {
-                                    getBridge().getWebView().postDelayed(this, 400);
-                                }
-                            });
+
+            // A notification action can cold-start the activity before Capacitor has
+            // attached its Bridge/WebView. Keep retrying until the bridge and the
+            // React notification handler are ready instead of silently dropping it.
+            final Handler mainHandler = new Handler(Looper.getMainLooper());
+            mainHandler.postDelayed(new Runnable() {
+                int attempts = 0;
+
+                private void retry() {
+                    if (attempts++ < 30) mainHandler.postDelayed(this, 400);
+                }
+
+                @Override
+                public void run() {
+                    WebView webView = getBridge() == null ? null : getBridge().getWebView();
+                    if (webView == null) {
+                        retry();
+                        return;
                     }
-                }, 700);
-            }
+                    webView.evaluateJavascript(
+                        "(function(){if(typeof window.__handleMasterMindsNotificationAction==='function'){window.__handleMasterMindsNotificationAction(" +
+                        JSONObject.quote(scriptPayload) + ");return true;}return false;})()",
+                        value -> {
+                            if (!"true".equals(value)) retry();
+                        });
+                }
+            }, 700);
         } catch (Exception ignored) {
             // Never log notification reply text or user identifiers.
         }
