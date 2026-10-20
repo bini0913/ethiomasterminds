@@ -510,8 +510,18 @@ const AdminPortal: React.FC = () => {
   };
 
   const handleUpdateUserRole = async (userId: string, newRole: Role) => {
-    if (!isAdmin && (newRole === 'admin' || newRole === 'manager')) {
-      toast.error('Managers cannot assign admin/manager roles');
+    if (!isAdmin && ['admin', 'manager', 'finance', 'extreme_admin'].includes(newRole)) {
+      toast.error('Managers cannot assign elevated roles'); return;
+    }
+    if (!isSuperAdmin && ['finance', 'extreme_admin'].includes(newRole)) {
+      toast.error('Only Super Admin can assign Finance or Super Admin roles.'); return;
+    }
+    if (isSuperAdmin) {
+      const { error } = await (supabase as any).rpc('extreme_admin_update_user_role', { p_user_id: userId, p_role: newRole });
+      if (error) { toast.error(error.message || 'Role update failed'); return; }
+      toast.success('Role updated');
+      logAction(`Changed role to ${newRole}`, userId);
+      await Promise.all([fetchUsers(), fetchStatsAndCharts(), fetchAuditLogs()]);
       return;
     }
 
@@ -544,9 +554,8 @@ const AdminPortal: React.FC = () => {
     }
 
     if (action === 'delete') {
-      const confirmed = window.confirm(`Delete ${selectedUsers.length} selected profile(s)? This is permanent and may fail if related records must be retained.`);
-      if (!confirmed) return;
-      await Promise.all(selectedUsers.map((id) => handleDeleteUser(id)));
+      if (!isSuperAdmin) { toast.error('Permanent account deletion is restricted to Super Admin.'); return; }
+      for (const id of selectedUsers) await handleDeleteUser(id);
     }
     if (action === 'promote_teacher') await Promise.all(selectedUsers.map((id) => handleUpdateUserRole(id, 'teacher')));
     if (action === 'suspend' || action === 'ban') {
