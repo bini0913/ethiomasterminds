@@ -63,6 +63,7 @@ interface Student {
 
 interface DirectoryStudent extends Student {
   classNames: string[];
+  classIds: string[];
 }
 
 interface QuizResult {
@@ -217,8 +218,9 @@ const TeacherPortal: React.FC = () => {
       const existing = directory.get(student.id);
       if (existing) {
         if (!existing.classNames.includes(className)) existing.classNames.push(className);
+        if (!existing.classIds.includes(classes.find(cls => cls.name === className)?.id || '')) existing.classIds.push(classes.find(cls => cls.name === className)?.id || '');
       } else {
-        directory.set(student.id, { ...student, classNames: [className] });
+        directory.set(student.id, { ...student, classNames: [className], classIds: [classes.find(cls => cls.name === className)?.id || ''] });
       }
     });
     setAllStudents(Array.from(directory.values()).sort((a, b) => (a.name || '').localeCompare(b.name || '')));
@@ -1420,7 +1422,11 @@ ${createdAnnouncement.content}`;
                 {assignments.map(assignment => {
                   const due = assignment.due_date ? new Date(assignment.due_date) : null;
                   const overdue = due ? due.getTime() < Date.now() : false;
-                  return <Card key={assignment.id} className="border-slate-200 shadow-sm dark:border-slate-800"><CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{assignment.quizzes?.title || 'Quiz assignment'}</p><p className="mt-1 text-sm text-muted-foreground">{assignment.classes?.name || 'Class'}{assignment.classes?.grade ? ` · Grade ${assignment.classes.grade}` : ''}</p></div><Badge variant={overdue ? 'destructive' : 'secondary'}>{overdue ? 'Past due' : due ? 'Due date set' : 'No due date'}</Badge></div><div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-muted-foreground dark:border-slate-800"><span>{due ? `Due ${due.toLocaleDateString()}` : 'Flexible deadline'}</span><span>{assignment.quizzes?.subject || 'Quiz'}</span></div></CardContent></Card>;
+                  const assignedStudentIds = allStudents.filter(student => student.classIds.includes(assignment.class_id)).map(student => student.id);
+                  const completedStudentIds = new Set(results.filter(result => (result as any).quiz_id === assignment.quiz_id && assignedStudentIds.includes(result.student_id)).map(result => result.student_id));
+                  const completedCount = completedStudentIds.size;
+                  const completionPercent = assignedStudentIds.length ? Math.round((completedCount / assignedStudentIds.length) * 100) : 0;
+                  return <Card key={assignment.id} className="border-slate-200 shadow-sm dark:border-slate-800"><CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{assignment.quizzes?.title || 'Quiz assignment'}</p><p className="mt-1 text-sm text-muted-foreground">{assignment.classes?.name || 'Class'}{assignment.classes?.grade ? ` · Grade ${assignment.classes.grade}` : ''}</p></div><Badge variant={overdue ? 'destructive' : 'secondary'}>{overdue ? 'Past due' : due ? 'Due date set' : 'No due date'}</Badge></div><div className="space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800"><div className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>{due ? `Due ${due.toLocaleDateString()}` : 'Flexible deadline'}</span><span>{assignment.quizzes?.subject || 'Quiz'}</span></div><div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Student progress</span><span className="font-semibold">{completedCount} / {assignedStudentIds.length} completed</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${completionPercent}%` }} /></div></div></CardContent></Card>;
                 })}
               </div>
               {assignments.length === 0 && <Card className="border-dashed border-slate-300 shadow-none dark:border-slate-700"><CardContent className="py-12 text-center"><ClipboardList className="mx-auto mb-3 h-9 w-9 text-muted-foreground" /><p className="font-semibold">No assignments yet</p><p className="mt-1 text-sm text-muted-foreground">Choose a quiz and class above to send the first assignment.</p></CardContent></Card>}
