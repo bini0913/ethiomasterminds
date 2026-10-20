@@ -885,7 +885,10 @@ const AdminPortal: React.FC = () => {
       return;
     }
     setSettingsSaving(true);
-    const entries = Object.entries(systemSettings) as Array<[keyof typeof systemSettings, boolean | number]>;
+    const entries: Array<[keyof typeof systemSettings, boolean | number]> = [
+      ['feature_ai_enabled', systemSettings.feature_ai_enabled],
+      ['max_ai_requests_per_day', systemSettings.max_ai_requests_per_day],
+    ];
     for (const [key, value] of entries) {
       const { error } = await (supabase as any).rpc('admin_set_setting', { p_key: key, p_value: value });
       if (error) {
@@ -1297,18 +1300,13 @@ const AdminPortal: React.FC = () => {
 
             <TabsContent value="settings" className="space-y-4">
               {!isAdmin ? <Card className="border-slate-200 shadow-sm dark:border-slate-800"><CardContent className="py-14 text-center"><Shield className="mx-auto mb-3 h-10 w-10 text-slate-400" /><p className="font-semibold">Administrator access required</p><p className="mt-1 text-sm text-muted-foreground">Managers can review platform activity but cannot change global settings.</p></CardContent></Card> : <>
-                <Card className="border-slate-200 shadow-sm dark:border-slate-800"><CardHeader><CardTitle>Platform configuration</CardTitle><CardDescription>These values are stored in the existing Supabase platform settings table. Changes are audited with the acting administrator.</CardDescription></CardHeader><CardContent className="space-y-5">
+                <Card className="border-slate-200 shadow-sm dark:border-slate-800"><CardHeader><CardTitle>Platform configuration</CardTitle><CardDescription>These controls are saved to the existing Supabase platform settings table and enforced server-side. Changes are written to the persistent admin audit trail.</CardDescription></CardHeader><CardContent className="space-y-5">
                   {settingsStatus === 'loading' && <p className="text-sm text-muted-foreground">Loading saved settings from Supabase…</p>}
                   {settingsStatus === 'error' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">Settings could not be loaded. Confirm the admin settings migration is applied and your account has permission, then refresh.</div>}
-                  <div className="grid gap-3 sm:grid-cols-2">{[
-                    { key: 'feature_social_enabled', title: 'Social features', description: 'Stored global setting for social feed availability' },
-                    { key: 'feature_xp_enabled', title: 'XP progression', description: 'Stored global setting for XP progression' },
-                    { key: 'feature_ai_enabled', title: 'AI features', description: 'Stored global setting for AI features' },
-                    { key: 'strict_moderation', title: 'Strict moderation', description: 'Stored moderation policy setting' },
-                  ].map((item) => <div key={item.key} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800"><div><Label className="font-semibold">{item.title}</Label><p className="mt-1 text-xs text-muted-foreground">{item.description}</p></div><Switch disabled={settingsStatus !== 'ready' || settingsSaving} checked={systemSettings[item.key as keyof typeof systemSettings] as boolean} onCheckedChange={(value) => setSystemSettings(current => ({ ...current, [item.key]: value }))} /></div>)}</div>
-                  <div className="max-w-md space-y-2"><Label>AI requests per day (0–1000)</Label><Input type="number" min={0} max={1000} step={1} disabled={settingsStatus !== 'ready' || settingsSaving} value={systemSettings.max_ai_requests_per_day} onChange={(e) => setSystemSettings(current => ({ ...current, max_ai_requests_per_day: Math.max(0, Math.min(1000, Math.floor(Number(e.target.value) || 0))) }))} /></div>
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800"><div><Label className="font-semibold">AI services enabled</Label><p className="mt-1 text-xs text-muted-foreground">Enforced by the AI Tutor and AI Helper server functions on each request.</p></div><Switch disabled={settingsStatus !== 'ready' || settingsSaving} checked={systemSettings.feature_ai_enabled} onCheckedChange={(value) => setSystemSettings(current => ({ ...current, feature_ai_enabled: value }))} /></div>
+                  <div className="max-w-md space-y-2"><Label>AI requests per user per rolling 24 hours (0–300)</Label><Input type="number" min={0} max={300} step={1} disabled={settingsStatus !== 'ready' || settingsSaving} value={systemSettings.max_ai_requests_per_day} onChange={(e) => setSystemSettings(current => ({ ...current, max_ai_requests_per_day: Math.max(0, Math.min(300, Math.floor(Number(e.target.value) || 0))) }))} /><p className="text-xs text-muted-foreground">A value of 0 disables AI requests. A separate per-minute abuse limit remains active.</p></div>
                   <div className="flex flex-wrap items-center gap-3"><Button disabled={settingsStatus !== 'ready' || settingsSaving} onClick={saveSystemSettings}>{settingsSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{settingsSaving ? 'Saving to Supabase…' : 'Save configuration'}</Button><Button variant="outline" disabled={settingsSaving} onClick={fetchSystemSettings}><RefreshCw className="mr-2 h-4 w-4" />Reload saved values</Button></div>
-                  <p className="text-xs text-muted-foreground">Feature settings are persisted here. A setting only changes live feature behavior when its consuming page or server function checks that setting; this panel does not pretend a saved flag automatically shuts down unrelated code paths.</p>
+                  <p className="text-xs text-muted-foreground">The AI enable switch and rolling 24-hour limit are enforced by both AI Edge Functions, in addition to the existing per-minute abuse limit.</p>
                 </CardContent></Card>
               </>}
             </TabsContent>
