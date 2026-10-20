@@ -72,11 +72,12 @@ BEGIN
   END IF;
 
   v_is_boolean := p_key <> 'max_ai_requests_per_day';
-  IF v_is_boolean AND jsonb_typeof(p_value) <> 'boolean' THEN
+  IF v_is_boolean AND (p_value IS NULL OR jsonb_typeof(p_value) <> 'boolean') THEN
     RAISE EXCEPTION 'This setting requires a boolean value';
   END IF;
   IF NOT v_is_boolean AND (
-    jsonb_typeof(p_value) <> 'number'
+    p_value IS NULL
+    OR jsonb_typeof(p_value) <> 'number'
     OR (p_value #>> '{}')::integer < 0
     OR (p_value #>> '{}')::integer > 1000
     OR (p_value #>> '{}')::numeric <> (p_value #>> '{}')::integer
@@ -182,3 +183,44 @@ GRANT EXECUTE ON FUNCTION public.admin_get_settings() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_set_setting(text, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_write_audit_log(text, text, uuid, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_get_audit_logs(integer) TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.extreme_admin_delete_user(p_user_id uuid, p_reason text DEFAULT NULL)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_target_role public.app_role;
+  v_super_admin_count bigint;
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Super Admin access required';
+  END IF;
+  IF p_user_id IS NULL OR p_user_id = auth.uid() THEN
+    RAISE EXCEPTION 'You cannot delete the active Super Admin account';
+  END IF;
+
+  SELECT role INTO v_target_role FROM public.user_roles WHERE user_id = p_user_id LIMIT 1;
+  IF v_target_role = 'extreme_admin'::public.app_role THEN
+    SELECT count(*) INTO v_super_admin_count FROM public.user_roles WHERE role = 'extreme_admin'::public.app_role;
+    IF v_super_admin_count <= 1 THEN
+      RAISE EXCEPTION 'Cannot delete the last Super Admin';
+    END IF;
+  END IF;
+
+  DELETE FROM auth.users WHERE id = p_user_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'User account not found';
+  END IF;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (auth.uid(), 'delete_auth_user', 'user', p_user_id, jsonb_build_object('reason', p_reason));
+
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.extreme_admin_delete_user(uuid, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_delete_user(uuid, text) TO authenticated;
