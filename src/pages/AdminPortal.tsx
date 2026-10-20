@@ -273,7 +273,7 @@ const AdminPortal: React.FC = () => {
       ...profile,
       role: roleByUser.get(profile.id) || 'student',
       account_status: profile.account_status || (profile.is_banned ? 'banned' : profile.is_suspended ? 'suspended' : 'active'),
-    }) as SystemUser[]);
+    })) as SystemUser[]);
   };
 
   const fetchContent = async () => {
