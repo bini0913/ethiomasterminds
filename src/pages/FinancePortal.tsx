@@ -108,7 +108,8 @@ const FinancePortal: React.FC = () => {
     const income = transactions.filter(x => x.direction === "inflow" && x.status === "posted").reduce((sum, x) => sum + Number(x.amount), 0);
     const expenses = transactions.filter(x => x.direction === "outflow" && x.status === "posted").reduce((sum, x) => sum + Number(x.amount), 0);
     const overdue = invoices.filter(x => x.status !== "paid" && x.status !== "cancelled" && x.due_date && new Date(x.due_date) < new Date()).length;
-    return { receivables, income, expenses, net: income - expenses, overdue };
+    const paid = invoices.reduce((sum, x) => sum + Number(x.amount_paid || 0), 0);
+    return { receivables, income, expenses, net: income - expenses, overdue, paid };
   }, [invoices, transactions]);
 
   const filteredInvoices = useMemo(() => {
@@ -129,7 +130,13 @@ const FinancePortal: React.FC = () => {
       status: "issued", notes: invoiceForm.notes || null, created_by: user.id
     });
     if (error) return toast.error(error.message);
-    await db.from("finance_audit_log").insert({ actor_id: user.id, action: "create_invoice", entity_type: "invoice", details: { invoice_number: invoiceNumber } });
+    const { error: auditError } = await db.rpc("finance_log_audit", {
+      p_action: "create_invoice",
+      p_entity_type: "invoice",
+      p_entity_id: null,
+      p_details: { invoice_number: invoiceNumber, student_id: invoiceForm.student_id },
+    });
+    if (auditError) console.error("Invoice was created, but its audit event could not be recorded:", auditError);
     toast.success(`Invoice ${invoiceNumber} created`);
     setInvoiceOpen(false);
     setInvoiceForm({ student_id: "", description: "Tuition & Fees", subtotal: "", discount: "", due_date: "", notes: "" });
