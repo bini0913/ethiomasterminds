@@ -547,7 +547,7 @@ const AdminPortal: React.FC = () => {
     fetchUsers();
   };
 
-  const handleBulkAction = async (action: 'delete' | 'promote_teacher' | 'suspend' | 'ban') => {
+  const handleBulkAction = async (action: 'delete' | 'promote_teacher' | 'suspend' | 'ban' | 'activate') => {
     if (!selectedUsers.length) {
       toast.error('Select users first');
       return;
@@ -558,8 +558,8 @@ const AdminPortal: React.FC = () => {
       for (const id of selectedUsers) await handleDeleteUser(id);
     }
     if (action === 'promote_teacher') await Promise.all(selectedUsers.map((id) => handleUpdateUserRole(id, 'teacher')));
-    if (action === 'suspend' || action === 'ban') {
-      const status = action === 'suspend' ? 'suspended' : 'banned';
+    if (action === 'suspend' || action === 'ban' || action === 'activate') {
+      const status = action === 'suspend' ? 'suspended' : action === 'ban' ? 'banned' : 'active';
       const targets = selectedUsers.map((id) => users.find((candidate) => candidate.id === id)).filter(Boolean) as SystemUser[];
       const results = await Promise.all(targets.map(async (target) => {
         if (isSuperAdmin) {
@@ -608,7 +608,7 @@ const AdminPortal: React.FC = () => {
   };
 
   const handleDeleteContent = async (type: 'quiz' | 'question' | 'flashcard' | 'social', id: string) => {
-    const table = type === 'social' ? 'social_posts' : `${type}s`;
+    const table = type === 'social' ? 'social_posts' : type === 'quiz' ? 'quizzes' : type === 'question' ? 'questions' : 'flashcards';
     const { error } = await supabase.from(table as any).delete().eq('id', id);
     if (error) {
       toast.error(`Failed to delete ${type}`);
@@ -1087,7 +1087,7 @@ const AdminPortal: React.FC = () => {
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={() => handleBulkAction('promote_teacher')}>Bulk Promote</Button>
                 <Button variant="outline" size="sm" onClick={() => handleBulkAction('suspend')}>Bulk Suspend</Button>
-                <Button variant="outline" size="sm" onClick={() => handleBulkAction('ban')}>Bulk Ban</Button>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction('ban')}>Bulk Ban</Button><Button variant="outline" size="sm" onClick={() => handleBulkAction('activate')}>Bulk Activate</Button>
                 {isSuperAdmin && <Button variant="destructive" size="sm" onClick={() => handleBulkAction('delete')}>Bulk Delete</Button>}
               </div>
 
