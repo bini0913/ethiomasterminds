@@ -87,6 +87,9 @@ const TeacherPortal: React.FC = () => {
   
   // Quiz state
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [assignmentForm, setAssignmentForm] = useState({ quiz_id: '', class_id: '', due_date: '' });
+  const [assigningQuiz, setAssigningQuiz] = useState(false);
   const [showQuizDialog, setShowQuizDialog] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
   const [quizForm, setQuizForm] = useState({
@@ -153,6 +156,7 @@ const TeacherPortal: React.FC = () => {
       fetchClasses();
       fetchResults();
       fetchAnnouncements();
+      fetchAssignments();
     }
   }, [user]);
 
@@ -261,6 +265,22 @@ const TeacherPortal: React.FC = () => {
     if (!error && data) {
       setResults(data);
     }
+  };
+
+  const fetchAssignments = async () => {
+    if (!user?.id) {
+      setAssignments([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('quiz_assignments')
+      .select('id, quiz_id, class_id, assigned_by, due_date, quizzes(title, subject), classes(name, grade)')
+      .eq('assigned_by', user.id);
+    if (error) {
+      console.error('Failed to fetch quiz assignments:', error);
+      return;
+    }
+    setAssignments(data || []);
   };
 
   const fetchAnnouncements = async () => {
@@ -626,21 +646,42 @@ ${createdAnnouncement.content}`;
   };
 
   const handleAssignQuiz = async (quizId: string, classId: string, dueDate?: Date) => {
+    if (!user?.id || !quizId || !classId) {
+      toast.error('Choose a quiz and class first');
+      return;
+    }
+    setAssigningQuiz(true);
     const { error } = await supabase
       .from('quiz_assignments')
-      .insert({
-        quiz_id: quizId,
-        class_id: classId,
-        assigned_by: user?.id,
-        due_date: dueDate?.toISOString()
-      });
+      .insert({ quiz_id: quizId, class_id: classId, assigned_by: user.id, due_date: dueDate?.toISOString() ?? null });
 
     if (error) {
-      toast.error('Failed to assign quiz');
+      setAssigningQuiz(false);
+      console.error('Failed to assign quiz:', error);
+      toast.error('Could not assign this quiz. Please check your class permissions and try again.');
       return;
     }
 
-    toast.success('Quiz assigned to class!');
+    const { data: members, error: membersError } = await supabase
+      .from('class_students')
+      .select('student_id')
+      .eq('class_id', classId);
+    const studentIds = Array.from(new Set((members || []).map((member: { student_id: string }) => member.student_id).filter(Boolean)));
+    const selectedQuiz = quizzes.find(quiz => quiz.id === quizId);
+    const sentCount = membersError ? 0 : await sendRemoteNotifications(studentIds.map(studentId => ({
+      userId: studentId,
+      kind: 'quiz_assignment',
+      title: `New assignment: ${selectedQuiz?.title || 'Quiz'}`,
+      body: `Your teacher assigned ${selectedQuiz?.title || 'a quiz'}${dueDate ? `, due ${dueDate.toLocaleDateString()}` : ''}. Open Master Minds to get started.`,
+      data: { route: '/notifications', quiz_id: quizId, class_id: classId },
+    })));
+
+    await fetchAssignments();
+    setAssigningQuiz(false);
+    setAssignmentForm({ quiz_id: '', class_id: '', due_date: '' });
+    toast.success(sentCount > 0
+      ? `Quiz assigned. ${sentCount} student device(s) notified.`
+      : 'Quiz assigned successfully. Students can see it in their assignments when they open Master Minds.');
   };
 
   const handleLogout = async () => {
@@ -704,6 +745,10 @@ ${createdAnnouncement.content}`;
               <TabsTrigger value="students" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                 <Users className="w-4 h-4" />
                 <span className="hidden sm:inline">Students</span>
+              </TabsTrigger>
+              <TabsTrigger value="assignments" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+                <ClipboardList className="w-4 h-4" />
+                <span className="hidden sm:inline">Assignments</span>
               </TabsTrigger>
               <TabsTrigger value="results" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                 <Trophy className="w-4 h-4" />
@@ -796,6 +841,10 @@ ${createdAnnouncement.content}`;
                   <Button onClick={() => setActiveTab('students')} variant="outline" className="h-20 flex-col gap-2">
                     <Users className="w-6 h-6" />
                     Students
+                  </Button>
+                  <Button onClick={() => setActiveTab('assignments')} variant="outline" className="h-20 flex-col gap-2">
+                    <ClipboardList className="w-6 h-6" />
+                    Assign Work
                   </Button>
                   <Button onClick={() => setActiveTab('results')} variant="outline" className="h-20 flex-col gap-2">
                     <BarChart3 className="w-6 h-6" />
@@ -1346,6 +1395,32 @@ ${createdAnnouncement.content}`;
             </TabsContent>
 
             {/* Results Tab */}
+            <TabsContent value="assignments" className="space-y-5">
+              <div>
+                <h2 className="text-2xl font-extrabold tracking-tight">Assignments</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Send a quiz to a class, set a due date, and notify students.</p>
+              </div>
+              <Card className="border-slate-200 shadow-sm dark:border-slate-800">
+                <CardHeader><CardTitle>Create assignment</CardTitle></CardHeader>
+                <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-2"><label className="text-sm font-medium">Quiz</label><Select value={assignmentForm.quiz_id} onValueChange={value => setAssignmentForm(current => ({ ...current, quiz_id: value }))}><SelectTrigger><SelectValue placeholder="Choose a quiz" /></SelectTrigger><SelectContent>{quizzes.map(quiz => <SelectItem key={quiz.id} value={quiz.id}>{quiz.title}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="space-y-2"><label className="text-sm font-medium">Class</label><Select value={assignmentForm.class_id} onValueChange={value => setAssignmentForm(current => ({ ...current, class_id: value }))}><SelectTrigger><SelectValue placeholder="Choose a class" /></SelectTrigger><SelectContent>{classes.map(cls => <SelectItem key={cls.id} value={cls.id}>{cls.name} · Grade {cls.grade}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="space-y-2"><label className="text-sm font-medium" htmlFor="assignment-due-date">Due date (optional)</label><Input id="assignment-due-date" type="date" min={new Date().toISOString().slice(0, 10)} value={assignmentForm.due_date} onChange={event => setAssignmentForm(current => ({ ...current, due_date: event.target.value }))} /></div>
+                  <div className="flex items-end"><Button className="w-full" disabled={assigningQuiz || !assignmentForm.quiz_id || !assignmentForm.class_id} onClick={() => handleAssignQuiz(assignmentForm.quiz_id, assignmentForm.class_id, assignmentForm.due_date ? new Date(`${assignmentForm.due_date}T23:59:59`) : undefined)}>{assigningQuiz ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}{assigningQuiz ? 'Assigning…' : 'Assign to students'}</Button></div>
+                </CardContent>
+                {(quizzes.length === 0 || classes.length === 0) && <div className="mx-6 mb-5 rounded-xl border border-dashed border-slate-300 p-4 text-sm text-muted-foreground dark:border-slate-700">{quizzes.length === 0 ? 'Create a quiz first' : 'Create a class first'} to start assigning work.</div>}
+              </Card>
+              <div className="flex items-center justify-between"><h3 className="text-lg font-bold">Assigned work</h3><Badge variant="secondary">{assignments.length} total</Badge></div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {assignments.map(assignment => {
+                  const due = assignment.due_date ? new Date(assignment.due_date) : null;
+                  const overdue = due ? due.getTime() < Date.now() : false;
+                  return <Card key={assignment.id} className="border-slate-200 shadow-sm dark:border-slate-800"><CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{assignment.quizzes?.title || 'Quiz assignment'}</p><p className="mt-1 text-sm text-muted-foreground">{assignment.classes?.name || 'Class'}{assignment.classes?.grade ? ` · Grade ${assignment.classes.grade}` : ''}</p></div><Badge variant={overdue ? 'destructive' : 'secondary'}>{overdue ? 'Past due' : due ? 'Due date set' : 'No due date'}</Badge></div><div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-muted-foreground dark:border-slate-800"><span>{due ? `Due ${due.toLocaleDateString()}` : 'Flexible deadline'}</span><span>{assignment.quizzes?.subject || 'Quiz'}</span></div></CardContent></Card>;
+                })}
+              </div>
+              {assignments.length === 0 && <Card className="border-dashed border-slate-300 shadow-none dark:border-slate-700"><CardContent className="py-12 text-center"><ClipboardList className="mx-auto mb-3 h-9 w-9 text-muted-foreground" /><p className="font-semibold">No assignments yet</p><p className="mt-1 text-sm text-muted-foreground">Choose a quiz and class above to send the first assignment.</p></CardContent></Card>}
+            </TabsContent>
+
             <TabsContent value="results" className="space-y-6">
               <Card>
                 <CardHeader>
