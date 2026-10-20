@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { sendRemoteNotifications } from '@/lib/staffNotifications';
-import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -194,7 +193,7 @@ const TeacherPortal: React.FC = () => {
     setClasses(data || []);
   };
 
-  const fetchAllStudents = async () => {
+  const fetchAllStudents = useCallback(async () => {
     if (!classes.length) {
       setAllStudents([]);
       return;
@@ -219,11 +218,11 @@ const TeacherPortal: React.FC = () => {
       }
     });
     setAllStudents(Array.from(directory.values()).sort((a, b) => (a.name || '').localeCompare(b.name || '')));
-  };
+  }, [classes]);
 
   useEffect(() => {
-    fetchAllStudents();
-  }, [classes]);
+    void fetchAllStudents();
+  }, [fetchAllStudents]);
 
   const fetchResults = async () => {
     if (!user?.id) {
@@ -785,7 +784,7 @@ ${createdAnnouncement.content}`;
                 <CardHeader>
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                   <Button onClick={() => { setActiveTab('quizzes'); setShowQuizDialog(true); }} className="h-20 flex-col gap-2">
                     <Plus className="w-6 h-6" />
                     Create Quiz
@@ -793,6 +792,10 @@ ${createdAnnouncement.content}`;
                   <Button onClick={() => { setActiveTab('classes'); setShowClassDialog(true); }} variant="secondary" className="h-20 flex-col gap-2">
                     <UserPlus className="w-6 h-6" />
                     New Class
+                  </Button>
+                  <Button onClick={() => setActiveTab('students')} variant="outline" className="h-20 flex-col gap-2">
+                    <Users className="w-6 h-6" />
+                    Students
                   </Button>
                   <Button onClick={() => setActiveTab('results')} variant="outline" className="h-20 flex-col gap-2">
                     <BarChart3 className="w-6 h-6" />
@@ -804,6 +807,24 @@ ${createdAnnouncement.content}`;
                   </Button>
                 </CardContent>
               </Card>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card className="border-slate-200 shadow-sm dark:border-slate-800">
+                  <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5 text-blue-600" />Class performance</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex items-end justify-between gap-4"><div><p className="text-sm text-muted-foreground">Average recorded quiz score</p><p className="mt-1 text-3xl font-extrabold">{averageScore === null ? '—' : `${averageScore}%`}</p></div><Badge variant="secondary">{results.length} result{results.length === 1 ? '' : 's'}</Badge></div>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${Math.max(0, Math.min(100, averageScore ?? 0))}%` }} /></div>
+                    <p className="mt-2 text-xs text-muted-foreground">Calculated from quiz results available to your teacher account.</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200 shadow-sm dark:border-slate-800">
+                  <CardHeader><CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-amber-600" />Students to check in with</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex items-end justify-between gap-4"><div><p className="text-sm text-muted-foreground">Unique students with a recorded score below 50%</p><p className="mt-1 text-3xl font-extrabold">{studentsNeedingSupport}</p></div><Button variant="outline" size="sm" onClick={() => setActiveTab('results')}>Review results</Button></div>
+                    <p className="mt-3 text-xs text-muted-foreground">A supportive follow-up prompt based on recorded results, not a permanent student label.</p>
+                  </CardContent>
+                </Card>
+              </div>
 
               {/* Recent Activity */}
               <Card className="border-slate-200 shadow-sm dark:border-slate-800">
