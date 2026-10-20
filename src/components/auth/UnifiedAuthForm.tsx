@@ -323,8 +323,24 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-      <div className="flex min-h-screen items-center justify-center px-4 py-6 sm:px-6">
-        <motion.div
+      <div className="grid min-h-screen lg:grid-cols-[0.9fr_1.1fr]">
+<aside className="relative hidden overflow-hidden bg-slate-950 px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between xl:px-16">
+<div className="absolute -right-24 top-24 h-72 w-72 rounded-full bg-blue-600/20 blur-3xl" />
+<div className="relative">
+<a href="/" className="inline-flex items-center gap-3" aria-label="Master Minds home"><img src="/brand/master-minds-icon.svg" alt="" className="h-12 w-12 rounded-xl" /><span className="text-xl font-extrabold tracking-tight">Master Minds</span></a>
+<div className="mt-24 max-w-lg">
+<p className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-400/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-blue-200"><Sparkles className="h-4 w-4" /> Learn. Practice. Grow.</p>
+<h2 className="mt-6 text-4xl font-black leading-tight tracking-tight xl:text-5xl">Your next big step in learning starts here.</h2>
+<p className="mt-5 max-w-md text-base leading-7 text-slate-300">Pick up where you left off, or create an account to get lessons, practice and activities shaped around your grade.</p>
+<div className="mt-9 space-y-4">
+<div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><BookOpen className="h-5 w-5 text-blue-200" /></div><span className="text-sm font-medium text-slate-200">Study tools and practice built around you</span></div>
+<div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><GraduationCap className="h-5 w-5 text-blue-200" /></div><span className="text-sm font-medium text-slate-200">An experience that fits your grade</span></div>
+<div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><ShieldCheck className="h-5 w-5 text-blue-200" /></div><span className="text-sm font-medium text-slate-200">Your profile and progress stay connected</span></div>
+</div></div></div>
+<p className="relative mt-12 text-xs text-slate-400">Made for curious minds, from first lessons to exam preparation.</p>
+</aside>
+<main className="flex min-h-screen items-center justify-center px-4 py-6 sm:px-6">
+<motion.div
           initial={{ opacity: 0, y: 20, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.35 }}
@@ -620,6 +636,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
             </motion.div>
           )}
         </motion.div>
+        </main>
       </div>
     </div>
   );
