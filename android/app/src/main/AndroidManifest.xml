@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Study Mode voice/video calls. These still require runtime grants. -->
+    <!-- Study Mode voice/video calls. Capacitor requests runtime grants when WebView media is used. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
@@ -14,18 +14,12 @@
     <!-- Notification feedback. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Optional device integrations; app code must request these only when
-         a user starts a feature that genuinely needs them. -->
+    <!-- Optional device integrations. Runtime requests must remain feature-triggered. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
-    <!-- Media access on newer Android versions. Prefer the system photo picker
-         where possible so broad storage access is not required. -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
-
+    <!-- Camera/microphone hardware is optional so devices without it can still install the app. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
