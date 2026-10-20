@@ -263,7 +263,7 @@ const FinancePortal: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {[
             ["Outstanding", `ETB ${metrics.receivables.toLocaleString()}`, Receipt],
             ["Collected", `ETB ${metrics.paid.toLocaleString()}`, Banknote],
@@ -273,7 +273,7 @@ const FinancePortal: React.FC = () => {
             ["Overdue invoices", metrics.overdue, FileText],
             ["Active accounts", accounts.filter(account => account.active).length, Landmark],
           ].map(([label, value, Icon]: any) => (
-            <Card key={label as string}><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-bold mt-1">{typeof value === "number" && label !== "Overdue invoices" ? "ETB " + value.toLocaleString() : value}</p></div><Icon className="h-5 w-5 text-muted-foreground" /></div></CardContent></Card>
+            <Card key={label as string}><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div><Icon className="h-5 w-5 text-muted-foreground" /></div></CardContent></Card>
           ))}
         </div>
 
