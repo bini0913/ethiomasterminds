@@ -699,6 +699,10 @@ ${createdAnnouncement.content}`;
     ? Math.round(results.reduce((sum, result) => sum + (Number(result.score) || 0), 0) / results.length)
     : null;
   const studentsNeedingSupport = new Set(results.filter(result => Number(result.score) < 50).map(result => result.student_id)).size;
+  const getStudentLabel = (studentId: string) => {
+    const student = allStudents.find(item => item.id === studentId);
+    return student ? `${student.name || 'Student'}${student.username ? ` (@${student.username})` : ''}` : 'Student';
+  };
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -886,8 +890,9 @@ ${createdAnnouncement.content}`;
                       <div key={result.id} className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
                         <div>
                           <p className="font-medium">{(result as any).quizzes?.title || 'Quiz'}</p>
+                          <p className="text-xs text-muted-foreground">By {getStudentLabel(result.student_id)}</p>
                           <p className="text-sm text-muted-foreground">
-                            Score: {result.correct_answers}/{result.total_questions} • XP: +{result.xp_earned}
+                            Score: {result.correct_answers}/{result.total_questions} • XP: +{result.xp_earned
                           </p>
                         </div>
                         <Badge variant={result.score >= 70 ? 'default' : 'secondary'}>
@@ -1434,6 +1439,7 @@ ${createdAnnouncement.content}`;
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="font-medium">{(result as any).quizzes?.title || 'Quiz'}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">Completed by {getStudentLabel(result.student_id)}</p>
                               <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                                 <span>Score: {result.correct_answers}/{result.total_questions}</span>
                                 <span>Time: {Math.floor((result.time_taken || 0) / 60)}m {(result.time_taken || 0) % 60}s</span>
@@ -1554,7 +1560,7 @@ ${createdAnnouncement.content}`;
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-3xl text-primary-foreground font-bold">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-50 text-3xl font-bold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-900">
                       {profile?.name?.charAt(0) || 'T'}
                     </div>
                     <div>
