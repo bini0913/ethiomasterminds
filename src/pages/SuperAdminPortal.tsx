@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import FinanceOversightCard from "@/components/portals/FinanceOversightCard";
 import {
   AlertTriangle,
   BarChart3,
@@ -469,6 +470,8 @@ const SuperAdminPortal: React.FC = () => {
             </Card>
           ))}
         </div>
+
+        <FinanceOversightCard />
 
         <Tabs defaultValue="users" className="mt-5">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
