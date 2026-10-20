@@ -892,7 +892,7 @@ ${createdAnnouncement.content}`;
                           <p className="font-medium">{(result as any).quizzes?.title || 'Quiz'}</p>
                           <p className="text-xs text-muted-foreground">By {getStudentLabel(result.student_id)}</p>
                           <p className="text-sm text-muted-foreground">
-                            Score: {result.correct_answers}/{result.total_questions} • XP: +{result.xp_earned
+                            Score: {result.correct_answers}/{result.total_questions} • XP: +{result.xp_earned}
                           </p>
                         </div>
                         <Badge variant={result.score >= 70 ? 'default' : 'secondary'}>
