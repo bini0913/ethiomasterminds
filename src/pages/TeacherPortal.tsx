@@ -62,6 +62,10 @@ interface Student {
   avatar: string;
 }
 
+interface DirectoryStudent extends Student {
+  classNames: string[];
+}
+
 interface QuizResult {
   id: string;
   student_id: string;
@@ -118,6 +122,8 @@ const TeacherPortal: React.FC = () => {
   });
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
   const [classStudents, setClassStudents] = useState<Student[]>([]);
+  const [allStudents, setAllStudents] = useState<DirectoryStudent[]>([]);
+  const [studentDirectoryQuery, setStudentDirectoryQuery] = useState('');
   
   // Results state
   const [results, setResults] = useState<QuizResult[]>([]);
@@ -187,6 +193,37 @@ const TeacherPortal: React.FC = () => {
     }
     setClasses(data || []);
   };
+
+  const fetchAllStudents = async () => {
+    if (!classes.length) {
+      setAllStudents([]);
+      return;
+    }
+
+    const results = await Promise.all(classes.map(async (cls) => {
+      const { data, error } = await supabase.rpc('get_class_students', { class_uuid: cls.id });
+      if (error) {
+        console.error(`Failed to load students for ${cls.name}:`, error);
+        return [] as Array<{ student: Student; className: string }>;
+      }
+      return (data || []).map((student: Student) => ({ student, className: cls.name }));
+    }));
+
+    const directory = new Map<string, DirectoryStudent>();
+    results.flat().forEach(({ student, className }) => {
+      const existing = directory.get(student.id);
+      if (existing) {
+        if (!existing.classNames.includes(className)) existing.classNames.push(className);
+      } else {
+        directory.set(student.id, { ...student, classNames: [className] });
+      }
+    });
+    setAllStudents(Array.from(directory.values()).sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+  };
+
+  useEffect(() => {
+    fetchAllStudents();
+  }, [classes]);
 
   const fetchResults = async () => {
     if (!user?.id) {
@@ -615,22 +652,25 @@ ${createdAnnouncement.content}`;
   const stats = {
     totalQuizzes: quizzes.length,
     totalClasses: classes.length,
-    totalStudents: classStudents.length,
+    totalStudents: allStudents.length,
     pendingApproval: quizzes.filter(q => !q.is_approved).length
   };
+  const averageScore = results.length
+    ? Math.round(results.reduce((sum, result) => sum + (Number(result.score) || 0), 0) / results.length)
+    : null;
+  const studentsNeedingSupport = new Set(results.filter(result => Number(result.score) < 50).map(result => result.student_id)).size;
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <AnimatedBackground />
+    <div className="min-h-screen relative overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       
       <div className="relative z-10">
         {/* Header */}
-        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
             <div className="flex items-center gap-4">
               <BackButton />
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                <h1 className="text-xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-2xl">
                   Teacher Portal
                 </h1>
                 <p className="text-sm text-muted-foreground">Welcome, {profile?.name || 'Teacher'}</p>
@@ -647,30 +687,34 @@ ${createdAnnouncement.content}`;
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-6">
+        <main className="mx-auto w-full max-w-7xl px-3 py-5 pb-24 sm:px-6 sm:py-7 lg:px-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid grid-cols-6 gap-2 bg-muted/50 p-1 rounded-xl">
-              <TabsTrigger value="dashboard" className="flex items-center gap-2">
+            <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <TabsTrigger value="dashboard" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                 <BarChart3 className="w-4 h-4" />
                 <span className="hidden sm:inline">Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger value="quizzes" className="flex items-center gap-2">
+              <TabsTrigger value="quizzes" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                 <BookOpen className="w-4 h-4" />
                 <span className="hidden sm:inline">Quizzes</span>
               </TabsTrigger>
-              <TabsTrigger value="classes" className="flex items-center gap-2">
+              <TabsTrigger value="classes" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                 <Users className="w-4 h-4" />
                 <span className="hidden sm:inline">Classes</span>
               </TabsTrigger>
-              <TabsTrigger value="results" className="flex items-center gap-2">
+              <TabsTrigger value="students" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+                <Users className="w-4 h-4" />
+                <span className="hidden sm:inline">Students</span>
+              </TabsTrigger>
+              <TabsTrigger value="results" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                 <Trophy className="w-4 h-4" />
                 <span className="hidden sm:inline">Results</span>
               </TabsTrigger>
-              <TabsTrigger value="announcements" className="flex items-center gap-2">
+              <TabsTrigger value="announcements" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                 <Bell className="w-4 h-4" />
                 <span className="hidden sm:inline">Announce</span>
               </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2">
+              <TabsTrigger value="settings" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                 <Settings className="w-4 h-4" />
                 <span className="hidden sm:inline">Settings</span>
               </TabsTrigger>
@@ -678,9 +722,9 @@ ${createdAnnouncement.content}`;
 
             {/* Dashboard Tab */}
             <TabsContent value="dashboard" className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                  <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20">
+                  <Card className="border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
@@ -694,7 +738,7 @@ ${createdAnnouncement.content}`;
                 </motion.div>
 
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                  <Card className="bg-gradient-to-br from-accent/20 to-accent/5 border-accent/20">
+                  <Card className="border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
@@ -708,7 +752,7 @@ ${createdAnnouncement.content}`;
                 </motion.div>
 
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                  <Card className="bg-gradient-to-br from-green-500/20 to-green-500/5 border-green-500/20">
+                  <Card className="border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
@@ -722,7 +766,7 @@ ${createdAnnouncement.content}`;
                 </motion.div>
 
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-                  <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border-yellow-500/20">
+                  <Card className="border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
@@ -737,7 +781,7 @@ ${createdAnnouncement.content}`;
               </div>
 
               {/* Quick Actions */}
-              <Card>
+              <Card className="border-slate-200 shadow-sm dark:border-slate-800">
                 <CardHeader>
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
@@ -762,7 +806,7 @@ ${createdAnnouncement.content}`;
               </Card>
 
               {/* Recent Activity */}
-              <Card>
+              <Card className="border-slate-200 shadow-sm dark:border-slate-800">
                 <CardHeader>
                   <CardTitle>Recent Quiz Results</CardTitle>
                 </CardHeader>
@@ -1025,6 +1069,40 @@ ${createdAnnouncement.content}`;
             </TabsContent>
 
             {/* Classes Tab */}
+            <TabsContent value="students" className="space-y-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-2xl font-extrabold tracking-tight">Student directory</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">One view of students across all your classes.</p>
+                </div>
+                <div className="relative w-full sm:max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input aria-label="Search students" placeholder="Search by name or username" className="pl-9" value={studentDirectoryQuery} onChange={(e) => setStudentDirectoryQuery(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <Card className="border-slate-200 shadow-sm dark:border-slate-800"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Unique students</p><p className="mt-1 text-2xl font-bold">{allStudents.length}</p></CardContent></Card>
+                <Card className="border-slate-200 shadow-sm dark:border-slate-800"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Classes</p><p className="mt-1 text-2xl font-bold">{classes.length}</p></CardContent></Card>
+                <Card className="col-span-2 border-slate-200 shadow-sm dark:border-slate-800 sm:col-span-1"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Average quiz score</p><p className="mt-1 text-2xl font-bold">{averageScore === null ? '—' : `${averageScore}%`}</p></CardContent></Card>
+              </div>
+              <Card className="overflow-hidden border-slate-200 shadow-sm dark:border-slate-800">
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {allStudents.filter(student => `${student.name || ''} ${student.username || ''}`.toLowerCase().includes(studentDirectoryQuery.toLowerCase().trim())).map(student => (
+                      <div key={student.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-200">{student.name?.charAt(0)?.toUpperCase() || 'S'}</div>
+                          <div className="min-w-0"><p className="truncate font-semibold">{student.name || 'Student'}</p><p className="truncate text-sm text-muted-foreground">@{student.username || 'student'} · Level {student.level ?? 1} · {student.xp ?? 0} XP</p><div className="mt-1 flex flex-wrap gap-1">{student.classNames.map(className => <Badge key={className} variant="secondary" className="font-normal">{className}</Badge>)}</div></div>
+                        </div>
+                        <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => { const cls = classes.find(item => student.classNames.includes(item.name)); if (cls) { setSelectedClass(cls); fetchClassStudents(cls.id); setActiveTab('classes'); } }}>Open class</Button>
+                      </div>
+                    ))}
+                    {allStudents.filter(student => `${student.name || ''} ${student.username || ''}`.toLowerCase().includes(studentDirectoryQuery.toLowerCase().trim())).length === 0 && <div className="px-4 py-12 text-center"><Users className="mx-auto mb-3 h-9 w-9 text-muted-foreground" /><p className="font-semibold">{studentDirectoryQuery ? 'No students match that search' : 'Your classes are ready for students'}</p><p className="mt-1 text-sm text-muted-foreground">{studentDirectoryQuery ? 'Try a different name or username.' : 'Create a class and share its class code, or add students from the Classes tab.'}</p><Button className="mt-4" onClick={() => { setActiveTab('classes'); setShowClassDialog(true); }}>Create a class</Button></div>}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             <TabsContent value="classes" className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">My Classes</h2>
