@@ -39,7 +39,7 @@ import {
   YAxis,
 } from 'recharts';
 
-type Role = 'student' | 'teacher' | 'admin' | 'manager' | 'extreme_admin';
+type Role = 'student' | 'teacher' | 'admin' | 'manager' | 'finance' | 'extreme_admin';
 
 interface SystemUser {
   id: string;
@@ -262,7 +262,7 @@ const AdminPortal: React.FC = () => {
       return;
     }
     if (rolesRes.error) console.error('Admin role list failed:', rolesRes.error);
-    const rolePriority: Role[] = ['extreme_admin', 'admin', 'manager', 'teacher', 'student'];
+    const rolePriority: Role[] = ['extreme_admin', 'admin', 'manager', 'finance', 'teacher', 'student'];
     const roleByUser = new Map<string, Role>();
     (rolesRes.data || []).forEach((entry: any) => {
       const role = entry.role as Role;
@@ -499,16 +499,14 @@ const AdminPortal: React.FC = () => {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    await supabase.from('user_roles').delete().eq('user_id', userId);
-    const { error } = await supabase.from('profiles').delete().eq('id', userId);
-    if (error) {
-      toast.error('Failed to delete user');
-      return;
-    }
-    toast.success('User deleted');
-    logAction('Deleted user', userId);
-    fetchUsers();
-    fetchStatsAndCharts();
+    if (!isSuperAdmin) { toast.error('Permanent account deletion is restricted to Super Admin.'); return; }
+    if (userId === user?.id) { toast.error('You cannot delete the account you are currently using.'); return; }
+    const target = users.find((item) => item.id === userId);
+    if (!window.confirm(`Permanently delete ${target?.name || 'this account'} and its auth identity? This cannot be undone.`)) return;
+    const { error } = await (supabase as any).rpc('extreme_admin_delete_user', { p_user_id: userId, p_reason: 'Deleted from Admin Portal' });
+    if (error) { toast.error(error.message || 'Account deletion failed. Related records may require retention.'); return; }
+    toast.success('Auth account and its cascading profile data were deleted.');
+    await Promise.all([fetchUsers(), fetchStatsAndCharts(), fetchAuditLogs()]);
   };
 
   const handleUpdateUserRole = async (userId: string, newRole: Role) => {
