@@ -79,10 +79,10 @@ BEGIN
     p_value IS NULL
     OR jsonb_typeof(p_value) <> 'number'
     OR (p_value #>> '{}')::integer < 0
-    OR (p_value #>> '{}')::integer > 1000
+    OR (p_value #>> '{}')::integer > 300
     OR (p_value #>> '{}')::numeric <> (p_value #>> '{}')::integer
   ) THEN
-    RAISE EXCEPTION 'AI daily limit must be a whole number between 0 and 1000';
+    RAISE EXCEPTION 'AI daily limit must be a whole number between 0 and 300';
   END IF;
 
   INSERT INTO public.platform_settings(setting_key, setting_value, updated_by, updated_at)
