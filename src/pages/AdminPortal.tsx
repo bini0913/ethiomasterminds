@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import FinanceOversightCard from "@/components/portals/FinanceOversightCard";
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
@@ -982,6 +983,7 @@ const AdminPortal: React.FC = () => {
         </header>
 
         <main className="mx-auto w-full max-w-7xl px-3 py-5 pb-24 sm:px-6 sm:py-7 lg:px-8">
+          <FinanceOversightCard />
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <section className="space-y-3">
               <div className="flex items-center justify-between">

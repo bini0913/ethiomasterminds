@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import FinanceOversightCard from "@/components/portals/FinanceOversightCard";
 import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -747,6 +748,8 @@ const ManagerDashboard: React.FC = () => {
             </Card>
           ))}
         </div>
+
+        <FinanceOversightCard />
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className={`grid grid-cols-2 md:grid-cols-6 xl:grid-cols-11 h-auto p-1 ${panelClass}`}>

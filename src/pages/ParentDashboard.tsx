@@ -31,6 +31,8 @@ type StudySessionRow = { id: string; created_at: string; duration: number | null
 type ParentTask = { id: string; student_id: string; title: string; description: string | null; deadline: string | null; status: string; created_by: string; is_required: boolean; created_at: string; };
 type ParentMessage = { id: string; student_id: string; message: string; emoji: string | null; read: boolean; created_at: string; };
 type ParentGoals = { student_id: string; daily_study_minutes: number; weekly_quiz_target: number; daily_xp_target: number; bedtime_hour: number | null; };
+type LinkedChildSummary = { student_id: string; student_name: string; grade: string | null; pending_assignments: number; recent_quizzes: number; average_recent_score: number | null; outstanding_amount: number; open_invoices: number; overdue_invoices: number; };
+type ParentPortalNotification = { id: string; title: string; message: string; notification_type: string; created_at: string; read: boolean; };
 
 const db = supabase as any;
 const toDateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
@@ -61,6 +63,8 @@ const ParentDashboard: React.FC = () => {
   const [aiInsights, setAiInsights] = useState<any>(null);
   const [earlyProgress, setEarlyProgress] = useState<any[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [linkedChildren, setLinkedChildren] = useState<LinkedChildSummary[]>([]);
+  const [portalNotifications, setPortalNotifications] = useState<ParentPortalNotification[]>([]);
 
   const isParentMode = localStorage.getItem("masterminds_login_mode") === "parent";
   const isEarlyStudent = getUserTier(user?.grade) === "early";
@@ -115,104 +119,20 @@ const ParentDashboard: React.FC = () => {
   };
 
   useEffect(() => { if (user?.id) void loadAll(); }, [user?.id]);
-  useEffect(() => {
-    if (!user?.id) return;
-    const ch = supabase.channel(`parent-dash-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${user.id}` }, () => void loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "quiz_results", filter: `student_id=eq.${user.id}` }, () => void loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "study_sessions", filter: `user_id=eq.${user.id}` }, () => void loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "parent_tasks", filter: `student_id=eq.${user.id}` }, () => void loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "parent_messages", filter: `student_id=eq.${user.id}` }, () => void loadAll())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [user?.id]);
 
-  // Derived metrics
-  const averageScore = useMemo(() => quizResults.length === 0 ? 0 : Math.round(quizResults.reduce((s, r) => s + r.score, 0) / quizResults.length), [quizResults]);
-  const accuracyPercent = useMemo(() => {
-    const c = quizResults.reduce((s, r) => s + r.correct_answers, 0);
-    const t = quizResults.reduce((s, r) => s + r.total_questions, 0);
-    return t ? Math.round((c / t) * 100) : 0;
-  }, [quizResults]);
-  const weeklyStudyMinutes = useMemo(() => {
-    const t = new Date(); t.setDate(t.getDate() - 7);
-    return studySessions.reduce((s, r) => new Date(r.created_at) < t ? s : s + (r.duration ?? r.planned_duration ?? 0), 0);
-  }, [studySessions]);
-  const dailyStudyMinutes = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return studySessions.reduce((s, r) => toDateOnly(r.created_at) !== today ? s : s + (r.duration ?? r.planned_duration ?? 0), 0);
-  }, [studySessions]);
-  const focusConsistency = useMemo(() => {
-    const recent = new Set<string>(); const t = new Date(); t.setDate(t.getDate() - 7);
-    studySessions.forEach(r => { if (new Date(r.created_at) >= t) recent.add(toDateOnly(r.created_at)); });
-    return Math.round((recent.size / 7) * 100);
-  }, [studySessions]);
-  const earlyAttempts = earlyProgress.reduce((s,r)=>s+(r.attempts||0),0);
-  const earlyCorrect = earlyProgress.reduce((s,r)=>s+(r.correct_answers||0),0);
-  const earlyAccuracy = earlyAttempts ? Math.round(earlyCorrect/earlyAttempts*100) : 0;
-  const earlyCompletions = earlyProgress.reduce((s,r)=>s+(r.completions||0),0);
-  const earlySkills = Array.from(new Set(earlyProgress.map(r=>r.skill))).length;
-  const completedTasks = tasks.filter(t => t.status === "completed").length;
-  const pendingTasks = tasks.filter(t => t.status === "pending").length;
-  const overdueTasks = tasks.filter(t => t.status === "pending" && t.deadline && new Date(t.deadline) < new Date()).length;
-  const dailyXP = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return quizResults.reduce((s, r) => r.completed_at && toDateOnly(r.completed_at) === today ? s + (r.xp_earned ?? 0) : s, 0);
-  }, [quizResults]);
-
-  // 7-day chart data
-  const weeklyChart = useMemo(() => {
-    const days = [...Array(7)].map((_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (6 - i));
-      const key = d.toISOString().slice(0, 10);
-      const label = d.toLocaleDateString(undefined, { weekday: "short" });
-      const studyMin = studySessions.filter(s => toDateOnly(s.created_at) === key).reduce((a, s) => a + (s.duration ?? s.planned_duration ?? 0), 0);
-      const xp = quizResults.filter(q => q.completed_at && toDateOnly(q.completed_at) === key).reduce((a, q) => a + (q.xp_earned ?? 0), 0);
-      const quizzes = quizResults.filter(q => q.completed_at && toDateOnly(q.completed_at) === key).length;
-      return { day: label, study: studyMin, xp, quizzes };
-    });
-    return days;
-  }, [studySessions, quizResults]);
-
-  const performanceStatus = accuracyPercent >= 85 && weeklyStudyMinutes >= 300 ? "Excellent" : accuracyPercent >= 60 && weeklyStudyMinutes >= 120 ? "On track" : "Needs attention";
-  const quickAlerts = useMemo(() => {
-    const a: string[] = [];
-    if (weeklyStudyMinutes < 120) a.push("Low activity: less than 2 study hours this week.");
-    if (overdueTasks > 0) a.push(`${overdueTasks} parent task(s) overdue.`);
-    if (positionDelta < 0) a.push(`Rank dropped by ${Math.abs(positionDelta)} position(s).`);
-    if (dailyStudyMinutes < goals.daily_study_minutes / 2 && new Date().getHours() >= 18) a.push("Daily study goal not met yet today.");
-    return a;
-  }, [weeklyStudyMinutes, overdueTasks, positionDelta, dailyStudyMinutes, goals.daily_study_minutes]);
-
-  // Tasks
-  const resetTaskForm = () => { setTaskTitle(""); setTaskDescription(""); setTaskDeadline(""); setTaskRequired(true); setEditingTaskId(null); };
-  const openCreateTask = () => { resetTaskForm(); setTaskDialogOpen(true); };
-  const openEditTask = (t: ParentTask) => { setEditingTaskId(t.id); setTaskTitle(t.title); setTaskDescription(t.description ?? ""); setTaskDeadline(t.deadline ? t.deadline.slice(0, 10) : ""); setTaskRequired(t.is_required); setTaskDialogOpen(true); };
-  const saveTask = async () => {
-    if (!user?.id || !taskTitle.trim()) { toast.error("Task title is required."); return; }
-    const payload: any = { student_id: user.id, title: taskTitle.trim(), description: taskDescription.trim() || null, deadline: taskDeadline || null, created_by: "parent", is_required: taskRequired };
-    if (editingTaskId) {
-      const { error } = await db.from("parent_tasks").update(payload).eq("id", editingTaskId);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Task updated.");
-    } else {
-      payload.status = "pending";
-      const { error } = await db.from("parent_tasks").insert(payload);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Task created.");
-    }
-    setTaskDialogOpen(false); resetTaskForm(); await loadAll();
+  const loadLinkedChildren = async () => {
+    if (!user?.id || !isParentMode) return;
+    const [{ data, error }, { data: notices, error: noticeError }] = await Promise.all([
+      db.rpc("get_parent_portal_overview"),
+      db.from("parent_notifications").select("id,title,message,notification_type,created_at,read").eq("parent_id", user.id).order("created_at", { ascending: false }).limit(8),
+    ]);
+    if (error) { console.error("Could not load linked-child overview:", error); }
+    else setLinkedChildren((data ?? []) as LinkedChildSummary[]);
+    if (noticeError) console.error("Could not load parent portal notifications:", noticeError);
+    else setPortalNotifications((notices ?? []) as ParentPortalNotification[]);
   };
-  const toggleTaskStatus = async (t: ParentTask) => {
-    const { error } = await db.from("parent_tasks").update({ status: t.status === "pending" ? "completed" : "pending" }).eq("id", t.id);
-    if (error) { toast.error(error.message); return; }
-    await loadAll();
-  };
-  const deleteTask = async (id: string) => {
-    const { error } = await db.from("parent_tasks").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Task deleted."); await loadAll();
-  };
+
+  useEffect(() => { void loadLinkedChildren(); }, [user?.id, isParentMode]);
 
   // Messages
   const sendMessage = async () => {
@@ -284,6 +204,52 @@ const ParentDashboard: React.FC = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6 relative z-10">
+        <Card className="border-blue-200/70 bg-white/90 shadow-sm dark:border-slate-700 dark:bg-slate-900/90">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg"><UserCheck className="h-5 w-5 text-blue-600" /> Learning & fee snapshot</CardTitle>
+            <CardDescription>Live academic and finance summaries from this account, with school updates delivered by teacher and finance workflows.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {linkedChildren.length === 0 ? (
+              <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No learning or finance records are available for this account yet. Class assignments, quiz results and school invoices will appear here when created.</p>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {linkedChildren.map(child => (
+                  <Card key={child.student_id} className="border-slate-200 dark:border-slate-700">
+                    <CardContent className="space-y-3 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div><p className="font-semibold">{child.student_name}</p><p className="text-xs text-muted-foreground">{child.grade || "Grade not set"}</p></div>
+                        <Badge variant="secondary">Connected</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Pending classwork</p><p className="text-xl font-bold">{child.pending_assignments}</p></div>
+                        <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Quizzes (30 days)</p><p className="text-xl font-bold">{child.recent_quizzes}</p></div>
+                        <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Recent average</p><p className="text-xl font-bold">{child.average_recent_score == null ? "—" : `${Math.round(Number(child.average_recent_score))}%`}</p></div>
+                        <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Overdue invoices</p><p className="text-xl font-bold">{child.overdue_invoices}</p></div>
+                      </div>
+                      <div className="flex items-center justify-between border-t pt-3 text-sm">
+                        <span className="text-muted-foreground">Outstanding fees</span>
+                        <span className="font-semibold">ETB {Number(child.outstanding_amount || 0).toLocaleString()}</span>
+                      </div>
+                      {child.open_invoices > 0 && <p className="text-xs text-muted-foreground">{child.open_invoices} open invoice(s). Finance staff record payments in the Finance Portal.</p>}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            {portalNotifications.length > 0 && (
+              <div className="space-y-2 border-t pt-4">
+                <div className="flex items-center justify-between"><h3 className="font-semibold">School updates</h3><Badge variant="secondary">{portalNotifications.filter(n => !n.read).length} unread</Badge></div>
+                {portalNotifications.map(notice => (
+                  <div key={notice.id} className="rounded-xl border p-3">
+                    <div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold">{notice.title}</p><span className="shrink-0 text-xs text-muted-foreground">{new Date(notice.created_at).toLocaleDateString()}</span></div>
+                    <p className="mt-1 text-sm text-muted-foreground">{notice.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
         {/* Hero */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="overflow-hidden border-0 bg-gradient-to-br from-primary/15 via-accent/10 to-secondary/10 backdrop-blur">
