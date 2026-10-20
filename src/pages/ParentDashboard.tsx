@@ -65,8 +65,6 @@ const ParentDashboard: React.FC = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [linkedChildren, setLinkedChildren] = useState<LinkedChildSummary[]>([]);
   const [portalNotifications, setPortalNotifications] = useState<ParentPortalNotification[]>([]);
-  const [parentLinkCodeInput, setParentLinkCodeInput] = useState("");
-  const [linkingChild, setLinkingChild] = useState(false);
 
   const isParentMode = localStorage.getItem("masterminds_login_mode") === "parent";
   const isEarlyStudent = getUserTier(user?.grade) === "early";
@@ -135,115 +133,6 @@ const ParentDashboard: React.FC = () => {
   };
 
   useEffect(() => { void loadLinkedChildren(); }, [user?.id, isParentMode]);
-
-  const claimChildLink = async () => {
-    if (!parentLinkCodeInput.trim()) { toast.error("Enter the code from your child's account."); return; }
-    setLinkingChild(true);
-    const { data, error } = await db.rpc("claim_parent_link_code", { p_code: parentLinkCodeInput.trim() });
-    setLinkingChild(false);
-    if (error) { toast.error(error.message || "Could not connect this child."); return; }
-    setParentLinkCodeInput("");
-    toast.success(`${data?.name || "Your child"} is now connected.`);
-    await loadLinkedChildren();
-  };
-  useEffect(() => {
-    if (!user?.id) return;
-    const ch = supabase.channel(`parent-dash-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${user.id}` }, () => void loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "quiz_results", filter: `student_id=eq.${user.id}` }, () => void loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "study_sessions", filter: `user_id=eq.${user.id}` }, () => void loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "parent_tasks", filter: `student_id=eq.${user.id}` }, () => void loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "parent_messages", filter: `student_id=eq.${user.id}` }, () => void loadAll())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [user?.id]);
-
-  // Derived metrics
-  const averageScore = useMemo(() => quizResults.length === 0 ? 0 : Math.round(quizResults.reduce((s, r) => s + r.score, 0) / quizResults.length), [quizResults]);
-  const accuracyPercent = useMemo(() => {
-    const c = quizResults.reduce((s, r) => s + r.correct_answers, 0);
-    const t = quizResults.reduce((s, r) => s + r.total_questions, 0);
-    return t ? Math.round((c / t) * 100) : 0;
-  }, [quizResults]);
-  const weeklyStudyMinutes = useMemo(() => {
-    const t = new Date(); t.setDate(t.getDate() - 7);
-    return studySessions.reduce((s, r) => new Date(r.created_at) < t ? s : s + (r.duration ?? r.planned_duration ?? 0), 0);
-  }, [studySessions]);
-  const dailyStudyMinutes = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return studySessions.reduce((s, r) => toDateOnly(r.created_at) !== today ? s : s + (r.duration ?? r.planned_duration ?? 0), 0);
-  }, [studySessions]);
-  const focusConsistency = useMemo(() => {
-    const recent = new Set<string>(); const t = new Date(); t.setDate(t.getDate() - 7);
-    studySessions.forEach(r => { if (new Date(r.created_at) >= t) recent.add(toDateOnly(r.created_at)); });
-    return Math.round((recent.size / 7) * 100);
-  }, [studySessions]);
-  const earlyAttempts = earlyProgress.reduce((s,r)=>s+(r.attempts||0),0);
-  const earlyCorrect = earlyProgress.reduce((s,r)=>s+(r.correct_answers||0),0);
-  const earlyAccuracy = earlyAttempts ? Math.round(earlyCorrect/earlyAttempts*100) : 0;
-  const earlyCompletions = earlyProgress.reduce((s,r)=>s+(r.completions||0),0);
-  const earlySkills = Array.from(new Set(earlyProgress.map(r=>r.skill))).length;
-  const completedTasks = tasks.filter(t => t.status === "completed").length;
-  const pendingTasks = tasks.filter(t => t.status === "pending").length;
-  const overdueTasks = tasks.filter(t => t.status === "pending" && t.deadline && new Date(t.deadline) < new Date()).length;
-  const dailyXP = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return quizResults.reduce((s, r) => r.completed_at && toDateOnly(r.completed_at) === today ? s + (r.xp_earned ?? 0) : s, 0);
-  }, [quizResults]);
-
-  // 7-day chart data
-  const weeklyChart = useMemo(() => {
-    const days = [...Array(7)].map((_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (6 - i));
-      const key = d.toISOString().slice(0, 10);
-      const label = d.toLocaleDateString(undefined, { weekday: "short" });
-      const studyMin = studySessions.filter(s => toDateOnly(s.created_at) === key).reduce((a, s) => a + (s.duration ?? s.planned_duration ?? 0), 0);
-      const xp = quizResults.filter(q => q.completed_at && toDateOnly(q.completed_at) === key).reduce((a, q) => a + (q.xp_earned ?? 0), 0);
-      const quizzes = quizResults.filter(q => q.completed_at && toDateOnly(q.completed_at) === key).length;
-      return { day: label, study: studyMin, xp, quizzes };
-    });
-    return days;
-  }, [studySessions, quizResults]);
-
-  const performanceStatus = accuracyPercent >= 85 && weeklyStudyMinutes >= 300 ? "Excellent" : accuracyPercent >= 60 && weeklyStudyMinutes >= 120 ? "On track" : "Needs attention";
-  const quickAlerts = useMemo(() => {
-    const a: string[] = [];
-    if (weeklyStudyMinutes < 120) a.push("Low activity: less than 2 study hours this week.");
-    if (overdueTasks > 0) a.push(`${overdueTasks} parent task(s) overdue.`);
-    if (positionDelta < 0) a.push(`Rank dropped by ${Math.abs(positionDelta)} position(s).`);
-    if (dailyStudyMinutes < goals.daily_study_minutes / 2 && new Date().getHours() >= 18) a.push("Daily study goal not met yet today.");
-    return a;
-  }, [weeklyStudyMinutes, overdueTasks, positionDelta, dailyStudyMinutes, goals.daily_study_minutes]);
-
-  // Tasks
-  const resetTaskForm = () => { setTaskTitle(""); setTaskDescription(""); setTaskDeadline(""); setTaskRequired(true); setEditingTaskId(null); };
-  const openCreateTask = () => { resetTaskForm(); setTaskDialogOpen(true); };
-  const openEditTask = (t: ParentTask) => { setEditingTaskId(t.id); setTaskTitle(t.title); setTaskDescription(t.description ?? ""); setTaskDeadline(t.deadline ? t.deadline.slice(0, 10) : ""); setTaskRequired(t.is_required); setTaskDialogOpen(true); };
-  const saveTask = async () => {
-    if (!user?.id || !taskTitle.trim()) { toast.error("Task title is required."); return; }
-    const payload: any = { student_id: user.id, title: taskTitle.trim(), description: taskDescription.trim() || null, deadline: taskDeadline || null, created_by: "parent", is_required: taskRequired };
-    if (editingTaskId) {
-      const { error } = await db.from("parent_tasks").update(payload).eq("id", editingTaskId);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Task updated.");
-    } else {
-      payload.status = "pending";
-      const { error } = await db.from("parent_tasks").insert(payload);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Task created.");
-    }
-    setTaskDialogOpen(false); resetTaskForm(); await loadAll();
-  };
-  const toggleTaskStatus = async (t: ParentTask) => {
-    const { error } = await db.from("parent_tasks").update({ status: t.status === "pending" ? "completed" : "pending" }).eq("id", t.id);
-    if (error) { toast.error(error.message); return; }
-    await loadAll();
-  };
-  const deleteTask = async (id: string) => {
-    const { error } = await db.from("parent_tasks").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Task deleted."); await loadAll();
-  };
 
   // Messages
   const sendMessage = async () => {
@@ -317,16 +206,12 @@ const ParentDashboard: React.FC = () => {
       <main className="container mx-auto px-4 py-6 space-y-6 relative z-10">
         <Card className="border-blue-200/70 bg-white/90 shadow-sm dark:border-slate-700 dark:bg-slate-900/90">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg"><UserCheck className="h-5 w-5 text-blue-600" /> Connected school accounts</CardTitle>
-            <CardDescription>Connect to your child’s account to receive classwork, progress and finance updates from the same school records.</CardDescription>
+            <CardTitle className="flex items-center gap-2 text-lg"><UserCheck className="h-5 w-5 text-blue-600" /> Learning & fee snapshot</CardTitle>
+            <CardDescription>Live academic and finance summaries from this account, with school updates delivered by teacher and finance workflows.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input value={parentLinkCodeInput} onChange={e => setParentLinkCodeInput(e.target.value.toUpperCase())} placeholder="Enter your child's MM link code" aria-label="Child link code" />
-              <Button onClick={claimChildLink} disabled={linkingChild}>{linkingChild ? "Connecting…" : "Connect child"}</Button>
-            </div>
             {linkedChildren.length === 0 ? (
-              <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No child accounts linked yet. On your child’s signed-in student account, open the student dashboard and generate a Parent Link Code.</p>
+              <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No learning or finance records are available for this account yet. Class assignments, quiz results and school invoices will appear here when created.</p>
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 {linkedChildren.map(child => (
