@@ -58,7 +58,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-900/20 via-background to-red-900/20">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="flex items-center justify-between h-16 px-4">
@@ -68,7 +68,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
           >
             <Menu className="h-6 w-6" />
           </button>
-          <h1 className="font-display font-bold text-lg bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
+          <h1 className="font-display font-bold text-lg tracking-tight text-foreground">
             Admin Portal
           </h1>
           <div className="w-10" />
@@ -85,13 +85,13 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 left-0 h-full w-64 bg-background/95 backdrop-blur-xl border-r border-border/50 z-50 
+        fixed top-0 left-0 h-full w-64 bg-slate-950 text-white border-r border-slate-800 z-50 shadow-xl 
         transform transition-transform duration-300 ease-in-out
         lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
-          <div className="p-4 border-b border-border/50">
+          <div className="p-4 border-b border-white/10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm ring-1 ring-black/5">
@@ -99,12 +99,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                 </div>
                 <div>
                   <h2 className="font-display font-bold text-sm">Admin Portal</h2>
-                  <p className="text-xs text-muted-foreground">{user?.name || "Admin"}</p>
+                  <p className="text-xs text-slate-300">{user?.name || "Admin"}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="lg:hidden p-1 rounded-lg hover:bg-muted"
+                className="lg:hidden p-1 rounded-lg text-slate-300 hover:bg-white/10 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -112,7 +112,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+          <nav aria-label="Admin navigation" className="flex-1 overflow-y-auto p-3 space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -126,15 +126,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
                   className={`
                     w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all
                     ${isActive 
-                      ? "bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-400 border border-orange-500/30" 
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      ? "bg-blue-500/20 text-blue-100 border border-blue-400/30" 
+                      : "text-slate-300 hover:bg-white/10 hover:text-white"
                     }
                   `}
                 >
-                  <Icon className={`h-5 w-5 ${isActive ? "text-orange-400" : ""}`} />
+                  <Icon className={`h-5 w-5 ${isActive ? "text-blue-200" : "text-slate-400"}`} />
                   <span className="font-medium text-sm">{item.label}</span>
                   {isActive && (
-                    <ChevronRight className="h-4 w-4 ml-auto text-orange-400" />
+                    <ChevronRight className="h-4 w-4 ml-auto text-blue-200" />
                   )}
                 </motion.button>
               );
@@ -146,7 +146,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
             <Button
               variant="ghost"
               onClick={handleLogout}
-              className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+              className="w-full justify-start gap-3 text-red-300 hover:text-red-200 hover:bg-red-500/15"
             >
               <LogOut className="h-5 w-5" />
               <span>Logout</span>
