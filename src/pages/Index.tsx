@@ -25,6 +25,7 @@ const Index: React.FC = () => {
   const tier = useTier();
   const [appStage, setAppStage] = useState<AppStage>(AppStage.Welcome);
   const [userType, setUserType] = useState<"student" | "teacher" | "admin" | "manager">("student");
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const navigate = useNavigate();
   
   // Redirect based on role when authenticated
@@ -68,8 +69,9 @@ const Index: React.FC = () => {
   }, [isAuthenticated, user, isLoading, navigate, appStage]);
   
   // Handle welcome screen continue button
-  const handleWelcomeContinue = (type: "student" | "teacher" | "admin" | "manager" = "student") => {
+  const handleWelcomeContinue = (type: "student" | "teacher" | "admin" | "manager" = "student", mode: "signin" | "signup" = "signin") => {
     setUserType(type);
+    setAuthMode(mode);
     setAppStage(AppStage.Auth);
   };
   
@@ -106,7 +108,8 @@ const Index: React.FC = () => {
           <UnifiedAuthForm 
             onSuccess={handleAuthSuccess} 
             onBack={handleBackToWelcome}
-            initialTab={userType} 
+            initialTab={userType}
+            initialMode={authMode}
           />
         );
       case AppStage.ProfileSetup:
