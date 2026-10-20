@@ -30,13 +30,13 @@ import {
   Circle,
   Loader2,
 } from "lucide-react";
-import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import type { UserTier } from "@/lib/getUserTier";
 
 interface UnifiedAuthFormProps {
   onSuccess: () => void;
   onBack?: () => void;
   initialTab?: "student" | "teacher" | "admin" | "manager";
+  initialMode?: "signin" | "signup";
 }
 
 type SignupStep = 1 | 2 | 3;
@@ -85,6 +85,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   onSuccess,
   onBack,
   initialTab = "student",
+  initialMode = "signin",
 }) => {
   const { loginWithUsername, signupWithRole, isLoading: authLoading } = useUser();
   const { t } = useLanguage();
@@ -100,7 +101,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   const [avatar, setAvatar] = useState("avatar-1");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isSignup, setIsSignup] = useState(false);
+  const [isSignup, setIsSignup] = useState(initialMode === "signup");
   const [signupStep, setSignupStep] = useState<SignupStep>(1);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -321,18 +322,17 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   const ActiveIcon = activeConfig.icon;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
-      <AnimatedBackground variant="minimal" />
-      <div className="relative z-20 flex min-h-screen items-center justify-center px-4 py-6 sm:px-6">
+    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+      <div className="flex min-h-screen items-center justify-center px-4 py-6 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.35 }}
           className="w-full max-w-xl"
         >
-          <div className="overflow-hidden rounded-[2rem] border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl">
+          <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-xl shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
             <div className="relative overflow-hidden border-b border-border/50 px-6 py-7 sm:px-8">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-accent/10" />
+              <div className="absolute inset-0 bg-slate-50 dark:bg-slate-800/40" />
               <div className="relative flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl shadow-sm ring-1 ring-primary/20">
