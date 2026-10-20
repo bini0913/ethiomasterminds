@@ -39,6 +39,12 @@ const Index: React.FC = () => {
         return;
       }
 
+      // Dedicated Finance accounts land directly in the Finance workspace.
+      if (user.role === 'finance') {
+        navigate('/finance');
+        return;
+      }
+
       // Redirect privileged roles to their portals
       if (user.role === 'extreme_admin') {
         navigate('/root-control-portal-9xA7');

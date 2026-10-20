@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +16,7 @@ import BackButton from "@/components/ui/BackButton";
 import { toast } from "sonner";
 import {
   Banknote, BarChart3, CalendarDays, CircleDollarSign, FileText, Plus,
-  Receipt, RefreshCw, Search, ShieldCheck, TrendingDown, TrendingUp, Wallet
+  Receipt, RefreshCw, Search, ShieldCheck, TrendingDown, TrendingUp, Wallet, LogOut, Landmark
 } from "lucide-react";
 
 type Account = { id: string; name: string; account_type: string; currency: string; current_balance: number; active: boolean };
@@ -35,7 +36,8 @@ type Budget = { id: string; name: string; amount: number; period_start: string; 
 const db = supabase as any;
 
 const FinancePortal: React.FC = () => {
-  const { user } = useUser();
+  const { user, logout } = useUser();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -68,8 +70,9 @@ const FinancePortal: React.FC = () => {
     if (manual) setRefreshing(true);
     else setLoading(true);
     try {
-      await db.rpc("finance_sync_overdue_invoices");
-      const [{ data: a }, { data: c }, { data: i }, { data: t }, { data: b }, { data: s }, { data: al }] = await Promise.all([
+      const { error: syncError } = await db.rpc("finance_sync_overdue_invoices");
+      if (syncError) console.warn("Could not synchronize overdue invoices:", syncError);
+      const [{ data: a, error: accountsError }, { data: c, error: categoriesError }, { data: i, error: invoicesError }, { data: t, error: transactionsError }, { data: b, error: budgetsError }, { data: s, error: studentsError }, { data: al, error: auditError }] = await Promise.all([
         db.from("finance_accounts").select("id,name,account_type,currency,current_balance,active").order("name"),
         db.from("finance_categories").select("id,name,category_type").eq("active", true).order("category_type").order("name"),
         db.from("finance_invoices").select("id,invoice_number,student_id,description,currency,subtotal,discount,total,amount_paid,due_date,status,created_at").order("created_at", { ascending: false }).limit(200),
@@ -78,6 +81,8 @@ const FinancePortal: React.FC = () => {
         db.from("profiles").select("id,name,grade").order("name").limit(500),
         db.from("finance_audit_log").select("id,actor_id,action,entity_type,entity_id,details,created_at").order("created_at",{ascending:false}).limit(300),
       ]);
+      const queryError = accountsError || categoriesError || invoicesError || transactionsError || budgetsError || studentsError || auditError;
+      if (queryError) throw queryError;
       if (a) setAccounts(a);
       if (c) setCategories(c);
       if (s) setStudents(s);
@@ -103,7 +108,8 @@ const FinancePortal: React.FC = () => {
     const income = transactions.filter(x => x.direction === "inflow" && x.status === "posted").reduce((sum, x) => sum + Number(x.amount), 0);
     const expenses = transactions.filter(x => x.direction === "outflow" && x.status === "posted").reduce((sum, x) => sum + Number(x.amount), 0);
     const overdue = invoices.filter(x => x.status !== "paid" && x.status !== "cancelled" && x.due_date && new Date(x.due_date) < new Date()).length;
-    return { receivables, income, expenses, net: income - expenses, overdue };
+    const paid = invoices.reduce((sum, x) => sum + Number(x.amount_paid || 0), 0);
+    return { receivables, income, expenses, net: income - expenses, overdue, paid };
   }, [invoices, transactions]);
 
   const filteredInvoices = useMemo(() => {
@@ -124,7 +130,13 @@ const FinancePortal: React.FC = () => {
       status: "issued", notes: invoiceForm.notes || null, created_by: user.id
     });
     if (error) return toast.error(error.message);
-    await db.from("finance_audit_log").insert({ actor_id: user.id, action: "create_invoice", entity_type: "invoice", details: { invoice_number: invoiceNumber } });
+    const { error: auditError } = await db.rpc("finance_log_audit", {
+      p_action: "create_invoice",
+      p_entity_type: "invoice",
+      p_entity_id: null,
+      p_details: { invoice_number: invoiceNumber, student_id: invoiceForm.student_id },
+    });
+    if (auditError) console.error("Invoice was created, but its audit event could not be recorded:", auditError);
     toast.success(`Invoice ${invoiceNumber} created`);
     setInvoiceOpen(false);
     setInvoiceForm({ student_id: "", description: "Tuition & Fees", subtotal: "", discount: "", due_date: "", notes: "" });
@@ -213,6 +225,11 @@ const FinancePortal: React.FC = () => {
     load(true);
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate("/", { replace: true });
+  };
+
   const createBudget = async () => {
     if (!user?.id || !budgetForm.name || !budgetForm.amount || !budgetForm.period_start || !budgetForm.period_end) return toast.error("Complete the budget fields");
     const { error } = await db.from("finance_budgets").insert({
@@ -229,42 +246,47 @@ const FinancePortal: React.FC = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading Finance Portal…</div>;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
+      <div className="mx-auto w-full max-w-7xl space-y-6 px-3 py-5 pb-10 sm:px-6 sm:py-7 lg:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
           <div className="flex items-center gap-3">
             <BackButton />
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Operations</p>
-              <h1 className="text-2xl font-bold flex items-center gap-2"><CircleDollarSign className="h-6 w-6" /> Finance Portal</h1>
-              <p className="text-sm text-muted-foreground">Invoices, collections, cash flow, budgets and financial audit history.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-cyan-300">Finance workspace</p>
+              <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight sm:text-3xl"><CircleDollarSign className="h-6 w-6 text-blue-600 dark:text-cyan-300" /> Finance Portal</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Secure financial operations · invoices, collections, cash flow and audit history</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => load(true)} disabled={refreshing}><RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />Refresh</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => load(true)} disabled={refreshing}><RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />Refresh</Button>
+            <Button variant="outline" onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" /><span className="hidden sm:inline">Log out</span></Button>
+          </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {[
             ["Outstanding", `ETB ${metrics.receivables.toLocaleString()}`, Receipt],
+            ["Collected", `ETB ${metrics.paid.toLocaleString()}`, Banknote],
             ["Income", `ETB ${metrics.income.toLocaleString()}`, TrendingUp],
             ["Expenses", `ETB ${metrics.expenses.toLocaleString()}`, TrendingDown],
             ["Net cash flow", `ETB ${metrics.net.toLocaleString()}`, Wallet],
             ["Overdue invoices", metrics.overdue, FileText],
+            ["Active accounts", accounts.filter(account => account.active).length, Landmark],
           ].map(([label, value, Icon]: any) => (
-            <Card key={label as string}><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-bold mt-1">{typeof value === "number" && label !== "Overdue invoices" ? "ETB " + value.toLocaleString() : value}</p></div><Icon className="h-5 w-5 text-muted-foreground" /></div></CardContent></Card>
+            <Card key={label as string}><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div><Icon className="h-5 w-5 text-muted-foreground" /></div></CardContent></Card>
           ))}
         </div>
 
         <Tabs defaultValue="overview" className="space-y-5">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
-            <TabsTrigger value="overview">Dashboard</TabsTrigger>
-            <TabsTrigger value="invoices">Invoices</TabsTrigger>
-            <TabsTrigger value="transactions">Ledger</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="budgets">Budgets</TabsTrigger>
-            <TabsTrigger value="accounts">Accounts</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="audit">Audit</TabsTrigger>
+          <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <TabsTrigger value="overview" className="shrink-0 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">Dashboard</TabsTrigger>
+            <TabsTrigger value="invoices" className="shrink-0 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">Invoices</TabsTrigger>
+            <TabsTrigger value="transactions" className="shrink-0 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">Ledger</TabsTrigger>
+            <TabsTrigger value="payments" className="shrink-0 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">Payments</TabsTrigger>
+            <TabsTrigger value="budgets" className="shrink-0 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">Budgets</TabsTrigger>
+            <TabsTrigger value="accounts" className="shrink-0 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">Accounts</TabsTrigger>
+            <TabsTrigger value="reports" className="shrink-0 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">Reports</TabsTrigger>
+            <TabsTrigger value="audit" className="shrink-0 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">Audit</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-5">
