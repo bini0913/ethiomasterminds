@@ -1,5 +1,7 @@
 -- Cross-portal school workflows: verified parent links, finance visibility, and notifications.
 -- All RPCs are scoped to auth.uid(); parent-facing finance output is summary-only.
+-- Pending links have no parent yet; a parent is attached only when the one-time code is claimed.
+alter table public.parent_links alter column parent_id drop not null;
 
 create or replace function public.create_parent_link_code()
 returns text
@@ -280,3 +282,39 @@ drop trigger if exists notify_parents_after_payment on public.finance_payments;
 create trigger notify_parents_after_payment
 after insert on public.finance_payments
 for each row execute function public.notify_linked_parents_for_payment();
+
+create or replace function public.notify_linked_parents_for_announcement()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.parent_notifications (parent_id, student_id, notification_type, title, message, read)
+  select distinct l.parent_id, l.student_id, 'teacher_announcement',
+         coalesce(new.title, 'School announcement'),
+         left(coalesce(new.content, ''), 1200),
+         false
+    from public.parent_links l
+   where l.status = 'linked'
+     and l.parent_id is not null
+     and (
+       new.target_type = 'all'
+       or (new.target_type = 'class' and exists (
+         select 1 from public.class_students cs
+         where cs.class_id = new.target_id and cs.student_id = l.student_id
+       ))
+       or (new.target_type = 'students' and exists (
+         select 1 from public.class_students cs
+         join public.classes c on c.id = cs.class_id
+         where cs.student_id = l.student_id and c.teacher_id = new.author_id
+       ))
+     );
+  return new;
+end;
+$$;
+
+drop trigger if exists notify_parents_after_announcement on public.announcements;
+create trigger notify_parents_after_announcement
+after insert on public.announcements
+for each row execute function public.notify_linked_parents_for_announcement();
