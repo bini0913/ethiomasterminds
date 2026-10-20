@@ -135,6 +135,9 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useUser();
 
+  // Finance is a standalone staff workspace with its own header and navigation.
+  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/")) return <>{children}</>;
+
   if (!isAuthenticated || !user) return <>{children}</>;
 
   const isHome = location.pathname === "/";
