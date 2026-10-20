@@ -31,6 +31,7 @@ type StudySessionRow = { id: string; created_at: string; duration: number | null
 type ParentTask = { id: string; student_id: string; title: string; description: string | null; deadline: string | null; status: string; created_by: string; is_required: boolean; created_at: string; };
 type ParentMessage = { id: string; student_id: string; message: string; emoji: string | null; read: boolean; created_at: string; };
 type ParentGoals = { student_id: string; daily_study_minutes: number; weekly_quiz_target: number; daily_xp_target: number; bedtime_hour: number | null; };
+type LinkedChildSummary = { student_id: string; student_name: string; grade: string | null; pending_assignments: number; recent_quizzes: number; average_recent_score: number | null; outstanding_amount: number; open_invoices: number; overdue_invoices: number; };
 
 const db = supabase as any;
 const toDateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
@@ -61,6 +62,9 @@ const ParentDashboard: React.FC = () => {
   const [aiInsights, setAiInsights] = useState<any>(null);
   const [earlyProgress, setEarlyProgress] = useState<any[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [linkedChildren, setLinkedChildren] = useState<LinkedChildSummary[]>([]);
+  const [parentLinkCodeInput, setParentLinkCodeInput] = useState("");
+  const [linkingChild, setLinkingChild] = useState(false);
 
   const isParentMode = localStorage.getItem("masterminds_login_mode") === "parent";
   const isEarlyStudent = getUserTier(user?.grade) === "early";
@@ -115,6 +119,26 @@ const ParentDashboard: React.FC = () => {
   };
 
   useEffect(() => { if (user?.id) void loadAll(); }, [user?.id]);
+
+  const loadLinkedChildren = async () => {
+    if (!user?.id || !isParentMode) return;
+    const { data, error } = await db.rpc("get_parent_portal_overview");
+    if (error) { console.error("Could not load linked-child overview:", error); return; }
+    setLinkedChildren((data ?? []) as LinkedChildSummary[]);
+  };
+
+  useEffect(() => { void loadLinkedChildren(); }, [user?.id, isParentMode]);
+
+  const claimChildLink = async () => {
+    if (!parentLinkCodeInput.trim()) { toast.error("Enter the code from your child's account."); return; }
+    setLinkingChild(true);
+    const { data, error } = await db.rpc("claim_parent_link_code", { p_code: parentLinkCodeInput.trim() });
+    setLinkingChild(false);
+    if (error) { toast.error(error.message || "Could not connect this child."); return; }
+    setParentLinkCodeInput("");
+    toast.success(`${data?.name || "Your child"} is now connected.`);
+    await loadLinkedChildren();
+  };
   useEffect(() => {
     if (!user?.id) return;
     const ch = supabase.channel(`parent-dash-${user.id}`)
@@ -284,6 +308,45 @@ const ParentDashboard: React.FC = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6 relative z-10">
+        <Card className="border-blue-200/70 bg-white/90 shadow-sm dark:border-slate-700 dark:bg-slate-900/90">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg"><UserCheck className="h-5 w-5 text-blue-600" /> Connected school accounts</CardTitle>
+            <CardDescription>Connect to your child’s account to receive classwork, progress and finance updates from the same school records.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input value={parentLinkCodeInput} onChange={e => setParentLinkCodeInput(e.target.value.toUpperCase())} placeholder="Enter your child's MM link code" aria-label="Child link code" />
+              <Button onClick={claimChildLink} disabled={linkingChild}>{linkingChild ? "Connecting…" : "Connect child"}</Button>
+            </div>
+            {linkedChildren.length === 0 ? (
+              <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No child accounts linked yet. On your child’s signed-in student account, open the student dashboard and generate a Parent Link Code.</p>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {linkedChildren.map(child => (
+                  <Card key={child.student_id} className="border-slate-200 dark:border-slate-700">
+                    <CardContent className="space-y-3 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div><p className="font-semibold">{child.student_name}</p><p className="text-xs text-muted-foreground">{child.grade || "Grade not set"}</p></div>
+                        <Badge variant="secondary">Connected</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Pending classwork</p><p className="text-xl font-bold">{child.pending_assignments}</p></div>
+                        <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Quizzes (30 days)</p><p className="text-xl font-bold">{child.recent_quizzes}</p></div>
+                        <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Recent average</p><p className="text-xl font-bold">{child.average_recent_score == null ? "—" : `${Math.round(Number(child.average_recent_score))}%`}</p></div>
+                        <div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Overdue invoices</p><p className="text-xl font-bold">{child.overdue_invoices}</p></div>
+                      </div>
+                      <div className="flex items-center justify-between border-t pt-3 text-sm">
+                        <span className="text-muted-foreground">Outstanding fees</span>
+                        <span className="font-semibold">ETB {Number(child.outstanding_amount || 0).toLocaleString()}</span>
+                      </div>
+                      {child.open_invoices > 0 && <p className="text-xs text-muted-foreground">{child.open_invoices} open invoice(s). Finance staff record payments in the Finance Portal.</p>}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
         {/* Hero */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="overflow-hidden border-0 bg-gradient-to-br from-primary/15 via-accent/10 to-secondary/10 backdrop-blur">
