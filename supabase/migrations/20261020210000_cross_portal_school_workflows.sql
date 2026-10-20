@@ -219,26 +219,32 @@ security definer
 set search_path = public
 as $$
 begin
+  with target_students as (
+    select ur.user_id as student_id
+      from public.user_roles ur
+     where new.target_type = 'all' and ur.role = 'student'::public.app_role
+    union
+    select cs.student_id
+      from public.class_students cs
+     where new.target_type = 'class' and cs.class_id = new.target_id
+    union
+    select cs.student_id
+      from public.class_students cs
+      join public.classes c on c.id = cs.class_id
+     where new.target_type = 'students' and c.teacher_id = new.author_id
+  ), recipients as (
+    select t.student_id, t.student_id as parent_id from target_students t
+    union
+    select l.student_id, l.parent_id from public.parent_links l
+    join target_students t on t.student_id = l.student_id
+    where l.status = 'linked' and l.parent_id is not null
+  )
   insert into public.parent_notifications (parent_id, student_id, notification_type, title, message, read)
-  select distinct l.parent_id, l.student_id, 'teacher_announcement',
+  select distinct r.parent_id, r.student_id, 'teacher_announcement',
          coalesce(new.title, 'School announcement'),
          left(coalesce(new.content, ''), 1200),
          false
-    from public.parent_links l
-   where l.status = 'linked'
-     and l.parent_id is not null
-     and (
-       new.target_type = 'all'
-       or (new.target_type = 'class' and exists (
-         select 1 from public.class_students cs
-         where cs.class_id = new.target_id and cs.student_id = l.student_id
-       ))
-       or (new.target_type = 'students' and exists (
-         select 1 from public.class_students cs
-         join public.classes c on c.id = cs.class_id
-         where cs.student_id = l.student_id and c.teacher_id = new.author_id
-       ))
-     );
+    from recipients r;
   return new;
 end;
 $$;
