@@ -32,6 +32,7 @@ type ParentTask = { id: string; student_id: string; title: string; description: 
 type ParentMessage = { id: string; student_id: string; message: string; emoji: string | null; read: boolean; created_at: string; };
 type ParentGoals = { student_id: string; daily_study_minutes: number; weekly_quiz_target: number; daily_xp_target: number; bedtime_hour: number | null; };
 type LinkedChildSummary = { student_id: string; student_name: string; grade: string | null; pending_assignments: number; recent_quizzes: number; average_recent_score: number | null; outstanding_amount: number; open_invoices: number; overdue_invoices: number; };
+type ParentPortalNotification = { id: string; title: string; message: string; notification_type: string; created_at: string; read: boolean; };
 
 const db = supabase as any;
 const toDateOnly = (iso: string) => new Date(iso).toISOString().slice(0, 10);
@@ -63,6 +64,7 @@ const ParentDashboard: React.FC = () => {
   const [earlyProgress, setEarlyProgress] = useState<any[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [linkedChildren, setLinkedChildren] = useState<LinkedChildSummary[]>([]);
+  const [portalNotifications, setPortalNotifications] = useState<ParentPortalNotification[]>([]);
   const [parentLinkCodeInput, setParentLinkCodeInput] = useState("");
   const [linkingChild, setLinkingChild] = useState(false);
 
@@ -122,9 +124,14 @@ const ParentDashboard: React.FC = () => {
 
   const loadLinkedChildren = async () => {
     if (!user?.id || !isParentMode) return;
-    const { data, error } = await db.rpc("get_parent_portal_overview");
-    if (error) { console.error("Could not load linked-child overview:", error); return; }
-    setLinkedChildren((data ?? []) as LinkedChildSummary[]);
+    const [{ data, error }, { data: notices, error: noticeError }] = await Promise.all([
+      db.rpc("get_parent_portal_overview"),
+      db.from("parent_notifications").select("id,title,message,notification_type,created_at,read").eq("parent_id", user.id).order("created_at", { ascending: false }).limit(8),
+    ]);
+    if (error) { console.error("Could not load linked-child overview:", error); }
+    else setLinkedChildren((data ?? []) as LinkedChildSummary[]);
+    if (noticeError) console.error("Could not load parent portal notifications:", noticeError);
+    else setPortalNotifications((notices ?? []) as ParentPortalNotification[]);
   };
 
   useEffect(() => { void loadLinkedChildren(); }, [user?.id, isParentMode]);
@@ -342,6 +349,17 @@ const ParentDashboard: React.FC = () => {
                       {child.open_invoices > 0 && <p className="text-xs text-muted-foreground">{child.open_invoices} open invoice(s). Finance staff record payments in the Finance Portal.</p>}
                     </CardContent>
                   </Card>
+                ))}
+              </div>
+            )}
+            {portalNotifications.length > 0 && (
+              <div className="space-y-2 border-t pt-4">
+                <div className="flex items-center justify-between"><h3 className="font-semibold">School updates</h3><Badge variant="secondary">{portalNotifications.filter(n => !n.read).length} unread</Badge></div>
+                {portalNotifications.map(notice => (
+                  <div key={notice.id} className="rounded-xl border p-3">
+                    <div className="flex items-start justify-between gap-3"><p className="text-sm font-semibold">{notice.title}</p><span className="shrink-0 text-xs text-muted-foreground">{new Date(notice.created_at).toLocaleDateString()}</span></div>
+                    <p className="mt-1 text-sm text-muted-foreground">{notice.message}</p>
+                  </div>
                 ))}
               </div>
             )}
