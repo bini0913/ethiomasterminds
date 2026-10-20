@@ -253,3 +253,37 @@ drop trigger if exists notify_parents_after_announcement on public.announcements
 create trigger notify_parents_after_announcement
 after insert on public.announcements
 for each row execute function public.notify_linked_parents_for_announcement();
+
+-- Aggregate-only finance oversight for authorized staff; never return ledger rows.
+create or replace function public.get_finance_oversight_summary()
+returns table (
+  open_invoices bigint,
+  outstanding_amount numeric,
+  overdue_invoices bigint,
+  payments_last_30_days numeric
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not public.finance_staff() then
+    raise exception 'Not authorized to view finance oversight';
+  end if;
+
+  return query
+  select
+    count(*) filter (where fi.status in ('issued', 'partial', 'overdue'))::bigint,
+    coalesce(sum(greatest(fi.total - fi.amount_paid, 0)) filter (where fi.status in ('issued', 'partial', 'overdue')), 0)::numeric,
+    count(*) filter (where fi.status = 'overdue')::bigint,
+    coalesce((
+      select sum(fp.amount) from public.finance_payments fp
+      where fp.paid_at >= now() - interval '30 days'
+    ), 0)::numeric
+  from public.finance_invoices fi;
+end;
+$$;
+
+revoke all on function public.get_finance_oversight_summary() from public;
+grant execute on function public.get_finance_oversight_summary() to authenticated;
