@@ -5,7 +5,6 @@ import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { sendRemoteNotifications } from '@/lib/staffNotifications';
-import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +39,7 @@ import {
   YAxis,
 } from 'recharts';
 
-type Role = 'student' | 'teacher' | 'admin' | 'manager' | 'extreme_admin';
+type Role = 'student' | 'teacher' | 'admin' | 'manager' | 'finance' | 'extreme_admin';
 
 interface SystemUser {
   id: string;
@@ -55,6 +54,7 @@ interface SystemUser {
   role: Role;
   grade?: string;
   created_at: string;
+  account_status?: 'active' | 'suspended' | 'banned' | 'purged';
 }
 
 interface SystemStats {
@@ -121,6 +121,7 @@ const AdminPortal: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useUser();
   const isAdmin = user?.role === 'admin' || user?.role === 'extreme_admin';
+  const isSuperAdmin = user?.role === 'extreme_admin';
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
@@ -143,6 +144,8 @@ const AdminPortal: React.FC = () => {
 
   const [notifications, setNotifications] = useState<Array<{ id: string; text: string; createdAt: string }>>([]);
   const [activityLog, setActivityLog] = useState<Array<{ id: string; actor: string; action: string; target: string; at: string }>>([]);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsStatus, setSettingsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [dailyActivity, setDailyActivity] = useState<Array<{ day: string; users: number; quizzes: number; posts: number }>>([]);
 
   const [stats, setStats] = useState<SystemStats>({
@@ -182,7 +185,19 @@ const AdminPortal: React.FC = () => {
   });
 
   const logAction = (action: string, target = 'platform') => {
-    setActivityLog((prev) => [{ id: `${Date.now()}-${Math.random()}`, actor: user?.name || 'System', action, target, at: new Date().toISOString() }, ...prev].slice(0, 200));
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(target);
+    void (supabase as any).rpc('admin_write_audit_log', {
+      p_action: action,
+      p_target_type: target === 'platform' ? 'platform' : 'record',
+      p_target_id: isUuid ? target : null,
+      p_metadata: target === 'platform' ? {} : { target_label: target },
+    }).then(({ error }: { error: { message?: string } | null }) => {
+      if (error) {
+        console.error('Could not persist admin audit event:', error.message);
+        return;
+      }
+      void fetchAuditLogs();
+    });
   };
 
   const pushNotification = (text: string) => {
@@ -190,7 +205,7 @@ const AdminPortal: React.FC = () => {
   };
 
   const fetchAllData = async () => {
-    await Promise.all([fetchUsers(), fetchContent(), fetchReports(), fetchAnnouncements(), fetchStatsAndCharts(), fetchSeasonControlData()]);
+    await Promise.all([fetchUsers(), fetchContent(), fetchReports(), fetchAnnouncements(), fetchStatsAndCharts(), fetchSeasonControlData(), fetchAuditLogs(), ...(isAdmin ? [fetchSystemSettings()] : [])]);
   };
 
   useEffect(() => {
@@ -237,15 +252,28 @@ const AdminPortal: React.FC = () => {
   }, []);
 
   const fetchUsers = async () => {
-    const { data: profiles } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(500);
-    const usersWithRoles = await Promise.all((profiles || []).map(async (p: any) => {
-      const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', p.id).single();
-      return {
-        ...p,
-        role: (roleData?.role || 'student') as Role,
-      } as SystemUser;
-    }));
-    setUsers(usersWithRoles);
+    const [profilesRes, rolesRes] = await Promise.all([
+      supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('user_roles').select('user_id, role'),
+    ]);
+    if (profilesRes.error) {
+      console.error('Admin user list failed:', profilesRes.error);
+      toast.error('Could not load users. Check your admin permissions and connection.');
+      return;
+    }
+    if (rolesRes.error) console.error('Admin role list failed:', rolesRes.error);
+    const rolePriority: Role[] = ['extreme_admin', 'admin', 'manager', 'finance', 'teacher', 'student'];
+    const roleByUser = new Map<string, Role>();
+    (rolesRes.data || []).forEach((entry: any) => {
+      const role = entry.role as Role;
+      const current = roleByUser.get(entry.user_id);
+      if (!current || rolePriority.indexOf(role) < rolePriority.indexOf(current)) roleByUser.set(entry.user_id, role);
+    });
+    setUsers((profilesRes.data || []).map((profile: any) => ({
+      ...profile,
+      role: roleByUser.get(profile.id) || 'student',
+      account_status: profile.account_status || (profile.is_banned ? 'banned' : profile.is_suspended ? 'suspended' : 'active'),
+    })) as SystemUser[]);
   };
 
   const fetchContent = async () => {
@@ -319,6 +347,41 @@ const AdminPortal: React.FC = () => {
     setReports(enriched);
   };
 
+  const fetchAuditLogs = async () => {
+    const { data, error } = await (supabase as any).rpc('admin_get_audit_logs', { p_limit: 300 });
+    if (error) {
+      console.error('Admin audit log fetch failed:', error);
+      return;
+    }
+    setActivityLog((data || []).map((row: any) => ({
+      id: row.id,
+      actor: row.actor_name || 'Staff account',
+      action: row.action,
+      target: row.metadata?.target_label || row.target_id || row.target_type || 'platform',
+      at: row.created_at,
+    })));
+  };
+
+  const fetchSystemSettings = async () => {
+    setSettingsStatus('loading');
+    const { data, error } = await (supabase as any).rpc('admin_get_settings');
+    if (error) {
+      console.error('Admin settings fetch failed:', error);
+      setSettingsStatus('error');
+      return;
+    }
+    const rows = data || [];
+    const values = new Map(rows.map((row: any) => [row.setting_key, row.setting_value]));
+    setSystemSettings({
+      feature_social_enabled: values.has('feature_social_enabled') ? values.get('feature_social_enabled') === true : true,
+      feature_xp_enabled: values.has('feature_xp_enabled') ? values.get('feature_xp_enabled') === true : true,
+      feature_ai_enabled: values.has('feature_ai_enabled') ? values.get('feature_ai_enabled') === true : true,
+      strict_moderation: values.has('strict_moderation') ? values.get('strict_moderation') === true : true,
+      max_ai_requests_per_day: Number(values.get('max_ai_requests_per_day') ?? 50),
+    });
+    setSettingsStatus('ready');
+  };
+
   const fetchAnnouncements = async () => {
     const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(100);
     setAnnouncements(data || []);
@@ -330,7 +393,7 @@ const AdminPortal: React.FC = () => {
       supabase.from('quizzes').select('id,is_approved', { count: 'exact' }),
       supabase.from('questions').select('id', { count: 'exact' }),
       supabase.from('flashcards').select('id', { count: 'exact' }),
-      supabase.from('user_roles').select('role'),
+      supabase.from('user_roles').select('user_id,role'),
       supabase.from('reports').select('id,status', { count: 'exact' }),
       supabase.from('social_posts').select('id,created_at', { count: 'exact' }),
       supabase.from('user_presence').select('id,last_seen', { count: 'exact' }),
@@ -342,11 +405,13 @@ const AdminPortal: React.FC = () => {
     const quizRows = quizzesRes.data || [];
     const reportRows = reportsRes.data || [];
 
+    const countRole = (wanted: string[]) => new Set(roles.filter((r: any) => wanted.includes(r.role)).map((r: any) => r.user_id)).size;
+
     setStats({
       totalUsers: profilesRes.count || 0,
-      totalStudents: roles.filter((r: any) => r.role === 'student').length,
-      totalTeachers: roles.filter((r: any) => r.role === 'teacher').length,
-      totalAdmins: roles.filter((r: any) => ['admin', 'manager'].includes(r.role)).length,
+      totalStudents: countRole(['student']),
+      totalTeachers: countRole(['teacher']),
+      totalAdmins: countRole(['admin', 'manager', 'extreme_admin']),
       totalQuizzes: quizzesRes.count || 0,
       totalQuestions: questionsRes.count || 0,
       totalFlashcards: flashcardsRes.count || 0,
@@ -434,21 +499,29 @@ const AdminPortal: React.FC = () => {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    await supabase.from('user_roles').delete().eq('user_id', userId);
-    const { error } = await supabase.from('profiles').delete().eq('id', userId);
-    if (error) {
-      toast.error('Failed to delete user');
-      return;
-    }
-    toast.success('User deleted');
-    logAction('Deleted user', userId);
-    fetchUsers();
-    fetchStatsAndCharts();
+    if (!isSuperAdmin) { toast.error('Permanent account deletion is restricted to Super Admin.'); return; }
+    if (userId === user?.id) { toast.error('You cannot delete the account you are currently using.'); return; }
+    const target = users.find((item) => item.id === userId);
+    if (!window.confirm(`Permanently delete ${target?.name || 'this account'} and its auth identity? This cannot be undone.`)) return;
+    const { error } = await (supabase as any).rpc('extreme_admin_delete_user', { p_user_id: userId, p_reason: 'Deleted from Admin Portal' });
+    if (error) { toast.error(error.message || 'Account deletion failed. Related records may require retention.'); return; }
+    toast.success('Auth account and its cascading profile data were deleted.');
+    await Promise.all([fetchUsers(), fetchStatsAndCharts(), fetchAuditLogs()]);
   };
 
   const handleUpdateUserRole = async (userId: string, newRole: Role) => {
-    if (!isAdmin && (newRole === 'admin' || newRole === 'manager')) {
-      toast.error('Managers cannot assign admin/manager roles');
+    if (!isAdmin && ['admin', 'manager', 'finance', 'extreme_admin'].includes(newRole)) {
+      toast.error('Managers cannot assign elevated roles'); return;
+    }
+    if (!isSuperAdmin && ['finance', 'extreme_admin'].includes(newRole)) {
+      toast.error('Only Super Admin can assign Finance or Super Admin roles.'); return;
+    }
+    if (isSuperAdmin) {
+      const { error } = await (supabase as any).rpc('extreme_admin_update_user_role', { p_user_id: userId, p_role: newRole });
+      if (error) { toast.error(error.message || 'Role update failed'); return; }
+      toast.success('Role updated');
+      logAction(`Changed role to ${newRole}`, userId);
+      await Promise.all([fetchUsers(), fetchStatsAndCharts(), fetchAuditLogs()]);
       return;
     }
 
@@ -474,21 +547,37 @@ const AdminPortal: React.FC = () => {
     fetchUsers();
   };
 
-  const handleBulkAction = async (action: 'delete' | 'promote_teacher' | 'suspend' | 'ban') => {
+  const handleBulkAction = async (action: 'delete' | 'promote_teacher' | 'suspend' | 'ban' | 'activate') => {
     if (!selectedUsers.length) {
       toast.error('Select users first');
       return;
     }
 
-    if (action === 'delete') await Promise.all(selectedUsers.map((id) => handleDeleteUser(id)));
+    if (action === 'delete') {
+      if (!isSuperAdmin) { toast.error('Permanent account deletion is restricted to Super Admin.'); return; }
+      for (const id of selectedUsers) await handleDeleteUser(id);
+    }
     if (action === 'promote_teacher') await Promise.all(selectedUsers.map((id) => handleUpdateUserRole(id, 'teacher')));
-    if (action === 'suspend') await Promise.all(selectedUsers.map((id) => supabase.from('profiles').update({ is_suspended: true } as never).eq('id', id)));
-    if (action === 'ban') await Promise.all(selectedUsers.map((id) => supabase.from('profiles').update({ is_banned: true } as never).eq('id', id)));
+    if (action === 'suspend' || action === 'ban' || action === 'activate') {
+      const status = action === 'suspend' ? 'suspended' : action === 'ban' ? 'banned' : 'active';
+      const targets = selectedUsers.map((id) => users.find((candidate) => candidate.id === id)).filter(Boolean) as SystemUser[];
+      const results = await Promise.all(targets.map(async (target) => {
+        if (isSuperAdmin) {
+          return (supabase as any).rpc('extreme_admin_set_user_status', { p_user_id: target.id, p_status: status, p_reason: 'Bulk action from Admin Portal' });
+        }
+        if (target.role !== 'student') return { error: { message: 'Standard admins can only moderate student accounts.' } };
+        return (supabase as any).rpc('manager_set_student_status', { p_user_id: target.id, p_status: status, p_reason: 'Bulk action from Admin Portal' });
+      }));
+      const failed = results.filter((result: any) => result.error);
+      if (failed.length) toast.error(`${failed.length} account(s) could not be updated. Review role permissions and selected account types.`);
+      if (failed.length < results.length) {
+        toast.success(`${results.length - failed.length} account(s) updated.`);
+        logAction(`Bulk action: ${action}`, `${results.length - failed.length} users`);
+      }
+    }
 
-    toast.success(`Bulk action executed: ${action}`);
-    logAction(`Bulk action: ${action}`, `${selectedUsers.length} users`);
     setSelectedUsers([]);
-    fetchUsers();
+    await Promise.all([fetchUsers(), fetchStatsAndCharts(), fetchAuditLogs()]);
   };
 
   const handleResetPassword = async (target: SystemUser) => {
@@ -519,7 +608,7 @@ const AdminPortal: React.FC = () => {
   };
 
   const handleDeleteContent = async (type: 'quiz' | 'question' | 'flashcard' | 'social', id: string) => {
-    const table = type === 'social' ? 'social_posts' : `${type}s`;
+    const table = type === 'social' ? 'social_posts' : type === 'quiz' ? 'quizzes' : type === 'question' ? 'questions' : 'flashcards';
     const { error } = await supabase.from(table as any).delete().eq('id', id);
     if (error) {
       toast.error(`Failed to delete ${type}`);
@@ -561,8 +650,7 @@ const AdminPortal: React.FC = () => {
       return;
     }
 
-    toast.success(`${type} reviewed`);
-    logAction(`Reviewed ${type}`, id);
+    toast.error(`Approval is not supported for ${type} records. No changes were made.`);
   };
 
   const handleModerateLibraryBook = async (bookId: string, status: 'approved' | 'rejected') => {
@@ -791,13 +879,30 @@ const AdminPortal: React.FC = () => {
     window.location.href = '/super-admin';
   };
 
-  const saveSystemSettings = () => {
+  const saveSystemSettings = async () => {
     if (!isAdmin) {
       toast.error('Admin only: system settings');
       return;
     }
-    toast.success('System settings saved');
-    logAction('Updated system settings');
+    setSettingsSaving(true);
+    const entries: Array<[keyof typeof systemSettings, boolean | number]> = [
+      ['feature_ai_enabled', systemSettings.feature_ai_enabled],
+      ['max_ai_requests_per_day', systemSettings.max_ai_requests_per_day],
+    ];
+    for (const [key, value] of entries) {
+      const { error } = await (supabase as any).rpc('admin_set_setting', { p_key: key, p_value: value });
+      if (error) {
+        setSettingsSaving(false);
+        console.error(`Could not save platform setting ${key}:`, error);
+        toast.error(`Settings were not fully saved: ${error.message || key}`);
+        await fetchSystemSettings();
+        await fetchAuditLogs();
+        return;
+      }
+    }
+    setSettingsSaving(false);
+    await Promise.all([fetchSystemSettings(), fetchAuditLogs()]);
+    toast.success('Platform settings saved to Supabase.');
   };
 
   const filteredUsers = useMemo(() => users
@@ -806,7 +911,7 @@ const AdminPortal: React.FC = () => {
     .filter((u) => (roleFilter === 'all' ? true : u.role === roleFilter)), [users, searchQuery, gradeFilter, roleFilter]);
 
   const contentRows = useMemo(() => [
-    ...quizzes.map((x: any) => ({ id: x.id, type: 'quiz', title: x.title, grade: x.grade, subject: x.subject, exam_type: x.exam_type || 'general', created_at: x.created_at })),
+    ...quizzes.map((x: any) => ({ id: x.id, type: 'quiz', title: x.title, grade: x.grade, subject: x.subject, exam_type: x.exam_type || 'general', is_approved: x.is_approved, created_at: x.created_at })),
     ...flashcards.map((x: any) => ({ id: x.id, type: 'flashcard', title: x.term || x.question || 'Flashcard', grade: x.grade, subject: x.subject, created_at: x.created_at })),
     ...questions.map((x: any) => ({ id: x.id, type: 'question', title: x.question_text || x.question || 'Question', grade: x.grade, subject: x.subject, created_at: x.created_at })),
     ...socialPosts.map((x: any) => ({ id: x.id, type: 'social', title: x.content?.slice(0, 80) || 'Social Post', grade: 'all', subject: x.post_type, created_at: x.created_at })),
@@ -832,30 +937,29 @@ const AdminPortal: React.FC = () => {
   ].filter((x) => x.value > 0);
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <AnimatedBackground variant="minimal" />
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="relative z-10">
-        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-50 border-b border-slate-800 bg-[#0A1526] text-white shadow-sm">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-6 lg:px-8">
             <div className="flex items-center gap-4">
               <BackButton />
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600">
                 <Shield className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Master Minds Admin & Manager</h1>
-                <p className="text-sm text-muted-foreground">{isAdmin ? 'Admin mode: full power' : 'Manager mode: limited controls'}</p>
+                <h1 className="text-lg font-extrabold tracking-tight text-white sm:text-2xl">Master Minds Admin</h1>
+                <p className="text-xs text-slate-300 sm:text-sm">{isSuperAdmin ? 'Super Admin access' : isAdmin ? 'Administrator workspace' : 'Manager workspace'}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               {isAdmin && (
-                <Button variant="outline" onClick={bootstrapSuperAdmin} className="hidden sm:inline-flex">
+                <Button variant="outline" onClick={bootstrapSuperAdmin} className="hidden border-white/20 bg-white/5 text-white hover:bg-white/10 sm:inline-flex">
                   <Shield className="mr-2 h-4 w-4" /> Super Admin
                 </Button>
               )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="relative">
+                  <Button variant="outline" size="icon" className="relative border-white/20 bg-white/5 text-white hover:bg-white/10">
                     <Bell className="w-4 h-4" />
                     {notifications.length > 0 && <span className="absolute -top-1 -right-1 text-[10px] px-1 rounded-full bg-destructive text-white">{notifications.length}</span>}
                   </Button>
@@ -871,13 +975,13 @@ const AdminPortal: React.FC = () => {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button variant="outline" size="sm" onClick={fetchAllData}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
+              <Button variant="outline" size="sm" className="border-white/20 bg-white/5 text-white hover:bg-white/10" onClick={fetchAllData}><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
               <Button variant="ghost" size="icon" onClick={async () => { await logout(); navigate('/'); }}><LogOut className="w-5 h-5" /></Button>
             </div>
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-6">
+        <main className="mx-auto w-full max-w-7xl px-3 py-5 pb-24 sm:px-6 sm:py-7 lg:px-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <section className="space-y-3">
               <div className="flex items-center justify-between">
@@ -895,7 +999,7 @@ const AdminPortal: React.FC = () => {
               ].map((item) => (
                 <Card
                   key={item.title}
-                  className="border-border/70 bg-card/80 transition-all hover:shadow-[0_0_25px_rgba(99,102,241,0.28)]"
+                  className="border-slate-200 bg-white shadow-sm transition-colors hover:border-blue-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
                 >
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center gap-2">
@@ -904,7 +1008,7 @@ const AdminPortal: React.FC = () => {
                     </div>
                     <p className="text-sm text-muted-foreground">{item.description}</p>
                     <Button
-                      className="w-full min-h-12"
+                      className="w-full min-h-11 bg-blue-600 text-white hover:bg-blue-700"
                       variant="outline"
                       onClick={() => setActiveTab(item.tab)}
                     >
@@ -916,8 +1020,8 @@ const AdminPortal: React.FC = () => {
               </div>
             </section>
 
-            <TabsList className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 bg-muted/50 p-2 rounded-xl max-h-[56vh] overflow-y-auto">
-              <TabsTrigger className="min-h-12 py-3" value="dashboard"><BarChart3 className="w-4 h-4 mr-1" />Dashboard</TabsTrigger>
+            <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <TabsTrigger className="min-h-11 shrink-0 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white" value="dashboard"><BarChart3 className="w-4 h-4 mr-1" />Dashboard</TabsTrigger>
               <TabsTrigger className="min-h-12 py-3" value="users"><Users className="w-4 h-4 mr-1" />Users</TabsTrigger>
               <TabsTrigger className="min-h-12 py-3" value="control"><Shield className="w-4 h-4 mr-1" />Control</TabsTrigger>
               <TabsTrigger className="min-h-12 py-3" value="content"><FileText className="w-4 h-4 mr-1" />Content</TabsTrigger>
@@ -932,19 +1036,22 @@ const AdminPortal: React.FC = () => {
 
             <TabsContent value="dashboard" className="space-y-5">
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Overview metrics</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                <h3 className="text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">Platform overview</h3>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 sm:gap-4">
                 {[
-                  ['Total Users', stats.totalUsers, Users, 'border-sky-500/40 bg-sky-500/5'],
-                  ['Active (10m)', stats.activeUsersNow, Activity, 'border-emerald-500/40 bg-emerald-500/5'],
-                  ['Flashcards', stats.totalFlashcards, Database, 'border-violet-500/40 bg-violet-500/5'],
-                  ['Books/Plans', stats.totalBooks, BookOpen, 'border-amber-500/40 bg-amber-500/5'],
-                  ['Quizzes', stats.totalQuizzes, Crown, 'border-rose-500/40 bg-rose-500/5'],
+                  ['Total users', stats.totalUsers, Users, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
+                  ['Students', stats.totalStudents, Users, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
+                  ['Teachers', stats.totalTeachers, UserCheck, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
+                  ['Active (10m)', stats.activeUsersNow, Activity, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
+                  ['Quizzes', stats.totalQuizzes, BookOpen, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
+                  ['Questions', stats.totalQuestions, FileText, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
+                  ['Pending reports', stats.pendingReports, Flag, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
+                  ['Library / plans', stats.totalBooks, Database, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
                 ].map(([label, value, IconComp, colorClass], i) => {
                   const LucideIcon = IconComp as React.ComponentType<{ className?: string }>;
                   return (
                   <motion.div key={String(label)} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                    <Card className={String(colorClass)}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{value as number}</p><LucideIcon className="w-5 h-5 text-primary" /></div></CardContent></Card>
+                    <Card className={String(colorClass) + ' shadow-sm'}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{value as number}</p><LucideIcon className="w-5 h-5 text-primary" /></div></CardContent></Card>
                   </motion.div>
                   );
                 })}
@@ -952,9 +1059,9 @@ const AdminPortal: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Trends & composition</h3>
+                <h3 className="text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">Trends & composition</h3>
                 <div className="grid lg:grid-cols-3 gap-4">
-                <Card className="lg:col-span-2 border-primary/30 bg-primary/5">
+                <Card className="lg:col-span-2 border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <CardHeader><CardTitle>Daily Activity</CardTitle></CardHeader>
                   <CardContent className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
@@ -976,15 +1083,15 @@ const AdminPortal: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 w-64" placeholder="Search users" /></div>
                 <Select value={gradeFilter} onValueChange={setGradeFilter}><SelectTrigger className="w-40"><SelectValue placeholder="Grade" /></SelectTrigger><SelectContent><SelectItem value="all">All Grades</SelectItem><SelectItem value="1">Grade 1</SelectItem><SelectItem value="5">Grade 5</SelectItem><SelectItem value="8">Grade 8</SelectItem><SelectItem value="12">Grade 12</SelectItem></SelectContent></Select>
-                <Select value={roleFilter} onValueChange={setRoleFilter}><SelectTrigger className="w-40"><SelectValue placeholder="Role" /></SelectTrigger><SelectContent><SelectItem value="all">All Roles</SelectItem><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select>
+                <Select value={roleFilter} onValueChange={setRoleFilter}><SelectTrigger className="w-40"><SelectValue placeholder="Role" /></SelectTrigger><SelectContent><SelectItem value="all">All Roles</SelectItem><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="finance">Finance</SelectItem><SelectItem value="extreme_admin">Super Admin</SelectItem></SelectContent></Select>
                 <Badge variant="outline">{filteredUsers.length} users</Badge>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={() => handleBulkAction('promote_teacher')}>Bulk Promote</Button>
                 <Button variant="outline" size="sm" onClick={() => handleBulkAction('suspend')}>Bulk Suspend</Button>
-                <Button variant="outline" size="sm" onClick={() => handleBulkAction('ban')}>Bulk Ban</Button>
-                <Button variant="destructive" size="sm" onClick={() => handleBulkAction('delete')}>Bulk Delete</Button>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction('ban')}>Bulk Ban</Button><Button variant="outline" size="sm" onClick={() => handleBulkAction('activate')}>Bulk Activate</Button>
+                {isSuperAdmin && <Button variant="destructive" size="sm" onClick={() => handleBulkAction('delete')}>Bulk Delete</Button>}
               </div>
 
               <Card>
@@ -1033,7 +1140,7 @@ const AdminPortal: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card><CardContent className="p-0"><ScrollArea className="h-[560px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Select</th><th className="p-3 text-left">User</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Joined</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{filteredUsers.map((u) => (<tr key={u.id} className="border-b border-border/50"><td className="p-3"><input type="checkbox" checked={selectedUsers.includes(u.id)} onChange={(e) => setSelectedUsers((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))} /></td><td className="p-3"><p className="font-medium">{u.name}</p><p className="text-xs text-muted-foreground">@{u.username}</p></td><td className="p-3"><Select value={u.role} onValueChange={(v) => handleUpdateUserRole(u.id, v as Role)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></td><td className="p-3">{u.grade || '-'}</td><td className="p-3"><span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-500" />{u.xp}</span></td><td className="p-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)}><Key className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+              <Card><CardContent className="p-0"><ScrollArea className="h-[560px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Select</th><th className="p-3 text-left">User</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Status</th><th className="p-3 text-left">Joined</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{filteredUsers.map((u) => (<tr key={u.id} className="border-b border-border/50"><td className="p-3"><input type="checkbox" checked={selectedUsers.includes(u.id)} onChange={(e) => setSelectedUsers((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))} /></td><td className="p-3"><p className="font-medium">{u.name}</p><p className="text-xs text-muted-foreground">@{u.username}</p></td><td className="p-3"><Select value={u.role} onValueChange={(v) => handleUpdateUserRole(u.id, v as Role)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem>{isSuperAdmin && <><SelectItem value="finance">Finance</SelectItem><SelectItem value="extreme_admin">Super Admin</SelectItem></>}</SelectContent></Select></td><td className="p-3">{u.grade || '-'}</td><td className="p-3"><span className="inline-flex items-center gap-1"><Zap className="h-3 w-3 text-blue-600" />{u.xp}</span></td><td className="p-3"><Badge variant={u.account_status === 'active' ? 'secondary' : 'destructive'}>{u.account_status || 'active'}</Badge></td><td className="p-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)} title="Send password reset email"><Key className="h-4 w-4" /></Button>{isSuperAdmin && <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)} title="Permanently delete auth account"><Trash2 className="h-4 w-4 text-destructive" /></Button>}</td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
 
             <TabsContent value="control" className="space-y-4">
@@ -1171,7 +1278,7 @@ const AdminPortal: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Manage quizzes, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Exam type</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3">{item.type === 'quiz' ? <Select value={item.exam_type || 'general'} onValueChange={(value) => handleExamTypeChange(item.id, value)}><SelectTrigger className="h-9 min-w-[150px]"><SelectValue placeholder="Exam type" /></SelectTrigger><SelectContent><SelectItem value="general">General practice</SelectItem><SelectItem value="school_exam">School exam</SelectItem><SelectItem value="coursework">Coursework</SelectItem><SelectItem value="grade12_exit">Grade 12 exit exam</SelectItem><SelectItem value="entrance_exam">Entrance exam</SelectItem><SelectItem value="past_paper">Past paper</SelectItem><SelectItem value="mock_exam">Mock exam</SelectItem></SelectContent></Select> : '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button size="sm" variant="outline" className="mr-2" onClick={() => toast.info('Inline edit can be wired to your preferred editor modal.')}>Edit</Button><Button size="sm" onClick={() => handleApproveContent(item.type, item.id)} className="mr-2"><Check className="w-4 h-4" /></Button><Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="w-4 h-4" /></Button></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+              <Card><CardHeader><CardTitle>Content Management</CardTitle><CardDescription>Manage quizzes, flashcards, questions, and social content.</CardDescription></CardHeader><CardContent className="p-0"><ScrollArea className="h-[620px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Type</th><th className="p-3 text-left">Title</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Exam type</th><th className="p-3 text-left">Created</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{contentRows.map((item: any) => (<tr key={`${item.type}-${item.id}`} className="border-b border-border/50"><td className="p-3"><Badge variant="outline">{item.type}</Badge></td><td className="p-3 max-w-md truncate">{item.title}</td><td className="p-3">{item.grade || '-'}</td><td className="p-3">{item.subject || '-'}</td><td className="p-3">{item.type === 'quiz' ? <Select value={item.exam_type || 'general'} onValueChange={(value) => handleExamTypeChange(item.id, value)}><SelectTrigger className="h-9 min-w-[150px]"><SelectValue placeholder="Exam type" /></SelectTrigger><SelectContent><SelectItem value="general">General practice</SelectItem><SelectItem value="school_exam">School exam</SelectItem><SelectItem value="coursework">Coursework</SelectItem><SelectItem value="grade12_exit">Grade 12 exit exam</SelectItem><SelectItem value="entrance_exam">Entrance exam</SelectItem><SelectItem value="past_paper">Past paper</SelectItem><SelectItem value="mock_exam">Mock exam</SelectItem></SelectContent></Select> : '-'}</td><td className="p-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><div className="inline-flex items-center gap-2">{item.type === 'quiz' && !item.is_approved && <Button size="sm" onClick={() => handleApproveContent(item.type, item.id)}><Check className="mr-1 h-4 w-4" />Approve</Button>}{item.type === 'quiz' && item.is_approved && <Badge variant="secondary">Approved</Badge>}<Button size="sm" variant="destructive" onClick={() => handleDeleteContent(item.type, item.id)}><Trash2 className="h-4 w-4" /><span className="sr-only">Delete content</span></Button></div></td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-4">
@@ -1192,7 +1299,16 @@ const AdminPortal: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4">
-              {!isAdmin ? <Card><CardContent className="py-14 text-center"><Shield className="w-10 h-10 mx-auto mb-2 text-destructive" /><p className="font-semibold">Managers cannot access sensitive controls.</p><p className="text-sm text-muted-foreground">Only Admin can configure platform/system settings.</p></CardContent></Card> : <Card><CardHeader><CardTitle>System Settings (Admin only)</CardTitle></CardHeader><CardContent className="space-y-5"><div className="flex items-center justify-between"><Label>Enable Social Feed</Label><Switch checked={systemSettings.feature_social_enabled} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, feature_social_enabled: v })} /></div><div className="flex items-center justify-between"><Label>Enable XP System</Label><Switch checked={systemSettings.feature_xp_enabled} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, feature_xp_enabled: v })} /></div><div className="flex items-center justify-between"><Label>Enable AI Features</Label><Switch checked={systemSettings.feature_ai_enabled} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, feature_ai_enabled: v })} /></div><div className="flex items-center justify-between"><Label>Strict Moderation</Label><Switch checked={systemSettings.strict_moderation} onCheckedChange={(v) => setSystemSettings({ ...systemSettings, strict_moderation: v })} /></div><div className="space-y-2"><Label>AI usage limit / day</Label><Input type="number" value={systemSettings.max_ai_requests_per_day} onChange={(e) => setSystemSettings({ ...systemSettings, max_ai_requests_per_day: Number(e.target.value) || 0 })} /></div><Button onClick={saveSystemSettings}>Save Settings</Button></CardContent></Card>}
+              {!isAdmin ? <Card className="border-slate-200 shadow-sm dark:border-slate-800"><CardContent className="py-14 text-center"><Shield className="mx-auto mb-3 h-10 w-10 text-slate-400" /><p className="font-semibold">Administrator access required</p><p className="mt-1 text-sm text-muted-foreground">Managers can review platform activity but cannot change global settings.</p></CardContent></Card> : <>
+                <Card className="border-slate-200 shadow-sm dark:border-slate-800"><CardHeader><CardTitle>Platform configuration</CardTitle><CardDescription>These controls are saved to the existing Supabase platform settings table and enforced server-side. Changes are written to the persistent admin audit trail.</CardDescription></CardHeader><CardContent className="space-y-5">
+                  {settingsStatus === 'loading' && <p className="text-sm text-muted-foreground">Loading saved settings from Supabase…</p>}
+                  {settingsStatus === 'error' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">Settings could not be loaded. Confirm the admin settings migration is applied and your account has permission, then refresh.</div>}
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800"><div><Label className="font-semibold">AI services enabled</Label><p className="mt-1 text-xs text-muted-foreground">Enforced by the AI Tutor and AI Helper server functions on each request.</p></div><Switch disabled={settingsStatus !== 'ready' || settingsSaving} checked={systemSettings.feature_ai_enabled} onCheckedChange={(value) => setSystemSettings(current => ({ ...current, feature_ai_enabled: value }))} /></div>
+                  <div className="max-w-md space-y-2"><Label>AI requests per user per rolling 24 hours (0–300)</Label><Input type="number" min={0} max={300} step={1} disabled={settingsStatus !== 'ready' || settingsSaving} value={systemSettings.max_ai_requests_per_day} onChange={(e) => setSystemSettings(current => ({ ...current, max_ai_requests_per_day: Math.max(0, Math.min(300, Math.floor(Number(e.target.value) || 0))) }))} /><p className="text-xs text-muted-foreground">A value of 0 disables AI requests. A separate per-minute abuse limit remains active.</p></div>
+                  <div className="flex flex-wrap items-center gap-3"><Button disabled={settingsStatus !== 'ready' || settingsSaving} onClick={saveSystemSettings}>{settingsSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{settingsSaving ? 'Saving to Supabase…' : 'Save configuration'}</Button><Button variant="outline" disabled={settingsSaving} onClick={fetchSystemSettings}><RefreshCw className="mr-2 h-4 w-4" />Reload saved values</Button></div>
+                  <p className="text-xs text-muted-foreground">The AI enable switch and rolling 24-hour limit are enforced by both AI Edge Functions, in addition to the existing per-minute abuse limit.</p>
+                </CardContent></Card>
+              </>}
             </TabsContent>
 
             <TabsContent value="logs" className="space-y-4">
