@@ -1,100 +1,5 @@
 -- Cross-portal school workflows: verified parent links, finance visibility, and notifications.
 -- All RPCs are scoped to auth.uid(); parent-facing finance output is summary-only.
--- Pending links have no parent yet; a parent is attached only when the one-time code is claimed.
-alter table public.parent_links alter column parent_id drop not null;
-
-create or replace function public.create_parent_link_code()
-returns text
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_user uuid := auth.uid();
-  v_code text;
-begin
-  if v_user is null then
-    raise exception 'Authentication required';
-  end if;
-  if not public.has_role(v_user, 'student'::public.app_role) then
-    raise exception 'Only student accounts can create a parent link code';
-  end if;
-
-  update public.parent_links
-     set status = 'expired'
-   where student_id = v_user and status = 'pending';
-
-  v_code := 'MM-' || substr(replace(upper(gen_random_uuid()::text), '-', ''), 1, 10);
-  insert into public.parent_links (student_id, parent_id, link_code, status)
-  values (v_user, null, v_code, 'pending');
-
-  return v_code;
-end;
-$$;
-
-revoke all on function public.create_parent_link_code() from public;
-grant execute on function public.create_parent_link_code() to authenticated;
-
-create or replace function public.claim_parent_link_code(p_code text)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_parent uuid := auth.uid();
-  v_link public.parent_links%rowtype;
-  v_student_name text;
-  v_grade text;
-begin
-  if v_parent is null then
-    raise exception 'Authentication required';
-  end if;
-  if nullif(trim(p_code), '') is null then
-    raise exception 'Enter a parent link code';
-  end if;
-
-  select * into v_link
-    from public.parent_links
-   where upper(link_code) = upper(trim(p_code))
-     and status = 'pending'
-     and parent_id is null
-     and student_id <> v_parent
-   order by created_at desc
-   limit 1
-   for update;
-
-  if not found then
-    raise exception 'That code is invalid, expired, or already used';
-  end if;
-
-  if exists (
-    select 1 from public.parent_links
-     where parent_id = v_parent
-       and student_id = v_link.student_id
-       and status = 'linked'
-  ) then
-    raise exception 'This child is already linked to your account';
-  end if;
-
-  update public.parent_links
-     set parent_id = v_parent, status = 'linked', linked_at = now()
-   where id = v_link.id;
-
-  select name, grade into v_student_name, v_grade
-    from public.profiles where id = v_link.student_id;
-
-  insert into public.parent_notifications (parent_id, student_id, notification_type, title, message, read)
-  values (v_parent, v_link.student_id, 'portal_link', 'Child account connected',
-          coalesce(v_student_name, 'Your child') || ' is now connected to your Parent Portal.', false);
-
-  return jsonb_build_object('student_id', v_link.student_id, 'name', v_student_name, 'grade', v_grade);
-end;
-$$;
-
-revoke all on function public.claim_parent_link_code(text) from public;
-grant execute on function public.claim_parent_link_code(text) to authenticated;
-
 create or replace function public.get_parent_portal_overview()
 returns table (
   student_id uuid,
@@ -112,53 +17,57 @@ stable
 security definer
 set search_path = public
 as $$
+  with authorized_students as (
+    -- This app's current Parent View uses the child's account credentials; show that account's own summary.
+    select auth.uid() as student_id
+     where auth.uid() is not null and public.has_role(auth.uid(), 'student'::public.app_role)
+    union
+    -- Keep support for any already-linked parent records, without allowing arbitrary student lookups.
+    select l.student_id
+      from public.parent_links l
+     where l.parent_id = auth.uid() and l.status = 'linked'
+  )
   select
-    l.student_id,
+    p.id as student_id,
     coalesce(p.name, 'Student') as student_name,
     p.grade,
     (
       select count(*)
       from public.quiz_assignments qa
-      where (qa.student_id = l.student_id or exists (
+      where (qa.student_id = p.id or exists (
         select 1 from public.class_students cs
-        where cs.class_id = qa.class_id and cs.student_id = l.student_id
+        where cs.class_id = qa.class_id and cs.student_id = p.id
       ))
       and not exists (
         select 1 from public.quiz_results qr
-        where qr.student_id = l.student_id
+        where qr.student_id = p.id
           and qr.quiz_id = qa.quiz_id
           and qr.completed_at >= qa.created_at
       )
     ) as pending_assignments,
     (
       select count(*) from public.quiz_results qr
-      where qr.student_id = l.student_id
-        and qr.completed_at >= now() - interval '30 days'
+      where qr.student_id = p.id and qr.completed_at >= now() - interval '30 days'
     ) as recent_quizzes,
     (
       select round(avg(qr.score)::numeric, 1) from public.quiz_results qr
-      where qr.student_id = l.student_id
-        and qr.completed_at >= now() - interval '30 days'
+      where qr.student_id = p.id and qr.completed_at >= now() - interval '30 days'
     ) as average_recent_score,
     coalesce((
       select sum(greatest(fi.total - fi.amount_paid, 0))
       from public.finance_invoices fi
-      where fi.student_id = l.student_id
-        and fi.status in ('issued', 'partial', 'overdue')
+      where fi.student_id = p.id and fi.status in ('issued', 'partial', 'overdue')
     ), 0)::numeric as outstanding_amount,
     (
       select count(*) from public.finance_invoices fi
-      where fi.student_id = l.student_id
-        and fi.status in ('issued', 'partial', 'overdue')
+      where fi.student_id = p.id and fi.status in ('issued', 'partial', 'overdue')
     ) as open_invoices,
     (
       select count(*) from public.finance_invoices fi
-      where fi.student_id = l.student_id and fi.status = 'overdue'
+      where fi.student_id = p.id and fi.status = 'overdue'
     ) as overdue_invoices
-  from public.parent_links l
-  join public.profiles p on p.id = l.student_id
-  where l.parent_id = auth.uid()
-    and l.status = 'linked'
+  from authorized_students a
+  join public.profiles p on p.id = a.student_id
   order by p.name;
 $$;
 
@@ -179,21 +88,23 @@ begin
   v_due := case when new.due_date is null then 'No due date was set.'
                 else 'Due ' || to_char(new.due_date at time zone 'UTC', 'DD Mon YYYY HH24:MI') || ' UTC.' end;
 
+  with target_students as (
+    select new.student_id as student_id where new.student_id is not null
+    union
+    select cs.student_id from public.class_students cs where cs.class_id = new.class_id
+  ), recipients as (
+    select t.student_id, t.student_id as parent_id from target_students t
+    union
+    select l.student_id, l.parent_id from public.parent_links l
+    join target_students t on t.student_id = l.student_id
+    where l.status = 'linked' and l.parent_id is not null
+  )
   insert into public.parent_notifications (parent_id, student_id, notification_type, title, message, read)
-  select distinct l.parent_id, l.student_id, 'assignment',
+  select distinct r.parent_id, r.student_id, 'assignment',
          'New learning assignment',
-         coalesce(v_title, 'A new quiz') || ' was assigned to your child. ' || v_due,
+         coalesce(v_title, 'A new quiz') || ' was assigned. ' || v_due,
          false
-    from public.parent_links l
-   where l.status = 'linked'
-     and l.parent_id is not null
-     and (
-       (new.student_id is not null and l.student_id = new.student_id)
-       or exists (
-         select 1 from public.class_students cs
-         where cs.class_id = new.class_id and cs.student_id = l.student_id
-       )
-     );
+    from recipients r;
   return new;
 end;
 $$;
@@ -214,6 +125,12 @@ declare
 begin
   select q.title into v_title from public.quizzes q where q.id = new.quiz_id;
   insert into public.parent_notifications (parent_id, student_id, notification_type, title, message, read)
+  select new.student_id, new.student_id, 'quiz_result',
+         'New learning result',
+         coalesce(v_title, 'A quiz') || ': score ' || coalesce(new.score, 0)::text ||
+         '%. View the learning summary in Parent Portal.',
+         false
+  union all
   select l.parent_id, l.student_id, 'quiz_result',
          'New learning result',
          coalesce(v_title, 'A quiz') || ': score ' || coalesce(new.score, 0)::text ||
@@ -238,6 +155,12 @@ set search_path = public
 as $$
 begin
   insert into public.parent_notifications (parent_id, student_id, notification_type, title, message, read)
+  select new.student_id, new.student_id, 'invoice',
+         'School invoice issued',
+         'Invoice ' || new.invoice_number || ' is available. Outstanding balance: ' ||
+         new.currency || ' ' || greatest(new.total - new.amount_paid, 0)::text || '.',
+         false
+  union all
   select l.parent_id, l.student_id, 'invoice',
          'School invoice issued',
          'Invoice ' || new.invoice_number || ' is available. Outstanding balance: ' ||
@@ -267,6 +190,12 @@ begin
   if not found then return new; end if;
 
   insert into public.parent_notifications (parent_id, student_id, notification_type, title, message, read)
+  select v_invoice.student_id, v_invoice.student_id, 'payment',
+         'School payment recorded',
+         'A payment of ' || v_invoice.currency || ' ' || new.amount::text ||
+         ' was recorded for invoice ' || v_invoice.invoice_number || '.',
+         false
+  union all
   select l.parent_id, l.student_id, 'payment',
          'School payment recorded',
          'A payment of ' || v_invoice.currency || ' ' || new.amount::text ||
