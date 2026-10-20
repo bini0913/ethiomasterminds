@@ -208,19 +208,19 @@ const TeacherPortal: React.FC = () => {
       const { data, error } = await supabase.rpc('get_class_students', { class_uuid: cls.id });
       if (error) {
         console.error(`Failed to load students for ${cls.name}:`, error);
-        return [] as Array<{ student: Student; className: string }>;
+        return [] as Array<{ student: Student; className: string; classId: string }>;
       }
-      return (data || []).map((student: Student) => ({ student, className: cls.name }));
+      return (data || []).map((student: Student) => ({ student, className: cls.name, classId: cls.id }));
     }));
 
     const directory = new Map<string, DirectoryStudent>();
-    results.flat().forEach(({ student, className }) => {
+    results.flat().forEach(({ student, className, classId }) => {
       const existing = directory.get(student.id);
       if (existing) {
         if (!existing.classNames.includes(className)) existing.classNames.push(className);
-        if (!existing.classIds.includes(classes.find(cls => cls.name === className)?.id || '')) existing.classIds.push(classes.find(cls => cls.name === className)?.id || '');
+        if (!existing.classIds.includes(classId)) existing.classIds.push(classId);
       } else {
-        directory.set(student.id, { ...student, classNames: [className], classIds: [classes.find(cls => cls.name === className)?.id || ''] });
+        directory.set(student.id, { ...student, classNames: [className], classIds: [classId] });
       }
     });
     setAllStudents(Array.from(directory.values()).sort((a, b) => (a.name || '').localeCompare(b.name || '')));
