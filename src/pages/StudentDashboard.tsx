@@ -80,23 +80,13 @@ const StudentDashboard: React.FC = () => {
   const [streak, setStreak] = useState(0);
   const [onlineFriends, setOnlineFriends] = useState<OnlineFriend[]>([]);
   const [loading, setLoading] = useState(true);
-  const [parentLinkCode, setParentLinkCode] = useState<string | null>(null);
-  const [creatingParentLink, setCreatingParentLink] = useState(false);
+  const [assignedLearning, setAssignedLearning] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
       loadDashboardData();
     }
   }, [user]);
-
-  const generateParentLinkCode = async () => {
-    setCreatingParentLink(true);
-    const { data, error } = await supabase.rpc("create_parent_link_code");
-    setCreatingParentLink(false);
-    if (error) { console.error("Parent link code creation failed:", error); toast.error(error.message || "Could not create a parent link code."); return; }
-    setParentLinkCode(String(data));
-    toast.success("Parent link code created. Share it with your parent.");
-  };
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -105,13 +95,31 @@ const StudentDashboard: React.FC = () => {
         fetchTodayStats(),
         fetchDailyMissions(),
         fetchStreak(),
-        fetchOnlineFriends()
+        fetchOnlineFriends(),
+        fetchAssignedLearning()
       ]);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchAssignedLearning = async () => {
+    if (!user?.id) return;
+    const { data: memberships, error: membershipError } = await supabase
+      .from("class_students").select("class_id").eq("student_id", user.id);
+    if (membershipError) { console.error("Could not load class memberships:", membershipError); return; }
+    const classIds = Array.from(new Set((memberships ?? []).map((row: any) => row.class_id).filter(Boolean)));
+    let query = supabase.from("quiz_assignments")
+      .select("id,quiz_id,class_id,student_id,due_date,created_at,quizzes(title,subject),classes(name,grade)")
+      .order("created_at", { ascending: false }).limit(8);
+    query = classIds.length
+      ? query.or(`student_id.eq.${user.id},class_id.in.(${classIds.join(",")})`)
+      : query.eq("student_id", user.id);
+    const { data, error } = await query;
+    if (error) { console.error("Could not load teacher assignments:", error); return; }
+    setAssignedLearning((data ?? []) as any[]);
   };
 
   const fetchTodayStats = async () => {
@@ -350,16 +358,19 @@ const StudentDashboard: React.FC = () => {
         >
           <motion.div variants={itemVariants}>
             <Card className="border-blue-200/70 bg-white/90 shadow-sm dark:border-slate-700 dark:bg-slate-900/90">
-              <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-xl bg-blue-100 p-3 text-blue-700 dark:bg-blue-950 dark:text-cyan-300"><Users className="h-5 w-5" /></div>
-                  <div>
-                    <h2 className="font-semibold">Connect your Parent Portal</h2>
-                    <p className="text-sm text-muted-foreground">Share a one-time code so your parent can see your learning progress, assignments and school-fee summaries.</p>
-                    {parentLinkCode && <p className="mt-2 inline-flex rounded-lg border border-dashed px-3 py-2 font-mono text-lg font-bold tracking-widest">{parentLinkCode}</p>}
+              <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg"><GraduationCap className="h-5 w-5 text-blue-600" /> Assignments from your teachers</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {assignedLearning.length === 0 ? (
+                  <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">Your teacher assignments will appear here when a quiz is assigned to one of your classes.</p>
+                ) : assignedLearning.map((item: any) => (
+                  <div key={item.id} className="flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-semibold">{item.quizzes?.title || "Assigned quiz"}</p>
+                      <p className="text-xs text-muted-foreground">{item.quizzes?.subject || "Learning activity"}{item.classes?.name ? ` · ${item.classes.name}` : ""}{item.due_date ? ` · Due ${new Date(item.due_date).toLocaleDateString()}` : ""}</p>
+                    </div>
+                    <Button size="sm" onClick={() => navigate(item.quizzes?.subject ? `/quiz?subject=${encodeURIComponent(item.quizzes.subject)}` : "/quiz")}>Open Quiz Center</Button>
                   </div>
-                </div>
-                <Button onClick={generateParentLinkCode} disabled={creatingParentLink} className="shrink-0">{creatingParentLink ? "Generating…" : parentLinkCode ? "Generate new code" : "Generate link code"}</Button>
+                ))}
               </CardContent>
             </Card>
           </motion.div>
