@@ -18,8 +18,15 @@ serve(async (req) => {
     if (authError || !authData.user) return new Response(JSON.stringify({ error: "Invalid authentication token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const dailyLimit = await supabase.rpc("consume_configured_ai_request");
-    if (dailyLimit.error) throw dailyLimit.error;
-    if (!dailyLimit.data) return new Response(JSON.stringify({ error: "AI is disabled by the administrator or your rolling 24-hour request limit has been reached." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (dailyLimit.error) {
+      if (dailyLimit.error.code === "PGRST202") {
+        console.error("Admin AI settings migration is not applied yet; existing per-minute protection remains active.");
+      } else {
+        throw dailyLimit.error;
+      }
+    } else if (!dailyLimit.data) {
+      return new Response(JSON.stringify({ error: "AI is disabled by the administrator or your rolling 24-hour request limit has been reached." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const rateLimit = await supabase.rpc("consume_edge_rate_limit", { p_bucket: "ai-academic-insights", p_limit: 10, p_window_seconds: 300 });
     if (rateLimit.error) throw rateLimit.error;
