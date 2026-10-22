@@ -211,8 +211,8 @@ const FlashcardsPage: React.FC = () => {
   // Subject selection view
   if (!selectedSubject) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-        <header className="sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl">
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 bg-primary text-primary-foreground px-4 py-3 shadow-xl">
           <div className="flex items-center gap-3 max-w-4xl mx-auto">
             <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className="text-white hover:bg-white/10">
               <ArrowLeft className="h-5 w-5" />
@@ -250,7 +250,7 @@ const FlashcardsPage: React.FC = () => {
         {dueCards.length > 0 && (
           <div className="px-4 max-w-4xl mx-auto mb-4">
             <Button
-              className="w-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground h-12 text-base"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-base"
               onClick={() => { setStudyMode("review"); setSelectedSubject("all"); setCurrentIndex(0); }}
             >
               <Brain className="h-5 w-5 mr-2" />
