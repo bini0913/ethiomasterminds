@@ -256,8 +256,5 @@
   /* Keep student portal content comfortable on narrow phones and wide tablets. */
   .tier-early main, .tier-middle main, .tier-upper main { min-width: 0; }
   .tier-early section, .tier-middle section, .tier-upper section { min-width: 0; }
-  .tier-early a, .tier-middle a, .tier-upper a { overflow-wrap: anywhere; }
-  @media (max-width: 359px) {
-    .tier-early .student-stat-grid, .tier-middle .student-stat-grid { grid-template-columns: minmax(0, 1fr); }
-  }
+  .tier-early main a, .tier-middle main a, .tier-upper main a { overflow-wrap: anywhere; }
 }
