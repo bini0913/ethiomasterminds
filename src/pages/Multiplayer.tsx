@@ -331,9 +331,9 @@ const Multiplayer: React.FC = () => {
         </div>
       </header>
 
-      <main className={upperStudent ? "mm-arena-hero container mx-auto max-w-7xl space-y-6 rounded-b-3xl border-x border-b border-white/10 px-4 py-5 sm:px-6 sm:py-7" : "container mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 sm:py-7"}>
+      <main className="container mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 sm:py-7">
         {/* Player card */}
-        <Card className={upperStudent ? "mm-arena-panel overflow-hidden" : ""}>
+        <Card className={upperStudent ? "mm-arena-hero mm-arena-panel overflow-hidden" : ""}>
           <CardContent className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/20 grid place-items-center font-bold text-primary">
