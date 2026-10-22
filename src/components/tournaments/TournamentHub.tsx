@@ -511,9 +511,9 @@ const TournamentHub: React.FC = () => {
             <p className={upperStudent ? "mm-tournament-label text-xs uppercase tracking-widest" : "text-xs uppercase tracking-widest text-cyan-200/70"}>Selected Tournament</p>
             <p className={upperStudent ? "mm-tournament-value mt-2 text-lg font-semibold" : "mt-2 text-lg font-semibold text-cyan-100"}>{selectedTournament?.name || "No tournament selected"}</p>
           </div>
-          <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-4">
-            <p className="text-xs uppercase tracking-widest text-cyan-200/70">Players</p>
-            <p className="mt-2 text-lg font-semibold text-cyan-100">
+          <div className={upperStudent ? "mm-tournament-metric rounded-xl border p-4" : "rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-4"}>
+            <p className={upperStudent ? "mm-tournament-label text-xs uppercase tracking-widest" : "text-xs uppercase tracking-widest text-cyan-200/70"}>Players</p>
+            <p className={upperStudent ? "mm-tournament-value mt-2 text-lg font-semibold" : "mt-2 text-lg font-semibold text-cyan-100"}>
               {selectedTournament ? `${selectedTournament.currentPlayers}/${selectedTournament.maxPlayers}` : "-"}
             </p>
           </div>
@@ -818,12 +818,12 @@ const TournamentHub: React.FC = () => {
 
       <Card className={upperStudent ? "mm-tournament-panel border-border/70 bg-card shadow-sm" : "border-cyan-400/25 bg-slate-950/90"}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-cyan-100"><Zap className="h-5 w-5" /> 📊 Realtime Event Feed</CardTitle>
+          <CardTitle className={upperStudent ? "flex items-center gap-2 text-foreground" : "flex items-center gap-2 text-cyan-100"}><Zap className={upperStudent ? "h-5 w-5 text-primary" : "h-5 w-5"} /> 📊 Realtime Event Feed</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {events.map((event) => (
             <div key={event.id} className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs">
-              <p className="font-semibold text-cyan-100">{event.eventType}</p>
+              <p className={upperStudent ? "font-semibold text-foreground" : "font-semibold text-cyan-100"}>{event.eventType}</p>
               <p className="text-slate-300">{new Date(event.createdAt).toLocaleString()}</p>
               <p className="text-slate-400">{JSON.stringify(event.data)}</p>
             </div>
