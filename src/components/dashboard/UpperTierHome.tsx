@@ -2,7 +2,8 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight, BookOpen, BrainCircuit, ChevronRight, Clock3, LogOut, Settings,
-  Sparkles, Swords, Timer, AlertCircle, Loader2
+  Sparkles, Swords, Timer, AlertCircle, Loader2, Home, Trophy, Users, Library,
+  Bot, Bell, CalendarDays, Target, BarChart3, Layers3
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useLearningDNA } from "@/hooks/useLearningDNA";
@@ -35,7 +36,7 @@ const UpperStudentDashboard: React.FC = () => {
   const attemptCount = learningData?.totalAttempts ?? 0;
   const profilePath = user?.id ? `/profile/${user.id}` : "/settings";
 
-  return <div className="tier-upper mm-upper-shell min-h-screen bg-background pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-foreground">
+  return <div className="tier-upper mm-upper-shell min-h-screen bg-background text-foreground">
     <style>{`
       .mm-upper-shell { --mm-navy:#101a35; --mm-navy-2:#17264a; --mm-gold:#f3c96b; --mm-ink:#f8fafc; }
       .mm-upper-shell .mm-upper-hero { background:radial-gradient(circle at 86% 15%,rgba(243,201,107,.16),transparent 28%),linear-gradient(120deg,var(--mm-navy),var(--mm-navy-2)); color:var(--mm-ink); }
@@ -46,9 +47,45 @@ const UpperStudentDashboard: React.FC = () => {
       .mm-upper-shell .mm-tone-violet {background:rgba(139,92,246,.13);color:#8b5cf6}.mm-upper-shell .mm-tone-blue {background:rgba(59,130,246,.12);color:#3b82f6}.mm-upper-shell .mm-tone-green {background:rgba(16,185,129,.12);color:#10b981}.mm-upper-shell .mm-tone-gold {background:rgba(217,161,44,.16);color:#c58b17}.mm-upper-shell .mm-tone-pink {background:rgba(217,70,239,.12);color:#c026d3}.mm-upper-shell .mm-tone-cyan {background:rgba(6,182,212,.12);color:#0891b2}.mm-upper-shell .mm-tone-coral {background:rgba(249,115,22,.12);color:#ea580c}
       .mm-upper-shell .mm-upper-stat { background:var(--card); border:1px solid var(--border); border-radius:1rem; padding:1rem; min-width:0; }
       .mm-upper-shell .mm-upper-label { color:rgba(237,242,255,.72); font-size:.75rem; }
+      .mm-upper-shell .mm-upper-sidebar { width:16rem; }
+      .mm-upper-shell .mm-upper-nav-link { display:flex; align-items:center; gap:.75rem; min-height:2.65rem; padding:.65rem .8rem; border-radius:.8rem; color:var(--muted-foreground); font-size:.875rem; font-weight:550; text-align:left; transition:background .15s,color .15s; }
+      .mm-upper-shell .mm-upper-nav-link:hover { background:var(--muted); color:var(--foreground); }
+      .mm-upper-shell .mm-upper-nav-link[data-active="true"] { background:rgba(99,102,241,.12); color:hsl(var(--primary)); font-weight:700; }
       @media(max-width:640px){.mm-upper-shell .mm-upper-hero{border-radius:1.25rem}.mm-upper-shell .mm-upper-action{padding:.85rem;gap:.7rem}.mm-upper-shell .mm-upper-icon{height:2.6rem;width:2.6rem}.mm-upper-shell .mm-upper-action .text-sm{font-size:.78rem;line-height:1.15rem}}
     `}</style>
-    <header className="border-b border-border/80 bg-background pt-[env(safe-area-inset-top)]">
+    <aside className="mm-upper-sidebar fixed inset-y-0 left-0 z-40 hidden border-r border-border bg-card/95 px-4 py-5 lg:flex lg:flex-col">
+      <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left">
+        <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span>
+        <span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span></span>
+      </button>
+      <nav aria-label="High school navigation" className="flex-1 space-y-1 overflow-y-auto">
+        <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Workspace</p>
+        <button type="button" data-active="true" onClick={() => navigate("/")} className="mm-upper-nav-link w-full"><Home className="h-4 w-4"/> Home</button>
+        <button type="button" onClick={() => navigate("/study-mode")} className="mm-upper-nav-link w-full"><Timer className="h-4 w-4"/> Study Mode</button>
+        <button type="button" onClick={() => navigate("/academic")} className="mm-upper-nav-link w-full"><BookOpen className="h-4 w-4"/> Academic Mode <ChevronRight className="ml-auto h-4 w-4"/></button>
+        <div className="ml-4 space-y-1 border-l border-border pl-3">
+          <button type="button" onClick={() => navigate("/academic/topics")} className="mm-upper-nav-link w-full"><Layers3 className="h-4 w-4"/> Topic Coverage</button>
+          <button type="button" onClick={() => navigate("/academic/flashcards")} className="mm-upper-nav-link w-full"><BrainCircuit className="h-4 w-4"/> Flashcards & Revision</button>
+          <button type="button" onClick={() => navigate("/academic/exam")} className="mm-upper-nav-link w-full"><Target className="h-4 w-4"/> Exam Mode</button>
+          <button type="button" onClick={() => navigate("/academic/planner")} className="mm-upper-nav-link w-full"><CalendarDays className="h-4 w-4"/> Study Planner</button>
+          <button type="button" onClick={() => navigate("/academic/insights")} className="mm-upper-nav-link w-full"><BarChart3 className="h-4 w-4"/> Academic Insights</button>
+        </div>
+        <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Connect</p>
+        <button type="button" onClick={() => navigate("/multiplayer")} className="mm-upper-nav-link w-full"><Swords className="h-4 w-4"/> Multiplayer</button>
+        <button type="button" onClick={() => navigate("/tournaments")} className="mm-upper-nav-link w-full"><Trophy className="h-4 w-4"/> Tournaments</button>
+        <button type="button" onClick={() => navigate("/learning-dna")} className="mm-upper-nav-link w-full"><BrainCircuit className="h-4 w-4"/> Learning DNA</button>
+        <button type="button" onClick={() => navigate("/friends")} className="mm-upper-nav-link w-full"><Users className="h-4 w-4"/> Friends</button>
+        <button type="button" onClick={() => navigate("/library")} className="mm-upper-nav-link w-full"><Library className="h-4 w-4"/> Library</button>
+        <button type="button" onClick={() => navigate("/ai-tutor")} className="mm-upper-nav-link w-full"><Bot className="h-4 w-4"/> AI Tutor</button>
+        <button type="button" onClick={() => navigate("/notifications")} className="mm-upper-nav-link w-full"><Bell className="h-4 w-4"/> Notifications</button>
+      </nav>
+      <div className="mt-4 border-t border-border pt-3">
+        <button type="button" onClick={() => navigate("/settings")} className="mm-upper-nav-link w-full"><Settings className="h-4 w-4"/> Settings</button>
+        <button type="button" onClick={async () => { await logout(); navigate("/", { replace: true }); }} className="mm-upper-nav-link w-full hover:!bg-destructive/10 hover:!text-destructive"><LogOut className="h-4 w-4"/> Log out</button>
+      </div>
+    </aside>
+    <div className="min-w-0 lg:pl-64">
+    <header className="border-b border-border/80 bg-background pt-[env(safe-area-inset-top)] lg:hidden">
       <div className="mx-auto flex min-h-16 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <button type="button" onClick={() => navigate("/")} className="flex min-h-11 min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span>
@@ -92,6 +129,7 @@ const UpperStudentDashboard: React.FC = () => {
 
       <p className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground"><Loader2 className="mt-0.5 h-4 w-4 shrink-0"/> Your progress comes from your signed-in account. Use More in the bottom navigation for friends, tournaments, the library, revision, notifications and other tools.</p>
     </main>
+    </div>
   </div>;
 };
 export default UpperStudentDashboard;
