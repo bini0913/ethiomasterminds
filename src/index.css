@@ -28,7 +28,7 @@
     --overlay: 216 20% 13% / .52;
     --ring: 221 83% 53%; --focus-ring: 221 83% 53%;
     --tier-early: 221 83% 53%; --tier-middle: 221 83% 53%; --tier-upper: 221 83% 53%;
-    --tier-early-foreground: 216 20% 13%; --tier-middle-foreground: 0 0% 100%; --tier-upper-foreground: 0 0% 100%;
+    --tier-early-foreground: 0 0% 100%; --tier-middle-foreground: 0 0% 100%; --tier-upper-foreground: 0 0% 100%;
     /* Upper-tier semantic roles: intelligence, mastery, and focused review. */
     --upper-intelligence: 250 58% 96%; --upper-intelligence-foreground: 250 48% 38%; --upper-mastery: 151 56% 29%; --upper-focus: 38 88% 37%;
     --radius-sm: .5rem; --radius-md: .75rem; --radius-lg: 1rem; --radius-xl: 1.5rem; --radius: var(--radius-md);
