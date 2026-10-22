@@ -61,9 +61,9 @@ const UpperStudentDashboard: React.FC = () => {
         <button type="button" onClick={() => navigate("/tournaments")} className="mm-upper-nav-link w-full"><Trophy className="h-4 w-4"/> Tournaments</button>
         <button type="button" onClick={() => navigate("/learning-dna")} className="mm-upper-nav-link w-full"><BrainCircuit className="h-4 w-4"/> Learning DNA</button>
         <button type="button" onClick={() => navigate("/friends")} className="mm-upper-nav-link w-full"><Users className="h-4 w-4"/> Friends</button>
+        <button type="button" onClick={() => navigate("/social/community")} className="mm-upper-nav-link w-full"><Users className="h-4 w-4"/> Community</button>
         <button type="button" onClick={() => navigate("/library")} className="mm-upper-nav-link w-full"><Library className="h-4 w-4"/> Library</button>
         <button type="button" onClick={() => navigate("/ai-tutor")} className="mm-upper-nav-link w-full"><Bot className="h-4 w-4"/> AI Tutor</button>
-        <button type="button" onClick={() => navigate("/notifications")} className="mm-upper-nav-link w-full"><Bell className="h-4 w-4"/> Notifications</button>
       </nav>
       <div className="mt-4 border-t border-slate-800 pt-3">
         <button type="button" onClick={() => navigate("/settings")} className="mm-upper-nav-link w-full"><Settings className="h-4 w-4"/> Settings</button>
@@ -111,7 +111,7 @@ const UpperStudentDashboard: React.FC = () => {
       </section>
 
 
-      <p className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground"><Loader2 className="mt-0.5 h-4 w-4 shrink-0"/> Your progress comes from your signed-in account. Use More in the bottom navigation for friends, tournaments, the library, revision, notifications and other tools.</p>
+      <p className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground"><Loader2 className="mt-0.5 h-4 w-4 shrink-0"/> Your progress comes from your signed-in account. Use the sidebar to open academic tools, friends, tournaments, the library and other learning features.</p>
     </main>
     </div>
     <div className="lg:hidden"><StudentBottomNav /></div>
