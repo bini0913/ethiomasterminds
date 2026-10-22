@@ -41,7 +41,7 @@ const MiddleTierHome: React.FC = () => {
   const levelProgress = Math.max(0, Math.min(100, xp - (level - 1) * 100));
 
   return <div className="min-h-screen bg-background pb-28 text-foreground">
-    <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 px-4 py-3 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 px-4 pt-[calc(.75rem+env(safe-area-inset-top))] pb-3 backdrop-blur-xl">
       <div className="mx-auto flex max-w-5xl items-center gap-3">
         <Link to={user?.id ? `/profile/${user.id}` : "/settings"} aria-label="Open your profile" className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><AvatarRenderer avatar={user?.avatar} avatarConfig={user?.avatarConfig} size="md" className="h-11 w-11 ring-2 ring-primary/15"/></Link>
         <div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Grade 5–8 · Your space</p><h1 className="truncate text-lg font-bold">Master Minds</h1></div>
