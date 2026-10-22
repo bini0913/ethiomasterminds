@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import StudyCallBar from "@/components/study/StudyCallBar";
 import StudyLeaderboard from "@/components/study/StudyLeaderboard";
 import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 import { ArrowLeft, Brain, Check, Clock, Flame, Pause, Play, RotateCcw, StopCircle, Trophy, Users, Zap } from "lucide-react";
 
 type StudyMode = "pomodoro" | "deep" | "custom";
@@ -90,6 +91,7 @@ const clampMinutes = (v: number, min: number, max: number) => Math.max(min, Math
 
 const StudyModePage: React.FC = () => {
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
 
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<StudyTask[]>([]);
@@ -565,7 +567,7 @@ const StudyModePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white pb-[env(safe-area-inset-bottom)]">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white pb-[env(safe-area-inset-bottom)]"}>
       <div className="max-w-7xl mx-auto px-3 py-4 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <header>
           <Link to="/" className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white mb-2">
