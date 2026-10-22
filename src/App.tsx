@@ -72,6 +72,7 @@ import { ArrowLeft, Home, LogOut } from "lucide-react";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
 import NativeBackHandler from "./components/mobile/NativeBackHandler";
+import StudentBottomNav from "./components/layout/StudentBottomNav";
 import NotificationBootstrap from "./components/notifications/NotificationBootstrap";
 import NotificationRouteHandler from "./components/notifications/NotificationRouteHandler";
 import SocialRealtimeNotifications from "./components/notifications/SocialRealtimeNotifications";
@@ -159,9 +160,15 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
     navigate("/", { replace: true });
   };
 
+  // Keep primary student navigation available on ordinary subpages. Focused
+  // activities keep the full viewport and rely on the in-page back/home controls.
+  const isStudent = user.role === "student";
+  const focusedActivityPrefixes = ["/quiz", "/early-games", "/early-quiz", "/multiplayer", "/lobby", "/study-mode", "/chat"];
+  const showStudentBottomNav = isStudent && !focusedActivityPrefixes.some((prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`));
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
+    <div className={showStudentBottomNav ? "min-h-screen bg-background pb-[calc(5rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background"}>
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex items-center gap-1">
@@ -204,6 +211,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
         </div>
       </header>
       {children}
+      {showStudentBottomNav && <StudentBottomNav />}
     </div>
   );
 };
