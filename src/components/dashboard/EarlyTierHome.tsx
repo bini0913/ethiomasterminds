@@ -33,7 +33,7 @@ const EarlyTierHome: React.FC = () => {
     { to:"/early-collection", label:"Collection", description:"Collect treasures", icon:<Trophy className="h-7 w-7"/>, tone:"bg-warning/15 text-warning" },
   ];
 
-  return <div className="min-h-screen bg-background pb-24">
+  return <div className="tier-early min-h-screen bg-background pb-24 text-foreground">
     <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 pt-[calc(.75rem+env(safe-area-inset-top))] pb-3 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full" /></div><div><p className="font-display text-lg font-bold">Master Minds</p><p className="text-xs font-semibold text-primary">{gradeLabel} • Learn through play</p></div></Link>
