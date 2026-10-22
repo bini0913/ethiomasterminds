@@ -36,6 +36,7 @@ const AcademicSetup = lazy(() => import("./pages/AcademicSetup"));
 const FlashcardsPage = lazy(() => import("./pages/FlashcardsPage"));
 const TopicCoveragePage = lazy(() => import("./pages/TopicCoveragePage"));
 const ExamModePage = lazy(() => import("./pages/ExamModePage"));
+const EntranceExamPapersPage = lazy(() => import("./pages/EntranceExamPapersPage"));
 const StudyPlannerPage = lazy(() => import("./pages/StudyPlannerPage"));
 const AcademicInsightsPage = lazy(() => import("./pages/AcademicInsightsPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
@@ -360,6 +361,7 @@ const App = () => (
                               <Route path="/academic/flashcards" element={<EarlyTierRestrictedRoute><FlashcardsPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/topics" element={<EarlyTierRestrictedRoute><TopicCoveragePage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/exam" element={<EarlyTierRestrictedRoute><ExamModePage /></EarlyTierRestrictedRoute>} />
+                              <Route path="/academic/entrance-papers" element={<EarlyTierRestrictedRoute><EntranceExamPapersPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/planner" element={<EarlyTierRestrictedRoute><StudyPlannerPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/insights" element={<EarlyTierRestrictedRoute><AcademicInsightsPage /></EarlyTierRestrictedRoute>} />
                               <Route
