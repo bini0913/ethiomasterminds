@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, Gamepad2, Globe2, Gift, BookOpen, Swords, MessageCircle, BrainCircuit, Trophy, MoreHorizontal, Users, GraduationCap, Timer, Library, Bot, Settings, Bell, X } from "lucide-react";
+import { Home, Gamepad2, Globe2, Gift, BookOpen, Swords, MessageCircle, BrainCircuit, Trophy, MoreHorizontal, Users, GraduationCap, Timer, Library, Bot, Settings, Bell, X, Target, CalendarDays, BarChart3 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
 
