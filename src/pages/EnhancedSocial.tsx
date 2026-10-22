@@ -66,7 +66,7 @@ const EnhancedSocial: React.FC = () => {
       </div>
 
       {/* Content */}
-      <main className="max-w-2xl mx-auto pb-24"><section className="mx-4 mt-4 rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-cyan-500/10 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-primary">Community</p><h2 className="mt-1 text-lg font-bold">What are students learning today?</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Explore ideas, study posts, challenges and conversations from the Master Minds community.</p></div><Button variant="outline" size="sm" onClick={() => navigate("/friends")} className="shrink-0"><Users className="mr-1.5 h-4 w-4" /> Friends</Button></div></section>
+      <main className="max-w-2xl mx-auto pb-24"><section className="mx-4 mt-4 rounded-2xl border bg-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-primary">Community</p><h2 className="mt-1 text-lg font-bold">What are students learning today?</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Explore ideas, study posts, challenges and conversations from the Master Minds community.</p></div><Button variant="outline" size="sm" onClick={() => navigate("/friends")} className="shrink-0"><Users className="mr-1.5 h-4 w-4" /> Friends</Button></div></section>
         {activeTab === 'explore' && <SocialFeedView mode="explore" />}
         {activeTab === 'following' && <SocialFeedView mode="following" />}
         {activeTab === 'trending' && <SocialFeedView mode="trending" />}
