@@ -22,6 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 
 type TournamentStatus = "waiting" | "starting" | "active" | "finished" | "upcoming" | "completed" | "next_round" | "cancelled";
 type MatchStatus = "waiting" | "playing" | "finished" | "pending" | "ready" | "live";
@@ -100,6 +101,7 @@ const matchStatusPill = (status: MatchStatus) => {
 const TournamentHub: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const [tournaments, setTournaments] = useState<HubTournament[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
   const [players, setPlayers] = useState<TournamentPlayer[]>([]);
@@ -484,7 +486,7 @@ const TournamentHub: React.FC = () => {
 
   return (
     <div className="space-y-6 text-foreground">
-      <Card className="overflow-hidden border-cyan-400/20 bg-[linear-gradient(160deg,#020617_0%,#0f172a_45%,#111827_100%)] shadow-[0_0_45px_rgba(34,211,238,0.18)]">
+      <Card className={upperStudent ? "overflow-hidden border-border/70 bg-card shadow-sm" : "overflow-hidden border-cyan-400/20 bg-[linear-gradient(160deg,#020617_0%,#0f172a_45%,#111827_100%)] shadow-[0_0_45px_rgba(34,211,238,0.18)]"}>
         <CardHeader className="border-b border-cyan-500/20">
           <CardTitle className="flex items-center gap-3 text-2xl text-cyan-100">
             <Trophy className="h-7 w-7 text-cyan-300" />
@@ -642,7 +644,7 @@ const TournamentHub: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-fuchsia-500/30 bg-slate-950/90 shadow-[0_0_34px_rgba(217,70,239,0.2)]">
+          <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "border-fuchsia-500/30 bg-slate-950/90 shadow-[0_0_34px_rgba(217,70,239,0.2)]"}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-fuchsia-100"><Target className="h-5 w-5" /> 🌳 Bracket</CardTitle>
             </CardHeader>
@@ -677,7 +679,7 @@ const TournamentHub: React.FC = () => {
       )}
 
       {isManager && selectedTournament && (
-        <Card className="border-amber-500/25 bg-slate-950/90">
+        <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "border-amber-500/25 bg-slate-950/90"}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-amber-100"><Crown className="h-5 w-5 text-amber-300" /> Manager Control Center</CardTitle>
           </CardHeader>
@@ -765,7 +767,7 @@ const TournamentHub: React.FC = () => {
         </Card>
       )}
 
-      <Card className="border-purple-500/30 bg-slate-950/90 shadow-[0_0_34px_rgba(168,85,247,0.22)]">
+      <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "border-purple-500/30 bg-slate-950/90 shadow-[0_0_34px_rgba(168,85,247,0.22)]"}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-purple-100"><PlayCircle className="h-5 w-5" /> 🎮 Live Match Arena</CardTitle>
         </CardHeader>
@@ -801,7 +803,7 @@ const TournamentHub: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card className="border-cyan-400/25 bg-slate-950/90">
+      <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "border-cyan-400/25 bg-slate-950/90"}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-cyan-100"><Zap className="h-5 w-5" /> 📊 Realtime Event Feed</CardTitle>
         </CardHeader>
