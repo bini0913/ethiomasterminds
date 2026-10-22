@@ -22,7 +22,7 @@ const StudentBottomNav: React.FC = () => {
         { icon: Gamepad2, label: "Play", path: "/early-games", match: ["/early-games", "/early-quiz"] },
         { icon: Globe2, label: "Discover", path: "/early-discover", match: ["/early-discover", "/early-videos", "/early-explore"] },
         { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/friends", "/chat"] },
-        { icon: Gift, label: "Rewards", path: "/store", match: ["/store"] },
+        { icon: Gift, label: "Rewards", path: "/store", match: ["/store", "/early-ranks", "/early-collection", "/early-progress"] },
       ]
     : [
         { icon: Home, label: "Home", path: "/", match: ["/"] },
