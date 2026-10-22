@@ -188,7 +188,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
           <button type="button" onClick={() => navigate("/ai-tutor")} className="mm-studio-nav flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-active={location.pathname === "/ai-tutor" || ("/ai-tutor" === "/academic" && location.pathname.startsWith("/academic"))}><Bot className="h-4 w-4"/> AI Tutor</button>
           <button type="button" onClick={() => navigate("/notifications")} className="mm-studio-nav flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-active={location.pathname === "/notifications" || ("/notifications" === "/academic" && location.pathname.startsWith("/academic"))}><Bell className="h-4 w-4"/> Notifications</button>
         </nav>
-        <div className="mt-4 border-t border-border pt-3"><button type="button" onClick={() => navigate("/settings")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><SettingsIcon className="h-4 w-4"/> Settings</button><button type="button" onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-4 w-4"/> Log out</button></div>
+        <div className="mt-4 border-t border-slate-800 pt-3"><button type="button" onClick={() => navigate("/settings")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><SettingsIcon className="h-4 w-4"/> Settings</button><button type="button" onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-4 w-4"/> Log out</button></div>
       </aside>}
       <div className={isUpperStudent ? "mm-studio-upper-content lg:pl-64" : ""}>
       <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
@@ -237,7 +237,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
           </button>
         </div>
       </header>
-      <div className={isUpperStudent ? "pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : undefined}>{children}</div>
+      <div className={`${isUpperStudent ? "upper-studio-content pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{children}</div>
       {isUpperStudent && <div className="lg:hidden"><StudentBottomNav /></div>}
       </div>
     </div>

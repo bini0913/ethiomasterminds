@@ -254,3 +254,78 @@
     }
   }
 }
+
+
+/* Grade 9–12 Design Studio visual system.
+   Scoped to the authenticated upper-tier workspace so younger portals are unchanged.
+   These rules restyle existing live pages; they do not add mock data or replace page logic. */
+.upper-tier-studio {
+  --upper-studio-radius: 1.1rem;
+  --upper-studio-border: hsl(var(--border) / .82);
+  min-width: 0;
+  isolation: isolate;
+}
+.upper-tier-studio main,
+.upper-tier-studio [role="main"] {
+  min-width: 0;
+}
+.upper-tier-studio h1 {
+  letter-spacing: -.035em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+.upper-tier-studio h2,
+.upper-tier-studio h3 {
+  letter-spacing: -.02em;
+}
+.upper-tier-studio .rounded-xl,
+.upper-tier-studio .rounded-2xl,
+.upper-tier-studio .rounded-3xl {
+  scroll-margin-top: 1.5rem;
+}
+.upper-tier-studio .border-border,
+.upper-tier-studio .border-border\/50 {
+  border-color: var(--upper-studio-border);
+}
+.upper-tier-studio .bg-card {
+  box-shadow: 0 1px 2px hsl(var(--foreground) / .025), 0 8px 24px hsl(var(--foreground) / .025);
+}
+.upper-tier-studio .bg-card\/80,
+.upper-tier-studio .bg-card\/90,
+.upper-tier-studio .bg-card\/95 {
+  backdrop-filter: blur(12px);
+}
+.upper-tier-studio button,
+.upper-tier-studio a[role="button"] {
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-duration: 160ms;
+}
+.upper-tier-studio button:focus-visible,
+.upper-tier-studio a:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 3px;
+}
+.upper-tier-studio .grid {
+  min-width: 0;
+}
+@media (min-width: 1024px) {
+  .upper-tier-studio {
+    padding-left: 16rem;
+  }
+  .upper-tier-studio > header,
+  .upper-tier-studio > main,
+  .upper-tier-studio > section {
+    min-width: 0;
+  }
+}
+@media (max-width: 1023px) {
+  .upper-tier-studio {
+    padding-left: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .upper-tier-studio button,
+  .upper-tier-studio a[role="button"] {
+    transition: none;
+  }
+}
