@@ -97,7 +97,6 @@ const UpperStudentDashboard: React.FC = () => {
             <div className="mt-5 flex flex-wrap gap-2">
               <button type="button" onClick={() => navigate("/study-mode")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 transition hover:brightness-105" style={{background:"var(--mm-gold)"}}><Timer className="h-4 w-4"/> Start Study Mode</button>
               <button type="button" onClick={() => navigate("/academic")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/15"><BookOpen className="h-4 w-4"/> Academic Prep <ArrowRight className="h-4 w-4"/></button>
-              <button type="button" onClick={() => navigate("/learning-dna")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/15"><BrainCircuit className="h-4 w-4"/> Learning DNA</button>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
