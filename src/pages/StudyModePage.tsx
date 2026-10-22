@@ -586,7 +586,7 @@ const StudyModePage: React.FC = () => {
         @media(max-width:640px){.mm-study-upper .mm-study-panel{border-radius:1rem}.mm-study-upper .mm-study-call-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}.mm-study-upper .mm-study-call-controls button{width:100%;padding-inline:.65rem}.mm-study-upper .mm-study-timer{max-width:15rem;max-height:15rem}}
       `}</style>}
       <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-6 sm:p-4 md:p-6">
-        <header>
+        <header className={upperStudent ? "mm-study-hero rounded-2xl border border-white/10 p-4 sm:p-5" : ""}>
           <Link to="/" className={`mb-2 inline-flex items-center gap-2 text-sm ${upperStudent ? "text-muted-foreground hover:text-foreground" : "text-white/80 hover:text-white"}`}>
             <ArrowLeft className="h-4 w-4" /> Back to Master Minds
           </Link>
