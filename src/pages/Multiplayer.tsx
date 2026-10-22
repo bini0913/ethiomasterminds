@@ -299,7 +299,17 @@ const Multiplayer: React.FC = () => {
 
   // Hub
   return (
-    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background text-foreground"}>
+    <div className={upperStudent ? "tier-upper mm-arena-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background text-foreground"}>
+      {upperStudent && <style>{`
+        .mm-arena-upper .mm-arena-hero{background:radial-gradient(circle at 88% 10%,rgba(243,201,107,.16),transparent 28%),linear-gradient(120deg,#101a35,#17264a);color:#f8fafc;border-color:rgba(255,255,255,.12)}
+        .mm-arena-upper .mm-arena-hero .text-muted-foreground{color:rgba(237,242,255,.76)}
+        .mm-arena-upper .mm-arena-panel{border-radius:1.1rem;border-color:var(--border);box-shadow:0 3px 12px rgba(15,23,42,.045)}
+        .mm-arena-upper .mm-arena-mode{border-radius:1rem;min-height:7.25rem;transition:transform .18s,box-shadow .18s,border-color .18s}
+        .mm-arena-upper .mm-arena-mode:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(15,23,42,.07)}
+        .mm-arena-upper .mm-arena-mode[aria-pressed="true"]{background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.55)}
+        .mm-arena-upper .mm-arena-stat{border-radius:1rem;border-color:var(--border);background:var(--card)}
+        @media(max-width:640px){.mm-arena-upper .mm-arena-panel{border-radius:1rem}.mm-arena-upper .mm-arena-mode{min-height:0;padding:.85rem}}
+      `}</style>}
       <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 backdrop-blur-xl" : "sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border"}>
         <div className="container mx-auto flex items-center justify-between gap-3 px-4 py-4 sm:gap-4">
           <div className="flex items-center gap-4">
@@ -323,8 +333,8 @@ const Multiplayer: React.FC = () => {
 
       <main className="container mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 sm:py-7">
         {/* Player card */}
-        <Card>
-          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <Card className={upperStudent ? "mm-arena-panel overflow-hidden" : ""}>
+          <CardContent className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/20 grid place-items-center font-bold text-primary">
                 {(user?.name || "P").slice(0, 1).toUpperCase()}
@@ -344,7 +354,7 @@ const Multiplayer: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={upperStudent ? "mm-arena-panel" : ""}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-yellow-500" /> Ranked Points Leaderboard

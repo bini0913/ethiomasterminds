@@ -485,18 +485,31 @@ const TournamentHub: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 text-foreground">
-      <Card className={upperStudent ? "overflow-hidden border-border/70 bg-card shadow-sm" : "overflow-hidden border-cyan-400/20 bg-[linear-gradient(160deg,#020617_0%,#0f172a_45%,#111827_100%)] shadow-[0_0_45px_rgba(34,211,238,0.18)]"}>
-        <CardHeader className="border-b border-cyan-500/20">
-          <CardTitle className="flex items-center gap-3 text-2xl text-cyan-100">
-            <Trophy className="h-7 w-7 text-cyan-300" />
+    <div className={upperStudent ? "mm-tournament-upper space-y-6 text-foreground" : "space-y-6 text-foreground"}>
+      {upperStudent && <style>{`
+        .mm-tournament-upper .mm-tournament-hero{background:radial-gradient(circle at 88% 10%,rgba(243,201,107,.16),transparent 28%),linear-gradient(120deg,#101a35,#17264a);color:#f8fafc;border-color:rgba(255,255,255,.12)}
+        .mm-tournament-upper .mm-tournament-hero .text-muted-foreground{color:rgba(237,242,255,.76)}
+        .mm-tournament-upper .mm-tournament-metric{border-radius:.9rem;border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.08)}
+        .mm-tournament-upper .mm-tournament-metric .mm-tournament-label{color:rgba(237,242,255,.68)}
+        .mm-tournament-upper .mm-tournament-metric .mm-tournament-value{color:#fff}
+        .mm-tournament-upper .mm-tournament-panel{border-radius:1.1rem;border-color:var(--border);background:var(--card);box-shadow:0 3px 12px rgba(15,23,42,.045)}
+        .mm-tournament-upper .mm-tournament-panel .text-cyan-100,.mm-tournament-upper .mm-tournament-panel .text-cyan-200\/70{color:inherit}
+        .mm-tournament-upper .mm-tournament-panel .text-slate-300,.mm-tournament-upper .mm-tournament-panel .text-slate-400{color:var(--muted-foreground)}
+        .mm-tournament-upper .mm-tournament-panel .bg-slate-900\/70{background:var(--muted)}
+        .mm-tournament-upper .mm-tournament-panel .border-slate-700{border-color:var(--border)}
+        @media(max-width:640px){.mm-tournament-upper .mm-tournament-panel{border-radius:1rem}}
+      `}</style>}
+      <Card className={upperStudent ? "mm-tournament-hero overflow-hidden border-border/70 shadow-sm" : "overflow-hidden border-cyan-400/20 bg-[linear-gradient(160deg,#020617_0%,#0f172a_45%,#111827_100%)] shadow-[0_0_45px_rgba(34,211,238,0.18)]"}>
+        <CardHeader className={upperStudent ? "border-b border-white/10" : "border-b border-cyan-500/20"}>
+          <CardTitle className={upperStudent ? "flex items-center gap-3 text-2xl text-white" : "flex items-center gap-3 text-2xl text-cyan-100"}>
+            <Trophy className={upperStudent ? "h-7 w-7 text-amber-300" : "h-7 w-7 text-cyan-300"} />
             Master Minds Tournament Hub
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 p-5 md:grid-cols-4">
-          <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-4">
-            <p className="text-xs uppercase tracking-widest text-cyan-200/70">Selected Tournament</p>
-            <p className="mt-2 text-lg font-semibold text-cyan-100">{selectedTournament?.name || "No tournament selected"}</p>
+          <div className={upperStudent ? "mm-tournament-metric rounded-xl border p-4" : "rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-4"}>
+            <p className={upperStudent ? "mm-tournament-label text-xs uppercase tracking-widest" : "text-xs uppercase tracking-widest text-cyan-200/70"}>Selected Tournament</p>
+            <p className={upperStudent ? "mm-tournament-value mt-2 text-lg font-semibold" : "mt-2 text-lg font-semibold text-cyan-100"}>{selectedTournament?.name || "No tournament selected"}</p>
           </div>
           <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-4">
             <p className="text-xs uppercase tracking-widest text-cyan-200/70">Players</p>
@@ -523,7 +536,7 @@ const TournamentHub: React.FC = () => {
           {activeTournaments.map((tournament) => (
             <Card
               key={tournament.id}
-              className="group cursor-pointer border-red-400/30 bg-slate-950/80 transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:border-red-300/70 hover:shadow-[0_0_28px_rgba(248,113,113,0.35)]"
+              className={upperStudent ? "mm-tournament-panel group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40" : "group cursor-pointer border-red-400/30 bg-slate-950/80 transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:border-red-300/70 hover:shadow-[0_0_28px_rgba(248,113,113,0.35)]"}
               onClick={() => setSelectedTournamentId(tournament.id)}
             >
               <CardHeader className="space-y-3">
@@ -803,7 +816,7 @@ const TournamentHub: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "border-cyan-400/25 bg-slate-950/90"}>
+      <Card className={upperStudent ? "mm-tournament-panel border-border/70 bg-card shadow-sm" : "border-cyan-400/25 bg-slate-950/90"}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-cyan-100"><Zap className="h-5 w-5" /> 📊 Realtime Event Feed</CardTitle>
         </CardHeader>
