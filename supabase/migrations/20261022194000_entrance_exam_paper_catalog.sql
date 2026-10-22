@@ -1,0 +1,86 @@
+-- Catalog metadata and source links for Ethiopian Grade 12 entrance past papers.
+-- Do not copy full exam paper text here; papers remain at their respective source.
+create table if not exists public.entrance_exam_papers (
+  id uuid primary key default gen_random_uuid(),
+  grade_level integer not null default 12 check (grade_level between 9 and 12),
+  exam_type text not null default 'university_entrance',
+  subject text not null,
+  ethiopian_year integer not null,
+  gregorian_year integer not null,
+  stream text not null default 'Both / varies by paper',
+  source_name text not null,
+  source_url text not null,
+  source_status text not null default 'external_reference' check (source_status in ('verified_metadata','external_reference','needs_review')),
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  unique (grade_level, exam_type, subject, ethiopian_year, stream, source_name)
+);
+
+alter table public.entrance_exam_papers enable row level security;
+drop policy if exists "Authenticated users can read entrance paper catalog" on public.entrance_exam_papers;
+create policy "Authenticated users can read entrance paper catalog"
+  on public.entrance_exam_papers for select to authenticated using (true);
+
+insert into public.entrance_exam_papers
+  (grade_level, exam_type, subject, ethiopian_year, gregorian_year, stream, source_name, source_url, source_status, notes)
+values
+  (12,'university_entrance','Biology',2005,2013,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2006,2014,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2007,2015,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2008,2016,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2009,2017,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2010,2018,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2011,2019,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2012,2020,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2013,2021,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2014,2022,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2015,2023,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2016,2024,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Biology',2017,2025,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2005,2013,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2006,2014,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2007,2015,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2008,2016,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2009,2017,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2010,2018,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2011,2019,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2012,2020,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2013,2021,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2014,2022,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2015,2023,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2016,2024,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Chemistry',2017,2025,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2005,2013,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2006,2014,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2007,2015,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2008,2016,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2009,2017,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2010,2018,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2011,2019,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2013,2021,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2014,2022,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2015,2023,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2016,2024,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','English',2017,2025,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Mathematics',2005,2013,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Mathematics',2006,2014,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Mathematics',2007,2015,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Mathematics',2008,2016,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Mathematics',2009,2017,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Mathematics',2013,2021,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Mathematics',2014,2022,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Mathematics',2016,2024,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2005,2013,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2006,2014,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2007,2015,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2008,2016,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2009,2017,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2010,2018,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2011,2019,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2012,2020,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2013,2021,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2014,2022,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2015,2023,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2016,2024,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.'),
+  (12,'university_entrance','Physics',2017,2025,'Both / varies by paper','Temari past-paper archive','https://temari.et/exam-prep/papers','external_reference','Archive lists this subject/year; open source to verify the specific paper and answer key.')
+on conflict do nothing;
