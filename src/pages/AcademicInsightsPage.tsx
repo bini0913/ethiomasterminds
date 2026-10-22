@@ -187,8 +187,8 @@ const AcademicInsightsPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-sky-700 to-cyan-700 px-4 py-3 shadow-xl">
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 bg-primary text-primary-foreground px-4 py-3 shadow-xl">
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className="text-white hover:bg-white/10">
             <ArrowLeft className="h-5 w-5" />
@@ -211,7 +211,7 @@ const AcademicInsightsPage: React.FC = () => {
 
         {/* AI Insights Button */}
         <Button
-          className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"
+          className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90"
           onClick={generateAIInsights}
           disabled={isLoadingAI}
         >
@@ -225,7 +225,7 @@ const AcademicInsightsPage: React.FC = () => {
         {/* AI Insights Display */}
         {aiInsights && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="bg-gradient-to-br from-violet-500/5 to-purple-500/5 border-violet-500/20">
+            <Card className="bg-card border-border">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Brain className="h-5 w-5 text-violet-600" />
