@@ -70,11 +70,10 @@
   }
 
   /* Tier personality overrides: same component system, deliberately different tone. */
-  .tier-early { --primary: 34 88% 42%; --primary-hover: 34 88% 36%; --primary-foreground: 0 0% 100%; --accent: 168 60% 31%; --accent-foreground: 0 0% 100%; --ring: 34 88% 42%; --focus-ring: 34 88% 42%; --card-hover: 35 80% 97%; }
-  .tier-middle { --primary: 276 62% 43%; --primary-hover: 276 62% 37%; --primary-foreground: 0 0% 100%; --accent: 335 70% 43%; --accent-foreground: 0 0% 100%; --ring: 276 62% 43%; --focus-ring: 276 62% 43%; --card-hover: 276 55% 97%; }
+  /* KG–Grade 4 and Grade 5–8 share one calm brand palette; age-appropriate personality comes from content and layout, not competing colors. */
+  .tier-early, .tier-middle { --primary: 221 83% 53%; --primary-hover: 221 83% 46%; --primary-foreground: 0 0% 100%; --accent: 187 100% 40%; --accent-foreground: 216 48% 9%; --ring: 221 83% 53%; --focus-ring: 221 83% 53%; --card-hover: 214 80% 98%; }
   .tier-upper { --primary: 221 83% 53%; --primary-hover: 221 83% 46%; --primary-foreground: 0 0% 100%; --secondary: 214 55% 96%; --accent: 214 95% 93%; --accent-foreground: 222 47% 11%; --muted: 210 35% 96%; --muted-foreground: 215 16% 40%; --border: 214 32% 88%; --border-subtle: 214 38% 93%; --input: 214 32% 88%; --ring: 221 83% 53%; --focus-ring: 221 83% 53%; --card-hover: 214 80% 98%; --upper-intelligence: 250 58% 96%; --upper-intelligence-foreground: 250 48% 38%; --upper-mastery: 151 56% 29%; --upper-focus: 38 88% 37%; }
-  .dark .tier-early { --primary: 40 90% 66%; --primary-hover: 40 90% 72%; --primary-foreground: 216 22% 9%; --accent: 168 58% 62%; --accent-foreground: 216 22% 9%; --ring: 40 90% 66%; --focus-ring: 40 90% 66%; }
-  .dark .tier-middle { --primary: 276 78% 73%; --primary-hover: 276 78% 78%; --primary-foreground: 216 22% 9%; --accent: 335 78% 70%; --accent-foreground: 216 22% 9%; --ring: 276 78% 73%; --focus-ring: 276 78% 73%; }
+  .dark .tier-early, .dark .tier-middle { --primary: 217 91% 70%; --primary-hover: 217 91% 76%; --primary-foreground: 216 22% 9%; --accent: 187 100% 50%; --accent-foreground: 216 22% 9%; --ring: 217 91% 70%; --focus-ring: 217 91% 70%; --card-hover: 216 16% 18%; }
   .dark .tier-upper { --primary: 217 91% 60%; --primary-hover: 217 91% 66%; --primary-foreground: 0 0% 100%; --secondary: 215 16% 18%; --accent: 217 33% 22%; --accent-foreground: 210 20% 96%; --muted: 215 16% 18%; --muted-foreground: 212 12% 70%; --border: 215 13% 28%; --border-subtle: 215 15% 22%; --input: 215 13% 28%; --ring: 217 91% 60%; --focus-ring: 217 91% 60%; --upper-intelligence: 250 30% 21%; --upper-intelligence-foreground: 250 82% 78%; --upper-mastery: 151 47% 64%; --upper-focus: 40 84% 69%; }
 
   * { @apply border-border; }
@@ -252,5 +251,13 @@
     .responsive-content {
       padding-inline: 1.5rem;
     }
+  }
+
+  /* Keep student portal content comfortable on narrow phones and wide tablets. */
+  .tier-early main, .tier-middle main, .tier-upper main { min-width: 0; }
+  .tier-early section, .tier-middle section, .tier-upper section { min-width: 0; }
+  .tier-early a, .tier-middle a, .tier-upper a { overflow-wrap: anywhere; }
+  @media (max-width: 359px) {
+    .tier-early .student-stat-grid, .tier-middle .student-stat-grid { grid-template-columns: minmax(0, 1fr); }
   }
 }
