@@ -567,33 +567,50 @@ const StudyModePage: React.FC = () => {
   }
 
   return (
-    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white pb-[env(safe-area-inset-bottom)]"}>
-      <div className="max-w-7xl mx-auto px-3 py-4 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+    <div className={upperStudent ? "tier-upper mm-study-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white pb-[env(safe-area-inset-bottom)]"}>
+      {upperStudent && <style>{`
+        .mm-study-upper .mm-study-hero{background:radial-gradient(circle at 88% 10%,rgba(243,201,107,.16),transparent 28%),linear-gradient(120deg,#101a35,#17264a);color:#f8fafc;border-color:rgba(255,255,255,.12)}
+        .mm-study-upper .mm-study-hero .text-muted-foreground{color:rgba(237,242,255,.76)}
+        .mm-study-upper .mm-study-panel{border-radius:1.15rem;border-color:var(--border);box-shadow:0 3px 12px rgba(15,23,42,.045)}
+        .mm-study-upper .mm-study-panel [data-slot="card-title"]{font-weight:750;letter-spacing:-.015em}
+        .mm-study-upper .mm-study-timer{background:radial-gradient(circle,#fff 0%,#f8fafc 66%,#eef2ff 100%);border:1px solid #e2e8f0;border-radius:999px}
+        .mm-study-upper .mm-study-timer .mm-timer-label{color:#64748b}
+        .mm-study-upper .mm-study-timer .mm-timer-value{color:#101a35}
+        .mm-study-upper .mm-study-soft{background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.16)}
+        .mm-study-upper .mm-study-call{border-radius:1.15rem;border-color:var(--border);overflow:hidden}
+        .mm-study-upper .mm-study-call-head{background:linear-gradient(120deg,#101a35,#17264a);color:#f8fafc}
+        .mm-study-upper .mm-study-call-head .text-muted-foreground{color:rgba(237,242,255,.74)}
+        .mm-study-upper .mm-study-call-controls button{min-height:2.75rem}
+        .mm-study-upper .mm-study-action-grid button{min-height:2.75rem}
+        .mm-study-upper input,.mm-study-upper select{min-height:2.65rem}
+        @media(max-width:640px){.mm-study-upper .mm-study-panel{border-radius:1rem}.mm-study-upper .mm-study-call-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}.mm-study-upper .mm-study-call-controls button{width:100%;padding-inline:.65rem}.mm-study-upper .mm-study-timer{max-width:15rem;max-height:15rem}}
+      `}</style>}
+      <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-6 sm:p-4 md:p-6">
         <header>
           <Link to="/" className={`mb-2 inline-flex items-center gap-2 text-sm ${upperStudent ? "text-muted-foreground hover:text-foreground" : "text-white/80 hover:text-white"}`}>
             <ArrowLeft className="h-4 w-4" /> Back to Master Minds
           </Link>
-          <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl">
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight md:text-3xl">
             <Brain className={`h-7 w-7 ${upperStudent ? "text-primary" : "text-violet-300"}`} /> Study Mode
           </h1>
           <p className={upperStudent ? "text-sm text-muted-foreground" : "text-sm text-white/70"}>Focus sessions · Real study history · XP rewards · Live study room · Task linking.</p>
         </header>
 
-        <div className="grid lg:grid-cols-3 gap-4">
-          <Card className={upperStudent ? "lg:col-span-2 border-border/70 bg-card shadow-sm" : "lg:col-span-2 bg-white/5 border-white/10"}>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className={upperStudent ? "mm-study-panel lg:col-span-2 border-border/70 bg-card shadow-sm" : "lg:col-span-2 bg-white/5 border-white/10"}>
             <CardHeader>
               <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-white"}`}><Clock className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-cyan-300"}`} /> Focus Timer</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4 items-center">
-                <div className="relative w-56 h-56 sm:w-64 sm:h-64 mx-auto">
-                  <svg className="w-56 h-56 sm:w-64 sm:h-64 -rotate-90" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="54" stroke="rgba(255,255,255,0.12)" strokeWidth="8" fill="none" />
+                <div className={upperStudent ? "mm-study-timer relative mx-auto grid h-56 w-56 place-items-center sm:h-64 sm:w-64" : "relative mx-auto h-56 w-56 sm:h-64 sm:w-64"}>
+                  <svg className={upperStudent ? "h-56 w-56 -rotate-90 sm:h-64 sm:w-64" : "h-56 w-56 -rotate-90 sm:h-64 sm:w-64"} viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="54" stroke={upperStudent ? "#e2e8f0" : "rgba(255,255,255,0.12)"} strokeWidth="8" fill="none" />
                     <circle
                       cx="60"
                       cy="60"
                       r="54"
-                      stroke="url(#timerGradient)"
+                      stroke={upperStudent ? "#6366f1" : "url(#timerGradient)"}
                       strokeWidth="8"
                       fill="none"
                       strokeLinecap="round"
@@ -609,14 +626,14 @@ const StudyModePage: React.FC = () => {
                     </defs>
                   </svg>
                   <div className="absolute inset-0 grid place-items-center text-center">
-                    <p className="text-xs text-white/60 uppercase tracking-wide">{timerState === "break" ? "Break" : "Focus"}</p>
-                    <p className="text-2xl sm:text-3xl font-bold tracking-wider text-white tabular-nums">{formatSeconds(countdownSeconds)}</p>
-                    <p className="text-xs text-white/60">{mode.toUpperCase()} • {timerState}</p>
+                    <p className={upperStudent ? "mm-timer-label text-xs uppercase tracking-wide" : "text-xs text-white/60 uppercase tracking-wide"}>{timerState === "break" ? "Break" : "Focus"}</p>
+                    <p className={upperStudent ? "mm-timer-value text-2xl font-bold tracking-wider tabular-nums sm:text-3xl" : "text-2xl sm:text-3xl font-bold tracking-wider text-white tabular-nums"}>{formatSeconds(countdownSeconds)}</p>
+                    <p className={upperStudent ? "mm-timer-label text-xs" : "text-xs text-white/60"}>{mode.toUpperCase()} • {timerState}</p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={upperStudent ? "mm-study-action-grid grid grid-cols-2 gap-2" : "grid grid-cols-2 gap-2"}>
                     <Button onClick={() => void onStartStudy()} disabled={!!activeSession || loading}><Play className="h-4 w-4 mr-1" />Start</Button>
                     <Button variant="secondary" onClick={onPauseStudy} disabled={!activeSession || timerState === "break"}><Pause className="h-4 w-4 mr-1" />{timerState === "paused" ? "Resume" : "Pause"}</Button>
                     <Button variant="destructive" onClick={() => void onStopStudy(false)} disabled={!activeSession}><StopCircle className="h-4 w-4 mr-1" />Stop</Button>
@@ -677,7 +694,7 @@ const StudyModePage: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
-                <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "bg-white/5 border-white/10"}><CardContent className="p-3"><p className="text-xs text-white/60">Today</p><p className="font-bold">{todayMinutes}m</p></CardContent></Card>
+                <Card className={upperStudent ? "mm-study-panel border-border/70 bg-card shadow-sm" : "bg-white/5 border-white/10"}><CardContent className="p-3"><p className="text-xs text-white/60">Today</p><p className="font-bold">{todayMinutes}m</p></CardContent></Card>
                 <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "bg-white/5 border-white/10"}><CardContent className="p-3"><p className="text-xs text-white/60">Week</p><p className="font-bold">{weekMinutes}m</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Streak</p><p className="font-bold">{streakDays} 🔥</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Pomodoros</p><p className="font-bold">{studyStats.pomodoros_today}/4</p></CardContent></Card>
