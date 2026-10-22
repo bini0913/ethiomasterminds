@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Book, Calculator, Atom, BookOpen, Brain, Zap, Trophy, Target, Play, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import BackButton from "@/components/ui/BackButton";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -370,7 +369,6 @@ const Quiz: React.FC = () => {
   
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <AnimatedBackground variant="minimal" showIcons={false} />
       
       <div className="relative z-10">
         {/* Header */}
@@ -379,7 +377,7 @@ const Quiz: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <BackButton to="/" />
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
                   <BookOpen className="h-5 w-5 text-white" />
                 </div>
                 <div>
@@ -474,20 +472,20 @@ const Quiz: React.FC = () => {
                       transition={{ delay: index * 0.05 }}
                     >
                       <Card className="glass border-border/30 card-hover overflow-hidden">
-                        <div className={`h-2 bg-gradient-to-r ${
-                          quiz.category === 'Math' ? 'from-primary to-accent' :
-                          quiz.category === 'Science' ? 'from-secondary to-glow-cyan' :
-                          quiz.category === 'English' ? 'from-accent to-glow-pink' :
-                          'from-glow-yellow to-orange-500'
+                        <div className={`h-1.5 ${
+                          quiz.category === 'Math' ? 'bg-primary' :
+                          quiz.category === 'Science' ? 'bg-info' :
+                          quiz.category === 'English' ? 'bg-accent' :
+                          'bg-warning'
                         }`} />
                         <CardHeader className="pb-2">
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2">
                               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                 quiz.category === 'Math' ? 'bg-primary/20 text-primary' :
-                                quiz.category === 'Science' ? 'bg-secondary/20 text-secondary' :
+                                quiz.category === 'Science' ? 'bg-info/10 text-info' :
                                 quiz.category === 'English' ? 'bg-accent/20 text-accent' :
-                                'bg-glow-yellow/20 text-glow-yellow'
+                                'bg-warning/10 text-warning'
                               }`}>
                                 {getCategoryIcon(quiz.category)}
                               </div>
@@ -497,8 +495,8 @@ const Quiz: React.FC = () => {
                               </div>
                             </div>
                             <Badge variant="outline" className={`text-xs ${
-                              quiz.difficulty === 'Easy' ? 'border-glow-green text-glow-green' :
-                              quiz.difficulty === 'Medium' ? 'border-glow-yellow text-glow-yellow' :
+                              quiz.difficulty === 'Easy' ? 'border-success text-success' :
+                              quiz.difficulty === 'Medium' ? 'border-warning text-warning' :
                               'border-destructive text-destructive'
                             }`}>
                               {quiz.difficulty}
@@ -520,14 +518,14 @@ const Quiz: React.FC = () => {
                             Done before: {quiz.questions.filter((q) => attemptedQuestionIds.has(q.id)).length}/{quiz.questions.length}
                           </p>
                           {(completedQuizIds.has(quiz.id) || (quiz.sourceQuizId && completedQuizIds.has(quiz.sourceQuizId))) && (
-                            <Badge className="mb-3 bg-glow-green/20 text-glow-green border-glow-green/30">
+                            <Badge className="mb-3 bg-success/10 text-success border-success/30">
                               <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                               Completed
                             </Badge>
                           )}
                           <Button
                             onClick={() => handleStartQuiz(quiz)}
-                            className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90"
+                            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                           >
                             <Play className="h-4 w-4 mr-2" />
                             {completedQuizIds.has(quiz.id) || (quiz.sourceQuizId && completedQuizIds.has(quiz.sourceQuizId)) ? "Retake Quiz" : "Start Quiz"}
@@ -646,7 +644,7 @@ const Quiz: React.FC = () => {
                     
                     <Button 
                       onClick={handleCreateRandomQuiz} 
-                      className="w-full bg-gradient-to-r from-accent to-glow-pink hover:opacity-90 h-12 text-lg"
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 text-lg"
                       disabled={!selectedCategory}
                     >
                       <Zap className="h-5 w-5 mr-2" />
@@ -659,16 +657,16 @@ const Quiz: React.FC = () => {
                 <Card className="glass border-border/30">
                   <CardHeader>
                     <CardTitle className="font-display flex items-center gap-2">
-                      <Trophy className="h-5 w-5 text-glow-yellow" />
+                      <Trophy className="h-5 w-5 text-warning" />
                       Daily Challenges
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {[
-                        { subject: "Math", reward: "+50 XP", icon: Calculator, color: "from-primary to-accent" },
-                        { subject: "Science", reward: "+50 XP", icon: Atom, color: "from-secondary to-glow-cyan" },
-                        { subject: "English", reward: "+50 XP", icon: BookOpen, color: "from-accent to-glow-pink" }
+                        { subject: "Math", reward: "+50 XP", icon: Calculator },
+                        { subject: "Science", reward: "+50 XP", icon: Atom },
+                        { subject: "English", reward: "+50 XP", icon: BookOpen }
                       ].map((challenge, i) => (
                         <motion.div
                           key={i}
@@ -678,8 +676,8 @@ const Quiz: React.FC = () => {
                           className="p-4 rounded-xl bg-muted/30 border border-border/30"
                         >
                           <div className="flex items-center gap-3 mb-3">
-                            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${challenge.color} flex items-center justify-center`}>
-                              <challenge.icon className="h-5 w-5 text-white" />
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                              <challenge.icon className="h-5 w-5" />
                             </div>
                             <div>
                               <p className="font-medium text-foreground">{challenge.subject} Challenge</p>
@@ -687,7 +685,7 @@ const Quiz: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <Badge className="bg-glow-yellow/20 text-glow-yellow border-glow-yellow/30">
+                            <Badge className="bg-warning/10 text-warning border-warning/30">
                               {challenge.reward}
                             </Badge>
                             <Button 
