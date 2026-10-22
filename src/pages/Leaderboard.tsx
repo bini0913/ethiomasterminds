@@ -11,7 +11,7 @@ import { CalendarClock, Flame, Globe, Swords, Trophy, Users, Zap } from "lucide-
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchClassCompetitionLeaderboard, fetchFollowing, fetchLeaderboardUsers, rankScore, tierFromUser, tierStyle, type ClassCompetitionRow, type LeaderboardUser } from "@/lib/leaderboardApi";
+import { fetchClassCompetitionLeaderboard, fetchFollowing, fetchLeaderboardUsers, rankScore, tierFromUser, type ClassCompetitionRow, type LeaderboardUser } from "@/lib/leaderboardApi";
 import { prefetchProfileBundle } from "@/lib/profilePrefetch";
 import { getRankTierByLevel } from "@/lib/rankSystem";
 import { getUserTier } from "@/lib/getUserTier";
@@ -20,9 +20,9 @@ type LeaderboardTab = "global" | "grade" | "friends" | "weekly" | "classes";
 type Timeframe = "all" | "monthly" | "weekly";
 
 const podiumStyles = {
-  1: "border-yellow-400/70 bg-gradient-to-b from-yellow-500/20 via-amber-500/15 to-background shadow-[0_0_30px_rgba(250,204,21,0.35)]",
-  2: "border-slate-300/70 bg-gradient-to-b from-slate-400/20 via-slate-400/10 to-background shadow-[0_0_24px_rgba(148,163,184,0.28)]",
-  3: "border-amber-600/60 bg-gradient-to-b from-amber-700/20 via-orange-600/10 to-background shadow-[0_0_20px_rgba(180,83,9,0.3)]",
+  1: "border-warning/40 bg-warning/10 shadow-sm",
+  2: "border-border bg-muted/60 shadow-sm",
+  3: "border-accent/40 bg-accent/10 shadow-sm",
 };
 
 const tabConfig: Array<{ value: LeaderboardTab; label: string; icon: typeof Globe }> = [
@@ -210,7 +210,7 @@ const Leaderboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/10 p-4 md:p-8">
+    <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6 pb-24">
         <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
@@ -345,7 +345,7 @@ const Leaderboard = () => {
                       <h3 className="font-semibold">{getDisplayName(entry)}</h3>
                       <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
                       <div className="mt-3 flex items-center justify-between">
-                        <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
+                        <Badge className="border border-primary/20 bg-primary/10 text-primary">{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
                         <span className="font-bold">#{entry.rankPos}</span>
                       </div>
                       <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} Season XP</p>
@@ -418,7 +418,7 @@ const Leaderboard = () => {
                       {entry.activeTitle ? <p className="text-[11px] text-amber-400">{entry.activeTitle}</p> : null}
                     </div>
                     <div className="text-right">
-                      <Badge className={`mb-1 bg-gradient-to-r ${tierStyle(entry.level)}`}>{entry.tier}</Badge>
+                      <Badge className="mb-1 border border-primary/20 bg-primary/10 text-primary">{entry.tier}</Badge>
                       <p className="text-sm font-semibold">{Math.round(entry.score).toLocaleString()} pts</p>
                       <p className="inline-flex items-center gap-1 text-xs text-orange-500"><Flame className="h-3 w-3" />{entry.streak}</p>
                     </div>
@@ -457,7 +457,7 @@ const Leaderboard = () => {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge className={`bg-gradient-to-r ${tierStyle(previewUser.level)}`}>{previewUser.tier}</Badge>
+                <Badge className="border border-primary/20 bg-primary/10 text-primary">{previewUser.tier}</Badge>
                 <Badge variant="secondary">{Math.round(previewUser.score).toLocaleString()} pts</Badge>
                 <Badge variant="outline">🔥 {previewUser.streak} day streak</Badge>
               </div>
