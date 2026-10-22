@@ -1090,7 +1090,7 @@ const Lobby: React.FC = () => {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold truncate text-white">{user.name || "Player"}</p>
                 <div className="h-1.5 rounded-full bg-slate-700 mt-1 overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-blue-400 to-violet-400 animate-pulse" style={{ width: `${Math.min(100, ((user.xp || 0) % 1000) / 10)}%` }} />
+                  <div className="h-full bg-primary animate-pulse" style={{ width: `${Math.min(100, ((user.xp || 0) % 1000) / 10)}%` }} />
                 </div>
               </div>
               <Badge className="bg-violet-500/20 text-violet-200 border-violet-300/40">Lv.{user.level || 1}</Badge>
@@ -1143,7 +1143,7 @@ const Lobby: React.FC = () => {
             <button
               key={card.title}
               onClick={card.onClick}
-              className={`text-left rounded-2xl border p-4 bg-gradient-to-br ${card.style} hover:scale-[1.015] transition-transform shadow-[0_0_25px_rgba(56,189,248,0.12)]`}
+              className="text-left rounded-2xl border border-border bg-card p-4 transition-transform hover:scale-[1.01] hover:border-primary/30"
             >
               <p className="font-semibold text-white">{card.title}</p>
               <p className="text-xs text-slate-200 mt-1">{card.desc}</p>
@@ -1335,7 +1335,7 @@ const Lobby: React.FC = () => {
           </Card>
 
           <Card className="bg-slate-900/80 backdrop-blur-sm border-white/10 text-white">
-            <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-t-xl py-3">
+            <CardHeader className="bg-primary text-primary-foreground rounded-t-xl py-3">
               <CardTitle className="flex items-center gap-2 text-base"><Bell className="h-5 w-5" /> Live Activity Feed</CardTitle>
             </CardHeader>
             <CardContent className="p-3 space-y-2">
