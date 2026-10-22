@@ -30,7 +30,7 @@ const SocialHub: React.FC = () => {
         </div>
       </header>
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        <section className="overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-cyan-500/10 p-5 shadow-sm sm:p-7">
+        <section className="overflow-hidden rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-xl"><Badge variant="secondary" className="mb-3">Your Social Space</Badge><h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Learn with people who are on the same journey.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Choose where you want to go. Keep private conversations and friendships in Friends, and discover the wider Master Minds community in Community.</p></div>
             {user && <div className="hidden shrink-0 sm:block"><AvatarRenderer avatar={user.avatar} size="lg" /></div>}
@@ -41,7 +41,7 @@ const SocialHub: React.FC = () => {
             const Icon = item.icon; const isFriends = item.path === "/friends";
             return <motion.div key={item.title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }}>
               <Card className="group h-full overflow-hidden border-border/70 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg"><CardContent className="flex h-full flex-col p-5">
-                <div className={"mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br " + item.accent + " text-primary"}><Icon className="h-7 w-7" /></div>
+                <div className={"mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"}><Icon className="h-7 w-7" /></div>
                 <div className="flex-1"><div className="flex items-center justify-between gap-2"><h3 className="text-xl font-bold">{item.title}</h3>{isFriends && incomingRequests > 0 && <Badge>{incomingRequests} request{incomingRequests === 1 ? "" : "s"}</Badge>}</div>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p><div className="mt-4 flex flex-wrap gap-2 text-xs"><Badge variant="outline">{item.stat}</Badge><Badge variant="outline">{item.secondary}</Badge></div>
                 </div>
