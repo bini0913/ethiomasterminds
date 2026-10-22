@@ -329,3 +329,87 @@
     transition: none;
   }
 }
+
+/* Upper-tier Design Studio visual system — scoped so KG–Grade 8 portals remain unchanged. */
+.upper-tier-studio {
+  --upper-studio-navy: #101a35;
+  --upper-studio-navy-2: #17264a;
+  --upper-studio-gold: #f3c96b;
+  --upper-studio-line: hsl(var(--border));
+  min-height: 100vh;
+  background: hsl(var(--background));
+}
+.upper-tier-studio > div { min-width: 0; }
+.upper-tier-studio aside[aria-label="High school navigation"] {
+  background: var(--upper-studio-navy) !important;
+  border-color: #27365a !important;
+  color: #f8fafc;
+}
+.upper-tier-studio aside[aria-label="High school navigation"] nav button:not([class*="bg-indigo"]) {
+  color: #cbd5e1;
+}
+.upper-tier-studio aside[aria-label="High school navigation"] nav button:hover {
+  color: #fff;
+  background: var(--upper-studio-navy-2);
+}
+.upper-tier-studio aside[aria-label="High school navigation"] > button:hover {
+  background: var(--upper-studio-navy-2);
+}
+.upper-tier-studio .upper-studio-content {
+  min-width: 0;
+}
+.upper-tier-studio .upper-studio-content > * {
+  min-width: 0;
+}
+.upper-tier-studio main {
+  width: 100%;
+}
+.upper-tier-studio h1,
+.upper-tier-studio h2,
+.upper-tier-studio h3 {
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.upper-tier-studio [class*="rounded-2xl"][class*="border"],
+.upper-tier-studio [class*="rounded-xl"][class*="border"] {
+  border-color: hsl(var(--border) / .9);
+}
+.upper-tier-studio [class*="shadow-card"],
+.upper-tier-studio [class*="shadow-lg"] {
+  box-shadow: 0 8px 24px -20px rgb(16 26 53 / .35);
+}
+.upper-tier-studio input:not([type="checkbox"]):not([type="radio"]),
+.upper-tier-studio select,
+.upper-tier-studio textarea {
+  border-radius: .75rem;
+}
+.upper-tier-studio button:focus-visible,
+.upper-tier-studio a:focus-visible,
+.upper-tier-studio input:focus-visible,
+.upper-tier-studio select:focus-visible,
+.upper-tier-studio textarea:focus-visible {
+  outline-offset: 2px;
+}
+.upper-tier-studio table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.upper-tier-studio th {
+  color: hsl(var(--muted-foreground));
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+@media (min-width: 1024px) {
+  .upper-tier-studio .upper-studio-content > main,
+  .upper-tier-studio .upper-studio-content > div > main {
+    padding-bottom: 2rem;
+  }
+}
+@media (max-width: 1023px) {
+  .upper-tier-studio .upper-studio-content {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+}
+
