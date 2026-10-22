@@ -1,10 +1,8 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowRight, ArrowUpRight, BarChart3, BookOpen, BrainCircuit, CalendarDays,
-  ChevronRight, Clock3, GraduationCap, Library, LogOut, MessageCircle, Settings,
-  Sparkles, Swords, Timer, Trophy, UserRoundPlus, Zap, Target, Flame, Bot,
-  AlertCircle, Loader2
+  ArrowRight, BookOpen, BrainCircuit, ChevronRight, Clock3, LogOut, Settings,
+  Sparkles, Swords, Timer, AlertCircle, Loader2
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useLearningDNA } from "@/hooks/useLearningDNA";
@@ -35,10 +33,6 @@ const UpperStudentDashboard: React.FC = () => {
   const firstName = user?.name?.trim().split(/\s+/)[0];
   const topicCount = Object.keys(learningData?.topicMastery ?? {}).length;
   const attemptCount = learningData?.totalAttempts ?? 0;
-  const masteryEntries = Object.entries(learningData?.topicMastery ?? {});
-  const averageMastery = masteryEntries.length
-    ? Math.round(masteryEntries.reduce((sum, [, item]) => sum + Math.max(0, Math.min(100, Number(item.mastery) || 0)), 0) / masteryEntries.length)
-    : null;
   const profilePath = user?.id ? `/profile/${user.id}` : "/settings";
 
   return <div className="tier-upper mm-upper-shell min-h-screen bg-background pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-foreground">
