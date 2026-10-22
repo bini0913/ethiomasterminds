@@ -131,7 +131,7 @@ export default function EarlyGamesPage() {
         </header>
 
         <main className="mx-auto max-w-5xl space-y-5 py-5">
-          <section className="rounded-[2rem] bg-gradient-to-br from-primary/15 via-accent/10 to-warning/10 p-5 sm:p-8">
+          <section className="rounded-[2rem] border border-primary/15 bg-card p-5 sm:p-8">
             <div className="text-5xl">🎮🧠🚀</div>
             <p className="mt-2 font-semibold text-primary">Games that grow with you</p>
             <h1 className="text-3xl font-display font-bold">Your challenge is personal</h1>
@@ -235,7 +235,7 @@ export default function EarlyGamesPage() {
         {current && (
           <Card className="overflow-hidden rounded-[2rem]">
             <CardContent className="space-y-5 p-5 sm:p-8">
-              <div className="rounded-3xl bg-gradient-to-br from-primary/10 to-accent/10 p-6 text-center">
+              <div className="rounded-3xl border border-primary/10 bg-primary/5 p-6 text-center">
                 <div className="mb-3 text-5xl">{current.visual || "🎯"}</div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">Mission • {gradeName(grade)}</p>
                 <h1 className="mt-2 text-2xl font-display font-bold">{current.prompt}</h1>
