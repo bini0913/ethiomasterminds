@@ -218,7 +218,7 @@ const TimeTravelRevision: React.FC = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <BackButton />
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-warning/15 text-warning flex items-center justify-center">
               <Clock className="h-5 w-5 text-white" />
             </div>
             <div>
