@@ -301,9 +301,9 @@ const FlashcardsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl">
+      <header className="sticky top-0 z-50 bg-primary text-primary-foreground px-4 py-3 shadow-xl">
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => { setSelectedSubject(null); setCurrentIndex(0); setIsFlipped(false); }} className="text-white hover:bg-white/10">
             <ArrowLeft className="h-5 w-5" />
