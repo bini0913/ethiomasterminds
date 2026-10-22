@@ -164,7 +164,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className={`min-h-screen bg-background ${isUpperStudent ? "upper-tier-studio" : ""}`}>
-      {isUpperStudent && <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-[#27365a] bg-[#101a35] px-4 py-5 text-slate-100 lg:flex">
+      {isUpperStudent && <aside className="upper-studio-sidebar fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-[#27365a] bg-[#101a35] px-4 py-5 text-slate-100 lg:flex">
         <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span><span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span></span></button>
         <nav aria-label="High school navigation" className="flex-1 space-y-1 overflow-y-auto">
           <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Workspace</p>
