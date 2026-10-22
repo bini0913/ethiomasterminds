@@ -309,18 +309,10 @@
   min-width: 0;
 }
 @media (min-width: 1024px) {
-  .upper-tier-studio {
-    padding-left: 16rem;
-  }
   .upper-tier-studio > header,
   .upper-tier-studio > main,
   .upper-tier-studio > section {
     min-width: 0;
-  }
-}
-@media (max-width: 1023px) {
-  .upper-tier-studio {
-    padding-left: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
