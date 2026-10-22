@@ -75,6 +75,8 @@ import NativeBackHandler from "./components/mobile/NativeBackHandler";
 import NotificationBootstrap from "./components/notifications/NotificationBootstrap";
 import NotificationRouteHandler from "./components/notifications/NotificationRouteHandler";
 import SocialRealtimeNotifications from "./components/notifications/SocialRealtimeNotifications";
+import StudentBottomNav from "./components/layout/StudentBottomNav";
+import { getUserTier } from "./lib/getUserTier";
 
 const queryClient = new QueryClient();
 
@@ -141,6 +143,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   if (!isAuthenticated || !user) return <>{children}</>;
 
   const isHome = location.pathname === "/";
+  const isUpperStudent = getUserTier(user?.grade) === "upper";
   if (isHome) {
     return <>{children}</>;
   }
@@ -203,7 +206,8 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
           </button>
         </div>
       </header>
-      {children}
+      <div className={isUpperStudent ? "pb-[calc(5.5rem+env(safe-area-inset-bottom))]" : undefined}>{children}</div>
+      {isUpperStudent && <StudentBottomNav />}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, Gamepad2, Globe2, Gift, BookOpen, Swords, MessageCircle, BrainCircuit, Trophy, MoreHorizontal, Users, GraduationCap, Timer, Library, Bot, Settings, Bell, X } from "lucide-react";
+import { Home, Gamepad2, Globe2, Gift, BookOpen, Swords, MessageCircle, BrainCircuit, Trophy, MoreHorizontal, Users, GraduationCap, Timer, Library, Bot, Settings, Bell, X, Target, CalendarDays, BarChart3 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
 
@@ -43,8 +43,14 @@ const StudentBottomNav: React.FC = () => {
     { icon: Trophy, label: "Tournaments", path: "/tournaments" },
     { icon: Users, label: "Friends", path: "/friends" },
     { icon: Trophy, label: "Leaderboard", path: "/leaderboard" },
+    { icon: BookOpen, label: "Topic Coverage", path: "/academic/topics" },
+    { icon: Target, label: "Exam Mode", path: "/academic/exam" },
+    { icon: CalendarDays, label: "Study Planner", path: "/academic/planner" },
+    { icon: BrainCircuit, label: "Flashcards", path: "/academic/flashcards" },
+    { icon: BarChart3, label: "Academic Insights", path: "/academic/insights" },
     { icon: Library, label: "Library", path: "/library" },
     { icon: Bot, label: "AI Tutor", path: "/ai-tutor" },
+    { icon: MessageCircle, label: "Social & chat", path: "/social" },
     { icon: Bell, label: "Notifications", path: "/notifications" },
     { icon: Settings, label: "Settings", path: "/settings" },
   ];

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +27,7 @@ const labelFor = (value: string) => value.replace(/\b\w/g, (m) => m.toUpperCase(
 
 const TopicCoveragePage: React.FC = () => {
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const [topics, setTopics] = useState<TopicData[]>([]);
   const [profileSubjects, setProfileSubjects] = useState<string[]>([]);
@@ -118,7 +120,7 @@ const TopicCoveragePage: React.FC = () => {
     const total = subjects.reduce((sum, s) => sum + subjectProgress(s).total, 0);
     const mastered = subjects.reduce((sum, s) => sum + subjectProgress(s).mastered, 0);
     return (
-      <div className="min-h-screen bg-background">
+      <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background"}>
         <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 py-3">
           <div className="mx-auto flex max-w-4xl items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button>

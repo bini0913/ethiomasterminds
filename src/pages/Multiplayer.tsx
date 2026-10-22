@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { useRoom } from "@/context/RoomContext";
 import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 import { supabase } from "@/integrations/supabase/client";
 import BackButton from "@/components/ui/BackButton";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +76,7 @@ const Multiplayer: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const { currentRoom, leaveRoom } = useRoom();
 
   const [onlineCount, setOnlineCount] = useState(0);
@@ -177,7 +179,7 @@ const Multiplayer: React.FC = () => {
   if (roomId && user && matchSummary) {
     const didWin = matchSummary.playerRank === 1;
     return (
-      <div className="min-h-screen bg-background text-foreground">
+      <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background text-foreground"}>
         {didWin && <Confetti />}
         <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
           <Card>

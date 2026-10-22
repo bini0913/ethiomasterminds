@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -353,7 +354,7 @@ const ExamModePage: React.FC = () => {
 
   if (examState === "setup") {
     return (
-      <div className="min-h-screen bg-muted/30">
+      <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-muted/30"}>
         <Header title="Exam practice" subtitle="Build a configurable practice set across your selected subjects." />
         <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:py-10">
           <section className="space-y-5">
