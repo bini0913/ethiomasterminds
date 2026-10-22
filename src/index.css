@@ -329,3 +329,68 @@
     transition: none;
   }
 }
+
+
+/* Full upper-tier Design Studio finishing pass.
+   These shared component rules intentionally sit behind the existing live page
+   components: they improve visual consistency without replacing real page data,
+   auth, forms, exam logic, or Supabase actions. */
+.upper-tier-studio main {
+  color: hsl(var(--foreground));
+}
+.upper-tier-studio main > .mx-auto,
+.upper-tier-studio main > .container,
+.upper-tier-studio main > [class*="max-w-"] {
+  min-width: 0;
+}
+.upper-tier-studio main [class*="rounded-2xl"][class*="border"],
+.upper-tier-studio main [class*="rounded-3xl"][class*="border"] {
+  border-color: hsl(var(--border) / .78);
+  box-shadow: 0 1px 2px hsl(var(--foreground) / .025), 0 10px 28px hsl(var(--foreground) / .035);
+}
+.upper-tier-studio main [class*="rounded-2xl"][class*="border"]:hover,
+.upper-tier-studio main [class*="rounded-3xl"][class*="border"]:hover {
+  border-color: hsl(var(--primary) / .28);
+}
+.upper-tier-studio main input:not([type="checkbox"]):not([type="radio"]),
+.upper-tier-studio main select,
+.upper-tier-studio main textarea {
+  border-radius: .8rem;
+}
+.upper-tier-studio main button:not([aria-label="Back"]):focus-visible,
+.upper-tier-studio main a:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 3px;
+}
+.upper-tier-studio main [role="tablist"] {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.upper-tier-studio main table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.upper-tier-studio main th {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+.upper-tier-studio main :where(p, label, li) {
+  overflow-wrap: anywhere;
+}
+@media (min-width: 1024px) {
+  .upper-tier-studio main {
+    padding-bottom: 2rem;
+  }
+}
+@media (max-width: 639px) {
+  .upper-tier-studio main [class*="grid-cols-"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .upper-tier-studio main [class*="rounded-2xl"][class*="border"],
+  .upper-tier-studio main [class*="rounded-3xl"][class*="border"] {
+    border-radius: 1rem;
+  }
+}
