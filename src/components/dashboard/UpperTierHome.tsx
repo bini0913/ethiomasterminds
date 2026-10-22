@@ -22,7 +22,7 @@ const UpperStudentDashboard: React.FC = () => {
   const attemptCount = learningData?.totalAttempts ?? 0;
   const profilePath = user?.id ? `/profile/${user.id}` : "/settings";
 
-  return <div className="tier-upper mm-upper-shell min-h-screen bg-background text-foreground">
+  return <div className="tier-upper mm-upper-shell mm-studio-upper min-h-screen bg-background text-foreground">
     <style>{`
       .mm-upper-shell { --mm-navy:#101a35; --mm-navy-2:#17264a; --mm-gold:#f3c96b; --mm-ink:#f8fafc; }
       .mm-upper-shell .mm-upper-hero { background:radial-gradient(circle at 86% 15%,rgba(243,201,107,.16),transparent 28%),linear-gradient(120deg,var(--mm-navy),var(--mm-navy-2)); color:var(--mm-ink); }
