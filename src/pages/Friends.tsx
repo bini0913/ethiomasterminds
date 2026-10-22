@@ -428,7 +428,7 @@ const Friends: React.FC = () => {
         </div>
         
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col bg-gradient-to-b from-muted/10 to-muted/30">
+        <div className="flex-1 flex flex-col bg-background">
           {selectedFriend ? (
             <>
               {/* Chat Header */}
