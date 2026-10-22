@@ -299,9 +299,9 @@ const Multiplayer: React.FC = () => {
 
   // Hub
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background text-foreground"}>
+      <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 backdrop-blur-xl" : "sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border"}>
+        <div className="container mx-auto flex items-center justify-between gap-3 px-4 py-4 sm:gap-4">
           <div className="flex items-center gap-4">
             <BackButton />
             <div className="flex items-center gap-3">
@@ -309,8 +309,8 @@ const Multiplayer: React.FC = () => {
                 <Gamepad2 className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-xl font-bold">Multiplayer Hub</h1>
-                <p className="text-sm text-muted-foreground">Choose a mode and start competing</p>
+                <h1 className="text-xl font-bold tracking-tight">Multiplayer Arena</h1>
+                <p className="text-sm text-muted-foreground">Choose your challenge and compete with friends</p>
               </div>
             </div>
           </div>
@@ -321,7 +321,7 @@ const Multiplayer: React.FC = () => {
         </div>
       </header>
 
-      <main className="container max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 sm:py-7">
         {/* Player card */}
         <Card>
           <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
