@@ -451,8 +451,8 @@ const StudyPlannerPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-amber-700 to-orange-700 px-4 py-3 shadow-xl">
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 bg-primary text-primary-foreground px-4 py-3 shadow-xl">
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className="text-white hover:bg-white/10">
             <ArrowLeft className="h-5 w-5" />
@@ -476,7 +476,7 @@ const StudyPlannerPage: React.FC = () => {
         <div className="grid gap-2 sm:grid-cols-2">
         <Button variant="outline" className="h-12" onClick={() => setShowPlanSettings((open) => !open)}><BookOpen className="h-4 w-4 mr-2" /> Plan all selected books</Button>
         <Button
-          className="h-12 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"
+          className="h-12 bg-primary text-primary-foreground hover:bg-primary/90"
           onClick={generateAIPlan}
           disabled={isGenerating}
         >
@@ -510,7 +510,7 @@ const StudyPlannerPage: React.FC = () => {
       {/* Today's Progress */}
       {todayPlans.length > 0 && (
         <div className="px-4 max-w-4xl mx-auto mb-4">
-          <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+          <Card className="bg-primary/5 border-primary/20">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -578,7 +578,7 @@ const StudyPlannerPage: React.FC = () => {
               <h3 className="font-semibold mb-1">No study plans yet</h3>
               <p className="text-muted-foreground text-sm mb-4">Use AI to generate a personalized plan or add tasks manually</p>
               <div className="flex gap-2 justify-center">
-                <Button onClick={generateAIPlan} disabled={isGenerating} className="bg-gradient-to-r from-violet-600 to-purple-600">
+                <Button onClick={generateAIPlan} disabled={isGenerating} className="bg-primary text-primary-foreground hover:bg-primary/90">
                   <Wand2 className="h-4 w-4 mr-1" /> AI Generate
                 </Button>
                 <Button variant="outline" onClick={() => setShowAdd(true)}>
