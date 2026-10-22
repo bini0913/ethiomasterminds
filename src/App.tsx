@@ -221,6 +221,10 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
               </p>
             </div>
           </div>
+          {isUpperStudent && <>
+            <button type="button" onClick={() => navigate("/notifications")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Notifications" title="Notifications"><Bell className="h-4 w-4" /></button>
+            <button type="button" onClick={() => navigate(user.id ? `/profile/${user.id}` : "/settings")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Profile" title="Profile"><UserRound className="h-4 w-4" /></button>
+          </>}
           <button
             type="button"
             onClick={handleLogout}
