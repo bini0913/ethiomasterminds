@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
 
 const AcademicInsightsPage: React.FC = () => {
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const [topicData, setTopicData] = useState<any[]>([]);
@@ -187,7 +189,7 @@ const AcademicInsightsPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5"}>
       <header className="sticky top-0 z-50 bg-gradient-to-r from-sky-700 to-cyan-700 px-4 py-3 shadow-xl">
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className="text-white hover:bg-white/10">
