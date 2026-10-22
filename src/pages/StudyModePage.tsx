@@ -565,7 +565,7 @@ const StudyModePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white pb-[env(safe-area-inset-bottom)]">
+    <div className="min-h-screen bg-[#0A1526] text-white pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-7xl mx-auto px-3 py-4 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <header>
           <Link to="/" className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white mb-2">
