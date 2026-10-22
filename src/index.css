@@ -394,3 +394,12 @@
     border-radius: 1rem;
   }
 }
+
+.upper-tier-studio aside[aria-label="High school navigation"] button[aria-current="page"] {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 8px 20px hsl(var(--primary) / .18);
+}
+.upper-tier-studio aside[aria-label="High school navigation"] button[aria-current="page"] svg {
+  color: currentColor;
+}
