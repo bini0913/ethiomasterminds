@@ -214,16 +214,16 @@ const FlashcardsPage: React.FC = () => {
   if (!selectedSubject) {
     return (
       <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5"}>
-        <header className="sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl">
+        <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
           <div className="flex items-center gap-3 max-w-4xl mx-auto">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className="text-white hover:bg-white/10">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className={upperStudent ? "text-muted-foreground hover:bg-muted hover:text-foreground" : "text-white hover:bg-white/10"}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-lg font-bold text-white flex items-center gap-2">
+              <h1 className={upperStudent ? "flex items-center gap-2 text-lg font-bold text-foreground" : "flex items-center gap-2 text-lg font-bold text-white"}>
                 <BookOpen className="h-5 w-5" /> Flashcards
               </h1>
-              <p className="text-xs text-white/60">{flashcards.length} cards • {dueCards.length} due for review</p>
+              <p className="text-xs text-muted-foreground">{flashcards.length} cards • {dueCards.length} due for review</p>
             </div>
           </div>
         </header>
@@ -252,7 +252,7 @@ const FlashcardsPage: React.FC = () => {
         {dueCards.length > 0 && (
           <div className="px-4 max-w-4xl mx-auto mb-4">
             <Button
-              className="w-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground h-12 text-base"
+              className="h-12 w-full text-base"
               onClick={() => { setStudyMode("review"); setSelectedSubject("all"); setCurrentIndex(0); }}
             >
               <Brain className="h-5 w-5 mr-2" />
@@ -305,7 +305,7 @@ const FlashcardsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl">
+      <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => { setSelectedSubject(null); setCurrentIndex(0); setIsFlipped(false); }} className="text-white hover:bg-white/10">
             <ArrowLeft className="h-5 w-5" />
