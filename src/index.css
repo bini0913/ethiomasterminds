@@ -340,19 +340,19 @@
   background: hsl(var(--background));
 }
 .upper-tier-studio > div { min-width: 0; }
-.upper-tier-studio aside[aria-label="High school navigation"] {
+.upper-tier-studio .upper-studio-sidebar {
   background: var(--upper-studio-navy) !important;
   border-color: #27365a !important;
   color: #f8fafc;
 }
-.upper-tier-studio aside[aria-label="High school navigation"] nav button:not([class*="bg-indigo"]) {
+.upper-tier-studio .upper-studio-sidebar nav button:not([class*="bg-indigo"]) {
   color: #cbd5e1;
 }
-.upper-tier-studio aside[aria-label="High school navigation"] nav button:hover {
+.upper-tier-studio .upper-studio-sidebar nav button:hover {
   color: #fff;
   background: var(--upper-studio-navy-2);
 }
-.upper-tier-studio aside[aria-label="High school navigation"] > button:hover {
+.upper-tier-studio .upper-studio-sidebar > button:hover {
   background: var(--upper-studio-navy-2);
 }
 .upper-tier-studio .upper-studio-content {
