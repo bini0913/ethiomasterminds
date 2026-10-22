@@ -14,23 +14,9 @@ import ThemeToggle from "@/components/layout/ThemeToggle";
 type Action = { title: string; description: string; path: string; icon: React.ElementType; tone: string };
 const primaryActions: Action[] = [
   { title: "Study Mode", description: "Focus sessions, study rooms and friend calls", path: "/study-mode", icon: Timer, tone: "violet" },
-  { title: "Academic Preparation", description: "Exam practice, topic coverage and study plans", path: "/academic", icon: BookOpen, tone: "blue" },
-  { title: "Multiplayer Arena", description: "Challenge friends and play real matches", path: "/multiplayer", icon: Swords, tone: "green" },
-  { title: "Tournament Center", description: "Explore the tournament features available to you", path: "/tournaments", icon: Trophy, tone: "gold" },
-  { title: "Learning DNA", description: "Your recorded strengths, topics and study signals", path: "/learning-dna", icon: BrainCircuit, tone: "pink" },
-  { title: "Topic Coverage", description: "Continue learning from available curriculum topics", path: "/academic/topics", icon: GraduationCap, tone: "cyan" },
-];
-const moreActions: Action[] = [
-  { title: "Friends", description: "Connect and study with friends", path: "/friends", icon: UserRoundPlus, tone: "cyan" },
-  { title: "Leaderboard", description: "View available student rankings", path: "/leaderboard", icon: Trophy, tone: "gold" },
-  { title: "Social & chat", description: "Messages and social spaces", path: "/social", icon: MessageCircle, tone: "pink" },
-  { title: "Library", description: "Your learning resources", path: "/library", icon: Library, tone: "blue" },
-  { title: "AI Tutor", description: "Open the existing AI Tutor", path: "/ai-tutor", icon: Bot, tone: "violet" },
-  { title: "Revision", description: "Revisit material you have studied", path: "/revision", icon: Flame, tone: "coral" },
-  { title: "Exam Mode", description: "Configure an exam or practice session", path: "/academic/exam", icon: Target, tone: "green" },
-  { title: "Study Planner", description: "Plan sessions around your learning", path: "/academic/planner", icon: CalendarDays, tone: "cyan" },
-  { title: "Academic Insights", description: "Review your recorded academic progress", path: "/academic/insights", icon: BarChart3, tone: "gold" },
-  { title: "Notifications", description: "View and manage app notifications", path: "/notifications", icon: MessageCircle, tone: "blue" },
+  { title: "Academic Prep", description: "Exams, topics and study plans", path: "/academic", icon: BookOpen, tone: "blue" },
+  { title: "Multiplayer", description: "Play and learn with friends", path: "/multiplayer", icon: Swords, tone: "green" },
+  { title: "Learning DNA", description: "Your learning progress and strengths", path: "/learning-dna", icon: BrainCircuit, tone: "pink" },
 ];
 const greeting = () => { const hour = new Date().getHours(); return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"; };
 
@@ -108,17 +94,9 @@ const UpperStudentDashboard: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Your live learning metrics">
-        <div className="mm-upper-stat"><p className="text-xs font-medium text-muted-foreground">Question attempts</p><p className="mt-2 text-2xl font-bold tabular-nums">{isLoading ? "…" : attemptCount.toLocaleString()}</p><p className="mt-1 text-xs text-muted-foreground">Recorded in your account</p></div>
-        <div className="mm-upper-stat"><p className="text-xs font-medium text-muted-foreground">Topics tracked</p><p className="mt-2 text-2xl font-bold tabular-nums">{isLoading ? "…" : topicCount.toLocaleString()}</p><p className="mt-1 text-xs text-muted-foreground">From Learning DNA</p></div>
-        <div className="mm-upper-stat"><p className="text-xs font-medium text-muted-foreground">Average topic mastery</p><p className="mt-2 text-2xl font-bold tabular-nums">{isLoading ? "…" : averageMastery === null ? "—" : `${averageMastery}%`}</p><p className="mt-1 text-xs text-muted-foreground">{averageMastery === null ? "Available when mastery is recorded" : "Calculated from recorded topic mastery"}</p></div>
-        <div className="mm-upper-stat"><p className="text-xs font-medium text-muted-foreground">Account level</p><p className="mt-2 text-2xl font-bold tabular-nums">{user?.level ?? 1}</p><p className="mt-1 text-xs text-muted-foreground">{(user?.xp ?? 0).toLocaleString()} XP recorded on your profile</p></div>
-      </section>
+      <section className="space-y-3"><div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-bold tracking-tight sm:text-xl">Your learning spaces</h2><p className="mt-1 text-sm text-muted-foreground">Your essential tools, in one place.</p></div><span className="hidden items-center gap-1 text-xs font-semibold text-muted-foreground sm:flex"><Sparkles className="h-4 w-4"/> Built for Grades 9–12</span></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{primaryActions.map(item => <ActionCard key={item.path} item={item} onOpen={navigate}/>)}</div></section>
 
-      <section className="space-y-3"><div className="flex items-end justify-between gap-3"><div><h2 className="text-lg font-bold tracking-tight sm:text-xl">Your main learning spaces</h2><p className="mt-1 text-sm text-muted-foreground">Open your study, exam preparation and competition tools.</p></div><span className="hidden items-center gap-1 text-xs font-semibold text-muted-foreground sm:flex"><Sparkles className="h-4 w-4"/> Built for Grades 9–12</span></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{primaryActions.map(item => <ActionCard key={item.path} item={item} onOpen={navigate}/>)}</div></section>
-
-      <section className="space-y-3"><div><h2 className="text-lg font-bold tracking-tight sm:text-xl">More from Master Minds</h2><p className="mt-1 text-sm text-muted-foreground">Your connected resources and student tools.</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{moreActions.map(item => <ActionCard key={item.path} item={item} onOpen={navigate}/>)}</div></section>
-      <p className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground"><Loader2 className="mt-0.5 h-4 w-4 shrink-0"/> Metrics shown here are read from your signed-in profile and existing Learning DNA records. Feature shortcuts open the existing production routes and preserve their backend integrations.</p>
+      <p className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground"><Loader2 className="mt-0.5 h-4 w-4 shrink-0"/> Your progress comes from your signed-in account. Use More in the bottom navigation for friends, tournaments, the library, revision, notifications and other tools.</p>
     </main>
   </div>;
 };
