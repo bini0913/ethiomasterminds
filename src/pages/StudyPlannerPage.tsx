@@ -454,16 +454,16 @@ const StudyPlannerPage: React.FC = () => {
 
   return (
     <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5"}>
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-amber-700 to-orange-700 px-4 py-3 shadow-xl">
+      <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 bg-gradient-to-r from-amber-700 to-orange-700 px-4 py-3 shadow-xl"}>
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className="text-white hover:bg-white/10">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className={upperStudent ? "text-muted-foreground hover:bg-muted hover:text-foreground" : "text-white hover:bg-white/10"}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-white flex items-center gap-2">
+            <h1 className={upperStudent ? "flex items-center gap-2 text-lg font-bold text-foreground" : "flex items-center gap-2 text-lg font-bold text-white"}>
               <Calendar className="h-5 w-5" /> AI Study Planner
             </h1>
-            <p className="text-xs text-white/60">Today: {completedToday}/{todayPlans.length} completed</p>
+            <p className="text-xs text-muted-foreground">Today: {completedToday}/{todayPlans.length} completed</p>
           </div>
           <div className="flex gap-1">
             <Button size="sm" variant="secondary" onClick={() => setShowAdd(true)}>
@@ -478,7 +478,7 @@ const StudyPlannerPage: React.FC = () => {
         <div className="grid gap-2 sm:grid-cols-2">
         <Button variant="outline" className="h-12" onClick={() => setShowPlanSettings((open) => !open)}><BookOpen className="h-4 w-4 mr-2" /> Plan all selected books</Button>
         <Button
-          className="h-12 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"
+          className={upperStudent ? "h-12" : "h-12 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"}
           onClick={generateAIPlan}
           disabled={isGenerating}
         >
