@@ -5,7 +5,7 @@ import {
   Layers3, Lightbulb, Medal, MessageCircle, Mic, MicOff, Pause, Play, Plus, RotateCcw, Search,
   Send, ShieldCheck, Sparkles, Star, Swords, Target, Trophy, Users, VideoOff, Volume2, Zap
 } from "lucide-react";
-import { AppFrame, Av, Bar, Btn, Card, IconBox, Pill, SectionTitle, Stat, useGo, type Tone } from "../ui";
+import { AppFrame, Av, Bar, Btn, Card, IconBox, Pill, SectionTitle, Stat, useGo, type Tone } from "./ui";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
