@@ -373,7 +373,7 @@ const Leaderboard = () => {
                       <h3 className="text-base font-semibold">{getDisplayName(entry)}</h3>
                       <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
                       <div className="mt-3 flex items-center justify-between gap-2">
-                        <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
+                        <Badge className="border border-primary/20 bg-primary/10 text-primary">{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
                         <span className="text-lg font-bold">#{entry.rankPos}</span>
                       </div>
                       <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} Season XP</p>
