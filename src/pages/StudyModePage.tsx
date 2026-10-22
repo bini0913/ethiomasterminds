@@ -570,19 +570,19 @@ const StudyModePage: React.FC = () => {
     <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white pb-[env(safe-area-inset-bottom)]"}>
       <div className="max-w-7xl mx-auto px-3 py-4 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         <header>
-          <Link to="/" className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white mb-2">
+          <Link to="/" className={`mb-2 inline-flex items-center gap-2 text-sm ${upperStudent ? "text-muted-foreground hover:text-foreground" : "text-white/80 hover:text-white"}`}>
             <ArrowLeft className="h-4 w-4" /> Back to Master Minds
           </Link>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <Brain className="h-7 w-7 text-violet-300" /> Study Mode Elite (Realtime)
+          <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl">
+            <Brain className={`h-7 w-7 ${upperStudent ? "text-primary" : "text-violet-300"}`} /> Study Mode
           </h1>
-          <p className="text-sm text-white/70">Pomodoro flow • Real timestamps • XP rewards • Live competition • Task linking.</p>
+          <p className={upperStudent ? "text-sm text-muted-foreground" : "text-sm text-white/70"}>Focus sessions · Real study history · XP rewards · Live study room · Task linking.</p>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-4">
-          <Card className="lg:col-span-2 bg-white/5 border-white/10">
+          <Card className={upperStudent ? "lg:col-span-2 border-border/70 bg-card shadow-sm" : "lg:col-span-2 bg-white/5 border-white/10"}>
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2"><Clock className="h-5 w-5 text-cyan-300" /> Focus Timer</CardTitle>
+              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-white"}`}><Clock className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-cyan-300"}`} /> Focus Timer</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4 items-center">
@@ -677,8 +677,8 @@ const StudyModePage: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
-                <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Today</p><p className="font-bold">{todayMinutes}m</p></CardContent></Card>
-                <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Week</p><p className="font-bold">{weekMinutes}m</p></CardContent></Card>
+                <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "bg-white/5 border-white/10"}><CardContent className="p-3"><p className="text-xs text-white/60">Today</p><p className="font-bold">{todayMinutes}m</p></CardContent></Card>
+                <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "bg-white/5 border-white/10"}><CardContent className="p-3"><p className="text-xs text-white/60">Week</p><p className="font-bold">{weekMinutes}m</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Streak</p><p className="font-bold">{streakDays} 🔥</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Pomodoros</p><p className="font-bold">{studyStats.pomodoros_today}/4</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Live Studying</p><p className="font-bold flex items-center justify-center gap-1">{liveStatuses.length} <Flame className="h-4 w-4 text-orange-400" /></p></CardContent></Card>
@@ -688,7 +688,7 @@ const StudyModePage: React.FC = () => {
 
           <Card className="bg-white/5 border-white/10">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2"><Users className="h-5 w-5 text-emerald-300" /> Studying Now</CardTitle>
+              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-white"}`}><Users className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-emerald-300"}`} /> Studying Now</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <StudyCallBar />
@@ -707,7 +707,7 @@ const StudyModePage: React.FC = () => {
         <div className="grid lg:grid-cols-3 gap-4">
           <Card className="lg:col-span-2 bg-white/5 border-white/10">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2"><Check className="h-5 w-5 text-emerald-300" /> Study Tasks</CardTitle>
+              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-white"}`}><Check className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-emerald-300"}`} /> Study Tasks</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-col sm:flex-row gap-2">
@@ -731,7 +731,7 @@ const StudyModePage: React.FC = () => {
 
           <Card className="bg-white/5 border-white/10">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2"><Trophy className="h-5 w-5 text-amber-300" /> Competitions</CardTitle>
+              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-white"}`}><Trophy className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-amber-300"}`} /> Competitions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-col sm:flex-row gap-2">
