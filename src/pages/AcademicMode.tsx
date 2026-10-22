@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
+import { useTier } from "@/context/TierContext";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ const formatSubject = (subject: string) => subject === "math" ? "Mathematics" : 
 
 const AcademicMode: React.FC = () => {
   const { user } = useUser();
+  const tier = useTier();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,7 +78,7 @@ const AcademicMode: React.FC = () => {
   const recentScore = recentResult?.score == null ? null : Math.max(0, Math.min(100, Number(recentResult.score)));
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className={tier === "upper" ? "tier-upper min-h-screen bg-background text-foreground" : "min-h-screen bg-muted/30"}>
       <header className="border-b bg-background">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
@@ -87,7 +89,7 @@ const AcademicMode: React.FC = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-5 pb-12 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
         <section className="relative overflow-hidden rounded-3xl border bg-card shadow-sm">
           <div className="absolute inset-y-0 right-0 hidden w-1/3 bg-primary/[0.04] md:block" />
           <div className="relative grid gap-6 p-5 sm:p-7 md:grid-cols-[1fr_auto] md:items-center md:p-9">
