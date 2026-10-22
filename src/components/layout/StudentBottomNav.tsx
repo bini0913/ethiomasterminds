@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, Gamepad2, Globe2, Gift, BookOpen, Swords, MessageCircle, Brain, Trophy, MoreHorizontal, Users, X } from "lucide-react";
+import { Home, Gamepad2, Globe2, Gift, BookOpen, Swords, MessageCircle, Brain, Trophy, MoreHorizontal, Users, GraduationCap } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
 
@@ -27,7 +27,7 @@ const StudentBottomNav: React.FC = () => {
         { icon: Home, label: "Home", path: "/", match: ["/"] },
         { icon: BookOpen, label: "Study", path: "/study-mode", match: ["/study-mode", "/academic", "/quiz", "/quiz/filter", "/library", "/revision", "/academic/setup", "/academic/flashcards", "/academic/topics", "/academic/exam", "/academic/planner", "/academic/insights"] },
         { icon: Swords, label: "Compete", path: "/multiplayer", match: ["/multiplayer", "/lobby"] },
-        { icon: GraduationCapIcon, label: "Prep", path: "/academic", match: ["/academic", "/library"] },
+        { icon: GraduationCap, label: "Prep", path: "/academic", match: ["/academic", "/library"] },
       ]
     : [
         { icon: Home, label: "Home", path: "/", match: ["/"] },
@@ -71,8 +71,5 @@ const StudentBottomNav: React.FC = () => {
     </div>
   );
 };
-
-// Keep the icon import small and explicit without changing other tier navigation.
-import { GraduationCap as GraduationCapIcon } from "lucide-react";
 
 export default StudentBottomNav;
