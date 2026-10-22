@@ -79,19 +79,19 @@ const AcademicMode: React.FC = () => {
 
   return (
     <div className={tier === "upper" ? "tier-upper min-h-screen bg-background text-foreground" : "min-h-screen bg-muted/30"}>
-      <header className="border-b bg-background">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
+      <header className={tier === "upper" ? "border-b border-border/70 bg-background/95 backdrop-blur-xl" : "border-b bg-background"}>
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm"><GraduationCap className="h-6 w-6" /></div>
-            <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Master Minds · Study</p><h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">Academic Prep</h1></div>
+            <div className={tier === "upper" ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary" : "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm"}><GraduationCap className="h-6 w-6" /></div>
+            <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Master Minds · {tier === "upper" ? "Academic workspace" : "Study"}</p><h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">Academic Prep</h1></div>
           </div>
           <Button variant="outline" size="sm" onClick={() => navigate("/academic/setup")}><Settings2 className="mr-2 h-4 w-4" /><span className="hidden sm:inline">Edit profile</span><span className="sm:hidden">Edit</span></Button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
-        <section className="relative overflow-hidden rounded-3xl border bg-card shadow-sm">
-          <div className="absolute inset-y-0 right-0 hidden w-1/3 bg-primary/[0.04] md:block" />
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8 lg:px-8">
+        <section className={tier === "upper" ? "relative overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm" : "relative overflow-hidden rounded-3xl border bg-card shadow-sm"}>
+          <div className={tier === "upper" ? "absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-primary/[0.09] to-transparent md:block" : "absolute inset-y-0 right-0 hidden w-1/3 bg-primary/[0.04] md:block"} />
           <div className="relative grid gap-6 p-5 sm:p-7 md:grid-cols-[1fr_auto] md:items-center md:p-9">
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">Grade {grade}</Badge><Badge variant="outline">{profile?.curriculum === "oromia" ? "Oromia curriculum" : "Addis Ababa curriculum"}</Badge></div>
