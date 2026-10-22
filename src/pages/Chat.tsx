@@ -519,7 +519,7 @@ const Chat: React.FC = () => {
                   activeRoom?.id === room.id && 'bg-accent/70 shadow-sm'
                 )}>
                 <div className="relative shrink-0">
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-lg border border-border/30">
+                  <div className="w-11 h-11 rounded-full bg-primary/10 text-primary flex items-center justify-center text-lg border border-border/30">
                     {room.avatar_url ? (
                       <img src={room.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
                     ) : getRoomIcon(room.group_type)}
@@ -581,7 +581,7 @@ const Chat: React.FC = () => {
             <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={() => setShowMobileChat(false)}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-border/30">
+            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center border border-border/30">
               {getRoomIcon(activeRoom.group_type)}
             </div>
             <div>
@@ -635,7 +635,7 @@ const Chat: React.FC = () => {
                           {showAvatar && !isMe && (
                             <button
                               onClick={() => navigate(`/profile/${msg.sender_id}`)}
-                              className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-sm border border-border/30 hover:ring-2 hover:ring-primary/50 transition-all">
+                              className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm border border-border/30 hover:ring-2 hover:ring-primary/50 transition-all">
                               {msg.senderAvatar}
                             </button>
                           )}
@@ -835,7 +835,7 @@ const Chat: React.FC = () => {
                         onClick={() => navigate(`/profile/${m.user_id}`)}
                         className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-accent/50 transition-colors text-left">
                         <div className="relative">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-sm border border-border/30">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm border border-border/30">
                             {m.avatar}
                           </div>
                           <div className={cn(
