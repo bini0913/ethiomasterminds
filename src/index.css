@@ -254,3 +254,100 @@
     }
   }
 }
+
+
+/*
+ * Grade 9–12 Design Studio visual port.
+ * Scoped to the upper-tier workspace only: keeps the production page components,
+ * routes, Supabase queries, and action handlers as the source of truth while
+ * aligning shared page surfaces with the Studio's navy / indigo / soft-canvas UI.
+ */
+.upper-studio-workspace {
+  --upper-studio-navy: #0b1220;
+  --upper-studio-indigo: #6366f1;
+  --upper-studio-canvas: #f6f8fc;
+  --upper-studio-border: #e5eaf2;
+}
+.upper-studio-workspace .upper-studio-content {
+  color: #172033;
+  background: var(--upper-studio-canvas);
+}
+.dark .upper-studio-workspace .upper-studio-content {
+  color: #e5eaf5;
+  background: #090f1e;
+}
+.upper-studio-workspace .upper-studio-content main {
+  width: 100%;
+  max-width: 1440px;
+  min-width: 0;
+  margin-inline: auto;
+  padding: clamp(1rem, 2vw, 2rem);
+}
+.upper-studio-workspace .upper-studio-content h1 {
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -.04em;
+}
+.upper-studio-workspace .upper-studio-content h2 {
+  letter-spacing: -.025em;
+}
+.upper-studio-workspace .upper-studio-content [class*="rounded-xl"][class*="border"],
+.upper-studio-workspace .upper-studio-content [class*="rounded-2xl"][class*="border"] {
+  border-color: var(--upper-studio-border);
+  border-radius: 1rem;
+  box-shadow: 0 2px 14px -9px rgb(15 23 42 / 24%);
+}
+.dark .upper-studio-workspace .upper-studio-content [class*="rounded-xl"][class*="border"],
+.dark .upper-studio-workspace .upper-studio-content [class*="rounded-2xl"][class*="border"] {
+  border-color: #263348;
+  box-shadow: 0 2px 16px -10px rgb(0 0 0 / 65%);
+}
+.upper-studio-workspace .upper-studio-content button,
+.upper-studio-workspace .upper-studio-content a {
+  -webkit-tap-highlight-color: transparent;
+}
+.upper-studio-workspace .upper-studio-content button:focus-visible,
+.upper-studio-workspace .upper-studio-content a:focus-visible,
+.upper-studio-workspace aside button:focus-visible {
+  outline: 2px solid var(--upper-studio-indigo);
+  outline-offset: 2px;
+}
+.upper-studio-workspace aside {
+  background: var(--upper-studio-navy);
+  border-color: #202b3d;
+}
+.upper-studio-workspace aside nav button {
+  min-height: 2.75rem;
+}
+.upper-studio-workspace aside nav button:hover {
+  background: #1b2638;
+}
+.upper-studio-workspace .upper-studio-content input,
+.upper-studio-workspace .upper-studio-content select,
+.upper-studio-workspace .upper-studio-content textarea {
+  min-width: 0;
+  border-radius: .75rem;
+}
+@media (max-width: 1023px) {
+  .upper-studio-workspace .upper-studio-content {
+    background: hsl(var(--background));
+  }
+  .upper-studio-workspace .upper-studio-content main {
+    padding: 1rem .875rem 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .upper-studio-workspace .upper-studio-content main {
+    padding: 1.75rem 2rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .upper-studio-workspace .upper-studio-content *,
+  .upper-studio-workspace aside * {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
