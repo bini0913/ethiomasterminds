@@ -1,11 +1,13 @@
 name: Build Windows EXE
 
+# Temporarily manual-only while the GitHub Actions allowance resets.
+# Re-enable push/pull_request triggers after the reset window.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -13,19 +15,22 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: npm
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Install Electron tooling
-        run: npm install --save-dev electron@31 @electron/packager@18 --legacy-peer-deps
-
+      # Electron and @electron/packager are already declared in package.json.
+      # Do not run npm install --save-dev in CI: it mutates package files on the runner.
       - name: Build web app for Electron
         env:
           VITE_SUPABASE_URL: https://mytbjkchvfybhyqcynnl.supabase.co
@@ -36,6 +41,15 @@ jobs:
 
       - name: Package Windows EXE
         run: npx @electron/packager . MasterMinds --platform=win32 --arch=x64 --out=release --overwrite --ignore="^/src$" --ignore="^/public$" --ignore="^/release$" --ignore="^/electron-release$" --ignore="^/supabase$" --ignore="^/\\.github$" --ignore="^/android$"
+
+      - name: Verify packaged executable exists
+        shell: pwsh
+        run: |
+          $exe = "release/MasterMinds-win32-x64/MasterMinds.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Error "Expected packaged executable was not created: $exe"
+            exit 1
+          }
 
       - name: Zip the build
         run: Compress-Archive -Path release/MasterMinds-win32-x64/* -DestinationPath MasterMinds-Windows.zip
