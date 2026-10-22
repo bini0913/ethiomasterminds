@@ -167,18 +167,18 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
       {isUpperStudent && <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-card/95 px-4 py-5 lg:flex">
         <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span><span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span></span></button>
         <nav aria-label="High school navigation" className="flex-1 space-y-1 overflow-y-auto">
-          <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Workspace</p>
-          <button type="button" onClick={() => navigate("/")} className="flex min-h-11 w-full items-center gap-3 rounded-xl bg-primary/10 px-3 py-2.5 text-left text-sm font-bold text-primary"><Home className="h-4 w-4"/> Home</button>
-          <button type="button" onClick={() => navigate("/study-mode")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Timer className="h-4 w-4"/> Study Mode</button>
+          <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Workspace</p>
+          <button type="button" onClick={() => navigate("/")} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${location.pathname === "/" ? "bg-indigo-500 text-white shadow-lg shadow-indigo-950/30" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}><Home className="h-4 w-4"/> Home</button>
+          <button type="button" onClick={() => navigate("/study-mode")} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${location.pathname === "/study-mode" ? "bg-indigo-500 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}><Timer className="h-4 w-4"/> Study Mode</button>
           <button type="button" onClick={() => navigate("/academic")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BookOpen className="h-4 w-4"/> Academic Mode <ChevronRight className="ml-auto h-4 w-4"/></button>
-          <div className="ml-4 space-y-1 border-l border-border pl-3">
+          <div className="ml-4 space-y-1 border-l border-slate-800 pl-3">
             <button type="button" onClick={() => navigate("/academic/topics")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Layers3 className="h-4 w-4"/> Topic Coverage</button>
             <button type="button" onClick={() => navigate("/academic/flashcards")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BrainCircuit className="h-4 w-4"/> Flashcards & Revision</button>
             <button type="button" onClick={() => navigate("/academic/exam")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Target className="h-4 w-4"/> Exam Mode</button>
             <button type="button" onClick={() => navigate("/academic/planner")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><CalendarDays className="h-4 w-4"/> Study Planner</button>
             <button type="button" onClick={() => navigate("/academic/insights")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BarChart3 className="h-4 w-4"/> Academic Insights</button>
           </div>
-          <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Connect</p>
+          <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Connect</p>
           <button type="button" onClick={() => navigate("/multiplayer")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Swords className="h-4 w-4"/> Multiplayer</button>
           <button type="button" onClick={() => navigate("/tournaments")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Trophy className="h-4 w-4"/> Tournaments</button>
           <button type="button" onClick={() => navigate("/learning-dna")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BrainCircuit className="h-4 w-4"/> Learning DNA</button>
@@ -187,7 +187,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
           <button type="button" onClick={() => navigate("/ai-tutor")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Bot className="h-4 w-4"/> AI Tutor</button>
           <button type="button" onClick={() => navigate("/notifications")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Bell className="h-4 w-4"/> Notifications</button>
         </nav>
-        <div className="mt-4 border-t border-border pt-3"><button type="button" onClick={() => navigate("/settings")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><SettingsIcon className="h-4 w-4"/> Settings</button><button type="button" onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-4 w-4"/> Log out</button></div>
+        <div className="mt-4 border-t border-slate-800 pt-3"><button type="button" onClick={() => navigate("/settings")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><SettingsIcon className="h-4 w-4"/> Settings</button><button type="button" onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-4 w-4"/> Log out</button></div>
       </aside>}
       <div className={isUpperStudent ? "lg:pl-64" : ""}>
       <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 lg:hidden" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
@@ -232,7 +232,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
           </button>
         </div>
       </header>
-      <div className={isUpperStudent ? "pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : undefined}>{children}</div>
+      <div className={`${isUpperStudent ? "upper-studio-content pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{children}</div>
       {isUpperStudent && <div className="lg:hidden"><StudentBottomNav /></div>}
       </div>
     </div>

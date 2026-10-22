@@ -34,29 +34,29 @@ const UpperStudentDashboard: React.FC = () => {
       .mm-upper-shell .mm-upper-stat { background:var(--card); border:1px solid var(--border); border-radius:1rem; padding:1rem; min-width:0; }
       .mm-upper-shell .mm-upper-label { color:rgba(237,242,255,.72); font-size:.75rem; }
       .mm-upper-shell .mm-upper-sidebar { width:16rem; }
-      .mm-upper-shell .mm-upper-nav-link { display:flex; align-items:center; gap:.75rem; min-height:2.65rem; padding:.65rem .8rem; border-radius:.8rem; color:var(--muted-foreground); font-size:.875rem; font-weight:550; text-align:left; transition:background .15s,color .15s; }
-      .mm-upper-shell .mm-upper-nav-link:hover { background:var(--muted); color:var(--foreground); }
-      .mm-upper-shell .mm-upper-nav-link[data-active="true"] { background:rgba(99,102,241,.12); color:hsl(var(--primary)); font-weight:700; }
+      .mm-upper-shell .mm-upper-nav-link { display:flex; align-items:center; gap:.75rem; min-height:2.65rem; padding:.65rem .8rem; border-radius:.8rem; color:#94a3b8; font-size:.875rem; font-weight:550; text-align:left; transition:background .15s,color .15s; }
+      .mm-upper-shell .mm-upper-nav-link:hover { background:#1e293b; color:#fff; }
+      .mm-upper-shell .mm-upper-nav-link[data-active="true"] { background:#6366f1; color:#fff; font-weight:700; box-shadow:0 8px 20px -12px rgba(99,102,241,.85); }
       @media(max-width:640px){.mm-upper-shell .mm-upper-hero{border-radius:1.25rem}.mm-upper-shell .mm-upper-action{padding:.85rem;gap:.7rem}.mm-upper-shell .mm-upper-icon{height:2.6rem;width:2.6rem}.mm-upper-shell .mm-upper-action .text-sm{font-size:.78rem;line-height:1.15rem}}
     `}</style>
-    <aside className="mm-upper-sidebar fixed inset-y-0 left-0 z-40 hidden border-r border-border bg-card/95 px-4 py-5 lg:flex lg:flex-col">
+    <aside className="mm-upper-sidebar fixed inset-y-0 left-0 z-40 hidden border-r border-slate-800 bg-slate-950 px-4 py-5 text-slate-100 lg:flex lg:flex-col">
       <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left">
-        <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span>
-        <span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span></span>
+        <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-slate-900 ring-1 ring-slate-700"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span>
+        <span><span className="block font-display text-base font-bold text-white">Master Minds</span><span className="block text-xs text-slate-400">Grades 9–12</span></span>
       </button>
       <nav aria-label="High school navigation" className="flex-1 space-y-1 overflow-y-auto">
-        <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Workspace</p>
+        <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Workspace</p>
         <button type="button" data-active="true" onClick={() => navigate("/")} className="mm-upper-nav-link w-full"><Home className="h-4 w-4"/> Home</button>
         <button type="button" onClick={() => navigate("/study-mode")} className="mm-upper-nav-link w-full"><Timer className="h-4 w-4"/> Study Mode</button>
         <button type="button" onClick={() => navigate("/academic")} className="mm-upper-nav-link w-full"><BookOpen className="h-4 w-4"/> Academic Mode <ChevronRight className="ml-auto h-4 w-4"/></button>
-        <div className="ml-4 space-y-1 border-l border-border pl-3">
+        <div className="ml-4 space-y-1 border-l border-slate-800 pl-3">
           <button type="button" onClick={() => navigate("/academic/topics")} className="mm-upper-nav-link w-full"><Layers3 className="h-4 w-4"/> Topic Coverage</button>
           <button type="button" onClick={() => navigate("/academic/flashcards")} className="mm-upper-nav-link w-full"><BrainCircuit className="h-4 w-4"/> Flashcards & Revision</button>
           <button type="button" onClick={() => navigate("/academic/exam")} className="mm-upper-nav-link w-full"><Target className="h-4 w-4"/> Exam Mode</button>
           <button type="button" onClick={() => navigate("/academic/planner")} className="mm-upper-nav-link w-full"><CalendarDays className="h-4 w-4"/> Study Planner</button>
           <button type="button" onClick={() => navigate("/academic/insights")} className="mm-upper-nav-link w-full"><BarChart3 className="h-4 w-4"/> Academic Insights</button>
         </div>
-        <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Connect</p>
+        <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Connect</p>
         <button type="button" onClick={() => navigate("/multiplayer")} className="mm-upper-nav-link w-full"><Swords className="h-4 w-4"/> Multiplayer</button>
         <button type="button" onClick={() => navigate("/tournaments")} className="mm-upper-nav-link w-full"><Trophy className="h-4 w-4"/> Tournaments</button>
         <button type="button" onClick={() => navigate("/learning-dna")} className="mm-upper-nav-link w-full"><BrainCircuit className="h-4 w-4"/> Learning DNA</button>
@@ -65,7 +65,7 @@ const UpperStudentDashboard: React.FC = () => {
         <button type="button" onClick={() => navigate("/ai-tutor")} className="mm-upper-nav-link w-full"><Bot className="h-4 w-4"/> AI Tutor</button>
         <button type="button" onClick={() => navigate("/notifications")} className="mm-upper-nav-link w-full"><Bell className="h-4 w-4"/> Notifications</button>
       </nav>
-      <div className="mt-4 border-t border-border pt-3">
+      <div className="mt-4 border-t border-slate-800 pt-3">
         <button type="button" onClick={() => navigate("/settings")} className="mm-upper-nav-link w-full"><Settings className="h-4 w-4"/> Settings</button>
         <button type="button" onClick={async () => { await logout(); navigate("/", { replace: true }); }} className="mm-upper-nav-link w-full hover:!bg-destructive/10 hover:!text-destructive"><LogOut className="h-4 w-4"/> Log out</button>
       </div>
