@@ -9,8 +9,8 @@ import { useUser } from "@/context/UserContext";
 import { useLearningDNA } from "@/hooks/useLearningDNA";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import ThemeToggle from "@/components/layout/ThemeToggle";
+import StudentBottomNav from "@/components/layout/StudentBottomNav";
 
-type Action = { title: string; description: string; path: string; icon: React.ElementType; tone: string };
 const greeting = () => { const hour = new Date().getHours(); return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"; };
 
 const UpperStudentDashboard: React.FC = () => {
@@ -115,6 +115,7 @@ const UpperStudentDashboard: React.FC = () => {
       <p className="flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground"><Loader2 className="mt-0.5 h-4 w-4 shrink-0"/> Your progress comes from your signed-in account. Use More in the bottom navigation for friends, tournaments, the library, revision, notifications and other tools.</p>
     </main>
     </div>
+    <div className="lg:hidden"><StudentBottomNav /></div>
   </div>;
 };
 export default UpperStudentDashboard;
