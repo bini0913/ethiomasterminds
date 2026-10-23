@@ -152,7 +152,7 @@ const ExamModePage: React.FC = () => {
     (async () => {
       try {
         // External archive links only; these are not imported questions or verified answer keys.
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("entrance_exam_papers")
           .select("id,subject,ethiopian_year,gregorian_year,source_name,source_url,source_status,notes")
           .eq("grade_level", 12)
