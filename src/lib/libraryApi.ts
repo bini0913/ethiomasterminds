@@ -554,3 +554,30 @@ export function getThumbnailPublicUrl(path: string | null) {
   const { data } = supabase.storage.from('library-thumbnails').getPublicUrl(normalizedPath);
   return data.publicUrl;
 }
+
+
+export interface CurriculumTextbookCatalogEntry {
+  id: string;
+  grade_level: number;
+  curriculum_year_ec: number;
+  subject: string;
+  book_title: string;
+  resource_type: 'student_textbook' | 'teacher_guide' | 'supplementary';
+  source_name: string;
+  source_url: string;
+  source_status: 'verified_official' | 'external_reference' | 'needs_review';
+  notes: string;
+}
+
+export async function listCurriculumTextbookCatalog(options?: { minGrade?: number; maxGrade?: number }) {
+  let query = db
+    .from('curriculum_textbook_catalog')
+    .select('id, grade_level, curriculum_year_ec, subject, book_title, resource_type, source_name, source_url, source_status, notes')
+    .order('grade_level', { ascending: true })
+    .order('subject', { ascending: true });
+  if (options?.minGrade != null) query = query.gte('grade_level', options.minGrade);
+  if (options?.maxGrade != null) query = query.lte('grade_level', options.maxGrade);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as CurriculumTextbookCatalogEntry[];
+}

@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Bookmark, BookmarkCheck, BookOpen, Brain, Download, Highlighter, Loader2, Search, Upload, User } from 'lucide-react';
+import { Bookmark, BookmarkCheck, BookOpen, Brain, Download, ExternalLink, FileText, Highlighter, Loader2, Search, Upload, User } from 'lucide-react';
 import {
   createBook,
   createHighlight,
@@ -25,6 +25,8 @@ import {
   invokeLibraryAI,
   isValidPublicUrl,
   LibraryBook,
+  CurriculumTextbookCatalogEntry,
+  listCurriculumTextbookCatalog,
   saveAIContent,
   listAssignedBooks,
   listBookmarks,
@@ -43,7 +45,7 @@ const PAGE_SIZE = 9;
 const MAX_UPLOAD_SIZE_MB = 50;
 const MAX_AI_TEXT_LENGTH = 3500;
 
-type SectionKey = 'my-books' | 'assigned' | 'community' | 'upload' | 'highlights' | 'notes';
+type SectionKey = 'my-books' | 'assigned' | 'community' | 'curriculum' | 'upload' | 'highlights' | 'notes';
 
 type AiAction = 'summary' | 'simple' | 'questions' | 'flashcards' | 'concepts';
 
@@ -88,6 +90,8 @@ const LibraryPage: React.FC = () => {
 
   const [books, setBooks] = useState<LibraryBook[]>([]);
   const [assignedBooks, setAssignedBooks] = useState<LibraryBook[]>([]);
+  const [curriculumBooks, setCurriculumBooks] = useState<CurriculumTextbookCatalogEntry[]>([]);
+  const [curriculumCatalogError, setCurriculumCatalogError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'validating' | 'uploading' | 'saving' | 'done'>('idle');
@@ -147,6 +151,16 @@ const LibraryPage: React.FC = () => {
       setAssignedBooks(assigned);
       setHighlights(highlightRows);
       setSavedQuestions(questionRows);
+
+      try {
+        const catalog = await listCurriculumTextbookCatalog({ minGrade: 9, maxGrade: 12 });
+        setCurriculumBooks(catalog);
+        setCurriculumCatalogError(false);
+      } catch (catalogError) {
+        console.warn('Curriculum textbook catalog unavailable:', catalogError);
+        setCurriculumBooks([]);
+        setCurriculumCatalogError(true);
+      }
 
       const progress = await listReadingProgress(user.id).catch(() => []);
       if (selectedBook) {
@@ -209,7 +223,7 @@ const LibraryPage: React.FC = () => {
 
   const visibleBooks = filteredBooks.slice(0, visibleCount);
 
-  const subjects = useMemo(() => Array.from(new Set(books.map((b) => b.subject))).sort(), [books]);
+  const subjects = useMemo(() => Array.from(new Set([...books.map((b) => b.subject), ...curriculumBooks.map((b) => b.subject)])).sort(), [books, curriculumBooks]);
 
   const resetForm = () => {
     const defaultGrade = user?.role === 'student'
@@ -595,6 +609,7 @@ const LibraryPage: React.FC = () => {
                 ['my-books', 'My Books'],
                 ['assigned', 'Assigned Books'],
                 ['community', 'Community Library'],
+                ...(userTier === 'upper' || user?.role !== 'student' ? [['curriculum', 'Curriculum Textbooks'] as [SectionKey, string]] : []),
                 ['upload', 'Upload Book'],
                 ['highlights', 'Highlights'],
                 ['notes', 'Saved Notes'],
@@ -614,7 +629,7 @@ const LibraryPage: React.FC = () => {
                 <CardContent className="p-4 grid gap-3 md:grid-cols-4">
                   <div className="md:col-span-2 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input className="pl-9" placeholder="Search by title, author, subject, uploader" value={search} onChange={(e) => setSearch(e.target.value)} />
+                    <Input className="pl-9" placeholder={activeSection === "curriculum" ? "Search textbooks by title or subject" : "Search by title, author, subject, uploader"} value={search} onChange={(e) => setSearch(e.target.value)} />
                   </div>
                   <Select value={subjectFilter} onValueChange={setSubjectFilter}>
                     <SelectTrigger><SelectValue placeholder="All subjects" /></SelectTrigger>
@@ -633,6 +648,56 @@ const LibraryPage: React.FC = () => {
                       })}
                     </SelectContent>
                   </Select>
+                </CardContent>
+              </Card>
+            )}
+
+            {activeSection === 'curriculum' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5" /> Grade 9–12 Curriculum Textbooks</CardTitle>
+                  <p className="text-sm text-muted-foreground">Catalog grouped under the requested 2019 E.C. curriculum label. Entries link to the textbook index; individual editions and downloadable files are not yet independently verified.</p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {curriculumCatalogError && (
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+                      The textbook catalog could not be loaded. The database migration may not have been applied yet. Existing Library books are unaffected.
+                    </div>
+                  )}
+                  {!curriculumCatalogError && curriculumBooks.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No catalog entries are available yet.</p>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {curriculumBooks.filter((book) => {
+                      const query = search.trim().toLowerCase();
+                      const matchesQuery = !query || book.book_title.toLowerCase().includes(query) || book.subject.toLowerCase().includes(query);
+                      const matchesGrade = gradeFilter === 'all' || String(book.grade_level) === gradeFilter;
+                      const matchesSubject = subjectFilter === 'all' || book.subject === subjectFilter;
+                      return matchesQuery && matchesGrade && matchesSubject;
+                    }).map((book) => (
+                      <div key={book.id} className="rounded-lg border p-4 flex flex-col gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-md bg-muted p-2"><FileText className="h-5 w-5" /></div>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold">{book.book_title}</h3>
+                            <p className="text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline">2019 E.C. collection</Badge>
+                          <Badge variant="secondary">External reference</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{book.notes}</p>
+                        <div className="mt-auto">
+                          <Button asChild size="sm" variant="outline" className="gap-2">
+                            <a href={book.source_url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-4 w-4" /> Open textbook index
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             )}
