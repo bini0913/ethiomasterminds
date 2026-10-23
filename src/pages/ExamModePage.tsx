@@ -417,13 +417,13 @@ const ExamModePage: React.FC = () => {
                 <div className="flex items-start gap-3">
                   <div className="rounded-xl bg-primary/10 p-2 text-primary"><BookOpen className="h-5 w-5" /></div>
                   <div className="min-w-0">
-                    <h3 className="font-semibold">Entrance exam papers · 2021 onward</h3>
-                    <p className="mt-1 text-sm leading-5 text-muted-foreground">Browse linked Grade 12 papers by year and subject. These are external archive references, not imported questions or verified official answer keys.</p>
+                    <h3 className="font-semibold">Entrance exam papers · 2013 onward</h3>
+                    <p className="mt-1 text-sm leading-5 text-muted-foreground">Browse linked Grade 12 papers by year and subject from 2013 onward. These are external archive references, not imported questions or verified official answer keys.</p>
                   </div>
                 </div>
                 {entrancePaperLoadState === "loading" && <p className="mt-4 text-sm text-muted-foreground">Loading paper references…</p>}
                 {entrancePaperLoadState === "unavailable" && <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">The paper catalog is not available yet. Confirm that the entrance-paper catalog migrations have been applied to the existing Supabase project.</p>}
-                {entrancePaperLoadState === "ready" && entrancePaperReferences.length === 0 && <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">No linked papers from 2021 onward are listed yet.</p>}
+                {entrancePaperLoadState === "ready" && entrancePaperReferences.length === 0 && <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">No linked papers from 2013 onward are listed yet.</p>}
                 {entrancePaperReferences.length > 0 && <div className="mt-4 space-y-2">
                   {entrancePaperReferences.map((paper) => (
                     <a key={paper.id} href={paper.source_url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
