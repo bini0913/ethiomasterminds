@@ -10,97 +10,10 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
-      academic_book_analyses: {
-        Row: {
-          user_id: string
-          book_id: string
-          units: Json
-          page_count: number
-          method: string
-          message: string | null
-          analyzed_at: string
-          updated_at: string
-        }
-        Insert: {
-          user_id: string
-          book_id: string
-          units?: Json
-          page_count?: number
-          method?: string
-          message?: string | null
-          analyzed_at?: string
-          updated_at?: string
-        }
-        Update: {
-          user_id?: string
-          book_id?: string
-          units?: Json
-          page_count?: number
-          method?: string
-          message?: string | null
-          analyzed_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      academic_profiles: {
-        Row: {
-          user_id: string
-          grade: number
-          study_goal: string
-          study_goal_detail: string | null
-          curriculum: string
-          subjects: string[]
-          book_id: string | null
-          book_title: string | null
-          onboarding_completed_at: string
-          updated_at: string
-        }
-        Insert: {
-          user_id: string
-          grade: number
-          study_goal: string
-          study_goal_detail?: string | null
-          curriculum: string
-          subjects?: string[]
-          book_id?: string | null
-          book_title?: string | null
-          onboarding_completed_at?: string
-          updated_at?: string
-        }
-        Update: {
-          user_id?: string
-          grade?: number
-          study_goal?: string
-          study_goal_detail?: string | null
-          curriculum?: string
-          subjects?: string[]
-          book_id?: string | null
-          book_title?: string | null
-          onboarding_completed_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "academic_profiles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "academic_profiles_book_id_fkey"
-            columns: ["book_id"]
-            isOneToOne: false
-            referencedRelation: "library_books"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       access_codes: {
         Row: {
           code: string
