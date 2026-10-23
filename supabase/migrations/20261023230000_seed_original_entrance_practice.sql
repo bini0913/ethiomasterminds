@@ -10,6 +10,9 @@ alter table public.quizzes
     check (source_verification_status in ('unverified','needs_review','verified','permission_confirmed'));
 create index if not exists quizzes_source_kind_idx on public.quizzes (source_kind);
 
+-- Exam Mode reads topic labels for topic coverage/progress tracking.
+alter table public.questions add column if not exists topic text;
+
 with owner as (
   select ur.user_id from public.user_roles ur
   where ur.role::text in ('admin','extreme_admin','teacher')
