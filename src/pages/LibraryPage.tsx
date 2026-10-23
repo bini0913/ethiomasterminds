@@ -223,7 +223,7 @@ const LibraryPage: React.FC = () => {
 
   const visibleBooks = filteredBooks.slice(0, visibleCount);
 
-  const subjects = useMemo(() => Array.from(new Set(books.map((b) => b.subject))).sort(), [books]);
+  const subjects = useMemo(() => Array.from(new Set([...books.map((b) => b.subject), ...curriculumBooks.map((b) => b.subject)])).sort(), [books, curriculumBooks]);
 
   const resetForm = () => {
     const defaultGrade = user?.role === 'student'
@@ -624,7 +624,7 @@ const LibraryPage: React.FC = () => {
           </Card>
 
           <div className="space-y-4">
-            {(activeSection === 'community' || activeSection === 'my-books' || activeSection === 'curriculum') && (
+            {(activeSection === 'community' || activeSection === 'my-books') && (
               <Card>
                 <CardContent className="p-4 grid gap-3 md:grid-cols-4">
                   <div className="md:col-span-2 relative">
