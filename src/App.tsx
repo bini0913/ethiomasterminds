@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import "./styles/upper-studio.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,6 +37,7 @@ const AcademicSetup = lazy(() => import("./pages/AcademicSetup"));
 const FlashcardsPage = lazy(() => import("./pages/FlashcardsPage"));
 const TopicCoveragePage = lazy(() => import("./pages/TopicCoveragePage"));
 const ExamModePage = lazy(() => import("./pages/ExamModePage"));
+const EntranceExamPapersPage = lazy(() => import("./pages/EntranceExamPapersPage"));
 const StudyPlannerPage = lazy(() => import("./pages/StudyPlannerPage"));
 const AcademicInsightsPage = lazy(() => import("./pages/AcademicInsightsPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
@@ -167,16 +169,16 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
       {isUpperStudent && <aside className="upper-studio-sidebar fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-[#27365a] bg-[#101a35] px-4 py-5 text-slate-100 lg:flex">
         <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span><span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span></span></button>
         <nav aria-label="High school navigation" className="flex-1 space-y-1 overflow-y-auto">
-          <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Workspace</p>
-          <button type="button" onClick={() => navigate("/")} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${location.pathname === "/" ? "bg-indigo-500 text-white shadow-lg shadow-indigo-950/30" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}><Home className="h-4 w-4"/> Home</button>
-          <button type="button" onClick={() => navigate("/study-mode")} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${location.pathname === "/study-mode" ? "bg-indigo-500 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}><Timer className="h-4 w-4"/> Study Mode</button>
-          <button type="button" onClick={() => navigate("/academic")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BookOpen className="h-4 w-4"/> Academic Mode <ChevronRight className="ml-auto h-4 w-4"/></button>
-          <div className="ml-4 space-y-1 border-l border-slate-800 pl-3">
-            <button type="button" onClick={() => navigate("/academic/topics")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Layers3 className="h-4 w-4"/> Topic Coverage</button>
-            <button type="button" onClick={() => navigate("/academic/flashcards")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BrainCircuit className="h-4 w-4"/> Flashcards & Revision</button>
-            <button type="button" onClick={() => navigate("/academic/exam")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Target className="h-4 w-4"/> Exam Mode</button>
-            <button type="button" onClick={() => navigate("/academic/planner")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><CalendarDays className="h-4 w-4"/> Study Planner</button>
-            <button type="button" onClick={() => navigate("/academic/insights")} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BarChart3 className="h-4 w-4"/> Academic Insights</button>
+          <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Workspace</p>
+          <button type="button" onClick={() => navigate("/")} className="mm-studio-nav flex min-h-11 w-full items-center gap-3 rounded-xl bg-primary/10 px-3 py-2.5 text-left text-sm font-bold text-primary" data-active={location.pathname === "/" || ("/" === "/academic" && location.pathname.startsWith("/academic"))}><Home className="h-4 w-4"/> Home</button>
+          <button type="button" onClick={() => navigate("/study-mode")} className="mm-studio-nav flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-active={location.pathname === "/study-mode" || ("/study-mode" === "/academic" && location.pathname.startsWith("/academic"))}><Timer className="h-4 w-4"/> Study Mode</button>
+          <button type="button" onClick={() => navigate("/academic")} className="mm-studio-nav flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-active={location.pathname === "/academic" || ("/academic" === "/academic" && location.pathname.startsWith("/academic"))}><BookOpen className="h-4 w-4"/> Academic Mode <ChevronRight className="ml-auto h-4 w-4"/></button>
+          <div className="ml-4 space-y-1 border-l border-border pl-3">
+            <button type="button" onClick={() => navigate("/academic/topics")} className="mm-studio-nav flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-active={location.pathname === "/academic/topics" || ("/academic/topics" === "/academic" && location.pathname.startsWith("/academic"))}><Layers3 className="h-4 w-4"/> Topic Coverage</button>
+            <button type="button" onClick={() => navigate("/academic/flashcards")} className="mm-studio-nav flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-active={location.pathname === "/academic/flashcards" || ("/academic/flashcards" === "/academic" && location.pathname.startsWith("/academic"))}><BrainCircuit className="h-4 w-4"/> Flashcards & Revision</button>
+            <button type="button" onClick={() => navigate("/academic/exam")} className="mm-studio-nav flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-active={location.pathname === "/academic/exam" || ("/academic/exam" === "/academic" && location.pathname.startsWith("/academic"))}><Target className="h-4 w-4"/> Exam Mode</button>
+            <button type="button" onClick={() => navigate("/academic/planner")} className="mm-studio-nav flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-active={location.pathname === "/academic/planner" || ("/academic/planner" === "/academic" && location.pathname.startsWith("/academic"))}><CalendarDays className="h-4 w-4"/> Study Planner</button>
+            <button type="button" onClick={() => navigate("/academic/insights")} className="mm-studio-nav flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-active={location.pathname === "/academic/insights" || ("/academic/insights" === "/academic" && location.pathname.startsWith("/academic"))}><BarChart3 className="h-4 w-4"/> Academic Insights</button>
           </div>
           <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Connect</p>
           <button type="button" onClick={() => navigate("/multiplayer")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Swords className="h-4 w-4"/> Multiplayer</button>
@@ -189,8 +191,8 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
         </nav>
         <div className="mt-4 border-t border-slate-800 pt-3"><button type="button" onClick={() => navigate("/settings")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><SettingsIcon className="h-4 w-4"/> Settings</button><button type="button" onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-4 w-4"/> Log out</button></div>
       </aside>}
-      <div className={isUpperStudent ? "lg:pl-64" : ""}>
-      <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 lg:hidden" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
+      <div className={isUpperStudent ? "mm-studio-upper-content lg:pl-64" : ""}>
+      <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex items-center gap-1">
@@ -220,6 +222,10 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
               </p>
             </div>
           </div>
+          {isUpperStudent && <>
+            <button type="button" onClick={() => navigate("/notifications")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Notifications" title="Notifications"><Bell className="h-4 w-4" /></button>
+            <button type="button" onClick={() => navigate(user.id ? `/profile/${user.id}` : "/settings")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Profile" title="Profile"><UserRound className="h-4 w-4" /></button>
+          </>}
           <button
             type="button"
             onClick={handleLogout}
@@ -360,6 +366,7 @@ const App = () => (
                               <Route path="/academic/flashcards" element={<EarlyTierRestrictedRoute><FlashcardsPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/topics" element={<EarlyTierRestrictedRoute><TopicCoveragePage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/exam" element={<EarlyTierRestrictedRoute><ExamModePage /></EarlyTierRestrictedRoute>} />
+                              <Route path="/academic/entrance-papers" element={<EarlyTierRestrictedRoute><EntranceExamPapersPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/planner" element={<EarlyTierRestrictedRoute><StudyPlannerPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/insights" element={<EarlyTierRestrictedRoute><AcademicInsightsPage /></EarlyTierRestrictedRoute>} />
                               <Route

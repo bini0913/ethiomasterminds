@@ -22,7 +22,7 @@ const UpperStudentDashboard: React.FC = () => {
   const attemptCount = learningData?.totalAttempts ?? 0;
   const profilePath = user?.id ? `/profile/${user.id}` : "/settings";
 
-  return <div className="tier-upper mm-upper-shell min-h-screen bg-background text-foreground">
+  return <div className="tier-upper mm-upper-shell mm-studio-upper min-h-screen bg-background text-foreground">
     <style>{`
       .mm-upper-shell { --mm-navy:#101a35; --mm-navy-2:#17264a; --mm-gold:#f3c96b; --mm-ink:#f8fafc; }
       .mm-upper-shell .mm-upper-hero { background:radial-gradient(circle at 86% 15%,rgba(243,201,107,.16),transparent 28%),linear-gradient(120deg,var(--mm-navy),var(--mm-navy-2)); color:var(--mm-ink); }
@@ -71,7 +71,7 @@ const UpperStudentDashboard: React.FC = () => {
       </div>
     </aside>
     <div className="min-w-0 lg:pl-64">
-    <header className="border-b border-border/80 bg-background pt-[env(safe-area-inset-top)] lg:hidden">
+    <header className="border-b border-border/80 bg-background pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex min-h-16 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <button type="button" onClick={() => navigate("/")} className="flex min-h-11 min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span>
