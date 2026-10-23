@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import "./styles/upper-studio.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -164,8 +165,8 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <div className={`min-h-screen bg-background ${isUpperStudent ? "upper-tier-studio" : ""}`}>
-      {isUpperStudent && <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-card/95 px-4 py-5 lg:flex">
+    <div className={isUpperStudent ? "min-h-screen bg-background mm-studio-upper" : "min-h-screen bg-background"}>
+      {isUpperStudent && <aside className="mm-studio-upper-sidebar fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r px-4 py-5 lg:flex">
         <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span><span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span></span></button>
         <nav aria-label="High school navigation" className="flex-1 space-y-1 overflow-y-auto">
           <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Workspace</p>
@@ -190,8 +191,8 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
         </nav>
         <div className="mt-4 border-t border-slate-800 pt-3"><button type="button" onClick={() => navigate("/settings")} aria-current={location.pathname === "/settings" || location.pathname.startsWith("/settings/") ? "page" : undefined} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><SettingsIcon className="h-4 w-4"/> Settings</button><button type="button" onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-4 w-4"/> Log out</button></div>
       </aside>}
-      <div className={isUpperStudent ? "lg:pl-64" : ""}>
-      <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 lg:hidden" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
+      <div className={isUpperStudent ? "mm-studio-upper-content lg:pl-64" : ""}>
+      <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex items-center gap-1">
@@ -221,6 +222,10 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
               </p>
             </div>
           </div>
+          {isUpperStudent && <>
+            <button type="button" onClick={() => navigate("/notifications")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Notifications" title="Notifications"><Bell className="h-4 w-4" /></button>
+            <button type="button" onClick={() => navigate(user.id ? `/profile/${user.id}` : "/settings")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Profile" title="Profile"><UserRound className="h-4 w-4" /></button>
+          </>}
           <button
             type="button"
             onClick={handleLogout}
