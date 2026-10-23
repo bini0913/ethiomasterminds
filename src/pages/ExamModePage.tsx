@@ -157,7 +157,7 @@ const ExamModePage: React.FC = () => {
           .select("id,subject,ethiopian_year,gregorian_year,source_name,source_url,source_status,notes")
           .eq("grade_level", 12)
           .eq("exam_type", "university_entrance")
-          .gte("gregorian_year", 2021)
+          .gte("gregorian_year", 2013)
           .order("gregorian_year", { ascending: false })
           .order("subject", { ascending: true });
         if (error) throw error;
