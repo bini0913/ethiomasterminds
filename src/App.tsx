@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import "./styles/upper-studio.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,6 +37,7 @@ const AcademicSetup = lazy(() => import("./pages/AcademicSetup"));
 const FlashcardsPage = lazy(() => import("./pages/FlashcardsPage"));
 const TopicCoveragePage = lazy(() => import("./pages/TopicCoveragePage"));
 const ExamModePage = lazy(() => import("./pages/ExamModePage"));
+const EntranceExamPapersPage = lazy(() => import("./pages/EntranceExamPapersPage"));
 const StudyPlannerPage = lazy(() => import("./pages/StudyPlannerPage"));
 const AcademicInsightsPage = lazy(() => import("./pages/AcademicInsightsPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
@@ -163,10 +165,9 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <div className={isUpperStudent ? "upper-studio-workspace min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100" : "min-h-screen bg-background"}>
-      {isUpperStudent && <style>{`.upper-studio-workspace aside button{color:#94a3b8}.upper-studio-workspace aside button:hover{background:#1e293b;color:#fff}.upper-studio-workspace aside button.bg-indigo-500{background:#6366f1;color:#fff}.upper-studio-workspace aside button svg{flex-shrink:0}.upper-studio-workspace .upper-studio-content{min-height:calc(100vh - 3.5rem);background:#f6f8fc}.dark .upper-studio-workspace .upper-studio-content{background:#090f1e}.upper-studio-workspace .upper-studio-content main{max-width:1440px;margin-inline:auto}.upper-studio-workspace .upper-studio-content [class*="rounded-xl"][class*="border"],.upper-studio-workspace .upper-studio-content [class*="rounded-2xl"][class*="border"]{border-radius:1rem;box-shadow:0 2px 12px -8px rgba(15,23,42,.22)}.upper-studio-workspace .upper-studio-content h1{letter-spacing:-.035em}.upper-studio-workspace .upper-studio-content button{transition:background-color .16s ease,border-color .16s ease,transform .16s ease}.upper-studio-workspace .upper-studio-content button:focus-visible{outline:2px solid hsl(var(--primary));outline-offset:2px}@media(max-width:1023px){.upper-studio-workspace .upper-studio-content{background:var(--background)}}`}</style>}
-      {isUpperStudent && <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-800 bg-slate-950 px-4 py-5 text-slate-100 lg:flex">
-        <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-slate-900 ring-1 ring-slate-700"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span><span><span className="block font-display text-base font-bold text-white">Master Minds</span><span className="block text-xs text-slate-400">Grades 9–12</span></span></button>
+    <div className={isUpperStudent ? "min-h-screen bg-background mm-studio-upper" : "min-h-screen bg-background"}>
+      {isUpperStudent && <aside className="mm-studio-upper-sidebar fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r px-4 py-5 lg:flex">
+        <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span><span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span></span></button>
         <nav aria-label="High school navigation" className="flex-1 space-y-1 overflow-y-auto">
           <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Workspace</p>
           <button type="button" onClick={() => navigate("/")} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${location.pathname === "/" ? "bg-indigo-500 text-white shadow-lg shadow-indigo-950/30" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}><Home className="h-4 w-4"/> Home</button>
@@ -190,8 +191,8 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
         </nav>
         <div className="mt-4 border-t border-slate-800 pt-3"><button type="button" onClick={() => navigate("/settings")} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><SettingsIcon className="h-4 w-4"/> Settings</button><button type="button" onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-4 w-4"/> Log out</button></div>
       </aside>}
-      <div className={isUpperStudent ? "lg:pl-64" : ""}>
-      <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 lg:hidden" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
+      <div className={isUpperStudent ? "mm-studio-upper-content lg:pl-64" : ""}>
+      <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex items-center gap-1">
@@ -221,6 +222,10 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
               </p>
             </div>
           </div>
+          {isUpperStudent && <>
+            <button type="button" onClick={() => navigate("/notifications")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Notifications" title="Notifications"><Bell className="h-4 w-4" /></button>
+            <button type="button" onClick={() => navigate(user.id ? `/profile/${user.id}` : "/settings")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Profile" title="Profile"><UserRound className="h-4 w-4" /></button>
+          </>}
           <button
             type="button"
             onClick={handleLogout}
@@ -361,6 +366,7 @@ const App = () => (
                               <Route path="/academic/flashcards" element={<EarlyTierRestrictedRoute><FlashcardsPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/topics" element={<EarlyTierRestrictedRoute><TopicCoveragePage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/exam" element={<EarlyTierRestrictedRoute><ExamModePage /></EarlyTierRestrictedRoute>} />
+                              <Route path="/academic/entrance-papers" element={<EarlyTierRestrictedRoute><EntranceExamPapersPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/planner" element={<EarlyTierRestrictedRoute><StudyPlannerPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/insights" element={<EarlyTierRestrictedRoute><AcademicInsightsPage /></EarlyTierRestrictedRoute>} />
                               <Route
