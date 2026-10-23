@@ -50,8 +50,8 @@ with owner as (
  ('What is the median of 4, 9, 2, 7, 3?','["3","4","5","7"]'::jsonb,'4','Ordered values are 2, 3, 4, 7, 9; the middle value is 4.','Statistics',12)
 )
 insert into public.questions
- (quiz_id,question_text,options,correct_answer,explanation,order_index,points,question_type,subject,grade,difficulty)
-select tq.id,s.question_text,s.options,s.correct_answer,s.explanation,s.order_index,10,'multiple_choice','Mathematics','12','medium'
+ (quiz_id,question_text,options,correct_answer,explanation,topic,order_index,points,question_type,subject,grade,difficulty)
+select tq.id,s.question_text,s.options,s.correct_answer,s.explanation,s.topic,s.order_index,10,'multiple_choice','Mathematics','12','medium'
 from target_quiz tq cross join question_seed s
 where not exists (select 1 from public.questions e where e.quiz_id=tq.id and e.order_index=s.order_index);
 
