@@ -14,6 +14,7 @@ import { getAcademicProfile, normalizeGrade, normalizeSubject, subjectsMatch } f
 
 type ExamState = "setup" | "running" | "results";
 type SourceQuiz = { id: string; title: string; description?: string; subject: string; grade: number; difficulty?: string; time_limit?: number | null; exam_type?: string; questionCount: number };
+type EntrancePaperReference = { id: string; subject: string; ethiopian_year: number; gregorian_year: number; source_name: string; source_url: string; source_status: string; notes?: string };
 type ExamQuestion = { id: string; quiz_id?: string; subject?: string; sourceKind: "past_paper" | "topic_practice"; sourceTitle: string; question_text: string; options: string[]; correct_answer: string; explanation?: string; topic?: string };
 function goalRelevance(quiz: SourceQuiz, goal: string): number {
   const text = `${quiz.title} ${quiz.description || ""} ${quiz.difficulty || ""} ${(quiz.exam_type || "general").replace(/[_-]+/g, " ")}`.toLowerCase();
@@ -57,6 +58,8 @@ const ExamModePage: React.FC = () => {
   const [timeLimit, setTimeLimit] = useState(30);
   const [, setSourceQuizId] = useState("");
   const [sourceQuizzes, setSourceQuizzes] = useState<SourceQuiz[]>([]);
+  const [entrancePaperReferences, setEntrancePaperReferences] = useState<EntrancePaperReference[]>([]);
+  const [entrancePaperLoadState, setEntrancePaperLoadState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -143,6 +146,36 @@ const ExamModePage: React.FC = () => {
     })();
     return () => { cancelled = true; };
   }, [user?.id, user?.grade, bankReload]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // External archive links only; these are not imported questions or verified answer keys.
+        const { data, error } = await supabase
+          .from("entrance_exam_papers")
+          .select("id,subject,ethiopian_year,gregorian_year,source_name,source_url,source_status,notes")
+          .eq("grade_level", 12)
+          .eq("exam_type", "university_entrance")
+          .gte("gregorian_year", 2021)
+          .order("gregorian_year", { ascending: false })
+          .order("subject", { ascending: true });
+        if (error) throw error;
+        if (cancelled) return;
+        const uniqueReferences = new Map<string, EntrancePaperReference>();
+        ((data || []) as EntrancePaperReference[]).forEach((entry) => {
+          const key = `${entry.ethiopian_year}:${entry.subject.toLowerCase()}`;
+          if (!uniqueReferences.has(key)) uniqueReferences.set(key, entry);
+        });
+        setEntrancePaperReferences(Array.from(uniqueReferences.values()));
+        setEntrancePaperLoadState("ready");
+      } catch (error) {
+        console.warn("Entrance-paper reference catalog unavailable:", error);
+        if (!cancelled) setEntrancePaperLoadState("unavailable");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const subjectQuizzes = useMemo(() => {
     return sourceQuizzes.filter((quiz) =>
@@ -379,6 +412,32 @@ const ExamModePage: React.FC = () => {
               {!isLoadingBank && !bankLoadError && !sourceQuizzes.length && <p className="mt-3 text-sm text-muted-foreground">No approved Grade {grade} quizzes with usable questions are available. The exam will become available when matching quizzes are approved and published.</p>}
               {!isLoadingBank && sourceQuizzes.length > 0 && profileSubjects.some((profileSubject) => !sourceQuizzes.some((quiz) => subjectsMatch(profileSubject, quiz.subject))) && <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">Some saved subjects ({profileSubjects.filter((profileSubject) => !sourceQuizzes.some((quiz) => subjectsMatch(profileSubject, quiz.subject))).map(prettySubject).join(", ")}) do not yet have usable approved Grade {grade} questions. “All available” includes only subjects with real questions; missing subjects are not substituted with invented questions.</p>}
             </div>
+            <Card className="rounded-3xl">
+              <CardContent className="p-5 sm:p-6">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-xl bg-primary/10 p-2 text-primary"><BookOpen className="h-5 w-5" /></div>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold">Entrance exam papers · 2021 onward</h3>
+                    <p className="mt-1 text-sm leading-5 text-muted-foreground">Browse linked Grade 12 papers by year and subject. These are external archive references, not imported questions or verified official answer keys.</p>
+                  </div>
+                </div>
+                {entrancePaperLoadState === "loading" && <p className="mt-4 text-sm text-muted-foreground">Loading paper references…</p>}
+                {entrancePaperLoadState === "unavailable" && <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">The paper catalog is not available yet. Confirm that the entrance-paper catalog migrations have been applied to the existing Supabase project.</p>}
+                {entrancePaperLoadState === "ready" && entrancePaperReferences.length === 0 && <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">No linked papers from 2021 onward are listed yet.</p>}
+                {entrancePaperReferences.length > 0 && <div className="mt-4 space-y-2">
+                  {entrancePaperReferences.map((paper) => (
+                    <a key={paper.id} href={paper.source_url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <span className="min-w-0">
+                        <span className="block font-medium">{paper.subject}</span>
+                        <span className="block text-xs text-muted-foreground">{paper.ethiopian_year} E.C. · {paper.gregorian_year} G.C. · {paper.source_name}</span>
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-primary">Open archive ↗</span>
+                    </a>
+                  ))}
+                  <p className="text-xs text-muted-foreground">Archive links can have incomplete coverage. Check the paper version and answer key before using them as verified exam material.</p>
+                </div>}
+              </CardContent>
+            </Card>
           </section>
           <aside className="space-y-4">
             <Card className="rounded-3xl"><CardContent className="p-6"><h3 className="font-semibold">What to expect</h3><div className="mt-4 space-y-4">{[{icon: ShieldCheck,title:"Real quiz content",text:"Only questions linked to approved quizzes are included."},{icon: Clock3,title:"Timed practice",text:"Move between questions and submit when you're ready."},{icon: Trophy,title:"Progress that counts",text:"Your score and XP are saved after submission."}].map((item) => <div key={item.title} className="flex gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><item.icon className="h-4 w-4" /></div><div><p className="text-sm font-semibold">{item.title}</p><p className="mt-0.5 text-sm leading-5 text-muted-foreground">{item.text}</p></div></div>)}</div></CardContent></Card>
