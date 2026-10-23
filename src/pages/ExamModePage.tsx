@@ -180,7 +180,7 @@ const ExamModePage: React.FC = () => {
   const subjectQuizzes = useMemo(() => {
     return sourceQuizzes.filter((quiz) =>
       (subject === "all_selected" || subjectsMatch(subject, quiz.subject)) &&
-      (examTypeFilter === "mixed" || (examTypeFilter === "past_paper" ? quiz.exam_type === "past_paper" : quiz.exam_type !== "past_paper"))
+      (examTypeFilter === "mixed" || (examTypeFilter === "past_paper" ? (quiz.source_kind || (quiz.exam_type === "past_paper" ? "past_paper" : "topic_practice")) === "past_paper" : (quiz.source_kind || (quiz.exam_type === "past_paper" ? "past_paper" : "topic_practice")) !== "past_paper"))
     ).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title));
   }, [sourceQuizzes, profileSubjects, subject, goal, examTypeFilter]);
   const selectedQuiz = useMemo(() => subjectQuizzes[0] || null, [subjectQuizzes]);
@@ -405,7 +405,7 @@ const ExamModePage: React.FC = () => {
               </div>
               <div className="mt-6 flex flex-col gap-3 rounded-2xl bg-muted/60 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3"><BookOpen className="h-5 w-5 text-primary" /><div><p className="font-semibold">{isLoadingBank ? "Checking your question bank…" : subjectQuizzes.length ? `${subjectQuizzes.length} matching approved sets` : "No matching question sets yet"}</p><p className="text-sm text-muted-foreground">{isLoadingBank ? "Loading approved content" : `${subjectQuizzes.reduce((sum, quiz) => sum + quiz.questionCount, 0)} questions across ${subject === "all_selected" ? "all selected subjects" : prettySubject(subject)}`}</p></div></div>
-                <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{goal}</Badge>{selectedQuiz?.source_kind === "past_paper" && <Badge variant="outline">{selectedQuiz.source_verification_status === "verified" ? "Source verified" : "Past-paper source unverified"}</Badge>}</div>
+                <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{goal}</Badge>{selectedQuiz?.source_kind === "past_paper" && <Badge variant="outline">{selectedQuiz.source_verification_status === "verified" ? "Source verified" : "Past-paper source unverified"}</Badge>{selectedQuiz.source_name && <span className="text-xs text-muted-foreground">{selectedQuiz.source_name}{selectedQuiz.source_year ? ` · ${selectedQuiz.source_year}` : ""}</span>}}</div>
               </div>
               <Button className="mt-6 h-12 w-full text-base" onClick={startExam} disabled={isLoadingBank || isStarting || !selectedQuiz}>{isStarting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Preparing exam…</> : <><Target className="mr-2 h-4 w-4" />Start exam</>}</Button>
               {!isLoadingBank && bankLoadError && <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm"><p className="font-medium">The question bank could not be loaded.</p><p className="mt-1 text-muted-foreground">Check your connection and retry. Your settings will be kept.</p><Button className="mt-2" variant="outline" size="sm" onClick={() => setBankReload((value) => value + 1)}>Retry question bank</Button></div>}
