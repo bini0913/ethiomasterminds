@@ -47,7 +47,7 @@ const UpperDesktopDashboard: React.FC = () => {
   ];
   return <div className="mm-exact-desktop">
     <aside className="mm-exact-sidebar">
-      <div className="mm-exact-brand"><span className="mm-exact-logo">◉</span><strong>{user?.name?.split(/\\s+/)[0] || "Master Minds"}</strong><span className="mm-exact-collapse">«</span></div>
+      <div className="mm-exact-brand"><span className="mm-exact-logo">◉</span><strong>{user?.name?.split(/\s+/)[0] || "Master Minds"}</strong><span className="mm-exact-collapse">«</span></div>
       <nav>{nav.map(([label,icon,path],i)=><button key={label} data-active={i===0} onClick={()=>navigate(path)}><span>{icon}</span>{label}</button>)}</nav>
       <button className="mm-exact-settings" onClick={()=>navigate("/settings")}>⬡ <span>Settings &amp; more</span></button>
     </aside>
