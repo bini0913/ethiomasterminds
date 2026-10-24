@@ -204,13 +204,14 @@ const FlashcardsPage: React.FC = () => {
       setCurrentIndex(i => i + 1);
     } else {
       toast.success("Session complete!");
-      setSessionStats({ reviewed: sessionReviewed + 1, retained: sessionRetained + ((level === "medium" || level === "easy") ? 1 : 0), nextReview: nextReview.toLocaleDateString() });
+      if (upperStudent) setSessionStats({ reviewed: sessionReviewed + 1, retained: sessionRetained + ((level === "medium" || level === "easy") ? 1 : 0), nextReview: nextReview.toLocaleDateString() });
       setSelectedSubject(null);
       setCurrentIndex(0);
     }
   };
 
   useEffect(() => {
+    if (!upperStudent) return;
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.matches("input, textarea, select, [contenteditable='true']") || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -227,7 +228,7 @@ const FlashcardsPage: React.FC = () => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [currentCard?.id, isFlipped, studyMode, handleDifficulty]);
+  }, [currentCard?.id, isFlipped, studyMode, handleDifficulty, upperStudent]);
 
   const statusCounts = getStatusCounts();
 
@@ -239,7 +240,7 @@ const FlashcardsPage: React.FC = () => {
     );
   }
 
-  if (!selectedSubject && sessionStats) {
+  if (upperStudent && !selectedSubject && sessionStats) {
     return <div className={upperStudent ? "tier-upper flex min-h-[70vh] items-center justify-center bg-background px-4 py-10 text-foreground" : "flex min-h-[70vh] items-center justify-center bg-background px-4 py-10"}>
       <Card className="w-full max-w-xl border-border"><CardContent className="p-6 text-center sm:p-8"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Sparkles className="h-7 w-7"/></div><h1 className="mt-4 text-2xl font-bold">Review session complete</h1><p className="mt-2 text-sm text-muted-foreground">Your review progress was saved to your account.</p><div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-xl border border-border bg-muted/30 p-4"><p className="text-xs text-muted-foreground">Cards reviewed</p><p className="mt-1 text-2xl font-bold">{sessionStats.reviewed}</p></div><div className="rounded-xl border border-border bg-muted/30 p-4"><p className="text-xs text-muted-foreground">Good / Easy retention</p><p className="mt-1 text-2xl font-bold">{sessionStats.reviewed ? Math.round(sessionStats.retained / sessionStats.reviewed * 100) : 0}%</p></div></div><p className="mt-4 text-sm text-muted-foreground">Next scheduled review: {sessionStats.nextReview}</p><div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center"><Button onClick={() => { setSessionStats(null); setSessionReviewed(0); setSessionRetained(0); setSelectedSubject(null); }}>Back to decks</Button><Button variant="outline" onClick={() => { setSessionStats(null); setSessionReviewed(0); setSessionRetained(0); setSelectedSubject("all"); setStudyMode("review"); setCurrentIndex(0); }}>Review more cards</Button></div></CardContent></Card>
     </div>;
@@ -312,7 +313,7 @@ const FlashcardsPage: React.FC = () => {
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="font-semibold capitalize">{subject}</h3>
-                    <p className="text-xs text-muted-foreground">{subjectCards.length} cards • {masteredCount} mastered</p>\n                    <div className="mt-2"><Badge variant={subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length ? "default" : "outline"}>{subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length} due today</Badge></div>
+                    <p className="text-xs text-muted-foreground">{subjectCards.length} cards • {masteredCount} mastered</p>\n                    {upperStudent && <div className="mt-2"><Badge variant={subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length ? "default" : "outline"}>{subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length} due today</Badge></div>}
                     <Progress value={pct} className="h-1.5 mt-2" />
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -401,12 +402,16 @@ const FlashcardsPage: React.FC = () => {
           className="px-4 pb-8 max-w-md mx-auto w-full"
         >
           <p className="text-center text-sm text-muted-foreground mb-3">How well did you know this?</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {upperStudent ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Button variant="outline" className="h-14 flex-col gap-1 border-border text-foreground hover:bg-muted" onClick={() => handleDifficulty("again")}><span className="text-lg">↻</span><span className="text-xs">Again · 1</span></Button>
             <Button variant="outline" className="h-14 flex-col gap-1 border-border text-foreground hover:bg-muted" onClick={() => handleDifficulty("hard")}><span className="text-lg">😓</span><span className="text-xs">Hard · 2</span></Button>
             <Button variant="outline" className="h-14 flex-col gap-1 border-border text-foreground hover:bg-muted" onClick={() => handleDifficulty("medium")}><span className="text-lg">🤔</span><span className="text-xs">Good · 3</span></Button>
             <Button variant="outline" className="h-14 flex-col gap-1 border-border text-foreground hover:bg-muted" onClick={() => handleDifficulty("easy")}><span className="text-lg">😎</span><span className="text-xs">Easy · 4</span></Button>
-          </div>
+          </div> : <div className="grid grid-cols-3 gap-3">
+            <Button variant="outline" className="h-14 flex-col gap-1 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20" onClick={() => handleDifficulty("hard")}><span className="text-lg">😓</span><span className="text-xs">Hard</span></Button>
+            <Button variant="outline" className="h-14 flex-col gap-1 border-yellow-300 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-950/20" onClick={() => handleDifficulty("medium")}><span className="text-lg">🤔</span><span className="text-xs">Medium</span></Button>
+            <Button variant="outline" className="h-14 flex-col gap-1 border-green-300 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20" onClick={() => handleDifficulty("easy")}><span className="text-lg">😎</span><span className="text-xs">Easy</span></Button>
+          </div>}
         </motion.div>
       )}
     </div>
