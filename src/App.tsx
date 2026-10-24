@@ -426,6 +426,7 @@ const App = () => (
                               <Route path="/migrate-supabase" element={<ProtectedRoute allowedRoles={["admin", "manager", "extreme_admin"]}><SupabaseMigration /></ProtectedRoute>} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
+                            </RouteErrorBoundary>
                             </Suspense>
                             </AppChrome>
                             <NativeBackHandler />
