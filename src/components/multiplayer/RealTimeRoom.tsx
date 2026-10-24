@@ -201,7 +201,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (roomState.status !== 'playing' || roomConfig.gameMode !== 'speed' || timeRemaining > 0) return;
     if (finishRequestedRef.current) return;
     finishRequestedRef.current = true;
-    void supabase.rpc('multiplayer_finish_game', { p_room_id: roomId });
+    void supabase.rpc('multiplayer_finish_game' as any, { p_room_id: roomId } as any);
   }, [roomState.status, roomConfig.gameMode, timeRemaining, roomId]);
 
   useEffect(() => {
@@ -1065,7 +1065,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                           ))}
                         </SelectContent>
                       </Select>
-                      <Select value={roomConfig.gameMode} onValueChange={(value) => void updateRoomConfig({ gameMode: value })}>
+                      <Select value={roomConfig.gameMode} onValueChange={(value) => void updateRoomConfig({ gameMode: value as 'speed' | 'accuracy' })}>
                         <SelectTrigger><SelectValue placeholder="Mode" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="accuracy">🎯 Accuracy — fixed questions</SelectItem>
