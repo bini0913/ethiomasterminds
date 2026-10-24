@@ -50,15 +50,39 @@ const UpperStudentDashboard: React.FC = () => {
     { title: "Digital library", description: "Return to your learning resources and textbooks.", label: "Open library", path: "/library", icon: Library },
   ];
 
+  const xp = Number((user as any)?.xp) || 0;
+  const level = Number((user as any)?.level) || 1;
+  const xpIntoLevel = xp % 1000;
+  const xpPercent = Math.min(100, Math.round((xpIntoLevel / 1000) * 100));
+  const avatarUrl = (user as any)?.avatar as string | undefined;
+  const initial = (firstName || "M").charAt(0).toUpperCase();
+
   return <main className="upper-tier-studio mx-auto w-full max-w-[1440px] space-y-6 px-4 py-5 pb-28 sm:px-6 sm:py-7 lg:px-8 lg:pb-8">
-    <section className="overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1.4fr)_minmax(240px,.6fr)] lg:items-center">
+    <section className="relative overflow-hidden rounded-3xl border border-border bg-card">
+      <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(520px circle at 85% -10%, hsl(var(--primary) / .22), transparent 60%), radial-gradient(420px circle at -5% 110%, hsl(var(--accent) / .14), transparent 55%)" }} />
+      <div className="relative grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1.4fr)_minmax(240px,.6fr)] lg:items-center">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-primary">MASTER MINDS SECONDARY · GRADES 9–12</p>
-          <h1 className="mt-2">{firstName ? `${greeting()}, ${firstName}` : "Your Academic Studio"}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">A focused space for exam preparation, independent study, and steady progress. Pick one useful next step and get started.</p>
+          <div className="mt-3 flex items-center gap-4">
+            <div className="relative shrink-0">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="h-16 w-16 rounded-2xl border border-border object-cover shadow-[var(--shadow-card)] sm:h-20 sm:w-20" />
+              ) : (
+                <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary text-2xl font-bold text-primary-foreground shadow-[var(--shadow-card)] sm:h-20 sm:w-20 sm:text-3xl">{initial}</div>
+              )}
+              <span className="absolute -bottom-2 -right-2 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-foreground shadow">Lv {level}</span>
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl sm:text-3xl">{firstName ? `${greeting()}, ${firstName}` : "Your Academic Studio"}</h1>
+              <div className="mt-2 max-w-md">
+                <div className="flex items-center justify-between text-xs font-medium text-muted-foreground"><span>{xp.toLocaleString()} XP</span><span>Level {level + 1} at {((level) * 1000).toLocaleString()} XP</span></div>
+                <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all duration-700" style={{ width: `${xpPercent}%` }} /></div>
+              </div>
+            </div>
+          </div>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">A focused space for exam preparation, independent study, and steady progress. Pick one useful next step and get started.</p>
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button onClick={() => navigate("/study-mode")} className="min-h-11"><Timer className="mr-2 h-4 w-4"/>Start Study Mode</Button>
+            <Button onClick={() => navigate("/study-mode")} className="min-h-11 shadow-[0_3px_0_hsl(var(--primary-hover))] transition-transform active:translate-y-[3px] active:shadow-none"><Timer className="mr-2 h-4 w-4"/>Start Study Mode</Button>
             <Button variant="outline" onClick={() => navigate("/academic")} className="min-h-11"><GraduationCap className="mr-2 h-4 w-4"/>Academic Preparation</Button>
           </div>
         </div>
