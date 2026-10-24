@@ -148,6 +148,9 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
 
   const isHome = location.pathname === "/";
   const isUpperStudent = getUserTier(user?.grade) === "upper";
+  // Grades 9–12 home renders its own screenshot-matched responsive shell.
+  // Wrapping it here creates a second sidebar, header and desktop navigation.
+  if (isHome && isUpperStudent) return <>{children}</>;
   if (isHome && !isUpperStudent) {
     return <>{children}</>;
   }
