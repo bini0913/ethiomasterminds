@@ -93,16 +93,6 @@ const AcademicMode: React.FC = () => {
 
   return (
     <div className={tier === "upper" ? "tier-upper mm-academic-upper min-h-screen bg-background text-foreground" : "min-h-screen bg-muted/30"}>
-      {tier === "upper" && <style>{`
-        .mm-academic-upper .mm-academic-hero{background:radial-gradient(circle at 88% 10%,rgba(243,201,107,.17),transparent 30%),linear-gradient(120deg,#101a35,#17264a);color:#f8fafc;border-color:rgba(255,255,255,.12)}
-        .mm-academic-upper .mm-academic-hero .mm-hero-muted{color:rgba(237,242,255,.78)}
-        .mm-academic-upper .mm-academic-hero [data-slot="badge"]{border-color:rgba(255,255,255,.22);color:#fff;background:rgba(255,255,255,.09)}
-        .mm-academic-upper .mm-academic-hero .mm-gold{background:#f3c96b;color:#101a35;border-color:#f3c96b}
-        .mm-academic-upper .mm-academic-metric{border-radius:1rem;border-color:var(--border);background:var(--card);box-shadow:0 2px 7px rgba(15,23,42,.035)}
-        .mm-academic-upper .mm-academic-feature{border-radius:1.1rem;box-shadow:0 2px 7px rgba(15,23,42,.035);min-height:210px}
-        .mm-academic-upper .mm-academic-feature:hover{box-shadow:0 10px 24px rgba(15,23,42,.08)}
-        @media(max-width:640px){.mm-academic-upper .mm-academic-hero{border-radius:1.25rem}.mm-academic-upper .mm-academic-feature{min-height:0;padding:1rem}}
-      `}</style>}
       <header className={tier === "upper" ? "border-b border-border/70 bg-background/95 backdrop-blur-xl" : "border-b bg-background"}>
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
@@ -126,9 +116,9 @@ const AcademicMode: React.FC = () => {
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">Grade {grade}</Badge><Badge variant="outline">{profile?.curriculum === "oromia" ? "Oromia curriculum" : "Addis Ababa curriculum"}</Badge></div>
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Prepare with a plan, not guesswork.</h2>
-              <p className={tier === "upper" ? "mm-hero-muted mt-3 max-w-xl text-sm leading-6 sm:text-base" : "mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base"}>Your study space is tailored to your grade, subjects and goal. Practice, review your mistakes and build steady progress—one session at a time.</p>
+              <p className={tier === "upper" ? "text-muted-foreground mt-3 max-w-xl text-sm leading-6 sm:text-base" : "mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base"}>Your study space is tailored to your grade, subjects and goal. Practice, review your mistakes and build steady progress—one session at a time.</p>
               <div className="mt-5 flex flex-wrap gap-2">{subjects.length ? subjects.map((item: string) => <Badge key={item} variant="outline" className="bg-background font-medium">{formatSubject(item)}</Badge>) : <span className="text-sm text-muted-foreground">Add your subjects in your study profile.</span>}</div>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button className={tier === "upper" ? "mm-gold h-11 font-bold" : "h-11"} onClick={() => navigate("/academic/exam")}><Target className="mr-2 h-4 w-4" />Start exam practice</Button><Button variant="outline" className={tier === "upper" ? "h-11 border-white/25 bg-white/10 text-white hover:bg-white/15 hover:text-white" : "h-11"} onClick={() => navigate("/academic/planner")}><CalendarDays className="mr-2 h-4 w-4" />Plan study time</Button></div>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button className={tier === "upper" ? "bg-primary text-primary-foreground h-11 font-bold" : "h-11"} onClick={() => navigate("/academic/exam")}><Target className="mr-2 h-4 w-4" />Start exam practice</Button><Button variant="outline" className={tier === "upper" ? "h-11 border-white/25 bg-white/10 text-white hover:bg-white/15 hover:text-white" : "h-11"} onClick={() => navigate("/academic/planner")}><CalendarDays className="mr-2 h-4 w-4" />Plan study time</Button></div>
             </div>
             <div className="grid grid-cols-2 gap-3 md:w-56 md:grid-cols-1">
               <div className={tier === "upper" ? "mm-academic-metric border bg-background p-4 text-foreground" : "rounded-2xl border bg-background p-4"}><div className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /><span className="text-xs font-medium">Today's plan</span></div><p className="mt-2 text-2xl font-bold tabular-nums">{todayCompleted}<span className="text-base font-medium text-muted-foreground">/{todayCount}</span></p>{todayCount > 0 && <Progress value={todayProgress} className="mt-3 h-1.5" />}{todayCount === 0 && <p className="mt-1 text-xs text-muted-foreground">No tasks scheduled yet</p>}</div>
