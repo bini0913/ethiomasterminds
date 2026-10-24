@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { normalizeSubject } from "@/lib/academicProfile";
 
 type Paper = {
   id: string; subject: string; ethiopian_year: number; gregorian_year: number;
@@ -22,6 +23,7 @@ const EntranceExamPapersPage: React.FC = () => {
   const [subject, setSubject] = useState("all");
   const [stream, setStream] = useState("all");
   const [ecYear, setEcYear] = useState("all");
+  const [practiceSubjects, setPracticeSubjects] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -35,6 +37,21 @@ const EntranceExamPapersPage: React.FC = () => {
       if (!active) return;
       if (queryError) setError("The past-paper catalog is not available yet. Apply the database migration and reload this page.");
       else setPapers((data ?? []) as Paper[]);
+      const { data: quizzes } = await supabase.from("quizzes").select("id,subject,grade,is_approved").eq("is_approved", true);
+      const grade12Quizzes = (quizzes || []).filter((quiz: any) => Number(quiz.grade) === 12);
+      if (grade12Quizzes.length) {
+        const { data: questions } = await supabase.from("questions").select("quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer").in("quiz_id", grade12Quizzes.map((quiz: any) => quiz.id));
+        const quizById = new Map(grade12Quizzes.map((quiz: any) => [quiz.id, normalizeSubject(String(quiz.subject || ""))]));
+        const available = new Set<string>();
+        (questions || []).forEach((question: any) => {
+          const options = Array.isArray(question.options) ? question.options : [question.option_a, question.option_b, question.option_c, question.option_d].filter(Boolean);
+          if (question.question_text && question.correct_answer != null && options.length >= 2) {
+            const subjectName = quizById.get(question.quiz_id);
+            if (subjectName) available.add(subjectName);
+          }
+        });
+        if (active) setPracticeSubjects(Array.from(available));
+      }
       setLoading(false);
     })();
     return () => { active = false; };
@@ -74,7 +91,7 @@ const EntranceExamPapersPage: React.FC = () => {
         <div><h2 className="font-semibold">{p.subject}</h2><p className="text-sm text-muted-foreground">{p.ethiopian_year} E.C. · Grade 12 entrance exam</p><p className="mt-1 text-xs text-muted-foreground">{p.stream}</p></div>
         <p className="flex-1 text-xs text-muted-foreground">{p.notes}</p>
         <div className="flex flex-wrap items-center gap-2"><Badge variant={p.source_status?.toLowerCase().includes("verif") ? "default" : "outline"}>{p.source_status?.toLowerCase().includes("verif") ? "Source verified" : "Verification pending"}</Badge><Badge variant="outline">{p.stream || "Stream not specified"}</Badge></div>\n        <p className="text-xs font-medium">{p.source_name}</p>
-        <Button variant="outline" className="w-full" onClick={() => navigate("/academic/exam", { state: { subject: p.subject } })}>Practice in Exam Mode</Button>\n        <Button className="w-full" onClick={() => window.open(p.source_url, "_blank", "noopener,noreferrer")}>Open source archive <ExternalLink className="ml-2 h-4 w-4"/></Button>
+        {practiceSubjects.includes(normalizeSubject(p.subject)) && <Button variant="outline" className="w-full" onClick={() => navigate("/academic/exam", { state: { subject: p.subject } })}>Practice in Exam Mode</Button>}\n        <Button className="w-full" onClick={() => window.open(p.source_url, "_blank", "noopener,noreferrer")}>Open source archive <ExternalLink className="ml-2 h-4 w-4"/></Button>
       </CardContent></Card>)}</div>}
   </main>;
 };
