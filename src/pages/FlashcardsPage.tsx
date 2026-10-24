@@ -339,7 +339,7 @@ const FlashcardsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))] flex flex-col" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col"}>
       {/* Header */}
       <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
@@ -347,10 +347,10 @@ const FlashcardsPage: React.FC = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-white capitalize">{selectedSubject === "all" ? "Review" : selectedSubject}</h1>
-            <p className="text-xs text-white/60">{currentIndex + 1} / {reviewCards.length}</p>
+            <h1 className={upperStudent ? "text-lg font-bold text-foreground capitalize" : "text-lg font-bold text-white capitalize"}>{selectedSubject === "all" ? "Review" : selectedSubject}</h1>
+            <p className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-white/60"}>{currentIndex + 1} / {reviewCards.length}</p>
           </div>
-          <Badge variant="outline" className="text-white border-white/30 capitalize text-xs">
+          <Badge variant="outline" className={upperStudent ? "text-foreground border-border capitalize text-xs" : "text-white border-white/30 capitalize text-xs"}>
             {currentCard.topic}
           </Badge>
         </div>
