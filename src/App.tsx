@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import "./styles/upper-studio.css";
 import UpperAppShell from "@/components/layout/UpperAppShell";
+import RouteErrorBoundary from "@/components/layout/RouteErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -291,6 +292,7 @@ const App = () => (
                                 </div>
                               </div>
                             }>
+                            <RouteErrorBoundary>
                             <Routes>
                               <Route path="/" element={<Index />} />
                               <Route path="/quiz" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Quiz /></ProtectedRoute>} />
