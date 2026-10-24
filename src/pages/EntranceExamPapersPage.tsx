@@ -41,7 +41,7 @@ const EntranceExamPapersPage: React.FC = () => {
       const grade12Quizzes = (quizzes || []).filter((quiz: any) => Number(quiz.grade) === 12);
       if (grade12Quizzes.length) {
         const { data: questions } = await supabase.from("questions").select("quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer").in("quiz_id", grade12Quizzes.map((quiz: any) => quiz.id));
-        const quizById = new Map(grade12Quizzes.map((quiz: any) => [quiz.id, normalizeSubject(String(quiz.subject || ""))]));
+        const quizById = new Map<string, string>(grade12Quizzes.map((quiz: any) => [String(quiz.id), normalizeSubject(String(quiz.subject || ""))] as [string, string]));
         const available = new Set<string>();
         (questions || []).forEach((question: any) => {
           const options = Array.isArray(question.options) ? question.options : [question.option_a, question.option_b, question.option_c, question.option_d].filter(Boolean);
