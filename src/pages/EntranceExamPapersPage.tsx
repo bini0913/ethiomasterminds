@@ -20,6 +20,8 @@ const EntranceExamPapersPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("all");
   const [subject, setSubject] = useState("all");
+  const [stream, setStream] = useState("all");
+  const [ecYear, setEcYear] = useState("all");
 
   useEffect(() => {
     let active = true;
@@ -43,9 +45,11 @@ const EntranceExamPapersPage: React.FC = () => {
   const filtered = useMemo(() => papers.filter(p => {
     const q = search.trim().toLowerCase();
     return (subject === "all" || p.subject === subject)
+      && (stream === "all" || p.stream.toLowerCase().includes(stream))
+      && (ecYear === "all" || String(p.ethiopian_year) === ecYear)
       && (year === "all" || String(p.gregorian_year) === year)
       && (!q || [p.subject, p.source_name, p.stream, String(p.gregorian_year), String(p.ethiopian_year)].some(v => v.toLowerCase().includes(q)));
-  }), [papers, search, subject, year]);
+  }), [papers, search, subject, year, stream, ecYear]);
 
   return <main className="mx-auto w-full max-w-6xl space-y-6 p-4 pb-24 md:p-8">
     <div className="flex items-center gap-3">
@@ -55,8 +59,14 @@ const EntranceExamPapersPage: React.FC = () => {
     <Card><CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
       <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search subject or year" className="pl-9"/></div>
       <select value={subject} onChange={e => setSubject(e.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="all">All subjects</option>{subjects.map(s=><option key={s} value={s}>{s}</option>)}</select>
+      <select aria-label="Stream" value={stream} onChange={e => setStream(e.target.value)} className="h-10 rounded-md border border-border bg-card px-3 text-sm"><option value="all">All streams</option><option value="natural">Natural Science</option><option value="social">Social Science</option></select>
+      <select aria-label="Ethiopian academic year" value={ecYear} onChange={e => setEcYear(e.target.value)} className="h-10 rounded-md border border-border bg-card px-3 text-sm"><option value="all">All E.C. years</option>{[2016,2015,2014,2013,2012].map(y=><option key={y} value={String(y)}>{y} E.C.</option>)}</select>
       <select value={year} onChange={e => setYear(e.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="all">All years</option>{years.map(y=><option key={y} value={String(y)}>{y} G.C.</option>)}</select>
     </CardContent></Card>
+    <div className="flex flex-wrap gap-2" aria-label="Quick Ethiopian year filters">
+      <Button size="sm" variant={ecYear === "all" ? "default" : "outline"} onClick={() => setEcYear("all")}>All years</Button>
+      {[2016, 2015, 2014, 2013, 2012].map((y) => <Button key={y} size="sm" variant={ecYear === String(y) ? "default" : "outline"} onClick={() => setEcYear(String(y))}>{y} E.C.</Button>)}
+    </div>
     <div className="flex items-start gap-3 rounded-lg border p-4 text-sm text-muted-foreground"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0"/><p>These entries are a source-linked catalog, not copied question text. Open the source to view/download papers and check the answer key. The catalog only marks source metadata; it does not certify every answer as official.</p></div>
     {loading ? <p className="py-10 text-center text-muted-foreground">Loading past papers…</p> : error ? <Card><CardContent className="p-6 text-sm">{error}</CardContent></Card> : filtered.length === 0 ? <Card><CardContent className="p-8 text-center text-muted-foreground">No catalog entries match those filters.</CardContent></Card> :
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filtered.map(p=><Card key={p.id} className="h-full"><CardContent className="flex h-full flex-col gap-3 p-4">
