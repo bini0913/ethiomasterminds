@@ -55,6 +55,21 @@ const UpperStudentDashboard: React.FC = () => {
       </div>
     </section>
 
+    <section aria-labelledby="daily-workout-title" className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(240px,.6fr)]">
+      <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5 sm:p-6">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Daily entrance workout</p>
+        <h2 id="daily-workout-title" className="mt-2 text-xl font-bold sm:text-2xl">Ten focused questions. One useful step forward.</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Start a 10-question practice session using the subjects in your Academic Prep setup. Questions are labelled by source in Exam Mode.</p>
+        <Button className="mt-4 min-h-11" onClick={() => navigate("/academic/exam", { state: { workoutQuestionCount: 10 } })}><Target className="mr-2 h-4 w-4"/>Start Today's Workout (10 Questions)<ArrowRight className="ml-2 h-4 w-4"/></Button>
+      </div>
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <p className="text-sm font-semibold">Academic calendar</p>
+        <p className="mt-2 text-lg font-bold">2017 E.C.</p>
+        <p className="text-sm text-muted-foreground">2024/25 G.C.</p>
+        <p className="mt-3 text-xs leading-5 text-muted-foreground">Ethiopian calendar labels are used in the entrance-paper archive to avoid mixing E.C. and G.C. exam years.</p>
+      </div>
+    </section>
+
     <section aria-labelledby="daily-workspace-title">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div><h2 id="daily-workspace-title" className="text-xl font-bold">Your workspace</h2><p className="mt-1 text-sm text-muted-foreground">Direct access to the tools you use most.</p></div>
