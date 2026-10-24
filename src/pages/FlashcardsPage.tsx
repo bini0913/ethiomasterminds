@@ -275,7 +275,7 @@ const FlashcardsPage: React.FC = () => {
             ].map(s => (
               <Card key={s.label} className="bg-card/80 border-border/50">
                 <CardContent className="p-3 text-center">
-                  <div className={`w-3 h-3 rounded-full ${s.color} mx-auto mb-1`} />
+                  <div className={`w-3 h-3 rounded-full ${upperStudent ? "bg-primary" : s.color} mx-auto mb-1`} />
                   <p className="text-lg font-bold">{s.count}</p>
                   <p className="text-[10px] text-muted-foreground">{s.label}</p>
                 </CardContent>
@@ -376,7 +376,7 @@ const FlashcardsPage: React.FC = () => {
               exit={{ rotateY: -90, opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <Card className={`min-h-[280px] flex flex-col justify-center border-2 ${isFlipped ? "border-green-500/30 bg-green-50/5" : "border-primary/20 bg-card"}`}>
+              <Card className={`min-h-[280px] flex flex-col justify-center border-2 ${isFlipped ? (upperStudent ? "border-primary/30 bg-primary/5" : "border-green-500/30 bg-green-50/5") : "border-primary/20 bg-card"}`}>
                 <CardContent className="p-8 text-center">
                   <Badge variant="secondary" className="mb-4 text-xs">
                     {isFlipped ? "Answer" : "Question"}
