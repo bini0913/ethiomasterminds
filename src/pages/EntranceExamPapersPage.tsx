@@ -73,8 +73,8 @@ const EntranceExamPapersPage: React.FC = () => {
         <div className="flex items-start justify-between gap-2"><div className="rounded-lg bg-primary/10 p-2 text-primary"><FileText className="h-5 w-5"/></div><Badge variant="secondary">{p.gregorian_year} G.C.</Badge></div>
         <div><h2 className="font-semibold">{p.subject}</h2><p className="text-sm text-muted-foreground">{p.ethiopian_year} E.C. · Grade 12 entrance exam</p><p className="mt-1 text-xs text-muted-foreground">{p.stream}</p></div>
         <p className="flex-1 text-xs text-muted-foreground">{p.notes}</p>
-        <p className="text-xs font-medium">{p.source_name}</p>
-        <Button className="w-full" onClick={() => window.open(p.source_url, "_blank", "noopener,noreferrer")}>Open source archive <ExternalLink className="ml-2 h-4 w-4"/></Button>
+        <div className="flex flex-wrap items-center gap-2"><Badge variant={p.source_status?.toLowerCase().includes("verif") ? "default" : "outline"}>{p.source_status?.toLowerCase().includes("verif") ? "Source verified" : "Verification pending"}</Badge><Badge variant="outline">{p.stream || "Stream not specified"}</Badge></div>\n        <p className="text-xs font-medium">{p.source_name}</p>
+        <Button variant="outline" className="w-full" onClick={() => navigate("/academic/exam", { state: { subject: p.subject } })}>Practice in Exam Mode</Button>\n        <Button className="w-full" onClick={() => window.open(p.source_url, "_blank", "noopener,noreferrer")}>Open source archive <ExternalLink className="ml-2 h-4 w-4"/></Button>
       </CardContent></Card>)}</div>}
   </main>;
 };
