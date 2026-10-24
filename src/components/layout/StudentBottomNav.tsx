@@ -23,9 +23,9 @@ const StudentBottomNav: React.FC = () => {
   ];
   const upperItems = [
     { icon: Home, label: "Home", path: "/", match: ["/"] },
-    { icon: Timer, label: "Study", path: "/study-mode", match: ["/study-mode", "/revision"] },
-    { icon: Swords, label: "Compete", path: "/multiplayer", match: ["/multiplayer", "/lobby", "/tournaments", "/leaderboard"] },
-    { icon: GraduationCap, label: "Prep", path: "/academic", match: ["/academic", "/library", "/quiz", "/ai-tutor", "/learning-dna"] },
+    { icon: Timer, label: "Study", path: "/study-mode", match: ["/study-mode", "/revision", "/academic/planner"] },
+    { icon: Target, label: "Exam Prep", path: "/academic/exam", match: ["/academic/exam", "/academic/entrance-papers"] },
+    { icon: Library, label: "Library", path: "/library", match: ["/library", "/academic/flashcards"] },
   ];
   const otherItems = [
     { icon: Home, label: "Home", path: "/", match: ["/"] },

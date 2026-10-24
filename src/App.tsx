@@ -70,7 +70,7 @@ import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
 import { ChatProvider } from "./context/ChatContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import { ArrowLeft, Home, LogOut, BookOpen, BrainCircuit, Timer, Swords, Trophy, Users, Library, Bot, Bell, CalendarDays, Target, BarChart3, Layers3, ChevronRight, Settings as SettingsIcon, UserRound } from "lucide-react";
+import { ArrowLeft, Home, LogOut, BookOpen, BrainCircuit, Timer, Swords, Trophy, Users, Library, Bot, Bell, CalendarDays, Target, BarChart3, Layers3, ChevronRight, Settings as SettingsIcon, UserRound, GraduationCap } from "lucide-react";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
 import NativeBackHandler from "./components/mobile/NativeBackHandler";
@@ -146,7 +146,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
 
   const isHome = location.pathname === "/";
   const isUpperStudent = getUserTier(user?.grade) === "upper";
-  if (isHome) {
+  if (isHome && !isUpperStudent) {
     return <>{children}</>;
   }
 
@@ -177,6 +177,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
             <button type="button" onClick={() => navigate("/academic/topics")} aria-current={location.pathname === "/academic/topics" || location.pathname.startsWith("/academic/topics/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Layers3 className="h-4 w-4"/> Topic Coverage</button>
             <button type="button" onClick={() => navigate("/academic/flashcards")} aria-current={location.pathname === "/academic/flashcards" || location.pathname.startsWith("/academic/flashcards/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BrainCircuit className="h-4 w-4"/> Flashcards & Revision</button>
             <button type="button" onClick={() => navigate("/academic/exam")} aria-current={location.pathname === "/academic/exam" || location.pathname.startsWith("/academic/exam/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Target className="h-4 w-4"/> Exam Mode</button>
+          <button type="button" onClick={() => navigate("/academic/entrance-papers")} aria-current={location.pathname === "/academic/entrance-papers" || location.pathname.startsWith("/academic/entrance-papers/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><GraduationCap className="h-4 w-4"/> Entrance Papers</button>
             <button type="button" onClick={() => navigate("/academic/planner")} aria-current={location.pathname === "/academic/planner" || location.pathname.startsWith("/academic/planner/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><CalendarDays className="h-4 w-4"/> Study Planner</button>
             <button type="button" onClick={() => navigate("/academic/insights")} aria-current={location.pathname === "/academic/insights" || location.pathname.startsWith("/academic/insights/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BarChart3 className="h-4 w-4"/> Academic Insights</button>
           </div>

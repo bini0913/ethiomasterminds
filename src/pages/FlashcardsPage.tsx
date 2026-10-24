@@ -200,6 +200,24 @@ const FlashcardsPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select, [contenteditable='true']") || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.code === "Space") {
+        event.preventDefault();
+        setIsFlipped(value => !value);
+        return;
+      }
+      if (!isFlipped || !currentCard || studyMode !== "review") return;
+      if (event.key === "1") void handleDifficulty("hard");
+      if (event.key === "2") void handleDifficulty("medium");
+      if (event.key === "3") void handleDifficulty("easy");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [currentCard?.id, isFlipped, studyMode, handleDifficulty]);
+
   const statusCounts = getStatusCounts();
 
   if (isLoading) {
