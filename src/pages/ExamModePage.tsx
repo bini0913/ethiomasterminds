@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,10 +51,17 @@ const prettySubject = (subject: string) => subject === "math" ? "Mathematics" : 
 const ExamModePage: React.FC = () => {
   const { user, refreshProfile } = useUser();
   const navigate = useNavigate();
+  const location = useLocation();
   const [examState, setExamState] = useState<ExamState>("setup");
   const [subject, setSubject] = useState("all_selected");
   const [examTypeFilter, setExamTypeFilter] = useState("mixed");
   const [questionCount, setQuestionCount] = useState(20);
+  useEffect(() => {
+    if (location.state?.workoutQuestionCount === 10) {
+      setQuestionCount(10);
+      setExamTypeFilter("mixed");
+    }
+  }, [location.state]);
   const [timeLimit, setTimeLimit] = useState(30);
   const [, setSourceQuizId] = useState("");
   const [sourceQuizzes, setSourceQuizzes] = useState<SourceQuiz[]>([]);
