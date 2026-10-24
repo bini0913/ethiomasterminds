@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import "./styles/upper-studio.css";
+import UpperAppShell from "@/components/layout/UpperAppShell";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -247,7 +248,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
           </button>
         </div>
       </header>
-      <div className={`${isUpperStudent ? "upper-studio-content pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{children}</div>
+      <div className={`${isUpperStudent ? "upper-studio-content pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{isUpperStudent ? <UpperAppShell>{children}</UpperAppShell> : children}</div>
       {isUpperStudent && <div className="lg:hidden"><StudentBottomNav /></div>}
       </div>
     </div>
