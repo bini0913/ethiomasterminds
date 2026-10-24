@@ -358,7 +358,12 @@ const StudentDashboard: React.FC = () => {
     visible: { opacity: 1, y: 0 }
   };
 
+  const isUpperTier = Number(String(user?.grade ?? "").match(/\d+/)?.[0] || 0) >= 9;
+
   return (
+    <>
+      {isUpperTier && <UpperDesktopDashboard />}
+      <div className={isUpperTier ? "upper-current-dashboard" : ""}>
     <div className="relative min-h-screen overflow-hidden">
       <AnimatedBackground variant="minimal" showIcons={false} />
 
@@ -774,6 +779,8 @@ const StudentDashboard: React.FC = () => {
         </footer>
       </div>
     </div>
+      </div>
+    </>
   );
 };
 
