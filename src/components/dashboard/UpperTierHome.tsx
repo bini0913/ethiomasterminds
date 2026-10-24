@@ -120,7 +120,7 @@ const UpperStudentDashboard: React.FC = () => {
 
     <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600"><CheckCircle2 className="h-5 w-5"/></span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><CheckCircle2 className="h-5 w-5"/></span>
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-bold">Your learning record</h2>
           {isLoading ? <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/>Loading your saved learning activity…</p> :
