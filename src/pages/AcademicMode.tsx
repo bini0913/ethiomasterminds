@@ -25,7 +25,7 @@ const formatSubject = (subject: unknown): string => {
   const normalized = subject.trim();
   return normalized.toLowerCase() === "math"
     ? "Mathematics"
-    : normalized.replace(/\\b\\w/g, (letter) => letter.toUpperCase());
+    : normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
 const AcademicMode: React.FC = () => {
