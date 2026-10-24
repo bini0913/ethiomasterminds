@@ -24,7 +24,7 @@ const StudentBottomNav: React.FC = () => {
   const upperItems = [
     { icon: Home, label: "Home", path: "/", match: ["/"] },
     { icon: Timer, label: "Study", path: "/study-mode", match: ["/study-mode", "/revision", "/academic/planner"] },
-    { icon: Target, label: "Exam Prep", path: "/academic/exam", match: ["/academic/exam", "/academic/entrance-papers", "/academic"] },
+    { icon: Target, label: "Exam Prep", path: "/academic/exam", match: ["/academic/exam", "/academic/entrance-papers"] },
     { icon: Library, label: "Library", path: "/library", match: ["/library", "/academic/flashcards"] },
   ];
   const otherItems = [
