@@ -282,6 +282,40 @@ const ExamModePage: React.FC = () => {
 
   useEffect(() => {
     if (examState !== "running") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName || "")) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const key = event.key.toLowerCase();
+      if (/^[1-4]$/.test(key) || /^[a-d]$/.test(key)) {
+        const optionIndex = /^[1-4]$/.test(key) ? Number(key) - 1 : "abcd".indexOf(key);
+        if (optionIndex < (currentQuestion?.options.length || 0)) {
+          event.preventDefault();
+          const option = currentQuestion.options[optionIndex];
+          setAnswers((previous) => ({ ...previous, [currentQ]: option }));
+        }
+        return;
+      }
+      if (key === "arrowleft") {
+        event.preventDefault();
+        setCurrentQ((index) => Math.max(0, index - 1));
+      } else if (key === "arrowright") {
+        event.preventDefault();
+        setCurrentQ((index) => Math.min(questions.length - 1, index + 1));
+      } else if (key === "enter") {
+        event.preventDefault();
+        if (currentQ < questions.length - 1) setCurrentQ((index) => index + 1);
+        else void submitExamRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [examState, currentQ, currentQuestion, questions.length]);
+
+
+
+  useEffect(() => {
+    if (examState !== "running") return;
     const timer = window.setInterval(() => {
       setTimeLeft((previous) => {
         if (previous <= 1) {
@@ -463,10 +497,11 @@ const ExamModePage: React.FC = () => {
 
   if (!currentQuestion) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   const timeCritical = timeLeft <= 60;
+  const timeWarning = timeLeft <= 300 && timeLeft > 60;
   return (
     <div className="min-h-screen bg-muted/30">
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur"><div className="mx-auto max-w-4xl px-4 py-4 sm:px-6"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">{examTypeFilter === "mock_exam" ? "Mock exam" : "Timed practice"}</p><h1 className="font-bold sm:text-lg">{selectedQuiz?.title || "Exam mode"}</h1></div><div className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono font-semibold tabular-nums ${timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card"}`}><Clock3 className="h-4 w-4" />{formatTime(timeLeft)}</div></div><div className="mt-4 flex items-center justify-between text-sm text-muted-foreground"><span>Question {currentQ + 1} of {questions.length}</span><span>{Object.keys(answers).length} answered · {unansweredCount} remaining</span></div><Progress value={((currentQ + 1) / questions.length) * 100} className="mt-2 h-2" /></div></header>
-      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10"><Card className="rounded-3xl shadow-sm"><CardContent className="p-5 sm:p-8"><div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><CircleHelp className="h-4 w-4 text-primary" />{currentQuestion.topic || prettySubject(currentQuestion.subject || subject)}<Badge variant="outline">{currentQuestion.sourceKind === "past_paper" ? `Past-paper-tagged quiz · ${selectedQuiz?.source_verification_status === "verified" ? "source verified" : "source not verified"}` : "Topic practice · approved quiz bank"}</Badge></div><h2 className="mt-4 text-xl font-semibold leading-8 sm:text-2xl">{currentQuestion.question_text}</h2><div className="mt-6 grid gap-3">{currentQuestion.options.map((option, index) => {const selected = answers[currentQ] === option; return <button key={`${currentQuestion.id}-${index}`} type="button" onClick={() => setAnswers((previous) => ({ ...previous, [currentQ]: option }))} className={`flex min-h-14 items-start gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-background hover:bg-muted/60"}`}><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{String.fromCharCode(65 + index)}</span><span className="pt-0.5 text-sm leading-6">{option}</span></button>;})}</div></CardContent></Card><div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><Button variant="outline" className="sm:min-w-32" disabled={currentQ === 0} onClick={() => setCurrentQ((index) => index - 1)}><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><div className="flex gap-3"><Button variant="outline" onClick={() => setCurrentQ((index) => Math.min(questions.length - 1, index + 1))} disabled={currentQ === questions.length - 1}>Skip <ChevronRight className="ml-1 h-4 w-4" /></Button><Button className="flex-1 sm:min-w-36" onClick={() => currentQ < questions.length - 1 ? setCurrentQ((index) => index + 1) : void submitExam()}>{currentQ < questions.length - 1 ? <>Next question <ChevronRight className="ml-1 h-4 w-4" /></> : "Submit exam"}</Button></div></div><p className="mt-4 text-center text-xs text-muted-foreground">Your answers are not revealed until you submit the exam.</p></main>
+      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur"><div className="mx-auto max-w-4xl px-4 py-4 sm:px-6"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">{examTypeFilter === "mock_exam" ? "Mock exam" : "Timed practice"}</p><h1 className="font-bold sm:text-lg">{selectedQuiz?.title || "Exam mode"}</h1></div><div className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono font-semibold tabular-nums ${timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive animate-pulse" : timeWarning ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300" : "bg-card"}`}><Clock3 className="h-4 w-4" />{formatTime(timeLeft)}</div></div><div className="mt-4 flex items-center justify-between text-sm text-muted-foreground"><span>Question {currentQ + 1} of {questions.length}</span><span>{Object.keys(answers).length} answered · {unansweredCount} remaining</span></div><Progress value={((currentQ + 1) / questions.length) * 100} className="mt-2 h-2" /></div></header>
+      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10"><Card className="rounded-3xl shadow-sm"><CardContent className="p-5 sm:p-8"><div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><CircleHelp className="h-4 w-4 text-primary" />{currentQuestion.topic || prettySubject(currentQuestion.subject || subject)}<Badge variant="outline">{currentQuestion.sourceKind === "past_paper" ? `Past-paper-tagged quiz · ${selectedQuiz?.source_verification_status === "verified" ? "source verified" : "source not verified"}` : "Topic practice · approved quiz bank"}</Badge></div><h2 className="mt-4 text-xl font-semibold leading-8 sm:text-2xl">{currentQuestion.question_text}</h2><div className="mt-6 grid gap-3">{currentQuestion.options.map((option, index) => {const selected = answers[currentQ] === option; return <button key={`${currentQuestion.id}-${index}`} type="button" onClick={() => setAnswers((previous) => ({ ...previous, [currentQ]: option }))} className={`flex min-h-14 items-start gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected ? "border-primary bg-primary/10 text-primary ring-2 ring-primary" : "bg-card hover:bg-muted"}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted text-muted-foreground"}`}>{String.fromCharCode(65 + index)}</span><span className="pt-0.5 text-sm leading-6">{option}</span></button>;})}</div></CardContent></Card><div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><Button variant="outline" className="sm:min-w-32" disabled={currentQ === 0} onClick={() => setCurrentQ((index) => index - 1)}><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><div className="flex gap-3"><Button variant="outline" onClick={() => setCurrentQ((index) => Math.min(questions.length - 1, index + 1))} disabled={currentQ === questions.length - 1}>Skip <ChevronRight className="ml-1 h-4 w-4" /></Button><Button className="flex-1 sm:min-w-36" onClick={() => currentQ < questions.length - 1 ? setCurrentQ((index) => index + 1) : void submitExam()}>{currentQ < questions.length - 1 ? <>Next question <ChevronRight className="ml-1 h-4 w-4" /></> : "Submit exam"}</Button></div></div><p className="mt-4 text-center text-xs text-muted-foreground">Your answers are not revealed until you submit the exam.</p></main>
     </div>
   );
 };
