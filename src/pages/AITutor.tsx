@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +35,7 @@ const subjects = [
 
 const quickActions = [
   { label: 'Proof / derivation', prompt: 'Give a rigorous step-by-step mathematical proof or derivation. State assumptions, show each step, and explain why it follows.', icon: Calculator },
-  { label: 'Entrance exam analysis', prompt: 'Analyze this as an Ethiopian Grade 12 Entrance Exam question. Identify the tested concept, solve it methodically, explain distractors, and show an efficient exam approach.', icon: Target },
+  { label: 'Entrance exam analysis', prompt: 'Analyze this as an Ethiopian Grade 12 Entrance Exam question. Identify the tested concept, solve it methodically, explain distractors, and show an efficient exam approach.', icon: Brain },
   { label: 'Formulas & mnemonics', prompt: 'Summarize the key formulas, define each symbol, explain when each formula applies, and suggest accurate mnemonic devices.', icon: BookOpen },
   { label: '3 high-yield questions', prompt: 'Generate 3 high-yield practice questions for this topic, ordered from foundational to exam-level. Hide answers until I attempt them.', icon: ListChecks },
 ];
@@ -144,7 +143,6 @@ const AITutor: React.FC = () => {
 
   return (
     <div className="tier-upper min-h-screen bg-background text-foreground relative overflow-hidden">
-      <AnimatedBackground />
 
       <header className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border/50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
