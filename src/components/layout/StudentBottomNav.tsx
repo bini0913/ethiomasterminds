@@ -23,7 +23,7 @@ const StudentBottomNav: React.FC = () => {
   ];
   const upperItems = [
     { icon: Home, label: "Studio", path: "/", match: ["/"] },
-    { icon: GraduationCap, label: "Exam Prep", path: "/academic/exam", match: ["/academic/exam", "/academic/entrance-papers", "/academic"] },
+    { icon: GraduationCap, label: "Exam Prep", path: "/academic/exam", match: ["/academic/exam", "/academic/entrance-papers"] },
     { icon: Timer, label: "Focus", path: "/study-mode", match: ["/study-mode", "/revision"] },
     { icon: BrainCircuit, label: "Review", path: "/academic/flashcards", match: ["/academic/flashcards"] },
   ];
