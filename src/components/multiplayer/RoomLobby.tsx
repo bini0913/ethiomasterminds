@@ -32,7 +32,7 @@ const RoomLobby: React.FC = () => {
       difficulty: difficulty as 'Easy' | 'Medium' | 'Hard',
       questionCount: parseInt(questionCount),
       timePerQuestion: 30,
-      gameMode: 'speed'
+      gameMode: 'speed' as const
     };
 
     void createRoom(roomName, gameSettings, parseInt(maxPlayers), password || undefined);
@@ -42,7 +42,8 @@ const RoomLobby: React.FC = () => {
   };
 
   const handleJoinRoom = (roomId: string) => {
-    joinRoom(roomId, 'current-user'); // Would use actual username
+    if (!user?.id) return;
+    void joinRoom(roomId, user.name || user.username || 'Student');
   };
 
   return (
