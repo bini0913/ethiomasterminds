@@ -252,7 +252,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
         </div>
       </header>
       <div className={`${isUpperStudent ? "upper-studio-content pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{isUpperStudent ? <UpperAppShell>{children}</UpperAppShell> : children}</div>
-      {isUpperStudent && <div className="lg:hidden"><StudentBottomNav /></div>}
+      {isUpperStudent && <div className={isUpperDashboardHome ? "mm-upper-bottom-nav lg:hidden" : "lg:hidden"}><StudentBottomNav /></div>}
       </div>
     </div>
   );
