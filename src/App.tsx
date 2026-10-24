@@ -149,6 +149,8 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   const isHome = location.pathname === "/";
   const isUpperStudent = getUserTier(user?.grade) === "upper";
   const isUpperDashboardHome = isUpperStudent && location.pathname === "/";
+  // The upper-tier home owns its screenshot-matched responsive shell; do not wrap it in AppChrome.
+  if (isUpperDashboardHome) return <>{children}</>;
   if (isHome && !isUpperStudent) {
     return <>{children}</>;
   }
