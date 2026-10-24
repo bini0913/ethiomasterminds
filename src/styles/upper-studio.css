@@ -92,3 +92,5 @@
     padding-bottom: 0 !important;
   }
 }
+
+.mm-exact-scorebar-empty{background:repeating-linear-gradient(90deg,#eef1f5 0,#eef1f5 8px,#fff 8px,#fff 12px)}.mm-exact-scorebar-empty span{display:none}
