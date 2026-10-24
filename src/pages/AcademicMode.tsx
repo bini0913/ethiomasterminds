@@ -34,6 +34,7 @@ const AcademicMode: React.FC = () => {
   const [recentResult, setRecentResult] = useState<{ score: number; total_questions: number; completed_at?: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [topicProgress, setTopicProgress] = useState<Array<{subject:string;topic:string;completion_percentage:number;accuracy_percentage:number;questions_attempted:number;questions_correct:number}>>([]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -52,18 +53,20 @@ const AcademicMode: React.FC = () => {
       const weekAgo = new Date(now);
       weekAgo.setDate(now.getDate() - 6);
       const start = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, "0")}-${String(weekAgo.getDate()).padStart(2, "0")}`;
-      const [todayRes, weekRes, resultsRes] = await Promise.all([
+      const [todayRes, weekRes, resultsRes, topicsRes] = await Promise.all([
         supabase.from("study_plans").select("id,completed").eq("user_id", user.id).eq("scheduled_date", today),
         supabase.from("study_plans").select("id,completed").eq("user_id", user.id).gte("scheduled_date", start).lte("scheduled_date", today),
         supabase.from("quiz_results").select("score,total_questions,created_at").eq("student_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("topic_progress").select("subject,topic,completion_percentage,accuracy_percentage,questions_attempted,questions_correct").eq("user_id", user.id),
       ]);
       if (cancelled) return;
-      if (todayRes.error || weekRes.error || resultsRes.error) setLoadError(true);
+      if (todayRes.error || weekRes.error || resultsRes.error || topicsRes.error) setLoadError(true);
       setProfile(p);
       setTodayCount(todayRes.data?.length || 0);
       setTodayCompleted(todayRes.data?.filter((item) => item.completed).length || 0);
       setWeekDone(weekRes.data?.filter((item) => item.completed).length || 0);
       setRecentResult(resultsRes.data || null);
+      setTopicProgress((topicsRes.data || []) as typeof topicProgress);
       setIsLoading(false);
     })();
     return () => { cancelled = true; };
@@ -77,6 +80,16 @@ const AcademicMode: React.FC = () => {
   const subjects = Array.isArray(profile?.subjects) ? profile.subjects : [];
   const todayProgress = todayCount ? Math.round((todayCompleted / todayCount) * 100) : 0;
   const recentScore = recentResult?.score == null ? null : Math.max(0, Math.min(100, Number(recentResult.score)));
+  const syllabusRows = subjects.map((subject: string) => {
+    const key = subject.toLowerCase() === "math" ? "mathematics" : subject.toLowerCase();
+    const rows = topicProgress.filter((row) => {
+      const topicSubject = row.subject?.toLowerCase();
+      return topicSubject === key || (key === "mathematics" && topicSubject === "math");
+    });
+    const attempted = rows.filter((row) => Number(row.questions_attempted) > 0);
+    const completed = rows.filter((row) => Number(row.completion_percentage) >= 100 || (Number(row.accuracy_percentage) >= 80 && Number(row.questions_attempted) >= 5));
+    return { subject, total: rows.length, attempted: attempted.length, completed: completed.length, pct: rows.length ? Math.round((completed.length / rows.length) * 100) : 0 };
+  });
 
   return (
     <div className={tier === "upper" ? "tier-upper mm-academic-upper min-h-screen bg-background text-foreground" : "min-h-screen bg-muted/30"}>
@@ -101,6 +114,12 @@ const AcademicMode: React.FC = () => {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8 lg:px-8">
+        {tier === "upper" && <section className="space-y-3" aria-labelledby="syllabus-mastery-title">
+          <div className="flex flex-wrap items-end justify-between gap-2"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Syllabus mastery center</p><h2 id="syllabus-mastery-title" className="mt-1 text-xl font-bold sm:text-2xl">Your subjects, your progress</h2><p className="mt-1 text-sm text-muted-foreground">Completion is calculated from saved topic progress. Subjects without recorded topics remain unmeasured, not marked complete.</p></div><Button variant="outline" onClick={() => navigate("/academic/topics")}>Open Topic Coverage <ArrowUpRight className="ml-2 h-4 w-4"/></Button></div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {syllabusRows.map((row) => <Card key={row.subject} className="border-border bg-card"><CardContent className="p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><h3 className="font-semibold">{formatSubject(row.subject)}</h3><Badge variant="outline">{row.total ? `${row.pct}%` : "Not measured"}</Badge></div><Progress value={row.total ? row.pct : 0} className="mt-4 h-2"/><p className="mt-2 text-xs text-muted-foreground">{row.total ? `${row.completed} of ${row.total} tracked topics mastered · ${row.attempted} attempted` : "Complete practice to start building your topic record."}</p><Button className="mt-4 w-full" variant="outline" onClick={() => navigate("/academic/exam", { state: { subject: row.subject } })}>Practice {formatSubject(row.subject)} <ArrowUpRight className="ml-2 h-4 w-4"/></Button></CardContent></Card>)}
+          </div>
+        </section>}
         <section className={tier === "upper" ? "mm-academic-hero relative overflow-hidden rounded-3xl border border-border/70 shadow-sm" : "relative overflow-hidden rounded-3xl border bg-card shadow-sm"}>
           <div className={tier === "upper" ? "absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-primary/[0.09] to-transparent md:block" : "absolute inset-y-0 right-0 hidden w-1/3 bg-primary/[0.04] md:block"} />
           <div className="relative grid gap-6 p-5 sm:p-7 md:grid-cols-[1fr_auto] md:items-center md:p-9">
