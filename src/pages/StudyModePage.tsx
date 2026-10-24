@@ -569,20 +569,21 @@ const StudyModePage: React.FC = () => {
   return (
     <div className={upperStudent ? "tier-upper mm-study-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white pb-[env(safe-area-inset-bottom)]"}>
       {upperStudent && <style>{`
-        .mm-study-upper .mm-study-hero{background:radial-gradient(circle at 88% 10%,rgba(243,201,107,.16),transparent 28%),linear-gradient(120deg,#101a35,#17264a);color:#f8fafc;border-color:rgba(255,255,255,.12)}
-        .mm-study-upper .mm-study-hero .text-muted-foreground{color:rgba(237,242,255,.76)}
-        .mm-study-upper .mm-study-panel{border-radius:1.15rem;border-color:var(--border);box-shadow:0 3px 12px rgba(15,23,42,.045)}
+        .mm-study-upper .mm-study-hero{background:radial-gradient(circle at 88% 10%,hsl(var(--primary)/.17),transparent 32%),hsl(var(--card));color:hsl(var(--foreground));border-color:hsl(var(--border))}
+        .mm-study-upper .mm-study-hero .text-muted-foreground{color:hsl(var(--muted-foreground))}
+        .mm-study-upper .mm-study-panel{border-radius:1.15rem;border-color:hsl(var(--border));box-shadow:0 3px 12px hsl(var(--foreground)/.045)}
         .mm-study-upper .mm-study-panel [data-slot="card-title"]{font-weight:750;letter-spacing:-.015em}
-        .mm-study-upper .mm-study-timer{background:radial-gradient(circle,#fff 0%,#f8fafc 66%,#eef2ff 100%);border:1px solid #e2e8f0;border-radius:999px}
-        .mm-study-upper .mm-study-timer .mm-timer-label{color:#64748b}
-        .mm-study-upper .mm-study-timer .mm-timer-value{color:#101a35}
-        .mm-study-upper .mm-study-soft{background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.16)}
-        .mm-study-upper .mm-study-call{border-radius:1.15rem;border-color:var(--border);overflow:hidden}
-        .mm-study-upper .mm-study-call-head{background:linear-gradient(120deg,#101a35,#17264a);color:#f8fafc}
-        .mm-study-upper .mm-study-call-head .text-muted-foreground{color:rgba(237,242,255,.74)}
-        .mm-study-upper .mm-study-call-controls button{min-height:2.75rem}
-        .mm-study-upper .mm-study-action-grid button{min-height:2.75rem}
-        .mm-study-upper input,.mm-study-upper select{min-height:2.65rem}
+        .mm-study-upper .mm-study-timer{background:radial-gradient(circle,hsl(var(--card)),hsl(var(--muted)));border:1px solid hsl(var(--border));border-radius:999px}
+        .mm-study-upper .mm-study-timer .mm-timer-label{color:hsl(var(--muted-foreground))}
+        .mm-study-upper .mm-study-timer .mm-timer-value{color:hsl(var(--foreground))}
+        .mm-study-upper .mm-study-soft{background:hsl(var(--primary)/.07);border-color:hsl(var(--primary)/.16)}
+        .mm-study-upper .mm-study-call{border-radius:1.15rem;border-color:hsl(var(--border));overflow:hidden}
+        .mm-study-upper .mm-study-call-head{background:hsl(var(--card));color:hsl(var(--foreground))}
+        .mm-study-upper .mm-study-call-head .text-muted-foreground{color:hsl(var(--muted-foreground))}
+        .mm-study-upper .mm-study-call-controls button,.mm-study-upper .mm-study-action-grid button{min-height:2.75rem}
+        .mm-study-upper .mm-study-action-grid button{box-shadow:0 3px 0 hsl(var(--border));transition:transform 140ms ease,box-shadow 140ms ease}
+        .mm-study-upper .mm-study-action-grid button:active{transform:translateY(3px);box-shadow:none}
+        .mm-study-upper input,.mm-study-upper select{min-height:2.65rem;border-radius:.75rem}
         @media(max-width:640px){.mm-study-upper .mm-study-panel{border-radius:1rem}.mm-study-upper .mm-study-call-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}.mm-study-upper .mm-study-call-controls button{width:100%;padding-inline:.65rem}.mm-study-upper .mm-study-timer{max-width:15rem;max-height:15rem}}
       `}</style>}
       <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-6 sm:p-4 md:p-6">

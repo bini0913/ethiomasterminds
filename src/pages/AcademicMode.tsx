@@ -20,7 +20,13 @@ const features = [
   { title: "Academic insights", eyebrow: "IMPROVE", description: "See your performance, strengths and areas to improve.", icon: TrendingUp, path: "/academic/insights", action: "See progress" },
 ];
 
-const formatSubject = (subject: string) => subject === "math" ? "Mathematics" : subject.replace(/\b\w/g, (letter) => letter.toUpperCase());
+const formatSubject = (subject: unknown): string => {
+  if (typeof subject !== "string" || !subject.trim()) return "General subject";
+  const normalized = subject.trim();
+  return normalized.toLowerCase() === "math"
+    ? "Mathematics"
+    : normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
 
 const AcademicMode: React.FC = () => {
   const { user } = useUser();
@@ -77,7 +83,12 @@ const AcademicMode: React.FC = () => {
   const grade = normalizeGrade(profile?.grade, normalizeGrade(user?.grade, 9));
   const goalLabels: Record<string, string> = { class: "School / Class", ministry_exam: "Ministry Exam", university_entrance: "University Entrance", national_exam: "National / Regional Exam", custom: "Custom goal" };
   const goal = profile?.study_goal_detail || goalLabels[profile?.study_goal] || "Study goal";
-  const subjects = Array.isArray(profile?.subjects) ? profile.subjects : [];
+  const subjects: string[] = Array.isArray(profile?.subjects)
+    ? profile.subjects.filter((subject: unknown): subject is string => typeof subject === "string" && subject.trim().length > 0).map((subject: string) => subject.trim())
+    : [];
+  const safeTopicProgress = Array.isArray(topicProgress)
+    ? topicProgress.filter((row): row is NonNullable<typeof row> => Boolean(row && typeof row === "object"))
+    : [];
   const todayProgress = todayCount ? Math.round((todayCompleted / todayCount) * 100) : 0;
   const recentScore = recentResult?.score == null ? null : Math.max(0, Math.min(100, Number(recentResult.score)));
   const syllabusRows = subjects.map((subject: string) => {
@@ -86,7 +97,7 @@ const AcademicMode: React.FC = () => {
       const topicSubject = row.subject?.toLowerCase();
       return topicSubject === key || (key === "mathematics" && topicSubject === "math");
     });
-    const attempted = rows.filter((row) => Number(row.questions_attempted) > 0);
+    const attempted = rows.filter((row) => Number.isFinite(Number(row.questions_attempted)) && Number(row.questions_attempted) > 0);
     const completed = rows.filter((row) => Number(row.completion_percentage) >= 100 || (Number(row.accuracy_percentage) >= 80 && Number(row.questions_attempted) >= 5));
     return { subject, total: rows.length, attempted: attempted.length, completed: completed.length, pct: rows.length ? Math.round((completed.length / rows.length) * 100) : 0 };
   });
@@ -118,7 +129,7 @@ const AcademicMode: React.FC = () => {
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Prepare with a plan, not guesswork.</h2>
               <p className={tier === "upper" ? "text-muted-foreground mt-3 max-w-xl text-sm leading-6 sm:text-base" : "mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base"}>Your study space is tailored to your grade, subjects and goal. Practice, review your mistakes and build steady progress—one session at a time.</p>
               <div className="mt-5 flex flex-wrap gap-2">{subjects.length ? subjects.map((item: string) => <Badge key={item} variant="outline" className="bg-background font-medium">{formatSubject(item)}</Badge>) : <span className="text-sm text-muted-foreground">Add your subjects in your study profile.</span>}</div>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button className={tier === "upper" ? "bg-primary text-primary-foreground h-11 font-bold" : "h-11"} onClick={() => navigate("/academic/exam")}><Target className="mr-2 h-4 w-4" />Start exam practice</Button><Button variant="outline" className={tier === "upper" ? "h-11 border-border bg-card text-foreground hover:bg-muted" : "h-11"} onClick={() => navigate("/academic/planner")}><CalendarDays className="mr-2 h-4 w-4" />Plan study time</Button></div>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button className={tier === "upper" ? "btn-3d-primary bg-primary text-primary-foreground h-11 font-bold" : "h-11"} onClick={() => navigate("/academic/exam")}><Target className="mr-2 h-4 w-4" />Start exam practice</Button><Button variant="outline" className={tier === "upper" ? "h-11 border-border bg-card text-foreground hover:bg-muted" : "h-11"} onClick={() => navigate("/academic/planner")}><CalendarDays className="mr-2 h-4 w-4" />Plan study time</Button></div>
             </div>
             <div className="grid grid-cols-2 gap-3 md:w-56 md:grid-cols-1">
               <div className={tier === "upper" ? "mm-academic-metric border bg-background p-4 text-foreground" : "rounded-2xl border bg-background p-4"}><div className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /><span className="text-xs font-medium">Today's plan</span></div><p className="mt-2 text-2xl font-bold tabular-nums">{todayCompleted}<span className="text-base font-medium text-muted-foreground">/{todayCount}</span></p>{todayCount > 0 && <Progress value={todayProgress} className="mt-3 h-1.5" />}{todayCount === 0 && <p className="mt-1 text-xs text-muted-foreground">No tasks scheduled yet</p>}</div>
@@ -130,7 +141,7 @@ const AcademicMode: React.FC = () => {
         <section>
           <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your learning tools</p><h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">Choose your next step</h2><p className="mt-1 text-sm text-muted-foreground">Everything works with your saved study profile.</p></div><Badge variant="outline" className="hidden sm:flex">{subjects.length} subjects</Badge></div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => { const Icon = feature.icon; return <button key={feature.path} type="button" onClick={() => navigate(feature.path)} className={`mm-academic-feature group rounded-2xl border bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${feature.featured ? "border-primary/30 bg-primary/[0.035] sm:col-span-2 lg:col-span-1" : ""}`}>
+            {features.map((feature) => { const Icon = feature.icon; return <button key={feature.path} type="button" onClick={() => navigate(feature.path)} className={`mm-academic-feature ${tier === "upper" ? "btn-3d-card" : ""} group rounded-2xl border bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${feature.featured ? "border-primary/30 bg-primary/[0.035] sm:col-span-2 lg:col-span-1" : ""}`}>
               <div className="flex items-start justify-between gap-3"><div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Icon className="h-5 w-5" /></div><ArrowUpRight className="h-4 w-4 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" /></div>
               <p className="mt-4 text-[11px] font-bold tracking-[0.16em] text-primary">{feature.eyebrow}</p><h3 className="mt-1 text-lg font-semibold">{feature.title}</h3><p className="mt-1 min-h-10 text-sm leading-5 text-muted-foreground">{feature.description}</p><span className="mt-4 inline-flex items-center text-sm font-semibold">{feature.action}<ArrowUpRight className="ml-1.5 h-3.5 w-3.5" /></span>
             </button>; })}

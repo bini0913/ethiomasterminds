@@ -425,3 +425,40 @@
 .upper-tier-studio aside[aria-label="High school navigation"] button[aria-current="page"] svg {
   color: currentColor;
 }
+
+
+/* Upper-tier tactile controls: semantic tokens adapt to light/dark and tier themes. */
+@layer components {
+  .tier-upper .btn-3d-primary {
+    border-bottom: 4px solid hsl(var(--primary) / .4);
+    transition: transform 140ms ease, border-width 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+    box-shadow: 0 5px 12px hsl(var(--primary) / .14);
+  }
+  .tier-upper .btn-3d-primary:hover { box-shadow: 0 7px 18px hsl(var(--primary) / .2); }
+  .tier-upper .btn-3d-primary:active {
+    border-bottom-width: 0;
+    transform: translateY(3px);
+    box-shadow: 0 1px 4px hsl(var(--primary) / .12);
+  }
+  .tier-upper .btn-3d-card {
+    box-shadow: 0 4px 0 0 hsl(var(--border));
+    transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+  }
+  .tier-upper .btn-3d-card:hover {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 0 hsl(var(--border));
+  }
+  .tier-upper .btn-3d-card:active {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 0 hsl(var(--border));
+  }
+  .tier-upper .studio-spotlight {
+    background-image: radial-gradient(ellipse at 80% 0%, hsl(var(--primary) / .13), transparent 55%);
+  }
+  .tier-upper .studio-mastery { color: hsl(var(--success)); }
+  .tier-upper .studio-focus { color: hsl(var(--warning)); }
+  .tier-upper .studio-intelligence { color: hsl(var(--upper-intelligence-foreground)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tier-upper .btn-3d-primary, .tier-upper .btn-3d-card { transition: none; }
+}

@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { cn } from '@/lib/utils';
 
@@ -35,10 +34,10 @@ const subjects = [
 ];
 
 const quickActions = [
-  { label: 'Explain simpler', prompt: 'Explain that in simpler words, like I am 12.', icon: Lightbulb },
-  { label: 'Give an example', prompt: 'Give me a real-world example.', icon: Brain },
-  { label: 'Quiz me', prompt: 'Quiz me with 3 questions on what we just discussed. Wait for my answers.', icon: ListChecks },
-  { label: 'Summarize', prompt: 'Summarize everything in 5 short bullet points.', icon: BookOpen },
+  { label: 'Proof / derivation', prompt: 'Give a rigorous step-by-step mathematical proof or derivation. State assumptions, show each step, and explain why it follows.', icon: Calculator },
+  { label: 'Entrance exam analysis', prompt: 'Analyze this as an Ethiopian Grade 12 Entrance Exam question. Identify the tested concept, solve it methodically, explain distractors, and show an efficient exam approach.', icon: Brain },
+  { label: 'Formulas & mnemonics', prompt: 'Summarize the key formulas, define each symbol, explain when each formula applies, and suggest accurate mnemonic devices.', icon: BookOpen },
+  { label: '3 high-yield questions', prompt: 'Generate 3 high-yield practice questions for this topic, ordered from foundational to exam-level. Hide answers until I attempt them.', icon: ListChecks },
 ];
 
 const starterPrompts: Record<string, string[]> = {
@@ -143,8 +142,7 @@ const AITutor: React.FC = () => {
   const prompts = starterPrompts[selectedSubject] || starterPrompts.general;
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <AnimatedBackground />
+    <div className="tier-upper min-h-screen bg-background text-foreground relative overflow-hidden">
 
       <header className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border/50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -155,7 +153,7 @@ const AITutor: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold">AI Coach <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Plus</span></h1>
-              <p className="text-xs text-muted-foreground">Smart, patient, and always here for you</p>
+              <p className="text-xs text-muted-foreground">Academic reasoning · Exam preparation · Concept mastery</p>
             </div>
           </div>
           <div className="flex gap-2">
