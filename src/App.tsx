@@ -70,7 +70,7 @@ import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
 import { ChatProvider } from "./context/ChatContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import { ArrowLeft, Home, LogOut, BookOpen, BrainCircuit, Timer, Swords, Trophy, Users, Library, Bot, Bell, CalendarDays, Target, BarChart3, Layers3, ChevronRight, Settings as SettingsIcon, UserRound } from "lucide-react";
+import { ArrowLeft, Home, LogOut, BookOpen, BrainCircuit, Timer, Swords, Trophy, Users, Library, Bot, Bell, CalendarDays, Target, BarChart3, Layers3, ChevronRight, Settings as SettingsIcon, UserRound, GraduationCap } from "lucide-react";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
 import NativeBackHandler from "./components/mobile/NativeBackHandler";
