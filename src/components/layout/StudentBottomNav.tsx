@@ -22,10 +22,10 @@ const StudentBottomNav: React.FC = () => {
     { icon: Gift, label: "Rewards", path: "/store", match: ["/store"] },
   ];
   const upperItems = [
-    { icon: Home, label: "Home", path: "/", match: ["/"] },
-    { icon: Timer, label: "Study", path: "/study-mode", match: ["/study-mode", "/revision", "/academic/planner"] },
-    { icon: Target, label: "Exam Prep", path: "/academic/exam", match: ["/academic/exam", "/academic/entrance-papers"] },
-    { icon: Library, label: "Library", path: "/library", match: ["/library", "/academic/flashcards"] },
+    { icon: Home, label: "Studio", path: "/", match: ["/"] },
+    { icon: GraduationCap, label: "Exam Prep", path: "/academic/exam", match: ["/academic/exam", "/academic/entrance-papers", "/academic"] },
+    { icon: Timer, label: "Focus", path: "/study-mode", match: ["/study-mode", "/revision"] },
+    { icon: BrainCircuit, label: "Review", path: "/academic/flashcards", match: ["/academic/flashcards"] },
   ];
   const otherItems = [
     { icon: Home, label: "Home", path: "/", match: ["/"] },
@@ -64,7 +64,7 @@ const StudentBottomNav: React.FC = () => {
     </div>}
     <nav aria-label="Primary" className="mx-auto flex h-16 max-w-lg items-center justify-around gap-1 px-1 sm:h-[68px] sm:px-2">
       {items.map(item => { const Icon = item.icon; const is = active(item.match); return <motion.button key={item.label} type="button" onClick={() => { setMoreOpen(false); navigate(item.path); }} whileTap={{ scale: 0.97 }} className={`flex min-h-11 min-w-0 flex-1 max-w-32 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${is ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`} aria-label={`Go to ${item.label}`} aria-current={is ? "page" : undefined}><Icon className={`h-5 w-5 ${is ? "stroke-[2.5]" : ""}`} aria-hidden="true"/><span className="text-[11px] font-semibold">{item.label}</span></motion.button>; })}
-      {upper && <motion.button type="button" onClick={() => setMoreOpen(open => !open)} whileTap={{ scale: 0.97 }} aria-expanded={moreOpen} aria-label={moreOpen ? "Close more navigation" : "More navigation"} className={`flex min-h-11 min-w-0 flex-1 max-w-32 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${moreOpen || moreActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>{moreOpen ? <X className="h-5 w-5" aria-hidden="true"/> : <MoreHorizontal className="h-5 w-5" aria-hidden="true"/>}<span className="text-[11px] font-semibold">{moreOpen ? "Close" : "More"}</span></motion.button>}
+}
     </nav>
   </div>;
 };
