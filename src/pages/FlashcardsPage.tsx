@@ -210,9 +210,10 @@ const FlashcardsPage: React.FC = () => {
         return;
       }
       if (!isFlipped || !currentCard || studyMode !== "review") return;
-      if (event.key === "1") void handleDifficulty("hard");
-      if (event.key === "2") void handleDifficulty("medium");
-      if (event.key === "3") void handleDifficulty("easy");
+      if (event.key === "1") void handleDifficulty("hard"); // Again
+      if (event.key === "2") void handleDifficulty("hard"); // Hard
+      if (event.key === "3") void handleDifficulty("medium"); // Good
+      if (event.key === "4") void handleDifficulty("easy"); // Easy
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
