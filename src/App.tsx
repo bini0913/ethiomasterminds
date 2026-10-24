@@ -148,6 +148,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
 
   const isHome = location.pathname === "/";
   const isUpperStudent = getUserTier(user?.grade) === "upper";
+  const isUpperDashboardHome = isUpperStudent && location.pathname === "/";
   if (isHome && !isUpperStudent) {
     return <>{children}</>;
   }
@@ -167,7 +168,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <div className={isUpperStudent ? "min-h-screen bg-background mm-studio-upper" : "min-h-screen bg-background"}>
+    <div className={isUpperStudent ? `min-h-screen bg-background mm-studio-upper ${isUpperDashboardHome ? "mm-upper-exact-home" : ""}` : "min-h-screen bg-background"}>
       {isUpperStudent && <aside className="mm-studio-upper-sidebar fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r px-4 py-5 lg:flex">
         <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span><span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span><span className="mt-1 block text-[10px] text-muted-foreground">Academic Year 2017 E.C. · 2024/25 G.C.</span></span></button>
         <nav aria-label="High school navigation" className="flex-1 space-y-1 overflow-y-auto">
