@@ -5,6 +5,7 @@ import { useLearningDNA } from "@/hooks/useLearningDNA";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2, Clock3, GraduationCap, Library, Loader2, Target, Timer, TrendingUp } from "lucide-react";
 
 const greeting = () => {
