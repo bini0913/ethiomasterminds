@@ -314,8 +314,7 @@ const ExamModePage: React.FC = () => {
         setCurrentQ((index) => Math.min(questions.length - 1, index + 1));
       } else if (key === "enter") {
         event.preventDefault();
-        if (currentQ < questions.length - 1) setCurrentQ((index) => index + 1);
-        else void submitExamRef.current();
+        void submitExamRef.current();
       }
     };
     window.addEventListener("keydown", onKeyDown);
