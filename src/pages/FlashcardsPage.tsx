@@ -343,7 +343,7 @@ const FlashcardsPage: React.FC = () => {
       {/* Header */}
       <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
-          <Button variant="ghost" size="icon" onClick={() => { setSelectedSubject(null); setCurrentIndex(0); setIsFlipped(false); }} className="text-white hover:bg-white/10">
+          <Button variant="ghost" size="icon" onClick={() => { setSelectedSubject(null); setCurrentIndex(0); setIsFlipped(false); }} className={upperStudent ? "text-muted-foreground hover:bg-muted hover:text-foreground" : "text-white hover:bg-white/10"}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
