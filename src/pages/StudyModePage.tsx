@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import StudyCallBar from "@/components/study/StudyCallBar";
 import StudyLeaderboard from "@/components/study/StudyLeaderboard";
+import StudyShareCard from "@/components/study/StudyShareCard";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
 import { ArrowLeft, Brain, Check, Clock, Flame, Pause, Play, RotateCcw, StopCircle, Trophy, Users, Zap } from "lucide-react";
@@ -700,6 +701,16 @@ const StudyModePage: React.FC = () => {
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Streak</p><p className="font-bold">{streakDays} 🔥</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Pomodoros</p><p className="font-bold">{studyStats.pomodoros_today}/4</p></CardContent></Card>
                 <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Live Studying</p><p className="font-bold flex items-center justify-center gap-1">{liveStatuses.length} <Flame className="h-4 w-4 text-orange-400" /></p></CardContent></Card>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
+                <p className="text-xs leading-5 text-muted-foreground sm:text-sm">Proud of your focus? Generate a story-ready card and post your study stats.</p>
+                <StudyShareCard
+                  name={user.name?.trim() || "A Master Minds student"}
+                  level={user.level ?? 1}
+                  todayMinutes={todayMinutes}
+                  weekMinutes={weekMinutes}
+                  streakDays={streakDays}
+                />
               </div>
             </CardContent>
           </Card>
