@@ -43,6 +43,9 @@ const FlashcardsPage: React.FC = () => {
   const [studyMode, setStudyMode] = useState<"browse" | "review">("browse");
   const [subjects, setSubjects] = useState<string[]>([]);
   const [profileSubjects, setProfileSubjects] = useState<string[]>([]);
+  const [sessionStats, setSessionStats] = useState<{ reviewed: number; retained: number; nextReview: string } | null>(null);
+  const [sessionReviewed, setSessionReviewed] = useState(0);
+  const [sessionRetained, setSessionRetained] = useState(0);
 
   const gradeNum = normalizeGrade(user?.grade, 5);
 
@@ -189,12 +192,15 @@ const FlashcardsPage: React.FC = () => {
     }
 
     setProgress(prev => ({ ...prev, [currentCard.id]: upsertData as any }));
+    setSessionReviewed((count) => count + 1);
+    if (level === "medium" || level === "easy") setSessionRetained((count) => count + 1);
     setIsFlipped(false);
 
     if (currentIndex < reviewCards.length - 1) {
       setCurrentIndex(i => i + 1);
     } else {
-      toast.success("Session complete! 🎉");
+      toast.success("Session complete!");
+      setSessionStats({ reviewed: sessionReviewed + 1, retained: sessionRetained + ((level === "medium" || level === "easy") ? 1 : 0), nextReview: nextReview.toLocaleDateString() });
       setSelectedSubject(null);
       setCurrentIndex(0);
     }
@@ -227,6 +233,12 @@ const FlashcardsPage: React.FC = () => {
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  if (!selectedSubject && sessionStats) {
+    return <div className={upperStudent ? "tier-upper flex min-h-[70vh] items-center justify-center bg-background px-4 py-10 text-foreground" : "flex min-h-[70vh] items-center justify-center bg-background px-4 py-10"}>
+      <Card className="w-full max-w-xl border-border"><CardContent className="p-6 text-center sm:p-8"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Sparkles className="h-7 w-7"/></div><h1 className="mt-4 text-2xl font-bold">Review session complete</h1><p className="mt-2 text-sm text-muted-foreground">Your review progress was saved to your account.</p><div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-xl border border-border bg-muted/30 p-4"><p className="text-xs text-muted-foreground">Cards reviewed</p><p className="mt-1 text-2xl font-bold">{sessionStats.reviewed}</p></div><div className="rounded-xl border border-border bg-muted/30 p-4"><p className="text-xs text-muted-foreground">Good / Easy retention</p><p className="mt-1 text-2xl font-bold">{sessionStats.reviewed ? Math.round(sessionStats.retained / sessionStats.reviewed * 100) : 0}%</p></div></div><p className="mt-4 text-sm text-muted-foreground">Next scheduled review: {sessionStats.nextReview}</p><div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center"><Button onClick={() => { setSessionStats(null); setSessionReviewed(0); setSessionRetained(0); setSelectedSubject(null); }}>Back to decks</Button><Button variant="outline" onClick={() => { setSessionStats(null); setSessionReviewed(0); setSessionRetained(0); setSelectedSubject("all"); setStudyMode("review"); setCurrentIndex(0); }}>Review more cards</Button></div></CardContent></Card>
+    </div>;
   }
 
   // Subject selection view
@@ -296,7 +308,7 @@ const FlashcardsPage: React.FC = () => {
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="font-semibold capitalize">{subject}</h3>
-                    <p className="text-xs text-muted-foreground">{subjectCards.length} cards • {masteredCount} mastered</p>
+                    <p className="text-xs text-muted-foreground">{subjectCards.length} cards • {masteredCount} mastered</p>\n                    <div className="mt-2"><Badge variant={subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length ? "default" : "outline"}>{subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length} due today</Badge></div>
                     <Progress value={pct} className="h-1.5 mt-2" />
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
