@@ -20,7 +20,13 @@ const features = [
   { title: "Academic insights", eyebrow: "IMPROVE", description: "See your performance, strengths and areas to improve.", icon: TrendingUp, path: "/academic/insights", action: "See progress" },
 ];
 
-const formatSubject = (subject: string) => subject === "math" ? "Mathematics" : subject.replace(/\b\w/g, (letter) => letter.toUpperCase());
+const formatSubject = (subject: unknown): string => {
+  if (typeof subject !== "string" || !subject.trim()) return "General subject";
+  const normalized = subject.trim();
+  return normalized.toLowerCase() === "math"
+    ? "Mathematics"
+    : normalized.replace(/\\b\\w/g, (letter) => letter.toUpperCase());
+};
 
 const AcademicMode: React.FC = () => {
   const { user } = useUser();
@@ -77,7 +83,12 @@ const AcademicMode: React.FC = () => {
   const grade = normalizeGrade(profile?.grade, normalizeGrade(user?.grade, 9));
   const goalLabels: Record<string, string> = { class: "School / Class", ministry_exam: "Ministry Exam", university_entrance: "University Entrance", national_exam: "National / Regional Exam", custom: "Custom goal" };
   const goal = profile?.study_goal_detail || goalLabels[profile?.study_goal] || "Study goal";
-  const subjects = Array.isArray(profile?.subjects) ? profile.subjects : [];
+  const subjects: string[] = Array.isArray(profile?.subjects)
+    ? profile.subjects.filter((subject: unknown): subject is string => typeof subject === "string" && subject.trim().length > 0).map((subject: string) => subject.trim())
+    : [];
+  const safeTopicProgress = Array.isArray(topicProgress)
+    ? topicProgress.filter((row): row is NonNullable<typeof row> => Boolean(row && typeof row === "object"))
+    : [];
   const todayProgress = todayCount ? Math.round((todayCompleted / todayCount) * 100) : 0;
   const recentScore = recentResult?.score == null ? null : Math.max(0, Math.min(100, Number(recentResult.score)));
   const syllabusRows = subjects.map((subject: string) => {
@@ -86,7 +97,7 @@ const AcademicMode: React.FC = () => {
       const topicSubject = row.subject?.toLowerCase();
       return topicSubject === key || (key === "mathematics" && topicSubject === "math");
     });
-    const attempted = rows.filter((row) => Number(row.questions_attempted) > 0);
+    const attempted = rows.filter((row) => Number.isFinite(Number(row.questions_attempted)) && Number(row.questions_attempted) > 0);
     const completed = rows.filter((row) => Number(row.completion_percentage) >= 100 || (Number(row.accuracy_percentage) >= 80 && Number(row.questions_attempted) >= 5));
     return { subject, total: rows.length, attempted: attempted.length, completed: completed.length, pct: rows.length ? Math.round((completed.length / rows.length) * 100) : 0 };
   });
