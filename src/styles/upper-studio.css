@@ -76,3 +76,19 @@
 @media(max-width:900px) and (min-width:768px){.mm-exact-sidebar{width:145px;flex-basis:145px}.mm-exact-grid{grid-template-columns:minmax(0,1fr) 185px;gap:9px}.mm-exact-topcards{gap:9px}.mm-exact-card{padding:10px}.mm-exact-primary,.mm-exact-right{gap:9px}.mm-exact-sidebar nav button{font-size:10px;padding:8px}.mm-exact-big{font-size:21px}}
 
 @media(min-width:768px){.upper-current-dashboard{display:none!important}}
+
+/* Exact upper-tier home owns its desktop shell; prevent the legacy AppChrome from stacking around it. */
+@media (min-width: 768px) {
+  .mm-upper-exact-home .mm-studio-upper-sidebar,
+  .mm-upper-exact-home .mm-studio-upper-content > header,
+  .mm-upper-exact-home .mm-studio-upper-content > .upper-studio-content > .tier-upper > div:first-child,
+  .mm-upper-exact-home .mm-upper-bottom-nav {
+    display: none !important;
+  }
+  .mm-upper-exact-home .mm-studio-upper-content {
+    padding-left: 0 !important;
+  }
+  .mm-upper-exact-home .mm-studio-upper-content > .upper-studio-content {
+    padding-bottom: 0 !important;
+  }
+}
