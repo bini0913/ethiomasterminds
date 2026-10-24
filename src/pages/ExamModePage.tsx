@@ -61,6 +61,9 @@ const ExamModePage: React.FC = () => {
       setQuestionCount(10);
       setExamTypeFilter("mixed");
     }
+    if (typeof location.state?.subject === "string" && location.state.subject.trim()) {
+      setSubject(normalizeSubject(location.state.subject));
+    }
   }, [location.state]);
   const [timeLimit, setTimeLimit] = useState(30);
   const [, setSourceQuizId] = useState("");
