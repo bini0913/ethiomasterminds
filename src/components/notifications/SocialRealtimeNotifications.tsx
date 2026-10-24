@@ -34,7 +34,7 @@ export default function SocialRealtimeNotifications() {
             action: {
               label: "Accept",
               onClick: async () => {
-                const { error } = await supabase.rpc("respond_friend_request", { p_request_id: request.id, p_accept: true });
+                const { error } = await supabase.rpc("respond_friend_request" as any, { p_request_id: request.id, p_accept: true } as any);
                 if (error) { toast.error("Could not accept this friend request. Open Friends and try again."); return; }
                 toast.success("Friend request accepted.");
               },
@@ -42,7 +42,7 @@ export default function SocialRealtimeNotifications() {
             cancel: {
               label: "Decline",
               onClick: async () => {
-                const { error } = await supabase.rpc("respond_friend_request", { p_request_id: request.id, p_accept: false });
+                const { error } = await supabase.rpc("respond_friend_request" as any, { p_request_id: request.id, p_accept: false } as any);
                 if (error) { toast.error("Could not decline this friend request. Open Friends and try again."); return; }
                 toast.info("Friend request declined.");
               },
