@@ -64,7 +64,6 @@ const StudentBottomNav: React.FC = () => {
     </div>}
     <nav aria-label="Primary" className="mx-auto flex h-16 max-w-lg items-center justify-around gap-1 px-1 sm:h-[68px] sm:px-2">
       {items.map(item => { const Icon = item.icon; const is = active(item.match); return <motion.button key={item.label} type="button" onClick={() => { setMoreOpen(false); navigate(item.path); }} whileTap={{ scale: 0.97 }} className={`flex min-h-11 min-w-0 flex-1 max-w-32 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${is ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`} aria-label={`Go to ${item.label}`} aria-current={is ? "page" : undefined}><Icon className={`h-5 w-5 ${is ? "stroke-[2.5]" : ""}`} aria-hidden="true"/><span className="text-[11px] font-semibold">{item.label}</span></motion.button>; })}
-}
     </nav>
   </div>;
 };
