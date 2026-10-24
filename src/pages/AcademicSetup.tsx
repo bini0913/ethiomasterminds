@@ -116,6 +116,13 @@ const AcademicSetup: React.FC = () => {
 
   const progress = useMemo(() => (step / totalSteps) * 100, [step, totalSteps]);
 
+  const applyStreamPreset = (track: "natural" | "social") => {
+    const natural = ["Mathematics", "Physics", "Chemistry", "Biology", "English", "Civics"];
+    const social = ["Mathematics", "History", "Geography", "Economics", "English", "Civics"];
+    const allowed = new Set(subjectOptions);
+    setSubjects((track === "natural" ? natural : social).filter((subject) => allowed.has(subject)));
+  };
+
   const toggleSubject = (subject: string) => {
     setSubjects((current) => current.includes(subject)
       ? current.filter((item) => item !== subject)
@@ -260,6 +267,12 @@ const AcademicSetup: React.FC = () => {
               <p className="text-sm text-muted-foreground">Choose all subjects you want Academic Prep to support.</p>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {band === "high" && grade >= 11 && (
+                <div className="mb-4 flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row">
+                  <Button type="button" variant="outline" className="flex-1 justify-start" onClick={() => applyStreamPreset("natural")}>Natural Science Track</Button>
+                  <Button type="button" variant="outline" className="flex-1 justify-start" onClick={() => applyStreamPreset("social")}>Social Science Track</Button>
+                </div>
+              )}
               {subjectOptions.map((subject) => (
                 <button key={subject} type="button" onClick={() => toggleSubject(subject)}
                   className={`flex min-h-12 items-center justify-between rounded-xl border px-3 py-3 text-left text-sm transition ${subjects.includes(subject) ? "border-primary bg-primary/5 text-primary ring-1 ring-primary" : "border-border hover:bg-muted/50"}`}>

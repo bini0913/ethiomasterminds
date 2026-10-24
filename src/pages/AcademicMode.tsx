@@ -34,6 +34,7 @@ const AcademicMode: React.FC = () => {
   const [recentResult, setRecentResult] = useState<{ score: number; total_questions: number; completed_at?: string } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [topicProgress, setTopicProgress] = useState<Array<{subject:string;topic:string;completion_percentage:number;accuracy_percentage:number;questions_attempted:number;questions_correct:number}>>([]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -52,18 +53,20 @@ const AcademicMode: React.FC = () => {
       const weekAgo = new Date(now);
       weekAgo.setDate(now.getDate() - 6);
       const start = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, "0")}-${String(weekAgo.getDate()).padStart(2, "0")}`;
-      const [todayRes, weekRes, resultsRes] = await Promise.all([
+      const [todayRes, weekRes, resultsRes, topicsRes] = await Promise.all([
         supabase.from("study_plans").select("id,completed").eq("user_id", user.id).eq("scheduled_date", today),
         supabase.from("study_plans").select("id,completed").eq("user_id", user.id).gte("scheduled_date", start).lte("scheduled_date", today),
         supabase.from("quiz_results").select("score,total_questions,created_at").eq("student_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("topic_progress").select("subject,topic,completion_percentage,accuracy_percentage,questions_attempted,questions_correct").eq("user_id", user.id),
       ]);
       if (cancelled) return;
-      if (todayRes.error || weekRes.error || resultsRes.error) setLoadError(true);
+      if (todayRes.error || weekRes.error || resultsRes.error || topicsRes.error) setLoadError(true);
       setProfile(p);
       setTodayCount(todayRes.data?.length || 0);
       setTodayCompleted(todayRes.data?.filter((item) => item.completed).length || 0);
       setWeekDone(weekRes.data?.filter((item) => item.completed).length || 0);
       setRecentResult(resultsRes.data || null);
+      setTopicProgress((topicsRes.data || []) as typeof topicProgress);
       setIsLoading(false);
     })();
     return () => { cancelled = true; };
@@ -77,19 +80,19 @@ const AcademicMode: React.FC = () => {
   const subjects = Array.isArray(profile?.subjects) ? profile.subjects : [];
   const todayProgress = todayCount ? Math.round((todayCompleted / todayCount) * 100) : 0;
   const recentScore = recentResult?.score == null ? null : Math.max(0, Math.min(100, Number(recentResult.score)));
+  const syllabusRows = subjects.map((subject: string) => {
+    const key = subject.toLowerCase() === "math" ? "mathematics" : subject.toLowerCase();
+    const rows = topicProgress.filter((row) => {
+      const topicSubject = row.subject?.toLowerCase();
+      return topicSubject === key || (key === "mathematics" && topicSubject === "math");
+    });
+    const attempted = rows.filter((row) => Number(row.questions_attempted) > 0);
+    const completed = rows.filter((row) => Number(row.completion_percentage) >= 100 || (Number(row.accuracy_percentage) >= 80 && Number(row.questions_attempted) >= 5));
+    return { subject, total: rows.length, attempted: attempted.length, completed: completed.length, pct: rows.length ? Math.round((completed.length / rows.length) * 100) : 0 };
+  });
 
   return (
     <div className={tier === "upper" ? "tier-upper mm-academic-upper min-h-screen bg-background text-foreground" : "min-h-screen bg-muted/30"}>
-      {tier === "upper" && <style>{`
-        .mm-academic-upper .mm-academic-hero{background:radial-gradient(circle at 88% 10%,rgba(243,201,107,.17),transparent 30%),linear-gradient(120deg,#101a35,#17264a);color:#f8fafc;border-color:rgba(255,255,255,.12)}
-        .mm-academic-upper .mm-academic-hero .mm-hero-muted{color:rgba(237,242,255,.78)}
-        .mm-academic-upper .mm-academic-hero [data-slot="badge"]{border-color:rgba(255,255,255,.22);color:#fff;background:rgba(255,255,255,.09)}
-        .mm-academic-upper .mm-academic-hero .mm-gold{background:#f3c96b;color:#101a35;border-color:#f3c96b}
-        .mm-academic-upper .mm-academic-metric{border-radius:1rem;border-color:var(--border);background:var(--card);box-shadow:0 2px 7px rgba(15,23,42,.035)}
-        .mm-academic-upper .mm-academic-feature{border-radius:1.1rem;box-shadow:0 2px 7px rgba(15,23,42,.035);min-height:210px}
-        .mm-academic-upper .mm-academic-feature:hover{box-shadow:0 10px 24px rgba(15,23,42,.08)}
-        @media(max-width:640px){.mm-academic-upper .mm-academic-hero{border-radius:1.25rem}.mm-academic-upper .mm-academic-feature{min-height:0;padding:1rem}}
-      `}</style>}
       <header className={tier === "upper" ? "border-b border-border/70 bg-background/95 backdrop-blur-xl" : "border-b bg-background"}>
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
@@ -101,15 +104,21 @@ const AcademicMode: React.FC = () => {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-8 lg:px-8">
+        {tier === "upper" && <section className="space-y-3" aria-labelledby="syllabus-mastery-title">
+          <div className="flex flex-wrap items-end justify-between gap-2"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Syllabus mastery center</p><h2 id="syllabus-mastery-title" className="mt-1 text-xl font-bold sm:text-2xl">Your subjects, your progress</h2><p className="mt-1 text-sm text-muted-foreground">Completion is calculated from saved topic progress. Subjects without recorded topics remain unmeasured, not marked complete.</p></div><Button variant="outline" onClick={() => navigate("/academic/topics")}>Open Topic Coverage <ArrowUpRight className="ml-2 h-4 w-4"/></Button></div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {syllabusRows.map((row) => <Card key={row.subject} className="border-border bg-card"><CardContent className="p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><h3 className="font-semibold">{formatSubject(row.subject)}</h3><Badge variant="outline">{row.total ? `${row.pct}%` : "Not measured"}</Badge></div><Progress value={row.total ? row.pct : 0} className="mt-4 h-2"/><p className="mt-2 text-xs text-muted-foreground">{row.total ? `${row.completed} of ${row.total} tracked topics mastered · ${row.attempted} attempted` : "Complete practice to start building your topic record."}</p><Button className="mt-4 w-full" variant="outline" onClick={() => navigate("/academic/exam", { state: { subject: row.subject } })}>Practice {formatSubject(row.subject)} <ArrowUpRight className="ml-2 h-4 w-4"/></Button></CardContent></Card>)}
+          </div>
+        </section>}
         <section className={tier === "upper" ? "mm-academic-hero relative overflow-hidden rounded-3xl border border-border/70 shadow-sm" : "relative overflow-hidden rounded-3xl border bg-card shadow-sm"}>
           <div className={tier === "upper" ? "absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-primary/[0.09] to-transparent md:block" : "absolute inset-y-0 right-0 hidden w-1/3 bg-primary/[0.04] md:block"} />
           <div className="relative grid gap-6 p-5 sm:p-7 md:grid-cols-[1fr_auto] md:items-center md:p-9">
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">Grade {grade}</Badge><Badge variant="outline">{profile?.curriculum === "oromia" ? "Oromia curriculum" : "Addis Ababa curriculum"}</Badge></div>
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Prepare with a plan, not guesswork.</h2>
-              <p className={tier === "upper" ? "mm-hero-muted mt-3 max-w-xl text-sm leading-6 sm:text-base" : "mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base"}>Your study space is tailored to your grade, subjects and goal. Practice, review your mistakes and build steady progress—one session at a time.</p>
+              <p className={tier === "upper" ? "text-muted-foreground mt-3 max-w-xl text-sm leading-6 sm:text-base" : "mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base"}>Your study space is tailored to your grade, subjects and goal. Practice, review your mistakes and build steady progress—one session at a time.</p>
               <div className="mt-5 flex flex-wrap gap-2">{subjects.length ? subjects.map((item: string) => <Badge key={item} variant="outline" className="bg-background font-medium">{formatSubject(item)}</Badge>) : <span className="text-sm text-muted-foreground">Add your subjects in your study profile.</span>}</div>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button className={tier === "upper" ? "mm-gold h-11 font-bold" : "h-11"} onClick={() => navigate("/academic/exam")}><Target className="mr-2 h-4 w-4" />Start exam practice</Button><Button variant="outline" className={tier === "upper" ? "h-11 border-white/25 bg-white/10 text-white hover:bg-white/15 hover:text-white" : "h-11"} onClick={() => navigate("/academic/planner")}><CalendarDays className="mr-2 h-4 w-4" />Plan study time</Button></div>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button className={tier === "upper" ? "bg-primary text-primary-foreground h-11 font-bold" : "h-11"} onClick={() => navigate("/academic/exam")}><Target className="mr-2 h-4 w-4" />Start exam practice</Button><Button variant="outline" className={tier === "upper" ? "h-11 border-border bg-card text-foreground hover:bg-muted" : "h-11"} onClick={() => navigate("/academic/planner")}><CalendarDays className="mr-2 h-4 w-4" />Plan study time</Button></div>
             </div>
             <div className="grid grid-cols-2 gap-3 md:w-56 md:grid-cols-1">
               <div className={tier === "upper" ? "mm-academic-metric border bg-background p-4 text-foreground" : "rounded-2xl border bg-background p-4"}><div className="flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /><span className="text-xs font-medium">Today's plan</span></div><p className="mt-2 text-2xl font-bold tabular-nums">{todayCompleted}<span className="text-base font-medium text-muted-foreground">/{todayCount}</span></p>{todayCount > 0 && <Progress value={todayProgress} className="mt-3 h-1.5" />}{todayCount === 0 && <p className="mt-1 text-xs text-muted-foreground">No tasks scheduled yet</p>}</div>

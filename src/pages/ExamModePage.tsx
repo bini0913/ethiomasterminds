@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,11 +50,22 @@ const prettySubject = (subject: string) => subject === "math" ? "Mathematics" : 
 
 const ExamModePage: React.FC = () => {
   const { user, refreshProfile } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
+  const location = useLocation();
   const [examState, setExamState] = useState<ExamState>("setup");
   const [subject, setSubject] = useState("all_selected");
   const [examTypeFilter, setExamTypeFilter] = useState("mixed");
   const [questionCount, setQuestionCount] = useState(20);
+  useEffect(() => {
+    if (location.state?.workoutQuestionCount === 10) {
+      setQuestionCount(10);
+      setExamTypeFilter("mixed");
+    }
+    if (typeof location.state?.subject === "string" && location.state.subject.trim()) {
+      setSubject(normalizeSubject(location.state.subject));
+    }
+  }, [location.state]);
   const [timeLimit, setTimeLimit] = useState(30);
   const [, setSourceQuizId] = useState("");
   const [sourceQuizzes, setSourceQuizzes] = useState<SourceQuiz[]>([]);
@@ -67,7 +78,7 @@ const ExamModePage: React.FC = () => {
   const [isLoadingBank, setIsLoadingBank] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [results, setResults] = useState<{ correct: number; total: number; details: Array<{ q: ExamQuestion; answer: string; correct: boolean }> } | null>(null);
+  const [results, setResults] = useState<{ correct: number; total: number; elapsedSeconds: number; details: Array<{ q: ExamQuestion; answer: string; correct: boolean }> } | null>(null);
   const [profileSubjects, setProfileSubjects] = useState<string[]>([]);
   const [bankSubjects, setBankSubjects] = useState<string[]>([]);
   const [bankLoadError, setBankLoadError] = useState<string | null>(null);
@@ -202,9 +213,9 @@ const ExamModePage: React.FC = () => {
       correct: answerText(answers[index], q.options) === answerText(q.correct_answer, q.options),
     }));
     const correct = details.filter((item) => item.correct).length;
-    setResults({ correct, total: questions.length, details });
-    setExamState("results");
     const elapsedSeconds = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+    setResults({ correct, total: questions.length, elapsedSeconds, details });
+    setExamState("results");
     if (user?.id && selectedQuiz?.id) {
       const { error } = await supabase.from("quiz_results").insert({
         quiz_id: selectedQuiz.id,
@@ -279,6 +290,39 @@ const ExamModePage: React.FC = () => {
     setIsSaving(false);
   }, [examState, questions, answers, user?.id, selectedQuiz?.id, refreshProfile]);
   submitExamRef.current = () => { void submitExam(); };
+
+  useEffect(() => {
+    if (examState !== "running" || !upperStudent) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName || "")) return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const key = event.key.toLowerCase();
+      if (/^[1-4]$/.test(key) || /^[a-d]$/.test(key)) {
+        const optionIndex = /^[1-4]$/.test(key) ? Number(key) - 1 : "abcd".indexOf(key);
+        if (optionIndex < (currentQuestion?.options.length || 0)) {
+          event.preventDefault();
+          const option = currentQuestion.options[optionIndex];
+          setAnswers((previous) => ({ ...previous, [currentQ]: option }));
+        }
+        return;
+      }
+      if (key === "arrowleft") {
+        event.preventDefault();
+        setCurrentQ((index) => Math.max(0, index - 1));
+      } else if (key === "arrowright") {
+        event.preventDefault();
+        setCurrentQ((index) => Math.min(questions.length - 1, index + 1));
+      } else if (key === "enter") {
+        event.preventDefault();
+        void submitExamRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [examState, currentQ, currentQuestion, questions.length, upperStudent]);
+
+
 
   useEffect(() => {
     if (examState !== "running") return;
@@ -454,8 +498,8 @@ const ExamModePage: React.FC = () => {
       <div className="min-h-screen bg-muted/30">
         <Header title="Exam review" subtitle={selectedQuiz?.title || "Your completed practice"} />
         <main className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6 sm:py-10">
-          <Card className="overflow-hidden rounded-3xl"><div className="h-2 bg-primary" /><CardContent className="p-6 text-center sm:p-10"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Trophy className="h-8 w-8" /></div><p className="mt-4 text-sm font-semibold text-primary">Exam completed</p><h2 className="mt-1 text-5xl font-bold tracking-tight">{percent}%</h2><p className="mt-2 text-muted-foreground">{results.correct} correct out of {results.total} questions</p><div className="mx-auto mt-5 max-w-sm"><Progress value={percent} className="h-2.5" /></div><div className="mt-5 flex flex-wrap justify-center gap-2"><Badge variant="secondary">{percent >= 80 ? "Strong result" : percent >= 60 ? "Good progress" : "Keep building confidence"}</Badge><Badge variant="outline">+{results.correct * 5} potential XP</Badge>{isSaving && <Badge variant="outline">Saving progress…</Badge>}</div><div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row"><Button onClick={resetExam}><RotateCcw className="mr-2 h-4 w-4" />Try another exam</Button><Button variant="outline" onClick={() => navigate("/academic/insights")}>View academic insights</Button></div></CardContent></Card>
-          <div className="space-y-3"><div><h3 className="text-lg font-bold">Answer review</h3><p className="text-sm text-muted-foreground">Review each response and explanation where one is available.</p></div>{results.details.map((detail, index) => <Card key={detail.q.id} className="rounded-2xl"><CardContent className="flex gap-3 p-4 sm:p-5"><div className={`mt-0.5 rounded-full p-1.5 ${detail.correct ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}>{detail.correct ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}</div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><p className="font-medium leading-6">{index + 1}. {detail.q.question_text}</p><Badge variant="outline">{detail.correct ? "Correct" : "Review"}</Badge></div>{!detail.correct && <p className="mt-2 text-sm text-muted-foreground">Your answer: <span className="text-foreground">{detail.answer || "Not answered"}</span></p>}<p className="mt-1 text-sm">Correct answer: <span className="font-semibold text-emerald-700 dark:text-emerald-400">{answerText(detail.q.correct_answer, detail.q.options)}</span></p>{detail.q.explanation && <p className="mt-2 rounded-xl bg-muted/60 p-3 text-sm leading-5 text-muted-foreground">{detail.q.explanation}</p>}</div></CardContent></Card>)}</div>
+          <Card className="overflow-hidden rounded-3xl"><div className="h-2 bg-primary" /><CardContent className="p-6 text-center sm:p-10"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Trophy className="h-8 w-8" /></div><p className="mt-4 text-sm font-semibold text-primary">Exam completed</p><h2 className="mt-1 text-5xl font-bold tracking-tight">{percent}%</h2><p className="mt-2 text-muted-foreground">{results.correct} correct out of {results.total} questions</p><div className="mx-auto mt-5 max-w-sm"><Progress value={percent} className="h-2.5" /></div>{upperStudent && <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Total score</p><p className="mt-1 text-xl font-bold">{percent}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Answer accuracy</p><p className="mt-1 text-xl font-bold">{results.details.filter(d => d.answer).length ? Math.round(results.correct / results.details.filter(d => d.answer).length * 100) : 0}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Time spent</p><p className="mt-1 text-xl font-bold">{Math.floor(results.elapsedSeconds / 60)}m {results.elapsedSeconds % 60}s</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">XP earned</p><p className="mt-1 text-xl font-bold">+{results.correct * 5}</p></div></div>}<div className="mt-5 flex flex-wrap justify-center gap-2"><Badge variant="secondary">{percent >= 80 ? "Strong result" : percent >= 60 ? "Good progress" : "Keep building confidence"}</Badge><Badge variant="outline">+{results.correct * 5} potential XP</Badge>{isSaving && <Badge variant="outline">Saving progress…</Badge>}</div><div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row"><Button onClick={resetExam}><RotateCcw className="mr-2 h-4 w-4" />Try another exam</Button><Button variant="outline" onClick={() => navigate("/academic/insights")}>View academic insights</Button></div></CardContent></Card>
+          {upperStudent && <div className="mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-4"><h3 className="font-semibold">Mistakes to Review</h3><p className="mt-1 text-sm text-muted-foreground">Send missed questions to AI Tutor for step-by-step explanations.</p>{results.details.some(d => !d.correct) && <Button className="mt-3" onClick={() => { const context = results.details.filter(d => !d.correct).map((d, i) => "Mistake " + (i + 1) + ": " + d.q.question_text + " | My answer: " + (d.answer || "Not answered") + " | Correct answer: " + answerText(d.q.correct_answer, d.q.options) + " | Explanation: " + (d.q.explanation || "Not provided")).join("\n"); navigate("/ai-tutor?context=" + encodeURIComponent("Please explain these exam mistakes step by step:\n" + context)); }}>Send Mistakes to AI Tutor</Button>}</div>}<div className="space-y-3"><div><h3 className="text-lg font-bold">Answer review</h3><p className="text-sm text-muted-foreground">Review each response and explanation where one is available.</p></div>{results.details.map((detail, index) => <Card key={detail.q.id} className="rounded-2xl"><CardContent className="flex gap-3 p-4 sm:p-5"><div className={`mt-0.5 rounded-full p-1.5 ${detail.correct ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}>{detail.correct ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}</div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><p className="font-medium leading-6">{index + 1}. {detail.q.question_text}</p><Badge variant="outline">{detail.correct ? "Correct" : "Review"}</Badge></div>{!detail.correct && <p className="mt-2 text-sm text-muted-foreground">Your answer: <span className="text-foreground">{detail.answer || "Not answered"}</span></p>}<p className="mt-1 text-sm">Correct answer: <span className="font-semibold text-emerald-700 dark:text-emerald-400">{answerText(detail.q.correct_answer, detail.q.options)}</span></p>{detail.q.explanation && <p className="mt-2 rounded-xl bg-muted/60 p-3 text-sm leading-5 text-muted-foreground">{detail.q.explanation}</p>}</div></CardContent></Card>)}</div>
         </main>
       </div>
     );
@@ -463,10 +507,11 @@ const ExamModePage: React.FC = () => {
 
   if (!currentQuestion) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   const timeCritical = timeLeft <= 60;
+  const timeWarning = timeLeft <= 300 && timeLeft > 60;
   return (
     <div className="min-h-screen bg-muted/30">
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur"><div className="mx-auto max-w-4xl px-4 py-4 sm:px-6"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">{examTypeFilter === "mock_exam" ? "Mock exam" : "Timed practice"}</p><h1 className="font-bold sm:text-lg">{selectedQuiz?.title || "Exam mode"}</h1></div><div className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono font-semibold tabular-nums ${timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card"}`}><Clock3 className="h-4 w-4" />{formatTime(timeLeft)}</div></div><div className="mt-4 flex items-center justify-between text-sm text-muted-foreground"><span>Question {currentQ + 1} of {questions.length}</span><span>{Object.keys(answers).length} answered · {unansweredCount} remaining</span></div><Progress value={((currentQ + 1) / questions.length) * 100} className="mt-2 h-2" /></div></header>
-      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10"><Card className="rounded-3xl shadow-sm"><CardContent className="p-5 sm:p-8"><div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><CircleHelp className="h-4 w-4 text-primary" />{currentQuestion.topic || prettySubject(currentQuestion.subject || subject)}<Badge variant="outline">{currentQuestion.sourceKind === "past_paper" ? `Past-paper-tagged quiz · ${selectedQuiz?.source_verification_status === "verified" ? "source verified" : "source not verified"}` : "Topic practice · approved quiz bank"}</Badge></div><h2 className="mt-4 text-xl font-semibold leading-8 sm:text-2xl">{currentQuestion.question_text}</h2><div className="mt-6 grid gap-3">{currentQuestion.options.map((option, index) => {const selected = answers[currentQ] === option; return <button key={`${currentQuestion.id}-${index}`} type="button" onClick={() => setAnswers((previous) => ({ ...previous, [currentQ]: option }))} className={`flex min-h-14 items-start gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-background hover:bg-muted/60"}`}><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{String.fromCharCode(65 + index)}</span><span className="pt-0.5 text-sm leading-6">{option}</span></button>;})}</div></CardContent></Card><div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><Button variant="outline" className="sm:min-w-32" disabled={currentQ === 0} onClick={() => setCurrentQ((index) => index - 1)}><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><div className="flex gap-3"><Button variant="outline" onClick={() => setCurrentQ((index) => Math.min(questions.length - 1, index + 1))} disabled={currentQ === questions.length - 1}>Skip <ChevronRight className="ml-1 h-4 w-4" /></Button><Button className="flex-1 sm:min-w-36" onClick={() => currentQ < questions.length - 1 ? setCurrentQ((index) => index + 1) : void submitExam()}>{currentQ < questions.length - 1 ? <>Next question <ChevronRight className="ml-1 h-4 w-4" /></> : "Submit exam"}</Button></div></div><p className="mt-4 text-center text-xs text-muted-foreground">Your answers are not revealed until you submit the exam.</p></main>
+      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur"><div className="mx-auto max-w-4xl px-4 py-4 sm:px-6"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">{examTypeFilter === "mock_exam" ? "Mock exam" : "Timed practice"}</p><h1 className="font-bold sm:text-lg">{selectedQuiz?.title || "Exam mode"}</h1></div><div className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono font-semibold tabular-nums ${upperStudent ? (timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive animate-pulse" : timeWarning ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-card text-foreground") : (timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card")}`}><Clock3 className="h-4 w-4" />{formatTime(timeLeft)}</div></div><div className="mt-4 flex items-center justify-between text-sm text-muted-foreground"><span>Question {currentQ + 1} of {questions.length}</span><span>{Object.keys(answers).length} answered · {unansweredCount} remaining</span></div><Progress value={((currentQ + 1) / questions.length) * 100} className="mt-2 h-2" /></div></header>
+      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10"><Card className="rounded-3xl shadow-sm"><CardContent className="p-5 sm:p-8"><div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><CircleHelp className="h-4 w-4 text-primary" />{currentQuestion.topic || prettySubject(currentQuestion.subject || subject)}<Badge variant="outline">{currentQuestion.sourceKind === "past_paper" ? `Past-paper-tagged quiz · ${selectedQuiz?.source_verification_status === "verified" ? "source verified" : "source not verified"}` : "Topic practice · approved quiz bank"}</Badge></div><h2 className="mt-4 text-xl font-semibold leading-8 sm:text-2xl">{currentQuestion.question_text}</h2><div className="mt-6 grid gap-3">{currentQuestion.options.map((option, index) => {const selected = answers[currentQ] === option; return <button key={`${currentQuestion.id}-${index}`} type="button" onClick={() => setAnswers((previous) => ({ ...previous, [currentQ]: option }))} className={`flex min-h-14 items-start gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${upperStudent ? (selected ? "border-primary bg-primary/10 text-primary ring-2 ring-primary" : "border-border bg-card hover:bg-muted") : (selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-background hover:bg-muted/60")}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold ${upperStudent ? (selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted text-muted-foreground") : (selected ? "border-primary bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}`}>{String.fromCharCode(65 + index)}</span><span className="pt-0.5 text-sm leading-6">{option}</span></button>;})}</div></CardContent></Card><div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><Button variant="outline" className="sm:min-w-32" disabled={currentQ === 0} onClick={() => setCurrentQ((index) => index - 1)}><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><div className="flex gap-3"><Button variant="outline" onClick={() => setCurrentQ((index) => Math.min(questions.length - 1, index + 1))} disabled={currentQ === questions.length - 1}>Skip <ChevronRight className="ml-1 h-4 w-4" /></Button><Button className="flex-1 sm:min-w-36" onClick={() => currentQ < questions.length - 1 ? setCurrentQ((index) => index + 1) : void submitExam()}>{currentQ < questions.length - 1 ? <>Next question <ChevronRight className="ml-1 h-4 w-4" /></> : "Submit exam"}</Button></div></div><p className="mt-4 text-center text-xs text-muted-foreground">Your answers are not revealed until you submit the exam.</p></main>
     </div>
   );
 };

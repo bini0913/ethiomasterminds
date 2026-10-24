@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import "./styles/upper-studio.css";
+import UpperAppShell from "@/components/layout/UpperAppShell";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -70,7 +71,7 @@ import { AchievementsProvider } from "./context/AchievementsContext";
 import { RoomProvider } from "./context/RoomContext";
 import { ChatProvider } from "./context/ChatContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import { ArrowLeft, Home, LogOut, BookOpen, BrainCircuit, Timer, Swords, Trophy, Users, Library, Bot, Bell, CalendarDays, Target, BarChart3, Layers3, ChevronRight, Settings as SettingsIcon, UserRound, GraduationCap } from "lucide-react";
+import { ArrowLeft, Home, LogOut, BookOpen, BrainCircuit, Timer, Swords, Trophy, Users, Library, Bot, Bell, CalendarDays, Target, BarChart3, Layers3, ChevronRight, Settings as SettingsIcon, UserRound, GraduationCap, Sparkles } from "lucide-react";
 import { useUser } from "./context/UserContext";
 import AIHelper from "./components/ai/AIHelper";
 import NativeBackHandler from "./components/mobile/NativeBackHandler";
@@ -167,13 +168,13 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className={isUpperStudent ? "min-h-screen bg-background mm-studio-upper" : "min-h-screen bg-background"}>
       {isUpperStudent && <aside className="mm-studio-upper-sidebar fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r px-4 py-5 lg:flex">
-        <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span><span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span></span></button>
+        <button type="button" onClick={() => navigate("/")} className="mb-7 flex items-center gap-3 rounded-xl px-2 text-left"><span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ring-1 ring-border"><img src="/brand/master-minds-icon.svg" alt="" className="h-full w-full"/></span><span><span className="block font-display text-base font-bold">Master Minds</span><span className="block text-xs text-muted-foreground">Grades 9–12</span><span className="mt-1 block text-[10px] text-muted-foreground">Academic Year 2017 E.C. · 2024/25 G.C.</span></span></button>
         <nav aria-label="High school navigation" className="flex-1 space-y-1 overflow-y-auto">
-          <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Workspace</p>
-          <button type="button" onClick={() => navigate("/")} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${location.pathname === "/" ? "bg-indigo-500 text-white shadow-lg shadow-indigo-950/30" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}><Home className="h-4 w-4"/> Home</button>
-          <button type="button" onClick={() => navigate("/study-mode")} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${location.pathname === "/study-mode" ? "bg-indigo-500 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}><Timer className="h-4 w-4"/> Study Mode</button>
+          <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Workspace</p>
+          <button type="button" onClick={() => navigate("/")} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${location.pathname === "/" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Home className="h-4 w-4"/> Home</button>
+          <button type="button" onClick={() => navigate("/study-mode")} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${location.pathname === "/study-mode" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Timer className="h-4 w-4"/> Study Mode</button>
           <button type="button" onClick={() => navigate("/academic")} aria-current={location.pathname === "/academic" || location.pathname.startsWith("/academic/") ? "page" : undefined} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BookOpen className="h-4 w-4"/> Academic Mode <ChevronRight className="ml-auto h-4 w-4"/></button>
-          <div className="ml-4 space-y-1 border-l border-slate-800 pl-3">
+          <div className="ml-4 space-y-1 border-l border-border pl-3">
             <button type="button" onClick={() => navigate("/academic/topics")} aria-current={location.pathname === "/academic/topics" || location.pathname.startsWith("/academic/topics/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Layers3 className="h-4 w-4"/> Topic Coverage</button>
             <button type="button" onClick={() => navigate("/academic/flashcards")} aria-current={location.pathname === "/academic/flashcards" || location.pathname.startsWith("/academic/flashcards/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BrainCircuit className="h-4 w-4"/> Flashcards & Revision</button>
             <button type="button" onClick={() => navigate("/academic/exam")} aria-current={location.pathname === "/academic/exam" || location.pathname.startsWith("/academic/exam/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Target className="h-4 w-4"/> Exam Mode</button>
@@ -181,7 +182,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
             <button type="button" onClick={() => navigate("/academic/planner")} aria-current={location.pathname === "/academic/planner" || location.pathname.startsWith("/academic/planner/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><CalendarDays className="h-4 w-4"/> Study Planner</button>
             <button type="button" onClick={() => navigate("/academic/insights")} aria-current={location.pathname === "/academic/insights" || location.pathname.startsWith("/academic/insights/") ? "page" : undefined} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BarChart3 className="h-4 w-4"/> Academic Insights</button>
           </div>
-          <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">Connect</p>
+          <p className="px-3 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[.16em] text-muted-foreground">Connect</p>
           <button type="button" onClick={() => navigate("/multiplayer")} aria-current={location.pathname === "/multiplayer" || location.pathname.startsWith("/multiplayer/") ? "page" : undefined} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Swords className="h-4 w-4"/> Multiplayer</button>
           <button type="button" onClick={() => navigate("/tournaments")} aria-current={location.pathname === "/tournaments" || location.pathname.startsWith("/tournaments/") ? "page" : undefined} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Trophy className="h-4 w-4"/> Tournaments</button>
           <button type="button" onClick={() => navigate("/learning-dna")} aria-current={location.pathname === "/learning-dna" || location.pathname.startsWith("/learning-dna/") ? "page" : undefined} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><BrainCircuit className="h-4 w-4"/> Learning DNA</button>
@@ -190,9 +191,17 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
           <button type="button" onClick={() => navigate("/ai-tutor")} aria-current={location.pathname === "/ai-tutor" || location.pathname.startsWith("/ai-tutor/") ? "page" : undefined} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Bot className="h-4 w-4"/> AI Tutor</button>
           <button type="button" onClick={() => navigate("/notifications")} aria-current={location.pathname === "/notifications" || location.pathname.startsWith("/notifications/") ? "page" : undefined} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><Bell className="h-4 w-4"/> Notifications</button>
         </nav>
-        <div className="mt-4 border-t border-slate-800 pt-3"><button type="button" onClick={() => navigate("/settings")} aria-current={location.pathname === "/settings" || location.pathname.startsWith("/settings/") ? "page" : undefined} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><SettingsIcon className="h-4 w-4"/> Settings</button><button type="button" onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-4 w-4"/> Log out</button></div>
+        <div className="mt-4 border-t border-border pt-3"><button type="button" onClick={() => navigate("/settings")} aria-current={location.pathname === "/settings" || location.pathname.startsWith("/settings/") ? "page" : undefined} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"><SettingsIcon className="h-4 w-4"/> Settings</button><button type="button" onClick={handleLogout} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-4 w-4"/> Log out</button></div>
       </aside>}
-      <div className={isUpperStudent ? "mm-studio-upper-content lg:pl-64" : ""}>
+      {isUpperStudent && <aside aria-label="Quick navigation" className="fixed inset-y-0 left-0 z-40 hidden w-[72px] flex-col items-center gap-2 border-r border-border bg-card py-5 md:flex lg:hidden">
+        <button type="button" title="Studio" aria-label="Studio" onClick={() => navigate("/")} className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${location.pathname === "/" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Home className="h-5 w-5"/></button>
+        <button type="button" title="Exam Prep" aria-label="Exam Prep" onClick={() => navigate("/academic/exam")} className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${location.pathname.startsWith("/academic/exam") ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Target className="h-5 w-5"/></button>
+        <button type="button" title="Focus" aria-label="Focus" onClick={() => navigate("/study-mode")} className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${location.pathname === "/study-mode" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Timer className="h-5 w-5"/></button>
+        <button type="button" title="Review" aria-label="Review" onClick={() => navigate("/academic/flashcards")} className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors ${location.pathname.startsWith("/academic/flashcards") ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><BrainCircuit className="h-5 w-5"/></button>
+        <button type="button" title="Library" aria-label="Library" onClick={() => navigate("/library")} className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Library className="h-5 w-5"/></button>
+        <div className="mt-auto flex flex-col items-center gap-1 px-1 text-center text-[9px] leading-tight text-muted-foreground"><span>2017 E.C.</span><span>2024/25</span></div>
+      </aside>}
+      <div className={isUpperStudent ? "mm-studio-upper-content md:pl-[72px] lg:pl-64" : ""}>
       <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
@@ -224,6 +233,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
             </div>
           </div>
           {isUpperStudent && <>
+            <span className="hidden items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1.5 text-xs font-semibold tabular-nums sm:inline-flex" aria-label={`Experience points: ${user.xp || 0}`}><Sparkles className="h-3.5 w-3.5 text-primary"/>{(user.xp || 0).toLocaleString()} XP</span>
             <button type="button" onClick={() => navigate("/notifications")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Notifications" title="Notifications"><Bell className="h-4 w-4" /></button>
             <button type="button" onClick={() => navigate(user.id ? `/profile/${user.id}` : "/settings")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Profile" title="Profile"><UserRound className="h-4 w-4" /></button>
           </>}
@@ -239,7 +249,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
           </button>
         </div>
       </header>
-      <div className={`${isUpperStudent ? "upper-studio-content pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{children}</div>
+      <div className={`${isUpperStudent ? "upper-studio-content pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{isUpperStudent ? <UpperAppShell>{children}</UpperAppShell> : children}</div>
       {isUpperStudent && <div className="lg:hidden"><StudentBottomNav /></div>}
       </div>
     </div>
