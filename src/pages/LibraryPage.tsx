@@ -513,8 +513,8 @@ const LibraryPage: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      <AnimatedBackground />
+    <div className={getUserTier(user?.grade) === "upper" ? "tier-upper min-h-screen relative overflow-hidden bg-background text-foreground" : "min-h-screen relative overflow-hidden"}>
+      {getUserTier(user?.grade) !== "upper" && <AnimatedBackground />}
 
       <div className="relative z-10 p-4 md:p-6 max-w-7xl mx-auto space-y-4">
         <div className="flex items-center justify-between gap-2">
