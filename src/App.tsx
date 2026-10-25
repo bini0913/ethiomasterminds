@@ -1,6 +1,4 @@
 import { lazy, Suspense } from "react";
-import "./styles/upper-studio.css";
-import UpperAppShell from "@/components/layout/UpperAppShell";
 import RouteErrorBoundary from "@/components/layout/RouteErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -255,7 +253,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
           </button>
         </div>
       </header>
-      <div className={`${isUpperStudent ? "upper-studio-content pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{isUpperStudent ? <UpperAppShell>{children}</UpperAppShell> : children}</div>
+      <div className={`${isUpperStudent ? "pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{children}</div>
       {isUpperStudent && <div className="lg:hidden"><StudentBottomNav /></div>}
       </div>
     </div>

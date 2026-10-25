@@ -5,7 +5,6 @@ import UnifiedAuthForm from "@/components/auth/UnifiedAuthForm";
 import ProfileSetup from "@/components/profile/ProfileSetup";
 import MainMenu from "@/components/dashboard/MainMenu";
 import EarlyTierHome from "@/components/dashboard/EarlyTierHome";
-import UpperTierHome from "@/components/dashboard/UpperTierHome";
 import MiddleTierHome from "@/components/dashboard/MiddleTierHome";
 import EarlyEncouragement from "@/components/early/EarlyEncouragement";
 import StudentBottomNav from "@/components/layout/StudentBottomNav";
@@ -130,10 +129,7 @@ const Index: React.FC = () => {
               <StudentBottomNav />
             </>
           ) : tier === "upper" ? (
-            <>
-              <UpperTierHome />
-              <StudentBottomNav />
-            </>
+            <div className="min-h-screen bg-background" aria-label="Grades 9–12 frontend reset" />
           ) : (
             <>
               <MainMenu />
