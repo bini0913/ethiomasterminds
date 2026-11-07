@@ -44,7 +44,7 @@ interface UserContextType {
   login: (email: string, password: string) => Promise<boolean>;
   loginWithUsername: (username: string, password: string) => Promise<UserProfile | null>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
-  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string, profileDetails?: { age: number; gender: "male" | "female"; avatar: string }) => Promise<UserProfile | null>;
+  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string, profileDetails?: { age: number; gender: "male" | "female"; avatar: string; learningGoal?: { id: string; minutes: number; xp: number } }) => Promise<UserProfile | null>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<boolean>;
   addXP: (amount: number) => Promise<void>;
