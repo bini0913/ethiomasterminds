@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   ArrowLeft, ArrowRight, AtSign, BookOpen, Check, CheckCircle2, Crown,
-  Eye, EyeOff, GraduationCap, Loader2, Lock, Mail, ShieldCheck, Sparkles,
+  Eye, EyeOff, GraduationCap, Loader2, Lock, ShieldCheck, Sparkles,
   Target, Trophy, Users, User, X, Clock3,
 } from "lucide-react";
 import type { UserTier } from "@/lib/getUserTier";
@@ -23,7 +23,7 @@ interface UnifiedAuthFormProps {
   initialMode?: "signin" | "signup";
 }
 
-type Role = "student" | "teacher" | "admin" | "manager" | "parent_view";
+type Role = "student" | "teacher" | "admin" | "manager" | "parent_view" | "finance";
 type SignupStep = 1 | 2 | 3 | 4;
 type LearningGoal = { id: string; title: string; minutes: number; xp: number; description: string };
 const goals: LearningGoal[] = [
@@ -245,6 +245,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     { id: "parent_view", label: "Parent", icon: User },
     { id: "admin", label: "Admin", icon: ShieldCheck },
     { id: "manager", label: "Staff", icon: Crown },
+    { id: "finance", label: "Finance", icon: Crown },
   ];
   const steps = ["Learning stage", "Your grade", "Daily goal", "Your profile"];
 
@@ -302,7 +303,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
             </header>
 
             {!isSignup && (
-              <nav aria-label="Sign in portal" className="grid grid-cols-3 gap-1 border-b border-slate-100 p-2 dark:border-slate-800 sm:grid-cols-5">
+              <nav aria-label="Sign in portal" className="grid grid-cols-3 gap-1 border-b border-slate-100 p-2 dark:border-slate-800 sm:grid-cols-6">
                 {roleOptions.map(({ id, label, icon: Icon }) => (
                   <button key={id} type="button" onClick={() => setRole(id)} aria-pressed={role === id} className={`flex min-h-12 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-bold transition ${role === id ? "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-cyan-200" : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
                     <Icon className="h-4 w-4" />{label}
