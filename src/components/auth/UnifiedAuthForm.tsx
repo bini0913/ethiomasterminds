@@ -338,7 +338,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         {gradeByTier[tier].map((item) => (
                           <button key={item} type="button" onClick={() => { setGrade(item); if (item !== "Grade 11" && item !== "Grade 12") setAcademicStream(""); }} aria-pressed={grade === item} className={`card-3d-choice min-h-16 rounded-2xl border px-4 py-3 text-sm font-extrabold ${grade === item ? "selected border-blue-600 bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-cyan-200" : "border-slate-200 bg-white hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900"}`}>
-                            {item}{grade === item && <CheckCircle2 className="ml-2 inline h-4 w-4" />}
+                            {item === "K" ? "KG" : item}{grade === item && <CheckCircle2 className="ml-2 inline h-4 w-4" />}
                           </button>
                         ))}
                       </div>
