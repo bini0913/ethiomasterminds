@@ -513,4 +513,27 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .tier-upper .btn-3d-primary, .tier-upper .btn-3d-card { transition: none; }
+
+  /* Tactile Master Minds entry and onboarding controls. */
+  .btn-3d-primary {
+    color: #fff;
+    background: linear-gradient(135deg, #00E5FF 0%, #0055FF 100%);
+    box-shadow: 0 4px 0 #003db3, 0 8px 16px rgba(0, 85, 255, .25);
+    transition: transform .1s ease, box-shadow .1s ease, filter .1s ease;
+  }
+  .btn-3d-primary:hover { filter: brightness(1.05); }
+  .btn-3d-primary:active { transform: translateY(3px); box-shadow: 0 1px 0 #003db3, 0 3px 8px rgba(0, 85, 255, .2); }
+  .btn-3d-primary:disabled { opacity: .55; cursor: not-allowed; filter: saturate(.6); }
+  .card-3d-choice {
+    box-shadow: 0 4px 0 hsl(var(--border)), 0 6px 12px rgba(0, 0, 0, .04);
+    transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease, background-color .12s ease;
+  }
+  .card-3d-choice:hover { border-color: #0055FF; transform: translateY(-2px); }
+  .card-3d-choice.selected { border-color: #0055FF; background-color: rgba(0, 85, 255, .05); box-shadow: 0 4px 0 #0055FF, 0 8px 16px rgba(0, 85, 255, .15); }
+  .card-3d-choice:active { transform: translateY(2px); box-shadow: 0 2px 0 hsl(var(--border)); }
+  @media (prefers-reduced-motion: reduce) {
+    .btn-3d-primary, .card-3d-choice { transition: none; }
+    .card-3d-choice:hover, .card-3d-choice:active, .btn-3d-primary:active { transform: none; }
+  }
+
 }
