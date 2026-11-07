@@ -493,9 +493,9 @@ const TournamentHub: React.FC = () => {
         .mm-tournament-upper .mm-tournament-metric .mm-tournament-label{color:rgba(237,242,255,.68)}
         .mm-tournament-upper .mm-tournament-metric .mm-tournament-value{color:#fff}
         .mm-tournament-upper .mm-tournament-panel{border-radius:1.1rem;border-color:var(--border);background:var(--card);box-shadow:0 3px 12px rgba(15,23,42,.045)}
-        .mm-tournament-upper .mm-tournament-panel .text-cyan-100,.mm-tournament-upper .mm-tournament-panel .text-cyan-200\/70{color:inherit}
+        .mm-tournament-upper .mm-tournament-panel .text-cyan-100,.mm-tournament-upper .mm-tournament-panel .text-cyan-200/70{color:inherit}
         .mm-tournament-upper .mm-tournament-panel .text-slate-300,.mm-tournament-upper .mm-tournament-panel .text-slate-400{color:var(--muted-foreground)}
-        .mm-tournament-upper .mm-tournament-panel .bg-slate-900\/70{background:var(--muted)}
+        .mm-tournament-upper .mm-tournament-panel .bg-slate-900/70{background:var(--muted)}
         .mm-tournament-upper .mm-tournament-panel .border-slate-700{border-color:var(--border)}
         @media(max-width:640px){.mm-tournament-upper .mm-tournament-panel{border-radius:1rem}}
       `}</style>}
