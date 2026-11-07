@@ -144,7 +144,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     try {
       const profile = await signupWithRole(
         email.trim(), password, name.trim(), username.trim().toLowerCase(), "student", grade,
-        { age: parsedAge, gender, avatar, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp }, academicStream: academicStream || undefined } as any,
+        { age: parsedAge, gender, avatar, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp }, academicStream: academicStream || undefined },
       );
       if (profile) {
         localStorage.setItem("masterminds_learning_goal", JSON.stringify({ id: goal.id, minutes: goal.minutes, xp: goal.xp, academicStream: academicStream || null }));
