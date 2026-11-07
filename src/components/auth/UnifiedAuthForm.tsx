@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -72,6 +72,24 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   const goal = useMemo(() => goals.find((item) => item.id === goalId) ?? goals[1], [goalId]);
   const score = passwordScore(password);
   const selectedTier = tiers.find((item) => item.id === tier);
+
+  // Debounced username availability feedback while the learner types.
+  useEffect(() => {
+    if (!isSignup || step !== 4) return;
+    const normalized = username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/.test(normalized)) {
+      setUsernameStatus("idle");
+      return;
+    }
+    let active = true;
+    setUsernameStatus("checking");
+    const timer = window.setTimeout(async () => {
+      const { data, error } = await supabase.rpc("get_email_by_username", { _username: normalized } as any);
+      if (!active) return;
+      setUsernameStatus(error ? "idle" : data ? "taken" : "available");
+    }, 450);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [username, isSignup, step]);
 
   const resetSignup = () => { setStep(1); setTier(null); setGrade(""); setUsernameStatus("idle"); };
   const switchMode = (signup: boolean) => { setIsSignup(signup); setRole("student"); resetSignup(); };
