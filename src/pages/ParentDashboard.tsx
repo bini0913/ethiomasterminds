@@ -77,13 +77,13 @@ const ParentDashboard: React.FC = () => {
     setLoadingData(true);
     const [quizRes, studyRes, tasksRes, msgRes, goalsRes, leaderboardRes, classMembershipRes, earlyProgressRes] = await Promise.all([
       supabase.from("quiz_results").select("id,score,correct_answers,total_questions,completed_at,xp_earned,quiz_id").eq("student_id", user.id).order("completed_at", { ascending: false }).limit(60),
-      db.from("study_sessions").select("id,created_at,duration,planned_duration,status").eq("user_id", user.id).order("created_at", { ascending: false }).limit(120),
-      db.from("parent_tasks").select("*").eq("student_id", user.id).order("created_at", { ascending: false }),
-      db.from("parent_messages").select("*").eq("student_id", user.id).order("created_at", { ascending: false }).limit(20),
-      db.from("parent_goals").select("*").eq("student_id", user.id).maybeSingle(),
+      supabase.from("study_sessions").select("id,created_at,duration,planned_duration,status").eq("user_id", user.id).order("created_at", { ascending: false }).limit(120),
+      supabase.from("parent_tasks").select("*").eq("student_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("parent_messages").select("*").eq("student_id", user.id).order("created_at", { ascending: false }).limit(20),
+      supabase.from("parent_goals").select("*").eq("student_id", user.id).maybeSingle(),
       supabase.rpc("get_public_leaderboard", { limit_count: 500, timeframe: "all" }),
       supabase.from("class_students").select("class_id").eq("student_id", user.id).limit(1),
-      db.from("early_activity_progress").select("activity_id,skill,attempts,correct_answers,completions,xp_earned").eq("user_id", user.id),
+      supabase.from("early_activity_progress").select("activity_id,skill,attempts,correct_answers,completions,xp_earned").eq("user_id", user.id),
     ]);
 
     setQuizResults((quizRes.data ?? []) as QuizRow[]);
@@ -123,8 +123,8 @@ const ParentDashboard: React.FC = () => {
   const loadLinkedChildren = async () => {
     if (!user?.id || !isParentMode) return;
     const [{ data, error }, { data: notices, error: noticeError }] = await Promise.all([
-      db.rpc("get_parent_portal_overview"),
-      db.from("parent_notifications").select("id,title,message,notification_type,created_at,read").eq("parent_id", user.id).order("created_at", { ascending: false }).limit(8),
+      supabase.rpc("get_parent_portal_overview"),
+      supabase.from("parent_notifications").select("id,title,message,notification_type,created_at,read").eq("parent_id", user.id).order("created_at", { ascending: false }).limit(8),
     ]);
     if (error) { console.error("Could not load linked-child overview:", error); }
     else setLinkedChildren((data ?? []) as LinkedChildSummary[]);
@@ -137,18 +137,18 @@ const ParentDashboard: React.FC = () => {
   // Messages
   const sendMessage = async () => {
     if (!user?.id || !newMessage.trim()) { toast.error("Write a message first."); return; }
-    const { error } = await db.from("parent_messages").insert({ student_id: user.id, message: newMessage.trim(), emoji: messageEmoji });
+    const { error } = await supabase.from("parent_messages").insert({ student_id: user.id, message: newMessage.trim(), emoji: messageEmoji });
     if (error) { toast.error(error.message); return; }
     setNewMessage(""); toast.success("Message sent to your child! 💌"); await loadAll();
   };
   const deleteMessage = async (id: string) => {
-    await db.from("parent_messages").delete().eq("id", id); await loadAll();
+    await supabase.from("parent_messages").delete().eq("id", id); await loadAll();
   };
 
   // Goals
   const saveGoals = async () => {
     if (!user?.id) return;
-    const { error } = await db.from("parent_goals").upsert({ ...goals, student_id: user.id });
+    const { error } = await supabase.from("parent_goals").upsert({ ...goals, student_id: user.id });
     if (error) { toast.error(error.message); return; }
     toast.success("Goals saved.");
   };

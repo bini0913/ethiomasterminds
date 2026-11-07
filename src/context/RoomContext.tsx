@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from './UserContext';
@@ -43,7 +44,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const cleanupExpiredRooms = useCallback(async () => {
-    const { error } = await supabase.rpc('cleanup_expired_multiplayer_rooms' as any);
+    const { error } = await db.rpc('cleanup_expired_multiplayer_rooms' as any);
     if (error) console.error('Room cleanup failed:', error);
   }, []);
 
@@ -65,8 +66,8 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const [{ data: playerData }, { data: hostProfiles }] = await Promise.all([
-        supabase.from('room_players').select('room_id, user_id').in('room_id', roomIds),
-        supabase.from('profiles').select('id, name').in('id', [...new Set((data || []).map((r) => r.host_id))]),
+        db.from('room_players').select('room_id, user_id').in('room_id', roomIds),
+        db.from('profiles').select('id, name').in('id', [...new Set((data || []).map((r) => r.host_id))]),
       ]);
 
       const playerMap = new Map<string, string[]>();
@@ -120,7 +121,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const createRoom = async (name: string, settings: Room['gameSettings'], maxPlayers: number, password?: string): Promise<Room | null> => {
     if (!user?.id) return null;
     try {
-      const { data, error } = await supabase.rpc('multiplayer_create_room', {
+      const { data, error } = await db.rpc('multiplayer_create_room', {
         p_name: name,
         p_subject: settings.subject,
         p_difficulty: settings.difficulty,
@@ -130,7 +131,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       });
       if (error) throw error;
 
-      const { error: settingsError } = await supabase.rpc('multiplayer_update_room', {
+      const { error: settingsError } = await db.rpc('multiplayer_update_room', {
         p_room_id: data.id,
         p_subject: settings.subject,
         p_difficulty: settings.difficulty,
@@ -185,7 +186,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle();
       const existingMembership = Boolean(existingRow);
 
-      const { error: joinError } = await supabase.rpc('multiplayer_join_room', {
+      const { error: joinError } = await db.rpc('multiplayer_join_room', {
         p_room_id: roomId,
         p_password: password || null,
       });
@@ -223,7 +224,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const leaveRoom = async (roomId: string, playerName: string) => {
     if (!user?.id) return;
     try {
-      const { error } = await supabase.rpc('multiplayer_leave_room', { p_room_id: roomId });
+      const { error } = await db.rpc('multiplayer_leave_room', { p_room_id: roomId });
       if (error) throw error;
       setCurrentRoom(null);
       toast.info('Left the room');

@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -34,7 +35,7 @@ export default function SocialRealtimeNotifications() {
             action: {
               label: "Accept",
               onClick: async () => {
-                const { error } = await supabase.rpc("respond_friend_request" as any, { p_request_id: request.id, p_accept: true } as any);
+                const { error } = await db.rpc("respond_friend_request" as any, { p_request_id: request.id, p_accept: true } as any);
                 if (error) { toast.error("Could not accept this friend request. Open Friends and try again."); return; }
                 toast.success("Friend request accepted.");
               },
@@ -42,7 +43,7 @@ export default function SocialRealtimeNotifications() {
             cancel: {
               label: "Decline",
               onClick: async () => {
-                const { error } = await supabase.rpc("respond_friend_request" as any, { p_request_id: request.id, p_accept: false } as any);
+                const { error } = await db.rpc("respond_friend_request" as any, { p_request_id: request.id, p_accept: false } as any);
                 if (error) { toast.error("Could not decline this friend request. Open Friends and try again."); return; }
                 toast.info("Friend request declined.");
               },
@@ -60,8 +61,8 @@ export default function SocialRealtimeNotifications() {
           if (invite.expires_at && new Date(invite.expires_at).getTime() <= Date.now()) return;
 
           const [{ data: profile }, { data: room }] = await Promise.all([
-            supabase.from("profiles").select("name, username").eq("id", invite.sender_id).maybeSingle(),
-            supabase.from("multiplayer_rooms").select("name").eq("id", invite.room_id).maybeSingle(),
+            db.from("profiles").select("name, username").eq("id", invite.sender_id).maybeSingle(),
+            db.from("multiplayer_rooms").select("name").eq("id", invite.room_id).maybeSingle(),
           ]);
           const senderName = profile?.name?.trim() || profile?.username?.trim() || "A friend";
           const roomName = room?.name?.trim() || "a multiplayer room";
@@ -70,7 +71,7 @@ export default function SocialRealtimeNotifications() {
             action: {
               label: "Join",
               onClick: async () => {
-                const { data, error } = await supabase.rpc("respond_multiplayer_invite", {
+                const { data, error } = await db.rpc("respond_multiplayer_invite", {
                   _invite_id: invite.id,
                   _accept: true,
                 });
@@ -89,7 +90,7 @@ export default function SocialRealtimeNotifications() {
             cancel: {
               label: "Decline",
               onClick: async () => {
-                const { data, error } = await supabase.rpc("respond_multiplayer_invite", {
+                const { data, error } = await db.rpc("respond_multiplayer_invite", {
                   _invite_id: invite.id,
                   _accept: false,
                 });

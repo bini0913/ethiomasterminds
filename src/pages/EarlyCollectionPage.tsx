@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Coins, Sparkles, Check, LockKeyhole } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +12,7 @@ type Item={id:string;name:string;description:string;icon:string;rarity:string;se
 type CollectionFilter = "all" | "owned" | "locked";
 export default function EarlyCollectionPage(){
  const nav=useNavigate(); const {user}=useUser(); const [items,setItems]=useState<Item[]>([]); const [owned,setOwned]=useState<Set<string>>(new Set()); const [coins,setCoins]=useState(0); const [busy,setBusy]=useState<string|null>(null); const [loading,setLoading]=useState(true); const [loadError,setLoadError]=useState(false); const [filter,setFilter]=useState<CollectionFilter>("all");
- const load=async()=>{if(!user?.id){setItems([]);setOwned(new Set());setCoins(0);setLoading(false);return;}setLoading(true);setLoadError(false);try{const [a,b,c]=await Promise.all([supabase.from("early_collectibles").select("id,name,description,icon,rarity,set_name,price_coins").eq("active",true).order("price_coins"),supabase.from("early_user_collection").select("collectible_id").eq("user_id",user.id),supabase.from("user_currency").select("coins").eq("user_id",user.id).maybeSingle()]);if(a.error||b.error||c.error){setLoadError(true);toast.error("Could not load your collection. Please try again.");return;}setItems((a.data??[]) as Item[]);setOwned(new Set((b.data??[]).map((x:any)=>x.collectible_id)));setCoins(c.data?.coins??0);}catch{setLoadError(true);toast.error("Could not load your collection. Please check your connection.");}finally{setLoading(false);}};
+ const load=async()=>{if(!user?.id){setItems([]);setOwned(new Set());setCoins(0);setLoading(false);return;}setLoading(true);setLoadError(false);try{const [a,b,c]=await Promise.all([db.from("early_collectibles").select("id,name,description,icon,rarity,set_name,price_coins").eq("active",true).order("price_coins"),db.from("early_user_collection").select("collectible_id").eq("user_id",user.id),db.from("user_currency").select("coins").eq("user_id",user.id).maybeSingle()]);if(a.error||b.error||c.error){setLoadError(true);toast.error("Could not load your collection. Please try again.");return;}setItems((a.data??[]) as Item[]);setOwned(new Set((b.data??[]).map((x:any)=>x.collectible_id)));setCoins(c.data?.coins??0);}catch{setLoadError(true);toast.error("Could not load your collection. Please check your connection.");}finally{setLoading(false);}};
  useEffect(()=>{void load()},[user?.id]);
  const visibleItems=items.filter(item=>filter==="all"||(filter==="owned"?owned.has(item.id):!owned.has(item.id)));
  const ownedCount=items.filter(item=>owned.has(item.id)).length;

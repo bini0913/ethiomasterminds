@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -72,7 +73,7 @@ const AcademicSetup: React.FC = () => {
     if (!session?.user?.id) return;
     let cancelled = false;
     const loadProfile = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from("academic_profiles")
         .select("*")
         .eq("user_id", session.user.id)
@@ -98,7 +99,7 @@ const AcademicSetup: React.FC = () => {
 
   useEffect(() => {
     const loadBooks = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from("library_books")
         .select("id,title,author,subject,grade_level")
         .eq("status", "approved")
@@ -146,7 +147,7 @@ const AcademicSetup: React.FC = () => {
     setLoading(true);
     const selectedBooks = books.filter((book) => bookIds.includes(book.id));
     const selectedBook = books.find((book) => book.id === bookId) || selectedBooks[0];
-    const { error } = await supabase
+    const { error } = await db
       .from("academic_profiles")
       .upsert({
         user_id: session.user.id,

@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { useCallback, useEffect, useState } from "react";
 import FinanceOversightCard from "@/components/portals/FinanceOversightCard";
 import {
@@ -103,15 +104,15 @@ const SuperAdminPortal: React.FC = () => {
     setLoading(true);
     try {
       const [dashboard, userRows, logRows, settingRows, security, systemOverview] = await Promise.all([
-        supabase.rpc("extreme_admin_get_dashboard" as any),
-        supabase.rpc("extreme_admin_list_users" as any, {
+        db.rpc("extreme_admin_get_dashboard" as any),
+        db.rpc("extreme_admin_list_users" as any, {
           p_search: userSearch.trim() || null,
           p_role: null,
           p_limit: 300,
           p_offset: 0,
         }),
-        supabase.rpc("extreme_admin_get_audit_logs" as any, { p_limit: 120 }),
-        supabase.rpc("extreme_admin_get_settings" as any),
+        db.rpc("extreme_admin_get_audit_logs" as any, { p_limit: 120 }),
+        db.rpc("extreme_admin_get_settings" as any),
       ]);
 
       if (dashboard.error) throw dashboard.error;
@@ -145,7 +146,7 @@ const SuperAdminPortal: React.FC = () => {
   }, [refresh, user?.role]);
 
   const loadChats = async () => {
-    const { data, error } = await supabase.rpc(
+    const { data, error } = await db.rpc(
       "extreme_admin_get_chat_archive" as any,
       {
         p_search: chatSearch.trim() || null,
@@ -171,7 +172,7 @@ const SuperAdminPortal: React.FC = () => {
   const updateRole = async () => {
     if (!targetUser) return;
 
-    const { error } = await supabase.rpc(
+    const { error } = await db.rpc(
       "extreme_admin_update_user_role" as any,
       {
         p_user_id: targetUser.id,
@@ -198,7 +199,7 @@ const SuperAdminPortal: React.FC = () => {
       return;
     }
 
-    const { error } = await supabase.rpc(
+    const { error } = await db.rpc(
       "extreme_admin_set_user_status" as any,
       {
         p_user_id: targetUser.id,
@@ -228,7 +229,7 @@ const SuperAdminPortal: React.FC = () => {
       return;
     }
 
-    const { error } = await supabase.rpc(
+    const { error } = await db.rpc(
       "extreme_admin_adjust_economy" as any,
       {
         p_user_id: targetUser.id,
@@ -250,7 +251,7 @@ const SuperAdminPortal: React.FC = () => {
   const deleteMessage = async (id: string) => {
     if (!window.confirm("Delete this direct message permanently?")) return;
 
-    const { error } = await supabase.rpc(
+    const { error } = await db.rpc(
       "extreme_admin_delete_message" as any,
       { p_message_id: id },
     );
@@ -268,10 +269,10 @@ const SuperAdminPortal: React.FC = () => {
     setGovernanceLoading(true);
     try {
       const [reportsRes, postsRes, booksRes, financeRes] = await Promise.all([
-        supabase.rpc("extreme_admin_list_reports" as any, { p_status: null, p_limit: 100, p_offset: 0 }),
-        supabase.rpc("extreme_admin_list_posts" as any, { p_search: null, p_limit: 100, p_offset: 0 }),
-        supabase.rpc("extreme_admin_list_books" as any, { p_search: null, p_limit: 100, p_offset: 0 }),
-        supabase.rpc("extreme_admin_finance_overview" as any),
+        db.rpc("extreme_admin_list_reports" as any, { p_status: null, p_limit: 100, p_offset: 0 }),
+        db.rpc("extreme_admin_list_posts" as any, { p_search: null, p_limit: 100, p_offset: 0 }),
+        db.rpc("extreme_admin_list_books" as any, { p_search: null, p_limit: 100, p_offset: 0 }),
+        db.rpc("extreme_admin_finance_overview" as any),
       ]);
       if (reportsRes.error) throw reportsRes.error;
       if (postsRes.error) throw postsRes.error;
@@ -289,7 +290,7 @@ const SuperAdminPortal: React.FC = () => {
   };
 
   const setReportStatus = async (id: string, nextStatus: string) => {
-    const { error } = await supabase.rpc("extreme_admin_set_report_status" as any, {
+    const { error } = await db.rpc("extreme_admin_set_report_status" as any, {
       p_report_id: id,
       p_status: nextStatus,
       p_reason: "Super Admin Control Center",
@@ -302,7 +303,7 @@ const SuperAdminPortal: React.FC = () => {
 
   const deletePost = async (id: string) => {
     if (!window.confirm("Permanently delete this social post?")) return;
-    const { error } = await supabase.rpc("extreme_admin_delete_post" as any, {
+    const { error } = await db.rpc("extreme_admin_delete_post" as any, {
       p_post_id: id,
       p_reason: "Super Admin Control Center",
     });
@@ -314,7 +315,7 @@ const SuperAdminPortal: React.FC = () => {
 
   const deleteBook = async (id: string) => {
     if (!window.confirm("Permanently delete this library book record?")) return;
-    const { error } = await supabase.rpc("extreme_admin_delete_book" as any, {
+    const { error } = await db.rpc("extreme_admin_delete_book" as any, {
       p_book_id: id,
       p_reason: "Super Admin Control Center",
     });
@@ -325,7 +326,7 @@ const SuperAdminPortal: React.FC = () => {
   };
 
   const toggleSetting = async (key: string, value: boolean) => {
-    const { error } = await supabase.rpc(
+    const { error } = await db.rpc(
       "extreme_admin_set_setting" as any,
       {
         p_key: key,

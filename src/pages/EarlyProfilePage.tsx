@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, BookOpen, Sparkles, Star, Trophy, Compass, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import EarlyCollectibleCard from "@/features/early/components/EarlyCollectibleCard";
 export default function EarlyProfilePage(){
  const nav=useNavigate();const {user}=useUser();const [summary,setSummary]=useState<any>({});const [items,setItems]=useState<any[]>([]);const [owned,setOwned]=useState<Set<string>>(new Set());const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState(false);
- const load=useCallback(async()=>{if(!user?.id){setLoading(false);setSummary({});setItems([]);setOwned(new Set());return;}setLoading(true);setLoadError(false);try{const [s,i,o]=await Promise.all([(supabase as any).rpc("get_early_profile_summary",{p_user_id:user.id}),supabase.from("early_collectibles").select("id,name,description,icon,rarity,set_name,price_coins").eq("active",true).order("price_coins"),supabase.from("early_user_collection").select("collectible_id").eq("user_id",user.id)]);if(s.error||i.error||o.error){setLoadError(true);return;}setSummary(s.data??{});setItems(i.data??[]);setOwned(new Set((o.data??[]).map((x:any)=>x.collectible_id)));}catch{setLoadError(true);}finally{setLoading(false);}},[user?.id]);
+ const load=useCallback(async()=>{if(!user?.id){setLoading(false);setSummary({});setItems([]);setOwned(new Set());return;}setLoading(true);setLoadError(false);try{const [s,i,o]=await Promise.all([(supabase as any).rpc("get_early_profile_summary",{p_user_id:user.id}),db.from("early_collectibles").select("id,name,description,icon,rarity,set_name,price_coins").eq("active",true).order("price_coins"),db.from("early_user_collection").select("collectible_id").eq("user_id",user.id)]);if(s.error||i.error||o.error){setLoadError(true);return;}setSummary(s.data??{});setItems(i.data??[]);setOwned(new Set((o.data??[]).map((x:any)=>x.collectible_id)));}catch{setLoadError(true);}finally{setLoading(false);}},[user?.id]);
  useEffect(()=>{void load()},[load]);
  const collection=items.filter(i=>owned.has(i.id));
  return <div className="min-h-screen bg-background px-4 pb-24">

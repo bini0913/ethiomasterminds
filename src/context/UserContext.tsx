@@ -135,7 +135,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         email: authUser?.email ?? session?.user?.email,
         role,
         gender: profile.gender || undefined,
-        age: profile.age == null ? undefined : Number(profile.age),
+        age: (profile as any).age == null ? undefined : Number((profile as any).age),
         grade: profile.grade || undefined,
         educationLevel: profile.education_level || undefined,
         xp: profile.xp || 0,

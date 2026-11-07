@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +24,7 @@ export default function FinanceOversightCard() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("get_finance_oversight_summary");
+    const { data, error } = await db.rpc("get_finance_oversight_summary");
     if (error) {
       console.error("Finance oversight summary unavailable:", error);
       setUnavailable(true);

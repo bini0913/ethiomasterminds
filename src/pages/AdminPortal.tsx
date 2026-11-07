@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { useEffect, useMemo, useState } from 'react';
 import FinanceOversightCard from "@/components/portals/FinanceOversightCard";
 import { motion } from 'framer-motion';
@@ -254,8 +255,8 @@ const AdminPortal: React.FC = () => {
 
   const fetchUsers = async () => {
     const [profilesRes, rolesRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(500),
-      supabase.from('user_roles').select('user_id, role'),
+      db.from('profiles').select('*').order('created_at', { ascending: false }).limit(500),
+      db.from('user_roles').select('user_id, role'),
     ]);
     if (profilesRes.error) {
       console.error('Admin user list failed:', profilesRes.error);
@@ -279,12 +280,12 @@ const AdminPortal: React.FC = () => {
 
   const fetchContent = async () => {
     const [quizRes, questionRes, flashRes, postRes, bookRes, libraryRes] = await Promise.all([
-      supabase.from('quizzes').select('*').order('created_at', { ascending: false }).limit(200),
-      supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(200),
-      supabase.from('flashcards').select('*').order('created_at', { ascending: false }).limit(200),
-      supabase.from('social_posts').select('*').order('created_at', { ascending: false }).limit(200),
-      supabase.from('study_plans').select('*').order('created_at', { ascending: false }).limit(200),
-      supabase.from('library_books').select('id,title,author,subject,status,uploader_id,created_at').order('created_at', { ascending: false }).limit(300),
+      db.from('quizzes').select('*').order('created_at', { ascending: false }).limit(200),
+      db.from('questions').select('*').order('created_at', { ascending: false }).limit(200),
+      db.from('flashcards').select('*').order('created_at', { ascending: false }).limit(200),
+      db.from('social_posts').select('*').order('created_at', { ascending: false }).limit(200),
+      db.from('study_plans').select('*').order('created_at', { ascending: false }).limit(200),
+      db.from('library_books').select('id,title,author,subject,status,uploader_id,created_at').order('created_at', { ascending: false }).limit(300),
     ]);
     setQuizzes(quizRes.data || []);
     setQuestions(questionRes.data || []);
@@ -340,9 +341,9 @@ const AdminPortal: React.FC = () => {
   }, [seasonConversionRate]);
 
   const fetchReports = async () => {
-    const { data } = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(200);
+    const { data } = await db.from('reports').select('*').order('created_at', { ascending: false }).limit(200);
     const enriched = await Promise.all((data || []).map(async (report: any) => {
-      const { data: profile } = await supabase.from('profiles').select('name').eq('id', report.reporter_id).single();
+      const { data: profile } = await db.from('profiles').select('name').eq('id', report.reporter_id).single();
       return { ...report, reporter_name: profile?.name || 'Unknown' };
     }));
     setReports(enriched);
@@ -384,22 +385,22 @@ const AdminPortal: React.FC = () => {
   };
 
   const fetchAnnouncements = async () => {
-    const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(100);
+    const { data } = await db.from('announcements').select('*').order('created_at', { ascending: false }).limit(100);
     setAnnouncements(data || []);
   };
 
   const fetchStatsAndCharts = async () => {
     const [profilesRes, quizzesRes, questionsRes, flashcardsRes, rolesRes, reportsRes, postsRes, presenceRes, booksRes, resultsRes] = await Promise.all([
-      supabase.from('profiles').select('id', { count: 'exact' }),
-      supabase.from('quizzes').select('id,is_approved', { count: 'exact' }),
-      supabase.from('questions').select('id', { count: 'exact' }),
-      supabase.from('flashcards').select('id', { count: 'exact' }),
-      supabase.from('user_roles').select('user_id,role'),
-      supabase.from('reports').select('id,status', { count: 'exact' }),
-      supabase.from('social_posts').select('id,created_at', { count: 'exact' }),
-      supabase.from('user_presence').select('id,last_seen', { count: 'exact' }),
-      supabase.from('study_plans').select('id', { count: 'exact' }),
-      supabase.from('quiz_results').select('completed_at').limit(1000),
+      db.from('profiles').select('id', { count: 'exact' }),
+      db.from('quizzes').select('id,is_approved', { count: 'exact' }),
+      db.from('questions').select('id', { count: 'exact' }),
+      db.from('flashcards').select('id', { count: 'exact' }),
+      db.from('user_roles').select('user_id,role'),
+      db.from('reports').select('id,status', { count: 'exact' }),
+      db.from('social_posts').select('id,created_at', { count: 'exact' }),
+      db.from('user_presence').select('id,last_seen', { count: 'exact' }),
+      db.from('study_plans').select('id', { count: 'exact' }),
+      db.from('quiz_results').select('completed_at').limit(1000),
     ]);
 
     const roles = rolesRes.data || [];
@@ -470,7 +471,7 @@ const AdminPortal: React.FC = () => {
     const { data: roleRows } = await supabase
       .from('user_roles')
       .select('user_id, role')
-      .in('role', allowedRoles);
+      .in('role', allowedRoles as any);
 
     const recipientIds = Array.from(
       new Set((roleRows || []).map((row: any) => row.user_id).filter((id: string) => id && id !== user.id)),
@@ -596,7 +597,7 @@ const AdminPortal: React.FC = () => {
   };
 
   const handleModerateReport = async (reportId: string, status: 'resolved' | 'dismissed') => {
-    const { error } = await supabase.from('reports').update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq('id', reportId);
+    const { error } = await db.from('reports').update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq('id', reportId);
     if (error) {
       toast.error('Failed to update report');
       return;
@@ -610,7 +611,7 @@ const AdminPortal: React.FC = () => {
 
   const handleDeleteContent = async (type: 'quiz' | 'question' | 'flashcard' | 'social', id: string) => {
     const table = type === 'social' ? 'social_posts' : type === 'quiz' ? 'quizzes' : type === 'question' ? 'questions' : 'flashcards';
-    const { error } = await supabase.from(table as any).delete().eq('id', id);
+    const { error } = await db.from(table as any).delete().eq('id', id);
     if (error) {
       toast.error(`Failed to delete ${type}`);
       return;
@@ -622,7 +623,7 @@ const AdminPortal: React.FC = () => {
   };
 
   const handleExamTypeChange = async (quizId: string, examType: string) => {
-    const { error } = await supabase.from('quizzes').update({ exam_type: examType } as never).eq('id', quizId);
+    const { error } = await db.from('quizzes').update({ exam_type: examType } as never).eq('id', quizId);
     if (error) {
       toast.error('Failed to update exam type. Confirm the typed exam bank migration is applied.');
       return;
@@ -678,12 +679,12 @@ const AdminPortal: React.FC = () => {
       moderation_note: status === 'approved' ? 'Approved by admin portal.' : 'Rejected by admin portal.',
     };
 
-    const { data: uploadRow } = await supabase.from('book_uploads').select('id').eq('book_id', bookId).maybeSingle();
+    const { data: uploadRow } = await db.from('book_uploads').select('id').eq('book_id', bookId).maybeSingle();
     if (uploadRow?.id) {
-      await supabase.from('book_uploads').update(uploadPatch).eq('id', uploadRow.id);
+      await db.from('book_uploads').update(uploadPatch).eq('id', uploadRow.id);
     } else {
-      const { data: bookRow } = await supabase.from('library_books').select('uploader_id').eq('id', bookId).single();
-      await supabase.from('book_uploads').insert({
+      const { data: bookRow } = await db.from('library_books').select('uploader_id').eq('id', bookId).single();
+      await db.from('book_uploads').insert({
         book_id: bookId,
         uploader_id: bookRow?.uploader_id,
         ...uploadPatch,

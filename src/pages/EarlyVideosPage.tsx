@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpen, PlayCircle, Sparkles, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -55,7 +56,7 @@ export default function EarlyVideosPage() {
     const load = async () => {
       setLoading(true);
       setLoadError(false);
-      const { data, error } = await supabase.from("early_video_resources")
+      const { data, error } = await db.from("early_video_resources")
         .select("id,title,description,subject,grade_min,grade_max,provider,url,icon,fallback_url,status")
         .eq("active", true).eq("status", "approved").lte("grade_min", grade).gte("grade_max", grade).order("title");
       if (!mounted) return;
@@ -67,7 +68,7 @@ export default function EarlyVideosPage() {
       }
       setResources((data ?? []) as VideoResource[]);
       if (user?.id) {
-        const { data: views, error: viewsError } = await supabase.from("early_video_views").select("video_id,completed").eq("user_id", user.id);
+        const { data: views, error: viewsError } = await db.from("early_video_views").select("video_id,completed").eq("user_id", user.id);
         if (!mounted) return;
         if (!viewsError) setWatched(new Set((views ?? []).filter((x: any) => x.completed).map((x: any) => x.video_id)));
       } else {
@@ -98,7 +99,7 @@ export default function EarlyVideosPage() {
         {shelves.map((item) => <button key={item.id} type="button" onClick={() => setActive(item.id)} aria-pressed={active === item.id} className={`min-h-20 rounded-2xl border p-3 text-left font-semibold transition ${active === item.id ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-muted"}`}><span className="text-2xl" aria-hidden="true">{item.icon}</span><span className="mt-1 block text-sm">{item.title}</span></button>)}
       </div>
       {loading ? <Card><CardContent className="p-6 text-center text-sm text-muted-foreground" role="status">Loading reviewed resources…</CardContent></Card> :
-        loadError ? <Card><CardContent className="space-y-3 p-6 text-center"><p className="font-semibold">We couldn’t load the video library.</p><p className="text-sm text-muted-foreground">Check your connection and try again.</p><Button variant="outline" onClick={() => { setLoading(true); setLoadError(false); const retry = async () => { const { data, error } = await supabase.from("early_video_resources").select("id,title,description,subject,grade_min,grade_max,provider,url,icon,fallback_url,status").eq("active", true).eq("status", "approved").lte("grade_min", grade).gte("grade_max", grade).order("title"); if (error) { setLoadError(true); setResources([]); } else setResources((data ?? []) as VideoResource[]); setLoading(false); }; void retry(); }}>Try again</Button></CardContent></Card> :
+        loadError ? <Card><CardContent className="space-y-3 p-6 text-center"><p className="font-semibold">We couldn’t load the video library.</p><p className="text-sm text-muted-foreground">Check your connection and try again.</p><Button variant="outline" onClick={() => { setLoading(true); setLoadError(false); const retry = async () => { const { data, error } = await db.from("early_video_resources").select("id,title,description,subject,grade_min,grade_max,provider,url,icon,fallback_url,status").eq("active", true).eq("status", "approved").lte("grade_min", grade).gte("grade_max", grade).order("title"); if (error) { setLoadError(true); setResources([]); } else setResources((data ?? []) as VideoResource[]); setLoading(false); }; void retry(); }}>Try again</Button></CardContent></Card> :
         visible.length === 0 ? <Card><CardContent className="space-y-3 p-6 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground" /><p className="font-semibold">More resources are coming soon.</p><p className="text-sm text-muted-foreground">This shelf is safe by default: unpublished or unreviewed resources are not shown.</p></CardContent></Card> :
         <div className="grid gap-4 sm:grid-cols-2">{visible.map((item) => {
           const embed = youtubeEmbed(item.url);
@@ -108,7 +109,7 @@ export default function EarlyVideosPage() {
             <CardContent className="space-y-3 p-5"><div className="flex flex-wrap gap-2"><Badge variant="secondary">{profile.label}</Badge>{item.provider && <Badge variant="outline">{item.provider}</Badge>}</div><h2 className="font-display text-xl font-bold">{item.title}</h2>{item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}<div className="grid gap-2"><Button variant={watched.has(item.id) ? "secondary" : "default"} disabled={!user?.id || watched.has(item.id) || savingWatched.has(item.id)} className="min-h-11 w-full" onClick={async () => {
             if (!user?.id || savingWatched.has(item.id) || watched.has(item.id)) return;
             setSavingWatched((current) => new Set(current).add(item.id));
-            const { error } = await supabase.from("early_video_views").upsert({ user_id: user.id, video_id: item.id, seconds_watched: 0, completed: true, updated_at: new Date().toISOString() }, { onConflict: "user_id,video_id" });
+            const { error } = await db.from("early_video_views").upsert({ user_id: user.id, video_id: item.id, seconds_watched: 0, completed: true, updated_at: new Date().toISOString() }, { onConflict: "user_id,video_id" });
             setSavingWatched((current) => { const next = new Set(current); next.delete(item.id); return next; });
             if (error) { toast.error("Could not save watched progress. Please try again."); return; }
             setWatched((current) => new Set(current).add(item.id));

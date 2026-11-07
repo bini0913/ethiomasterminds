@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { supabase } from "@/integrations/supabase/client";
 
 export type BookAnalysisMethod = "headings" | "page-ranges" | "estimated";
@@ -17,7 +18,7 @@ type AnalysisRow = {
 };
 
 export async function loadBookAnalyses(userId: string): Promise<Record<string, BookAnalysis>> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("academic_book_analyses")
     .select("book_id,units,page_count,method,message")
     .eq("user_id", userId);
@@ -47,6 +48,6 @@ export async function saveBookAnalyses(userId: string, analyses: Record<string, 
     updated_at: new Date().toISOString(),
   }));
   if (!rows.length) return;
-  const { error } = await supabase.from("academic_book_analyses").upsert(rows, { onConflict: "user_id,book_id" });
+  const { error } = await db.from("academic_book_analyses").upsert(rows, { onConflict: "user_id,book_id" });
   if (error) throw error;
 }

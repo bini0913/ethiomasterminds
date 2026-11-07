@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { supabase } from "@/integrations/supabase/client";
 
 export type AcademicProfile = {
@@ -49,7 +50,7 @@ export function subjectsMatch(profileSubject: string, contentSubject: string) {
 }
 
 export async function getAcademicProfile(userId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("academic_profiles")
     .select("user_id,grade,study_goal,study_goal_detail,curriculum,subjects,book_id,book_ids,book_title")
     .eq("user_id", userId)

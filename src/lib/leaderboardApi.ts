@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { supabase } from "@/integrations/supabase/client";
 import { getRankTierByLevel } from "@/lib/rankSystem";
 
@@ -63,7 +64,7 @@ export const tierStyle = (level: number) => {
 export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   // Prefer the server-side projection so the leaderboard is not dependent on
   // broad SELECT access to profiles, attempts, streaks, or multiplayer tables.
-  const { data: leaderboardData, error: leaderboardError } = await supabase.rpc("get_student_leaderboard");
+  const { data: leaderboardData, error: leaderboardError } = await db.rpc("get_student_leaderboard");
 
   if (!leaderboardError && Array.isArray(leaderboardData)) {
     return leaderboardData.map((row: any) => {
@@ -106,13 +107,13 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
     supabase
       .from("profiles")
       .select("id,name,username,avatar,avatar_config,grade,xp,season_xp,level,rank,badges"),
-    supabase.from("user_streaks").select("user_id,current_streak"),
+    db.from("user_streaks").select("user_id,current_streak"),
     supabase
       .from("question_attempts")
       .select("user_id,is_correct,created_at")
       .gte("created_at", monthAgo),
-    supabase.from("user_currency").select("user_id,coins"),
-    supabase.from("multiplayer_ranked_stats").select("user_id,total_points,matches_played,wins"),
+    db.from("user_currency").select("user_id,coins"),
+    db.from("multiplayer_ranked_stats").select("user_id,total_points,matches_played,wins"),
   ]);
 
   if (profilesRes.error) {
@@ -201,9 +202,9 @@ export async function fetchFollowing(userId: string): Promise<string[]> {
 }
 
 export async function followUser(followerId: string, followingId: string) {
-  const { error } = await supabase.from("followers" as never).insert({ follower_id: followerId, following_id: followingId } as never);
+  const { error } = await db.from("followers" as never).insert({ follower_id: followerId, following_id: followingId } as never);
   if (error) throw error;
-  await supabase.from("social_notifications" as never).insert({
+  await db.from("social_notifications" as never).insert({
     user_id: followingId,
     actor_id: followerId,
     notification_type: "new_follower",
@@ -222,8 +223,8 @@ export async function unfollowUser(followerId: string, followingId: string) {
 
 export async function fetchFollowerCounts(userId: string) {
   const [followers, following] = await Promise.all([
-    supabase.from("followers" as never).select("id", { count: "exact", head: true }).eq("following_id", userId),
-    supabase.from("followers" as never).select("id", { count: "exact", head: true }).eq("follower_id", userId),
+    db.from("followers" as never).select("id", { count: "exact", head: true }).eq("following_id", userId),
+    db.from("followers" as never).select("id", { count: "exact", head: true }).eq("follower_id", userId),
   ]);
 
   return {
@@ -233,7 +234,7 @@ export async function fetchFollowerCounts(userId: string) {
 }
 
 export async function createFollowChallenge(challengerId: string, challengedId: string) {
-  const { error } = await supabase.from("follow_challenges" as never).insert({
+  const { error } = await db.from("follow_challenges" as never).insert({
     challenger_id: challengerId,
     challenged_id: challengedId,
     status: "pending",

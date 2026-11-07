@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useCurrency } from '@/context/CurrencyContext';
@@ -71,7 +72,7 @@ const UpperDesktopDashboard: React.FC = () => {
   useEffect(() => {
     if (!user?.id) { setLoading(false); return; }
     let alive = true;
-    supabase.from("topic_progress").select("subject,topic,accuracy_percentage,questions_attempted").eq("user_id", user.id)
+    db.from("topic_progress").select("subject,topic,accuracy_percentage,questions_attempted").eq("user_id", user.id)
       .then(({data}) => {
         if (!alive) return;
         setTopics((data || []).filter((r:any) => r.topic && Number(r.questions_attempted)>0)
@@ -165,11 +166,11 @@ const StudentDashboard: React.FC = () => {
 
   const fetchAssignedLearning = async () => {
     if (!user?.id) return;
-    const { data: memberships, error: membershipError } = await supabase
+    const { data: memberships, error: membershipError } = await db
       .from("class_students").select("class_id").eq("student_id", user.id);
     if (membershipError) { console.error("Could not load class memberships:", membershipError); return; }
     const classIds = Array.from(new Set((memberships ?? []).map((row: any) => row.class_id).filter(Boolean)));
-    let query = supabase.from("quiz_assignments")
+    let query = db.from("quiz_assignments")
       .select("id,quiz_id,class_id,student_id,due_date,created_at,quizzes(title,subject),classes(name,grade)")
       .order("created_at", { ascending: false }).limit(8);
     query = classIds.length
@@ -186,7 +187,7 @@ const StudentDashboard: React.FC = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('quiz_results')
       .select('score, correct_answers, total_questions, xp_earned')
       .eq('student_id', user.id)
@@ -209,7 +210,7 @@ const StudentDashboard: React.FC = () => {
 
     const today = new Date().toISOString().split('T')[0];
 
-    const { data: userMissions, error } = await supabase
+    const { data: userMissions, error } = await db
       .from('user_missions')
       .select(`
         id,
@@ -261,7 +262,7 @@ const StudentDashboard: React.FC = () => {
   const fetchStreak = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('user_streaks')
       .select('current_streak, longest_streak')
       .eq('user_id', user.id)
@@ -276,7 +277,7 @@ const StudentDashboard: React.FC = () => {
     if (!user) return;
 
     // Get accepted friends
-    const { data: friendsList, error } = await supabase
+    const { data: friendsList, error } = await db
       .from('friends')
       .select('friend_id')
       .eq('user_id', user.id)
@@ -287,7 +288,7 @@ const StudentDashboard: React.FC = () => {
       
       if (friendIds.length > 0) {
         // Get profiles with online status
-        const { data: profiles } = await supabase
+        const { data: profiles } = await db
           .from('profiles')
           .select(`
             id,

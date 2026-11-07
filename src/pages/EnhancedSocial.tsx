@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Compass, Users, Flame, BookOpen, Target, Plus, UsersRound } from 'lucide-react';
 import BackButton from '@/components/ui/BackButton';
@@ -20,6 +21,7 @@ const feedTabs = [
 type FeedTab = (typeof feedTabs)[number]['id'];
 
 const EnhancedSocial: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState<FeedTab>('explore');
   const [showCreatePost, setShowCreatePost] = useState(false);

@@ -1,3 +1,5 @@
+import { db } from "@/integrations/untypedClient";
+import { useNavigate } from "react-router-dom";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, Bell, CheckCircle2, ChevronRight, MessageSquare, RefreshCw, Search, Shield, ShieldCheck, UserCog, Users, XCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
@@ -29,9 +31,9 @@ const ManagerControlCenter: React.FC = () => {
     setLoading(true);
     try {
       const [dashboard, people, reportRows] = await Promise.all([
-        supabase.rpc("manager_get_dashboard" as any),
-        supabase.rpc("manager_list_users" as any, { p_search: search.trim() || null, p_role: null, p_limit: 150, p_offset: 0 }),
-        supabase.from("reports").select("id,reason,description,status,reporter_id,reported_id,created_at").order("created_at", { ascending: false }).limit(80),
+        db.rpc("manager_get_dashboard" as any),
+        db.rpc("manager_list_users" as any, { p_search: search.trim() || null, p_role: null, p_limit: 150, p_offset: 0 }),
+        db.from("reports").select("id,reason,description,status,reporter_id,reported_id,created_at").order("created_at", { ascending: false }).limit(80),
       ]);
       if (dashboard.error) throw dashboard.error;
       if (people.error) throw people.error;
@@ -52,14 +54,14 @@ const ManagerControlCenter: React.FC = () => {
   const pendingReports = useMemo(() => reports.filter((r) => r.status === "pending").length, [reports]);
 
   const moderateStudent = async (id: string, status: "active" | "suspended" | "banned") => {
-    const { error } = await supabase.rpc("manager_set_student_status" as any, { p_user_id: id, p_status: status, p_reason: "Manager moderation action" });
+    const { error } = await db.rpc("manager_set_student_status" as any, { p_user_id: id, p_status: status, p_reason: "Manager moderation action" });
     if (error) return toast.error(error.message || "Action failed");
     toast.success("Student marked " + status);
     load();
   };
 
   const resolveReport = async (id: string, status: "resolved" | "dismissed") => {
-    const { error } = await supabase.from("reports").update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq("id", id);
+    const { error } = await db.from("reports").update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq("id", id);
     if (error) return toast.error(error.message || "Could not update report");
     toast.success("Report " + status);
     load();
@@ -70,7 +72,7 @@ const ManagerControlCenter: React.FC = () => {
       toast.error("Add a title and message first");
       return;
     }
-    const { error } = await supabase.from("announcements").insert({ author_id: user.id, title: announcementTitle.trim(), content: announcementBody.trim(), target_type: "global", target_id: null });
+    const { error } = await db.from("announcements").insert({ author_id: user.id, title: announcementTitle.trim(), content: announcementBody.trim(), target_type: "global", target_id: null });
     if (error) return toast.error(error.message || "Announcement failed");
     toast.success("Announcement published");
     setAnnouncementTitle(""); setAnnouncementBody("");

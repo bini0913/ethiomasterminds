@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser, UserProfile } from './UserContext';
@@ -83,7 +84,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // Fetch ALL friendships involving this user
-      const { data: allFriendships, error: friendshipsError } = await supabase
+      const { data: allFriendships, error: friendshipsError } = await db
         .from('friends')
         .select('*')
         .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
@@ -115,7 +116,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         profiles?.forEach(p => profilesMap.set(p.id, p));
 
         // Fetch presence
-        const { data: presenceData } = await supabase
+        const { data: presenceData } = await db
           .from('user_presence')
           .select('user_id, status, last_seen')
           .in('user_id', friendIdsFromAccepted);
@@ -201,7 +202,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       setOutgoingRequests(mappedOutgoing);
 
       // Fetch messages
-      const { data: messagesData, error: messagesError } = await supabase
+      const { data: messagesData, error: messagesError } = await db
         .from('messages')
         .select('*')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
@@ -320,8 +321,8 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     if (!query.trim()) return [];
     
     try {
-      const { data, error } = await supabase
-        .rpc('find_student_by_username', { _username: query.trim() });
+      const { data, error } = await db
+        .rpc('find_student_by_username', { search_username: query.trim() });
       
       if (error) throw error;
       
@@ -346,11 +347,11 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   const sendFriendRequest = async (targetUserId: string) => {
     if (!user?.id) return;
     try {
-      const { error } = await supabase.rpc('send_friend_request', { p_target_user_id: targetUserId });
+      const { error } = await db.rpc('send_friend_request', { p_target_user_id: targetUserId });
       if (error) throw error;
       // Look up the newly-created request so the server can validate it before
       // sending a push; recipient and message copy are derived server-side.
-      const { data: request } = await supabase.from('friends').select('id')
+      const { data: request } = await db.from('friends').select('id')
         .eq('user_id', user.id).eq('friend_id', targetUserId).eq('status', 'pending')
         .order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (request?.id) {
@@ -368,7 +369,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const acceptFriendRequest = async (requestId: string) => {
     try {
-      const { error } = await supabase.rpc('respond_friend_request', { p_request_id: requestId, p_accept: true });
+      const { error } = await db.rpc('respond_friend_request', { p_request_id: requestId, p_accept: true });
       if (error) throw error;
       toast.success('Friend request accepted!');
       await fetchFriends();
@@ -380,7 +381,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const declineFriendRequest = async (requestId: string) => {
     try {
-      const { error } = await supabase.rpc('respond_friend_request', { p_request_id: requestId, p_accept: false });
+      const { error } = await db.rpc('respond_friend_request', { p_request_id: requestId, p_accept: false });
       if (error) throw error;
       toast.info('Friend request declined');
       await fetchFriends();
@@ -391,7 +392,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const removeFriend = async (friendshipId: string) => {
     try {
-      const { error } = await supabase.rpc('remove_friend', { p_friendship_id: friendshipId });
+      const { error } = await db.rpc('remove_friend', { p_friendship_id: friendshipId });
       if (error) throw error;
       toast.info('Friend removed');
       await fetchFriends();
@@ -403,7 +404,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   const sendMessage = async (receiverId: string, content: string) => {
     if (!user?.id || !content.trim()) return;
     try {
-      const { data, error } = await supabase.rpc('send_direct_message', {
+      const { data, error } = await db.rpc('send_direct_message', {
         p_receiver_id: receiverId,
         p_content: content.trim(),
       });
@@ -429,7 +430,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const markMessageAsRead = (messageId: string) => {
-    supabase.rpc('mark_direct_message_read', { p_message_id: messageId }).then(() => {
+    db.rpc('mark_direct_message_read', { p_message_id: messageId }).then(() => {
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, read: true } : m));
     });
   };

@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -201,7 +202,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (roomState.status !== 'playing' || roomConfig.gameMode !== 'speed' || timeRemaining > 0) return;
     if (finishRequestedRef.current) return;
     finishRequestedRef.current = true;
-    void supabase.rpc('multiplayer_finish_game' as any, { p_room_id: roomId } as any);
+    void db.rpc('multiplayer_finish_game' as any, { p_room_id: roomId } as any);
   }, [roomState.status, roomConfig.gameMode, timeRemaining, roomId]);
 
   useEffect(() => {
@@ -321,12 +322,12 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         maxPlayers: room.max_players || initialMaxPlayers,
       });
 
-      const { error: membershipError } = await supabase.rpc('multiplayer_ensure_membership', { p_room_id: roomId });
+      const { error: membershipError } = await db.rpc('multiplayer_ensure_membership', { p_room_id: roomId });
       if (membershipError) throw membershipError;
 
       await fetchPlayers();
 
-      const { data: state } = await supabase.from('room_state').select('*').eq('room_id', roomId).single();
+      const { data: state } = await db.from('room_state').select('*').eq('room_id', roomId).single();
 
       if (room.started_at) setMatchStartedAt(room.started_at);
       if (state) {
@@ -356,14 +357,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   };
 
   const fetchPlayers = async (): Promise<Player[]> => {
-    const { data: roomData } = await supabase.from('multiplayer_rooms').select('host_id').eq('id', roomId).single();
+    const { data: roomData } = await db.from('multiplayer_rooms').select('host_id').eq('id', roomId).single();
 
-    const { data: playersData } = await supabase.from('room_players').select('user_id, score, is_ready').eq('room_id', roomId);
+    const { data: playersData } = await db.from('room_players').select('user_id, score, is_ready').eq('room_id', roomId);
 
     if (playersData) {
       const userIds = playersData.map((p) => p.user_id);
       const [{ data: profiles }, { data: presenceRows }] = await Promise.all([
-        supabase.rpc('get_public_student_profiles', { p_user_ids: userIds }),
+        db.rpc('get_public_student_profiles', { p_user_ids: userIds }),
         supabase
           .from('user_presence')
           .select('user_id, status, last_seen')
@@ -379,7 +380,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       );
 
       const mappedPlayers: Player[] = playersData.map((p) => {
-        const profile = profileMap.get(p.user_id);
+        const profile = profileMap.get(p.user_id) as any;
         return {
           id: p.user_id,
           name: profile?.name || profile?.username || `Player ${p.user_id.slice(0, 6)}`,
@@ -444,7 +445,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       }
 
       if (attempts >= 5) {
-        await supabase.rpc('multiplayer_finish_game', { p_room_id: roomId });
+        await db.rpc('multiplayer_finish_game', { p_room_id: roomId });
         attempts = 0;
       }
       window.setTimeout(poll, 1000);
@@ -523,7 +524,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const loadPlayerQuestion = async () => {
     setQuestionLoadError(null);
     try {
-      const { data, error } = await supabase.rpc('multiplayer_get_current_question', { p_room_id: roomId });
+      const { data, error } = await db.rpc('multiplayer_get_current_question', { p_room_id: roomId });
       if (error) throw error;
       if (data?.done) {
         setCurrentQuestion(null);
@@ -562,7 +563,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
     if (data) {
       const userIds = [...new Set(data.map((m) => m.user_id))];
-      const { data: profiles } = await supabase.from('profiles').select('id, name').in('id', userIds);
+      const { data: profiles } = await db.from('profiles').select('id, name').in('id', userIds);
       const profileMap = new Map((profiles || []).map((p) => [p.id, p.name]));
 
       const mappedMessages: ChatMessage[] = data.map((m) => ({
@@ -657,7 +658,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         },
         async (payload) => {
           const newMsg = payload.new as any;
-          const { data: profile } = await supabase.from('profiles').select('name').eq('id', newMsg.user_id).single();
+          const { data: profile } = await db.from('profiles').select('name').eq('id', newMsg.user_id).single();
 
           setMessages((prev) => [
             ...prev,
@@ -687,7 +688,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     const currentPlayer = players.find((p) => p.id === currentUserId);
     if (!currentPlayer) return;
 
-    const { error } = await supabase.rpc('multiplayer_toggle_ready', { p_room_id: roomId });
+    const { error } = await db.rpc('multiplayer_toggle_ready', { p_room_id: roomId });
     if (error) throw error;
 
     playTone(520, 0.08);
@@ -701,7 +702,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     }
 
     try {
-      const { error } = await supabase.rpc('multiplayer_start_game', {
+      const { error } = await db.rpc('multiplayer_start_game', {
         p_room_id: roomId,
       });
 
@@ -721,7 +722,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     const timeUsed = Math.max(0, Math.round((Date.now() - (questionStartedAt ?? Date.now())) / 1000));
 
     try {
-      const { data, error } = await supabase.rpc('multiplayer_submit_answer', {
+      const { data, error } = await db.rpc('multiplayer_submit_answer', {
         p_room_id: roomId,
         p_question_id: currentQuestion.id,
         p_answer: currentQuestion.options[answerIndex],
@@ -790,13 +791,13 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     setQuestionAdvanceError(null);
     try {
       advancingQuestionRef.current = true;
-      const { data, error } = await supabase.rpc('multiplayer_advance_player', { p_room_id: roomId });
+      const { data, error } = await db.rpc('multiplayer_advance_player', { p_room_id: roomId });
       if (error) throw error;
       if (data?.done) {
         setQuestionAdvanceError(null);
         setCurrentQuestion(null);
         setPlayerFinished(true);
-        void supabase.rpc('multiplayer_finish_game', { p_room_id: roomId });
+        void db.rpc('multiplayer_finish_game', { p_room_id: roomId });
         return;
       }
       setCurrentQuestion({
@@ -824,7 +825,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     const content = (message || chatInput.trim()).slice(0, 80);
     if (!content) return;
 
-    const { error } = await supabase.rpc('multiplayer_send_room_message', {
+    const { error } = await db.rpc('multiplayer_send_room_message', {
       p_room_id: roomId,
       p_content: content,
     });
@@ -838,7 +839,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     const merged = { ...roomConfig, ...nextConfig };
     setRoomConfig(merged);
     setRoomMaxPlayers(merged.maxPlayers);
-    const { error } = await supabase.rpc('multiplayer_update_room', {
+    const { error } = await db.rpc('multiplayer_update_room', {
       p_room_id: roomId,
       p_subject: merged.subject,
       p_difficulty: merged.difficulty,
@@ -871,7 +872,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
   const kickPlayer = async (playerId: string, playerName: string) => {
     if (!isHost || playerId === currentUserId) return;
-    const { error } = await supabase.rpc('multiplayer_kick_player', { p_room_id: roomId, p_player_id: playerId });
+    const { error } = await db.rpc('multiplayer_kick_player', { p_room_id: roomId, p_player_id: playerId });
     if (error) throw error;
     toast.info(`${playerName} was removed from the room`);
   };
@@ -886,7 +887,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
     setSendingInviteTo(friendId);
     try {
-      const { error } = await supabase.rpc('create_multiplayer_invite', {
+      const { error } = await db.rpc('create_multiplayer_invite', {
         _receiver_id: friendId,
         _room_id: roomId,
       });
@@ -1263,7 +1264,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     Your final score is locked in. Waiting briefly for the other players to finish so we can calculate the final standings.
                   </p>
                   <div className="text-3xl font-black text-cyan-300">{currentPlayer?.score ?? 0} POINTS</div>
-                  <Button variant="outline" onClick={() => void supabase.rpc('multiplayer_finish_game', { p_room_id: roomId })}>
+                  <Button variant="outline" onClick={() => void db.rpc('multiplayer_finish_game', { p_room_id: roomId })}>
                     Refresh Result
                   </Button>
                 </div>

@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -106,7 +107,7 @@ const Multiplayer: React.FC = () => {
   useEffect(() => {
     const loadRankedLeaderboard = async () => {
       setRankedLoading(true);
-      const { data, error } = await supabase.rpc('multiplayer_ranked_leaderboard', { p_limit: 10 });
+      const { data, error } = await db.rpc('multiplayer_ranked_leaderboard', { p_limit: 10 });
       if (!error && data) setRankedLeaderboard(data);
       setRankedLoading(false);
     };
@@ -130,7 +131,7 @@ const Multiplayer: React.FC = () => {
   useEffect(() => {
     if (!user?.id) return;
     const updatePresence = async () => {
-      await supabase.from("user_presence").upsert(
+      await db.from("user_presence").upsert(
         { user_id: user.id, status: "online", last_seen: new Date().toISOString() },
         { onConflict: "user_id" },
       );

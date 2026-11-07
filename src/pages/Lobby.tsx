@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -216,7 +217,7 @@ const Lobby: React.FC = () => {
       return;
     }
 
-    const { data: profiles, error: profileError } = await supabase.rpc(
+    const { data: profiles, error: profileError } = await db.rpc(
       'get_public_student_profiles',
       { p_user_ids: userIds },
     );
@@ -355,10 +356,10 @@ const Lobby: React.FC = () => {
 
     const [profilesRes, tournamentMetaRes] = await Promise.all([
       userIds.length > 0
-        ? supabase.from("profiles").select("id, name").in("id", userIds)
+        ? db.from("profiles").select("id, name").in("id", userIds)
         : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
       tournamentIds.length > 0
-        ? supabase.from("tournaments").select("id, name").in("id", tournamentIds)
+        ? db.from("tournaments").select("id, name").in("id", tournamentIds)
         : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     ]);
 
@@ -454,7 +455,7 @@ const Lobby: React.FC = () => {
         table: 'multiplayer_rooms'
       }, async (payload) => {
         const newRoom = payload.new as { name: string; host_id: string };
-        const { data: profile } = await supabase.from("profiles").select("name").eq("id", newRoom.host_id).single();
+        const { data: profile } = await db.from("profiles").select("name").eq("id", newRoom.host_id).single();
         pushActivity(`${profile?.name || "Student"} created room "${newRoom.name}"`);
       })
       .subscribe();
@@ -493,8 +494,8 @@ const Lobby: React.FC = () => {
       }, async (payload) => {
         const entry = payload.new as { user_id: string; tournament_id: string };
         const [{ data: profile }, { data: tournament }] = await Promise.all([
-          supabase.from("profiles").select("name").eq("id", entry.user_id).single(),
-          supabase.from("tournaments").select("name").eq("id", entry.tournament_id).single(),
+          db.from("profiles").select("name").eq("id", entry.user_id).single(),
+          db.from("tournaments").select("name").eq("id", entry.tournament_id).single(),
         ]);
         pushActivity(`${profile?.name || "Student"} joined ${tournament?.name || "a tournament"}`);
       })
@@ -682,7 +683,7 @@ const Lobby: React.FC = () => {
       if (newRoomData.inviteFriendIds.length > 0 && user?.id) {
         await Promise.all(
           newRoomData.inviteFriendIds.map((friendId) =>
-            supabase.from("messages").insert({
+            db.from("messages").insert({
               sender_id: user.id,
               receiver_id: friendId,
               content: `🎮 Join my ${newRoomData.subject} room "${newRoomData.name}" with code: ${inviteCode}`
@@ -761,7 +762,7 @@ const Lobby: React.FC = () => {
 
     const roomIds = (waitingRooms || []).map((room) => room.id);
     const { data: playerRows, error: playerRowsError } = roomIds.length
-      ? await supabase.from("room_players").select("room_id").in("room_id", roomIds)
+      ? await db.from("room_players").select("room_id").in("room_id", roomIds)
       : { data: [], error: null };
 
     if (playerRowsError) {
@@ -931,7 +932,7 @@ const Lobby: React.FC = () => {
     if (!user) return;
     setSendingInviteForUserId(playerId);
     try {
-      const { data: room, error: roomError } = await supabase.rpc("multiplayer_create_room", {
+      const { data: room, error: roomError } = await db.rpc("multiplayer_create_room", {
         p_name: `${user.name || "Player"}'s Challenge`,
         p_subject: "Mixed",
         p_difficulty: "Medium",
@@ -941,7 +942,7 @@ const Lobby: React.FC = () => {
       });
       if (roomError) throw roomError;
 
-      const { error: settingsError } = await supabase.rpc("multiplayer_update_room", {
+      const { error: settingsError } = await db.rpc("multiplayer_update_room", {
         p_room_id: room.id,
         p_subject: "Mixed",
         p_difficulty: "Medium",
@@ -951,7 +952,7 @@ const Lobby: React.FC = () => {
       });
       if (settingsError) throw settingsError;
 
-      const { error: inviteError } = await supabase.rpc("create_multiplayer_invite", {
+      const { error: inviteError } = await db.rpc("create_multiplayer_invite", {
         _receiver_id: playerId,
         _room_id: room.id,
       });
@@ -990,7 +991,7 @@ const Lobby: React.FC = () => {
 
         // An accepted direct challenge is a ready-to-play action. Mark the invitee ready
         // so the host can automatically start the match as soon as both players are present.
-        const { error: readyError } = await supabase.rpc("multiplayer_toggle_ready", { p_room_id: roomId });
+        const { error: readyError } = await db.rpc("multiplayer_toggle_ready", { p_room_id: roomId });
         if (readyError) throw readyError;
 
         navigate(`/multiplayer?room=${roomId}`);

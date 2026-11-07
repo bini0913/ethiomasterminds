@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { useTier } from "@/context/TierContext";
@@ -60,10 +61,10 @@ const AcademicMode: React.FC = () => {
       weekAgo.setDate(now.getDate() - 6);
       const start = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, "0")}-${String(weekAgo.getDate()).padStart(2, "0")}`;
       const [todayRes, weekRes, resultsRes, topicsRes] = await Promise.all([
-        supabase.from("study_plans").select("id,completed").eq("user_id", user.id).eq("scheduled_date", today),
-        supabase.from("study_plans").select("id,completed").eq("user_id", user.id).gte("scheduled_date", start).lte("scheduled_date", today),
-        supabase.from("quiz_results").select("score,total_questions,created_at").eq("student_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("topic_progress").select("subject,topic,completion_percentage,accuracy_percentage,questions_attempted,questions_correct").eq("user_id", user.id),
+        db.from("study_plans").select("id,completed").eq("user_id", user.id).eq("scheduled_date", today),
+        db.from("study_plans").select("id,completed").eq("user_id", user.id).gte("scheduled_date", start).lte("scheduled_date", today),
+        db.from("quiz_results").select("score,total_questions,created_at").eq("student_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        db.from("topic_progress").select("subject,topic,completion_percentage,accuracy_percentage,questions_attempted,questions_correct").eq("user_id", user.id),
       ]);
       if (cancelled) return;
       if (todayRes.error || weekRes.error || resultsRes.error || topicsRes.error) setLoadError(true);

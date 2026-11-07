@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -173,11 +174,11 @@ const Quiz: React.FC = () => {
     const storedIds = JSON.parse(localStorage.getItem(storageKey) || "[]") as string[];
 
     const loadCompletedFromDatabase = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from("quiz_results")
         .select("quiz_id")
         .eq("student_id", user.id);
-      const { data: attemptsData } = await supabase
+      const { data: attemptsData } = await db
         .from("question_attempts")
         .select("question_id")
         .eq("user_id", user.id);
@@ -193,7 +194,7 @@ const Quiz: React.FC = () => {
     if (!user?.id || !selectedCategory) return;
 
     const loadDifficultyOffset = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from("quiz_results")
         .select("correct_answers,total_questions")
         .eq("student_id", user.id)

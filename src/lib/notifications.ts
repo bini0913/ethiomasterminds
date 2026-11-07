@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications, type Token, type PushNotificationSchema, type ActionPerformed } from "@capacitor/push-notifications";
 import { LocalNotifications } from "@capacitor/local-notifications";
@@ -67,7 +68,7 @@ export function getStoredNotificationPreferences(): NotificationPreferences {
 }
 
 export async function loadNotificationPreferences(userId: string): Promise<NotificationPreferences> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("notification_preferences" as any)
     .select("*")
     .eq("user_id", userId)
@@ -98,7 +99,7 @@ export async function saveNotificationPreferences(
   preferences: NotificationPreferences,
 ): Promise<void> {
   const safe = normalizePreferences(preferences);
-  const { error } = await supabase.from("notification_preferences" as any).upsert({
+  const { error } = await db.from("notification_preferences" as any).upsert({
     user_id: userId,
     enabled: safe.enabled,
     daily_reminders: safe.dailyReminders,
@@ -173,7 +174,7 @@ export async function registerForPushNotifications(userId: string): Promise<bool
       try {
         listeners.push(await PushNotifications.addListener("registration", async (token: Token) => {
           try {
-            const { error } = await supabase.rpc("upsert_notification_device" as any, {
+            const { error } = await db.rpc("upsert_notification_device" as any, {
               p_token: token.value,
               p_platform: Capacitor.getPlatform(),
               p_app_version: "1.0.0",
@@ -202,14 +203,14 @@ export async function registerForPushNotifications(userId: string): Promise<bool
 
 export async function unregisterPushNotifications(userId: string): Promise<void> {
   if (!isNative()) return;
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("notification_devices" as any)
     .select("token")
     .eq("user_id", userId)
     .eq("enabled", true);
   if (error) throw new Error("Could not load registered notification devices.");
   for (const row of data ?? []) {
-    const { error: disableError } = await supabase.rpc("disable_notification_device" as any, { p_token: row.token });
+    const { error: disableError } = await db.rpc("disable_notification_device" as any, { p_token: row.token });
     if (disableError) throw new Error("Could not disable a notification device.");
   }
 }

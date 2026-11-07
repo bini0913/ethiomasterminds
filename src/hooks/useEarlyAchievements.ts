@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useEarlyProgress } from "./useEarlyProgress";
@@ -11,8 +12,8 @@ export function useEarlyAchievements(){
  const evaluate=useCallback(async()=>{
    const {data:{user}}=await supabase.auth.getUser(); if(!user)return;
    const [{data:defs,error:dErr},{data:mine,error:mErr}]=await Promise.all([
-     supabase.from("early_achievements").select("*").eq("active",true),
-     supabase.from("early_user_achievements").select("*").eq("user_id",user.id)
+     db.from("early_achievements").select("*").eq("active",true),
+     db.from("early_user_achievements").select("*").eq("user_id",user.id)
    ]);
    if(dErr||mErr){setLoading(false);return;}
    const xp=rows.reduce((n,r)=>n+r.xp_earned,0);
