@@ -513,7 +513,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .tier-upper .btn-3d-primary, .tier-upper .btn-3d-card { transition: none; }
+}
 
+@layer components {
   /* Tactile Master Minds entry and onboarding controls. */
   .btn-3d-primary {
     color: #fff;
@@ -535,5 +537,4 @@
     .btn-3d-primary, .card-3d-choice { transition: none; }
     .card-3d-choice:hover, .card-3d-choice:active, .btn-3d-primary:active { transform: none; }
   }
-
 }
