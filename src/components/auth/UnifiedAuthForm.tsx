@@ -56,6 +56,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   const [step, setStep] = useState<SignupStep>(1);
   const [tier, setTier] = useState<UserTier | null>(null);
   const [grade, setGrade] = useState("");
+  const [academicStream, setAcademicStream] = useState<"Natural Science" | "Social Science" | "">("");
   const [goalId, setGoalId] = useState("regular");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -143,10 +144,10 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     try {
       const profile = await signupWithRole(
         email.trim(), password, name.trim(), username.trim().toLowerCase(), "student", grade,
-        { age: parsedAge, gender, avatar, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp } } as any,
+        { age: parsedAge, gender, avatar, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp }, academicStream: academicStream || undefined } as any,
       );
       if (profile) {
-        localStorage.setItem("masterminds_learning_goal", JSON.stringify({ id: goal.id, minutes: goal.minutes, xp: goal.xp }));
+        localStorage.setItem("masterminds_learning_goal", JSON.stringify({ id: goal.id, minutes: goal.minutes, xp: goal.xp, academicStream: academicStream || null }));
         toast.success("Your Master Minds learning journey is ready!");
         onSuccess();
       }
@@ -166,6 +167,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     }
     if (step === 2) {
       if (!grade) { toast.error("Choose your current grade."); return; }
+      if ((grade === "Grade 11" || grade === "Grade 12") && !academicStream) { toast.error("Choose your academic stream."); return; }
       setStep(3); return;
     }
     if (step === 3) { setStep(4); return; }
@@ -320,7 +322,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                       <div><h2 className="text-xl font-black sm:text-2xl">What do you want to learn?</h2><p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">Choose your stage — we will adapt the learning experience to your level.</p></div>
                       <div className="grid gap-3">
                         {tiers.map(({ id, title, grades: gradeLabel, description, icon: Icon, accent }) => (
-                          <button key={id} type="button" onClick={() => { setTier(id); setGrade(""); }} aria-pressed={tier === id} className={`card-3d-choice flex w-full items-center gap-4 rounded-2xl border p-4 text-left ${tier === id ? "selected border-blue-600 bg-blue-50/70 dark:bg-blue-500/10" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}>
+                          <button key={id} type="button" onClick={() => { setTier(id); setGrade(""); setAcademicStream(""); }} aria-pressed={tier === id} className={`card-3d-choice flex w-full items-center gap-4 rounded-2xl border p-4 text-left ${tier === id ? "selected border-blue-600 bg-blue-50/70 dark:bg-blue-500/10" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}>
                             <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-[#07152b] shadow-lg`}><Icon className="h-7 w-7" /></span>
                             <span className="min-w-0 flex-1"><span className="block font-extrabold">{title}</span><span className="mt-0.5 block text-xs font-bold text-blue-700 dark:text-cyan-300">{gradeLabel}</span><span className="mt-1 block text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</span></span>
                             <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${tier === id ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-transparent dark:border-slate-600"}`}><Check className="h-4 w-4" /></span>
@@ -335,11 +337,23 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                       <div><h2 className="text-xl font-black sm:text-2xl">Select your grade</h2><p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Your grade helps us personalize lessons, practice and your student home.</p></div>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         {gradeByTier[tier].map((item) => (
-                          <button key={item} type="button" onClick={() => setGrade(item)} aria-pressed={grade === item} className={`card-3d-choice min-h-16 rounded-2xl border px-4 py-3 text-sm font-extrabold ${grade === item ? "selected border-blue-600 bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-cyan-200" : "border-slate-200 bg-white hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900"}`}>
+                          <button key={item} type="button" onClick={() => { setGrade(item); if (item !== "Grade 11" && item !== "Grade 12") setAcademicStream(""); }} aria-pressed={grade === item} className={`card-3d-choice min-h-16 rounded-2xl border px-4 py-3 text-sm font-extrabold ${grade === item ? "selected border-blue-600 bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-cyan-200" : "border-slate-200 bg-white hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900"}`}>
                             {item}{grade === item && <CheckCircle2 className="ml-2 inline h-4 w-4" />}
                           </button>
                         ))}
                       </div>
+                      {(grade === "Grade 11" || grade === "Grade 12") && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-bold">Choose your academic stream</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            {(["Natural Science", "Social Science"] as const).map((item) => (
+                              <button key={item} type="button" onClick={() => setAcademicStream(item)} aria-pressed={academicStream === item} className={`card-3d-choice min-h-14 rounded-xl border px-3 py-3 text-sm font-bold ${academicStream === item ? "selected border-blue-600 bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-cyan-200" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}>
+                                {item}{academicStream === item && <CheckCircle2 className="ml-1 inline h-4 w-4" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {selectedTier && <p className="rounded-xl bg-blue-50 p-3 text-xs font-medium text-blue-800 dark:bg-blue-500/10 dark:text-cyan-200">Selected path: {selectedTier.title}</p>}
                     </motion.div>
                   )}
@@ -377,7 +391,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                         </div>
                       </div>
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                        <span className="font-bold">Your path:</span> {grade} · {goal.minutes} minutes/day · {goal.xp} XP goal
+                        <span className="font-bold">Your path:</span> {grade}{academicStream ? ` · ${academicStream}` : ""} · {goal.minutes} minutes/day · {goal.xp} XP goal
                       </div>
                     </motion.div>
                   )}
@@ -395,7 +409,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
               {isSignup && (
                 <div className="sticky bottom-0 flex gap-3 border-t border-slate-100 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-[#131F37]/95 sm:px-8">
                   {step > 1 && <Button type="button" variant="outline" onClick={() => setStep((current) => (current - 1) as SignupStep)} className="h-12 flex-1 rounded-xl"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>}
-                  <Button type="submit" disabled={loading || authLoading || (step === 1 && !tier) || (step === 2 && !grade)} className="btn-3d-primary h-12 flex-[2] rounded-xl font-extrabold text-white">
+                  <Button type="submit" disabled={loading || authLoading || (step === 1 && !tier) || (step === 2 && (!grade || ((grade === "Grade 11" || grade === "Grade 12") && !academicStream)))} className="btn-3d-primary h-12 flex-[2] rounded-xl font-extrabold text-white">
                     {loading || authLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : step === 4 ? "START LEARNING NOW" : <>Continue <ArrowRight className="ml-2 h-4 w-4" /></>}
                   </Button>
                 </div>
