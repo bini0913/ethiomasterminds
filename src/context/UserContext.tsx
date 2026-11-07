@@ -334,7 +334,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     username: string,
     role: UserRole,
     grade?: string,
-    profileDetails?: { age: number; gender: "male" | "female"; avatar: string },
+    profileDetails?: { age: number; gender: "male" | "female"; avatar: string; learningGoal?: { id: string; minutes: number; xp: number } },
   ): Promise<UserProfile | null> => {
     try {
       if (role !== 'student') {
@@ -373,7 +373,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           data: {
             name: name.trim(),
             username: username.trim().toLowerCase(),
-            ...(profileDetails ? { age: profileDetails.age, gender: profileDetails.gender, avatar: profileDetails.avatar } : {}),
+            ...(profileDetails ? { age: profileDetails.age, gender: profileDetails.gender, avatar: profileDetails.avatar, ...(profileDetails.learningGoal ? { learning_goal: profileDetails.learningGoal } : {}) } : {}),
             ...(grade?.trim()
               ? {
                   grade: grade.trim(),
