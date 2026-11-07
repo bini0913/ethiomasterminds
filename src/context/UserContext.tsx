@@ -44,7 +44,7 @@ interface UserContextType {
   login: (email: string, password: string) => Promise<boolean>;
   loginWithUsername: (username: string, password: string) => Promise<UserProfile | null>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
-  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string, profileDetails?: { age: number; gender: "male" | "female"; avatar: string }) => Promise<UserProfile | null>;
+  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string, profileDetails?: { age: number; gender: "male" | "female"; avatar: string; learningGoal?: { id: string; minutes: number; xp: number }; academicStream?: "Natural Science" | "Social Science" }) => Promise<UserProfile | null>;
   logout: () => Promise<void>;
   updateProfile: (profileData: Partial<UserProfile>) => Promise<boolean>;
   addXP: (amount: number) => Promise<void>;
@@ -334,7 +334,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     username: string,
     role: UserRole,
     grade?: string,
-    profileDetails?: { age: number; gender: "male" | "female"; avatar: string },
+    profileDetails?: { age: number; gender: "male" | "female"; avatar: string; learningGoal?: { id: string; minutes: number; xp: number }; academicStream?: "Natural Science" | "Social Science" },
   ): Promise<UserProfile | null> => {
     try {
       if (role !== 'student') {
@@ -373,7 +373,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           data: {
             name: name.trim(),
             username: username.trim().toLowerCase(),
-            ...(profileDetails ? { age: profileDetails.age, gender: profileDetails.gender, avatar: profileDetails.avatar } : {}),
+            ...(profileDetails ? { age: profileDetails.age, gender: profileDetails.gender, avatar: profileDetails.avatar, ...(profileDetails.learningGoal ? { learning_goal: profileDetails.learningGoal } : {}), ...(profileDetails.academicStream ? { academic_stream: profileDetails.academicStream } : {}) } : {}),
             ...(grade?.trim()
               ? {
                   grade: grade.trim(),

@@ -1,34 +1,18 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useUser } from "@/context/UserContext";
+import { useLanguage } from "@/context/LanguageContext";
+import AvatarCreator from "@/components/profile/AvatarCreator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "@/context/UserContext";
-import { useLanguage } from "@/context/LanguageContext";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import AvatarCreator from "@/components/profile/AvatarCreator";
-import { lovable } from "@/integrations/lovable";
-import { supabase } from "@/integrations/supabase/client";
 import {
-  GraduationCap,
-  Users,
-  ShieldCheck,
-  Crown,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Sparkles,
-  Lock,
-  User,
-  Mail,
-  AtSign,
-  BookOpen,
-  CheckCircle2,
-  Circle,
-  Loader2,
+  ArrowLeft, ArrowRight, AtSign, BookOpen, Check, CheckCircle2, Crown,
+  Eye, EyeOff, GraduationCap, Loader2, Lock, ShieldCheck, Sparkles,
+  Target, Trophy, Users, User, X, Clock3,
 } from "lucide-react";
 import type { UserTier } from "@/lib/getUserTier";
 
@@ -39,192 +23,132 @@ interface UnifiedAuthFormProps {
   initialMode?: "signin" | "signup";
 }
 
-type SignupStep = 1 | 2 | 3;
-
-const gradeOptions = [
-  { value: "K", label: "Kindergarten", short: "K", description: "Learning through play", tier: "early" as UserTier },
-  ...Array.from({ length: 12 }, (_, index) => {
-    const grade = index + 1;
-    const tier: UserTier = grade <= 4 ? "early" : grade <= 8 ? "middle" : "upper";
-    return {
-      value: `Grade ${grade}`,
-      label: `Grade ${grade}`,
-      short: String(grade),
-      description: tier === "early" ? "Learn through play" : tier === "middle" ? "Study, practice & compete" : "Academic focus & exam prep",
-      tier,
-    };
-  }),
+type Role = "student" | "teacher" | "admin" | "manager" | "parent_view" | "finance";
+type SignupStep = 1 | 2 | 3 | 4;
+type LearningGoal = { id: string; title: string; minutes: number; xp: number; description: string };
+const goals: LearningGoal[] = [
+  { id: "casual", title: "Casual", minutes: 10, xp: 50, description: "A relaxed start, one day at a time." },
+  { id: "regular", title: "Regular", minutes: 20, xp: 120, description: "A steady rhythm for real progress." },
+  { id: "serious", title: "Serious", minutes: 35, xp: 250, description: "More practice, stronger mastery." },
+  { id: "intense", title: "Exam prep", minutes: 50, xp: 400, description: "A focused goal for ambitious study days." },
 ];
-
-const tierCopy: Record<UserTier, { title: string; description: string }> = {
-  early: {
-    title: "Early • Learning through play",
-    description: "Games, stories, quick quizzes and joyful discovery for KG–Grade 4.",
-  },
-  middle: {
-    title: "Middle • Full Master Minds",
-    description: "Study, practice, play, competition, AI Tutor and social learning for Grades 5–8.",
-  },
-  upper: {
-    title: "Upper • Academic focus",
-    description: "A focused academic experience with study tools, revision, AI Tutor and competition for Grades 9–12.",
-  },
+const tiers: { id: UserTier; title: string; grades: string; description: string; icon: React.ElementType; accent: string }[] = [
+  { id: "early", title: "Early Explorers", grades: "KG – Grade 4", description: "Games, stories, phonics and joyful discovery.", icon: Sparkles, accent: "from-amber-300 to-orange-400" },
+  { id: "middle", title: "Middle Champions", grades: "Grades 5 – 8", description: "Curriculum practice, XP leagues and multiplayer.", icon: Trophy, accent: "from-emerald-300 to-teal-500" },
+  { id: "upper", title: "Academic Studio", grades: "Grades 9 – 12", description: "Exam preparation, study tools and focused revision.", icon: Target, accent: "from-cyan-300 to-blue-600" },
+];
+const gradeByTier: Record<UserTier, string[]> = {
+  early: ["K", "Grade 1", "Grade 2", "Grade 3", "Grade 4"],
+  middle: ["Grade 5", "Grade 6", "Grade 7", "Grade 8"],
+  upper: ["Grade 9", "Grade 10", "Grade 11", "Grade 12"],
 };
-
-const passwordScore = (password: string) => {
-  let score = 0;
-  if (password.length >= 8) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/[a-z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-  return score;
-};
+const passwordScore = (value: string) =>
+  [value.length >= 8, /[A-Z]/.test(value), /[a-z]/.test(value), /\d/.test(value), /[^A-Za-z0-9]/.test(value)].filter(Boolean).length;
 
 const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
-  onSuccess,
-  onBack,
-  initialTab = "student",
-  initialMode = "signin",
+  onSuccess, onBack, initialTab = "student", initialMode = "signin",
 }) => {
   const { loginWithUsername, signupWithRole, isLoading: authLoading } = useUser();
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [role, setRole] = useState<"student" | "teacher" | "admin" | "manager" | "parent_view">(initialTab);
+  const [role, setRole] = useState<Role>(initialTab);
+  const [isSignup, setIsSignup] = useState(initialMode === "signup");
+  const [step, setStep] = useState<SignupStep>(1);
+  const [tier, setTier] = useState<UserTier | null>(null);
+  const [grade, setGrade] = useState("");
+  const [academicStream, setAcademicStream] = useState<"Natural Science" | "Social Science" | "">("");
+  const [goalId, setGoalId] = useState("regular");
+  const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [grade, setGrade] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
   const [avatar, setAvatar] = useState("avatar-1");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isSignup, setIsSignup] = useState(initialMode === "signup");
-  const [signupStep, setSignupStep] = useState<SignupStep>(1);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const selectedGrade = useMemo(
-    () => gradeOptions.find((option) => option.value === grade),
-    [grade],
-  );
-  const selectedTier = selectedGrade?.tier ?? null;
+  const goal = useMemo(() => goals.find((item) => item.id === goalId) ?? goals[1], [goalId]);
   const score = passwordScore(password);
+  const selectedTier = tiers.find((item) => item.id === tier);
 
-  const resetSignup = () => {
-    setSignupStep(1);
-    setUsernameStatus("idle");
-  };
+  // Debounced username availability feedback while the learner types.
+  useEffect(() => {
+    if (!isSignup || step !== 4) return;
+    const normalized = username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/.test(normalized)) {
+      setUsernameStatus("idle");
+      return;
+    }
+    let active = true;
+    setUsernameStatus("checking");
+    const timer = window.setTimeout(async () => {
+      const { data, error } = await supabase.rpc("get_email_by_username", { _username: normalized } as any);
+      if (!active) return;
+      setUsernameStatus(error ? "idle" : data ? "taken" : "available");
+    }, 450);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [username, isSignup, step]);
 
-  const switchMode = () => {
-    setIsSignup((current) => !current);
-    resetSignup();
-  };
-
-  const validateIdentity = () => {
-    if (!name.trim()) {
-      toast.error("Tell us your name first.");
-      return false;
-    }
-    if (!gender) {
-      toast.error("Choose male or female.");
-      return false;
-    }
-    const parsedAge = Number(age);
-    if (!age || !Number.isInteger(parsedAge) || parsedAge < 3 || parsedAge > 120) {
-      toast.error("Enter a valid age between 3 and 120.");
-      return false;
-    }
-    if (!email.trim()) {
-      toast.error("Enter your email address.");
-      return false;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      toast.error("Please enter a valid email address.");
-      return false;
-    }
-    return true;
+  const resetSignup = () => { setStep(1); setTier(null); setGrade(""); setUsernameStatus("idle"); };
+  const switchMode = (signup: boolean) => { setIsSignup(signup); setRole("student"); resetSignup(); };
+  const backStep = () => {
+    if (step === 1) { onBack?.(); return; }
+    setStep((current) => (current - 1) as SignupStep);
   };
 
   const checkUsername = async () => {
     const normalized = username.trim().toLowerCase();
-    if (!normalized) {
-      toast.error("Choose a username.");
-      return false;
-    }
     if (!/^[a-z0-9_]{3,20}$/.test(normalized)) {
-      toast.error("Use 3–20 letters, numbers or underscores.");
+      toast.error("Use 3–20 letters, numbers or underscores for your username.");
       return false;
     }
-
     setUsernameStatus("checking");
-    const { data, error } = await supabase.rpc("get_email_by_username", {
-      _username: normalized,
-    } as any);
-
+    const { data, error } = await supabase.rpc("get_email_by_username", { _username: normalized } as any);
     if (error) {
       setUsernameStatus("idle");
       toast.error("We couldn't check that username. Please try again.");
       return false;
     }
-
     if (data) {
       setUsernameStatus("taken");
       toast.error("That username is already taken.");
       return false;
     }
-
     setUsernameStatus("available");
     return true;
   };
 
-  const handleSignupNext = async () => {
-    if (signupStep === 1) {
-      if (validateIdentity()) setSignupStep(2);
-      return;
-    }
-
-    if (signupStep === 2) {
-      if (!grade) {
-        toast.error("Choose your grade so we can personalize Master Minds.");
-        return;
-      }
-      setSignupStep(3);
-      return;
-    }
-
-    const available = await checkUsername();
-    if (!available) return;
-
-    if (password.length < 8) {
-      toast.error("Use at least 8 characters for a stronger account.");
-      return;
-    }
-    if (score < 3) {
-      toast.error("Add a number, uppercase letter or symbol to strengthen your password.");
-      return;
-    }
-
-    await submitSignup();
-  };
-
   const submitSignup = async () => {
+    if (!name.trim() || !username.trim() || !email.trim() || !password || !grade || !tier || !gender) {
+      toast.error("Please complete the required profile fields.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast.error("Enter a valid email address. Supabase uses it for account authentication and recovery.");
+      setStep(4);
+      return;
+    }
+    const parsedAge = Number(age);
+    if (!Number.isInteger(parsedAge) || parsedAge < 3 || parsedAge > 120) {
+      toast.error("Enter a valid age.");
+      return;
+    }
+    if (password.length < 8 || score < 3) {
+      toast.error("Use at least 8 characters and a mix of letters, numbers or symbols.");
+      return;
+    }
     setLoading(true);
     try {
-      const success = await signupWithRole(
-        email,
-        password,
-        name,
-        username,
-        "student",
-        grade,
-        { age: Number(age), gender: gender as "male" | "female", avatar },
+      const profile = await signupWithRole(
+        email.trim(), password, name.trim(), username.trim().toLowerCase(), "student", grade,
+        { age: parsedAge, gender, avatar, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp }, academicStream: academicStream || undefined },
       );
-
-      if (success) {
-        toast.success(`Welcome to Master Minds, ${name.trim()}!`);
+      if (profile) {
+        localStorage.setItem("masterminds_learning_goal", JSON.stringify({ id: goal.id, minutes: goal.minutes, xp: goal.xp, academicStream: academicStream || null }));
+        toast.success("Your Master Minds learning journey is ready!");
         onSuccess();
       }
     } catch (error) {
@@ -235,45 +159,43 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin + "/",
-      });
-
-      if (result.error) {
-        toast.error(t("google-signin-failed") + ": " + result.error.message);
-      } else if (!result.redirected && result.tokens) {
-        toast.success(t("signed-in-google"));
-        onSuccess();
-      } else if (!result.redirected) {
-        toast.error(t("google-signin-failed"));
-      }
-    } catch (error) {
-      console.error("Google sign in error:", error);
-      toast.error(t("google-signin-failed"));
-    } finally {
-      setGoogleLoading(false);
+  const handleNext = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (step === 1) {
+      if (!tier) { toast.error("Choose the learning stage that matches your grade."); return; }
+      setStep(2); return;
     }
+    if (step === 2) {
+      if (!grade) { toast.error("Choose your current grade."); return; }
+      if ((grade === "Grade 11" || grade === "Grade 12") && !academicStream) { toast.error("Choose your academic stream."); return; }
+      setStep(3); return;
+    }
+    if (step === 3) { setStep(4); return; }
+    if (!name.trim() || !age || !gender || !email.trim() || !username.trim() || !password) {
+      toast.error("Complete the profile details to create your account."); return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast.error("Enter a valid email address."); return;
+    }
+    if (!Number.isInteger(Number(age)) || Number(age) < 3 || Number(age) > 120) {
+      toast.error("Enter a valid age."); return;
+    }
+    if (password.length < 8 || score < 3) {
+      toast.error("Choose a stronger password (8+ characters)."); return;
+    }
+    if (!(await checkUsername())) return;
+    await submitSignup();
   };
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!username.trim()) {
-      toast.error(t("please-enter-username"));
-      return;
+    if (!username.trim() || !password.trim()) {
+      toast.error("Please enter both username and password."); return;
     }
-    if (!password.trim()) {
-      toast.error(t("please-enter-password"));
-      return;
-    }
-
     setLoading(true);
     try {
       const profile = await loginWithUsername(username, password);
       if (!profile) return;
-
       if (role === "parent_view") {
         localStorage.setItem("masterminds_login_mode", "parent");
         await supabase.from("profiles").update({ login_mode: "parent" } as any).eq("id", profile.id);
@@ -281,364 +203,230 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
         return;
       }
       localStorage.removeItem("masterminds_login_mode");
-
-      // The profile (with role) is already loaded into UserContext, so route
-      // directly. Students stay on "/" where Index renders their tier portal.
       switch (profile.role) {
-        case "extreme_admin":
-          navigate("/root-control-portal-9xA7", { replace: true });
-          break;
-        case "admin":
-          navigate("/admin", { replace: true });
-          break;
-        case "manager":
-          navigate("/manager-dashboard", { replace: true });
-          break;
-        case "teacher":
-          navigate("/teacher", { replace: true });
-          break;
-        default:
-          navigate("/", { replace: true });
-          onSuccess();
+        case "extreme_admin": navigate("/root-control-portal-9xA7", { replace: true }); break;
+        case "admin": navigate("/admin", { replace: true }); break;
+        case "manager": navigate("/manager-dashboard", { replace: true }); break;
+        case "teacher": navigate("/teacher", { replace: true }); break;
+        case "finance": navigate("/finance", { replace: true }); break;
+        default: navigate("/", { replace: true }); onSuccess();
       }
     } catch (error) {
-      console.error("Auth error:", error);
+      console.error("Login error:", error);
       toast.error(t("auth-failed"));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const roleConfig = {
-    student: { icon: GraduationCap, title: t("student"), description: t("student-desc") },
-    teacher: { icon: Users, title: t("teacher"), description: t("teacher-desc") },
-    admin: { icon: ShieldCheck, title: t("admin"), description: t("admin-desc") },
-    manager: { icon: Crown, title: t("manager"), description: t("manager-desc") },
-    parent_view: { icon: Users, title: "Parent Portal", description: "Login with your child account credentials" },
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin + "/" },
+      });
+      if (error) toast.error(error.message);
+    } catch (error) {
+      console.error("Google sign in error:", error);
+      toast.error(t("google-signin-failed"));
+    } finally { setGoogleLoading(false); }
   };
 
-  const activeRole = isSignup ? "student" : role;
-  const activeConfig = roleConfig[activeRole];
-  const ActiveIcon = activeConfig.icon;
+  const handleForgotPassword = async () => {
+    const recoveryEmail = window.prompt("Enter the email address linked to your Master Minds account:");
+    if (!recoveryEmail) return;
+    const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail.trim(), {
+      redirectTo: window.location.origin + "/",
+    });
+    if (error) toast.error(error.message);
+    else toast.success("If that email is registered, a password recovery link will be sent.");
+  };
+
+  const roleOptions: { id: Role; label: string; icon: React.ElementType }[] = [
+    { id: "student", label: "Student", icon: GraduationCap },
+    { id: "teacher", label: "Teacher", icon: Users },
+    { id: "parent_view", label: "Parent", icon: User },
+    { id: "admin", label: "Admin", icon: ShieldCheck },
+    { id: "manager", label: "Staff", icon: Crown },
+    { id: "finance", label: "Finance", icon: Crown },
+  ];
+  const steps = ["Learning stage", "Your grade", "Daily goal", "Your profile"];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-      <div className="grid min-h-screen lg:grid-cols-[0.9fr_1.1fr]">
-<aside className="relative hidden overflow-hidden bg-slate-950 px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between xl:px-16">
-<div className="absolute -right-24 top-24 h-72 w-72 rounded-full bg-blue-600/20 blur-3xl" />
-<div className="relative">
-<a href="/" className="inline-flex items-center gap-3" aria-label="Master Minds home"><img src="/brand/master-minds-icon.svg" alt="" className="h-12 w-12 rounded-xl" /><span className="text-xl font-extrabold tracking-tight">Master Minds</span></a>
-<div className="mt-24 max-w-lg">
-<p className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-400/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-blue-200"><Sparkles className="h-4 w-4" /> Learn. Practice. Grow.</p>
-<h2 className="mt-6 text-4xl font-black leading-tight tracking-tight xl:text-5xl">Your next big step in learning starts here.</h2>
-<p className="mt-5 max-w-md text-base leading-7 text-slate-300">Pick up where you left off, or create an account to get lessons, practice and activities shaped around your grade.</p>
-<div className="mt-9 space-y-4">
-<div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><BookOpen className="h-5 w-5 text-blue-200" /></div><span className="text-sm font-medium text-slate-200">Study tools and practice built around you</span></div>
-<div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><GraduationCap className="h-5 w-5 text-blue-200" /></div><span className="text-sm font-medium text-slate-200">An experience that fits your grade</span></div>
-<div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><ShieldCheck className="h-5 w-5 text-blue-200" /></div><span className="text-sm font-medium text-slate-200">Your profile and progress stay connected</span></div>
-</div></div></div>
-<p className="relative mt-12 text-xs text-slate-400">Made for curious minds, from first lessons to exam preparation.</p>
-</aside>
-<main className="flex min-h-screen items-center justify-center px-4 py-6 sm:px-6">
-<motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.35 }}
-          className="w-full max-w-xl"
-        >
-          <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-xl shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
-            <div className="relative overflow-hidden border-b border-border/50 px-6 py-7 sm:px-8">
-              <div className="absolute inset-0 bg-slate-50 dark:bg-slate-800/40" />
-              <div className="relative flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl shadow-sm ring-1 ring-primary/20">
-                    <img src="/brand/master-minds-icon.svg" alt="Master Minds" className="h-full w-full" />
+    <main className="min-h-[100svh] bg-[#F8FAFC] px-3 py-5 text-slate-950 dark:bg-[#0A1120] dark:text-white sm:px-6 sm:py-8">
+      <div className="mx-auto flex min-h-[calc(100svh-2.5rem)] w-full max-w-6xl items-center justify-center">
+        <div className="grid w-full overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 dark:border-slate-800 dark:bg-[#131F37] lg:grid-cols-[0.78fr_1.22fr]">
+          <aside className="relative hidden min-h-[690px] flex-col justify-between overflow-hidden bg-[#0A1120] p-10 text-white lg:flex xl:p-12">
+            <div className="absolute -right-28 top-20 h-80 w-80 rounded-full bg-blue-600/25 blur-3xl" />
+            <div className="relative flex items-center gap-3">
+              <img src="/brand/master-minds-icon.svg" alt="" className="h-12 w-12 rounded-xl" />
+              <span className="text-xl font-black">Master Minds</span>
+            </div>
+            <div className="relative">
+              <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-cyan-200"><Sparkles className="h-4 w-4" /> Learn. Compete. Level Up.</p>
+              <h1 className="mt-6 text-4xl font-black leading-tight">Small steps today. Big wins tomorrow.</h1>
+              <p className="mt-4 max-w-sm text-sm leading-7 text-slate-300">A learning space that grows with you — from your first discoveries to national exam preparation.</p>
+              <div className="mt-9 space-y-4 text-sm text-slate-200">
+                <p className="flex items-center gap-3"><BookOpen className="h-5 w-5 text-cyan-300" /> Grade-aware lessons and practice</p>
+                <p className="flex items-center gap-3"><Trophy className="h-5 w-5 text-amber-300" /> XP, challenges and learning leagues</p>
+                <p className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-emerald-300" /> Your account and progress stay connected</p>
+              </div>
+            </div>
+            <p className="relative text-xs text-slate-500">Master Minds · Built for learners across Ethiopia</p>
+          </aside>
+
+          <section className="flex min-w-0 flex-col">
+            <header className="border-b border-slate-100 px-5 pb-5 pt-5 dark:border-slate-800 sm:px-8 sm:pt-7">
+              <div className="flex items-center justify-between gap-3">
+                <button type="button" onClick={isSignup ? backStep : onBack} className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white">
+                  <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">{isSignup ? "Back" : "Welcome"}</span>
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-extrabold tracking-tight lg:hidden">Master Minds</span>
+                  {onBack && <button type="button" onClick={onBack} aria-label="Close authentication" className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-5 w-5" /></button>}
+                </div>
+              </div>
+
+              {isSignup ? (
+                <div className="mt-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-300">Step {step} of 4</span>
+                    <span className="text-xs font-medium text-slate-500">{steps[step - 1]}</span>
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Master Minds</p>
-                    <h1 className="mt-1 text-2xl font-bold tracking-tight">
-                      {isSignup ? "Create your learning account" : `${activeConfig.title} ${t("login")}`}
-                    </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {isSignup ? "A few quick steps, then your learning journey begins." : activeConfig.description}
-                    </p>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <motion.div className="h-full rounded-full bg-gradient-to-r from-[#00E5FF] to-[#0055FF]" animate={{ width: `${step * 25}%` }} transition={{ duration: 0.25 }} />
                   </div>
                 </div>
+              ) : (
+                <div className="mt-5">
+                  <h2 className="text-2xl font-black tracking-tight">Welcome back</h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Sign in with your Master Minds username.</p>
+                </div>
+              )}
+            </header>
+
+            {!isSignup && (
+              <nav aria-label="Sign in portal" className="grid grid-cols-3 gap-1 border-b border-slate-100 p-2 dark:border-slate-800 sm:grid-cols-6">
+                {roleOptions.map(({ id, label, icon: Icon }) => (
+                  <button key={id} type="button" onClick={() => setRole(id)} aria-pressed={role === id} className={`flex min-h-12 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-bold transition ${role === id ? "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-cyan-200" : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                    <Icon className="h-4 w-4" />{label}
+                  </button>
+                ))}
+              </nav>
+            )}
+
+            <form onSubmit={isSignup ? handleNext : handleLogin} className="flex flex-1 flex-col">
+              <div className="flex-1 px-5 py-6 sm:px-8 sm:py-8">
+                <AnimatePresence mode="wait">
+                  {isSignup && step === 1 && (
+                    <motion.div key="tier" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }} className="space-y-5">
+                      <div><h2 className="text-xl font-black sm:text-2xl">What do you want to learn?</h2><p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">Choose your stage — we will adapt the learning experience to your level.</p></div>
+                      <div className="grid gap-3">
+                        {tiers.map(({ id, title, grades: gradeLabel, description, icon: Icon, accent }) => (
+                          <button key={id} type="button" onClick={() => { setTier(id); setGrade(""); setAcademicStream(""); }} aria-pressed={tier === id} className={`card-3d-choice flex w-full items-center gap-4 rounded-2xl border p-4 text-left ${tier === id ? "selected border-blue-600 bg-blue-50/70 dark:bg-blue-500/10" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}>
+                            <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-[#07152b] shadow-lg`}><Icon className="h-7 w-7" /></span>
+                            <span className="min-w-0 flex-1"><span className="block font-extrabold">{title}</span><span className="mt-0.5 block text-xs font-bold text-blue-700 dark:text-cyan-300">{gradeLabel}</span><span className="mt-1 block text-sm leading-5 text-slate-500 dark:text-slate-400">{description}</span></span>
+                            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${tier === id ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 text-transparent dark:border-slate-600"}`}><Check className="h-4 w-4" /></span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {isSignup && step === 2 && tier && (
+                    <motion.div key="grade" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }} className="space-y-5">
+                      <div><h2 className="text-xl font-black sm:text-2xl">Select your grade</h2><p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Your grade helps us personalize lessons, practice and your student home.</p></div>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {gradeByTier[tier].map((item) => (
+                          <button key={item} type="button" onClick={() => { setGrade(item); if (item !== "Grade 11" && item !== "Grade 12") setAcademicStream(""); }} aria-pressed={grade === item} className={`card-3d-choice min-h-16 rounded-2xl border px-4 py-3 text-sm font-extrabold ${grade === item ? "selected border-blue-600 bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-cyan-200" : "border-slate-200 bg-white hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900"}`}>
+                            {item === "K" ? "KG" : item}{grade === item && <CheckCircle2 className="ml-2 inline h-4 w-4" />}
+                          </button>
+                        ))}
+                      </div>
+                      {(grade === "Grade 11" || grade === "Grade 12") && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-bold">Choose your academic stream</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            {(["Natural Science", "Social Science"] as const).map((item) => (
+                              <button key={item} type="button" onClick={() => setAcademicStream(item)} aria-pressed={academicStream === item} className={`card-3d-choice min-h-14 rounded-xl border px-3 py-3 text-sm font-bold ${academicStream === item ? "selected border-blue-600 bg-blue-50 text-blue-800 dark:bg-blue-500/10 dark:text-cyan-200" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}>
+                                {item}{academicStream === item && <CheckCircle2 className="ml-1 inline h-4 w-4" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedTier && <p className="rounded-xl bg-blue-50 p-3 text-xs font-medium text-blue-800 dark:bg-blue-500/10 dark:text-cyan-200">Selected path: {selectedTier.title}</p>}
+                    </motion.div>
+                  )}
+
+                  {isSignup && step === 3 && (
+                    <motion.div key="goal" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }} className="space-y-5">
+                      <div><h2 className="text-xl font-black sm:text-2xl">Set your daily learning goal</h2><p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Choose a pace that feels achievable. You can adjust your goal later.</p></div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {goals.map((item) => (
+                          <button key={item.id} type="button" onClick={() => setGoalId(item.id)} aria-pressed={goalId === item.id} className={`card-3d-choice rounded-2xl border p-4 text-left ${goalId === item.id ? "selected border-blue-600 bg-blue-50 dark:bg-blue-500/10" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}>
+                            <div className="flex items-center justify-between"><span className="font-extrabold">{item.title}</span>{goalId === item.id && <CheckCircle2 className="h-5 w-5 text-blue-600" />}</div>
+                            <div className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200"><Clock3 className="h-4 w-4 text-blue-600" />{item.minutes} min / day</div>
+                            <div className="mt-1 text-sm font-bold text-amber-600">+{item.xp} XP daily goal</div>
+                            <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{item.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {isSignup && step === 4 && (
+                    <motion.div key="profile" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }} className="space-y-4">
+                      <div><h2 className="text-xl font-black sm:text-2xl">Create your profile</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">One last step. Your account details stay protected.</p></div>
+                      <div className="space-y-2"><Label htmlFor="profile-avatar">Choose an avatar</Label><AvatarCreator onSelect={setAvatar} selectedAvatar={avatar} /></div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2"><Label htmlFor="signup-name">Full name</Label><Input id="signup-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" className="h-12 rounded-xl" /></div>
+                        <div className="space-y-2"><Label htmlFor="signup-username">Username</Label><div className="relative"><AtSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input id="signup-username" autoComplete="username" value={username} onChange={(e) => { setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0,20)); setUsernameStatus("idle"); }} placeholder="choose_username" className="h-12 rounded-xl pl-9 pr-8" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">{username.length}/20</span></div>
+                          <p className="min-h-4 text-xs">{usernameStatus === "checking" ? "Checking availability…" : usernameStatus === "available" ? <span className="text-emerald-600">✓ Username available</span> : usernameStatus === "taken" ? <span className="text-red-600">Username already taken</span> : "3–20 letters, numbers or underscores"}</p>
+                        </div>
+                        <div className="space-y-2"><Label htmlFor="signup-email">Email address</Label><Input id="signup-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="h-12 rounded-xl" /><p className="text-[11px] text-slate-500">Required by the current account and recovery flow.</p></div>
+                        <div className="space-y-2"><Label htmlFor="signup-age">Age</Label><Input id="signup-age" type="number" min="3" max="120" value={age} onChange={(e) => setAge(e.target.value)} placeholder="Age" className="h-12 rounded-xl" /></div>
+                        <div className="space-y-2"><Label htmlFor="signup-gender">Gender</Label><select id="signup-gender" value={gender} onChange={(e) => setGender(e.target.value as "male" | "female" | "")} className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option></select></div>
+                        <div className="space-y-2"><Label htmlFor="signup-password">Password</Label><div className="relative"><Input id="signup-password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create a strong password" className="h-12 rounded-xl pr-11" /><button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center text-slate-500">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                          <div className="grid grid-cols-5 gap-1">{Array.from({ length: 5 }, (_, i) => <span key={i} className={`h-1.5 rounded-full ${i < score ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"}`} />)}</div>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                        <span className="font-bold">Your path:</span> {grade}{academicStream ? ` · ${academicStream}` : ""} · {goal.minutes} minutes/day · {goal.xp} XP goal
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {!isSignup && (
+                    <motion.div key="login" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-md space-y-5">
+                      <div className="space-y-2"><Label htmlFor="login-username">Username</Label><div className="relative"><AtSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input id="login-username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ""))} placeholder="Your username" className="h-12 rounded-xl pl-9" /></div></div>
+                      <div className="space-y-2"><div className="flex items-center justify-between"><Label htmlFor="login-password">Password</Label><button type="button" onClick={handleForgotPassword} className="text-xs font-semibold text-blue-700 hover:underline dark:text-cyan-300">Forgot password?</button></div><div className="relative"><Input id="login-password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password" className="h-12 rounded-xl pr-11" /><button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center text-slate-500">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
+                      <Button type="submit" disabled={loading || authLoading} className="btn-3d-primary h-13 w-full rounded-xl text-base font-extrabold text-white">{loading || authLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Lock className="mr-2 h-4 w-4" /> Sign in</>}</Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {isSignup && (
-                <div className="relative mt-7 grid grid-cols-3 gap-2" aria-label="Signup progress">
-                  {[
-                    ["1", "About you"],
-                    ["2", "Your grade"],
-                    ["3", "Account"],
-                  ].map(([number, label]) => {
-                    const active = signupStep === Number(number);
-                    const complete = signupStep > Number(number);
-                    return (
-                      <div key={number} className="flex items-center gap-2">
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${complete ? "bg-primary text-primary-foreground" : active ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "bg-muted text-muted-foreground"}`}>
-                          {complete ? <Check className="h-4 w-4" /> : number}
-                        </div>
-                        <span className={`hidden text-xs font-medium sm:block ${active || complete ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
-                      </div>
-                    );
-                  })}
+                <div className="sticky bottom-0 flex gap-3 border-t border-slate-100 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-[#131F37]/95 sm:px-8">
+                  {step > 1 && <Button type="button" variant="outline" onClick={() => setStep((current) => (current - 1) as SignupStep)} className="h-12 flex-1 rounded-xl"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>}
+                  <Button type="submit" disabled={loading || authLoading || (step === 1 && !tier) || (step === 2 && (!grade || ((grade === "Grade 11" || grade === "Grade 12") && !academicStream)))} className="btn-3d-primary h-12 flex-[2] rounded-xl font-extrabold text-white">
+                    {loading || authLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : step === 4 ? "START LEARNING NOW" : <>Continue <ArrowRight className="ml-2 h-4 w-4" /></>}
+                  </Button>
                 </div>
               )}
-            </div>
 
-            {!isSignup && (
-              <div className="flex overflow-x-auto border-b border-border/50">
-                {(["student", "teacher", "admin", "manager", "parent_view"] as const).map((r) => {
-                  const RoleIcon = roleConfig[r].icon;
-                  return (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setRole(r)}
-                      className={`flex min-w-[84px] flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 transition-colors ${role === r ? "border-primary bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:bg-muted/50"}`}
-                    >
-                      <RoleIcon className="h-4 w-4" />
-                      <span className="text-xs font-medium">{r === "parent_view" ? "Parent" : t(r)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            <form onSubmit={isSignup ? (event) => { event.preventDefault(); void handleSignupNext(); } : handleLogin} className="p-6 sm:p-8">
-              <AnimatePresence mode="wait">
-                {isSignup && signupStep === 1 && (
-                  <motion.div key="step-1" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
-                    <div>
-                      <p className="text-lg font-semibold">Let's start with you</p>
-                      <p className="mt-1 text-sm text-muted-foreground">We'll use this to make your profile feel like yours.</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-name">Full name</Label>
-                      <div className="relative">
-                        <User className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input id="signup-name" autoComplete="name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="h-13 rounded-xl pl-10" />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-age">Age</Label>
-                        <Input id="signup-age" type="number" inputMode="numeric" min={3} max={120} step={1} value={age} onChange={(e) => setAge(e.target.value)} placeholder="Your age" className="h-13 rounded-xl" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-gender">Gender</Label>
-                        <select id="signup-gender" value={gender} onChange={(e) => setGender(e.target.value as "male" | "female" | "")} className="h-13 w-full rounded-xl border border-input bg-background px-3 text-sm">
-                          <option value="">Choose gender</option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Choose your avatar</Label>
-                      <AvatarCreator onSelect={setAvatar} selectedAvatar={avatar} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email address</Label>
-                      <div className="relative">
-                        <Mail className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input id="signup-email" autoComplete="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="h-13 rounded-xl pl-10" />
-                      </div>
-                      <p className="text-xs text-muted-foreground">Used for account recovery and important updates.</p>
-                    </div>
-
-                    <Button type="submit" className="h-13 w-full rounded-xl text-base font-semibold">
-                      Continue <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </motion.div>
-                )}
-
-                {isSignup && signupStep === 2 && (
-                  <motion.div key="step-2" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
-                    <div>
-                      <p className="text-lg font-semibold">What are you learning?</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Choose your current grade. This personalizes your home, quizzes and learning recommendations.</p>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
-                      {gradeOptions.map((option) => {
-                        const selected = grade === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setGrade(option.value)}
-                            className={`group relative min-h-[82px] rounded-2xl border p-3 text-left transition-all active:scale-[0.98] ${selected ? "border-primary bg-primary/10 shadow-md ring-2 ring-primary/20" : "border-border bg-background/60 hover:border-primary/40 hover:bg-muted/50"}`}
-                            aria-pressed={selected}
-                          >
-                            {selected && <CheckCircle2 className="absolute right-2 top-2 h-4 w-4 text-primary" />}
-                            <span className="block text-lg font-bold">{option.short}</span>
-                            <span className="mt-1 block text-[11px] leading-tight text-muted-foreground">{option.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {selectedTier && (
-                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="mt-0.5 rounded-xl bg-primary/10 p-2 text-primary"><BookOpen className="h-5 w-5" /></div>
-                          <div>
-                            <p className="font-semibold">{tierCopy[selectedTier].title}</p>
-                            <p className="mt-1 text-sm text-muted-foreground">{tierCopy[selectedTier].description}</p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    <div className="flex gap-3">
-                      <Button type="button" variant="outline" onClick={() => setSignupStep(1)} className="h-13 flex-1 rounded-xl">
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                      </Button>
-                      <Button type="submit" disabled={!grade} className="h-13 flex-[2] rounded-xl text-base font-semibold">
-                        Continue <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {isSignup && signupStep === 3 && (
-                  <motion.div key="step-3" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
-                    <div>
-                      <p className="text-lg font-semibold">Secure your account</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Choose a username and password you'll remember.</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-username">Username</Label>
-                      <div className="relative">
-                        <AtSign className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          id="signup-username"
-                          autoComplete="username"
-                          value={username}
-                          onChange={(e) => {
-                            setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20));
-                            setUsernameStatus("idle");
-                          }}
-                          placeholder="choose_a_username"
-                          className="h-13 rounded-xl pl-10 pr-28"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{username.length}/20</span>
-                      </div>
-                      <div className="min-h-5 text-xs">
-                        {usernameStatus === "checking" && <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Checking availability…</span>}
-                        {usernameStatus === "available" && <span className="inline-flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" /> Username available</span>}
-                        {usernameStatus === "taken" && <span className="text-destructive">Username already taken</span>}
-                        {usernameStatus === "idle" && <span className="text-muted-foreground">3–20 letters, numbers or underscores.</span>}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Password</Label>
-                      <div className="relative">
-                        <Lock className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input id="signup-password" autoComplete="new-password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create a strong password" className="h-13 rounded-xl pl-10 pr-11" />
-                        <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={showPassword ? "Hide password" : "Show password"}>
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-5 gap-1.5" aria-label="Password strength">
-                        {Array.from({ length: 5 }, (_, index) => (
-                          <div key={index} className={`h-1.5 rounded-full ${index < score ? "bg-primary" : "bg-muted"}`} />
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Use 8+ characters with a mix of upper/lowercase letters, numbers and symbols.</p>
-                    </div>
-
-                    <div className="rounded-2xl border border-border bg-muted/30 p-4">
-                      <p className="text-sm font-semibold">Your setup</p>
-                      <div className="mt-3 space-y-2 text-sm">
-                        <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Name</span><span className="font-medium">{name || "—"}</span></div>
-                        <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Grade</span><span className="font-medium">{selectedGrade?.label || "—"}</span></div>
-                        <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Experience</span><span className="font-medium">{selectedTier ? tierCopy[selectedTier].title.split(" • ")[0] : "—"}</span></div>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button type="button" variant="outline" onClick={() => setSignupStep(2)} className="h-13 flex-1 rounded-xl">
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                      </Button>
-                      <Button type="submit" disabled={loading || authLoading} className="h-13 flex-[2] rounded-xl text-base font-semibold">
-                        {loading || authLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Sparkles className="mr-2 h-5 w-5" /> Create my account</>}
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {!isSignup && (
-                  <motion.div key="login" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-                    <div>
-                      <p className="text-lg font-semibold">Welcome back</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Continue your Master Minds journey.</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="login-username">{t("username")}</Label>
-                      <div className="relative">
-                        <AtSign className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input id="login-username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ""))} placeholder={t("enter-username")} className="h-13 rounded-xl pl-10" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="login-password">{t("password")}</Label>
-                      </div>
-                      <div className="relative">
-                        <Lock className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                        <Input id="login-password" autoComplete="current-password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("enter-password")} className="h-13 rounded-xl pl-10 pr-11" />
-                        <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={showPassword ? "Hide password" : "Show password"}>
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                    </div>
-                    <Button type="submit" disabled={loading || authLoading} className="h-13 w-full rounded-xl text-base font-semibold">
-                      {loading || authLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Lock className="mr-2 h-4 w-4" /> {t("login")}</>}
-                    </Button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border/60" /></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-3 text-muted-foreground">{t("or-continue-with")}</span></div>
-              </div>
-
-              <Button type="button" variant="outline" onClick={handleGoogleSignIn} disabled={googleLoading || loading || authLoading} className="h-12 w-full rounded-xl">
-                {googleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><span className="mr-2 text-base font-bold">G</span>{t("sign-in-google")}</>}
-              </Button>
-
-              <div className="mt-5 text-center">
-                <button type="button" onClick={switchMode} className="text-sm font-medium text-muted-foreground hover:text-primary">
-                  {isSignup ? "Already have an account? Sign in" : "New to Master Minds? Create a student account"}
-                </button>
-              </div>
+              {!isSignup && (
+                <div className="space-y-4 border-t border-slate-100 px-5 py-5 dark:border-slate-800 sm:px-8">
+                  <Button type="button" variant="outline" onClick={handleGoogleSignIn} disabled={googleLoading || loading} className="h-12 w-full rounded-xl font-bold">{googleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <span className="mr-2 font-black">G</span>} Sign in with Google</Button>
+                  <p className="text-center text-xs text-slate-500">New to Master Minds? <button type="button" onClick={() => switchMode(true)} className="font-bold text-blue-700 hover:underline dark:text-cyan-300">Create a student account</button></p>
+                </div>
+              )}
+              {isSignup && <p className="border-t border-slate-100 px-5 py-4 text-center text-xs text-slate-500 dark:border-slate-800">Already have an account? <button type="button" onClick={() => switchMode(false)} className="font-bold text-blue-700 hover:underline dark:text-cyan-300">Sign in</button></p>}
             </form>
-
-            <div className="border-t border-border/50 px-6 py-4 text-center text-xs text-muted-foreground">
-              <p className="inline-flex items-center gap-1"><Circle className="h-2 w-2 fill-current" /> Your grade personalizes your learning experience.</p>
-            </div>
-          </div>
-
-          {onBack && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 text-center">
-              <Button variant="ghost" onClick={onBack} className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="mr-2 h-4 w-4" /> {t("back-to-welcome")}
-              </Button>
-            </motion.div>
-          )}
-        </motion.div>
-        </main>
+          </section>
+        </div>
       </div>
-    </div>
+    </main>
   );
 };
 
