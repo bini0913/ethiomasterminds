@@ -79,7 +79,7 @@ const UpperDesktopDashboard: React.FC = () => {
           .map((r:any) => ({subject:String(r.subject || "General"),topic:String(r.topic),accuracy:Number(r.accuracy_percentage)||0}))
           .sort((x,y)=>x.accuracy-y.accuracy).slice(0,6));
         setLoading(false);
-      }).catch(()=>{ if(alive) setLoading(false); });
+      }, ()=>{ if(alive) setLoading(false); });
     return () => { alive = false; };
   }, [user?.id]);
   const xp = Number((user as any)?.xp) || 0;

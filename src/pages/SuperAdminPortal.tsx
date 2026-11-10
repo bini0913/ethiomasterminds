@@ -103,7 +103,7 @@ const SuperAdminPortal: React.FC = () => {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [dashboard, userRows, logRows, settingRows, security, systemOverview] = await Promise.all([
+      const [dashboard, userRows, logRows, settingRows] = await Promise.all([
         db.rpc("extreme_admin_get_dashboard" as any),
         db.rpc("extreme_admin_list_users" as any, {
           p_search: userSearch.trim() || null,
@@ -835,7 +835,7 @@ const SuperAdminPortal: React.FC = () => {
                   >
                     <div>
                       <p className="font-medium">
-                        {key.replaceAll("_", " ")}
+                        {key.split("_").join( " ")}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Global feature flag

@@ -629,7 +629,7 @@ const LibraryPage: React.FC = () => {
                 <CardContent className="p-4 grid gap-3 md:grid-cols-4">
                   <div className="md:col-span-2 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input className="pl-9" placeholder={activeSection === "curriculum" ? "Search textbooks by title or subject" : "Search by title, author, subject, uploader"} value={search} onChange={(e) => setSearch(e.target.value)} />
+                    <Input className="pl-9" placeholder={"Search by title, author, subject, uploader"} value={search} onChange={(e) => setSearch(e.target.value)} />
                   </div>
                   <Select value={subjectFilter} onValueChange={setSubjectFilter}>
                     <SelectTrigger><SelectValue placeholder="All subjects" /></SelectTrigger>
