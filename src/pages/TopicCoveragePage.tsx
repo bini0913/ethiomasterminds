@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, BarChart3, CheckCircle, Lock, Star, Trophy, BookOpen, LibraryBig, GraduationCap } from "lucide-react";
 import { getAcademicProfile, normalizeSubject } from "@/lib/academicProfile";
 import { loadBookAnalyses } from "@/lib/bookAnalysis";
+import SkillTree from "@/components/academic/SkillTree";
 
 interface TopicData {
   subject: string;
@@ -111,7 +112,7 @@ const TopicCoveragePage: React.FC = () => {
     const path = getPath(subject);
     const mastered = path.filter((topic) => getStatus(subject, topic).status === "mastered").length;
     const active = path.filter((topic) => getStatus(subject, topic).attempted > 0).length;
-    return { mastered, active, total: path.length, pct: Math.round((mastered / path.length) * 100) };
+    return { mastered, active, total: path.length, pct: path.length ? Math.round((mastered / path.length) * 100) : 0 };
   };
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading your learning paths…</div>;
@@ -154,7 +155,7 @@ const TopicCoveragePage: React.FC = () => {
   const path = getPath(selectedSubject);
   const progress = subjectProgress(selectedSubject);
   return (
-    <div className="min-h-screen bg-background">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background"}>
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 py-3">
         <div className="mx-auto flex max-w-4xl items-center gap-3"><Button variant="ghost" size="icon" onClick={() => setSelectedSubject(null)}><ArrowLeft className="h-5 w-5" /></Button><div className="flex-1"><h1 className="font-bold">{labelFor(selectedSubject)}</h1><p className="text-xs text-muted-foreground">{progress.mastered}/{progress.total} mastered</p></div><Badge>{progress.pct}%</Badge></div>
       </header>
@@ -167,21 +168,7 @@ const TopicCoveragePage: React.FC = () => {
           <div className="flex flex-wrap gap-2"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Read in Library</Button><Button variant="outline" onClick={()=>navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(path[0] || "")}`)}><GraduationCap className="mr-2 h-4 w-4"/>Practice questions</Button></div>
         </CardContent></Card>
         <div className="space-y-3">
-          {path.length === 0 ? <Card><CardContent className="space-y-3 p-6 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground"/><h2 className="font-semibold">No verified units yet</h2><p className="text-sm text-muted-foreground">Topic Coverage will show units extracted from your selected book analysis and topics you have actually practised. Select or analyze a book, or complete a topic practice, to build your real coverage map. Suggested topics are not counted as covered units.</p><div className="flex flex-col justify-center gap-2 sm:flex-row"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Choose a book</Button><Button variant="outline" onClick={()=>navigate("/academic/setup")}>Academic Prep setup</Button></div></CardContent></Card> : path.map((topic, index) => {
-            const status = getStatus(selectedSubject, topic);
-            const unlocked = index === 0 || getStatus(selectedSubject, path[index - 1]).status !== "new";
-            return <motion.div key={topic} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:index*.04}}>
-              <Card className={!unlocked ? "opacity-50" : "cursor-pointer hover:shadow-md"} onClick={() => unlocked && navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(topic)}`)}>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${status.status === "mastered" ? "bg-green-500/10 text-green-600" : unlocked ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                    {status.status === "mastered" ? <CheckCircle className="h-5 w-5" /> : unlocked ? <Star className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                  </div>
-                  <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{index + 1}. {topic}</p>{status.attempted > 0 && <p className="text-xs text-muted-foreground">{status.attempted} questions • {Math.round(status.accuracy)}% accuracy</p>}</div>
-                  {unlocked && status.status !== "mastered" && <Button size="sm" variant="outline" onClick={(event:any)=>{event.stopPropagation();navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(topic)}`);}}><BookOpen className="mr-1 h-3 w-3" />Practice</Button>}
-                </CardContent>
-              </Card>
-            </motion.div>;
-          })}
+          {path.length === 0 ? <Card><CardContent className="space-y-3 p-6 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground"/><h2 className="font-semibold">No verified units yet</h2><p className="text-sm text-muted-foreground">Topic Coverage will show units extracted from your selected book analysis and topics you have actually practised. Select or analyze a book, or complete a topic practice, to build your real coverage map. Suggested topics are not counted as covered units.</p><div className="flex flex-col justify-center gap-2 sm:flex-row"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Choose a book</Button><Button variant="outline" onClick={()=>navigate("/academic/setup")}>Academic Prep setup</Button></div></CardContent></Card> : <SkillTree onPractice={(topic)=>navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(topic)}`)} nodes={path.map((topic, index) => { const st = getStatus(selectedSubject, topic); return { topic, status: st.status, accuracy: st.accuracy, attempted: st.attempted, unlocked: index === 0 || getStatus(selectedSubject, path[index - 1]).status !== "new" }; })} />}
         </div>
       </main>
     </div>
