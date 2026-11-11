@@ -1,157 +1,159 @@
-import { useNavigate } from "react-router-dom";
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  Activity, ArrowUpRight, BookOpen, BrainCircuit, CalendarDays, ChevronRight,
-  CirclePlay, Compass, GraduationCap, LibraryBig, MessageCircle, Search,
-  Settings2, Sparkles, Swords, Target, Trophy, Users, Video, Zap
+  ArrowRight, BarChart3, BookOpen, BrainCircuit, CalendarDays, Check, Flame, GraduationCap,
+  LibraryBig, Lock, LogOut, Play, Settings, Swords, Target, Timer, Trophy, Users, Bot, Zap,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
+import { useCurrency } from "@/context/CurrencyContext";
+import AvatarRenderer from "@/components/avatar/AvatarRenderer";
+import ThemeToggle from "@/components/layout/ThemeToggle";
+import StudentBottomNav from "@/components/layout/StudentBottomNav";
 
-const primaryLinks = [
-  { label: "Study Mode", description: "Focus together, live", path: "/study-mode", icon: Video, tone: "violet" },
-  { label: "Academic Prep", description: "Prepare for your next exam", path: "/academic", icon: GraduationCap, tone: "blue" },
-  { label: "Multiplayer", description: "Challenge your friends", path: "/multiplayer", icon: Swords, tone: "orange" },
-  { label: "Tournaments", description: "Compete and climb", path: "/tournaments", icon: Trophy, tone: "green" },
+const drill = [
+  { title: "Entrance exam drill", sub: "Timed past-paper questions", to: "/academic/exam", icon: Target },
+  { title: "Deep focus session", sub: "25 min study timer", to: "/study-mode", icon: Timer },
+  { title: "Flashcard review", sub: "Formulas & past mistakes", to: "/academic/flashcards", icon: BrainCircuit },
+  { title: "Past papers", sub: "Real national exams", to: "/academic/entrance-papers", icon: GraduationCap },
 ];
-
-const learningLinks = [
-  { label: "Exam Mode", path: "/academic/exam", icon: Target },
-  { label: "Topic Coverage", path: "/academic/topics", icon: BookOpen },
-  { label: "Study Planner", path: "/academic/planner", icon: CalendarDays },
-  { label: "Academic Insights", path: "/academic/insights", icon: Activity },
-  { label: "Flashcards", path: "/academic/flashcards", icon: BrainCircuit },
-  { label: "Entrance Papers", path: "/academic/entrance-papers", icon: GraduationCap },
+const tools = [
+  { title: "Topics", to: "/academic/topics", icon: BookOpen },
+  { title: "Planner", to: "/academic/planner", icon: CalendarDays },
+  { title: "Insights", to: "/academic/insights", icon: BarChart3 },
+  { title: "AI Tutor", to: "/ai-tutor", icon: Bot },
+  { title: "Library", to: "/library", icon: LibraryBig },
+  { title: "Battle", to: "/multiplayer", icon: Swords },
+  { title: "Tournaments", to: "/tournaments", icon: Trophy },
+  { title: "Friends", to: "/friends", icon: Users },
 ];
+const days = ["M", "T", "W", "T", "F", "S", "S"];
 
-const navGroups = [
-  { title: "Workspace", items: [
-    { label: "Home", path: "/", icon: Compass },
-    { label: "Study Mode", path: "/study-mode", icon: Video },
-    { label: "Academic Prep", path: "/academic", icon: BookOpen },
-    { label: "Multiplayer", path: "/multiplayer", icon: Swords },
-    { label: "Tournaments", path: "/tournaments", icon: Trophy },
-  ]},
-  { title: "Your learning", items: [
-    { label: "Learning DNA", path: "/learning-dna", icon: BrainCircuit },
-    { label: "Library", path: "/library", icon: LibraryBig },
-    { label: "Friends & chat", path: "/friends", icon: Users },
-  ]},
-];
+/** Days until the next national exam window (early July, estimated). */
+function daysToExam() {
+  const now = new Date();
+  let target = new Date(now.getFullYear(), 6, 1);
+  if (target < now) target = new Date(now.getFullYear() + 1, 6, 1);
+  return Math.ceil((target.getTime() - now.getTime()) / 86400000);
+}
 
-const toneClasses: Record<string, string> = {
-  violet: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-  blue: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-  orange: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-  green: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-};
+function Ring({ value }: { value: number }) {
+  const r = 34, c = 2 * Math.PI * r;
+  return <svg viewBox="0 0 80 80" className="h-28 w-28 -rotate-90" aria-hidden="true">
+    <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" className="stroke-primary-foreground/20" />
+    <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" strokeLinecap="round" className="stroke-primary-foreground transition-[stroke-dashoffset] duration-700" strokeDasharray={c} strokeDashoffset={c - (value / 100) * c} />
+  </svg>;
+}
 
-export default function UpperTierHome() {
-  const navigate = useNavigate();
+const UpperTierHome: React.FC = () => {
   const { user, logout } = useUser();
-  const firstName = user?.name?.trim().split(/\s+/)[0] || "there";
-  const grade = user?.grade ? `Grade ${user.grade.replace(/^grade\s*/i, "")}` : "High school";
-  const initials = user?.name?.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "MM";
+  const { coins, dailyStreak } = useCurrency();
+  const navigate = useNavigate();
+  const firstName = user?.name?.trim().split(/\s+/)[0] || "Scholar";
+  const gradeNum = user?.grade?.replace(/^grade\s*/i, "") || "";
+  const xp = user?.xp ?? 0;
+  const level = user?.level ?? 1;
+  const progress = Math.max(0, Math.min(100, xp - (level - 1) * 100));
+  const doneSteps = Math.min(drill.length, Math.floor(progress / 25));
+  const todayIdx = (new Date().getDay() + 6) % 7;
+  const streakDays = Math.min(dailyStreak, todayIdx + 1);
+  const examDays = daysToExam();
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  return (
-    <div className="min-h-screen bg-[#f6f7fb] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-slate-200/80 bg-white px-5 py-6 dark:border-slate-800 dark:bg-slate-900 lg:flex">
-        <button onClick={() => navigate("/")} className="mb-9 flex items-center gap-3 text-left">
-          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"><BrainCircuit size={22}/></span>
-          <span><span className="block text-[15px] font-bold tracking-tight">Master Minds</span><span className="block text-xs text-slate-500">Student workspace</span></span>
-        </button>
-        {navGroups.map((group) => <div key={group.title} className="mb-7">
-          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">{group.title}</p>
-          <nav className="space-y-1">
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              const active = item.label === "Home";
-              return <button key={item.label} onClick={() => navigate(item.path)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${active ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"}`}>
-                <Icon size={18}/><span>{item.label}</span>{active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600"/>}
-              </button>;
-            })}
-          </nav>
-        </div>)}
-        <div className="mt-auto rounded-2xl border border-indigo-100 bg-indigo-50/80 p-4 dark:border-indigo-900 dark:bg-indigo-950/40">
-          <div className="mb-2 flex items-center gap-2 text-indigo-700 dark:text-indigo-300"><Sparkles size={16}/><span className="text-xs font-semibold">A little progress daily</span></div>
-          <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">Small, consistent study sessions add up. Pick one goal and get started.</p>
-          <button onClick={() => navigate("/academic/planner")} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">Open planner <ArrowUpRight size={13}/></button>
+  const stats = [
+    { label: "Streak", value: `${dailyStreak}`, icon: Flame, tone: "text-warning bg-warning/15" },
+    { label: "Total XP", value: xp.toLocaleString(), icon: Zap, tone: "text-primary bg-primary/10" },
+    { label: "Exam in", value: `${examDays}d`, icon: GraduationCap, tone: "text-accent bg-accent/15" },
+  ];
+
+  return <div className="min-h-screen bg-background pb-28 text-foreground lg:pb-10">
+    <header className="sticky top-0 z-30 border-b border-border/70 bg-background/90 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+        <Link to={user?.id ? `/profile/${user.id}` : "/settings"} aria-label="Open your profile" className="shrink-0 rounded-full"><AvatarRenderer avatar={user?.avatar} avatarConfig={user?.avatarConfig} size="md" className="h-10 w-10 ring-2 ring-primary/20" /></Link>
+        <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{greet}{gradeNum ? ` · Grade ${gradeNum}` : ""}</p><h1 className="truncate text-base font-bold">{firstName}</h1></div>
+        <div className="hidden items-center gap-2 sm:flex">
+          {stats.map(s => <span key={s.label} title={s.label} className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-bold tabular-nums"><s.icon className={`h-4 w-4 ${s.tone.split(" ")[0]}`} />{s.value}</span>)}
         </div>
-      </aside>
+        <ThemeToggle className="h-10 w-10 rounded-xl" />
+        <Link to="/settings" aria-label="Settings" className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted"><Settings className="h-5 w-5" /></Link>
+        <button type="button" onClick={async () => { await logout(); navigate("/", { replace: true }); }} aria-label="Log out" className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-5 w-5" /></button>
+      </div>
+    </header>
 
-      <div className="lg:pl-[248px]">
-        <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="mx-auto flex h-[68px] max-w-[1500px] items-center justify-between gap-4 px-4 sm:px-7 xl:px-10">
-            <div className="flex min-w-0 items-center gap-3 lg:hidden">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white"><BrainCircuit size={19}/></span>
-              <span className="truncate font-bold">Master Minds</span>
-            </div>
-            <div className="hidden min-w-0 items-center gap-2 text-sm text-slate-500 lg:flex"><span>Workspace</span><ChevronRight size={15}/><span className="font-semibold text-slate-900 dark:text-white">Home</span></div>
-            <div className="ml-auto flex items-center gap-2 sm:gap-3">
-              <button onClick={() => navigate("/library")} aria-label="Search learning resources" className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"><Search size={18}/></button>
-              <button onClick={() => navigate("/notifications")} aria-label="Notifications" className="relative grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"><Activity size={18}/></button>
-              <button onClick={() => navigate("/settings")} aria-label="Settings" className="hidden h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 sm:grid"><Settings2 size={18}/></button>
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900" title={user?.name || "Student"}>{initials}</div>
-              <button onClick={() => void logout()} className="hidden rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900 sm:block dark:hover:bg-slate-800">Log out</button>
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-[1500px] px-4 pb-28 pt-7 sm:px-7 sm:pt-9 lg:px-10 lg:pb-12">
-          <section className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:border-indigo-900 dark:bg-slate-900 dark:text-indigo-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500"/>{grade} · Your learning space</div>
-              <h1 className="text-3xl font-bold tracking-[-.04em] sm:text-4xl xl:text-[42px]">Good to see you, {firstName}.</h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500 sm:text-base">What would you like to make progress on today?</p>
-            </div>
-            <button onClick={() => navigate("/academic/planner")} className="inline-flex w-fit items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/15 transition hover:bg-indigo-700"><CalendarDays size={17}/> Plan a study session</button>
-          </section>
-
-          <section className="mb-9 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-            {primaryLinks.map((item) => {
-              const Icon = item.icon;
-              return <button key={item.label} onClick={() => navigate(item.path)} className="group rounded-2xl border border-slate-200/80 bg-white p-5 text-left shadow-sm shadow-slate-900/[.02] transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg hover:shadow-slate-900/[.05] dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800">
-                <div className="mb-5 flex items-start justify-between"><span className={`grid h-11 w-11 place-items-center rounded-xl ${toneClasses[item.tone]}`}><Icon size={21}/></span><ArrowUpRight size={18} className="text-slate-300 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-indigo-600"/></div>
-                <span className="block text-base font-bold tracking-tight">{item.label}</span><span className="mt-1 block text-sm text-slate-500">{item.description}</span>
-              </button>;
-            })}
-          </section>
-
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.85fr)]">
-            <section className="min-w-0">
-              <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.15em] text-indigo-600 dark:text-indigo-300">Keep learning</p><h2 className="mt-1 text-xl font-bold tracking-tight">Your study toolkit</h2></div><button onClick={() => navigate("/academic")} className="inline-flex items-center gap-1 whitespace-nowrap text-sm font-semibold text-slate-500 hover:text-indigo-600">All academic tools <ChevronRight size={16}/></button></div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {learningLinks.map((item) => { const Icon = item.icon; return <button key={item.label} onClick={() => navigate(item.path)} className="flex min-h-[86px] items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 text-left transition hover:border-indigo-200 hover:bg-indigo-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/20"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><Icon size={19}/></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{item.label}</span><span className="mt-1 block text-xs text-slate-500">Open {item.label.toLowerCase()}</span></span><ChevronRight size={16} className="shrink-0 text-slate-400"/></button>; })}
+    <main className="mx-auto grid max-w-6xl gap-5 px-4 py-5 md:py-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
+      <div className="min-w-0 space-y-6">
+        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-foreground via-foreground to-primary p-6 text-background shadow-lg md:p-8">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/30 blur-2xl" />
+          <div className="relative flex items-center gap-6">
+            <div className="min-w-0 flex-1">
+              <p className="inline-flex items-center gap-2 rounded-full bg-background/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em]"><GraduationCap className="h-3.5 w-3.5" /> National exam in ~{examDays} days</p>
+              <h2 className="mt-3 text-2xl font-extrabold leading-tight md:text-4xl">Every session moves you closer, {firstName}.</h2>
+              <p className="mt-2 max-w-md text-sm opacity-80 md:text-base">Today's drill: timed questions, a focus block and a quick review. {100 - progress} XP to level {level + 1}.</p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link to="/academic/exam" className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground shadow-[0_4px_0_hsl(var(--primary)/0.45)] transition active:translate-y-1 active:shadow-none"><Play className="h-5 w-5 fill-current" /> Start today's drill</Link>
+                <Link to="/academic/planner" className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-background/25 px-5 font-semibold transition hover:bg-background/10"><CalendarDays className="h-5 w-5" /> Plan</Link>
               </div>
-            </section>
-            <aside className="space-y-5">
-              <section className="overflow-hidden rounded-2xl bg-slate-950 p-6 text-white">
-                <div className="mb-5 flex items-center justify-between"><span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold text-indigo-200">Your personal learning profile</span><BrainCircuit size={20} className="text-indigo-300"/></div>
-                <h2 className="text-xl font-bold tracking-tight">Understand how you learn.</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Explore your Learning DNA to see insights based on your learning activity.</p>
-                <button onClick={() => navigate("/learning-dna")} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-indigo-50">Explore Learning DNA <ArrowUpRight size={16}/></button>
-              </section>
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-                <div className="mb-4 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"><Users size={19}/></span><div><h3 className="text-sm font-bold">Learn with people</h3><p className="mt-1 text-xs text-slate-500">Study, chat, and play together</p></div></div>
-                <div className="grid grid-cols-2 gap-2"><button onClick={() => navigate("/friends")} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">Find friends</button><button onClick={() => navigate("/chat")} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><span className="inline-flex items-center gap-2"><MessageCircle size={15}/> Open chat</span></button></div>
-              </section>
-              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"><Zap size={19}/></span><div className="min-w-0 flex-1"><h3 className="text-sm font-bold">Quick revision</h3><p className="mt-1 text-xs text-slate-500">Practice with flashcards</p></div><button aria-label="Open flashcards" onClick={() => navigate("/academic/flashcards")} className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><ChevronRight size={18}/></button></div>
-              </section>
-            </aside>
+            </div>
+            <div className="relative hidden shrink-0 text-primary-foreground sm:block">
+              <Ring value={progress} />
+              <span className="absolute inset-0 flex flex-col items-center justify-center text-background"><span className="text-2xl font-extrabold tabular-nums">{progress}%</span><span className="text-[10px] uppercase opacity-80">Level {level}</span></span>
+            </div>
           </div>
-        </main>
+        </section>
+
+        <section className="grid grid-cols-3 gap-2 sm:hidden">
+          {stats.map(s => <div key={s.label} className="rounded-2xl border bg-card p-3 text-center"><span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-lg ${s.tone}`}><s.icon className="h-4 w-4" /></span><p className="mt-1.5 text-lg font-extrabold tabular-nums">{s.value}</p><p className="text-[11px] text-muted-foreground">{s.label}</p></div>)}
+        </section>
+
+        <section>
+          <div className="mb-4 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Exam preparation</p><h2 className="text-xl font-extrabold md:text-2xl">Today's drill</h2></div><span className="text-sm font-semibold text-muted-foreground">{doneSteps}/{drill.length} done</span></div>
+          <ol className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+            {drill.map((step, i) => {
+              const done = i < doneSteps, current = i === doneSteps, locked = i > doneSteps;
+              return <li key={step.to}>
+                <Link to={step.to} className={`flex items-center gap-4 rounded-2xl border-2 p-4 transition active:scale-[.99] ${current ? "border-primary bg-primary/5 shadow-[0_4px_0_hsl(var(--primary)/0.35)]" : "border-border bg-card hover:border-primary/40"}`}>
+                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${done ? "bg-success text-success-foreground" : current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {done ? <Check className="h-6 w-6" /> : locked ? <Lock className="h-5 w-5" /> : <step.icon className="h-6 w-6" />}
+                  </span>
+                  <span className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">Step {i + 1}</span><span className="block font-bold">{step.title}</span><span className="block text-sm text-muted-foreground">{step.sub}</span></span>
+                  {current && <span className="rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground">Next</span>}
+                </Link>
+              </li>;
+            })}
+          </ol>
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-extrabold md:text-2xl">Study toolkit</h2>
+          <div className="grid grid-cols-4 gap-2 sm:gap-3">
+            {tools.map(t => <Link key={t.to} to={t.to} className="group flex flex-col items-center gap-2 rounded-2xl border bg-card p-3 text-center transition hover:-translate-y-0.5 hover:border-primary/40 sm:p-4">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary transition group-hover:bg-primary group-hover:text-primary-foreground sm:h-12 sm:w-12"><t.icon className="h-5 w-5" /></span>
+              <span className="text-xs font-bold sm:text-sm">{t.title}</span>
+            </Link>)}
+          </div>
+        </section>
       </div>
 
-      <nav aria-label="Primary mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95 lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
-          {[
-            { label: "Home", path: "/", icon: Compass },
-            { label: "Study", path: "/study-mode", icon: Video },
-            { label: "Academic", path: "/academic", icon: BookOpen },
-            { label: "Play", path: "/multiplayer", icon: Swords },
-            { label: "More", path: "/learning-dna", icon: BrainCircuit },
-          ].map((item) => { const Icon = item.icon; return <button key={item.label} onClick={() => navigate(item.path)} className={`flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold ${item.label === "Home" ? "text-indigo-700 dark:text-indigo-300" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}><Icon size={19}/>{item.label}</button>; })}
+      <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <section className="rounded-3xl border bg-card p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Exam countdown</p>
+          <p className="mt-1 text-4xl font-extrabold tabular-nums">{examDays}<span className="ml-1 text-base font-semibold text-muted-foreground">days</span></p>
+          <p className="mt-1 text-sm text-muted-foreground">Estimated to the national exam window.</p>
+          <Link to="/academic/topics" className="mt-4 flex items-center justify-between rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground hover:bg-secondary/80">Check topic coverage <ArrowRight className="h-4 w-4" /></Link>
+        </section>
+        <section className="rounded-3xl border bg-card p-5">
+          <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-warning/15 text-warning"><Flame className="h-6 w-6" /></span><div><p className="text-2xl font-extrabold tabular-nums">{dailyStreak} day{dailyStreak === 1 ? "" : "s"}</p><p className="text-sm text-muted-foreground">Study streak</p></div></div>
+          <div className="mt-4 grid grid-cols-7 gap-1.5">
+            {days.map((d, i) => { const lit = i <= todayIdx && i > todayIdx - streakDays; return <div key={i} className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${lit ? "bg-warning text-warning-foreground" : i === todayIdx ? "border-2 border-warning text-warning" : "bg-muted text-muted-foreground"}`}>{lit ? <Flame className="h-4 w-4" /> : d}</div>; })}
+          </div>
+        </section>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
+          <Link to="/leaderboard" className="flex items-center gap-3 rounded-3xl border bg-card p-4 hover:border-primary/40"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Trophy className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block font-bold">Leaderboard</span><span className="block truncate text-sm text-muted-foreground">See your rank</span></span></Link>
+          <Link to="/store" className="flex items-center gap-3 rounded-3xl border bg-card p-4 hover:border-primary/40"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent/15 text-accent"><Zap className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block font-bold">Store</span><span className="block truncate text-sm text-muted-foreground">{coins.toLocaleString()} coins</span></span></Link>
         </div>
-      </nav>
-    </div>
-  );
-}
+      </aside>
+    </main>
+    <div className="lg:hidden"><StudentBottomNav /></div>
+  </div>;
+};
+export default UpperTierHome;
