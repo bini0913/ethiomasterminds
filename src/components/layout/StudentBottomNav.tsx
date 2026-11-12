@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, Gamepad2, Globe2, Gift, BookOpen, Swords, MessageCircle, BrainCircuit, Trophy, MoreHorizontal, Users, GraduationCap, Timer, Library, Bot, Settings, Bell, X, Target, CalendarDays, BarChart3 } from "lucide-react";
+import { Home, Gamepad2, Globe2, Gift, BookOpen, Swords, MessageCircle, BrainCircuit, Trophy, MoreHorizontal, Users, GraduationCap, Timer, Library, Bot, Settings, Bell, X, Target, CalendarDays, BarChart3, Route } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
 
@@ -23,9 +23,9 @@ const StudentBottomNav: React.FC = () => {
   ];
   const upperItems = [
     { icon: Home, label: "Studio", path: "/", match: ["/"] },
-    { icon: GraduationCap, label: "Exam Prep", path: "/academic/exam", match: ["/academic/exam", "/academic/entrance-papers"] },
+    { icon: Route, label: "Path", path: "/academic/topics", match: ["/academic/topics"] },
     { icon: Timer, label: "Focus", path: "/study-mode", match: ["/study-mode", "/revision"] },
-    { icon: BrainCircuit, label: "Review", path: "/academic/flashcards", match: ["/academic/flashcards"] },
+    { icon: Swords, label: "Arena", path: "/multiplayer", match: ["/multiplayer", "/lobby", "/tournaments"] },
   ];
   const otherItems = [
     { icon: Home, label: "Home", path: "/", match: ["/"] },
@@ -54,7 +54,7 @@ const StudentBottomNav: React.FC = () => {
     { icon: Bell, label: "Notifications", path: "/notifications" },
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
-  const moreActive = moreItems.some(item => location.pathname === item.path || location.pathname.startsWith(item.path + "/"));
+  const moreActive = !active(items.flatMap(i => i.match)) && moreItems.some(item => location.pathname === item.path || location.pathname.startsWith(item.path + "/"));
 
   return <div data-guide="bottom-nav" className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
     {upper && moreOpen && <div className="mx-auto max-w-lg px-3 pb-2">
@@ -64,6 +64,7 @@ const StudentBottomNav: React.FC = () => {
     </div>}
     <nav aria-label="Primary" className="mx-auto flex h-16 max-w-lg items-center justify-around gap-1 px-1 sm:h-[68px] sm:px-2">
       {items.map(item => { const Icon = item.icon; const is = active(item.match); return <motion.button key={item.label} type="button" onClick={() => { setMoreOpen(false); navigate(item.path); }} whileTap={{ scale: 0.97 }} className={`flex min-h-11 min-w-0 flex-1 max-w-32 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${is ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`} aria-label={`Go to ${item.label}`} aria-current={is ? "page" : undefined}><Icon className={`h-5 w-5 ${is ? "stroke-[2.5]" : ""}`} aria-hidden="true"/><span className="text-[11px] font-semibold">{item.label}</span></motion.button>; })}
+      {upper && <motion.button type="button" onClick={() => setMoreOpen(o => !o)} whileTap={{ scale: 0.97 }} aria-expanded={moreOpen} aria-label="More destinations" className={`flex min-h-11 min-w-0 flex-1 max-w-32 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${moreOpen || moreActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}>{moreOpen ? <X className="h-5 w-5" aria-hidden="true"/> : <MoreHorizontal className="h-5 w-5" aria-hidden="true"/>}<span className="text-[11px] font-semibold">More</span></motion.button>}
     </nav>
   </div>;
 };

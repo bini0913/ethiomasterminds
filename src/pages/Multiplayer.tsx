@@ -302,13 +302,13 @@ const Multiplayer: React.FC = () => {
   return (
     <div className={upperStudent ? "tier-upper mm-arena-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background text-foreground"}>
       {upperStudent && <style>{`
-        .mm-arena-upper .mm-arena-hero{background:radial-gradient(circle at 88% 10%,rgba(243,201,107,.16),transparent 28%),linear-gradient(120deg,#101a35,#17264a);color:#f8fafc;border-color:rgba(255,255,255,.12)}
-        .mm-arena-upper .mm-arena-hero .text-muted-foreground{color:rgba(237,242,255,.76)}
-        .mm-arena-upper .mm-arena-panel{border-radius:1.1rem;border-color:var(--border);box-shadow:0 3px 12px rgba(15,23,42,.045)}
-        .mm-arena-upper .mm-arena-mode{border-radius:1rem;min-height:7.25rem;transition:transform .18s,box-shadow .18s,border-color .18s}
-        .mm-arena-upper .mm-arena-mode:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(15,23,42,.07)}
-        .mm-arena-upper .mm-arena-mode[aria-pressed="true"]{background:rgba(99,102,241,.07);border-color:rgba(99,102,241,.55)}
-        .mm-arena-upper .mm-arena-stat{border-radius:1rem;border-color:var(--border);background:var(--card)}
+        .mm-arena-upper .mm-arena-hero{background:radial-gradient(circle at 88% 10%,hsl(var(--primary)/.22),transparent 34%),linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)));color:hsl(var(--foreground));border-color:hsl(var(--border))}
+        .mm-arena-upper .mm-arena-hero .text-muted-foreground{color:hsl(var(--muted-foreground))}
+        .mm-arena-upper .mm-arena-panel{border-radius:1.1rem;border-color:hsl(var(--border));box-shadow:0 3px 12px hsl(var(--foreground)/.045)}
+        .mm-arena-upper .mm-arena-mode{border-radius:1rem;border-width:2px;border-bottom-width:5px;min-height:7.25rem;transition:transform .18s,box-shadow .18s,border-color .18s}
+        .mm-arena-upper .mm-arena-mode:hover{transform:translateY(-2px);box-shadow:0 10px 24px hsl(var(--foreground)/.07)}.mm-arena-upper .mm-arena-mode:active{transform:translateY(3px);border-bottom-width:2px}
+        .mm-arena-upper .mm-arena-mode[aria-pressed="true"]{background:hsl(var(--primary)/.08);border-color:hsl(var(--primary))}
+        .mm-arena-upper .mm-arena-stat{border-radius:1rem;border-color:hsl(var(--border));background:hsl(var(--card))}
         @media(max-width:640px){.mm-arena-upper .mm-arena-panel{border-radius:1rem}.mm-arena-upper .mm-arena-mode{min-height:0;padding:.85rem}}
       `}</style>}
       <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 backdrop-blur-xl" : "sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border"}>

@@ -584,6 +584,12 @@ const StudyModePage: React.FC = () => {
         .mm-study-upper .mm-study-call-controls button,.mm-study-upper .mm-study-action-grid button{min-height:2.75rem}
         .mm-study-upper .mm-study-action-grid button{box-shadow:0 3px 0 hsl(var(--border));transition:transform 140ms ease,box-shadow 140ms ease}
         .mm-study-upper .mm-study-action-grid button:active{transform:translateY(3px);box-shadow:none}
+        .mm-study-upper [class*="text-white"]{color:hsl(var(--muted-foreground))}
+        .mm-study-upper .bg-white\/5{background:hsl(var(--muted)/.5)}
+        .mm-study-upper [class*="border-white"]{border-color:hsl(var(--border))}
+        .mm-study-upper .mm-preset{border:2px solid hsl(var(--border));border-bottom-width:4px;border-radius:.9rem;padding:.5rem .25rem;font-weight:700;font-size:.8rem;background:hsl(var(--card));color:hsl(var(--foreground));transition:transform .12s}
+        .mm-study-upper .mm-preset:active{transform:translateY(2px);border-bottom-width:2px}
+        .mm-study-upper .mm-preset[aria-pressed="true"]{border-color:hsl(var(--primary));background:hsl(var(--primary)/.1);color:hsl(var(--primary))}
         .mm-study-upper input,.mm-study-upper select{min-height:2.65rem;border-radius:.75rem}
         @media(max-width:640px){.mm-study-upper .mm-study-panel{border-radius:1rem}.mm-study-upper .mm-study-call-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}.mm-study-upper .mm-study-call-controls button{width:100%;padding-inline:.65rem}.mm-study-upper .mm-study-timer{max-width:15rem;max-height:15rem}}
       `}</style>}
@@ -607,12 +613,12 @@ const StudyModePage: React.FC = () => {
               <div className="grid md:grid-cols-2 gap-4 items-center">
                 <div className={upperStudent ? "mm-study-timer relative mx-auto grid h-56 w-56 place-items-center sm:h-64 sm:w-64" : "relative mx-auto h-56 w-56 sm:h-64 sm:w-64"}>
                   <svg className={upperStudent ? "h-56 w-56 -rotate-90 sm:h-64 sm:w-64" : "h-56 w-56 -rotate-90 sm:h-64 sm:w-64"} viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="54" stroke={upperStudent ? "#e2e8f0" : "rgba(255,255,255,0.12)"} strokeWidth="8" fill="none" />
+                    <circle cx="60" cy="60" r="54" stroke={upperStudent ? "hsl(var(--muted))" : "rgba(255,255,255,0.12)"} strokeWidth="8" fill="none" />
                     <circle
                       cx="60"
                       cy="60"
                       r="54"
-                      stroke={upperStudent ? "#6366f1" : "url(#timerGradient)"}
+                      stroke={upperStudent ? "hsl(var(--primary))" : "url(#timerGradient)"}
                       strokeWidth="8"
                       fill="none"
                       strokeLinecap="round"
@@ -642,6 +648,11 @@ const StudyModePage: React.FC = () => {
                     <Button variant="outline" onClick={resetTimer} disabled={!!activeSession}><RotateCcw className="h-4 w-4 mr-1" />Reset</Button>
                   </div>
 
+                  {upperStudent && <div className="grid grid-cols-3 gap-2" role="group" aria-label="Quick presets">
+                    {([["pomodoro",25,"25m Focus"],["deep",50,"50m Deep"],["custom",15,"15m Sprint"]] as const).map(([m,min,label]) => (
+                      <button key={label} type="button" className="mm-preset disabled:opacity-50" disabled={!editableTimer} aria-pressed={mode === m && studyMinutes === min} onClick={() => { setMode(m); void updateStudyMinutes(min); }}>{label}</button>
+                    ))}
+                  </div>}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
                       <p className="text-xs text-white/60 mb-1">Mode</p>
