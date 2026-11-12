@@ -148,10 +148,11 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   const isUpperStudent = getUserTier(user?.grade) === "upper";
   // Grades 9–12 home renders its own screenshot-matched responsive shell.
   // Wrapping it here creates a second sidebar, header and desktop navigation.
-  if (isHome && isUpperStudent) return <>{children}</>;
   if (isHome && !isUpperStudent) {
     return <>{children}</>;
   }
+  const isStudent = user.role === "student";
+  const showBottomNav = isStudent && !isUpperStudent ? true : isUpperStudent;
 
   const handleBack = () => {
     const historyIndex = window.history.state?.idx;
@@ -204,7 +205,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
         <div className="mt-auto flex flex-col items-center gap-1 px-1 text-center text-[9px] leading-tight text-muted-foreground"><span>2017 E.C.</span><span>2024/25</span></div>
       </aside>}
       <div className={isUpperStudent ? "mm-studio-upper-content md:pl-[72px] lg:pl-64" : ""}>
-      <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
+      {!isHome && <header className={isUpperStudent ? "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80" : "sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80"}>
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-3 px-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex items-center gap-1">
@@ -216,15 +217,6 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
                 title="Go back"
               >
                 <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/")}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Go home"
-                title="Go home"
-              >
-                <Home className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
             <div className="min-w-0">
@@ -250,9 +242,9 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
             <span className="hidden sm:inline">Log out</span>
           </button>
         </div>
-      </header>
-      <div className={`${isUpperStudent ? "pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0" : ""}`}>{children}</div>
-      {isUpperStudent && <div className="lg:hidden"><StudentBottomNav /></div>}
+      </header>}
+      <div className={`${showBottomNav && !isHome ? "pb-[calc(5.5rem+env(safe-area-inset-bottom))]" + (isUpperStudent ? " lg:pb-0" : "") : ""}`}>{children}</div>
+      {showBottomNav && <div className={isUpperStudent ? "lg:hidden" : ""}><StudentBottomNav /></div>}
       </div>
     </div>
   );

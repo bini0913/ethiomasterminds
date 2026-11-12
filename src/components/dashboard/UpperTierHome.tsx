@@ -8,7 +8,6 @@ import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import ThemeToggle from "@/components/layout/ThemeToggle";
-import StudentBottomNav from "@/components/layout/StudentBottomNav";
 
 const drill = [
   { title: "Entrance exam drill", sub: "Timed past-paper questions", to: "/academic/exam", icon: Target },
@@ -153,7 +152,6 @@ const UpperTierHome: React.FC = () => {
         </div>
       </aside>
     </main>
-    <div className="lg:hidden"><StudentBottomNav /></div>
   </div>;
 };
 export default UpperTierHome;

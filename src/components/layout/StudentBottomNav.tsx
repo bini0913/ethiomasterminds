@@ -26,10 +26,11 @@ const StudentBottomNav: React.FC = () => {
     { icon: Route, label: "Path", path: "/academic/topics", match: ["/academic/topics"] },
     { icon: Timer, label: "Focus", path: "/study-mode", match: ["/study-mode", "/revision"] },
     { icon: Swords, label: "Arena", path: "/multiplayer", match: ["/multiplayer", "/lobby", "/tournaments"] },
-  ];
+  ].map(i => i.label === "Focus" ? { ...i, label: "Study" } : i);
   const otherItems = [
     { icon: Home, label: "Home", path: "/", match: ["/"] },
-    { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/quiz/filter", "/study-mode", "/library", "/ai-tutor", "/academic", "/revision", "/learning-dna"] },
+    { icon: BookOpen, label: "Study", path: "/academic", match: ["/quiz", "/quiz/filter", "/library", "/ai-tutor", "/academic", "/revision", "/learning-dna"] },
+    { icon: Timer, label: "Focus", path: "/study-mode", match: ["/study-mode"] },
     { icon: Swords, label: "Play", path: "/lobby", match: ["/lobby", "/multiplayer", "/tournaments", "/leaderboard", "/store"] },
     { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/friends", "/chat", "/notifications"] },
   ];
