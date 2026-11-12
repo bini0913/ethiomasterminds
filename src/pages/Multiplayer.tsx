@@ -311,10 +311,10 @@ const Multiplayer: React.FC = () => {
         .mm-arena-upper .mm-arena-stat{border-radius:1rem;border-color:hsl(var(--border));background:hsl(var(--card))}
         @media(max-width:640px){.mm-arena-upper .mm-arena-panel{border-radius:1rem}.mm-arena-upper .mm-arena-mode{min-height:0;padding:.85rem}}
       `}</style>}
-      <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 backdrop-blur-xl" : "sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border"}>
+      <header className={upperStudent ? "" : "sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border"}>
         <div className="container mx-auto flex items-center justify-between gap-3 px-4 py-4 sm:gap-4">
           <div className="flex items-center gap-4">
-            <BackButton />
+            {!upperStudent && <BackButton />}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Gamepad2 className="w-5 h-5 text-primary" />

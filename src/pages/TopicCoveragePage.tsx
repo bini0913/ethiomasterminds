@@ -122,9 +122,9 @@ const TopicCoveragePage: React.FC = () => {
     const mastered = subjects.reduce((sum, s) => sum + subjectProgress(s).mastered, 0);
     return (
       <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background"}>
-        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 py-3">
+        <header className={upperStudent ? "px-4 pt-5" : "sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 py-3"}>
           <div className="mx-auto flex max-w-4xl items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button>
+            {!upperStudent && <Button variant="ghost" size="icon" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button>}
             <div><h1 className="text-lg font-bold flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /> Topic Coverage</h1><p className="text-xs text-muted-foreground">Book-based units when available; otherwise suggested learning paths</p></div>
           </div>
         </header>
@@ -156,8 +156,8 @@ const TopicCoveragePage: React.FC = () => {
   const progress = subjectProgress(selectedSubject);
   return (
     <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background"}>
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 py-3">
-        <div className="mx-auto flex max-w-4xl items-center gap-3"><Button variant="ghost" size="icon" onClick={() => setSelectedSubject(null)}><ArrowLeft className="h-5 w-5" /></Button><div className="flex-1"><h1 className="font-bold">{labelFor(selectedSubject)}</h1><p className="text-xs text-muted-foreground">{progress.mastered}/{progress.total} mastered</p></div><Badge>{progress.pct}%</Badge></div>
+      <header className={upperStudent ? "px-4 pt-5" : "sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 py-3"}>
+        <div className="mx-auto flex max-w-4xl items-center gap-3"><Button variant="ghost" size="icon" aria-label="All subjects" onClick={() => setSelectedSubject(null)}><ArrowLeft className="h-5 w-5" /></Button><div className="flex-1"><h1 className="font-bold">{labelFor(selectedSubject)}</h1><p className="text-xs text-muted-foreground">{progress.mastered}/{progress.total} mastered</p></div><Badge>{progress.pct}%</Badge></div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-5 pb-24">
         <Progress value={progress.pct} className="mb-5 h-2" />

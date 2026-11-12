@@ -250,11 +250,11 @@ const FlashcardsPage: React.FC = () => {
   if (!selectedSubject) {
     return (
       <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5"}>
-        <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
+        <header className={upperStudent ? "px-4 pt-5 pb-1" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
           <div className="flex items-center gap-3 max-w-4xl mx-auto">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className={upperStudent ? "text-muted-foreground hover:bg-muted hover:text-foreground" : "text-white hover:bg-white/10"}>
+            {!upperStudent && <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className="text-white hover:bg-white/10">
               <ArrowLeft className="h-5 w-5" />
-            </Button>
+            </Button>}
             <div>
               <h1 className={upperStudent ? "flex items-center gap-2 text-lg font-bold text-foreground" : "flex items-center gap-2 text-lg font-bold text-white"}>
                 <BookOpen className="h-5 w-5" /> Flashcards
@@ -313,7 +313,8 @@ const FlashcardsPage: React.FC = () => {
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="font-semibold capitalize">{subject}</h3>
-                    <p className="text-xs text-muted-foreground">{subjectCards.length} cards • {masteredCount} mastered</p>\n                    {upperStudent && <div className="mt-2"><Badge variant={subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length ? "default" : "outline"}>{subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length} due today</Badge></div>}
+                    <p className="text-xs text-muted-foreground">{subjectCards.length} cards • {masteredCount} mastered</p>
+                    {upperStudent && <div className="mt-2"><Badge variant={subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length ? "default" : "outline"}>{subjectCards.filter(f => !progress[f.id] || new Date(progress[f.id].next_review_date) <= new Date()).length} due today</Badge></div>}
                     <Progress value={pct} className="h-1.5 mt-2" />
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -341,7 +342,7 @@ const FlashcardsPage: React.FC = () => {
   return (
     <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))] flex flex-col" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col"}>
       {/* Header */}
-      <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
+      <header className={upperStudent ? "px-4 pt-5 pb-1" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => { setSelectedSubject(null); setCurrentIndex(0); setIsFlipped(false); }} className={upperStudent ? "text-muted-foreground hover:bg-muted hover:text-foreground" : "text-white hover:bg-white/10"}>
             <ArrowLeft className="h-5 w-5" />

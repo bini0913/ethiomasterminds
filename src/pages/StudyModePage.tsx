@@ -595,9 +595,9 @@ const StudyModePage: React.FC = () => {
       `}</style>}
       <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-6 sm:p-4 md:p-6">
         <header className={upperStudent ? "mm-study-hero rounded-2xl border border-white/10 p-4 sm:p-5" : ""}>
-          <Link to="/" className={`mb-2 inline-flex items-center gap-2 text-sm ${upperStudent ? "text-muted-foreground hover:text-foreground" : "text-white/80 hover:text-white"}`}>
+          {!upperStudent && <Link to="/" className="mb-2 inline-flex items-center gap-2 text-sm text-white/80 hover:text-white">
             <ArrowLeft className="h-4 w-4" /> Back to Master Minds
-          </Link>
+          </Link>}
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight md:text-3xl">
             <Brain className={`h-7 w-7 ${upperStudent ? "text-primary" : "text-violet-300"}`} /> Study Mode
           </h1>
