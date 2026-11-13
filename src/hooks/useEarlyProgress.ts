@@ -30,21 +30,22 @@ export function useEarlyProgress() {
     setIsLoading(true);
     setError(null);
 
-    const { data, error: queryError } = await db
-      .from("early_activity_progress")
-      .select("activity_id,skill,attempts,correct_answers,completions,xp_earned,coins_earned,last_played_at")
-      .eq("user_id", user.id)
-      .order("last_played_at", { ascending: false });
+    try {
+      const { data, error: queryError } = await db
+        .from("early_activity_progress")
+        .select("activity_id,skill,attempts,correct_answers,completions,xp_earned,coins_earned,last_played_at")
+        .eq("user_id", user.id)
+        .order("last_played_at", { ascending: false });
 
-    if (queryError) {
-      console.error("Early progress load failed:", queryError);
-      setError(queryError.message);
-      setRows([]);
-    } else {
+      if (queryError) throw queryError;
       setRows((data ?? []) as EarlyProgressRow[]);
+    } catch (loadError) {
+      console.error("Early progress load failed:", loadError);
+      setError(loadError instanceof Error ? loadError.message : "Could not load learning progress.");
+      setRows([]);
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }, [user?.id]);
 
   useEffect(() => {
