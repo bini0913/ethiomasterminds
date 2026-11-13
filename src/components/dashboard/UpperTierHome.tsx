@@ -101,7 +101,7 @@ const UpperTierHome: React.FC = () => {
               const current = i === 0;
               return <li key={step.to}>
                 <Link to={step.to} className={`flex items-center gap-4 rounded-2xl border-2 p-4 transition active:scale-[.99] ${current ? "border-primary bg-primary/5 shadow-[0_4px_0_hsl(var(--primary)/0.35)]" : "border-border bg-card hover:border-primary/40"}`}>
-                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${done ? "bg-success text-success-foreground" : current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                     <step.icon className="h-6 w-6" />
                   </span>
                   <span className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">Step {i + 1}</span><span className="block font-bold">{step.title}</span><span className="block text-sm text-muted-foreground">{step.sub}</span></span>
