@@ -18,14 +18,19 @@ type EarlyRewardOptions = {
 
 export function useEarlyReward() {
   return useCallback(async (kind: RewardKind, options?: EarlyRewardOptions) => {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user?.id) return false;
-
-    const activityId = options?.activityId ?? `early-${kind}`;
-    const skill = options?.skill ?? "general";
-    const attemptId = options?.attemptId ?? crypto.randomUUID();
-
     try {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!auth.user?.id) return false;
+
+      const activityId = options?.activityId ?? `early-${kind}`;
+      const skill = options?.skill ?? "general";
+      const attemptId = options?.attemptId ?? (
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `early-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      );
+
       const { error } = await (supabase as any).rpc("complete_early_activity", {
         p_attempt_id: attemptId,
         p_activity_id: activityId,
@@ -34,11 +39,7 @@ export function useEarlyReward() {
         p_completed: options?.completed ?? false,
       });
 
-      if (error) {
-        console.error("Early reward failed:", error);
-        return false;
-      }
-
+      if (error) throw error;
       return true;
     } catch (error) {
       console.error("Early reward failed:", error);
