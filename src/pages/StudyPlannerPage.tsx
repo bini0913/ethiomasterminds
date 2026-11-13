@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { safeStorage } from "@/lib/safeStorage";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
 import { useNavigate } from "react-router-dom";
@@ -88,13 +89,13 @@ const StudyPlannerPage: React.FC = () => {
         setSelectedBooks(selected);
         const selectedBookTitles = selected.map((book) => book.title + " — " + book.subject);
         let cachedAnalysis: typeof bookAnalysis = {};
-        try { const savedAnalysis = localStorage.getItem("masterminds:book-analysis:" + user.id); if (savedAnalysis) cachedAnalysis = JSON.parse(savedAnalysis); } catch { /* ignore invalid cached analysis */ }
+        try { const savedAnalysis = safeStorage.getItem("masterminds:book-analysis:" + user.id); if (savedAnalysis) cachedAnalysis = JSON.parse(savedAnalysis); } catch { /* ignore invalid cached analysis */ }
         try {
           const persistedAnalysis = await loadBookAnalyses(user.id);
           if (!cancelled) {
             const mergedAnalysis = { ...cachedAnalysis, ...persistedAnalysis };
             setBookAnalysis(mergedAnalysis);
-            localStorage.setItem("masterminds:book-analysis:" + user.id, JSON.stringify(mergedAnalysis));
+            safeStorage.setItem("masterminds:book-analysis:" + user.id, JSON.stringify(mergedAnalysis));
           }
         } catch (analysisError) {
           console.warn("Could not load saved textbook analysis from Supabase; using this device's cache.", analysisError);
