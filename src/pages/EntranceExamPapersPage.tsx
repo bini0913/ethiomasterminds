@@ -28,33 +28,49 @@ const EntranceExamPapersPage: React.FC = () => {
 
   useEffect(() => {
     let active = true;
-    (async () => {
-      const { data, error: queryError } = await db
-        .from("entrance_exam_papers")
-        .select("id,subject,ethiopian_year,gregorian_year,stream,source_name,source_url,source_status,notes")
-        .eq("grade_level", 12)
-        .order("gregorian_year", { ascending: false })
-        .order("subject", { ascending: true });
-      if (!active) return;
-      if (queryError) setError("The past-paper catalog is not available yet. Apply the database migration and reload this page.");
-      else setPapers((data ?? []) as Paper[]);
-      const { data: quizzes } = await db.from("quizzes").select("id,subject,grade,is_approved").eq("is_approved", true);
-      const grade12Quizzes = (quizzes || []).filter((quiz: any) => Number(quiz.grade) === 12);
-      if (grade12Quizzes.length) {
-        const { data: questions } = await db.from("questions").select("quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer").in("quiz_id", grade12Quizzes.map((quiz: any) => quiz.id));
-        const quizById = new Map<string, string>(grade12Quizzes.map((quiz: any) => [String(quiz.id), normalizeSubject(String(quiz.subject || ""))] as [string, string]));
-        const available = new Set<string>();
-        (questions || []).forEach((question: any) => {
-          const options = Array.isArray(question.options) ? question.options : [question.option_a, question.option_b, question.option_c, question.option_d].filter(Boolean);
-          if (question.question_text && question.correct_answer != null && options.length >= 2) {
-            const subjectName = quizById.get(question.quiz_id);
-            if (subjectName) available.add(subjectName);
-          }
-        });
-        if (active) setPracticeSubjects(Array.from(available));
+    const loadCatalog = async () => {
+      try {
+        const { data, error: queryError } = await db
+          .from("entrance_exam_papers")
+          .select("id,subject,ethiopian_year,gregorian_year,stream,source_name,source_url,source_status,notes")
+          .eq("grade_level", 12)
+          .order("gregorian_year", { ascending: false })
+          .order("subject", { ascending: true });
+        if (queryError) throw queryError;
+        if (!active) return;
+        setPapers((data ?? []) as Paper[]);
+
+        const { data: quizzes, error: quizzesError } = await db
+          .from("quizzes")
+          .select("id,subject,grade,is_approved")
+          .eq("is_approved", true);
+        if (quizzesError) throw quizzesError;
+        const grade12Quizzes = (quizzes || []).filter((quiz: any) => Number(quiz.grade) === 12);
+        if (grade12Quizzes.length) {
+          const { data: questions, error: questionsError } = await db
+            .from("questions")
+            .select("quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer")
+            .in("quiz_id", grade12Quizzes.map((quiz: any) => quiz.id));
+          if (questionsError) throw questionsError;
+          const quizById = new Map<string, string>(grade12Quizzes.map((quiz: any) => [String(quiz.id), normalizeSubject(String(quiz.subject || ""))] as [string, string]));
+          const available = new Set<string>();
+          (questions || []).forEach((question: any) => {
+            const options = Array.isArray(question.options) ? question.options : [question.option_a, question.option_b, question.option_c, question.option_d].filter(Boolean);
+            if (question.question_text && question.correct_answer != null && options.length >= 2) {
+              const subjectName = quizById.get(question.quiz_id);
+              if (subjectName) available.add(subjectName);
+            }
+          });
+          if (active) setPracticeSubjects(Array.from(available));
+        }
+      } catch (error) {
+        console.error("Entrance exam catalog load failed:", error);
+        if (active) setError("The past-paper and verified-practice catalog could not be loaded. Please try again.");
+      } finally {
+        if (active) setLoading(false);
       }
-      setLoading(false);
-    })();
+    };
+    void loadCatalog();
     return () => { active = false; };
   }, []);
 
