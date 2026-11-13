@@ -73,28 +73,43 @@ const Leaderboard = () => {
   };
 
   const loadClassCompetition = async () => {
-    const rows = await fetchClassCompetitionLeaderboard(12);
-    setClassRows(rows);
+    try {
+      const rows = await fetchClassCompetitionLeaderboard(12);
+      setClassRows(rows);
+    } catch (error) {
+      console.error("Class leaderboard load failed:", error);
+      setClassRows([]);
+    }
   };
 
   const loadFollowing = async () => {
-    if (!user?.id) return;
-    const ids = await fetchFollowing(user.id);
-    setFollowing(ids);
+    if (!user?.id) { setFollowing([]); return; }
+    try {
+      const ids = await fetchFollowing(user.id);
+      setFollowing(ids);
+    } catch (error) {
+      console.error("Following list load failed:", error);
+      setFollowing([]);
+    }
   };
 
   const loadSeason = async () => {
-    const { data } = await (supabase as any)
-      .from("season_runtime_state")
-      .select("current_season_name,season_number,started_at")
-      .eq("id", 1)
-      .maybeSingle();
-    if (data) {
-      setSeason({
-        name: data.current_season_name ?? "Season 1",
-        number: data.season_number ?? 1,
-        startedAt: data.started_at ?? null,
-      });
+    try {
+      const { data, error } = await (supabase as any)
+        .from("season_runtime_state")
+        .select("current_season_name,season_number,started_at")
+        .eq("id", 1)
+        .maybeSingle();
+      if (error) throw error;
+      if (data) {
+        setSeason({
+          name: data.current_season_name ?? "Season 1",
+          number: data.season_number ?? 1,
+          startedAt: data.started_at ?? null,
+        });
+      }
+    } catch (error) {
+      console.error("Season metadata load failed:", error);
     }
   };
 
