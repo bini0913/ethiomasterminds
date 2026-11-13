@@ -44,8 +44,13 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const cleanupExpiredRooms = useCallback(async () => {
-    const { error } = await db.rpc('cleanup_expired_multiplayer_rooms' as any);
-    if (error) console.error('Room cleanup failed:', error);
+    try {
+      const { error } = await db.rpc('cleanup_expired_multiplayer_rooms' as any);
+      if (error) console.warn('Room cleanup failed:', error);
+    } catch (error) {
+      // Expiry cleanup is maintenance-only and must never interrupt room discovery.
+      console.warn('Room cleanup request failed:', error);
+    }
   }, []);
 
   const fetchRooms = useCallback(async () => {
@@ -231,6 +236,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       await fetchRooms();
     } catch (err) {
       console.error('Error leaving room:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to leave room');
     }
   };
 
