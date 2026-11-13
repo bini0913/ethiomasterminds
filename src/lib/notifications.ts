@@ -1,4 +1,5 @@
 import { db } from "@/integrations/untypedClient";
+import { safeStorage } from "@/lib/safeStorage";
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications, type Token, type PushNotificationSchema, type ActionPerformed } from "@capacitor/push-notifications";
 import { LocalNotifications } from "@capacitor/local-notifications";
@@ -60,7 +61,7 @@ function normalizePreferences(value: Partial<NotificationPreferences> | null | u
 
 export function getStoredNotificationPreferences(): NotificationPreferences {
   try {
-    const raw = localStorage.getItem(PREF_KEY);
+    const raw = safeStorage.getItem(PREF_KEY);
     return normalizePreferences(raw ? JSON.parse(raw) : defaults);
   } catch {
     return defaults;
@@ -90,7 +91,7 @@ export async function loadNotificationPreferences(userId: string): Promise<Notif
     reminderHour: data.reminder_hour,
   } : defaults);
 
-  localStorage.setItem(PREF_KEY, JSON.stringify(mapped));
+  safeStorage.setItem(PREF_KEY, JSON.stringify(mapped));
   return mapped;
 }
 
@@ -118,7 +119,7 @@ export async function saveNotificationPreferences(
   if (error) throw new Error("Your notification settings could not be saved. Please try again.");
 
   // Update local state only after the server confirms persistence.
-  localStorage.setItem(PREF_KEY, JSON.stringify(safe));
+  safeStorage.setItem(PREF_KEY, JSON.stringify(safe));
   await scheduleDailyLearningReminder(safe);
 }
 
