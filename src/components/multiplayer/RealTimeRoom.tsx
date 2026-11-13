@@ -980,21 +980,21 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             <p className="break-words text-xs text-blue-100/75 sm:text-sm">Room ID: {roomId.slice(0, 8)}... · Subject: {roomConfig.subject} · Mode: {modeLabel}</p>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => setSoundEnabled((prev) => !prev)}>
+            <Button className="min-h-10" variant="outline" size="sm" onClick={() => setSoundEnabled((prev) => !prev)}>
               {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowChat(!showChat)}>
+            <Button className="min-h-10" variant="outline" size="sm" onClick={() => setShowChat(!showChat)}>
               <MessageCircle className="h-4 w-4 mr-2" />
               Chat
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setInviteDialogOpen(true)} disabled={!isHost}>
+            <Button className="min-h-10" variant="outline" size="sm" onClick={() => setInviteDialogOpen(true)} disabled={!isHost}>
               <UserPlus className="h-4 w-4 mr-2" />
               Invite Friend
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { navigator.clipboard?.writeText(roomId); toast.success('Room code copied'); }}>
+            <Button className="min-h-10" variant="outline" size="sm" onClick={() => { navigator.clipboard?.writeText(roomId); toast.success('Room code copied'); }}>
               <Link className="h-4 w-4 mr-2" /> Join via Code
             </Button>
-            <Button variant="destructive" size="sm" onClick={onLeave}>
+            <Button className="min-h-10" variant="destructive" size="sm" onClick={onLeave}>
               <LogOut className="h-4 w-4 mr-2" />
               Leave
             </Button>
@@ -1004,7 +1004,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         <div className="grid min-w-0 grid-cols-1 items-start gap-3 sm:gap-4 lg:grid-cols-3">
           <div className="min-w-0 space-y-3 sm:space-y-4 lg:col-span-2">
             {roomState.status === 'waiting' && (
-              <Card className="p-6 bg-white/5 border-white/10 shadow-sm">
+              <Card className="bg-white/5 border-white/10 p-4 shadow-sm transition-all duration-200 sm:p-6">
                 <div className="text-center space-y-4">
                   <h2 className="text-xl font-bold">Lobby Ready Check</h2>
                   <p className="text-blue-100/80">{players.length}/{roomMaxPlayers} players connected</p>
@@ -1091,8 +1091,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             )}
 
             {(roomState.status === 'countdown' || roomState.status === 'starting') && (
-              <Card className="p-12 bg-white/5 border-white/10 text-center">
-                <motion.div key={countdownValue} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-8xl font-display font-bold text-cyan-300">
+              <Card className="bg-white/5 border-white/10 p-6 text-center sm:p-12">
+                <motion.div key={countdownValue} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-7xl font-display font-bold text-cyan-300 sm:text-8xl">
                   {countdownValue}
                 </motion.div>
                 <p className="mt-4 text-base text-blue-100/80 sm:text-xl">Get ready — your match is about to begin.</p>
