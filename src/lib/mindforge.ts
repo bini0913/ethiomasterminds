@@ -1,3 +1,5 @@
+import { safeStorage } from "@/lib/safeStorage";
+
 export const MINDFORGE_SETTINGS_KEY = "mindforge-settings";
 
 export type MindForgeReactionType =
@@ -23,7 +25,7 @@ export const defaultMindForgeSettings: MindForgeSettings = {
 export const getMindForgeSettings = (): MindForgeSettings => {
   if (typeof window === "undefined") return defaultMindForgeSettings;
 
-  const raw = window.localStorage.getItem(MINDFORGE_SETTINGS_KEY);
+  const raw = safeStorage.getItem(MINDFORGE_SETTINGS_KEY);
   if (!raw) return defaultMindForgeSettings;
 
   try {
@@ -38,6 +40,5 @@ export const getMindForgeSettings = (): MindForgeSettings => {
 };
 
 export const saveMindForgeSettings = (settings: MindForgeSettings) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(MINDFORGE_SETTINGS_KEY, JSON.stringify(settings));
+  safeStorage.setItem(MINDFORGE_SETTINGS_KEY, JSON.stringify(settings));
 };
