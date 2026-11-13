@@ -50,20 +50,29 @@ export const getXpProgressInLevel = (xp: number, perLevel = 220) => {
 };
 
 export const playRankUpTone = () => {
-  const audioContext = new window.AudioContext();
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
+  try {
+    if (typeof window === "undefined" || typeof window.AudioContext !== "function") return;
+    const audioContext = new window.AudioContext();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
 
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-  oscillator.type = "triangle";
-  oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
-  oscillator.frequency.exponentialRampToValueAtTime(783.99, audioContext.currentTime + 0.25);
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(783.99, audioContext.currentTime + 0.25);
 
-  gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.2, audioContext.currentTime + 0.03);
-  gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.4);
+    gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.2, audioContext.currentTime + 0.03);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.4);
 
-  oscillator.start(audioContext.currentTime);
-  oscillator.stop(audioContext.currentTime + 0.4);
+    oscillator.onended = () => {
+      void audioContext.close().catch(() => undefined);
+    };
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.4);
+  } catch (error) {
+    // Audio is optional feedback; it must never interrupt a rank-up action.
+    console.warn("Rank-up audio is unavailable in this browser:", error);
+  }
 };
