@@ -14,9 +14,19 @@ const THEMES: Theme[] = ["light", "dark", "pink", "blue"];
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const getInitialTheme = (): Theme => {
-  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-  if (savedTheme && (THEMES as string[]).includes(savedTheme)) return savedTheme as Theme;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  try {
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme && (THEMES as string[]).includes(savedTheme)) return savedTheme as Theme;
+  } catch (error) {
+    // Storage can be unavailable in restricted browser/WebView contexts.
+    console.warn("Could not read saved theme preference; using system preference.", error);
+  }
+
+  try {
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } catch {
+    return "light";
+  }
 };
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
@@ -26,7 +36,12 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     const root = document.documentElement;
     root.classList.remove("dark", "pink", "blue");
     if (theme !== "light") root.classList.add(theme);
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (error) {
+      // Theme still applies for this session even when persistence is blocked.
+      console.warn("Could not persist theme preference.", error);
+    }
   }, [theme]);
 
   const setTheme = (next: Theme) => setThemeState(next);
