@@ -304,7 +304,7 @@ const App = () => (
                               <Route path="/leaderboard" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Leaderboard /></ProtectedRoute>} />
                               <Route path="/profile" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><SelfProfileRedirect /></ProtectedRoute>} />
                               <Route path="/profile/:userId" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><UserProfilePage /></ProtectedRoute>} />
-                              <Route path="/friends" element={<EarlyTierRestrictedRoute><Friends /></EarlyTierRestrictedRoute>} />
+                              <Route path="/friends" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Friends /></ProtectedRoute>} />
                               <Route path="/settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Settings /></ProtectedRoute>} />
                               <Route path="/notifications" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
@@ -352,7 +352,7 @@ const App = () => (
                               <Route path="/store" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><StorePage /></ProtectedRoute>} />
                               <Route path="/tournaments" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Tournaments /></ProtectedRoute>} />
                               <Route path="/enhanced-settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><EnhancedSettings /></ProtectedRoute>} />
-                              <Route path="/social" element={<EarlyTierRestrictedRoute><SocialHub /></EarlyTierRestrictedRoute>} />
+                              <Route path="/social" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><SocialHub /></ProtectedRoute>} />
                               <Route path="/social/community" element={<EarlyTierRestrictedRoute><EnhancedSocial /></EarlyTierRestrictedRoute>} />
                               <Route path="/ai-tutor" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AITutor /></ProtectedRoute>} />
                               <Route path="/learning-dna" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><LearningDNA /></ProtectedRoute>} />
