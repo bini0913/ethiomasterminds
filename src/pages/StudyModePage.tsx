@@ -305,7 +305,11 @@ const StudyModePage: React.FC = () => {
 
   useEffect(() => {
     if (!user?.id || !activeSession?.id) return;
-    const heartbeat = () => { void db.rpc("heartbeat_study_presence", { p_session_id: activeSession.id }); };
+    const heartbeat = () => {
+      void db.rpc("heartbeat_study_presence", { p_session_id: activeSession.id })
+        .then(({ error }) => { if (error) console.warn("Study presence heartbeat failed:", error); })
+        .catch((error) => console.warn("Study presence heartbeat failed:", error));
+    };
     heartbeat();
     const timer = window.setInterval(heartbeat, 30_000);
     return () => window.clearInterval(timer);
@@ -337,9 +341,14 @@ const StudyModePage: React.FC = () => {
       auto_start_break: settings?.auto_start_break ?? true,
     };
 
-    const { error } = await db.from("study_settings").upsert(payload, { onConflict: "user_id" });
-    if (error) toast.error(error.message);
-    else setSettings(payload);
+    try {
+      const { error } = await db.from("study_settings").upsert(payload, { onConflict: "user_id" });
+      if (error) throw error;
+      setSettings(payload);
+    } catch (error) {
+      console.error("Study settings save failed:", error);
+      toast.error("Your Study Mode settings could not be saved.");
+    }
   };
 
   const onStartStudy = async () => {
@@ -351,14 +360,18 @@ const StudyModePage: React.FC = () => {
 
     const plannedDuration = clampMinutes(studyMinutes, 5, 180);
 
-    const { data, error } = await db.rpc("start_study_session", {
-      p_planned_duration: plannedDuration,
-      p_mode: mode,
-      p_competition_id: selectedCompetitionId || null,
-    });
-
-    if (error) {
-      toast.error(error.message);
+    let data: unknown;
+    try {
+      const result = await db.rpc("start_study_session", {
+        p_planned_duration: plannedDuration,
+        p_mode: mode,
+        p_competition_id: selectedCompetitionId || null,
+      });
+      if (result.error) throw result.error;
+      data = result.data;
+    } catch (error) {
+      console.error("Could not start Study Mode session:", error);
+      toast.error(error instanceof Error ? error.message : "Could not start your study session. Please retry.");
       return;
     }
 
@@ -376,9 +389,12 @@ const StudyModePage: React.FC = () => {
   const onPauseStudy = async () => {
     if (!activeSession) return;
     const isPaused = timerState === "paused";
-    const { error } = await db.rpc(isPaused ? "resume_study_session" : "pause_study_session", { p_session_id: activeSession.id });
-    if (error) {
-      toast.error(error.message);
+    try {
+      const { error } = await db.rpc(isPaused ? "resume_study_session" : "pause_study_session", { p_session_id: activeSession.id });
+      if (error) throw error;
+    } catch (error) {
+      console.error("Could not update Study Mode pause state:", error);
+      toast.error(error instanceof Error ? error.message : "Could not update your study session.");
       return;
     }
     const now = new Date().toISOString();
@@ -404,15 +420,19 @@ const StudyModePage: React.FC = () => {
 
     const minutesCompleted = Math.max(1, Math.ceil(elapsedSeconds / 60));
 
-    const { data, error } = await db.rpc("complete_study_session", {
-      p_session_id: activeSession.id,
-      p_duration_override: null,
-      p_task_id: selectedTaskId || null,
-      p_mark_task_complete: markTaskOnComplete,
-    });
-
-    if (error) {
-      toast.error(error.message);
+    let data: unknown;
+    try {
+      const result = await db.rpc("complete_study_session", {
+        p_session_id: activeSession.id,
+        p_duration_override: null,
+        p_task_id: selectedTaskId || null,
+        p_mark_task_complete: markTaskOnComplete,
+      });
+      if (result.error) throw result.error;
+      data = result.data;
+    } catch (error) {
+      console.error("Could not complete Study Mode session:", error);
+      toast.error(error instanceof Error ? error.message : "Your study session could not be completed. Please retry.");
       return;
     }
 
@@ -479,9 +499,14 @@ const StudyModePage: React.FC = () => {
       default_break_time: clampMinutes(breakMinutes, 1, 30),
       auto_start_break: enabled,
     };
-    const { error } = await db.from("study_settings").upsert(payload, { onConflict: "user_id" });
-    if (error) toast.error(error.message);
-    else setSettings(payload);
+    try {
+      const { error } = await db.from("study_settings").upsert(payload, { onConflict: "user_id" });
+      if (error) throw error;
+      setSettings(payload);
+    } catch (error) {
+      console.error("Auto-start break preference save failed:", error);
+      toast.error("Your break preference could not be saved.");
+    }
   };
 
   const addTask = async () => {
