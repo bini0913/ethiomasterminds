@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { safeStorage } from "@/lib/safeStorage";
 
 export type Theme = "light" | "dark" | "pink" | "blue";
 
@@ -14,7 +15,7 @@ const THEMES: Theme[] = ["light", "dark", "pink", "blue"];
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const getInitialTheme = (): Theme => {
-  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+  const savedTheme = safeStorage.getItem(THEME_STORAGE_KEY);
   if (savedTheme && (THEMES as string[]).includes(savedTheme)) return savedTheme as Theme;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 };
@@ -26,7 +27,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     const root = document.documentElement;
     root.classList.remove("dark", "pink", "blue");
     if (theme !== "light") root.classList.add(theme);
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    safeStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
   const setTheme = (next: Theme) => setThemeState(next);
