@@ -69,21 +69,22 @@ const StorePage: React.FC = () => {
   }, [user, navigate]);
 
   const loadTransactions = React.useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) { setTransactions([]); return; }
 
-    const { data, error } = await (supabase as any)
-      .from('transactions')
-      .select('id, amount, type, source, created_at, sender_id, receiver_id')
-      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-      .order('created_at', { ascending: false })
-      .limit(60);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('transactions')
+        .select('id, amount, type, source, created_at, sender_id, receiver_id')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+        .limit(60);
 
-    if (error) {
+      if (error) throw error;
+      setTransactions((data || []) as TransactionRow[]);
+    } catch (error) {
       console.error('Failed to load transactions', error);
-      return;
+      toast.error('Transaction history could not be loaded. Please retry.');
     }
-
-    setTransactions((data || []) as TransactionRow[]);
   }, [user?.id]);
 
   React.useEffect(() => {
