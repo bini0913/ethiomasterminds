@@ -60,7 +60,7 @@ export default function EarlyDiscoverPage() {
         if (!active) return;
         const map: Record<number, string> = {};
         (data ?? []).forEach((row: any) => {
-          const match = /^early-discover-(\\d+)$/.exec(row.activity_id);
+          const match = /^early-discover-(\d+)$/.exec(row.activity_id);
           if (match) map[Number(match[1])] = row.id;
         });
         setContentIds(map);
