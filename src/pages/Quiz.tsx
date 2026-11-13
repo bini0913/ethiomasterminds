@@ -169,24 +169,51 @@ const Quiz: React.FC = () => {
 
   useEffect(() => {
     if (!user?.id) return;
+
+    let cancelled = false;
     const storageKey = `completed-practice-quizzes:${user.id}`;
-    const storedIds = JSON.parse(localStorage.getItem(storageKey) || "[]") as string[];
+    let storedIds: string[] = [];
+
+    // Browser storage is a cache, not a trusted source. A stale value from an
+    // older app version or a partially written entry must never break Quiz.
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) {
+        storedIds = parsed.filter((value): value is string => typeof value === "string");
+      }
+    } catch (error) {
+      console.warn("Could not read saved quiz completion cache; using database progress.", error);
+    }
 
     const loadCompletedFromDatabase = async () => {
-      const { data } = await db
-        .from("quiz_results")
-        .select("quiz_id")
-        .eq("student_id", user.id);
-      const { data: attemptsData } = await db
-        .from("question_attempts")
-        .select("question_id")
-        .eq("user_id", user.id);
-      const dbIds = (data || []).map((entry) => entry.quiz_id).filter(Boolean);
-      setCompletedQuizIds(new Set([...storedIds, ...dbIds]));
-      setAttemptedQuestionIds(new Set((attemptsData || []).map((entry) => entry.question_id)));
+      try {
+        const [resultsRes, attemptsRes] = await Promise.all([
+          db.from("quiz_results").select("quiz_id").eq("student_id", user.id),
+          db.from("question_attempts").select("question_id").eq("user_id", user.id),
+        ]);
+
+        if (resultsRes.error) throw resultsRes.error;
+        if (attemptsRes.error) throw attemptsRes.error;
+        if (cancelled) return;
+
+        const dbIds = (resultsRes.data || []).map((entry) => entry.quiz_id).filter(Boolean);
+        setCompletedQuizIds(new Set([...storedIds, ...dbIds]));
+        setAttemptedQuestionIds(new Set((attemptsRes.data || []).map((entry) => entry.question_id)));
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Could not load saved quiz progress:", error);
+          // Keep the local cache available when the database is temporarily
+          // unreachable; do not replace progress with an empty result.
+          setCompletedQuizIds(new Set(storedIds));
+        }
+      }
     };
 
-    loadCompletedFromDatabase();
+    void loadCompletedFromDatabase();
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
 
   useEffect(() => {
