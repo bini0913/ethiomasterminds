@@ -50,44 +50,46 @@ const FlashcardsPage: React.FC = () => {
   const gradeNum = normalizeGrade(user?.grade, 5);
 
   const fetchData = useCallback(async () => {
-    const auth = await supabase.auth.getUser();
-    if (!user || !auth.data.user?.id) return;
-    setIsLoading(true);
-    const profile = await getAcademicProfile(user.id).catch(() => null);
-    const allowedSubjects = profile?.subjects || [];
-    setProfileSubjects(allowedSubjects);
-
-    const [cardsRes, progressRes] = await Promise.all([
-      supabase
-        .from("flashcards")
-        .select("*")
-        .lte("grade_level", gradeNum),
-      supabase.from("user_flashcard_progress").select("*").eq("user_id", auth.data.user.id),
-    ]);
-
-    if (cardsRes.error) {
-      console.error(cardsRes.error);
-      toast.error("Failed to load flashcards");
+    if (!user?.id) {
+      setFlashcards([]);
+      setProgress({});
+      setIsLoading(false);
+      return;
     }
 
-    if (cardsRes.data) {
+    setIsLoading(true);
+    try {
+      const auth = await supabase.auth.getUser();
+      if (auth.error) throw auth.error;
+      if (!auth.data.user?.id) throw new Error("Your sign-in session is unavailable.");
+
+      const profile = await getAcademicProfile(user.id).catch(() => null);
+      const allowedSubjects = profile?.subjects || [];
+      setProfileSubjects(allowedSubjects);
+
+      const [cardsRes, progressRes] = await Promise.all([
+        supabase.from("flashcards").select("*").lte("grade_level", gradeNum),
+        supabase.from("user_flashcard_progress").select("*").eq("user_id", auth.data.user.id),
+      ]);
+
+      if (cardsRes.error) throw cardsRes.error;
+      if (progressRes.error) throw progressRes.error;
+
       const filteredByProfile = allowedSubjects.length
-        ? cardsRes.data.filter((card) => allowedSubjects.some((subject) => subjectsMatch(subject, card.subject)))
-        : cardsRes.data;
+        ? (cardsRes.data || []).filter((card) => allowedSubjects.some((subject) => subjectsMatch(subject, card.subject)))
+        : (cardsRes.data || []);
       setFlashcards(filteredByProfile);
       setSubjects(Array.from(new Set(filteredByProfile.map((card) => card.subject))).sort());
-    }
-    if (progressRes.error) {
-      console.error(progressRes.error);
-      toast.error("Failed to load flashcard progress");
-    }
 
-    if (progressRes.data) {
       const map: Record<string, FlashcardProgress> = {};
-      progressRes.data.forEach((p: any) => { map[p.flashcard_id] = p; });
+      (progressRes.data || []).forEach((p: any) => { map[p.flashcard_id] = p; });
       setProgress(map);
+    } catch (error) {
+      console.error("Flashcard data load failed:", error);
+      toast.error("Flashcards could not be loaded. Please retry.");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [gradeNum, user]);
 
   useEffect(() => {
