@@ -85,7 +85,7 @@ const UpperDesktopDashboard: React.FC = () => {
   const xp = Number((user as any)?.xp) || 0;
   const streak = Number((user as any)?.streak ?? (user as any)?.dayStreak);
   const nav = [
-    ["Home", "⌂", "/home"], ["Drills", "ϟ", "/quiz"], ["Question bank", "▤", "/academic/entrance-papers"],
+    ["Home", "⌂", "/"], ["Drills", "ϟ", "/quiz"], ["Question bank", "▤", "/academic/entrance-papers"],
     ["Mock tests", "▣", "/academic/exam"], ["Study plan", "▦", "/academic/planner"], ["Vocabulary", "✣", "/academic/flashcards"],
     ["Courses", "▰", "/library"], ["Classroom", "♙", "/study-mode"], ["Leaderboard", "▥", "/leaderboard"],
     ["AI tutor", "♧", "/ai-tutor"], ["Discord", "☻", "/friends"]
