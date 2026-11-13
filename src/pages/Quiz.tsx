@@ -1,5 +1,6 @@
 import { db } from "@/integrations/untypedClient";
 import React, { useEffect, useMemo, useState } from "react";
+import { safeStorage } from "@/lib/safeStorage";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useQuiz, Quiz as QuizType, Question } from "@/context/QuizContext";
@@ -169,24 +170,40 @@ const Quiz: React.FC = () => {
 
   useEffect(() => {
     if (!user?.id) return;
+
+    let cancelled = false;
     const storageKey = `completed-practice-quizzes:${user.id}`;
-    const storedIds = JSON.parse(localStorage.getItem(storageKey) || "[]") as string[];
+    let storedIds: string[] = [];
+    try {
+      const raw = safeStorage.getItem(storageKey);
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) storedIds = parsed.filter((value): value is string => typeof value === "string");
+    } catch (error) {
+      console.warn("Could not read saved quiz completion cache:", error);
+    }
 
     const loadCompletedFromDatabase = async () => {
-      const { data } = await db
-        .from("quiz_results")
-        .select("quiz_id")
-        .eq("student_id", user.id);
-      const { data: attemptsData } = await db
-        .from("question_attempts")
-        .select("question_id")
-        .eq("user_id", user.id);
-      const dbIds = (data || []).map((entry) => entry.quiz_id).filter(Boolean);
-      setCompletedQuizIds(new Set([...storedIds, ...dbIds]));
-      setAttemptedQuestionIds(new Set((attemptsData || []).map((entry) => entry.question_id)));
+      try {
+        const [resultsRes, attemptsRes] = await Promise.all([
+          db.from("quiz_results").select("quiz_id").eq("student_id", user.id),
+          db.from("question_attempts").select("question_id").eq("user_id", user.id),
+        ]);
+        if (resultsRes.error) throw resultsRes.error;
+        if (attemptsRes.error) throw attemptsRes.error;
+        if (cancelled) return;
+        const dbIds = (resultsRes.data || []).map((entry) => entry.quiz_id).filter(Boolean);
+        setCompletedQuizIds(new Set([...storedIds, ...dbIds]));
+        setAttemptedQuestionIds(new Set((attemptsRes.data || []).map((entry) => entry.question_id)));
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Could not load saved quiz progress:", error);
+          setCompletedQuizIds(new Set(storedIds));
+        }
+      }
     };
 
-    loadCompletedFromDatabase();
+    void loadCompletedFromDatabase();
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   useEffect(() => {
@@ -319,7 +336,7 @@ const Quiz: React.FC = () => {
       nextCompleted.add(activeQuiz.id);
       if (activeQuiz.sourceQuizId) nextCompleted.add(activeQuiz.sourceQuizId);
       setCompletedQuizIds(nextCompleted);
-      localStorage.setItem(`completed-practice-quizzes:${user.id}`, JSON.stringify(Array.from(nextCompleted)));
+      safeStorage.setItem(`completed-practice-quizzes:${user.id}`, JSON.stringify(Array.from(nextCompleted)));
     }
   };
   
