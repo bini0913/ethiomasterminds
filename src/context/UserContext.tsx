@@ -59,6 +59,15 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+const clearStoredLoginMode = () => {
+  try {
+    window.localStorage.removeItem("masterminds_login_mode");
+  } catch (error) {
+    // Auth state must still clear even if browser storage is blocked.
+    console.warn("Could not clear the saved login mode.", error);
+  }
+};
+
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -474,7 +483,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     signingOutRef.current = true;
-    localStorage.removeItem("masterminds_login_mode");
+    clearStoredLoginMode();
     setShowLevelUp(false);
     setUser(null);
     setSession(null);
