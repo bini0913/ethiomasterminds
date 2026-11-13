@@ -567,237 +567,205 @@ const StudyModePage: React.FC = () => {
     );
   }
 
+  const isBreak = timerState === "break";
+  const isRunning = timerState === "running";
+  const isPaused = timerState === "paused";
+  const ringColor = isBreak ? "hsl(var(--accent))" : isPaused ? "hsl(var(--muted-foreground))" : "hsl(var(--primary))";
+  const stateLabel = isBreak ? "Break time" : isRunning ? "Focusing" : isPaused ? "Paused" : timerState === "completed" ? "Session done" : "Ready";
+  const presets = [["pomodoro", 25, "Focus", "25 min"], ["deep", 50, "Deep work", "50 min"], ["custom", 15, "Sprint", "15 min"]] as const;
+  const openTasks = tasks.filter((t) => !t.completed);
+  const doneTasks = tasks.length - openTasks.length;
+  const stats = [
+    { label: "Today", value: `${todayMinutes}m`, icon: Clock },
+    { label: "This week", value: `${weekMinutes}m`, icon: Brain },
+    { label: "Streak", value: `${streakDays}d`, icon: Flame },
+    { label: "Pomodoros", value: `${studyStats.pomodoros_today}/4`, icon: Trophy },
+  ];
+  const R = 54, C = 2 * Math.PI * R;
+
   return (
-    <div className={upperStudent ? "tier-upper mm-study-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background text-foreground pb-[env(safe-area-inset-bottom)]"}>
-      {upperStudent && <style>{`
-        .mm-study-upper .mm-study-hero{background:radial-gradient(circle at 88% 10%,hsl(var(--primary)/.17),transparent 32%),hsl(var(--card));color:hsl(var(--foreground));border-color:hsl(var(--border))}
-        .mm-study-upper .mm-study-hero .text-muted-foreground{color:hsl(var(--muted-foreground))}
-        .mm-study-upper .mm-study-panel{border-radius:1.15rem;border-color:hsl(var(--border));box-shadow:0 3px 12px hsl(var(--foreground)/.045)}
-        .mm-study-upper .mm-study-panel [data-slot="card-title"]{font-weight:750;letter-spacing:-.015em}
-        .mm-study-upper .mm-study-timer{background:radial-gradient(circle,hsl(var(--card)),hsl(var(--muted)));border:1px solid hsl(var(--border));border-radius:999px}
-        .mm-study-upper .mm-study-timer .mm-timer-label{color:hsl(var(--muted-foreground))}
-        .mm-study-upper .mm-study-timer .mm-timer-value{color:hsl(var(--foreground))}
-        .mm-study-upper .mm-study-soft{background:hsl(var(--primary)/.07);border-color:hsl(var(--primary)/.16)}
-        .mm-study-upper .mm-study-call{border-radius:1.15rem;border-color:hsl(var(--border));overflow:hidden}
-        .mm-study-upper .mm-study-call-head{background:hsl(var(--card));color:hsl(var(--foreground))}
-        .mm-study-upper .mm-study-call-head .text-muted-foreground{color:hsl(var(--muted-foreground))}
-        .mm-study-upper .mm-study-call-controls button,.mm-study-upper .mm-study-action-grid button{min-height:2.75rem}
-        .mm-study-upper .mm-study-action-grid button{box-shadow:0 3px 0 hsl(var(--border));transition:transform 140ms ease,box-shadow 140ms ease}
-        .mm-study-upper .mm-study-action-grid button:active{transform:translateY(3px);box-shadow:none}
-        .mm-study-upper [class*="text-foreground"]{color:hsl(var(--muted-foreground))}
-        .mm-study-upper .bg-white\/5{background:hsl(var(--muted)/.5)}
-        .mm-study-upper [class*="border-white"]{border-color:hsl(var(--border))}
-        .mm-study-upper .mm-preset{border:2px solid hsl(var(--border));border-bottom-width:4px;border-radius:.9rem;padding:.5rem .25rem;font-weight:700;font-size:.8rem;background:hsl(var(--card));color:hsl(var(--foreground));transition:transform .12s}
-        .mm-study-upper .mm-preset:active{transform:translateY(2px);border-bottom-width:2px}
-        .mm-study-upper .mm-preset[aria-pressed="true"]{border-color:hsl(var(--primary));background:hsl(var(--primary)/.1);color:hsl(var(--primary))}
-        .mm-study-upper input,.mm-study-upper select{min-height:2.65rem;border-radius:.75rem}
-        @media(max-width:640px){.mm-study-upper .mm-study-panel{border-radius:1rem}.mm-study-upper .mm-study-call-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}.mm-study-upper .mm-study-call-controls button{width:100%;padding-inline:.65rem}.mm-study-upper .mm-study-timer{max-width:15rem;max-height:15rem}}
-      `}</style>}
-      <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-6 sm:p-4 md:p-6">
-        <header className={upperStudent ? "mm-study-hero rounded-2xl border border-border p-4 sm:p-5" : ""}>
-          {!upperStudent && <Link to="/" className="mb-2 inline-flex items-center gap-2 text-sm text-foreground/80 hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Back to Master Minds
-          </Link>}
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight md:text-3xl">
-            <Brain className={`h-7 w-7 ${upperStudent ? "text-primary" : "text-primary"}`} /> Study Mode
-          </h1>
-          <p className={upperStudent ? "text-sm text-muted-foreground" : "text-sm text-muted-foreground"}>Focus sessions · Real study history · XP rewards · Live study room · Task linking.</p>
+    <div className={`${upperStudent ? "tier-upper " : ""}min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]`}>
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:py-8">
+        <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            {!upperStudent && <Link to="/" className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Home</Link>}
+            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Study Mode</h1>
+            <p className="text-sm text-muted-foreground">One task. One timer. Earn XP for every focused minute.</p>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-semibold">
+            <span className="relative flex h-2.5 w-2.5"><span className={`absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 ${liveStatuses.length ? "animate-ping" : ""}`} /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" /></span>
+            {liveStatuses.length} studying now
+          </div>
         </header>
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className={upperStudent ? "mm-study-panel lg:col-span-2 border-border/70 bg-card shadow-sm" : "lg:col-span-2 bg-card border-border"}>
-            <CardHeader>
-              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-foreground"}`}><Clock className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-primary"}`} /> Focus Timer</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4 items-center">
-                <div className={upperStudent ? "mm-study-timer relative mx-auto grid h-56 w-56 place-items-center sm:h-64 sm:w-64" : "relative mx-auto h-56 w-56 sm:h-64 sm:w-64"}>
-                  <svg className={upperStudent ? "h-56 w-56 -rotate-90 sm:h-64 sm:w-64" : "h-56 w-56 -rotate-90 sm:h-64 sm:w-64"} viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="54" stroke={upperStudent ? "hsl(var(--muted))" : "rgba(255,255,255,0.12)"} strokeWidth="8" fill="none" />
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r="54"
-                      stroke={upperStudent ? "hsl(var(--primary))" : "url(#timerGradient)"}
-                      strokeWidth="8"
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeDasharray={339.292}
-                      strokeDashoffset={339.292 - (339.292 * progressPercent) / 100}
-                      className="transition-all duration-700"
-                    />
-                    <defs>
-                      <linearGradient id="timerGradient" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#22d3ee" />
-                        <stop offset="100%" stopColor="#a78bfa" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="absolute inset-0 grid place-items-center text-center">
-                    <p className={upperStudent ? "mm-timer-label text-xs uppercase tracking-wide" : "text-xs text-muted-foreground uppercase tracking-wide"}>{timerState === "break" ? "Break" : "Focus"}</p>
-                    <p className={upperStudent ? "mm-timer-value text-2xl font-bold tracking-wider tabular-nums sm:text-3xl" : "text-2xl sm:text-3xl font-bold tracking-wider text-foreground tabular-nums"}>{formatSeconds(countdownSeconds)}</p>
-                    <p className={upperStudent ? "mm-timer-label text-xs" : "text-xs text-muted-foreground"}>{mode.toUpperCase()} • {timerState}</p>
-                  </div>
-                </div>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <main className="space-y-5">
+            <section className="rounded-3xl border-2 border-border bg-card p-5 shadow-[0_4px_0_hsl(var(--border))] sm:p-8">
+              <div className="mx-auto mb-6 grid max-w-md grid-cols-3 gap-2" role="group" aria-label="Session length">
+                {presets.map(([m, min, label, sub]) => {
+                  const on = mode === m && studyMinutes === min;
+                  return (
+                    <button key={label} type="button" disabled={!editableTimer} aria-pressed={on}
+                      onClick={() => { setMode(m); void updateStudyMinutes(min); }}
+                      className={`rounded-2xl border-2 border-b-4 px-2 py-2.5 text-center transition-all active:translate-y-0.5 active:border-b-2 disabled:opacity-50 ${on ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-foreground hover:bg-muted"}`}>
+                      <span className="block text-sm font-bold">{label}</span>
+                      <span className="block text-xs opacity-70">{sub}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-                <div className="space-y-3">
-                  <div className={upperStudent ? "mm-study-action-grid grid grid-cols-2 gap-2" : "grid grid-cols-2 gap-2"}>
-                    <Button onClick={() => void onStartStudy()} disabled={!!activeSession || loading}><Play className="h-4 w-4 mr-1" />Start</Button>
-                    <Button variant="secondary" onClick={onPauseStudy} disabled={!activeSession || timerState === "break"}><Pause className="h-4 w-4 mr-1" />{timerState === "paused" ? "Resume" : "Pause"}</Button>
-                    <Button variant="destructive" onClick={() => void onStopStudy(false)} disabled={!activeSession}><StopCircle className="h-4 w-4 mr-1" />Stop</Button>
-                    <Button variant="outline" onClick={resetTimer} disabled={!!activeSession}><RotateCcw className="h-4 w-4 mr-1" />Reset</Button>
-                  </div>
-
-                  {upperStudent && <div className="grid grid-cols-3 gap-2" role="group" aria-label="Quick presets">
-                    {([["pomodoro",25,"25m Focus"],["deep",50,"50m Deep"],["custom",15,"15m Sprint"]] as const).map(([m,min,label]) => (
-                      <button key={label} type="button" className="mm-preset disabled:opacity-50" disabled={!editableTimer} aria-pressed={mode === m && studyMinutes === min} onClick={() => { setMode(m); void updateStudyMinutes(min); }}>{label}</button>
-                    ))}
-                  </div>}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Mode</p>
-                      <select
-                        value={mode}
-                        onChange={(e) => setMode(e.target.value as StudyMode)}
-                        disabled={!editableTimer}
-                        className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm disabled:opacity-60"
-                      >
-                        <option value="pomodoro">Focus (Pomodoro)</option>
-                        <option value="deep">Deep Work</option>
-                        <option value="custom">Custom</option>
-                      </select>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Study (min)</p>
-                      <div className="flex items-center gap-1">
-                        <Button size="icon" variant="secondary" onClick={() => void updateStudyMinutes(studyMinutes - 1)} disabled={!editableTimer}>-</Button>
-                        <Input type="number" value={studyMinutes} onChange={(e) => void updateStudyMinutes(Number(e.target.value || 0))} disabled={!editableTimer} className="bg-card border-border text-center" />
-                        <Button size="icon" variant="secondary" onClick={() => void updateStudyMinutes(studyMinutes + 1)} disabled={!editableTimer}>+</Button>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Break (min)</p>
-                      <div className="flex items-center gap-1">
-                        <Button size="icon" variant="secondary" onClick={() => void updateBreakMinutes(breakMinutes - 1)} disabled={!editableTimer || mode === "deep"}>-</Button>
-                        <Input type="number" value={breakMinutes} onChange={(e) => void updateBreakMinutes(Number(e.target.value || 0))} disabled={!editableTimer || mode === "deep"} className="bg-card border-border text-center" />
-                        <Button size="icon" variant="secondary" onClick={() => void updateBreakMinutes(breakMinutes + 1)} disabled={!editableTimer || mode === "deep"}>+</Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <label className="flex items-center gap-2 text-xs text-foreground/80">
-                    <input type="checkbox" checked={settings?.auto_start_break ?? true} onChange={(e) => void updateAutoStartBreak(e.target.checked)} disabled={!editableTimer || mode !== "pomodoro"} />
-                    Automatically start a break after Pomodoro
-                  </label>
-
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Link task to session</p>
-                    <select value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)} className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm">
-                      <option value="">No linked task</option>
-                      {tasks.filter((task) => !task.completed).map((task) => (
-                        <option key={task.id} value={task.id}>{task.task_title}</option>
-                      ))}
-                    </select>
-                    <label className="mt-2 flex items-center gap-2 text-xs text-foreground/80">
-                      <input type="checkbox" checked={markTaskOnComplete} onChange={(e) => setMarkTaskOnComplete(e.target.checked)} />
-                      Mark linked task complete when session ends
-                    </label>
-                  </div>
+              <div className="relative mx-auto aspect-square w-full max-w-[18rem] sm:max-w-[20rem]">
+                <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
+                  <circle cx="60" cy="60" r={R} stroke="hsl(var(--muted))" strokeWidth="9" fill="none" />
+                  <circle cx="60" cy="60" r={R} stroke={ringColor} strokeWidth="9" fill="none" strokeLinecap="round"
+                    strokeDasharray={C} strokeDashoffset={C - (C * progressPercent) / 100} className="transition-[stroke-dashoffset] duration-1000 ease-linear" />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className={`mb-1 rounded-full px-3 py-0.5 text-xs font-bold uppercase tracking-wider ${isBreak ? "bg-accent text-accent-foreground" : "bg-primary/10 text-primary"}`}>{stateLabel}</span>
+                  <span className="text-5xl font-extrabold tabular-nums tracking-tight sm:text-6xl" aria-live="polite">{formatSeconds(countdownSeconds)}</span>
+                  <span className="mt-1 text-xs text-muted-foreground">{Math.round(progressPercent)}% complete</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
-                <Card className={upperStudent ? "mm-study-panel border-border/70 bg-card shadow-sm" : "bg-card border-border"}><CardContent className="p-3"><p className="text-xs text-muted-foreground">Today</p><p className="font-bold">{todayMinutes}m</p></CardContent></Card>
-                <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "bg-card border-border"}><CardContent className="p-3"><p className="text-xs text-muted-foreground">Week</p><p className="font-bold">{weekMinutes}m</p></CardContent></Card>
-                <Card className="bg-card border-border"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Streak</p><p className="font-bold">{streakDays} 🔥</p></CardContent></Card>
-                <Card className="bg-card border-border"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Pomodoros</p><p className="font-bold">{studyStats.pomodoros_today}/4</p></CardContent></Card>
-                <Card className="bg-card border-border"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Live Studying</p><p className="font-bold flex items-center justify-center gap-1">{liveStatuses.length} <Flame className="h-4 w-4 text-orange-400" /></p></CardContent></Card>
+              <div className="mx-auto mt-6 flex max-w-md items-center justify-center gap-3">
+                {!activeSession ? (
+                  <>
+                    <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl" onClick={resetTimer} aria-label="Reset timer"><RotateCcw className="h-5 w-5" /></Button>
+                    <Button className="h-14 flex-1 rounded-2xl text-base font-extrabold uppercase tracking-wide shadow-[0_4px_0_hsl(var(--primary)/0.55)] active:translate-y-1 active:shadow-none" onClick={() => void onStartStudy()} disabled={loading || isBreak}>
+                      <Play className="mr-2 h-5 w-5" /> Start focus
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="secondary" className="h-14 flex-1 rounded-2xl text-base font-bold shadow-[0_4px_0_hsl(var(--border))] active:translate-y-1 active:shadow-none" onClick={onPauseStudy} disabled={isBreak}>
+                      {isPaused ? <><Play className="mr-2 h-5 w-5" />Resume</> : <><Pause className="mr-2 h-5 w-5" />Pause</>}
+                    </Button>
+                    <Button variant="destructive" className="h-14 flex-1 rounded-2xl text-base font-bold shadow-[0_4px_0_hsl(var(--destructive)/0.55)] active:translate-y-1 active:shadow-none" onClick={() => void onStopStudy(false)}>
+                      <StopCircle className="mr-2 h-5 w-5" />Finish
+                    </Button>
+                  </>
+                )}
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
-                <p className="text-xs leading-5 text-muted-foreground sm:text-sm">Proud of your focus? Generate a story-ready card and post your study stats.</p>
-                <StudyShareCard
-                  name={user.name?.trim() || "A Master Minds student"}
-                  level={user.level ?? 1}
-                  todayMinutes={todayMinutes}
-                  weekMinutes={weekMinutes}
-                  streakDays={streakDays}
-                />
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-foreground"}`}><Users className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-primary"}`} /> Studying Now</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <StudyCallBar />
-              {liveStatuses.length === 0 && <p className="text-sm text-muted-foreground">No one is currently studying.</p>}
-              {liveStatuses.map((entry) => (
-                <div key={entry.user_id} className="bg-card border border-border rounded-lg p-2 text-sm">
-                  <p>{memberNames[entry.user_id] ?? "A student"} is studying 🔥</p>
+              <div className="mx-auto mt-5 max-w-md">
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground" htmlFor="sm-task">Working on</label>
+                <select id="sm-task" value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)} className="h-11 w-full rounded-xl border-2 border-border bg-background px-3 text-sm font-medium">
+                  <option value="">No task selected</option>
+                  {openTasks.map((t) => <option key={t.id} value={t.id}>{t.task_title}</option>)}
+                </select>
+                {selectedTaskId && <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={markTaskOnComplete} onChange={(e) => setMarkTaskOnComplete(e.target.checked)} /> Tick this task off when I finish</label>}
+              </div>
+
+              <details className="mx-auto mt-4 max-w-md rounded-xl border border-border bg-background/60 px-3 py-2 text-sm">
+                <summary className="cursor-pointer select-none font-semibold text-muted-foreground">Custom timer settings</summary>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  {([["Study (min)", studyMinutes, updateStudyMinutes, false], ["Break (min)", breakMinutes, updateBreakMinutes, mode === "deep"]] as const).map(([label, val, fn, off]) => (
+                    <div key={label}>
+                      <p className="mb-1 text-xs text-muted-foreground">{label}</p>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => void fn(val - 1)} disabled={!editableTimer || off}>-</Button>
+                        <Input type="number" value={val} onChange={(e) => void fn(Number(e.target.value || 0))} disabled={!editableTimer || off} className="h-9 text-center" />
+                        <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => void fn(val + 1)} disabled={!editableTimer || off}>+</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <input type="checkbox" checked={settings?.auto_start_break ?? true} onChange={(e) => void updateAutoStartBreak(e.target.checked)} disabled={!editableTimer || mode !== "pomodoro"} />
+                  Start a break automatically after a Focus session
+                </label>
+              </details>
+            </section>
+
+            <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {stats.map(({ label, value, icon: Icon }) => (
+                <div key={label} className="rounded-2xl border-2 border-border bg-card p-4 shadow-[0_3px_0_hsl(var(--border))]">
+                  <Icon className="mb-2 h-5 w-5 text-primary" />
+                  <p className="text-2xl font-extrabold tabular-nums">{value}</p>
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
                 </div>
               ))}
-            </CardContent>
-          </Card>
-        </div>
+            </section>
 
-        <StudyLeaderboard />
-
-        <div className="grid lg:grid-cols-3 gap-4">
-          <Card className="lg:col-span-2 bg-card border-border">
-            <CardHeader>
-              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-foreground"}`}><Check className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-primary"}`} /> Study Tasks</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Add a study task" className="bg-card border-border" />
-                <Button className="min-h-11 w-full sm:w-auto" onClick={() => void addTask()}>Add</Button>
+            <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-primary/30 bg-primary/5 p-4">
+              <div>
+                <p className="font-bold">Share your progress</p>
+                <p className="text-sm text-muted-foreground">Make a story card with today's study stats.</p>
               </div>
-              <div className="space-y-2 max-h-72 overflow-auto">
-                {tasks.length === 0 && <p className="text-sm text-muted-foreground">No tasks yet.</p>}
+              <StudyShareCard name={user.name?.trim() || "A Master Minds student"} level={user.level ?? 1} todayMinutes={todayMinutes} weekMinutes={weekMinutes} streakDays={streakDays} />
+            </section>
+
+            <div className="hidden lg:block"><StudyLeaderboard /></div>
+          </main>
+
+          <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
+            <section className="rounded-3xl border-2 border-border bg-card p-4 sm:p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 font-bold"><Check className="h-5 w-5 text-primary" /> Tasks</h2>
+                <span className="text-xs font-semibold text-muted-foreground">{doneTasks}/{tasks.length} done</span>
+              </div>
+              <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); void addTask(); }}>
+                <Input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Add a task…" className="h-11 rounded-xl" />
+                <Button type="submit" className="h-11 rounded-xl px-4 font-bold">Add</Button>
+              </form>
+              <ul className="max-h-72 space-y-1.5 overflow-auto">
+                {tasks.length === 0 && <li className="py-6 text-center text-sm text-muted-foreground">Add what you want to finish today.</li>}
                 {tasks.map((task) => (
-                  <div key={task.id} className="bg-card border border-border rounded-lg p-3 flex items-center justify-between gap-2">
-                    <p className={task.completed ? "line-through text-muted-foreground" : ""}>{task.task_title}</p>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Button size="sm" variant={task.completed ? "secondary" : "default"} onClick={() => void toggleTask(task)}>{task.completed ? "Undo" : "Complete"}</Button>
-                      <Button size="sm" variant="destructive" onClick={() => void deleteTask(task)}>Delete</Button>
-                    </div>
-                  </div>
+                  <li key={task.id} className="group flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-muted/60">
+                    <button type="button" onClick={() => void toggleTask(task)} aria-label={task.completed ? "Mark not done" : "Mark done"}
+                      className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition-colors ${task.completed ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>
+                      {task.completed && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                    <span className={`min-w-0 flex-1 truncate text-sm ${task.completed ? "text-muted-foreground line-through" : "font-medium"}`}>{task.task_title}</span>
+                    <button type="button" onClick={() => void deleteTask(task)} className="text-xs text-muted-foreground opacity-70 hover:text-destructive group-hover:opacity-100" aria-label="Delete task">✕</button>
+                  </li>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
+              </ul>
+            </section>
 
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-foreground"}`}><Trophy className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-primary"}`} /> Competitions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Input value={competitionName} onChange={(e) => setCompetitionName(e.target.value)} placeholder="Competition name" className="bg-card border-border" />
-                <Button className="min-h-11 w-full sm:w-auto" onClick={() => void createCompetition()}>Create</Button>
-              </div>
-              <select value={selectedCompetitionId} onChange={(e) => setSelectedCompetitionId(e.target.value)} className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm">
-                <option value="">Select competition</option>
-                {activeCompetitions.map((competition) => (
-                  <option key={competition.id} value={competition.id}>{competition.name}</option>
+            <section className="rounded-3xl border-2 border-border bg-card p-4 sm:p-5">
+              <h2 className="mb-3 flex items-center gap-2 font-bold"><Users className="h-5 w-5 text-primary" /> Study room</h2>
+              <StudyCallBar />
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {liveStatuses.length === 0 && <p className="text-sm text-muted-foreground">Nobody else is studying right now. Start first!</p>}
+                {liveStatuses.map((e) => (
+                  <span key={e.user_id} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />{memberNames[e.user_id] ?? "A student"}
+                  </span>
                 ))}
-              </select>
-              <Button variant="secondary" className="w-full" onClick={() => void joinCompetition()}>Join selected</Button>
+              </div>
+            </section>
 
-              <div className="pt-2 border-t border-border space-y-2">
-                <p className="text-sm font-medium text-foreground/80 flex items-center gap-1"><Zap className="h-4 w-4 text-yellow-300" /> Live Leaderboard</p>
-                {selectedCompetitionLeaderboard.map((entry, index) => (
-                  <div key={entry.id} className="text-xs bg-card border border-border rounded-md p-2 flex items-center justify-between gap-2">
-                    <span className="truncate">#{index + 1} {memberNames[entry.user_id] ?? entry.user_id.slice(0, 8)}</span>
-                    <Badge variant={entry.user_id === user.id ? "default" : "secondary"}>{entry.total_study_time}m</Badge>
-                  </div>
-                ))}
-                {selectedCompetitionLeaderboard.length === 0 && <p className="text-xs text-muted-foreground">No leaderboard data yet.</p>}
+            <section className="rounded-3xl border-2 border-border bg-card p-4 sm:p-5">
+              <h2 className="mb-3 flex items-center gap-2 font-bold"><Trophy className="h-5 w-5 text-primary" /> Study challenges</h2>
+              <form className="mb-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); void createCompetition(); }}>
+                <Input value={competitionName} onChange={(e) => setCompetitionName(e.target.value)} placeholder="Challenge name" className="h-11 rounded-xl" />
+                <Button type="submit" variant="outline" className="h-11 rounded-xl font-bold">Create</Button>
+              </form>
+              <div className="flex gap-2">
+                <select value={selectedCompetitionId} onChange={(e) => setSelectedCompetitionId(e.target.value)} className="h-11 min-w-0 flex-1 rounded-xl border-2 border-border bg-background px-3 text-sm">
+                  <option value="">Pick a challenge</option>
+                  {activeCompetitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <Button variant="secondary" className="h-11 rounded-xl font-bold" onClick={() => void joinCompetition()}>Join</Button>
               </div>
-            </CardContent>
-          </Card>
+              {selectedCompetitionId && (
+                <ol className="mt-3 space-y-1.5 border-t border-border pt-3">
+                  {selectedCompetitionLeaderboard.length === 0 && <li className="text-xs text-muted-foreground">No minutes logged yet.</li>}
+                  {selectedCompetitionLeaderboard.map((entry, i) => (
+                    <li key={entry.id} className={`flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm ${entry.user_id === user.id ? "bg-primary/10" : ""}`}>
+                      <span className="w-6 text-center font-extrabold text-muted-foreground">{i + 1}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium">{memberNames[entry.user_id] ?? "Student"}</span>
+                      <Badge variant={entry.user_id === user.id ? "default" : "secondary"}><Zap className="mr-1 h-3 w-3" />{entry.total_study_time}m</Badge>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
+            <div className="lg:hidden"><StudyLeaderboard /></div>
+          </aside>
         </div>
       </div>
     </div>
