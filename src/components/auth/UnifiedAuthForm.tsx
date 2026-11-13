@@ -86,9 +86,15 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     let active = true;
     setUsernameStatus("checking");
     const timer = window.setTimeout(async () => {
-      const { data, error } = await supabase.rpc("get_email_by_username", { _username: normalized } as any);
-      if (!active) return;
-      setUsernameStatus(error ? "idle" : data ? "taken" : "available");
+      try {
+        const { data, error } = await supabase.rpc("get_email_by_username", { _username: normalized } as any);
+        if (!active) return;
+        setUsernameStatus(error ? "idle" : data ? "taken" : "available");
+      } catch (error) {
+        if (!active) return;
+        console.warn("Username availability check failed:", error);
+        setUsernameStatus("idle");
+      }
     }, 450);
     return () => { active = false; window.clearTimeout(timer); };
   }, [username, isSignup, step]);
@@ -107,19 +113,26 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
       return false;
     }
     setUsernameStatus("checking");
-    const { data, error } = await supabase.rpc("get_email_by_username", { _username: normalized } as any);
-    if (error) {
+    try {
+      const { data, error } = await supabase.rpc("get_email_by_username", { _username: normalized } as any);
+      if (error) {
+        setUsernameStatus("idle");
+        toast.error("We couldn't check that username. Please try again.");
+        return false;
+      }
+      if (data) {
+        setUsernameStatus("taken");
+        toast.error("That username is already taken.");
+        return false;
+      }
+      setUsernameStatus("available");
+      return true;
+    } catch (error) {
+      console.error("Username availability check failed:", error);
       setUsernameStatus("idle");
       toast.error("We couldn't check that username. Please try again.");
       return false;
     }
-    if (data) {
-      setUsernameStatus("taken");
-      toast.error("That username is already taken.");
-      return false;
-    }
-    setUsernameStatus("available");
-    return true;
   };
 
   const submitSignup = async () => {
