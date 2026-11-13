@@ -1,5 +1,5 @@
 import { db } from "@/integrations/untypedClient";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpen, PlayCircle, Sparkles, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -51,34 +51,41 @@ export default function EarlyVideosPage() {
   const [savingWatched, setSavingWatched] = useState<Set<string>>(new Set());
   const shelf = useMemo(() => shelves.find((s) => s.id === active) ?? shelves[0], [active]);
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      setLoading(true);
-      setLoadError(false);
+  const loadResources = useCallback(async (isActive: () => boolean = () => true) => {
+    setLoading(true);
+    setLoadError(false);
+    try {
       const { data, error } = await db.from("early_video_resources")
         .select("id,title,description,subject,grade_min,grade_max,provider,url,icon,fallback_url,status")
         .eq("active", true).eq("status", "approved").lte("grade_min", grade).gte("grade_max", grade).order("title");
-      if (!mounted) return;
-      if (error) {
-        setLoadError(true);
-        setResources([]);
-        setLoading(false);
-        return;
-      }
+      if (error) throw error;
+      if (!isActive()) return;
       setResources((data ?? []) as VideoResource[]);
+
       if (user?.id) {
         const { data: views, error: viewsError } = await db.from("early_video_views").select("video_id,completed").eq("user_id", user.id);
-        if (!mounted) return;
-        if (!viewsError) setWatched(new Set((views ?? []).filter((x: any) => x.completed).map((x: any) => x.video_id)));
+        if (viewsError) throw viewsError;
+        if (!isActive()) return;
+        setWatched(new Set((views ?? []).filter((x: any) => x.completed).map((x: any) => x.video_id)));
       } else {
         setWatched(new Set());
       }
-      setLoading(false);
-    };
-    void load();
-    return () => { mounted = false; };
+    } catch (error) {
+      console.error("Early video library load failed:", error);
+      if (isActive()) {
+        setLoadError(true);
+        setResources([]);
+      }
+    } finally {
+      if (isActive()) setLoading(false);
+    }
   }, [grade, user?.id]);
+
+  useEffect(() => {
+    let mounted = true;
+    void loadResources(() => mounted);
+    return () => { mounted = false; };
+  }, [loadResources]);
 
   const visible = useMemo(() => resources.filter((item) => !item.subject || item.subject.toLowerCase() === shelf.subject), [resources, shelf.subject]);
 
@@ -99,7 +106,7 @@ export default function EarlyVideosPage() {
         {shelves.map((item) => <button key={item.id} type="button" onClick={() => setActive(item.id)} aria-pressed={active === item.id} className={`min-h-20 rounded-2xl border p-3 text-left font-semibold transition ${active === item.id ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-muted"}`}><span className="text-2xl" aria-hidden="true">{item.icon}</span><span className="mt-1 block text-sm">{item.title}</span></button>)}
       </div>
       {loading ? <Card><CardContent className="p-6 text-center text-sm text-muted-foreground" role="status">Loading reviewed resources…</CardContent></Card> :
-        loadError ? <Card><CardContent className="space-y-3 p-6 text-center"><p className="font-semibold">We couldn’t load the video library.</p><p className="text-sm text-muted-foreground">Check your connection and try again.</p><Button variant="outline" onClick={() => { setLoading(true); setLoadError(false); const retry = async () => { const { data, error } = await db.from("early_video_resources").select("id,title,description,subject,grade_min,grade_max,provider,url,icon,fallback_url,status").eq("active", true).eq("status", "approved").lte("grade_min", grade).gte("grade_max", grade).order("title"); if (error) { setLoadError(true); setResources([]); } else setResources((data ?? []) as VideoResource[]); setLoading(false); }; void retry(); }}>Try again</Button></CardContent></Card> :
+        loadError ? <Card><CardContent className="space-y-3 p-6 text-center"><p className="font-semibold">We couldn’t load the video library.</p><p className="text-sm text-muted-foreground">Check your connection and try again.</p><Button variant="outline" onClick={() => { void loadResources(); }}>Try again</Button></CardContent></Card> :
         visible.length === 0 ? <Card><CardContent className="space-y-3 p-6 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground" /><p className="font-semibold">More resources are coming soon.</p><p className="text-sm text-muted-foreground">This shelf is safe by default: unpublished or unreviewed resources are not shown.</p></CardContent></Card> :
         <div className="grid gap-4 sm:grid-cols-2">{visible.map((item) => {
           const embed = youtubeEmbed(item.url);
