@@ -151,14 +151,18 @@ const TeacherPortal: React.FC = () => {
   const [searchingStudents, setSearchingStudents] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      fetchProfile();
-      fetchQuizzes();
-      fetchClasses();
-      fetchResults();
-      fetchAnnouncements();
-      fetchAssignments();
-    }
+    if (!user) return;
+    void Promise.all([
+      fetchProfile(),
+      fetchQuizzes(),
+      fetchClasses(),
+      fetchResults(),
+      fetchAnnouncements(),
+      fetchAssignments(),
+    ]).catch((error) => {
+      console.error("Teacher portal initial data load failed:", error);
+      toast.error("Some teacher workspace data could not be loaded. Please refresh and try again.");
+    });
   }, [user]);
 
   const fetchProfile = async () => {
