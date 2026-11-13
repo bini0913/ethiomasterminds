@@ -143,126 +143,143 @@ const TournamentHub: React.FC = () => {
   }, [matches]);
 
   const loadTournaments = async () => {
-    // Best-effort auto-start. This should never block tournament loading.
-    const { error: autoStartError } = await supabase.rpc("auto_start_due_tournaments" as any);
-    if (autoStartError) {
-      console.warn("auto_start_due_tournaments unavailable:", autoStartError.message);
-    }
+    try {
+      // Auto-start is best-effort; a missing RPC must not block the tournament list.
+      try {
+        const { error: autoStartError } = await supabase.rpc("auto_start_due_tournaments" as any);
+        if (autoStartError) console.warn("auto_start_due_tournaments unavailable:", autoStartError.message);
+      } catch (error) {
+        console.warn("Tournament auto-start check failed:", error);
+      }
 
-    const [{ data: tournamentRows, error: tError }, { data: playerRows }, { data: profileRows }] = await Promise.all([
-      supabase
-        .from("tournaments")
-        .select("id,name,status,mode,subject,settings,question_count,questions_count,start_time,starts_at,max_participants,current_players,entry_fee,entry_fee_coins,prize_coins,winner_id")
-        .order("created_at", { ascending: false })
-        .limit(30),
-      supabase.from("tournament_players" as any).select("tournament_id,user_id"),
-      supabase.from("profiles").select("id,name"),
-    ]);
+      const [tournamentsRes, playersRes, profilesRes] = await Promise.all([
+        supabase
+          .from("tournaments")
+          .select("id,name,status,mode,subject,settings,question_count,questions_count,start_time,starts_at,max_participants,current_players,entry_fee,entry_fee_coins,prize_coins,winner_id")
+          .order("created_at", { ascending: false })
+          .limit(30),
+        supabase.from("tournament_players" as any).select("tournament_id,user_id"),
+        supabase.from("profiles").select("id,name"),
+      ]);
 
-    if (tError) {
-      toast.error("Unable to load tournaments");
-      return;
-    }
+      if (tournamentsRes.error) throw tournamentsRes.error;
+      if (playersRes.error) console.warn("Tournament participant counts unavailable:", playersRes.error);
+      if (profilesRes.error) console.warn("Tournament winner names unavailable:", profilesRes.error);
 
-    const participantCounts = (playerRows || []).reduce<Record<string, number>>((acc, row: any) => {
-      acc[row.tournament_id] = (acc[row.tournament_id] || 0) + 1;
-      return acc;
-    }, {});
+      const participantCounts = (playersRes.data || []).reduce<Record<string, number>>((acc, row: any) => {
+        acc[row.tournament_id] = (acc[row.tournament_id] || 0) + 1;
+        return acc;
+      }, {});
 
-    const profileMap = new Map((profileRows || []).map((profile) => [profile.id, profile.name || "Unknown"]));
+      const profileMap = new Map((profilesRes.data || []).map((profile) => [profile.id, profile.name || "Unknown"]));
 
-    const mapped = (tournamentRows || []).map((row: any): HubTournament => ({
-      id: row.id,
-      name: row.name,
-      status: row.status,
-      mode: row.mode ?? "speed",
-      subject: row.subject ?? "General",
-      questionsPerMatch: row.settings?.questions_per_match ?? row.question_count ?? row.questions_count ?? 10,
-      startTime: row.start_time ?? row.starts_at ?? null,
-      registrationDeadline: row.settings?.registration_deadline ?? null,
-      maxPlayers: row.max_participants || 16,
-      currentPlayers: row.current_players ?? participantCounts[row.id] ?? 0,
-      entryFee: row.entry_fee ?? row.entry_fee_coins ?? 0,
-      prize: row.prize_coins ?? 0,
-      winnerId: row.winner_id,
-      winnerName: row.winner_id ? profileMap.get(row.winner_id) ?? null : null,
-    }));
+      const mapped = (tournamentsRes.data || []).map((row: any): HubTournament => ({
+        id: row.id,
+        name: row.name,
+        status: row.status,
+        mode: row.mode ?? "speed",
+        subject: row.subject ?? "General",
+        questionsPerMatch: row.settings?.questions_per_match ?? row.question_count ?? row.questions_count ?? 10,
+        startTime: row.start_time ?? row.starts_at ?? null,
+        registrationDeadline: row.settings?.registration_deadline ?? null,
+        maxPlayers: row.max_participants || 16,
+        currentPlayers: row.current_players ?? participantCounts[row.id] ?? 0,
+        entryFee: row.entry_fee ?? row.entry_fee_coins ?? 0,
+        prize: row.prize_coins ?? 0,
+        winnerId: row.winner_id,
+        winnerName: row.winner_id ? profileMap.get(row.winner_id) ?? null : null,
+      }));
 
-    setTournaments(mapped);
-
-    if (!selectedTournamentId && mapped.length > 0) {
-      setSelectedTournamentId(mapped[0].id);
+      setTournaments(mapped);
+      if (!selectedTournamentId && mapped.length > 0) setSelectedTournamentId(mapped[0].id);
+    } catch (error) {
+      console.error("Tournament list load failed:", error);
+      toast.error("Tournaments could not be loaded. Please retry.");
+      setTournaments([]);
     }
   };
 
   const loadTournamentDetails = async (tournamentId: string) => {
-    const [{ data: playerRows }, { data: matchRows }, { data: profileRows }, { data: eventRows }] = await Promise.all([
-      supabase
-        .from("tournament_players" as any)
-        .select("id,user_id,status")
-        .eq("tournament_id", tournamentId)
-        .order("joined_at", { ascending: true }),
-      supabase
-        .from("tournament_matches" as any)
-        .select("id,round,bracket_position,status,player1_id,player2_id,winner_id,score_player1,score_player2,room_id,meta")
-        .eq("tournament_id", tournamentId)
-        .order("round", { ascending: true })
-        .order("bracket_position", { ascending: true }),
-      supabase.from("profiles").select("id,name,avatar"),
-      supabase
-        .from("tournament_events" as any)
-        .select("id,event_type,data,payload,created_at")
-        .eq("tournament_id", tournamentId)
-        .order("created_at", { ascending: false })
-        .limit(20),
-    ]);
+    try {
+      const [playersRes, matchesRes, profilesRes, eventsRes] = await Promise.all([
+        supabase
+          .from("tournament_players" as any)
+          .select("id,user_id,status")
+          .eq("tournament_id", tournamentId)
+          .order("joined_at", { ascending: true }),
+        supabase
+          .from("tournament_matches" as any)
+          .select("id,round,bracket_position,status,player1_id,player2_id,winner_id,score_player1,score_player2,room_id,meta")
+          .eq("tournament_id", tournamentId)
+          .order("round", { ascending: true })
+          .order("bracket_position", { ascending: true }),
+        supabase.from("profiles").select("id,name,avatar"),
+        supabase
+          .from("tournament_events" as any)
+          .select("id,event_type,data,payload,created_at")
+          .eq("tournament_id", tournamentId)
+          .order("created_at", { ascending: false })
+          .limit(20),
+      ]);
 
-    const profileMap = new Map(((profileRows as any[]) || []).map((profile: any) => [profile.id, profile]));
+      if (playersRes.error) throw playersRes.error;
+      if (matchesRes.error) throw matchesRes.error;
+      if (profilesRes.error) console.warn("Tournament participant profiles unavailable:", profilesRes.error);
+      if (eventsRes.error) console.warn("Tournament event history unavailable:", eventsRes.error);
 
-    const mappedPlayers = (playerRows || []).map((player: any): TournamentPlayer => ({
-      id: player.id,
-      userId: player.user_id,
-      name: profileMap.get(player.user_id)?.name || "Unknown Player",
-      avatarUrl: profileMap.get(player.user_id)?.avatar || null,
-      status: player.status,
-    }));
+      const profileMap = new Map(((profilesRes.data as any[]) || []).map((profile: any) => [profile.id, profile]));
 
-    const mappedMatches = (matchRows || []).map((match: any): HubMatch => ({
-      id: match.id,
-      round: match.round,
-      bracketPosition: match.bracket_position,
-      status: match.status,
-      player1Id: match.player1_id,
-      player2Id: match.player2_id,
-      player1: match.player1_id ? profileMap.get(match.player1_id)?.name || "Unknown Player" : "Open Slot",
-      player2: match.player2_id ? profileMap.get(match.player2_id)?.name || "Unknown Player" : "Open Slot",
-      winnerId: match.winner_id,
-      winnerName: match.winner_id ? profileMap.get(match.winner_id)?.name || "Unknown Player" : null,
-      score1: match.score_player1 ?? 0,
-      score2: match.score_player2 ?? 0,
-      roomId: match.room_id ?? null,
-      meta: (match.meta || {}) as Record<string, unknown>,
-    }));
+      const mappedPlayers = (playersRes.data || []).map((player: any): TournamentPlayer => ({
+        id: player.id,
+        userId: player.user_id,
+        name: profileMap.get(player.user_id)?.name || "Unknown Player",
+        avatarUrl: profileMap.get(player.user_id)?.avatar || null,
+        status: player.status,
+      }));
 
-    setPlayers(mappedPlayers);
-    setMatches(mappedMatches);
-    setEvents(
-      (eventRows || []).map((event: any): TournamentEvent => ({
-        id: event.id,
-        eventType: event.event_type,
-        createdAt: event.created_at,
-        data: (event.data || event.payload || {}) as Record<string, unknown>,
-      })),
-    );
+      const mappedMatches = (matchesRes.data || []).map((match: any): HubMatch => ({
+        id: match.id,
+        round: match.round,
+        bracketPosition: match.bracket_position,
+        status: match.status,
+        player1Id: match.player1_id,
+        player2Id: match.player2_id,
+        player1: match.player1_id ? profileMap.get(match.player1_id)?.name || "Unknown Player" : "Open Slot",
+        player2: match.player2_id ? profileMap.get(match.player2_id)?.name || "Unknown Player" : "Open Slot",
+        winnerId: match.winner_id,
+        winnerName: match.winner_id ? profileMap.get(match.winner_id)?.name || "Unknown Player" : null,
+        score1: match.score_player1 ?? 0,
+        score2: match.score_player2 ?? 0,
+        roomId: match.room_id ?? null,
+        meta: (match.meta || {}) as Record<string, unknown>,
+      }));
+
+      setPlayers(mappedPlayers);
+      setMatches(mappedMatches);
+      setEvents(
+        (eventsRes.data || []).map((event: any): TournamentEvent => ({
+          id: event.id,
+          eventType: event.event_type,
+          createdAt: event.created_at,
+          data: (event.data || event.payload || {}) as Record<string, unknown>,
+        })),
+      );
+    } catch (error) {
+      console.error("Tournament details load failed:", error);
+      toast.error("Tournament details could not be loaded. Please select the tournament again.");
+      setPlayers([]);
+      setMatches([]);
+      setEvents([]);
+    }
   };
 
   useEffect(() => {
-    loadTournaments();
+    void loadTournaments();
   }, []);
 
   useEffect(() => {
     if (!selectedTournamentId) return;
-    loadTournamentDetails(selectedTournamentId);
+    void loadTournamentDetails(selectedTournamentId);
   }, [selectedTournamentId]);
 
   useEffect(() => {
