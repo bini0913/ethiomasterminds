@@ -20,6 +20,7 @@ import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import BackButton from "@/components/ui/BackButton";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { safeStorage } from "@/lib/safeStorage";
 
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 
@@ -46,15 +47,21 @@ const Settings: React.FC = () => {
   };
 
   const handleReplayTutorial = async () => {
-    localStorage.removeItem(HOME_ONBOARDING_STORAGE_KEY);
-    if (user?.id) {
-      await supabase.from("user_onboarding_states" as any).upsert({
-        user_id: user.id,
-        home_completed: false,
-        updated_at: new Date().toISOString(),
-      });
+    safeStorage.removeItem(HOME_ONBOARDING_STORAGE_KEY);
+    try {
+      if (user?.id) {
+        const { error } = await supabase.from("user_onboarding_states" as any).upsert({
+          user_id: user.id,
+          home_completed: false,
+          updated_at: new Date().toISOString(),
+        });
+        if (error) throw error;
+      }
+      toast.success("Tutorial reset. Return to Home to replay it.");
+    } catch (error) {
+      console.error("Could not reset saved tutorial progress:", error);
+      toast.error("The tutorial preference could not be reset on your account.");
     }
-    toast.success("Tutorial reset. Return to Home to replay it.");
   };
 
   const settingsSections = [
