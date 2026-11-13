@@ -10,30 +10,42 @@ export type EarlyAchievement={id:string;key:string;name:string;description:strin
 export function useEarlyAchievements(){
  const {summary,rows}=useEarlyProgress(); const reward=useEarlyReward(); const [items,setItems]=useState<EarlyAchievement[]>([]); const [loading,setLoading]=useState(true);
  const evaluate=useCallback(async()=>{
-   const {data:{user}}=await supabase.auth.getUser(); if(!user)return;
-   const [{data:defs,error:dErr},{data:mine,error:mErr}]=await Promise.all([
-     db.from("early_achievements").select("*").eq("active",true),
-     db.from("early_user_achievements").select("*").eq("user_id",user.id)
-   ]);
-   if(dErr||mErr){setLoading(false);return;}
-   const xp=rows.reduce((n,r)=>n+r.xp_earned,0);
-   const math=rows.filter(r=>["number sense","shapes","patterns"].includes(r.skill)).reduce((n,r)=>n+r.attempts,0);
-   const reading=rows.filter(r=>["vocabulary","phonics"].includes(r.skill)).reduce((n,r)=>n+r.attempts,0);
-   const science=rows.filter(r=>r.skill==="animals").reduce((n,r)=>n+r.attempts,0);
-   const coding=rows.filter(r=>r.skill==="sequencing").reduce((n,r)=>n+r.attempts,0);
-   const values:Record<string,number>={completions:summary.completions,math_attempts:math,reading_attempts:reading,science_attempts:science,coding_attempts:coding,accuracy_80:summary.attempts>=10&&summary.accuracy>=80?10:summary.attempts,xp_earned:xp};
-   const next=(defs??[]).map((d:any)=>{
-     const current=values[d.requirement_type]??0; const old=(mine??[]).find((x:any)=>x.achievement_id===d.id);
-     return {...d,progress:Math.min(current,d.requirement_value),completed:old?.completed||current>=d.requirement_value};
-   });
-   setItems(next);setLoading(false);
-   for(const d of defs??[]){
-     const current=values[d.requirement_type]??0; const old=(mine??[]).find((x:any)=>x.achievement_id===d.id);
-     if(current>=d.requirement_value && !old?.completed){
-       const rewarded=await reward("discoverCorrect",{activityId:`achievement-${d.key}`,skill:"achievement",completed:true});
-       if(!rewarded) continue;
-       toast.success(`${d.icon} ${d.name} unlocked!`,{description:`${d.description} +${d.reward_xp} XP`});
+   setLoading(true);
+   try {
+     const { data: { user }, error: authError } = await supabase.auth.getUser();
+     if (authError) throw authError;
+     if (!user) { setItems([]); return; }
+
+     const [{data:defs,error:dErr},{data:mine,error:mErr}]=await Promise.all([
+       db.from("early_achievements").select("*").eq("active",true),
+       db.from("early_user_achievements").select("*").eq("user_id",user.id)
+     ]);
+     if (dErr) throw dErr;
+     if (mErr) throw mErr;
+
+     const xp=rows.reduce((n,r)=>n+r.xp_earned,0);
+     const math=rows.filter(r=>["number sense","shapes","patterns"].includes(r.skill)).reduce((n,r)=>n+r.attempts,0);
+     const reading=rows.filter(r=>["vocabulary","phonics"].includes(r.skill)).reduce((n,r)=>n+r.attempts,0);
+     const science=rows.filter(r=>r.skill==="animals").reduce((n,r)=>n+r.attempts,0);
+     const coding=rows.filter(r=>r.skill==="sequencing").reduce((n,r)=>n+r.attempts,0);
+     const values:Record<string,number>={completions:summary.completions,math_attempts:math,reading_attempts:reading,science_attempts:science,coding_attempts:coding,accuracy_80:summary.attempts>=10&&summary.accuracy>=80?10:summary.attempts,xp_earned:xp};
+     const next=(defs??[]).map((d:any)=>{
+       const current=values[d.requirement_type]??0; const old=(mine??[]).find((x:any)=>x.achievement_id===d.id);
+       return {...d,progress:Math.min(current,d.requirement_value),completed:old?.completed||current>=d.requirement_value};
+     });
+     setItems(next);
+     for(const d of defs??[]){
+       const current=values[d.requirement_type]??0; const old=(mine??[]).find((x:any)=>x.achievement_id===d.id);
+       if(current>=d.requirement_value && !old?.completed){
+         const rewarded=await reward("discoverCorrect",{activityId:`achievement-${d.key}`,skill:"achievement",completed:true});
+         if(!rewarded) continue;
+         toast.success(`${d.icon} ${d.name} unlocked!`,{description:`${d.description} +${d.reward_xp} XP`});
+       }
      }
+   } catch (error) {
+     console.error("Early achievements load failed:", error);
+   } finally {
+     setLoading(false);
    }
  },[rows,summary,reward]);
  useEffect(()=>{void evaluate()},[evaluate]);
