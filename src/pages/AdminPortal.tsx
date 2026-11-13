@@ -207,11 +207,25 @@ const AdminPortal: React.FC = () => {
   };
 
   const fetchAllData = async () => {
-    await Promise.all([fetchUsers(), fetchContent(), fetchReports(), fetchAnnouncements(), fetchStatsAndCharts(), fetchSeasonControlData(), fetchAuditLogs(), ...(isAdmin ? [fetchSystemSettings()] : [])]);
+    try {
+      await Promise.all([
+        fetchUsers(),
+        fetchContent(),
+        fetchReports(),
+        fetchAnnouncements(),
+        fetchStatsAndCharts(),
+        fetchSeasonControlData(),
+        fetchAuditLogs(),
+        ...(isAdmin ? [fetchSystemSettings()] : []),
+      ]);
+    } catch (error) {
+      console.error("Admin portal initial data load failed:", error);
+      toast.error("Some admin workspace data could not be loaded. Please refresh and try again.");
+    }
   };
 
   useEffect(() => {
-    fetchAllData();
+    void fetchAllData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
