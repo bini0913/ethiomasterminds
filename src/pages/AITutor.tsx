@@ -95,10 +95,16 @@ const AITutor: React.FC = () => {
   };
 
   const loadConversations = async () => {
-    if (!user?.id) return;
-    const { data } = await supabase.from('ai_tutor_conversations')
-      .select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(15);
-    setConversations(data || []);
+    if (!user?.id) { setConversations([]); return; }
+    try {
+      const { data, error } = await supabase.from('ai_tutor_conversations')
+        .select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(15);
+      if (error) throw error;
+      setConversations(data || []);
+    } catch (error) {
+      console.error("AI Tutor conversation list load failed:", error);
+      toast.error("Your saved AI Tutor conversations could not be loaded.");
+    }
   };
 
   const loadConversation = (conv: any) => {
