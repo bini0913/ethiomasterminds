@@ -133,23 +133,7 @@ const Lobby: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([
-    {
-      id: "seed-room",
-      message: "Player123 just won a ranked duel",
-      timestamp: new Date(),
-    },
-    {
-      id: "seed-tournament",
-      message: "Tournament qualifier opens in 15 minutes",
-      timestamp: new Date(Date.now() - 3 * 60 * 1000),
-    },
-    {
-      id: "seed-champion",
-      message: "New champion crowned in Grade 8 bracket",
-      timestamp: new Date(Date.now() - 8 * 60 * 1000),
-    },
-  ]);
+  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
   const [newTournamentData, setNewTournamentData] = useState<NewTournamentForm>({
     name: "",
     description: "",
@@ -168,11 +152,28 @@ const Lobby: React.FC = () => {
 
   useEffect(() => {
     const requestedMode = searchParams.get("mode");
+    const requestedCode = searchParams.get("join");
+
+    if (requestedCode) {
+      setJoinByCode(requestedCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8));
+    }
+
     if (!requestedMode) return;
+
     setNewRoomData((prev) => {
-      const mode = requestedMode === "2v2" || requestedMode === "Battle Royale" ? requestedMode : "1v1";
-      const maxPlayers = mode === "2v2" ? "4" : mode === "Battle Royale" ? "8" : prev.maxPlayers;
-      return { ...prev, gameMode: mode, maxPlayers };
+      const mode =
+        requestedMode === "2v2" || requestedMode === "Battle Royale"
+          ? requestedMode
+          : "1v1";
+      const maxPlayers =
+        mode === "2v2" ? "4" : mode === "Battle Royale" ? "8" : "2";
+
+      return {
+        ...prev,
+        gameMode: mode,
+        maxPlayers,
+        roomType: requestedMode === "private" ? "private" : "public",
+      };
     });
     setCreateRoomOpen(true);
   }, [searchParams]);
