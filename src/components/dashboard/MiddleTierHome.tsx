@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Flame, GraduationCap, LibraryBig, LogOut, MessageCircle, Play, Settings, Store, Swords, Timer, Trophy, Users, Zap } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
+import { getXpProgressInLevel } from "@/lib/rankSystem";
 import { useAchievements } from "@/context/AchievementsContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import ThemeToggle from "@/components/layout/ThemeToggle";
@@ -37,7 +38,9 @@ const MiddleTierHome: React.FC = () => {
   const firstName = user?.name?.trim().split(/\s+/)[0] || "Learner";
   const xp = user?.xp ?? 0;
   const level = user?.level ?? 1;
-  const progress = Math.max(0, Math.min(100, xp - (level - 1) * 100));
+  const levelProgress = getXpProgressInLevel(xp);
+  const progress = levelProgress.percentage;
+  const xpToNextLevel = levelProgress.max - levelProgress.current;
   const todayIdx = (new Date().getDay() + 6) % 7;
   const streakDays = Math.min(dailyStreak, todayIdx + 1);
   const hour = new Date().getHours();
@@ -73,7 +76,7 @@ const MiddleTierHome: React.FC = () => {
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-[0.18em] opacity-80">Today's mission · Level {level}</p>
               <h2 className="mt-2 text-2xl font-extrabold leading-tight md:text-4xl">Keep your streak alive, {firstName}.</h2>
-              <p className="mt-2 max-w-md text-sm opacity-85 md:text-base">One quick quiz is all it takes. {100 - progress} XP until level {level + 1}.</p>
+              <p className="mt-2 max-w-md text-sm opacity-85 md:text-base">One quick quiz is all it takes. {xpToNextLevel} XP until level {level + 1}.</p>
               <Link to="/quiz" className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-background px-6 font-bold text-primary shadow-[0_4px_0_hsl(var(--foreground)/0.25)] transition active:translate-y-1 active:shadow-none">
                 <Play className="h-5 w-5 fill-current" /> Start learning
               </Link>
