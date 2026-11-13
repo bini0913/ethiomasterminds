@@ -574,7 +574,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       // Note: Full account deletion requires admin privileges
       // For now, we sign out the user
       await supabase.auth.signOut();
-      localStorage.removeItem("masterminds_login_mode");
+      safeStorage.removeItem("masterminds_login_mode");
       setUser(null);
       setSession(null);
       toast.success("You have been logged out. Contact support to fully delete your account.");
