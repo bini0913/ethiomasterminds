@@ -41,14 +41,49 @@ export default function EarlyDiscoverPage() {
   const [rewarded, setRewarded] = useState<boolean | null>(null);
   const [seen, setSeen] = useState<number[]>([]);
   const [contentIds, setContentIds] = useState<Record<number,string>>({});
-  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem("master-minds-early-discover-seen") || "[]"); if (Array.isArray(saved)) setSeen(saved.filter((x) => Number.isInteger(x))); } catch (error) { console.warn("Could not restore discover history", error); } const load = async () => { const { data } = await db.from("early_content_items").select("id,activity_id").eq("activity_type","discover").eq("active",true); const map: Record<number,string> = {}; (data ?? []).forEach((row:any) => { const m = /^early-discover-(\d+)$/.exec(row.activity_id); if (m) map[Number(m[1])] = row.id; }); setContentIds(map); }; void load(); }, []);
+  useEffect(() => {
+    let active = true;
+    try {
+      const saved = JSON.parse(localStorage.getItem("master-minds-early-discover-seen") || "[]");
+      if (Array.isArray(saved)) setSeen(saved.filter((x) => Number.isInteger(x)));
+    } catch (error) {
+      console.warn("Could not restore discover history", error);
+    }
+
+    const load = async () => {
+      try {
+        const { data, error } = await db.from("early_content_items")
+          .select("id,activity_id")
+          .eq("activity_type", "discover")
+          .eq("active", true);
+        if (error) throw error;
+        if (!active) return;
+        const map: Record<number, string> = {};
+        (data ?? []).forEach((row: any) => {
+          const match = /^early-discover-(\\d+)$/.exec(row.activity_id);
+          if (match) map[Number(match[1])] = row.id;
+        });
+        setContentIds(map);
+      } catch (error) {
+        console.warn("Could not load early discover content mappings:", error);
+      }
+    };
+
+    void load();
+    return () => { active = false; };
+  }, []);
   const f = facts[i];
   const answer = f[5];
 
   const choose = async (value: string) => {
     if (selected) return;
     setSelected(value);
-    if (user?.id && contentIds[i]) { void db.from("early_item_exposure").upsert({ user_id: user.id, item_id: contentIds[i], last_seen: new Date().toISOString(), times_seen: 1, last_correct: value === answer }, { onConflict: "user_id,item_id" }); }
+    if (user?.id && contentIds[i]) {
+      void db.from("early_item_exposure")
+        .upsert({ user_id: user.id, item_id: contentIds[i], last_seen: new Date().toISOString(), times_seen: 1, last_correct: value === answer }, { onConflict: "user_id,item_id" })
+        .then(({ error }) => { if (error) console.warn("Could not record early discover exposure:", error); })
+        .catch((error) => console.warn("Could not record early discover exposure:", error));
+    }
     const ok = value === answer;
     setCorrect(ok);
     if (ok) {
