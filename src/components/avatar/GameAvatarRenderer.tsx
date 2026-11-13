@@ -740,7 +740,7 @@ const GameAvatarRenderer: React.FC<GameAvatarRendererProps> = ({
             ⭐
           </motion.div>
           <motion.div
-            className="absolute bottom-4 left-2 text-purple-400"
+            className="absolute bottom-4 left-2 text-primary"
             animate={{ y: [0, -5, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
           >

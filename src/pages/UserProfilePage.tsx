@@ -769,7 +769,7 @@ const UserProfilePage = () => {
           <p className="text-xs text-white/60">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "recently"}</p>
         </header>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-indigo-900/70 via-violet-900/60 to-cyan-900/50 shadow-[0_0_60px_rgba(34,211,238,0.12)]">
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-primary/70 via-primary/60 to-cyan-900/50 shadow-sm">
           <motion.div
             aria-hidden
             className="absolute inset-0"
@@ -777,8 +777,8 @@ const UserProfilePage = () => {
             transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
             style={{ backgroundImage: "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1), transparent 40%), radial-gradient(circle at 80% 0%, rgba(34,211,238,0.25), transparent 35%)" }}
           />
-          <div className="pointer-events-none absolute -left-20 top-10 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
-          <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 top-10 h-64 w-64 rounded-full bg-primary/20 hidden" />
+          <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-500/20 hidden" />
 
           <div className="relative flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-5 sm:p-5 md:p-6">
             <motion.button
@@ -823,7 +823,7 @@ const UserProfilePage = () => {
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profile.name || profile.username}</h1>
-                <Badge className={`bg-gradient-to-r ${tierStyle(profile.level)} px-3 py-1 text-xs shadow-[0_0_18px_rgba(168,85,247,0.35)]`}>
+                <Badge className={`bg-gradient-to-r ${tierStyle(profile.level)} px-3 py-1 text-xs shadow-sm`}>
                   {currentTier.icon} {currentTier.name}
                 </Badge>
               </div>
@@ -933,7 +933,7 @@ const UserProfilePage = () => {
                 className={`min-w-40 snap-start rounded-2xl border p-4 text-left transition ${
                   achievement.locked
                     ? "border-white/10 bg-white/[0.03] opacity-55 blur-[0.4px]"
-                    : "border-cyan-400/30 bg-cyan-400/10 shadow-[0_0_24px_rgba(34,211,238,0.28)]"
+                    : "border-cyan-400/30 bg-cyan-400/10 shadow-sm"
                 }`}
               >
                 <p className="text-4xl">{achievement.icon}</p>
@@ -950,8 +950,8 @@ const UserProfilePage = () => {
             <Badge variant="secondary">{collections.length}/{totalCollectionItems || 0} owned</Badge>
           </div>
 
-          <div className="rounded-2xl border border-violet-400/25 bg-gradient-to-r from-violet-500/20 via-cyan-500/10 to-transparent p-4">
-            <p className="mb-2 text-xs uppercase tracking-wide text-violet-100/80">Featured Loadout</p>
+          <div className="rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/20 via-cyan-500/10 to-transparent p-4">
+            <p className="mb-2 text-xs uppercase tracking-wide text-primary/80">Featured Loadout</p>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {featuredItems.length ? featuredItems.map((item) => (
                 <motion.div key={item.item_id} whileHover={{ scale: 1.04 }} className="rounded-xl border border-white/15 bg-white/[0.04] p-3 text-center">
@@ -978,7 +978,7 @@ const UserProfilePage = () => {
                     <motion.div
                       key={item.item_id}
                       whileHover={{ scale: 1.03 }}
-                      className={`rounded-2xl border p-3 text-center transition ${item.owned ? "bg-card" : "opacity-45 grayscale"} ${item.rarity === "legendary" ? "border-amber-400/60 shadow-[0_0_24px_rgba(251,191,36,0.35)]" : "border-white/10"}`}
+                      className={`rounded-2xl border p-3 text-center transition ${item.owned ? "bg-card" : "opacity-45 grayscale"} ${item.rarity === "legendary" ? "border-amber-400/60 shadow-sm" : "border-white/10"}`}
                     >
                       <p className="text-4xl">{item.preview}</p>
                       <p className="mt-2 truncate text-sm font-semibold">{item.name}</p>
@@ -1002,7 +1002,7 @@ const UserProfilePage = () => {
           {(activities.length ? activities : [{ id: "0", text: "Reached a new learning milestone", time: new Date().toISOString(), icon: "spark" as const }]).map((activity, index) => (
             <motion.div key={activity.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <span className="rounded-full border border-white/20 bg-white/10 p-2">
-                {activity.icon === "trophy" ? <Trophy className="h-4 w-4 text-amber-300" /> : activity.icon === "zap" ? <Zap className="h-4 w-4 text-cyan-300" /> : <Sparkles className="h-4 w-4 text-fuchsia-300" />}
+                {activity.icon === "trophy" ? <Trophy className="h-4 w-4 text-amber-300" /> : activity.icon === "zap" ? <Zap className="h-4 w-4 text-cyan-300" /> : <Sparkles className="h-4 w-4 text-primary" />}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold leading-tight">{activity.text}</p>
@@ -1062,7 +1062,7 @@ const UserProfilePage = () => {
           <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
             <p className="inline-flex items-center gap-2"><Star className="h-4 w-4 text-cyan-300" />Status: {selectedAchievement?.locked ? "Locked" : "Unlocked"}</p>
             <p className="inline-flex items-center gap-2"><Crown className="h-4 w-4 text-amber-300" />Earn date: {selectedAchievement?.date || "Not yet earned"}</p>
-            <p className="inline-flex items-center gap-2"><Lock className="h-4 w-4 text-violet-300" />Rarity: {selectedAchievement?.locked ? "Hidden" : "Profile highlight"}</p>
+            <p className="inline-flex items-center gap-2"><Lock className="h-4 w-4 text-primary" />Rarity: {selectedAchievement?.locked ? "Hidden" : "Profile highlight"}</p>
           </div>
         </DialogContent>
       </Dialog>

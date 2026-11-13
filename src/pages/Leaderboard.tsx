@@ -20,9 +20,9 @@ type LeaderboardTab = "global" | "grade" | "friends" | "weekly" | "classes";
 type Timeframe = "all" | "monthly" | "weekly";
 
 const podiumStyles = {
-  1: "border-yellow-400/70 bg-gradient-to-b from-yellow-500/20 via-amber-500/15 to-background shadow-[0_0_30px_rgba(250,204,21,0.35)]",
-  2: "border-slate-300/70 bg-gradient-to-b from-slate-400/20 via-slate-400/10 to-background shadow-[0_0_24px_rgba(148,163,184,0.28)]",
-  3: "border-amber-600/60 bg-gradient-to-b from-amber-700/20 via-orange-600/10 to-background shadow-[0_0_20px_rgba(180,83,9,0.3)]",
+  1: "border-yellow-400/70 bg-gradient-to-b from-yellow-500/20 via-amber-500/15 to-background shadow-sm",
+  2: "border-slate-300/70 bg-gradient-to-b from-slate-400/20 via-slate-400/10 to-background shadow-sm",
+  3: "border-amber-600/60 bg-gradient-to-b from-amber-700/20 via-orange-600/10 to-background shadow-sm",
 };
 
 const tabConfig: Array<{ value: LeaderboardTab; label: string; icon: typeof Globe }> = [
@@ -263,7 +263,7 @@ const Leaderboard = () => {
                     <TabsTrigger
                       key={value}
                       value={value}
-                      className="gap-2 rounded-full px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_18px_rgba(99,102,241,0.45)]"
+                      className="gap-2 rounded-full px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
                     >
                       <Icon className="h-4 w-4" />
                       {label}
@@ -408,7 +408,7 @@ const Leaderboard = () => {
                     exit={{ opacity: 0 }}
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    className={`mb-2 flex w-full items-center gap-3 rounded-xl border p-3 text-left transition active:shadow-[0_0_20px_rgba(99,102,241,0.28)] ${entry.rankPos <= 10 ? "shadow-[0_0_14px_rgba(99,102,241,0.25)]" : "bg-card/80"}`}
+                    className={`mb-2 flex w-full items-center gap-3 rounded-xl border p-3 text-left transition active:shadow-sm ${entry.rankPos <= 10 ? "shadow-sm" : "bg-card/80"}`}
                   >
                     <span className="w-8 text-center text-sm font-semibold text-muted-foreground">#{entry.rankPos}</span>
                     <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="md" />
@@ -434,7 +434,7 @@ const Leaderboard = () => {
 
       <Button
         onClick={() => navigate("/social")}
-        className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-[0_0_22px_rgba(168,85,247,0.75)] md:bottom-6 md:right-6"
+        className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-sm md:bottom-6 md:right-6"
         aria-label="Quick challenge"
       >
         <Swords className="h-5 w-5" />

@@ -27,7 +27,7 @@ interface Message {
 const subjects = [
   { id: 'math', name: 'Mathematics', icon: Calculator, color: 'from-blue-500 to-cyan-500' },
   { id: 'science', name: 'Science', icon: Beaker, color: 'from-green-500 to-emerald-500' },
-  { id: 'english', name: 'English', icon: BookOpen, color: 'from-purple-500 to-fuchsia-500' },
+  { id: 'english', name: 'English', icon: BookOpen, color: 'from-primary to-accent' },
   { id: 'history', name: 'History', icon: History, color: 'from-amber-500 to-orange-500' },
   { id: 'geography', name: 'Geography', icon: Globe, color: 'from-teal-500 to-cyan-500' },
   { id: 'general', name: 'General', icon: Sparkles, color: 'from-pink-500 to-rose-500' },

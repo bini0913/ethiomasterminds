@@ -25,7 +25,7 @@ const UserLevel: React.FC<UserLevelProps> = ({
     if (level < 6) return { name: "Thinker", color: "bg-green-500 text-white" };
     if (level < 10) return { name: "Challenger", color: "bg-yellow-500 text-black" };
     if (level < 15) return { name: "Genius", color: "bg-orange-500 text-white" };
-    return { name: "Master Mind", color: "bg-purple-500 text-white" };
+    return { name: "Master Mind", color: "bg-primary text-white" };
   };
   
   const rank = getRank();

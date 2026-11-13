@@ -694,7 +694,7 @@ const ManagerDashboard: React.FC = () => {
   };
 
   const messagingTrend = weeklyLearning.map((item) => ({ day: item.day, messages: item.quizzes * 2 + item.flashcards }));
-  const panelClass = 'border border-primary/20 bg-background/70 backdrop-blur-xl shadow-[0_0_30px_rgba(99,102,241,0.12)]';
+  const panelClass = 'border border-primary/20 bg-background/70 backdrop-blur-xl shadow-sm';
   const subtlePanelClass = 'border border-primary/15 bg-background/60 backdrop-blur-md';
 
   return (
@@ -718,7 +718,7 @@ const ManagerDashboard: React.FC = () => {
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
             </Button>
-            <Badge className="bg-gradient-to-r from-cyan-500 via-indigo-500 to-fuchsia-500 text-white border-none">
+            <Badge className="bg-gradient-to-r from-cyan-500 via-primary to-accent text-white border-none">
               <Sparkles className="h-3 w-3 mr-1" />
               Manager Access
             </Badge>
@@ -1115,7 +1115,7 @@ const ManagerDashboard: React.FC = () => {
                 </Card>
 
                 <Card>
-                  <CardHeader><CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-fuchsia-500" /> Match + Bracket Control</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-primary" /> Match + Bracket Control</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <ScrollArea className="h-64 pr-3">
                       <div className="space-y-2">

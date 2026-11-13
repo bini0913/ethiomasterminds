@@ -335,7 +335,7 @@ const TimeTravelRevision: React.FC = () => {
               <Card className="glass border-border/50">
                 <CardContent className="pt-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Brain className="h-4 w-4 text-purple-500" />
+                    <Brain className="h-4 w-4 text-primary" />
                     <span className="text-sm text-muted-foreground">Total Mistakes</span>
                   </div>
                   <p className="text-2xl font-bold">{stats.totalMissed}</p>

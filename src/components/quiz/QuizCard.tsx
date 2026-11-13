@@ -33,13 +33,13 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onStart }) => {
     switch (category.toLowerCase()) {
       case "math":
       case "mathematics":
-        return "from-blue-500 to-indigo-600";
+        return "from-blue-500 to-accent";
       case "science":
         return "from-green-500 to-teal-600";
       case "english":
         return "from-yellow-500 to-orange-600";
       case "general knowledge":
-        return "from-purple-500 to-pink-600";
+        return "from-primary to-pink-600";
       default:
         return "from-gray-500 to-gray-600";
     }

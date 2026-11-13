@@ -250,7 +250,7 @@ const FlashcardsPage: React.FC = () => {
   if (!selectedSubject) {
     return (
       <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5"}>
-        <header className={upperStudent ? "px-4 pt-5 pb-1" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
+        <header className={upperStudent ? "px-4 pt-5 pb-1" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-accent px-4 py-3 shadow-xl"}>
           <div className="flex items-center gap-3 max-w-4xl mx-auto">
             {!upperStudent && <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className="text-white hover:bg-white/10">
               <ArrowLeft className="h-5 w-5" />
@@ -342,7 +342,7 @@ const FlashcardsPage: React.FC = () => {
   return (
     <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))] flex flex-col" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col"}>
       {/* Header */}
-      <header className={upperStudent ? "px-4 pt-5 pb-1" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-indigo-700 px-4 py-3 shadow-xl"}>
+      <header className={upperStudent ? "px-4 pt-5 pb-1" : "sticky top-0 z-50 bg-gradient-to-r from-blue-700 to-accent px-4 py-3 shadow-xl"}>
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => { setSelectedSubject(null); setCurrentIndex(0); setIsFlipped(false); }} className={upperStudent ? "text-muted-foreground hover:bg-muted hover:text-foreground" : "text-white hover:bg-white/10"}>
             <ArrowLeft className="h-5 w-5" />

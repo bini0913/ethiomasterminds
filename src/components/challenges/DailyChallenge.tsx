@@ -46,7 +46,7 @@ const DailyChallenge: React.FC = () => {
   if (loading) {
     return (
       <Card className="shadow-md">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+        <CardHeader className="bg-gradient-to-r from-blue-500 to-accent text-white">
           <CardTitle className="flex items-center justify-between">
             <span>Daily Challenge</span>
             <div className="text-sm bg-white text-blue-600 px-2 py-1 rounded-full">
@@ -65,7 +65,7 @@ const DailyChallenge: React.FC = () => {
   if (!dailyQuestion) {
     return (
       <Card className="shadow-md">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+        <CardHeader className="bg-gradient-to-r from-blue-500 to-accent text-white">
           <CardTitle className="flex items-center justify-between">
             <span>Daily Challenge</span>
             <div className="text-sm bg-white text-blue-600 px-2 py-1 rounded-full">
@@ -84,7 +84,7 @@ const DailyChallenge: React.FC = () => {
   
   return (
     <Card className="shadow-md">
-      <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+      <CardHeader className="bg-gradient-to-r from-blue-500 to-accent text-white">
         <CardTitle className="flex items-center justify-between">
           <span>Daily Challenge</span>
           <div className="text-sm bg-white text-blue-600 px-2 py-1 rounded-full">

@@ -33,7 +33,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onJoin }) => {
       case "science":
         return "bg-green-100 text-green-800";
       case "english":
-        return "bg-purple-100 text-purple-800";
+        return "bg-primary text-primary";
       case "mixed":
         return "bg-amber-100 text-amber-800";
       default:

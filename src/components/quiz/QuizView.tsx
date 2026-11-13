@@ -472,7 +472,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
 
               {/* Rank Display */}
               {user && (
-                <div className="mt-4 p-3 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-lg">
+                <div className="mt-4 p-3 bg-gradient-to-r from-primary to-accent rounded-lg">
                   <div className="text-sm text-gray-600">Current Level</div>
                   <div className="flex items-center justify-center gap-2 text-lg font-semibold">
                     Level {user.level} 

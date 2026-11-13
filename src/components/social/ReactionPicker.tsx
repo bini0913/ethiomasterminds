@@ -18,7 +18,7 @@ const reactionConfig: Record<ReactionType, { icon: React.ElementType; color: str
   like: { icon: ThumbsUp, color: 'text-blue-500', label: 'Like', emoji: '👍' },
   love: { icon: Heart, color: 'text-red-500', label: 'Love', emoji: '❤️' },
   laugh: { icon: Laugh, color: 'text-yellow-500', label: 'Haha', emoji: '😂' },
-  sad: { icon: Frown, color: 'text-purple-500', label: 'Sad', emoji: '😢' },
+  sad: { icon: Frown, color: 'text-primary', label: 'Sad', emoji: '😢' },
   angry: { icon: Angry, color: 'text-orange-500', label: 'Angry', emoji: '😠' },
   celebrate: { icon: PartyPopper, color: 'text-green-500', label: 'Celebrate', emoji: '🎉' }
 };

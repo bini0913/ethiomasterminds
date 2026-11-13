@@ -22,8 +22,8 @@ const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({ variant = 'compact', 
           <span className="text-sm font-medium">{coins.toLocaleString()}</span>
         </div>
         
-        <div className="flex items-center space-x-1 px-2 py-1 bg-purple-500/20 rounded-lg">
-          <Gem className="w-4 h-4 text-purple-500" />
+        <div className="flex items-center space-x-1 px-2 py-1 bg-primary/20 rounded-lg">
+          <Gem className="w-4 h-4 text-primary" />
           <span className="text-sm font-medium">{gems.toLocaleString()}</span>
         </div>
       </div>
@@ -44,14 +44,14 @@ const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({ variant = 'compact', 
         </div>
       </Card>
 
-      <Card className="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
+      <Card className="p-4 bg-gradient-to-br from-primary/10 to-pink-500/10 border-primary/20">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-purple-500/20 rounded-lg">
-            <Gem className="w-6 h-6 text-purple-500" />
+          <div className="p-2 bg-primary/20 rounded-lg">
+            <Gem className="w-6 h-6 text-primary" />
           </div>
           <div>
             <p className="text-sm font-medium text-muted-foreground">Gems</p>
-            <p className="text-2xl font-bold text-purple-600">{gems.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-primary">{gems.toLocaleString()}</p>
           </div>
         </div>
       </Card>

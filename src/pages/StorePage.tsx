@@ -209,7 +209,7 @@ const StorePage: React.FC = () => {
                   <Coins className="h-4 w-4 text-yellow-500" /> {coins.toLocaleString()}
                 </div>
                 <div className="rounded-lg border bg-card/70 px-3 py-1 text-sm flex items-center gap-2">
-                  <Gem className="h-4 w-4 text-purple-500" /> {gems.toLocaleString()}
+                  <Gem className="h-4 w-4 text-primary" /> {gems.toLocaleString()}
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
                   <Home className="h-4 w-4 mr-2" />

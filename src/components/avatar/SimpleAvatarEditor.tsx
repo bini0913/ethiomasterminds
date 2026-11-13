@@ -73,9 +73,9 @@ const backgrounds = [
   { id: 'forest', gradient: 'from-green-400 to-emerald-600', label: 'Forest', level: 2 },
   { id: 'ocean', gradient: 'from-cyan-400 to-blue-600', label: 'Ocean', level: 2 },
   { id: 'rose', gradient: 'from-pink-400 to-rose-500', label: 'Rose', level: 3 },
-  { id: 'galaxy', gradient: 'from-purple-500 to-indigo-700', label: 'Galaxy', level: 5 },
+  { id: 'galaxy', gradient: 'from-primary to-accent', label: 'Galaxy', level: 5 },
   { id: 'fire', gradient: 'from-red-500 to-orange-500', label: 'Fire', level: 6 },
-  { id: 'aurora', gradient: 'from-green-400 via-purple-500 to-pink-500', label: 'Aurora', level: 8 },
+  { id: 'aurora', gradient: 'from-green-400 via-primary to-pink-500', label: 'Aurora', level: 8 },
   { id: 'gold', gradient: 'from-yellow-400 to-amber-600', label: 'Gold', level: 10 },
 ];
 
@@ -203,7 +203,7 @@ const SimpleAvatarEditor: React.FC<SimpleAvatarEditorProps> = ({
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="relative mb-6">
           {/* Glow */}
-          <div className="absolute inset-0 bg-primary/30 rounded-full blur-3xl scale-150" />
+          <div className="absolute inset-0 bg-primary/30 rounded-full hidden scale-150" />
           
           {/* Avatar Display */}
           <motion.div

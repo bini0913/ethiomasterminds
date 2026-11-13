@@ -38,11 +38,11 @@ const backgroundColors: Record<string, string> = {
   sunset: 'bg-gradient-to-br from-orange-400 to-pink-500',
   forest: 'bg-gradient-to-br from-green-400 to-emerald-600',
   ocean: 'bg-gradient-to-br from-cyan-400 to-blue-600',
-  galaxy: 'bg-gradient-to-br from-purple-500 to-indigo-700',
+  galaxy: 'bg-gradient-to-br from-primary to-accent',
   fire: 'bg-gradient-to-br from-red-500 to-orange-500',
   mint: 'bg-gradient-to-br from-green-300 to-teal-400',
   rose: 'bg-gradient-to-br from-pink-400 to-rose-500',
-  aurora: 'bg-gradient-to-br from-green-400 via-purple-500 to-pink-500',
+  aurora: 'bg-gradient-to-br from-green-400 via-primary to-pink-500',
   gold: 'bg-gradient-to-br from-yellow-400 to-amber-600'
 };
 

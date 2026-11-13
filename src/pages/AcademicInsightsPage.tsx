@@ -185,7 +185,7 @@ const AcademicInsightsPage: React.FC = () => {
     { icon: <Target className="h-5 w-5" />, label: "Accuracy", value: `${Math.round(accuracy)}%`, color: accuracy >= 80 ? "text-green-600" : accuracy >= 50 ? "text-yellow-600" : "text-red-600" },
     { icon: <Zap className="h-5 w-5" />, label: "Quizzes Done", value: String(totalQuizzes), color: "text-primary" },
     { icon: <Calendar className="h-5 w-5" />, label: "Current Streak", value: `${currentStreak} days`, color: "text-orange-600" },
-    { icon: <Award className="h-5 w-5" />, label: "Best Streak", value: `${longestStreak} days`, color: "text-purple-600" },
+    { icon: <Award className="h-5 w-5" />, label: "Best Streak", value: `${longestStreak} days`, color: "text-primary" },
   ];
 
   return (
@@ -213,7 +213,7 @@ const AcademicInsightsPage: React.FC = () => {
 
         {/* AI Insights Button */}
         <Button
-          className={upperStudent ? "h-12 w-full" : "w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"}
+          className={upperStudent ? "h-12 w-full" : "w-full h-12 bg-gradient-to-r from-primary to-accent text-white hover:from-primary hover:to-accent"}
           onClick={generateAIInsights}
           disabled={isLoadingAI}
         >
@@ -227,10 +227,10 @@ const AcademicInsightsPage: React.FC = () => {
         {/* AI Insights Display */}
         {aiInsights && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="bg-gradient-to-br from-violet-500/5 to-purple-500/5 border-violet-500/20">
+            <Card className="bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <Brain className="h-5 w-5 text-violet-600" />
+                  <Brain className="h-5 w-5 text-primary" />
                   <h3 className="font-semibold text-sm">AI Analysis</h3>
                 </div>
                 <div className="text-sm leading-relaxed whitespace-pre-line text-foreground/80">

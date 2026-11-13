@@ -968,7 +968,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-blue-950 to-purple-950 p-4 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-blue-950 to-accent p-4 text-white relative overflow-hidden">
       <div className="absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_20%_10%,rgba(59,130,246,0.28),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(168,85,247,0.24),transparent_35%)]" />
 
       <div className="max-w-6xl mx-auto relative z-10">
@@ -1011,7 +1011,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
             {roomState.status === 'waiting' && (
-              <Card className="p-6 bg-white/5 border-white/10 shadow-[0_0_40px_rgba(99,102,241,0.22)]">
+              <Card className="p-6 bg-white/5 border-white/10 shadow-sm">
                 <div className="text-center space-y-4">
                   <h2 className="text-xl font-bold">Lobby Ready Check</h2>
                   <p className="text-blue-100/80">{players.length}/{roomMaxPlayers} players connected</p>
@@ -1177,7 +1177,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
                       if (selectedAnswer !== null) {
                         if (answerResult?.correctAnswerIndex === index) {
-                          buttonClass = 'border-green-500 bg-green-500/20 shadow-[0_0_18px_rgba(16,185,129,0.45)]';
+                          buttonClass = 'border-green-500 bg-green-500/20 shadow-sm';
                         } else if (selectedAnswer === index && !answerResult?.correct) {
                           buttonClass = 'border-red-400 bg-red-500/20';
                         } else {
@@ -1229,7 +1229,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                   )}
 
                   {consecutiveCorrect >= 3 && (
-                    <div className="rounded-lg bg-violet-500/20 p-2 text-center text-sm">
+                    <div className="rounded-lg bg-primary/20 p-2 text-center text-sm">
                       {consecutiveCorrect >= 10 ? 'OVERDRIVE MODE 🔥' : consecutiveCorrect >= 5 ? 'Flame Streak Active 🔥' : 'Streak Glow Activated ✨'}
                     </div>
                   )}

@@ -111,7 +111,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSuccess }) => {
         
         <Button 
           type="submit" 
-          className="w-full bg-purple-600 hover:bg-purple-700"
+          className="w-full bg-primary hover:bg-primary"
           disabled={loading}
         >
           {loading ? "Creating Account..." : "Sign Up"}

@@ -568,7 +568,7 @@ const StudyModePage: React.FC = () => {
   }
 
   return (
-    <div className={upperStudent ? "tier-upper mm-study-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white pb-[env(safe-area-inset-bottom)]"}>
+    <div className={upperStudent ? "tier-upper mm-study-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-slate-950 via-primary to-slate-900 text-white pb-[env(safe-area-inset-bottom)]"}>
       {upperStudent && <style>{`
         .mm-study-upper .mm-study-hero{background:radial-gradient(circle at 88% 10%,hsl(var(--primary)/.17),transparent 32%),hsl(var(--card));color:hsl(var(--foreground));border-color:hsl(var(--border))}
         .mm-study-upper .mm-study-hero .text-muted-foreground{color:hsl(var(--muted-foreground))}
@@ -599,7 +599,7 @@ const StudyModePage: React.FC = () => {
             <ArrowLeft className="h-4 w-4" /> Back to Master Minds
           </Link>}
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight md:text-3xl">
-            <Brain className={`h-7 w-7 ${upperStudent ? "text-primary" : "text-violet-300"}`} /> Study Mode
+            <Brain className={`h-7 w-7 ${upperStudent ? "text-primary" : "text-primary"}`} /> Study Mode
           </h1>
           <p className={upperStudent ? "text-sm text-muted-foreground" : "text-sm text-white/70"}>Focus sessions · Real study history · XP rewards · Live study room · Task linking.</p>
         </header>

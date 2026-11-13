@@ -56,7 +56,7 @@ const MindForgeReactionOverlay: React.FC<MindForgeReactionOverlayProps> = ({
           className={`w-full max-w-md rounded-2xl border p-5 shadow-2xl backdrop-blur-md ${
             activeReaction === "wrong_growth" || activeReaction === "focus_boost"
               ? "border-blue-300/40 bg-slate-900/85"
-              : "border-purple-300/40 bg-gradient-to-br from-indigo-900/90 to-purple-900/90"
+              : "border-primary/40 bg-gradient-to-br from-primary/90 to-accent/90"
           } text-white`}
         >
           <div className="mb-3 flex items-center gap-3">

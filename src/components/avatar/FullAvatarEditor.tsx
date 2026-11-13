@@ -255,7 +255,7 @@ const FullAvatarEditor: React.FC<FullAvatarEditorProps> = ({
       {/* Avatar Preview - Large */}
       <div className="flex flex-col items-center py-6">
         <div className="relative">
-          <div className="absolute inset-0 bg-primary/10 rounded-full blur-3xl scale-150 -z-10" />
+          <div className="absolute inset-0 bg-primary/10 rounded-full hidden scale-150 -z-10" />
           <motion.div
             className="relative"
             animate={{ y: [0, -6, 0] }}

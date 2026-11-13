@@ -42,25 +42,25 @@ const sectionLabel: Record<StoreItem['section'], string> = {
 const rarityStyle: Record<StoreItem['rarity'], { border: string; glow: string; chip: string; text: string }> = {
   common: {
     border: 'border-slate-500/50',
-    glow: 'hover:shadow-[0_0_30px_rgba(148,163,184,0.35)]',
+    glow: 'hover:shadow-sm',
     chip: 'bg-slate-500/20 border-slate-400/40 text-slate-100',
     text: 'Common',
   },
   rare: {
     border: 'border-blue-500/60',
-    glow: 'hover:shadow-[0_0_30px_rgba(59,130,246,0.45)]',
+    glow: 'hover:shadow-sm',
     chip: 'bg-blue-500/20 border-blue-400/40 text-blue-100',
     text: 'Rare',
   },
   epic: {
-    border: 'border-purple-500/60',
-    glow: 'hover:shadow-[0_0_30px_rgba(168,85,247,0.45)]',
-    chip: 'bg-purple-500/20 border-purple-400/40 text-purple-100',
+    border: 'border-primary/60',
+    glow: 'hover:shadow-sm',
+    chip: 'bg-primary/20 border-primary/40 text-primary',
     text: 'Epic',
   },
   legendary: {
     border: 'border-amber-500/60',
-    glow: 'hover:shadow-[0_0_40px_rgba(245,158,11,0.5)]',
+    glow: 'hover:shadow-sm',
     chip: 'bg-amber-500/20 border-amber-400/40 text-amber-100',
     text: 'Legendary',
   },
@@ -271,7 +271,7 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
       >
         <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
         {limited && <Badge className="absolute left-2 top-2 border-none bg-red-500/90 text-white">Limited Today</Badge>}
-        {exclusive && <Badge className="absolute right-2 top-2 border-none bg-fuchsia-500/90 text-white">Top Players</Badge>}
+        {exclusive && <Badge className="absolute right-2 top-2 border-none bg-primary/90 text-white">Top Players</Badge>}
 
         {item.owned && !item.equipped && (
           <div className="absolute bottom-2 right-2">
@@ -293,7 +293,7 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
           </div>
 
           <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-white">
-            {item.currency === 'coins' ? <Coins className="h-4 w-4 text-yellow-400" /> : <Gem className="h-4 w-4 text-purple-400" />}
+            {item.currency === 'coins' ? <Coins className="h-4 w-4 text-yellow-400" /> : <Gem className="h-4 w-4 text-primary" />}
             {item.price === 0 ? 'Free level reward' : item.price.toLocaleString()}
           </div>
           <div className="text-xs text-zinc-400">{levelLocked ? `Unlocks at Level ${item.unlockLevel}` : `Available from Level ${item.unlockLevel}`}</div>
@@ -374,7 +374,7 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
             <Coins className="mr-1 h-4 w-4 text-yellow-400" /> {coins.toLocaleString()}
           </Badge>
           <Badge className="border border-zinc-700 bg-zinc-900 px-3 py-1 text-zinc-100">
-            <Gem className="mr-1 h-4 w-4 text-purple-400" /> {gems.toLocaleString()}
+            <Gem className="mr-1 h-4 w-4 text-primary" /> {gems.toLocaleString()}
           </Badge>
           <Button size="sm" variant="secondary" onClick={() => onQuickNavigate?.('exchange')}>
             + Get Coins
@@ -409,7 +409,7 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
       {renderSection('👕 Clothes', <Zap className="h-4 w-4 text-pink-400" />, categoryItems.clothes)}
       {renderSection('🚗 Cars', <Zap className="h-4 w-4 text-cyan-300" />, categoryItems.cars)}
       {renderSection('🏠 Houses', <Crown className="h-4 w-4 text-emerald-300" />, categoryItems.houses)}
-      {renderSection('🏷️ Titles', <Badge className="h-4 w-4 rounded-full p-0" />, categoryItems.titles, <Badge className="bg-fuchsia-500/80">Exclusive</Badge>, false, true)}
+      {renderSection('🏷️ Titles', <Badge className="h-4 w-4 rounded-full p-0" />, categoryItems.titles, <Badge className="bg-primary/80">Exclusive</Badge>, false, true)}
       {renderSection('🎁 Bundles', <Gift className="h-4 w-4 text-emerald-300" />, categoryItems.bundles)}
 
       <Dialog open={Boolean(selectedItem)} onOpenChange={(open) => !open && setSelectedItem(null)}>
@@ -445,7 +445,7 @@ const AvatarStore: React.FC<AvatarStoreProps> = ({ onQuickNavigate }) => {
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className={`border ${rarityStyle[selectedItem.rarity].chip}`}>{rarityStyle[selectedItem.rarity].text}</Badge>
                   <Badge variant="outline" className="border-zinc-700 text-zinc-300">
-                    {selectedItem.currency === 'coins' ? <Coins className="mr-1 h-3.5 w-3.5 text-yellow-400" /> : <Gem className="mr-1 h-3.5 w-3.5 text-purple-400" />} {selectedItem.price}
+                    {selectedItem.currency === 'coins' ? <Coins className="mr-1 h-3.5 w-3.5 text-yellow-400" /> : <Gem className="mr-1 h-3.5 w-3.5 text-primary" />} {selectedItem.price}
                   </Badge>
                 </div>
               </div>

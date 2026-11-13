@@ -1091,10 +1091,10 @@ const Lobby: React.FC = () => {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold truncate text-white">{user.name || "Player"}</p>
                 <div className="h-1.5 rounded-full bg-slate-700 mt-1 overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-blue-400 to-violet-400 animate-pulse" style={{ width: `${Math.min(100, ((user.xp || 0) % 1000) / 10)}%` }} />
+                  <div className="h-full bg-gradient-to-r from-blue-400 to-accent animate-pulse" style={{ width: `${Math.min(100, ((user.xp || 0) % 1000) / 10)}%` }} />
                 </div>
               </div>
-              <Badge className="bg-violet-500/20 text-violet-200 border-violet-300/40">Lv.{user.level || 1}</Badge>
+              <Badge className="bg-primary/20 text-primary border-primary/40">Lv.{user.level || 1}</Badge>
             </div>
             <Button variant="ghost" size="icon" onClick={loadLobbyData}>
               <RefreshCw className={`h-4 w-4 text-white ${loading ? 'animate-spin' : ''}`} />
@@ -1114,7 +1114,7 @@ const Lobby: React.FC = () => {
           <Button variant="outline" className="gap-2 whitespace-nowrap border-cyan-400/40 text-cyan-100 bg-cyan-500/10 hover:bg-cyan-500/20" onClick={handleRandomMatch}>
             <Zap className="h-4 w-4" /> Find Match
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap border-violet-400/40 text-violet-100 bg-violet-500/10 hover:bg-violet-500/20">
+          <Button variant="outline" className="gap-2 whitespace-nowrap border-primary/40 text-primary bg-primary/10 hover:bg-primary/20">
             <Swords className="h-4 w-4" /> Ranked
           </Button>
           <Button variant="outline" className="gap-2 whitespace-nowrap border-amber-300/40 text-amber-100 bg-amber-500/10 hover:bg-amber-500/20">
@@ -1137,14 +1137,14 @@ const Lobby: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
           {[
             { title: "⚔️ Quick Match", desc: "Fast balanced duel queue", onClick: handleRandomMatch, style: "from-cyan-500/40 to-blue-500/30 border-cyan-300/30" },
-            { title: "👥 Team Up", desc: "Invite friends and squad", onClick: () => setCreateRoomOpen(true), style: "from-violet-500/40 to-fuchsia-500/30 border-violet-300/30" },
+            { title: "👥 Team Up", desc: "Invite friends and squad", onClick: () => setCreateRoomOpen(true), style: "from-primary/40 to-accent/30 border-primary/30" },
             { title: "🏆 Tournaments", desc: "Join live competitive cups", onClick: () => {}, style: "from-amber-500/40 to-orange-500/30 border-amber-300/30" },
             { title: "🔐 Private Room", desc: "Code + pass protected lobby", onClick: () => setCreateRoomOpen(true), style: "from-emerald-500/40 to-teal-500/30 border-emerald-300/30" },
           ].map((card) => (
             <button
               key={card.title}
               onClick={card.onClick}
-              className={`text-left rounded-2xl border p-4 bg-gradient-to-br ${card.style} hover:scale-[1.015] transition-transform shadow-[0_0_25px_rgba(56,189,248,0.12)]`}
+              className={`text-left rounded-2xl border p-4 bg-gradient-to-br ${card.style} hover:scale-[1.015] transition-transform shadow-sm`}
             >
               <p className="font-semibold text-white">{card.title}</p>
               <p className="text-xs text-slate-200 mt-1">{card.desc}</p>
@@ -1158,9 +1158,9 @@ const Lobby: React.FC = () => {
               <p className="text-2xl font-bold mt-1 text-white">{onlinePlayers.length.toLocaleString()}</p>
             </CardContent>
           </Card>
-          <Card className="border-indigo-300/30 bg-indigo-500/10">
+          <Card className="border-primary/30 bg-primary/10">
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-indigo-100"><Activity className="h-4 w-4" /> Matches in progress</div>
+              <div className="flex items-center gap-2 text-primary"><Activity className="h-4 w-4" /> Matches in progress</div>
               <p className="text-2xl font-bold mt-1 text-white">{liveMatchCount}</p>
             </CardContent>
           </Card>
@@ -1592,7 +1592,7 @@ const Lobby: React.FC = () => {
 
       {incomingInvite && incomingInvite.status === "pending" && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[92vw] max-w-md">
-          <Card className="border-emerald-400/40 bg-slate-950/95 backdrop-blur-xl shadow-[0_0_40px_rgba(16,185,129,0.35)]">
+          <Card className="border-emerald-400/40 bg-slate-950/95 backdrop-blur-xl shadow-sm">
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <AvatarRenderer avatar={incomingInviteSender?.avatar || "avatar-1"} size="md" />

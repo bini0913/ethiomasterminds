@@ -94,7 +94,7 @@ const QuizFilter: React.FC = () => {
           transition={{ duration: 0.5 }}>
 
           <Card className="shadow-md">
-            <CardHeader className="bg-gradient-to-r from-primary to-indigo-600 text-white">
+            <CardHeader className="bg-gradient-to-r from-primary to-accent text-white">
               <div className="flex items-center">
                 <Filter className="mr-2 h-5 w-5" />
                 <CardTitle>Customize Your Quiz</CardTitle>
@@ -193,7 +193,7 @@ const QuizFilter: React.FC = () => {
                       </Badge>
                     }
                     {topic &&
-                    <Badge variant="outline" className="bg-purple-50 text-purple-800 border-purple-300">
+                    <Badge variant="outline" className="bg-primary text-primary border-primary">
                         Topic: {topic}
                       </Badge>
                     }

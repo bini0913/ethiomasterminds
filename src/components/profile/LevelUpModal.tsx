@@ -104,7 +104,7 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({
             >
               <div className="relative mx-auto w-24 h-24 mb-6">
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"
+                  className="absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-full"
                   animate={{ 
                     scale: [1, 1.2, 1],
                     boxShadow: [
@@ -159,17 +159,17 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({
               
               <div className="grid grid-cols-3 gap-3 mb-6">
                 <motion.div 
-                  className="flex flex-col items-center justify-center p-3 bg-indigo-50 rounded-lg"
+                  className="flex flex-col items-center justify-center p-3 bg-primary rounded-lg"
                   whileHover={{ scale: 1.05 }}
                 >
-                  <BadgeCheck className="h-6 w-6 text-indigo-500 mb-1" />
+                  <BadgeCheck className="h-6 w-6 text-primary mb-1" />
                   <span className="text-xs text-gray-600">New Quizzes</span>
                 </motion.div>
                 <motion.div 
-                  className="flex flex-col items-center justify-center p-3 bg-purple-50 rounded-lg"
+                  className="flex flex-col items-center justify-center p-3 bg-primary rounded-lg"
                   whileHover={{ scale: 1.05 }}
                 >
-                  <Star className="h-6 w-6 text-purple-500 mb-1" />
+                  <Star className="h-6 w-6 text-primary mb-1" />
                   <span className="text-xs text-gray-600">XP Bonus</span>
                 </motion.div>
                 <motion.div 
@@ -183,7 +183,7 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({
               
               <Button
                 onClick={handleClose}
-                className="w-full bg-gradient-to-r from-indigo-500 to-purple-600"
+                className="w-full bg-gradient-to-r from-primary to-accent"
               >
                 Continue Learning
               </Button>

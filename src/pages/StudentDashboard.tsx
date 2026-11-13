@@ -333,7 +333,7 @@ const StudentDashboard: React.FC = () => {
   const getRankInfo = (level: number) => {
     if (level < 5) return { title: "Rookie", icon: "🌱", color: "from-slate-500 to-slate-600" };
     if (level < 10) return { title: "Thinker", icon: "💭", color: "from-blue-500 to-blue-600" };
-    if (level < 20) return { title: "Master", icon: "🎓", color: "from-purple-500 to-purple-600" };
+    if (level < 20) return { title: "Master", icon: "🎓", color: "from-primary to-accent" };
     if (level < 35) return { title: "Grand Master", icon: "👑", color: "from-amber-500 to-orange-600" };
     return { title: "Legend", icon: "⚡", color: "from-pink-500 to-rose-600" };
   };
@@ -517,10 +517,10 @@ const StudentDashboard: React.FC = () => {
                   {[
                     { icon: BookOpen, label: "Start Quiz", path: "/quiz", gradient: "from-primary to-accent" },
                     { icon: Users, label: "Multiplayer", path: "/lobby", gradient: "from-secondary to-glow-cyan" },
-                    { icon: Bot, label: "AI Tutor", path: "/ai-tutor", gradient: "from-violet-500 to-purple-600" },
+                    { icon: Bot, label: "AI Tutor", path: "/ai-tutor", gradient: "from-primary to-accent" },
                     { icon: Brain, label: "My Learning", path: "/learning-dna", gradient: "from-pink-500 to-rose-500" },
                     { icon: Trophy, label: "Leaderboard", path: "/leaderboard", gradient: "from-glow-yellow to-orange-500" },
-                    { icon: Gift, label: "Store", path: "/store", gradient: "from-purple-500 to-indigo-500" }
+                    { icon: Gift, label: "Store", path: "/store", gradient: "from-primary to-accent" }
                   ].map((action, i) => (
                     <motion.div key={i} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                       <Button

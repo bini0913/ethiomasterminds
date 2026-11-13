@@ -499,7 +499,7 @@ const TournamentHub: React.FC = () => {
         .mm-tournament-upper .mm-tournament-panel .border-slate-700{border-color:var(--border)}
         @media(max-width:640px){.mm-tournament-upper .mm-tournament-panel{border-radius:1rem}}
       `}</style>}
-      <Card className={upperStudent ? "mm-tournament-hero overflow-hidden border-border/70 shadow-sm" : "overflow-hidden border-cyan-400/20 bg-[linear-gradient(160deg,#020617_0%,#0f172a_45%,#111827_100%)] shadow-[0_0_45px_rgba(34,211,238,0.18)]"}>
+      <Card className={upperStudent ? "mm-tournament-hero overflow-hidden border-border/70 shadow-sm" : "overflow-hidden border-cyan-400/20 bg-[linear-gradient(160deg,#020617_0%,#0f172a_45%,#111827_100%)] shadow-sm"}>
         <CardHeader className={upperStudent ? "border-b border-white/10" : "border-b border-cyan-500/20"}>
           <CardTitle className={upperStudent ? "flex items-center gap-3 text-2xl text-white" : "flex items-center gap-3 text-2xl text-cyan-100"}>
             <Trophy className={upperStudent ? "h-7 w-7 text-amber-300" : "h-7 w-7 text-cyan-300"} />
@@ -536,7 +536,7 @@ const TournamentHub: React.FC = () => {
           {activeTournaments.map((tournament) => (
             <Card
               key={tournament.id}
-              className={upperStudent ? "mm-tournament-panel group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40" : "group cursor-pointer border-red-400/30 bg-slate-950/80 transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:border-red-300/70 hover:shadow-[0_0_28px_rgba(248,113,113,0.35)]"}
+              className={upperStudent ? "mm-tournament-panel group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40" : "group cursor-pointer border-red-400/30 bg-slate-950/80 transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:border-red-300/70 hover:shadow-sm"}
               onClick={() => setSelectedTournamentId(tournament.id)}
             >
               <CardHeader className="space-y-3">
@@ -567,7 +567,7 @@ const TournamentHub: React.FC = () => {
           {upcomingTournaments.map((tournament) => (
             <Card
               key={tournament.id}
-              className="group cursor-pointer border-amber-400/20 bg-slate-950/70 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(251,191,36,0.28)]"
+              className="group cursor-pointer border-amber-400/20 bg-slate-950/70 transition-all duration-300 hover:-translate-y-1 hover:shadow-sm"
               onClick={() => setSelectedTournamentId(tournament.id)}
             >
               <CardContent className="space-y-3 p-5">
@@ -594,7 +594,7 @@ const TournamentHub: React.FC = () => {
           {completedTournaments.map((tournament) => (
             <Card
               key={tournament.id}
-              className="cursor-pointer border-emerald-400/20 bg-slate-950/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(16,185,129,0.3)]"
+              className="cursor-pointer border-emerald-400/20 bg-slate-950/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-sm"
               onClick={() => setSelectedTournamentId(tournament.id)}
             >
               <CardContent className="space-y-2 p-5">
@@ -613,7 +613,7 @@ const TournamentHub: React.FC = () => {
 
       {selectedTournament && (
         <section className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
-          <Card className="border-cyan-500/30 bg-slate-950/90 shadow-[0_0_30px_rgba(34,211,238,0.18)]">
+          <Card className="border-cyan-500/30 bg-slate-950/90 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center justify-between gap-2 text-cyan-100">
                 <span>🏟️ Tournament Details</span>
@@ -657,9 +657,9 @@ const TournamentHub: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "border-fuchsia-500/30 bg-slate-950/90 shadow-[0_0_34px_rgba(217,70,239,0.2)]"}>
+          <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "border-primary/30 bg-slate-950/90 shadow-sm"}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-fuchsia-100"><Target className="h-5 w-5" /> 🌳 Bracket</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-primary"><Target className="h-5 w-5" /> 🌳 Bracket</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <div className="flex min-w-max gap-4">
@@ -667,11 +667,11 @@ const TournamentHub: React.FC = () => {
                   <div key={column.round} className="w-[240px] space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="font-semibold">{column.label}</p>
-                      {index === bracketRounds.length - 1 && <Badge className="bg-fuchsia-500/70">Current</Badge>}
+                      {index === bracketRounds.length - 1 && <Badge className="bg-primary/70">Current</Badge>}
                     </div>
                     {column.matches.map((match) => (
-                      <div key={match.id} className="relative rounded-xl border border-fuchsia-500/30 bg-slate-900/80 p-3 transition hover:border-fuchsia-300/70 hover:shadow-[0_0_20px_rgba(217,70,239,0.3)]">
-                        <div className="absolute -right-3 top-1/2 hidden h-px w-3 bg-fuchsia-500/60 lg:block" />
+                      <div key={match.id} className="relative rounded-xl border border-primary/30 bg-slate-900/80 p-3 transition hover:border-primary/70 hover:shadow-sm">
+                        <div className="absolute -right-3 top-1/2 hidden h-px w-3 bg-primary/60 lg:block" />
                         <p className="text-xs text-slate-400">Match {match.bracketPosition}</p>
                         <p className={`text-sm ${match.winnerId === match.player1Id ? "text-emerald-300 font-semibold" : "text-slate-100"}`}>{match.player1}</p>
                         <p className={`text-sm ${match.winnerId === match.player2Id ? "text-emerald-300 font-semibold" : "text-slate-100"}`}>{match.player2}</p>
@@ -780,9 +780,9 @@ const TournamentHub: React.FC = () => {
         </Card>
       )}
 
-      <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "border-purple-500/30 bg-slate-950/90 shadow-[0_0_34px_rgba(168,85,247,0.22)]"}>
+      <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "border-primary/30 bg-slate-950/90 shadow-sm"}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-purple-100"><PlayCircle className="h-5 w-5" /> 🎮 Live Match Arena</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-primary"><PlayCircle className="h-5 w-5" /> 🎮 Live Match Arena</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {liveMatch ? (
@@ -793,12 +793,12 @@ const TournamentHub: React.FC = () => {
               </div>
               <p className="text-sm text-slate-300">Timer ⏳ {String(Number(liveMatch.meta?.remaining_seconds || 90)).padStart(2, "0")}s</p>
               <p className="text-sm text-slate-300">Live Score: {liveMatch.score1} - {liveMatch.score2}</p>
-              <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 p-3">
-                <p className="text-sm font-medium text-purple-100">Question</p>
+              <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
+                <p className="text-sm font-medium text-primary">Question</p>
                 <p className="text-sm text-slate-200">{String(liveMatch.meta?.question || "Question stream will appear here during match play.")}</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {(Array.isArray(liveMatch.meta?.options) ? (liveMatch.meta.options as string[]) : []).map((option, index) => (
-                    <div key={`${option}-${index}`} className="rounded border border-purple-500/30 bg-slate-900/80 px-2 py-1 text-xs text-slate-100">{option}</div>
+                    <div key={`${option}-${index}`} className="rounded border border-primary/30 bg-slate-900/80 px-2 py-1 text-xs text-slate-100">{option}</div>
                   ))}
                 </div>
               </div>
@@ -810,7 +810,7 @@ const TournamentHub: React.FC = () => {
           ) : (
             <p className="text-sm text-muted-foreground">No live match right now. Matches will appear here automatically once they start.</p>
           )}
-          <div className="flex items-center gap-2 text-xs text-purple-200/80">
+          <div className="flex items-center gap-2 text-xs text-primary/80">
             <Sparkles className="h-4 w-4" /> Win flash, bracket highlights, and champion celebration are auto-triggered from live DB state updates.
           </div>
         </CardContent>

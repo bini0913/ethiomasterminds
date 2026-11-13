@@ -23,7 +23,7 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
   const rarityColors = {
     common: 'bg-gray-500',
     rare: 'bg-blue-500',
-    epic: 'bg-purple-500',
+    epic: 'bg-primary',
     legendary: 'bg-yellow-500'
   };
 

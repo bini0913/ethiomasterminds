@@ -478,7 +478,7 @@ const StudyPlannerPage: React.FC = () => {
         <div className="grid gap-2 sm:grid-cols-2">
         <Button variant="outline" className="h-12" onClick={() => setShowPlanSettings((open) => !open)}><BookOpen className="h-4 w-4 mr-2" /> Plan all selected books</Button>
         <Button
-          className={upperStudent ? "h-12" : "h-12 bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700"}
+          className={upperStudent ? "h-12" : "h-12 bg-gradient-to-r from-primary to-accent text-white hover:from-primary hover:to-accent"}
           onClick={generateAIPlan}
           disabled={isGenerating}
         >
@@ -580,7 +580,7 @@ const StudyPlannerPage: React.FC = () => {
               <h3 className="font-semibold mb-1">No study plans yet</h3>
               <p className="text-muted-foreground text-sm mb-4">Use AI to generate a personalized plan or add tasks manually</p>
               <div className="flex gap-2 justify-center">
-                <Button onClick={generateAIPlan} disabled={isGenerating} className="bg-gradient-to-r from-violet-600 to-purple-600">
+                <Button onClick={generateAIPlan} disabled={isGenerating} className="bg-gradient-to-r from-primary to-accent">
                   <Wand2 className="h-4 w-4 mr-1" /> AI Generate
                 </Button>
                 <Button variant="outline" onClick={() => setShowAdd(true)}>

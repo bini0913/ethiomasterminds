@@ -48,7 +48,7 @@ const XPProgressBar: React.FC<XPProgressBarProps> = ({
     if (level < 6) return { name: "Thinker", color: "text-green-500" };
     if (level < 10) return { name: "Challenger", color: "text-yellow-500" };
     if (level < 15) return { name: "Genius", color: "text-orange-500" };
-    return { name: "Master Mind", color: "text-purple-500" };
+    return { name: "Master Mind", color: "text-primary" };
   };
   
   const rank = getRank();
