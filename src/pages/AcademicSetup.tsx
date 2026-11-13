@@ -73,42 +73,57 @@ const AcademicSetup: React.FC = () => {
     if (!session?.user?.id) return;
     let cancelled = false;
     const loadProfile = async () => {
-      const { data } = await db
-        .from("academic_profiles")
-        .select("*")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
+      try {
+        const { data, error } = await db
+          .from("academic_profiles")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        if (error) throw error;
 
-      if (!cancelled && data) {
-        setGrade(data.grade);
-        setStep(Number(data.grade) >= 9 ? 2 : 1);
-        if (Number(data.grade) >= 9) setStep((current) => current === 1 ? 2 : current);
-        setGoal(data.study_goal as Goal);
-        setGoalDetail(data.study_goal_detail || "");
-        setCurriculum(data.curriculum as Curriculum);
-        setSubjects(data.subjects || []);
-        setBookId(data.book_id || "");
-        setBookIds(Array.isArray(data.book_ids) ? data.book_ids : (data.book_id ? [data.book_id] : []));
-        setBookTitle(data.book_title || "");
+        if (!cancelled && data) {
+          setGrade(data.grade);
+          setStep(Number(data.grade) >= 9 ? 2 : 1);
+          if (Number(data.grade) >= 9) setStep((current) => current === 1 ? 2 : current);
+          setGoal(data.study_goal as Goal);
+          setGoalDetail(data.study_goal_detail || "");
+          setCurriculum(data.curriculum as Curriculum);
+          setSubjects(data.subjects || []);
+          setBookId(data.book_id || "");
+          setBookIds(Array.isArray(data.book_ids) ? data.book_ids : (data.book_id ? [data.book_id] : []));
+          setBookTitle(data.book_title || "");
+        }
+      } catch (error) {
+        console.error("Academic setup profile load failed:", error);
+        if (!cancelled) toast.error("Your academic setup could not be loaded. Please retry.");
+      } finally {
+        if (!cancelled) setLoadingProfile(false);
       }
-      if (!cancelled) setLoadingProfile(false);
     };
     loadProfile();
     return () => { cancelled = true; };
   }, [session?.user?.id]);
 
   useEffect(() => {
+    let cancelled = false;
     const loadBooks = async () => {
-      const { data } = await db
-        .from("library_books")
-        .select("id,title,author,subject,grade_level")
-        .eq("status", "approved")
-        .eq("grade_level", grade)
-        .order("title")
-        .limit(100);
-      setBooks((data || []) as BookOption[]);
+      try {
+        const { data, error } = await db
+          .from("library_books")
+          .select("id,title,author,subject,grade_level")
+          .eq("status", "approved")
+          .eq("grade_level", grade)
+          .order("title")
+          .limit(100);
+        if (error) throw error;
+        if (!cancelled) setBooks((data || []) as BookOption[]);
+      } catch (error) {
+        console.error("Academic setup book list load failed:", error);
+        if (!cancelled) setBooks([]);
+      }
     };
-    loadBooks();
+    void loadBooks();
+    return () => { cancelled = true; };
   }, [grade]);
 
   useEffect(() => {
