@@ -668,7 +668,7 @@ const Lobby: React.FC = () => {
     }
 
     const scoreMode = newRoomData.gameMode === "2v2" ? "accuracy" : "speed";
-    const playerLimit = newRoomData.gameMode === "2v2" ? 4 : newRoomData.gameMode === "Battle Royale" ? 8 : 2;
+    const playerLimit = Math.max(2, Math.min(8, Number.parseInt(newRoomData.maxPlayers, 10) || 2));
 
     const room = await contextCreateRoom(
       newRoomData.name,
@@ -1411,7 +1411,7 @@ const Lobby: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Game Mode</Label>
-                <Select value={newRoomData.gameMode} onValueChange={(v) => setNewRoomData({...newRoomData, gameMode: v})}>
+                <Select value={newRoomData.gameMode} onValueChange={(v) => setNewRoomData((prev) => ({ ...prev, gameMode: v, maxPlayers: v === "2v2" ? "4" : v === "Battle Royale" ? "8" : "2" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="1v1">1v1 Duel</SelectItem>
