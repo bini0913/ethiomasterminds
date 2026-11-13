@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { safeStorage } from "@/lib/safeStorage";
 import { useUser } from "@/context/UserContext";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarCreator from "@/components/profile/AvatarCreator";
@@ -147,7 +148,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
         { age: parsedAge, gender, avatar, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp }, academicStream: academicStream || undefined },
       );
       if (profile) {
-        localStorage.setItem("masterminds_learning_goal", JSON.stringify({ id: goal.id, minutes: goal.minutes, xp: goal.xp, academicStream: academicStream || null }));
+        safeStorage.setItem("masterminds_learning_goal", JSON.stringify({ id: goal.id, minutes: goal.minutes, xp: goal.xp, academicStream: academicStream || null }));
         toast.success("Your Master Minds learning journey is ready!");
         onSuccess();
       }
@@ -202,7 +203,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
         navigate("/parent-dashboard", { replace: true });
         return;
       }
-      localStorage.removeItem("masterminds_login_mode");
+      safeStorage.removeItem("masterminds_login_mode");
       switch (profile.role) {
         case "extreme_admin": navigate("/root-control-portal-9xA7", { replace: true }); break;
         case "admin": navigate("/admin", { replace: true }); break;
