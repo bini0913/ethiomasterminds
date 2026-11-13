@@ -351,16 +351,13 @@ const UserProfilePage = () => {
       setInsights({ strong: strong.slice(0, 3), weak: weak.slice(0, 3), recommended: [...new Set(weak)].slice(0, 3) });
 
       setActivities(
-        (recentResultsRes.data ?? []).map((row, index) => ({
+        (recentResultsRes.data ?? []).map((row) => ({
           id: row.id,
-          text: [
-            `Won a match with ${Math.round(row.score)}% accuracy`,
-            `Reached a new momentum spike (+${row.xp_earned ?? 0} XP)`,
-            "Unlocked a sharp-focus study streak",
-            "Completed a precision challenge",
-          ][index % 4],
+          // quiz_results are quiz completions, not match, streak, or challenge
+          // events. Keep the profile activity feed faithful to the source row.
+          text: `Completed a quiz · ${Math.round(Number(row.score) || 0)}% score · +${Number(row.xp_earned ?? 0)} XP`,
           time: row.completed_at ? new Date(row.completed_at).toISOString() : new Date().toISOString(),
-          icon: (["trophy", "zap", "spark", "spark"] as const)[index % 4],
+          icon: "spark" as const,
         })),
       );
 
@@ -499,6 +496,9 @@ const UserProfilePage = () => {
 
       try {
         await Promise.all([refreshCore(), refreshSocial(), refreshProfileDetails()]);
+      } catch (error) {
+        console.error("Profile hydration was partially unsuccessful:", error);
+        if (active) toast.error("Some profile details could not be loaded. Please refresh to retry.");
       } finally {
         if (active) {
           setLoadingProfile(false);
