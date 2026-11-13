@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { safeStorage } from "@/lib/safeStorage";
 import EnhancedWelcomeScreen from "@/components/welcome/EnhancedWelcomeScreen";
 import UnifiedAuthForm from "@/components/auth/UnifiedAuthForm";
 import ProfileSetup from "@/components/profile/ProfileSetup";
@@ -33,7 +34,7 @@ const Index: React.FC = () => {
     if (isLoading) return;
     
     if (isAuthenticated && user) {
-      const loginMode = localStorage.getItem("masterminds_login_mode");
+      const loginMode = safeStorage.getItem("masterminds_login_mode");
       if (loginMode === "parent") {
         navigate('/parent-dashboard');
         return;
