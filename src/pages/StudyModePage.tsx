@@ -420,7 +420,7 @@ const StudyModePage: React.FC = () => {
 
     const minutesCompleted = Math.max(1, Math.ceil(elapsedSeconds / 60));
 
-    let data: unknown;
+    let data: { xp_earned?: number; coins_earned?: number } | null = null;
     try {
       const result = await db.rpc("complete_study_session", {
         p_session_id: activeSession.id,
@@ -429,7 +429,7 @@ const StudyModePage: React.FC = () => {
         p_mark_task_complete: markTaskOnComplete,
       });
       if (result.error) throw result.error;
-      data = result.data;
+      data = result.data as { xp_earned?: number; coins_earned?: number } | null;
     } catch (error) {
       console.error("Could not complete Study Mode session:", error);
       toast.error(error instanceof Error ? error.message : "Your study session could not be completed. Please retry.");
