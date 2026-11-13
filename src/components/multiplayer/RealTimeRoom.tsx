@@ -23,7 +23,6 @@ import {
   VolumeX,
   UserPlus,
   Link,
-  Signal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -156,7 +155,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [floatingPoints, setFloatingPoints] = useState<number | null>(null);
   const [playerFinished, setPlayerFinished] = useState(false);
   const [answerShake, setAnswerShake] = useState(false);
-  const [latencyMs, setLatencyMs] = useState(42);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [sendingInviteTo, setSendingInviteTo] = useState<string | null>(null);
   const [roomConfig, setRoomConfig] = useState({
@@ -906,8 +904,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   };
 
   const currentPlayer = players.find((p) => p.id === currentUserId);
-  const connectionQuality = latencyMs <= 120 ? 'Excellent' : latencyMs <= 220 ? 'Stable' : latencyMs <= 350 ? 'Degraded' : 'Poor';
-  const connectionColor = latencyMs <= 120 ? 'text-emerald-300' : latencyMs <= 220 ? 'text-cyan-300' : latencyMs <= 350 ? 'text-amber-300' : 'text-red-300';
   const strongestOpponent = players
     .filter((p) => p.id !== currentUserId)
     .sort((a, b) => b.level - a.level)[0];
@@ -968,50 +964,47 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-blue-950 to-accent p-4 text-white relative overflow-hidden">
+    <div className="min-h-[100dvh] w-full min-w-0 bg-gradient-to-b from-slate-950 via-blue-950 to-accent p-2 pb-[calc(1rem+env(safe-area-inset-bottom))] text-white relative sm:p-4">
       <div className="absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_20%_10%,rgba(59,130,246,0.28),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(168,85,247,0.24),transparent_35%)]" />
 
-      <div className="max-w-6xl mx-auto relative z-10">
+      <div className="relative z-10 mx-auto w-full min-w-0 max-w-6xl">
         {isOffline && (
           <Card className="mb-4 p-3 border-amber-300/30 bg-amber-500/10 text-amber-100">
             Connection lost… reconnecting ({offlineSeconds}s return window)
           </Card>
         )}
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
+        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold">{roomName}</h1>
-            <p className="text-sm text-blue-100/75">Room ID: {roomId.slice(0, 8)}... · Subject: {roomConfig.subject} · Mode: {modeLabel}</p>
+            <h1 className="break-words text-xl font-display font-bold sm:text-2xl">{roomName}</h1>
+            <p className="break-words text-xs text-blue-100/75 sm:text-sm">Room ID: {roomId.slice(0, 8)}... · Subject: {roomConfig.subject} · Mode: {modeLabel}</p>
           </div>
-          <div className={`text-xs rounded-md border border-white/20 bg-black/25 px-2 py-1 flex items-center gap-2 ${connectionColor}`}>
-            <Signal className="h-3 w-3" /> {connectionQuality} · {latencyMs}ms
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => setSoundEnabled((prev) => !prev)}>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            <Button className="min-h-10" variant="outline" size="sm" onClick={() => setSoundEnabled((prev) => !prev)}>
               {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowChat(!showChat)}>
+            <Button className="min-h-10" variant="outline" size="sm" onClick={() => setShowChat(!showChat)}>
               <MessageCircle className="h-4 w-4 mr-2" />
               Chat
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setInviteDialogOpen(true)} disabled={!isHost}>
+            <Button className="min-h-10" variant="outline" size="sm" onClick={() => setInviteDialogOpen(true)} disabled={!isHost}>
               <UserPlus className="h-4 w-4 mr-2" />
               Invite Friend
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { navigator.clipboard?.writeText(roomId); toast.success('Room code copied'); }}>
+            <Button className="min-h-10" variant="outline" size="sm" onClick={() => { navigator.clipboard?.writeText(roomId); toast.success('Room code copied'); }}>
               <Link className="h-4 w-4 mr-2" /> Join via Code
             </Button>
-            <Button variant="destructive" size="sm" onClick={onLeave}>
+            <Button className="min-h-10" variant="destructive" size="sm" onClick={onLeave}>
               <LogOut className="h-4 w-4 mr-2" />
               Leave
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 space-y-4">
+        <div className="grid min-w-0 grid-cols-1 items-start gap-3 sm:gap-4 lg:grid-cols-3">
+          <div className="min-w-0 space-y-3 sm:space-y-4 lg:col-span-2">
             {roomState.status === 'waiting' && (
-              <Card className="p-6 bg-white/5 border-white/10 shadow-sm">
+              <Card className="bg-white/5 border-white/10 p-4 shadow-sm transition-all duration-200 sm:p-6">
                 <div className="text-center space-y-4">
                   <h2 className="text-xl font-bold">Lobby Ready Check</h2>
                   <p className="text-blue-100/80">{players.length}/{roomMaxPlayers} players connected</p>
@@ -1098,16 +1091,16 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             )}
 
             {(roomState.status === 'countdown' || roomState.status === 'starting') && (
-              <Card className="p-12 bg-white/5 border-white/10 text-center">
-                <motion.div key={countdownValue} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-8xl font-display font-bold text-cyan-300">
+              <Card className="bg-white/5 border-white/10 p-6 text-center sm:p-12">
+                <motion.div key={countdownValue} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-7xl font-display font-bold text-cyan-300 sm:text-8xl">
                   {countdownValue}
                 </motion.div>
-                <p className="text-xl mt-4">Match Starting… Syncing both players now</p>
+                <p className="mt-4 text-base text-blue-100/80 sm:text-xl">Get ready — your match is about to begin.</p>
               </Card>
             )}
 
             {roomState.status === 'finished' && resultsLoadError && (
-              <Card className="p-6 bg-white/5 border-white/10 text-center space-y-3" role="status" aria-live="polite">
+              <Card className="space-y-3 bg-white/5 p-4 text-center border-white/10 sm:p-6" role="status" aria-live="polite">
                 <h2 className="text-lg font-semibold">Match finished — results not ready</h2>
                 <p className="text-sm text-white/70">{resultsLoadError}</p>
                 <Button disabled={retryingResults} onClick={async () => {
@@ -1137,7 +1130,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             )}
 
             {roomState.status === 'playing' && currentQuestion && (
-              <Card className={cn('p-6 bg-white/5 border-white/10 transition-all', answerShake && 'animate-pulse')}>
+              <Card className={cn('bg-white/5 p-3 border-white/10 transition-all duration-200 sm:p-6', answerShake && 'animate-pulse')}>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center gap-2 flex-wrap">
                     <Badge variant="secondary">{roomConfig.gameMode === 'accuracy' ? `Question ${playerQuestionNumber}/${totalQuestions}` : `Question ${playerQuestionNumber} • as many as possible`}</Badge>
@@ -1167,7 +1160,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     </div>
                   )}
 
-                  <h3 className="text-2xl font-bold text-center py-4 leading-relaxed">
+                  <h3 className="py-3 text-xl font-bold text-center leading-relaxed break-words sm:py-4 sm:text-2xl">
                     {highlightKeywords(currentQuestion.question_text)}
                   </h3>
 
@@ -1192,7 +1185,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                           whileTap={{ scale: selectedAnswer === null ? 0.98 : 1 }}
                           onClick={() => handleAnswer(index)}
                           disabled={selectedAnswer !== null || timeRemaining <= 0}
-                          className={cn('p-4 min-h-14 rounded-xl border-2 text-left transition-all relative overflow-hidden', buttonClass)}
+                          className={cn('min-h-14 rounded-xl border-2 p-3 text-left transition-all duration-200 relative overflow-hidden sm:p-4', buttonClass)}
                         >
                           <span className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity" />
                           <span className="font-medium relative z-10">
@@ -1275,7 +1268,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
               <h3 className="font-bold mb-3 flex items-center gap-2">
                 <Users className="h-4 w-4" /> Players ({players.length}/{roomMaxPlayers})
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {players.map((player) => (
                   <motion.div key={player.id} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={cn('p-3 rounded-xl border text-center', player.isReady ? 'border-green-400/50 bg-green-500/10' : 'border-white/15 bg-white/5')}>
                     <AvatarRenderer avatar={player.avatar} size="md" className="mx-auto mb-1" />
@@ -1290,7 +1283,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     <div className="flex items-center justify-center gap-1 mt-1 text-xs text-blue-100/75">
                       {player.isHost && <Crown className="h-3 w-3 text-yellow-400" />} Lv.{player.level}
                     </div>
-                    <div className={cn('flex justify-center items-center gap-1 mt-1 text-xs', connectionColor)}><Signal className="h-3 w-3" /> {connectionQuality}</div>
                     <div className="mt-1 text-xs">{player.isReady ? 'Ready ✅' : 'Waiting ⏳'}</div>
                     <div className="text-sm font-bold text-cyan-300 mt-1">{player.score} pts</div>
                     {isHost && player.id !== currentUserId && roomState.status === 'waiting' && (
@@ -1307,7 +1299,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           <AnimatePresence>
             {showChat && (
               <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }}>
-                <Card className="h-[560px] flex flex-col bg-white/5 border-white/10">
+                <Card className="flex h-[min(70dvh,560px)] min-h-[320px] flex-col bg-white/5 border-white/10">
                   <div className="p-3 border-b border-white/10">
                     <h3 className="font-bold flex items-center gap-2">
                       <MessageCircle className="h-4 w-4" />
