@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { safeStorage } from "@/lib/safeStorage";
 import { User, Session } from "@supabase/supabase-js";
 
 // Types
@@ -496,7 +497,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     signingOutRef.current = true;
-    localStorage.removeItem("masterminds_login_mode");
+    safeStorage.removeItem("masterminds_login_mode");
     setShowLevelUp(false);
     setUser(null);
     setSession(null);
@@ -573,7 +574,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       // Note: Full account deletion requires admin privileges
       // For now, we sign out the user
       await supabase.auth.signOut();
-      localStorage.removeItem("masterminds_login_mode");
+      safeStorage.removeItem("masterminds_login_mode");
       setUser(null);
       setSession(null);
       toast.success("You have been logged out. Contact support to fully delete your account.");
