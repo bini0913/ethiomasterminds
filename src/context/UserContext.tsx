@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { safeStorage } from "@/lib/safeStorage";
 import { User, Session } from "@supabase/supabase-js";
 
 // Types
@@ -496,7 +497,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     signingOutRef.current = true;
-    localStorage.removeItem("masterminds_login_mode");
+    safeStorage.removeItem("masterminds_login_mode");
     setShowLevelUp(false);
     setUser(null);
     setSession(null);
