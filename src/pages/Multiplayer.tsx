@@ -2,18 +2,8 @@ import { db } from "@/integrations/untypedClient";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  BarChart3,
-  Bot,
-  Gamepad2,
-  Lock,
-  Medal,
-  RefreshCw,
-  Share2,
-  Swords,
-  Trophy,
-  UserPlus,
-  Users,
-  Zap,
+  BarChart3, Gamepad2, Lock, Medal, RefreshCw, Share2, Shield,
+  Swords, Trophy, Users, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,52 +16,48 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RealTimeRoom, { type MatchSummary } from "@/components/multiplayer/RealTimeRoom";
 import Confetti from "@/components/quiz/Confetti";
 
 type HubMode = {
-  id: string;
+  id: "duel" | "2v2" | "private" | "tournament";
   title: string;
   subtitle: string;
   description: string;
+  badge: string;
   icon: React.ComponentType<{ className?: string }>;
-  xp: "enabled" | "disabled";
+  targetPath: string;
 };
 
-const multiplayerModes: HubMode[] = [
-  {
-    id: "duel",
-    title: "1v1 Duel",
-    subtitle: "Pure skill, fast rounds",
-    description: "10-20 question duel where speed and accuracy decide every round.",
-    icon: Swords,
-    xp: "enabled",
-  },
-  {
-    id: "2v2",
-    title: "2v2 Team Battle",
-    subtitle: "Coordinate with your teammate",
-    description: "Coordinate with your teammate for streak multipliers and clutch recoveries.",
-    icon: Users,
-    xp: "enabled",
-  },
-  {
-    id: "private",
-    title: "Private Room",
-    subtitle: "Invite-only rooms for friends",
-    description: "Create a room code and customize format before launching your match.",
-    icon: Lock,
-    xp: "enabled",
-  },
-  {
-    id: "tournament",
-    title: "Tournament Mode",
-    subtitle: "Bracket-driven competitive flow",
-    description: "Progress from qualifiers to finals and chase title-exclusive rewards.",
-    icon: Trophy,
-    xp: "enabled",
-  },
+const MODES: HubMode[] = [
+  { id: "duel", title: "1v1 Duel", subtitle: "Speed & accuracy showdown", description: "Face another student in a live, head-to-head quiz battle.", badge: "Quick match", icon: Swords, targetPath: "/lobby?mode=1v1" },
+  { id: "2v2", title: "2v2 Team Battle", subtitle: "Play together", description: "Team up with a classmate and compete as a pair.", badge: "Team play", icon: Users, targetPath: "/lobby?mode=2v2" },
+  { id: "private", title: "Private Arena", subtitle: "Challenge your friends", description: "Create or join a private room using its room code.", badge: "Invite only", icon: Lock, targetPath: "/lobby?mode=private" },
+  { id: "tournament", title: "Tournaments", subtitle: "Compete for the title", description: "Explore available tournaments and competitive brackets.", badge: "Competition", icon: Trophy, targetPath: "/tournaments" },
 ];
+
+type LeaderboardEntry = {
+  user_id: string;
+  rank_position: number;
+  player_name: string;
+  total_points: number;
+  matches_played?: number;
+  wins?: number;
+  podiums?: number;
+};
+
+type MatchHistoryEntry = {
+  room_id: string;
+  placement: number;
+  player_count: number;
+  score: number;
+  accuracy: number;
+  xp_earned: number;
+  coins_earned: number;
+  created_at: string;
+};
 
 const Multiplayer: React.FC = () => {
   const navigate = useNavigate();
@@ -81,11 +67,11 @@ const Multiplayer: React.FC = () => {
   const { currentRoom, leaveRoom } = useRoom();
 
   const [onlineCount, setOnlineCount] = useState(0);
-  const [selectedMode, setSelectedMode] = useState(multiplayerModes[0]);
   const [matchSummary, setMatchSummary] = useState<MatchSummary | null>(null);
-  const [recentHistory, setRecentHistory] = useState<any[]>([]);
-  const [rankedLeaderboard, setRankedLeaderboard] = useState<any[]>([]);
+  const [recentHistory, setRecentHistory] = useState<MatchHistoryEntry[]>([]);
+  const [rankedLeaderboard, setRankedLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [rankedLoading, setRankedLoading] = useState(true);
+  const [directCode, setDirectCode] = useState("");
 
   const roomId = searchParams.get("room");
 
@@ -100,45 +86,52 @@ const Multiplayer: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchOnlineCount();
-    const interval = setInterval(fetchOnlineCount, 30000);
-    return () => clearInterval(interval);
+    void fetchOnlineCount();
+    const interval = window.setInterval(() => void fetchOnlineCount(), 30000);
+    return () => window.clearInterval(interval);
   }, [fetchOnlineCount]);
-  useEffect(() => {
-    const loadRankedLeaderboard = async () => {
-      setRankedLoading(true);
-      const { data, error } = await db.rpc('multiplayer_ranked_leaderboard', { p_limit: 10 });
-      if (!error && data) setRankedLeaderboard(data);
-      setRankedLoading(false);
-    };
-    void loadRankedLeaderboard();
-
-    if (!user?.id) return;
-    const loadHistory = async () => {
-      const { data, error } = await (supabase as any)
-        .from('multiplayer_match_results')
-        .select('room_id, placement, player_count, score, accuracy, xp_earned, coins_earned, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (!error && data) setRecentHistory(data);
-    };
-    void loadHistory();
-  }, [user?.id]);
-
-
 
   useEffect(() => {
     if (!user?.id) return;
+    let active = true;
     const updatePresence = async () => {
       await db.from("user_presence").upsert(
         { user_id: user.id, status: "online", last_seen: new Date().toISOString() },
         { onConflict: "user_id" },
       );
     };
-    updatePresence();
-    const interval = setInterval(updatePresence, 60000);
-    return () => clearInterval(interval);
+    void updatePresence();
+    const interval = window.setInterval(() => void updatePresence(), 60000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      void active;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    let active = true;
+    const loadRankedLeaderboard = async () => {
+      setRankedLoading(true);
+      const { data, error } = await db.rpc("multiplayer_ranked_leaderboard", { p_limit: 10 });
+      if (active && !error && data) setRankedLeaderboard(data as LeaderboardEntry[]);
+      if (active) setRankedLoading(false);
+    };
+    void loadRankedLeaderboard();
+
+    if (user?.id) {
+      const loadHistory = async () => {
+        const { data, error } = await (supabase as any)
+          .from("multiplayer_match_results")
+          .select("room_id, placement, player_count, score, accuracy, xp_earned, coins_earned, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(5);
+        if (active && !error && data) setRecentHistory(data as MatchHistoryEntry[]);
+      };
+      void loadHistory();
+    }
+    return () => { active = false; };
   }, [user?.id]);
 
   useEffect(() => {
@@ -148,133 +141,106 @@ const Multiplayer: React.FC = () => {
     }
   }, [navigate, user]);
 
-  const playerMetrics = useMemo(
-    () => ({
-      level: user?.level ?? 1,
-      xp: user?.xp ?? 0,
-      rank: user?.rank ?? "Rookie",
-    }),
-    [user?.level, user?.rank, user?.xp],
-  );
+  const playerMetrics = useMemo(() => ({
+    level: user?.level ?? 1,
+    xp: user?.xp ?? 0,
+    rank: user?.rank ?? "Rookie",
+  }), [user?.level, user?.rank, user?.xp]);
 
   const xpInLevel = playerMetrics.xp % 1000;
-  const xpProgress = Math.max(5, Math.min(100, (xpInLevel / 1000) * 100));
+  const xpProgress = Math.max(0, Math.min(100, (xpInLevel / 1000) * 100));
 
-  const joinMode = (mode: HubMode) => {
-    if (mode.id === "tournament") {
-      navigate("/tournaments");
+  const handleJoinDirectCode = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const code = directCode.trim().toUpperCase();
+    if (!code) {
+      toast.error("Enter the room code first");
       return;
     }
-    const target = mode.id === "2v2" ? "2v2" : mode.id === "private" ? "private" : "1v1";
-    navigate(`/lobby?mode=${target}`);
+    navigate(`/lobby?join=${encodeURIComponent(code)}`);
   };
 
   const handleLeaveRoom = useCallback(() => {
-    if (roomId && user) {
-      void leaveRoom(roomId, user.name || "Player");
-    }
-    navigate("/lobby");
+    if (roomId && user) void leaveRoom(roomId, user.name || "Player");
+    navigate("/multiplayer");
   }, [leaveRoom, navigate, roomId, user]);
 
-  // Match summary screen
+  const shareResult = async () => {
+    const text = `I finished a Master Minds multiplayer match with a score of ${matchSummary?.score ?? 0}!`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Master Minds match result", text });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        toast.success("Result copied");
+      } else {
+        toast.error("Sharing isn't available on this device");
+      }
+    } catch (error) {
+      if ((error as Error)?.name !== "AbortError") toast.error("Couldn't share the result");
+    }
+  };
+
   if (roomId && user && matchSummary) {
     const didWin = matchSummary.playerRank === 1;
     return (
-      <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background text-foreground"}>
+      <div className={`min-h-screen bg-background text-foreground ${upperStudent ? "tier-upper pb-[calc(6rem+env(safe-area-inset-bottom))]" : "pb-10"}`}>
         {didWin && <Confetti />}
-        <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-2xl">
-                {didWin ? <Trophy className="text-yellow-500" /> : <Medal className="text-blue-400" />}
-                {didWin ? "Victory!" : "Match Complete"}
+            <CardHeader className="text-center sm:text-left">
+              <CardTitle className="flex items-center justify-center gap-2 text-2xl sm:justify-start">
+                {didWin ? <Trophy className="h-7 w-7 text-amber-500" /> : <Medal className="h-7 w-7 text-primary" />}
+                {didWin ? "Victory!" : "Match complete"}
               </CardTitle>
               <CardDescription>
-                {didWin
-                  ? "XP burst, rank climb, and streak bonus unlocked."
-                  : "Great fight — tune accuracy and bounce back."} Winner: {didWin ? 'You 🥇' : 'Opponent 🥇'}
+                {didWin ? "Great performance. Your final results are ready." : "Review your performance and get ready for the next match."}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 {[
-                  { label: "Match rank", value: `#${matchSummary.playerRank} / ${matchSummary.playerCount}` },
+                  { label: "Placement", value: `#${matchSummary.playerRank} / ${matchSummary.playerCount}` },
                   { label: "Score", value: String(matchSummary.score) },
                   { label: "Accuracy", value: `${matchSummary.accuracy}%` },
                   { label: "Correct", value: `${matchSummary.correctAnswers}/${matchSummary.answeredQuestions}` },
-                  { label: "XP earned", value: `+${matchSummary.xpGained}` },
-                  { label: "Coins earned", value: `+${matchSummary.coinsGained}` },
+                  { label: "XP", value: `+${matchSummary.xpGained}` },
+                  { label: "Coins", value: `+${matchSummary.coinsGained}` },
                 ].map((stat) => (
-                  <Card key={stat.label} className="bg-muted/50">
-                    <CardContent className="p-3 text-sm">
-                      {stat.label}<br /><strong>{stat.value}</strong>
-                    </CardContent>
-                  </Card>
+                  <div key={stat.label} className="rounded-xl border border-border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    <p className="mt-1 text-lg font-bold">{stat.value}</p>
+                  </div>
                 ))}
               </div>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5" /> Match Standings
-                  </CardTitle>
-                  <CardDescription>Final ranking, score and rewards for every player.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {matchSummary.players.map((player) => (
-                    <div
-                      key={player.id}
-                      className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${player.id === user.id ? "border-primary bg-primary/5" : "border-border"}`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-muted grid place-items-center font-bold">
-                          {player.placement <= 3 ? ["🥇", "🥈", "🥉"][player.placement - 1] : `#${player.placement}`}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold truncate">{player.name}{player.id === user.id ? " (You)" : ""}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {player.score} pts · {player.correctAnswers}/{player.answeredQuestions} correct · {player.accuracy}%
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-semibold">+{player.xpEarned} XP</p>
-                        <p className="text-xs text-muted-foreground">+{player.coinsEarned} coins</p>
-                      </div>
+              <section className="space-y-3">
+                <h2 className="font-semibold">Final standings</h2>
+                {matchSummary.players.map((player) => (
+                  <div key={player.id} className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${player.id === user.id ? "border-primary bg-primary/5" : "border-border"}`}>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{player.placement <= 3 ? ["🥇", "🥈", "🥉"][player.placement - 1] : `#${player.placement}`} {player.name}{player.id === user.id ? " (You)" : ""}</p>
+                      <p className="text-xs text-muted-foreground">{player.score} pts · {player.accuracy}% accuracy</p>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-              <div className="grid md:grid-cols-2 gap-4">
-                <Card className="bg-muted/50">
-                  <CardHeader><CardTitle className="text-base">Match Analytics</CardTitle></CardHeader>
-                  <CardContent className="text-sm space-y-2">
-                    <p>Strong topics: {matchSummary.strongTopics.join(", ")}</p>
-                    <p>Weak topics: {matchSummary.weakTopics.join(", ")}</p>
-                    <Button variant="outline" className="w-full" onClick={() => toast.success("Launching AI weak-topic practice plan")}>
-                      <Bot className="w-4 h-4 mr-2" /> Practice Weak Topic
-                    </Button>
-                  </CardContent>
-                </Card>
-                <Card className="bg-muted/50">
-                  <CardHeader><CardTitle className="text-base">Post Match Actions</CardTitle></CardHeader>
-                  <CardContent className="grid gap-2">
-                    <Button onClick={() => { setMatchSummary(null); navigate(`/multiplayer?room=${roomId}`); }}>
-                      <RefreshCw className="w-4 h-4 mr-2" /> Rematch
-                    </Button>
-                    <Button variant="outline" onClick={() => toast.success("Friend request sent")}>
-                      <UserPlus className="w-4 h-4 mr-2" /> Add Friend
-                    </Button>
-                    <Button variant="secondary" onClick={() => navigate("/leaderboard")}>
-                      <BarChart3 className="w-4 h-4 mr-2" /> View Stats
-                    </Button>
-                    <Button variant="outline" onClick={() => toast.success('Result card shared')}>
-                      <Share2 className="w-4 h-4 mr-2" /> Share Result
-                    </Button>
-                  </CardContent>
-                </Card>
+                    <div className="shrink-0 text-right text-sm">
+                      <p className="font-semibold">+{player.xpEarned} XP</p>
+                      <p className="text-xs text-muted-foreground">+{player.coinsEarned} coins</p>
+                    </div>
+                  </div>
+                ))}
+              </section>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <Button onClick={() => { setMatchSummary(null); navigate(`/multiplayer?room=${encodeURIComponent(roomId)}`); }}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Rematch
+                </Button>
+                <Button variant="outline" onClick={() => navigate("/leaderboard")}>
+                  <BarChart3 className="mr-2 h-4 w-4" /> Statistics
+                </Button>
+                <Button variant="outline" onClick={() => void shareResult()}>
+                  <Share2 className="mr-2 h-4 w-4" /> Share result
+                </Button>
               </div>
-              <Button className="w-full" variant="ghost" onClick={() => { setMatchSummary(null); navigate("/multiplayer"); }}>
-                Back to Hub
+              <Button variant="ghost" className="w-full" onClick={() => { setMatchSummary(null); navigate("/multiplayer"); }}>
+                Return to Arena
               </Button>
             </CardContent>
           </Card>
@@ -283,7 +249,6 @@ const Multiplayer: React.FC = () => {
     );
   }
 
-  // Active room
   if (roomId && user) {
     return (
       <RealTimeRoom
@@ -298,199 +263,150 @@ const Multiplayer: React.FC = () => {
     );
   }
 
-  // Hub
+  const playerCard = (
+    <Card className="border-border shadow-sm">
+      <CardContent className="space-y-4 p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 font-bold text-primary">
+            {(user?.name || "P").slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate font-semibold">{user?.name || "Player"}</p>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Shield className="h-3.5 w-3.5 text-primary" /> {playerMetrics.rank} · Level {playerMetrics.level}
+            </p>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Level progress</span><span>{xpInLevel.toLocaleString()} / 1,000 XP</span>
+          </div>
+          <Progress value={xpProgress} className="h-2" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const leaderboardCard = (
+    <Card className="border-border shadow-sm">
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="flex items-center gap-2 text-base"><Trophy className="h-4 w-4 text-amber-500" /> Ranked leaderboard</CardTitle>
+        <CardDescription className="text-xs">Top players by multiplayer points</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 p-4 pt-2">
+        {rankedLoading ? <p className="py-5 text-center text-sm text-muted-foreground">Loading rankings…</p> :
+          rankedLeaderboard.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">No ranked matches recorded yet.</p> :
+          rankedLeaderboard.slice(0, 6).map((entry) => (
+            <div key={entry.user_id} className={`flex items-center justify-between gap-2 rounded-lg border p-2.5 text-sm ${entry.user_id === user?.id ? "border-primary bg-primary/5" : "border-border"}`}>
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="w-6 shrink-0 text-center font-bold">{entry.rank_position <= 3 ? ["🥇", "🥈", "🥉"][Number(entry.rank_position) - 1] : `#${entry.rank_position}`}</span>
+                <span className="truncate font-medium">{entry.player_name}{entry.user_id === user?.id ? " (You)" : ""}</span>
+              </div>
+              <span className="shrink-0 font-bold text-primary">{Number(entry.total_points).toLocaleString()} pts</span>
+            </div>
+          ))}
+        <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/leaderboard")}>View full leaderboard</Button>
+      </CardContent>
+    </Card>
+  );
+
+  const historyCard = (
+    <Card className="border-border shadow-sm">
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="flex items-center gap-2 text-base"><Medal className="h-4 w-4 text-primary" /> Recent matches</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 p-4 pt-2">
+        {recentHistory.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">Your completed matches will appear here.</p> :
+          recentHistory.map((match) => (
+            <div key={`${match.room_id}-${match.created_at}`} className="flex items-center justify-between gap-3 rounded-lg border border-border p-2.5 text-sm">
+              <div className="min-w-0">
+                <p className="font-semibold">#{match.placement} of {match.player_count}</p>
+                <p className="text-xs text-muted-foreground">{match.score} pts · {Number(match.accuracy || 0)}% accuracy</p>
+              </div>
+              <span className="shrink-0 font-semibold text-primary">+{match.xp_earned} XP</span>
+            </div>
+          ))}
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <div className={upperStudent ? "tier-upper mm-arena-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background text-foreground"}>
-      {upperStudent && <style>{`
-        .mm-arena-upper .mm-arena-hero{background:radial-gradient(circle at 88% 10%,hsl(var(--primary)/.22),transparent 34%),linear-gradient(120deg,hsl(var(--card)),hsl(var(--muted)));color:hsl(var(--foreground));border-color:hsl(var(--border))}
-        .mm-arena-upper .mm-arena-hero .text-muted-foreground{color:hsl(var(--muted-foreground))}
-        .mm-arena-upper .mm-arena-panel{border-radius:1.1rem;border-color:hsl(var(--border));box-shadow:0 3px 12px hsl(var(--foreground)/.045)}
-        .mm-arena-upper .mm-arena-mode{border-radius:1rem;border-width:2px;border-bottom-width:5px;min-height:7.25rem;transition:transform .18s,box-shadow .18s,border-color .18s}
-        .mm-arena-upper .mm-arena-mode:hover{transform:translateY(-2px);box-shadow:0 10px 24px hsl(var(--foreground)/.07)}.mm-arena-upper .mm-arena-mode:active{transform:translateY(3px);border-bottom-width:2px}
-        .mm-arena-upper .mm-arena-mode[aria-pressed="true"]{background:hsl(var(--primary)/.08);border-color:hsl(var(--primary))}
-        .mm-arena-upper .mm-arena-stat{border-radius:1rem;border-color:hsl(var(--border));background:hsl(var(--card))}
-        @media(max-width:640px){.mm-arena-upper .mm-arena-panel{border-radius:1rem}.mm-arena-upper .mm-arena-mode{min-height:0;padding:.85rem}}
-      `}</style>}
-      <header className={upperStudent ? "" : "sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border"}>
-        <div className="container mx-auto flex items-center justify-between gap-3 px-4 py-4 sm:gap-4">
-          <div className="flex items-center gap-4">
-            {!upperStudent && <BackButton />}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Gamepad2 className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold tracking-tight">Multiplayer Arena</h1>
-                <p className="text-sm text-muted-foreground">Choose your challenge and compete with friends</p>
-              </div>
+    <div className={`min-h-screen bg-background text-foreground ${upperStudent ? "tier-upper pb-[calc(6rem+env(safe-area-inset-bottom))]" : "pb-10"}`}>
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <BackButton />
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Gamepad2 className="h-5 w-5" /></div>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold tracking-tight">Multiplayer Arena</h1>
+              <p className="hidden text-xs text-muted-foreground sm:block">Play live quiz battles with other students</p>
             </div>
           </div>
-          <Badge variant="secondary" className="px-3 py-1">
-            <span className="w-2 h-2 rounded-full bg-green-500 mr-2 inline-block" />
-            {onlineCount} Online
+          <Badge variant="outline" className="shrink-0 gap-2 px-3 py-1.5">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" /> {onlineCount} online
           </Badge>
         </div>
       </header>
 
-      <main className="container mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 sm:py-7">
-        {/* Player card */}
-        <Card className={upperStudent ? "mm-arena-hero mm-arena-panel overflow-hidden" : ""}>
-          <CardContent className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/20 grid place-items-center font-bold text-primary">
-                {(user?.name || "P").slice(0, 1).toUpperCase()}
-              </div>
-              <div>
-                <p className="font-semibold">{user?.name || "Player"}</p>
-                <p className="text-xs text-muted-foreground">Rank: {playerMetrics.rank} · Level {playerMetrics.level}</p>
-              </div>
-            </div>
-            <div className="w-full sm:max-w-sm space-y-1">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>XP Progress</span>
-                <span>{xpInLevel}/1000</span>
-              </div>
-              <Progress value={xpProgress} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={upperStudent ? "mm-arena-panel" : ""}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-yellow-500" /> Ranked Points Leaderboard
-            </CardTitle>
-            <CardDescription>Players are ranked by total multiplayer points earned across completed matches — not XP.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {rankedLoading ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">Loading rankings…</div>
-            ) : rankedLeaderboard.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">No ranked matches yet. Be the first to score!</div>
-            ) : (
-              rankedLeaderboard.map((entry) => (
-                <div key={entry.user_id} className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${entry.user_id === user?.id ? "border-primary bg-primary/5" : "border-border"}`}>
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 text-center font-black">{entry.rank_position <= 3 ? ["🥇","🥈","🥉"][Number(entry.rank_position)-1] : `#${entry.rank_position}`}</div>
-                    <div className="min-w-0">
-                      <p className="font-semibold truncate">{entry.player_name}{entry.user_id === user?.id ? " (You)" : ""}</p>
-                      <p className="text-xs text-muted-foreground">{entry.matches_played} matches · {entry.wins} wins · {entry.podiums} podiums</p>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-black text-cyan-500">{Number(entry.total_points).toLocaleString()} pts</p>
-                    <p className="text-xs text-muted-foreground">Total points</p>
-                  </div>
-                </div>
-              ))
-            )}
-            <Button variant="outline" className="w-full" onClick={() => navigate("/leaderboard")}>
-              View Full Leaderboard
-            </Button>
-          </CardContent>
-        </Card>
-
-        {recentHistory.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Medal className="w-5 h-5" /> Recent Match History
-              </CardTitle>
-              <CardDescription>Your latest multiplayer results and rewards.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {recentHistory.map((match) => (
-                <div key={`${match.room_id}-${match.created_at}`} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
-                  <div>
-                    <p className="font-semibold">#{match.placement} / {match.player_count} place</p>
-                    <p className="text-xs text-muted-foreground">
-                      {match.score} pts · {Number(match.accuracy || 0)}% accuracy · {new Date(match.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-semibold">+{match.xp_earned} XP</p>
-                    <p className="text-xs text-muted-foreground">+{match.coins_earned} coins</p>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Quick actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: "⚔️ Quick Match", desc: "Fast balanced duel", onClick: () => navigate("/lobby?mode=1v1") },
-            { label: "👥 Team Up", desc: "Play with friends", onClick: () => navigate("/lobby?mode=2v2") },
-            { label: "🏆 Tournaments", desc: "Competitive cups", onClick: () => navigate("/tournaments") },
-            { label: "🔐 Private Room", desc: "Code-protected", onClick: () => navigate("/lobby?mode=private") },
-          ].map((card) => (
-            <button
-              key={card.label}
-              onClick={card.onClick}
-              className="text-left rounded-xl border border-border p-4 bg-card hover:bg-accent transition-colors"
-            >
-              <p className="font-semibold text-sm">{card.label}</p>
-              <p className="text-xs text-muted-foreground mt-1">{card.desc}</p>
-            </button>
-          ))}
-        </div>
-
-        {/* Mode select */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Select Mode</CardTitle>
-              <CardDescription>Choose your battle format</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {multiplayerModes.map((mode) => (
-                <button
-                  key={mode.id}
-                  className={`text-left p-4 rounded-xl border transition-all ${
-                    selectedMode.id === mode.id
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40"
-                  }`}
-                  onClick={() => setSelectedMode(mode)}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <mode.icon className="w-4 h-4 text-primary" />
-                      <span className="font-semibold text-sm">{mode.title}</span>
-                    </div>
-                    <Badge variant={mode.xp === "enabled" ? "default" : "secondary"} className="text-xs">
-                      {mode.xp === "enabled" ? "XP" : "No XP"}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{mode.subtitle}</p>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <selectedMode.icon className="w-5 h-5 text-primary" />
-                {selectedMode.title}
-              </CardTitle>
-              <CardDescription>{selectedMode.subtitle}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">{selectedMode.description}</p>
-              <Button className="w-full" onClick={() => joinMode(selectedMode)}>
-                <Zap className="w-4 h-4 mr-2" /> Queue for {selectedMode.title}
+      <main className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 sm:py-7">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
+          <section className="min-w-0 space-y-5 lg:col-span-8">
+            <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card via-card to-primary/10 p-5 shadow-sm sm:p-7">
+              <Badge variant="secondary" className="mb-3">MULTIPLAYER SEASON</Badge>
+              <h2 className="max-w-2xl text-2xl font-black tracking-tight sm:text-3xl">Ready for your next challenge?</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">Jump into a quick duel, team up with a friend, or create a private room. Your next match starts here.</p>
+              <Button size="lg" className="mt-5 w-full font-bold sm:w-auto" onClick={() => navigate("/lobby?mode=1v1")}>
+                <Swords className="mr-2 h-4 w-4" /> Quick 1v1 Duel <Zap className="ml-2 h-4 w-4" />
               </Button>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
 
-        {/* Open lobby button */}
-        <div className="text-center">
-          <Button onClick={() => navigate("/lobby")} size="lg">
-            <Zap className="w-4 h-4 mr-2" /> Open Lobby
-          </Button>
+            <div className="grid grid-cols-2 gap-3">
+              {MODES.map((mode) => {
+                const Icon = mode.icon;
+                return (
+                  <button key={mode.id} type="button" onClick={() => navigate(mode.targetPath)}
+                    className="group flex min-h-36 flex-col items-start rounded-xl border border-border border-b-4 bg-card p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:bg-accent/40 active:translate-y-1 active:border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-40 sm:p-4">
+                    <div className="mb-3 flex w-full items-center justify-between gap-2">
+                      <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground"><Icon className="h-4 w-4" /></span>
+                      <Badge variant="secondary" className="text-[10px]">{mode.badge}</Badge>
+                    </div>
+                    <span className="text-sm font-bold sm:text-base">{mode.title}</span>
+                    <span className="mt-1 text-xs text-muted-foreground">{mode.subtitle}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <Card className="border-border shadow-sm">
+              <CardContent className="p-4 sm:p-5">
+                <form onSubmit={handleJoinDirectCode} className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex items-center gap-2 text-sm font-semibold"><Lock className="h-4 w-4 text-primary" /> Have a room code?</div>
+                  <div className="flex min-w-0 flex-1 gap-2">
+                    <Input value={directCode} onChange={(event) => setDirectCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))}
+                      placeholder="Enter room code" aria-label="Room code" autoComplete="off" className="min-w-0 text-center font-mono tracking-widest sm:text-left" />
+                    <Button type="submit" className="shrink-0">Join room</Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <div className="lg:hidden">
+              <Tabs defaultValue="rankings" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="rankings">Rankings</TabsTrigger>
+                  <TabsTrigger value="history">Recent matches</TabsTrigger>
+                </TabsList>
+                <TabsContent value="rankings" className="mt-3">{leaderboardCard}</TabsContent>
+                <TabsContent value="history" className="mt-3">{historyCard}</TabsContent>
+              </Tabs>
+            </div>
+          </section>
+
+          <aside className="hidden space-y-5 lg:sticky lg:top-20 lg:col-span-4 lg:block">
+            {playerCard}
+            {leaderboardCard}
+            {historyCard}
+          </aside>
         </div>
       </main>
     </div>
