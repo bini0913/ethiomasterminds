@@ -140,24 +140,34 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    const { data, error } = await db.rpc("get_friend_profiles", { _user_ids: uniqueIds });
-    if (error || !data) return;
+    try {
+      const { data, error } = await db.rpc("get_friend_profiles", { _user_ids: uniqueIds });
+      if (error) throw error;
+      if (!data) return;
 
-    const nextNames = data.reduce((acc: Record<string, string>, row: { id: string; name: string | null; username: string | null }) => {
-      acc[row.id] = row.name?.trim() || row.username?.trim() || `User ${row.id.slice(0, 8)}`;
-      return acc;
-    }, {});
+      const nextNames = data.reduce((acc: Record<string, string>, row: { id: string; name: string | null; username: string | null }) => {
+        acc[row.id] = row.name?.trim() || row.username?.trim() || `User ${row.id.slice(0, 8)}`;
+        return acc;
+      }, {});
 
-    setMemberNames(nextNames);
+      setMemberNames(nextNames);
+    } catch (error) {
+      console.error("Study Mode participant names could not be loaded:", error);
+    }
   };
 
   const loadData = async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     setLoading(true);
-    const { error: expiryError } = await db.rpc("expire_study_competitions");
-    if (expiryError) console.error("Could not expire old study competitions", expiryError);
+    try {
+      try {
+        const { error: expiryError } = await db.rpc("expire_study_competitions");
+        if (expiryError) console.error("Could not expire old study competitions", expiryError);
+      } catch (error) {
+        console.warn("Study competition expiry check failed:", error);
+      }
 
-    const [sessionsRes, tasksRes, competitionsRes, participantsRes, liveRes, settingsRes, statsRes] = await Promise.all([
+      const [sessionsRes, tasksRes, competitionsRes, participantsRes, liveRes, settingsRes, statsRes] = await Promise.all([
       db.from("study_sessions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100),
       db.from("study_tasks").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
       db.from("study_competitions").select("*").order("created_at", { ascending: false }).limit(50),
@@ -233,7 +243,12 @@ const StudyModePage: React.FC = () => {
         : availableCompetitions[0]?.id ?? ""
     );
 
-    setLoading(false);
+    } catch (error) {
+      console.error("Study Mode data load failed:", error);
+      toast.error("Your Study Mode data could not be refreshed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
