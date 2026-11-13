@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { safeStorage } from "@/lib/safeStorage";
 
 export type Theme = "light" | "dark" | "pink" | "blue";
 
@@ -15,7 +16,7 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const getInitialTheme = (): Theme => {
   try {
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const savedTheme = safeStorage.getItem(THEME_STORAGE_KEY);
     if (savedTheme && (THEMES as string[]).includes(savedTheme)) return savedTheme as Theme;
   } catch (error) {
     // Storage can be unavailable in restricted browser/WebView contexts.
@@ -37,7 +38,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     root.classList.remove("dark", "pink", "blue");
     if (theme !== "light") root.classList.add(theme);
     try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+      safeStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch (error) {
       // Theme still applies for this session even when persistence is blocked.
       console.warn("Could not persist theme preference.", error);
