@@ -1,8 +1,8 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ArrowRight, BarChart3, BookOpen, BrainCircuit, CalendarDays, Check, Flame, GraduationCap,
-  LibraryBig, Lock, LogOut, Play, Settings, Swords, Target, Timer, Trophy, Users, Bot, Zap,
+  ArrowRight, BarChart3, BookOpen, BrainCircuit, CalendarDays, Flame, GraduationCap,
+  LibraryBig, LogOut, Play, Settings, Swords, Target, Timer, Trophy, Users, Bot, Zap,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -27,14 +27,6 @@ const tools = [
 ];
 const days = ["M", "T", "W", "T", "F", "S", "S"];
 
-/** Days until the next national exam window (early July, estimated). */
-function daysToExam() {
-  const now = new Date();
-  let target = new Date(now.getFullYear(), 6, 1);
-  if (target < now) target = new Date(now.getFullYear() + 1, 6, 1);
-  return Math.ceil((target.getTime() - now.getTime()) / 86400000);
-}
-
 function Ring({ value }: { value: number }) {
   const r = 34, c = 2 * Math.PI * r;
   return <svg viewBox="0 0 80 80" className="h-28 w-28 -rotate-90" aria-hidden="true">
@@ -52,17 +44,15 @@ const UpperTierHome: React.FC = () => {
   const xp = user?.xp ?? 0;
   const level = user?.level ?? 1;
   const progress = Math.max(0, Math.min(100, xp - (level - 1) * 100));
-  const doneSteps = Math.min(drill.length, Math.floor(progress / 25));
   const todayIdx = (new Date().getDay() + 6) % 7;
   const streakDays = Math.min(dailyStreak, todayIdx + 1);
-  const examDays = daysToExam();
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   const stats = [
     { label: "Streak", value: `${dailyStreak}`, icon: Flame, tone: "text-warning bg-warning/15" },
     { label: "Total XP", value: xp.toLocaleString(), icon: Zap, tone: "text-primary bg-primary/10" },
-    { label: "Exam in", value: `${examDays}d`, icon: GraduationCap, tone: "text-accent bg-accent/15" },
+    { label: "Level", value: `${level}`, icon: GraduationCap, tone: "text-accent bg-accent/15" },
   ];
 
   return <div className="min-h-screen bg-background pb-28 text-foreground lg:pb-10">
@@ -85,7 +75,7 @@ const UpperTierHome: React.FC = () => {
           <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/30 blur-2xl" />
           <div className="relative flex items-center gap-6">
             <div className="min-w-0 flex-1">
-              <p className="inline-flex items-center gap-2 rounded-full bg-background/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em]"><GraduationCap className="h-3.5 w-3.5" /> National exam in ~{examDays} days</p>
+              <p className="inline-flex items-center gap-2 rounded-full bg-background/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em]"><GraduationCap className="h-3.5 w-3.5" /> Grade 9–12 learning workspace</p>
               <h2 className="mt-3 text-2xl font-extrabold leading-tight md:text-4xl">Every session moves you closer, {firstName}.</h2>
               <p className="mt-2 max-w-md text-sm opacity-80 md:text-base">Today's drill: timed questions, a focus block and a quick review. {100 - progress} XP to level {level + 1}.</p>
               <div className="mt-5 flex flex-wrap gap-3">
@@ -105,17 +95,17 @@ const UpperTierHome: React.FC = () => {
         </section>
 
         <section>
-          <div className="mb-4 flex items-end justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Exam preparation</p><h2 className="text-xl font-extrabold md:text-2xl">Today's drill</h2></div><span className="text-sm font-semibold text-muted-foreground">{doneSteps}/{drill.length} done</span></div>
+          <div className="mb-4"><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Exam preparation</p><h2 className="text-xl font-extrabold md:text-2xl">Recommended next steps</h2><p className="mt-1 text-sm text-muted-foreground">Choose a task to continue your preparation.</p></div>
           <ol className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
             {drill.map((step, i) => {
-              const done = i < doneSteps, current = i === doneSteps, locked = i > doneSteps;
+              const current = i === 0;
               return <li key={step.to}>
                 <Link to={step.to} className={`flex items-center gap-4 rounded-2xl border-2 p-4 transition active:scale-[.99] ${current ? "border-primary bg-primary/5 shadow-[0_4px_0_hsl(var(--primary)/0.35)]" : "border-border bg-card hover:border-primary/40"}`}>
                   <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${done ? "bg-success text-success-foreground" : current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                    {done ? <Check className="h-6 w-6" /> : locked ? <Lock className="h-5 w-5" /> : <step.icon className="h-6 w-6" />}
+                    <step.icon className="h-6 w-6" />
                   </span>
                   <span className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">Step {i + 1}</span><span className="block font-bold">{step.title}</span><span className="block text-sm text-muted-foreground">{step.sub}</span></span>
-                  {current && <span className="rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground">Next</span>}
+                  <span className={current ? "rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground" : "text-xs font-semibold text-muted-foreground"}>{current ? "Recommended" : "Open"}</span>
                 </Link>
               </li>;
             })}
@@ -135,9 +125,9 @@ const UpperTierHome: React.FC = () => {
 
       <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
         <section className="rounded-3xl border bg-card p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Exam countdown</p>
-          <p className="mt-1 text-4xl font-extrabold tabular-nums">{examDays}<span className="ml-1 text-base font-semibold text-muted-foreground">days</span></p>
-          <p className="mt-1 text-sm text-muted-foreground">Estimated to the national exam window.</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Entrance exam preparation</p>
+          <p className="mt-2 text-lg font-extrabold">Practice with verified papers</p>
+          <p className="mt-1 text-sm text-muted-foreground">Use available past papers and track coverage from your selected textbooks. Exam dates are shown only when officially configured.</p>
           <Link to="/academic/topics" className="mt-4 flex items-center justify-between rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground hover:bg-secondary/80">Check topic coverage <ArrowRight className="h-4 w-4" /></Link>
         </section>
         <section className="rounded-3xl border bg-card p-5">
