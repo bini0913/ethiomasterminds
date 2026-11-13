@@ -1,5 +1,6 @@
 import { db } from "@/integrations/untypedClient";
 import React, { useEffect, useMemo, useState } from "react";
+import { safeStorage } from "@/lib/safeStorage";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useQuiz, Quiz as QuizType, Question } from "@/context/QuizContext";
@@ -177,7 +178,7 @@ const Quiz: React.FC = () => {
     // Browser storage is a cache, not a trusted source. A stale value from an
     // older app version or a partially written entry must never break Quiz.
     try {
-      const raw = window.localStorage.getItem(storageKey);
+      const raw = safeStorage.getItem(storageKey);
       const parsed: unknown = raw ? JSON.parse(raw) : [];
       if (Array.isArray(parsed)) {
         storedIds = parsed.filter((value): value is string => typeof value === "string");
@@ -346,7 +347,7 @@ const Quiz: React.FC = () => {
       nextCompleted.add(activeQuiz.id);
       if (activeQuiz.sourceQuizId) nextCompleted.add(activeQuiz.sourceQuizId);
       setCompletedQuizIds(nextCompleted);
-      localStorage.setItem(`completed-practice-quizzes:${user.id}`, JSON.stringify(Array.from(nextCompleted)));
+      safeStorage.setItem(`completed-practice-quizzes:${user.id}`, JSON.stringify(Array.from(nextCompleted)));
     }
   };
   
