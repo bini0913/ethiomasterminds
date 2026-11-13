@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
+import { getXpProgressInLevel } from "@/lib/rankSystem";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 
@@ -43,7 +44,9 @@ const UpperTierHome: React.FC = () => {
   const gradeNum = user?.grade?.replace(/^grade\s*/i, "") || "";
   const xp = user?.xp ?? 0;
   const level = user?.level ?? 1;
-  const progress = Math.max(0, Math.min(100, xp - (level - 1) * 100));
+  const levelProgress = getXpProgressInLevel(xp);
+  const progress = levelProgress.percentage;
+  const xpToNextLevel = levelProgress.max - levelProgress.current;
   const todayIdx = (new Date().getDay() + 6) % 7;
   const streakDays = Math.min(dailyStreak, todayIdx + 1);
   const hour = new Date().getHours();
