@@ -65,17 +65,31 @@ const AcademicInsightsPage: React.FC = () => {
     };
     void loadAcademicContext();
     const fetchAll = async () => {
-      const [statsRes, topicsRes, streakRes] = await Promise.all([
-        supabase.rpc("get_user_stats", { p_user_id: user.id }),
-        supabase.from("topic_progress").select("*").eq("user_id", user.id),
-        supabase.from("user_streaks").select("*").eq("user_id", user.id).single(),
-      ]);
-      if (statsRes.data) setStats(statsRes.data);
-      if (topicsRes.data) setTopicData(topicsRes.data);
-      if (streakRes.data) setStreak(streakRes.data);
-      setIsLoading(false);
+      try {
+        const [statsRes, topicsRes, streakRes] = await Promise.all([
+          supabase.rpc("get_user_stats", { p_user_id: user.id }),
+          supabase.from("topic_progress").select("*").eq("user_id", user.id),
+          // A student with no recorded streak yet is a valid empty state.
+          supabase.from("user_streaks").select("*").eq("user_id", user.id).maybeSingle(),
+        ]);
+
+        if (statsRes.error) throw statsRes.error;
+        if (topicsRes.error) throw topicsRes.error;
+        if (cancelled) return;
+
+        setStats(statsRes.data ?? null);
+        setTopicData(topicsRes.data ?? []);
+        setStreak(streakRes.data ?? null);
+      } catch (error) {
+        console.error("Academic insights data load failed:", error);
+        if (!cancelled) {
+          toast.error("Some learning insights could not be loaded. Please retry.");
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
     };
-    fetchAll();
+    void fetchAll();
     return () => { cancelled = true; };
   }, [user]);
 
