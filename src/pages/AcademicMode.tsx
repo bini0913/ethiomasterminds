@@ -49,7 +49,8 @@ const AcademicMode: React.FC = () => {
     (async () => {
       setIsLoading(true);
       setLoadError(false);
-      const p = await getAcademicProfile(user.id).catch(() => null);
+      try {
+      const p = await getAcademicProfile(user.id);
       if (cancelled) return;
       if (!p) {
         navigate("/academic/setup", { replace: true });
@@ -74,7 +75,12 @@ const AcademicMode: React.FC = () => {
       setWeekDone(weekRes.data?.filter((item) => item.completed).length || 0);
       setRecentResult(resultsRes.data || null);
       setTopicProgress((topicsRes.data || []) as typeof topicProgress);
-      setIsLoading(false);
+      } catch (error) {
+        console.error("Academic Mode data load failed:", error);
+        if (!cancelled) setLoadError(true);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
     })();
     return () => { cancelled = true; };
   }, [user?.id, navigate, reloadKey]);
