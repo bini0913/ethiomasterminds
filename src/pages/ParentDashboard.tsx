@@ -292,7 +292,7 @@ const ParentDashboard: React.FC = () => {
   const xpGoalProgress = Math.min(100, Math.round((dailyXP / Math.max(1, goals.daily_xp_target)) * 100));
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
       <AnimatedBackground variant="minimal" />
 
       <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -315,7 +315,7 @@ const ParentDashboard: React.FC = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6 relative z-10">
-        <Card className="border-blue-200/70 bg-white/90 shadow-sm dark:border-slate-700 dark:bg-slate-900/90">
+        <Card className="border-blue-200/70 bg-white/90 shadow-sm dark:border-slate-700 dark:bg-card">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg"><UserCheck className="h-5 w-5 text-blue-600" /> Connected school accounts</CardTitle>
             <CardDescription>Connect to your child’s account to receive classwork, progress and finance updates from the same school records.</CardDescription>

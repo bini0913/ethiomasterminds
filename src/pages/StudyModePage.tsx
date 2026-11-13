@@ -555,11 +555,11 @@ const StudyModePage: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white grid place-items-center p-6">
-        <Card className="bg-white/5 border-white/10 max-w-lg w-full">
-          <CardHeader><CardTitle className="text-white">Study Mode</CardTitle></CardHeader>
+      <div className="min-h-screen bg-background text-foreground grid place-items-center p-6">
+        <Card className="bg-card border-border max-w-lg w-full">
+          <CardHeader><CardTitle className="text-foreground">Study Mode</CardTitle></CardHeader>
           <CardContent>
-            <p className="text-white/80">Please sign in to use live Study Mode.</p>
+            <p className="text-foreground/80">Please sign in to use live Study Mode.</p>
             <Link to="/"><Button className="mt-4">Back Home</Button></Link>
           </CardContent>
         </Card>
@@ -568,7 +568,7 @@ const StudyModePage: React.FC = () => {
   }
 
   return (
-    <div className={upperStudent ? "tier-upper mm-study-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-slate-950 via-primary to-slate-900 text-white pb-[env(safe-area-inset-bottom)]"}>
+    <div className={upperStudent ? "tier-upper mm-study-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background text-foreground pb-[env(safe-area-inset-bottom)]"}>
       {upperStudent && <style>{`
         .mm-study-upper .mm-study-hero{background:radial-gradient(circle at 88% 10%,hsl(var(--primary)/.17),transparent 32%),hsl(var(--card));color:hsl(var(--foreground));border-color:hsl(var(--border))}
         .mm-study-upper .mm-study-hero .text-muted-foreground{color:hsl(var(--muted-foreground))}
@@ -584,7 +584,7 @@ const StudyModePage: React.FC = () => {
         .mm-study-upper .mm-study-call-controls button,.mm-study-upper .mm-study-action-grid button{min-height:2.75rem}
         .mm-study-upper .mm-study-action-grid button{box-shadow:0 3px 0 hsl(var(--border));transition:transform 140ms ease,box-shadow 140ms ease}
         .mm-study-upper .mm-study-action-grid button:active{transform:translateY(3px);box-shadow:none}
-        .mm-study-upper [class*="text-white"]{color:hsl(var(--muted-foreground))}
+        .mm-study-upper [class*="text-foreground"]{color:hsl(var(--muted-foreground))}
         .mm-study-upper .bg-white\/5{background:hsl(var(--muted)/.5)}
         .mm-study-upper [class*="border-white"]{border-color:hsl(var(--border))}
         .mm-study-upper .mm-preset{border:2px solid hsl(var(--border));border-bottom-width:4px;border-radius:.9rem;padding:.5rem .25rem;font-weight:700;font-size:.8rem;background:hsl(var(--card));color:hsl(var(--foreground));transition:transform .12s}
@@ -594,20 +594,20 @@ const StudyModePage: React.FC = () => {
         @media(max-width:640px){.mm-study-upper .mm-study-panel{border-radius:1rem}.mm-study-upper .mm-study-call-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}.mm-study-upper .mm-study-call-controls button{width:100%;padding-inline:.65rem}.mm-study-upper .mm-study-timer{max-width:15rem;max-height:15rem}}
       `}</style>}
       <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-6 sm:p-4 md:p-6">
-        <header className={upperStudent ? "mm-study-hero rounded-2xl border border-white/10 p-4 sm:p-5" : ""}>
-          {!upperStudent && <Link to="/" className="mb-2 inline-flex items-center gap-2 text-sm text-white/80 hover:text-white">
+        <header className={upperStudent ? "mm-study-hero rounded-2xl border border-border p-4 sm:p-5" : ""}>
+          {!upperStudent && <Link to="/" className="mb-2 inline-flex items-center gap-2 text-sm text-foreground/80 hover:text-foreground">
             <ArrowLeft className="h-4 w-4" /> Back to Master Minds
           </Link>}
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight md:text-3xl">
             <Brain className={`h-7 w-7 ${upperStudent ? "text-primary" : "text-primary"}`} /> Study Mode
           </h1>
-          <p className={upperStudent ? "text-sm text-muted-foreground" : "text-sm text-white/70"}>Focus sessions · Real study history · XP rewards · Live study room · Task linking.</p>
+          <p className={upperStudent ? "text-sm text-muted-foreground" : "text-sm text-muted-foreground"}>Focus sessions · Real study history · XP rewards · Live study room · Task linking.</p>
         </header>
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <Card className={upperStudent ? "mm-study-panel lg:col-span-2 border-border/70 bg-card shadow-sm" : "lg:col-span-2 bg-white/5 border-white/10"}>
+          <Card className={upperStudent ? "mm-study-panel lg:col-span-2 border-border/70 bg-card shadow-sm" : "lg:col-span-2 bg-card border-border"}>
             <CardHeader>
-              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-white"}`}><Clock className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-cyan-300"}`} /> Focus Timer</CardTitle>
+              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-foreground"}`}><Clock className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-primary"}`} /> Focus Timer</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4 items-center">
@@ -634,9 +634,9 @@ const StudyModePage: React.FC = () => {
                     </defs>
                   </svg>
                   <div className="absolute inset-0 grid place-items-center text-center">
-                    <p className={upperStudent ? "mm-timer-label text-xs uppercase tracking-wide" : "text-xs text-white/60 uppercase tracking-wide"}>{timerState === "break" ? "Break" : "Focus"}</p>
-                    <p className={upperStudent ? "mm-timer-value text-2xl font-bold tracking-wider tabular-nums sm:text-3xl" : "text-2xl sm:text-3xl font-bold tracking-wider text-white tabular-nums"}>{formatSeconds(countdownSeconds)}</p>
-                    <p className={upperStudent ? "mm-timer-label text-xs" : "text-xs text-white/60"}>{mode.toUpperCase()} • {timerState}</p>
+                    <p className={upperStudent ? "mm-timer-label text-xs uppercase tracking-wide" : "text-xs text-muted-foreground uppercase tracking-wide"}>{timerState === "break" ? "Break" : "Focus"}</p>
+                    <p className={upperStudent ? "mm-timer-value text-2xl font-bold tracking-wider tabular-nums sm:text-3xl" : "text-2xl sm:text-3xl font-bold tracking-wider text-foreground tabular-nums"}>{formatSeconds(countdownSeconds)}</p>
+                    <p className={upperStudent ? "mm-timer-label text-xs" : "text-xs text-muted-foreground"}>{mode.toUpperCase()} • {timerState}</p>
                   </div>
                 </div>
 
@@ -655,12 +655,12 @@ const StudyModePage: React.FC = () => {
                   </div>}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
-                      <p className="text-xs text-white/60 mb-1">Mode</p>
+                      <p className="text-xs text-muted-foreground mb-1">Mode</p>
                       <select
                         value={mode}
                         onChange={(e) => setMode(e.target.value as StudyMode)}
                         disabled={!editableTimer}
-                        className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-2 text-sm disabled:opacity-60"
+                        className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm disabled:opacity-60"
                       >
                         <option value="pomodoro">Focus (Pomodoro)</option>
                         <option value="deep">Deep Work</option>
@@ -668,37 +668,37 @@ const StudyModePage: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <p className="text-xs text-white/60 mb-1">Study (min)</p>
+                      <p className="text-xs text-muted-foreground mb-1">Study (min)</p>
                       <div className="flex items-center gap-1">
                         <Button size="icon" variant="secondary" onClick={() => void updateStudyMinutes(studyMinutes - 1)} disabled={!editableTimer}>-</Button>
-                        <Input type="number" value={studyMinutes} onChange={(e) => void updateStudyMinutes(Number(e.target.value || 0))} disabled={!editableTimer} className="bg-white/5 border-white/20 text-center" />
+                        <Input type="number" value={studyMinutes} onChange={(e) => void updateStudyMinutes(Number(e.target.value || 0))} disabled={!editableTimer} className="bg-card border-border text-center" />
                         <Button size="icon" variant="secondary" onClick={() => void updateStudyMinutes(studyMinutes + 1)} disabled={!editableTimer}>+</Button>
                       </div>
                     </div>
                     <div>
-                      <p className="text-xs text-white/60 mb-1">Break (min)</p>
+                      <p className="text-xs text-muted-foreground mb-1">Break (min)</p>
                       <div className="flex items-center gap-1">
                         <Button size="icon" variant="secondary" onClick={() => void updateBreakMinutes(breakMinutes - 1)} disabled={!editableTimer || mode === "deep"}>-</Button>
-                        <Input type="number" value={breakMinutes} onChange={(e) => void updateBreakMinutes(Number(e.target.value || 0))} disabled={!editableTimer || mode === "deep"} className="bg-white/5 border-white/20 text-center" />
+                        <Input type="number" value={breakMinutes} onChange={(e) => void updateBreakMinutes(Number(e.target.value || 0))} disabled={!editableTimer || mode === "deep"} className="bg-card border-border text-center" />
                         <Button size="icon" variant="secondary" onClick={() => void updateBreakMinutes(breakMinutes + 1)} disabled={!editableTimer || mode === "deep"}>+</Button>
                       </div>
                     </div>
                   </div>
 
-                  <label className="flex items-center gap-2 text-xs text-white/80">
+                  <label className="flex items-center gap-2 text-xs text-foreground/80">
                     <input type="checkbox" checked={settings?.auto_start_break ?? true} onChange={(e) => void updateAutoStartBreak(e.target.checked)} disabled={!editableTimer || mode !== "pomodoro"} />
                     Automatically start a break after Pomodoro
                   </label>
 
                   <div>
-                    <p className="text-xs text-white/60 mb-1">Link task to session</p>
-                    <select value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)} className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-2 text-sm">
+                    <p className="text-xs text-muted-foreground mb-1">Link task to session</p>
+                    <select value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)} className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm">
                       <option value="">No linked task</option>
                       {tasks.filter((task) => !task.completed).map((task) => (
                         <option key={task.id} value={task.id}>{task.task_title}</option>
                       ))}
                     </select>
-                    <label className="mt-2 flex items-center gap-2 text-xs text-white/80">
+                    <label className="mt-2 flex items-center gap-2 text-xs text-foreground/80">
                       <input type="checkbox" checked={markTaskOnComplete} onChange={(e) => setMarkTaskOnComplete(e.target.checked)} />
                       Mark linked task complete when session ends
                     </label>
@@ -707,11 +707,11 @@ const StudyModePage: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
-                <Card className={upperStudent ? "mm-study-panel border-border/70 bg-card shadow-sm" : "bg-white/5 border-white/10"}><CardContent className="p-3"><p className="text-xs text-white/60">Today</p><p className="font-bold">{todayMinutes}m</p></CardContent></Card>
-                <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "bg-white/5 border-white/10"}><CardContent className="p-3"><p className="text-xs text-white/60">Week</p><p className="font-bold">{weekMinutes}m</p></CardContent></Card>
-                <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Streak</p><p className="font-bold">{streakDays} 🔥</p></CardContent></Card>
-                <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Pomodoros</p><p className="font-bold">{studyStats.pomodoros_today}/4</p></CardContent></Card>
-                <Card className="bg-white/5 border-white/10"><CardContent className="p-3"><p className="text-xs text-white/60">Live Studying</p><p className="font-bold flex items-center justify-center gap-1">{liveStatuses.length} <Flame className="h-4 w-4 text-orange-400" /></p></CardContent></Card>
+                <Card className={upperStudent ? "mm-study-panel border-border/70 bg-card shadow-sm" : "bg-card border-border"}><CardContent className="p-3"><p className="text-xs text-muted-foreground">Today</p><p className="font-bold">{todayMinutes}m</p></CardContent></Card>
+                <Card className={upperStudent ? "border-border/70 bg-card shadow-sm" : "bg-card border-border"}><CardContent className="p-3"><p className="text-xs text-muted-foreground">Week</p><p className="font-bold">{weekMinutes}m</p></CardContent></Card>
+                <Card className="bg-card border-border"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Streak</p><p className="font-bold">{streakDays} 🔥</p></CardContent></Card>
+                <Card className="bg-card border-border"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Pomodoros</p><p className="font-bold">{studyStats.pomodoros_today}/4</p></CardContent></Card>
+                <Card className="bg-card border-border"><CardContent className="p-3"><p className="text-xs text-muted-foreground">Live Studying</p><p className="font-bold flex items-center justify-center gap-1">{liveStatuses.length} <Flame className="h-4 w-4 text-orange-400" /></p></CardContent></Card>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
                 <p className="text-xs leading-5 text-muted-foreground sm:text-sm">Proud of your focus? Generate a story-ready card and post your study stats.</p>
@@ -726,15 +726,15 @@ const StudyModePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/5 border-white/10">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-white"}`}><Users className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-emerald-300"}`} /> Studying Now</CardTitle>
+              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-foreground"}`}><Users className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-primary"}`} /> Studying Now</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <StudyCallBar />
-              {liveStatuses.length === 0 && <p className="text-sm text-white/60">No one is currently studying.</p>}
+              {liveStatuses.length === 0 && <p className="text-sm text-muted-foreground">No one is currently studying.</p>}
               {liveStatuses.map((entry) => (
-                <div key={entry.user_id} className="bg-white/5 border border-white/10 rounded-lg p-2 text-sm">
+                <div key={entry.user_id} className="bg-card border border-border rounded-lg p-2 text-sm">
                   <p>{memberNames[entry.user_id] ?? "A student"} is studying 🔥</p>
                 </div>
               ))}
@@ -745,20 +745,20 @@ const StudyModePage: React.FC = () => {
         <StudyLeaderboard />
 
         <div className="grid lg:grid-cols-3 gap-4">
-          <Card className="lg:col-span-2 bg-white/5 border-white/10">
+          <Card className="lg:col-span-2 bg-card border-border">
             <CardHeader>
-              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-white"}`}><Check className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-emerald-300"}`} /> Study Tasks</CardTitle>
+              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-foreground"}`}><Check className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-primary"}`} /> Study Tasks</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-col sm:flex-row gap-2">
-                <Input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Add a study task" className="bg-white/5 border-white/20" />
+                <Input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Add a study task" className="bg-card border-border" />
                 <Button className="min-h-11 w-full sm:w-auto" onClick={() => void addTask()}>Add</Button>
               </div>
               <div className="space-y-2 max-h-72 overflow-auto">
-                {tasks.length === 0 && <p className="text-sm text-white/60">No tasks yet.</p>}
+                {tasks.length === 0 && <p className="text-sm text-muted-foreground">No tasks yet.</p>}
                 {tasks.map((task) => (
-                  <div key={task.id} className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between gap-2">
-                    <p className={task.completed ? "line-through text-white/50" : ""}>{task.task_title}</p>
+                  <div key={task.id} className="bg-card border border-border rounded-lg p-3 flex items-center justify-between gap-2">
+                    <p className={task.completed ? "line-through text-muted-foreground" : ""}>{task.task_title}</p>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Button size="sm" variant={task.completed ? "secondary" : "default"} onClick={() => void toggleTask(task)}>{task.completed ? "Undo" : "Complete"}</Button>
                       <Button size="sm" variant="destructive" onClick={() => void deleteTask(task)}>Delete</Button>
@@ -769,16 +769,16 @@ const StudyModePage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/5 border-white/10">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-white"}`}><Trophy className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-amber-300"}`} /> Competitions</CardTitle>
+              <CardTitle className={`flex items-center gap-2 ${upperStudent ? "text-foreground" : "text-foreground"}`}><Trophy className={`h-5 w-5 ${upperStudent ? "text-primary" : "text-primary"}`} /> Competitions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-col sm:flex-row gap-2">
-                <Input value={competitionName} onChange={(e) => setCompetitionName(e.target.value)} placeholder="Competition name" className="bg-white/5 border-white/20" />
+                <Input value={competitionName} onChange={(e) => setCompetitionName(e.target.value)} placeholder="Competition name" className="bg-card border-border" />
                 <Button className="min-h-11 w-full sm:w-auto" onClick={() => void createCompetition()}>Create</Button>
               </div>
-              <select value={selectedCompetitionId} onChange={(e) => setSelectedCompetitionId(e.target.value)} className="w-full bg-white/5 border border-white/20 rounded-md px-3 py-2 text-sm">
+              <select value={selectedCompetitionId} onChange={(e) => setSelectedCompetitionId(e.target.value)} className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm">
                 <option value="">Select competition</option>
                 {activeCompetitions.map((competition) => (
                   <option key={competition.id} value={competition.id}>{competition.name}</option>
@@ -786,15 +786,15 @@ const StudyModePage: React.FC = () => {
               </select>
               <Button variant="secondary" className="w-full" onClick={() => void joinCompetition()}>Join selected</Button>
 
-              <div className="pt-2 border-t border-white/10 space-y-2">
-                <p className="text-sm font-medium text-white/90 flex items-center gap-1"><Zap className="h-4 w-4 text-yellow-300" /> Live Leaderboard</p>
+              <div className="pt-2 border-t border-border space-y-2">
+                <p className="text-sm font-medium text-foreground/80 flex items-center gap-1"><Zap className="h-4 w-4 text-yellow-300" /> Live Leaderboard</p>
                 {selectedCompetitionLeaderboard.map((entry, index) => (
-                  <div key={entry.id} className="text-xs bg-white/5 border border-white/10 rounded-md p-2 flex items-center justify-between gap-2">
+                  <div key={entry.id} className="text-xs bg-card border border-border rounded-md p-2 flex items-center justify-between gap-2">
                     <span className="truncate">#{index + 1} {memberNames[entry.user_id] ?? entry.user_id.slice(0, 8)}</span>
                     <Badge variant={entry.user_id === user.id ? "default" : "secondary"}>{entry.total_study_time}m</Badge>
                   </div>
                 ))}
-                {selectedCompetitionLeaderboard.length === 0 && <p className="text-xs text-white/60">No leaderboard data yet.</p>}
+                {selectedCompetitionLeaderboard.length === 0 && <p className="text-xs text-muted-foreground">No leaderboard data yet.</p>}
               </div>
             </CardContent>
           </Card>

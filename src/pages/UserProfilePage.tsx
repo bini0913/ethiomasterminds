@@ -728,13 +728,13 @@ const UserProfilePage = () => {
 
   if (loadingProfile) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#1e1b4b,_#0b1020_45%,_#05060f)] px-3 pb-14 pt-4 md:px-8">
+      <div className="min-h-screen bg-background px-3 pb-14 pt-4 md:px-8">
         <div className="mx-auto max-w-6xl space-y-4">
           <div className="flex items-center justify-between">
             <Skeleton className="h-9 w-24 rounded-lg" />
             <Skeleton className="h-4 w-32" />
           </div>
-          <div className="rounded-3xl border border-white/10 bg-card/50 p-5">
+          <div className="rounded-3xl border border-border bg-card/50 p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <Skeleton className="h-40 w-40 rounded-full" />
               <div className="w-full space-y-3">
@@ -748,7 +748,7 @@ const UserProfilePage = () => {
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-28 w-full rounded-2xl" />
           ))}
-          <div className="flex items-center justify-center gap-2 text-sm text-white/70">
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading profile…
           </div>
@@ -760,16 +760,16 @@ const UserProfilePage = () => {
   if (profileMissing || !profile) return <div className="p-8">Profile not found.</div>;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[radial-gradient(circle_at_top,_#1e1b4b,_#0b1020_45%,_#05060f)] px-3 pb-14 pt-4 text-foreground md:px-8">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background px-3 pb-14 pt-4 text-foreground md:px-8">
       <div className="mx-auto max-w-6xl space-y-5">
         <header className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate(-1)} className="gap-2 border-white/20 bg-white/5">
+          <Button variant="outline" onClick={() => navigate(-1)} className="gap-2 border-border bg-card">
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
-          <p className="text-xs text-white/60">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "recently"}</p>
+          <p className="text-xs text-muted-foreground">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "recently"}</p>
         </header>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-primary/70 via-primary/60 to-cyan-900/50 shadow-sm">
+        <section className="relative overflow-hidden rounded-[2rem] border border-border bg-gradient-to-br from-primary/70 via-primary/60 to-cyan-900/50 shadow-sm">
           <motion.div
             aria-hidden
             className="absolute inset-0"
@@ -797,7 +797,7 @@ const UserProfilePage = () => {
                 <img
                   src={profile.avatar}
                   alt={`${profile.name || profile.username}'s profile`}
-                  className="relative h-28 w-28 rounded-full border-2 border-white/70 object-cover shadow-lg sm:h-32 sm:w-32"
+                  className="relative h-28 w-28 rounded-full border-2 border-border object-cover shadow-lg sm:h-32 sm:w-32"
                 />
               ) : (
                 <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={116} autoRotate={false} className="[&>p]:hidden" />
@@ -827,7 +827,7 @@ const UserProfilePage = () => {
                   {currentTier.icon} {currentTier.name}
                 </Badge>
               </div>
-              <p className="text-sm text-white/80">@{profile.username}</p>
+              <p className="text-sm text-foreground/80">@{profile.username}</p>
 
               <div className="max-w-2xl space-y-1">
                 <div className="flex items-center justify-between text-xs text-white/85">
@@ -835,10 +835,10 @@ const UserProfilePage = () => {
                   <span>{xpProgress.current}/220 XP</span>
                 </div>
                 <Progress value={progress} className="h-2 bg-white/20" />
-                <p className="text-[11px] text-white/70">Next tier: {nextTier ? nextTier.name : "MAX RANK"}</p>
+                <p className="text-[11px] text-muted-foreground">Next tier: {nextTier ? nextTier.name : "MAX RANK"}</p>
               </div>
 
-              <p className="text-sm text-white/90">
+              <p className="text-sm text-foreground/80">
                 Level {profile.level} • {(profile.xp ?? 0).toLocaleString()} XP • #{profileRank > 0 ? profileRank : "-"} Rank • Grade {Math.max(1, Math.ceil((profile.level ?? 1) / 2))}
               </p>
 
@@ -860,7 +860,7 @@ const UserProfilePage = () => {
           </div>
         </section>
 
-        <Card className="border-white/15 bg-card/80">
+        <Card className="border-border bg-card/80">
           <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4">
             <div className="flex flex-wrap gap-2">
               {!isSelf ? (
@@ -885,10 +885,10 @@ const UserProfilePage = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-white/15 bg-card/80 backdrop-blur">
+        <Card className="border-border bg-card/80 backdrop-blur">
           <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
             {[{ label: "Followers", value: followersCount, icon: Users }, { label: "Following", value: followingCount, icon: UserRoundPlus }, { label: "Streak", value: streak, icon: Flame }, { label: "Wins", value: wins, icon: Trophy }].map((stat) => (
-              <motion.div key={stat.label} whileHover={{ y: -4 }} className="rounded-full border border-white/10 bg-white/[0.03] p-3 text-center">
+              <motion.div key={stat.label} whileHover={{ y: -4 }} className="rounded-full border border-border bg-card p-3 text-center">
                 <stat.icon className="mx-auto mb-1 h-4 w-4 text-primary" />
                 <p className="text-xs text-muted-foreground">{stat.label}</p>
                 <p className="text-xl font-extrabold">{stat.value.toLocaleString()}</p>
@@ -897,7 +897,7 @@ const UserProfilePage = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-white/15 bg-card/80">
+        <Card className="border-border bg-card/80">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary" />Learning Progress</CardTitle>
           </CardHeader>
@@ -917,10 +917,10 @@ const UserProfilePage = () => {
           </CardContent>
         </Card>
 
-        <section className="space-y-3 rounded-3xl border border-white/15 bg-card/70 p-5">
+        <section className="space-y-3 rounded-3xl border border-border bg-card/70 p-5">
           <div className="flex items-center justify-between">
             <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="h-5 w-5 text-primary" />Achievements</h2>
-            <p className="text-xs text-white/60">Tap a badge for details</p>
+            <p className="text-xs text-muted-foreground">Tap a badge for details</p>
           </div>
           <div className="flex snap-x gap-3 overflow-x-auto pb-2">
             {displayedAchievements.map((achievement) => (
@@ -932,19 +932,19 @@ const UserProfilePage = () => {
                 onClick={() => setSelectedAchievement(achievement)}
                 className={`min-w-40 snap-start rounded-2xl border p-4 text-left transition ${
                   achievement.locked
-                    ? "border-white/10 bg-white/[0.03] opacity-55 blur-[0.4px]"
+                    ? "border-border bg-card opacity-55 blur-[0.4px]"
                     : "border-cyan-400/30 bg-cyan-400/10 shadow-sm"
                 }`}
               >
                 <p className="text-4xl">{achievement.icon}</p>
                 <p className="mt-2 text-sm font-semibold">{achievement.name}</p>
-                <p className="text-xs text-white/70">{achievement.locked ? "Locked" : `Unlocked ${achievement.date || "recently"}`}</p>
+                <p className="text-xs text-muted-foreground">{achievement.locked ? "Locked" : `Unlocked ${achievement.date || "recently"}`}</p>
               </motion.button>
             ))}
           </div>
         </section>
 
-        <section className="space-y-4 rounded-3xl border border-white/15 bg-card/70 p-5">
+        <section className="space-y-4 rounded-3xl border border-border bg-card/70 p-5">
           <div className="flex items-center justify-between">
             <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><Sparkles className="h-5 w-5 text-primary" />Collection Showroom</h2>
             <Badge variant="secondary">{collections.length}/{totalCollectionItems || 0} owned</Badge>
@@ -954,10 +954,10 @@ const UserProfilePage = () => {
             <p className="mb-2 text-xs uppercase tracking-wide text-primary/80">Featured Loadout</p>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {featuredItems.length ? featuredItems.map((item) => (
-                <motion.div key={item.item_id} whileHover={{ scale: 1.04 }} className="rounded-xl border border-white/15 bg-white/[0.04] p-3 text-center">
+                <motion.div key={item.item_id} whileHover={{ scale: 1.04 }} className="rounded-xl border border-border bg-card p-3 text-center">
                   <p className="text-3xl">{item.preview}</p>
                   <p className="truncate text-xs font-semibold">{item.name}</p>
-                  <p className="text-[10px] uppercase text-white/60">{item.section}</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">{item.section}</p>
                 </motion.div>
               )) : <p className="col-span-full text-sm text-muted-foreground">No featured items yet.</p>}
             </div>
@@ -978,7 +978,7 @@ const UserProfilePage = () => {
                     <motion.div
                       key={item.item_id}
                       whileHover={{ scale: 1.03 }}
-                      className={`rounded-2xl border p-3 text-center transition ${item.owned ? "bg-card" : "opacity-45 grayscale"} ${item.rarity === "legendary" ? "border-amber-400/60 shadow-sm" : "border-white/10"}`}
+                      className={`rounded-2xl border p-3 text-center transition ${item.owned ? "bg-card" : "opacity-45 grayscale"} ${item.rarity === "legendary" ? "border-amber-400/60 shadow-sm" : "border-border"}`}
                     >
                       <p className="text-4xl">{item.preview}</p>
                       <p className="mt-2 truncate text-sm font-semibold">{item.name}</p>
@@ -997,33 +997,33 @@ const UserProfilePage = () => {
           </Tabs>
         </section>
 
-        <section className="space-y-3 rounded-3xl border border-white/15 bg-card/70 p-5">
+        <section className="space-y-3 rounded-3xl border border-border bg-card/70 p-5">
           <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><Rocket className="h-5 w-5 text-primary" />Activity Feed</h2>
           {(activities.length ? activities : [{ id: "0", text: "Reached a new learning milestone", time: new Date().toISOString(), icon: "spark" as const }]).map((activity, index) => (
-            <motion.div key={activity.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <span className="rounded-full border border-white/20 bg-white/10 p-2">
+            <motion.div key={activity.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
+              <span className="rounded-full border border-border bg-card p-2">
                 {activity.icon === "trophy" ? <Trophy className="h-4 w-4 text-amber-300" /> : activity.icon === "zap" ? <Zap className="h-4 w-4 text-cyan-300" /> : <Sparkles className="h-4 w-4 text-primary" />}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold leading-tight">{activity.text}</p>
                 <p className="text-xs text-muted-foreground">{relativeTime(activity.time)}</p>
               </div>
-              <Clock3 className="h-4 w-4 text-white/40" />
+              <Clock3 className="h-4 w-4 text-muted-foreground" />
             </motion.div>
           ))}
         </section>
 
-        <section className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 backdrop-blur">
+        <section className="rounded-3xl border border-border bg-card p-5 backdrop-blur">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-lg font-semibold">About</h2>
-            {isSelf ? <span className="text-xs text-white/60">Auto-saves</span> : null}
+            {isSelf ? <span className="text-xs text-muted-foreground">Auto-saves</span> : null}
           </div>
           {isSelf ? (
             <textarea
               value={aboutText}
               onChange={(event) => setAboutText(event.target.value)}
               placeholder="Tell others about yourself..."
-              className="min-h-16 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-sm leading-relaxed text-white/90 outline-none focus:border-cyan-400/50"
+              className="min-h-16 w-full resize-none rounded-2xl border border-border bg-card p-3 text-sm leading-relaxed text-foreground/80 outline-none focus:border-cyan-400/50"
             />
           ) : (
             <p className="text-sm leading-relaxed text-muted-foreground">{aboutText || "This learner hasn't added an about section yet."}</p>
@@ -1032,7 +1032,7 @@ const UserProfilePage = () => {
         </section>
 
         {isSelf && (
-          <Card className="border-white/15 bg-card/80">
+          <Card className="border-border bg-card/80">
             <CardHeader>
               <CardTitle>Profile Privacy</CardTitle>
             </CardHeader>
@@ -1051,7 +1051,7 @@ const UserProfilePage = () => {
       </div>
 
       <Dialog open={Boolean(selectedAchievement)} onOpenChange={(open) => !open && setSelectedAchievement(null)}>
-        <DialogContent className="border-white/20 bg-[#0b1020]">
+        <DialogContent className="border-border bg-[#0b1020]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <span className="text-2xl">{selectedAchievement?.icon}</span>
@@ -1059,7 +1059,7 @@ const UserProfilePage = () => {
             </DialogTitle>
             <DialogDescription>{selectedAchievement?.description}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
+          <div className="space-y-2 rounded-xl border border-border bg-card p-3 text-sm">
             <p className="inline-flex items-center gap-2"><Star className="h-4 w-4 text-cyan-300" />Status: {selectedAchievement?.locked ? "Locked" : "Unlocked"}</p>
             <p className="inline-flex items-center gap-2"><Crown className="h-4 w-4 text-amber-300" />Earn date: {selectedAchievement?.date || "Not yet earned"}</p>
             <p className="inline-flex items-center gap-2"><Lock className="h-4 w-4 text-primary" />Rarity: {selectedAchievement?.locked ? "Hidden" : "Profile highlight"}</p>

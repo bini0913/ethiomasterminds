@@ -421,7 +421,7 @@ const StudentDashboard: React.FC = () => {
           animate="visible"
         >
           <motion.div variants={itemVariants}>
-            <Card className="border-blue-200/70 bg-white/90 shadow-sm dark:border-slate-700 dark:bg-slate-900/90">
+            <Card className="border-blue-200/70 bg-white/90 shadow-sm dark:border-slate-700 dark:bg-card">
               <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-lg"><GraduationCap className="h-5 w-5 text-blue-600" /> Assignments from your teachers</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 {assignedLearning.length === 0 ? (

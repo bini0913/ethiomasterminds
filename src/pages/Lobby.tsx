@@ -1070,43 +1070,43 @@ const Lobby: React.FC = () => {
   const friendsOnline = onlineFriends;
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
       <AnimatedBackground />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.24),transparent_52%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.16),transparent_44%)]" />
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/75 px-4 py-3 backdrop-blur-xl">
+      <div className="absolute inset-0 bg-transparent" />
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-xl">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             <BackButton to="/" />
             <div className="bg-cyan-500/15 rounded-xl p-2 border border-cyan-300/30">
-              <Gamepad className="h-6 w-6 text-cyan-300" />
+              <Gamepad className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Nexus Lobby</h1>
-              <p className="text-xs text-slate-300">{onlinePlayers.length.toLocaleString()} players online • {liveMatchCount} matches live</p>
+              <h1 className="text-xl font-bold text-foreground">Nexus Lobby</h1>
+              <p className="text-xs text-muted-foreground">{onlinePlayers.length.toLocaleString()} players online • {liveMatchCount} matches live</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden lg:flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 min-w-[260px]">
+            <div className="hidden lg:flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 min-w-[260px]">
               <AvatarRenderer avatar={user.avatar || "avatar-1"} size="sm" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold truncate text-white">{user.name || "Player"}</p>
-                <div className="h-1.5 rounded-full bg-slate-700 mt-1 overflow-hidden">
+                <p className="text-sm font-semibold truncate text-foreground">{user.name || "Player"}</p>
+                <div className="h-1.5 rounded-full bg-muted mt-1 overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-blue-400 to-accent animate-pulse" style={{ width: `${Math.min(100, ((user.xp || 0) % 1000) / 10)}%` }} />
                 </div>
               </div>
               <Badge className="bg-primary/20 text-primary border-primary/40">Lv.{user.level || 1}</Badge>
             </div>
             <Button variant="ghost" size="icon" onClick={loadLobbyData}>
-              <RefreshCw className={`h-4 w-4 text-white ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 text-foreground ${loading ? 'animate-spin' : ''}`} />
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2 bg-white/10 text-white hover:bg-white/20 border border-white/20">
+            <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2 bg-card text-card-foreground hover:bg-muted border border-border">
               <Home className="h-4 w-4" /> Menu
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="border-b border-white/10 px-4 py-3 relative z-10">
+      <div className="border-b border-border px-4 py-3 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-wrap gap-2">
           <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 whitespace-nowrap bg-cyan-600 hover:bg-cyan-500">
             <Plus className="h-4 w-4" /> Create Room
@@ -1144,10 +1144,10 @@ const Lobby: React.FC = () => {
             <button
               key={card.title}
               onClick={card.onClick}
-              className={`text-left rounded-2xl border p-4 bg-gradient-to-br ${card.style} hover:scale-[1.015] transition-transform shadow-sm`}
+              className="mm-option text-left p-4"
             >
-              <p className="font-semibold text-white">{card.title}</p>
-              <p className="text-xs text-slate-200 mt-1">{card.desc}</p>
+              <p className="font-semibold text-foreground">{card.title}</p>
+              <p className="text-xs text-muted-foreground mt-1">{card.desc}</p>
             </button>
           ))}
         </div>
@@ -1155,25 +1155,25 @@ const Lobby: React.FC = () => {
           <Card className="border-cyan-300/30 bg-cyan-500/10">
             <CardContent className="p-3 text-sm">
               <div className="flex items-center gap-2 text-cyan-100"><Users className="h-4 w-4" /> Players online now</div>
-              <p className="text-2xl font-bold mt-1 text-white">{onlinePlayers.length.toLocaleString()}</p>
+              <p className="text-2xl font-bold mt-1 text-foreground">{onlinePlayers.length.toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card className="border-primary/30 bg-primary/10">
             <CardContent className="p-3 text-sm">
               <div className="flex items-center gap-2 text-primary"><Activity className="h-4 w-4" /> Matches in progress</div>
-              <p className="text-2xl font-bold mt-1 text-white">{liveMatchCount}</p>
+              <p className="text-2xl font-bold mt-1 text-foreground">{liveMatchCount}</p>
             </CardContent>
           </Card>
           <Card className="border-emerald-300/30 bg-emerald-500/10">
             <CardContent className="p-3 text-sm">
               <div className="flex items-center gap-2 text-emerald-100"><Target className="h-4 w-4" /> Match Quality</div>
-              <p className="text-2xl font-bold mt-1 text-white">{matchQualityScore}% Balanced</p>
+              <p className="text-2xl font-bold mt-1 text-foreground">{matchQualityScore}% Balanced</p>
             </CardContent>
           </Card>
           <Card className="border-orange-300/30 bg-orange-500/10">
             <CardContent className="p-3 text-sm">
               <div className="flex items-center gap-2 text-orange-100"><Flame className="h-4 w-4" /> Win Streak Aura</div>
-              <p className="text-2xl font-bold mt-1 text-white">🔥 {Math.max(1, Math.floor((user?.xp || 0) / 1200))}</p>
+              <p className="text-2xl font-bold mt-1 text-foreground">🔥 {Math.max(1, Math.floor((user?.xp || 0) / 1200))}</p>
             </CardContent>
           </Card>
         </div>
@@ -1186,7 +1186,7 @@ const Lobby: React.FC = () => {
           </div>
         )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="bg-slate-900/80 border-white/10 text-white">
+          <Card className="bg-card border-border text-card-foreground">
             <CardHeader className="border-b py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="h-5 w-5" /> Online Players ({onlinePlayers.length})
@@ -1205,8 +1205,8 @@ const Lobby: React.FC = () => {
                           <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${getStatusColor(player.status)} border-2 border-card`}></div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate text-white">{player.name}</div>
-                          <div className="text-xs text-slate-300 flex items-center gap-1">
+                          <div className="font-medium text-sm truncate text-foreground">{player.name}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1">
                             <Star className="h-3 w-3 text-yellow-500" /> Lv.{player.level} • {player.xp} XP
                           </div>
                         </div>
@@ -1229,7 +1229,7 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          <Card className="bg-slate-900/80 border-white/10 text-white">
+          <Card className="bg-card border-border text-card-foreground">
             <CardHeader className="border-b py-3">
               <CardTitle className="text-base">Play & Compete</CardTitle>
             </CardHeader>
@@ -1297,7 +1297,7 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          <Card className="bg-slate-900/80 border-white/10 text-white">
+          <Card className="bg-card border-border text-card-foreground">
             <CardHeader className="border-b py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <MessageSquare className="h-5 w-5" /> Lobby Chat
@@ -1335,7 +1335,7 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/80 backdrop-blur-sm border-white/10 text-white">
+          <Card className="bg-card backdrop-blur-sm border-border text-card-foreground">
             <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-t-xl py-3">
               <CardTitle className="flex items-center gap-2 text-base"><Bell className="h-5 w-5" /> Live Activity Feed</CardTitle>
             </CardHeader>
@@ -1355,19 +1355,19 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/80 border-white/10 text-white">
-            <CardHeader className="py-3 border-b border-white/10">
+          <Card className="bg-card border-border text-card-foreground">
+            <CardHeader className="py-3 border-b border-border">
               <CardTitle className="text-base">Friends + Recent Matches</CardTitle>
             </CardHeader>
             <CardContent className="p-3 space-y-3">
               <div>
-                <p className="text-xs text-slate-300 mb-2">Online friends ({friendsOnline.length})</p>
+                <p className="text-xs text-muted-foreground mb-2">Online friends ({friendsOnline.length})</p>
                 <div className="space-y-2 max-h-44 overflow-auto pr-1">
                   {friendsOnline.length === 0 ? (
-                    <p className="text-xs text-slate-400">No friends online right now.</p>
+                    <p className="text-xs text-muted-foreground">No friends online right now.</p>
                   ) : (
                     friendsOnline.slice(0, 6).map((friend) => (
-                      <div key={friend.id} className="flex items-center justify-between rounded-lg bg-white/5 border border-white/10 p-2">
+                      <div key={friend.id} className="flex items-center justify-between rounded-lg bg-card border border-border p-2">
                         <span className="text-sm">{friend.name}</span>
                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => challengePlayer(friend.id, friend.name)}>
                           Invite
@@ -1378,15 +1378,15 @@ const Lobby: React.FC = () => {
                 </div>
               </div>
               <div>
-                <p className="text-xs text-slate-300 mb-2">Recent active rooms</p>
+                <p className="text-xs text-muted-foreground mb-2">Recent active rooms</p>
                 <div className="space-y-2">
                   {recentMatches.length === 0 ? (
-                    <p className="text-xs text-slate-400">No recent room history yet.</p>
+                    <p className="text-xs text-muted-foreground">No recent room history yet.</p>
                   ) : (
                     recentMatches.map((match) => (
-                      <div key={match.id} className="rounded-lg bg-white/5 border border-white/10 p-2 text-xs">
-                        <p className="font-medium text-slate-100">{match.name}</p>
-                        <p className="text-slate-300">{match.subject} • {match.players}/{match.maxPlayers} players</p>
+                      <div key={match.id} className="rounded-lg bg-card border border-border p-2 text-xs">
+                        <p className="font-medium text-muted-foreground">{match.name}</p>
+                        <p className="text-muted-foreground">{match.subject} • {match.players}/{match.maxPlayers} players</p>
                       </div>
                     ))
                   )}
@@ -1592,7 +1592,7 @@ const Lobby: React.FC = () => {
 
       {incomingInvite && incomingInvite.status === "pending" && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[92vw] max-w-md">
-          <Card className="border-emerald-400/40 bg-slate-950/95 backdrop-blur-xl shadow-sm">
+          <Card className="border-emerald-400/40 bg-background/95 backdrop-blur-xl shadow-sm">
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <AvatarRenderer avatar={incomingInviteSender?.avatar || "avatar-1"} size="md" />

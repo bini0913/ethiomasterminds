@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Book, Calculator, Atom, BookOpen, Brain, Zap, Trophy, Target, Play, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import AnimatedBackground from "@/components/ui/AnimatedBackground";
 import BackButton from "@/components/ui/BackButton";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -370,18 +369,17 @@ const Quiz: React.FC = () => {
   }
   
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <AnimatedBackground variant="minimal" showIcons={false} />
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
       
       <div className="relative z-10">
         {/* Header */}
-        <header className="glass border-b border-border/50 sticky top-0 z-20">
+        <header className="sticky top-0 z-20 border-b border-border bg-background/95">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <BackButton to="/" />
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <BookOpen className="h-5 w-5 text-white" />
+                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+                  <BookOpen className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div>
                   <h1 className="text-lg font-display font-bold text-foreground">Quiz Center</h1>
@@ -402,15 +400,23 @@ const Quiz: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.3 }}
           >
+            <section className="mb-6 rounded-3xl border-2 border-b-4 border-border bg-card p-5 sm:p-6">
+              <p className="text-xs font-bold uppercase tracking-widest text-primary">Ready when you are</p>
+              <h2 className="mt-1 font-display text-2xl font-bold sm:text-3xl">Jump straight into practice</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{numQuestions} questions picked for your level. No setup needed.</p>
+              <button type="button" onClick={() => handleCreateRandomQuiz()} className="mm-btn mt-4 inline-flex h-14 w-full items-center justify-center gap-2 px-6 text-base font-bold uppercase tracking-wide sm:w-auto">
+                <Play className="h-5 w-5" /> Start practice
+              </button>
+            </section>
             <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-6">
-              <TabsList className="grid w-full grid-cols-2 glass border-border/30">
+              <TabsList className="grid w-full grid-cols-2 bg-card border-border">
                 <TabsTrigger value="browse" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   <Book className="h-4 w-4" />
                   Browse Quizzes
                 </TabsTrigger>
-                <TabsTrigger value="random" className="flex items-center gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+                <TabsTrigger value="random" className="flex items-center gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
                   <Zap className="h-4 w-4" />
                   Quick Quiz
                 </TabsTrigger>
@@ -418,7 +424,7 @@ const Quiz: React.FC = () => {
               
               <TabsContent value="browse" className="mt-6">
                 {/* Filters */}
-                <Card className="glass border-border/30 mb-6">
+                <Card className="bg-card border-border mb-6">
                   <CardContent className="p-4">
                     <div className="flex flex-wrap items-center gap-3">
                       {/* Subject Filter */}
@@ -474,7 +480,7 @@ const Quiz: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
                     >
-                      <Card className="glass border-border/30 card-hover overflow-hidden">
+                      <Card className="bg-card border-border card-hover overflow-hidden">
                         <div className={`h-2 bg-gradient-to-r ${
                           quiz.category === 'Math' ? 'from-primary to-accent' :
                           quiz.category === 'Science' ? 'from-secondary to-glow-cyan' :
@@ -540,7 +546,7 @@ const Quiz: React.FC = () => {
                   
                   {filteredQuizzes.length === 0 && (
                     <div className="col-span-full">
-                      <Card className="glass border-border/30">
+                      <Card className="bg-card border-border">
                         <CardContent className="py-12 text-center">
                           <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                           <p className="text-muted-foreground">No quizzes available for this grade/subject yet.</p>
@@ -562,7 +568,7 @@ const Quiz: React.FC = () => {
               </TabsContent>
               
               <TabsContent value="random" className="mt-6">
-                <Card className="glass border-border/30 mb-6">
+                <Card className="bg-card border-border mb-6">
                   <CardHeader>
                     <CardTitle className="font-display flex items-center gap-2">
                       <Zap className="h-5 w-5 text-accent" />
@@ -657,7 +663,7 @@ const Quiz: React.FC = () => {
                 </Card>
                 
                 {/* Daily Challenge Preview */}
-                <Card className="glass border-border/30">
+                <Card className="bg-card border-border">
                   <CardHeader>
                     <CardTitle className="font-display flex items-center gap-2">
                       <Trophy className="h-5 w-5 text-glow-yellow" />
