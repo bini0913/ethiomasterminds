@@ -1,7 +1,6 @@
 import { db } from "@/integrations/untypedClient";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,16 +23,18 @@ export default function FinanceOversightCard() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await db.rpc("get_finance_oversight_summary");
-    if (error) {
+    try {
+      const { data, error } = await db.rpc("get_finance_oversight_summary");
+      if (error) throw error;
+      setUnavailable(false);
+      setSummary((Array.isArray(data) ? data[0] : data) as FinanceSummary | null);
+    } catch (error) {
       console.error("Finance oversight summary unavailable:", error);
       setUnavailable(true);
       setSummary(null);
-    } else {
-      setUnavailable(false);
-      setSummary((Array.isArray(data) ? data[0] : data) as FinanceSummary | null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { void load(); }, []);

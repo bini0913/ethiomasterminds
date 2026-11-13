@@ -77,6 +77,7 @@ const ParentDashboard: React.FC = () => {
   const loadAll = async () => {
     if (!user?.id) return;
     setLoadingData(true);
+    try {
     const [quizRes, studyRes, tasksRes, msgRes, goalsRes, leaderboardRes, classMembershipRes, earlyProgressRes] = await Promise.all([
       supabase.from("quiz_results").select("id,score,correct_answers,total_questions,completed_at,xp_earned,quiz_id").eq("student_id", user.id).order("completed_at", { ascending: false }).limit(60),
       db.from("study_sessions").select("id,created_at,duration,planned_duration,status").eq("user_id", user.id).order("created_at", { ascending: false }).limit(120),
@@ -117,7 +118,12 @@ const ParentDashboard: React.FC = () => {
         setClassSize(sorted.length);
       }
     }
-    setLoadingData(false);
+    } catch (error) {
+      console.error("Parent dashboard data load failed:", error);
+      toast.error("Some dashboard information could not be loaded. Please retry.");
+    } finally {
+      setLoadingData(false);
+    }
   };
 
   useEffect(() => { if (user?.id) void loadAll(); }, [user?.id]);

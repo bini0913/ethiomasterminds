@@ -256,6 +256,9 @@ const ManagerDashboard: React.FC = () => {
         fetchModerationData(),
         fetchManagerTournaments(),
       ]);
+    } catch (error) {
+      console.error("Manager dashboard data load failed:", error);
+      toast.error("Some management data could not be loaded. Please refresh and try again.");
     } finally {
       setLoading(false);
     }
