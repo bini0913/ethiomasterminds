@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { safeStorage } from "@/lib/safeStorage";
 import { User, Session } from "@supabase/supabase-js";
 
 // Types
@@ -60,12 +61,7 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const clearStoredLoginMode = () => {
-  try {
-    window.localStorage.removeItem("masterminds_login_mode");
-  } catch (error) {
-    // Auth state must still clear even if browser storage is blocked.
-    console.warn("Could not clear the saved login mode.", error);
-  }
+  safeStorage.removeItem("masterminds_login_mode");
 };
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
