@@ -100,7 +100,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Fetch user profile and role from database
-  const fetchUserProfile = async (userId: string, authUser?: User): Promise<UserProfile | null> => {
+  const fetchUserProfile = async (
+    userId: string,
+    authUser?: User,
+    allowMissingProfileCreate = true,
+  ): Promise<UserProfile | null> => {
     try {
       // Fetch profile
       const { data: profile, error: profileError } = await supabase
@@ -110,9 +114,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (profileError) {
-        if (profileError.code === "PGRST116") {
+        if (profileError.code === "PGRST116" && allowMissingProfileCreate) {
           await createMissingProfile(userId, authUser);
-          return await fetchUserProfile(userId, authUser);
+          // Retry once after bootstrapping the missing row. A persistent RLS
+          // or visibility problem must resolve to a controlled null result,
+          // not an unbounded chain of profile requests.
+          return await fetchUserProfile(userId, authUser, false);
+        }
+        if (profileError.code === "PGRST116") {
+          console.error("Profile row is still unavailable after bootstrap:", userId);
+          return null;
         }
         console.error('Error fetching profile:', profileError);
         return null;
@@ -184,27 +195,38 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      // A session read can finish after logout. Never let that stale result
-      // restore the account we just logged out from.
-      if (signingOutRef.current) {
+    supabase.auth.getSession()
+      .then(({ data: { session: existingSession } }) => {
+        // A session read can finish after logout. Never let that stale result
+        // restore the account we just logged out from.
+        if (signingOutRef.current) {
+          setSession(null);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
+        setSession(existingSession);
+        if (existingSession?.user) {
+          fetchUserProfile(existingSession.user.id, existingSession.user).then(profile => {
+            if (signingOutRef.current) return;
+            setUser(profile);
+            setIsLoading(false);
+          });
+        } else {
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => {
+        // A failed session read must not leave the entire app stuck in its
+        // initial loading state. The auth listener can still resolve a later
+        // sign-in event and repopulate the context.
+        console.error("Could not restore the saved authentication session:", error);
+        if (signingOutRef.current) return;
         setSession(null);
         setUser(null);
         setIsLoading(false);
-        return;
-      }
-
-      setSession(existingSession);
-      if (existingSession?.user) {
-        fetchUserProfile(existingSession.user.id, existingSession.user).then(profile => {
-          if (signingOutRef.current) return;
-          setUser(profile);
-          setIsLoading(false);
-        });
-      } else {
-        setIsLoading(false);
-      }
-    });
+      });
 
     return () => subscription.unsubscribe();
   }, []);
