@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Check, Flame, GraduationCap, LibraryBig, Lock, LogOut, MessageCircle, Play, Settings, Store, Swords, Timer, Trophy, Users, Zap } from "lucide-react";
+import { ArrowRight, Flame, GraduationCap, LibraryBig, LogOut, MessageCircle, Play, Settings, Store, Swords, Timer, Trophy, Users, Zap } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAchievements } from "@/context/AchievementsContext";
@@ -42,7 +42,6 @@ const MiddleTierHome: React.FC = () => {
   const streakDays = Math.min(dailyStreak, todayIdx + 1);
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const doneSteps = Math.min(path.length, Math.floor(progress / 25));
 
   const stats = [
     { label: "Streak", value: `${dailyStreak}`, icon: Flame, tone: "text-warning bg-warning/15" },
@@ -93,17 +92,17 @@ const MiddleTierHome: React.FC = () => {
 
         {/* Learning path */}
         <section>
-          <div className="mb-4 flex items-end justify-between"><h2 className="text-xl font-extrabold md:text-2xl">Your path today</h2><span className="text-sm font-semibold text-muted-foreground">{doneSteps}/{path.length} done</span></div>
+          <div className="mb-4"><h2 className="text-xl font-extrabold md:text-2xl">Recommended next steps</h2><p className="mt-1 text-sm text-muted-foreground">Choose a learning activity to continue your progress.</p></div>
           <ol className="relative space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
             {path.map((step, i) => {
-              const done = i < doneSteps, current = i === doneSteps, locked = i > doneSteps;
+              const current = i === 0;
               return <li key={step.to}>
                 <Link to={step.to} className={`group flex items-center gap-4 rounded-2xl border-2 p-4 transition active:scale-[.99] ${current ? "border-primary bg-primary/5 shadow-[0_4px_0_hsl(var(--primary)/0.35)]" : "border-border bg-card hover:border-primary/40"}`}>
-                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${done ? "bg-success text-success-foreground" : current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                    {done ? <Check className="h-6 w-6" /> : locked ? <Lock className="h-5 w-5" /> : <step.icon className="h-6 w-6" />}
+                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    <step.icon className="h-6 w-6" />
                   </span>
                   <span className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">Step {i + 1}</span><span className="block font-bold">{step.title}</span><span className="block text-sm text-muted-foreground">{step.sub}</span></span>
-                  {current && <span className="rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground">Next</span>}
+                  <span className={current ? "rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground" : "text-xs font-semibold text-muted-foreground"}>{current ? "Recommended" : "Open"}</span>
                 </Link>
               </li>;
             })}
