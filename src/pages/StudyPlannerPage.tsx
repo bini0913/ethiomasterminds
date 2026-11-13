@@ -262,7 +262,15 @@ const StudyPlannerPage: React.FC = () => {
       return weekday <= Math.max(1, Math.min(7, planSettings.daysPerWeek));
     }).filter(Boolean).length;
     const capacity = eligibleDays * Math.max(1, Math.min(4, planSettings.sessionsPerDay));
-    const unitsByBook = selectedBooks.map((book) => ({ book, units: bookAnalysis[book.id]?.units?.length ? bookAnalysis[book.id].units : Array.from({ length: Math.max(1, planSettings.unitsPerBook) }, (_, index) => "Estimated study unit " + (index + 1)) }));
+    const unitsByBook = selectedBooks.map((book) => ({
+      book,
+      units: Array.isArray(bookAnalysis[book.id]?.units) ? bookAnalysis[book.id].units.filter((unit) => typeof unit === "string" && unit.trim()) : [],
+    }));
+    const unanalyzedBooks = unitsByBook.filter((item) => item.units.length === 0);
+    if (unanalyzedBooks.length) {
+      toast.error("Analyze the selected textbooks in the Library before generating a book-completion schedule. Estimated placeholder units are not used.");
+      return;
+    }
     const totalUnits = unitsByBook.reduce((total, item) => total + item.units.length, 0);
     const requiredSessions = totalUnits * 3;
     if (capacity < requiredSessions) { toast.error("This deadline fits about " + capacity + " sessions, but finishing all books with reading, practice, and review needs " + requiredSessions + ". Increase finish days or sessions per day."); return; }
@@ -281,11 +289,11 @@ const StudyPlannerPage: React.FC = () => {
           if (unitOrdinal < unitsBefore + item.units.length) { selected = item; break; }
           unitsBefore += item.units.length;
         }
-        const unitLabel = selected.units[Math.max(0, unitOrdinal - unitsBefore)] || "Estimated study unit";
+        const unitLabel = selected.units[Math.max(0, unitOrdinal - unitsBefore)];
         const book = selected.book;
         const phase = phases[sessionIndex % 3];
-        const sourceMethod = bookAnalysis[book.id]?.method || "estimated";
-        const sourceNote = sourceMethod === "headings" ? "Unit label extracted from the PDF text layer; check it against the original book." : sourceMethod === "page-ranges" ? "Unit is a page range generated from the PDF page count." : "Unit name is an estimate because this PDF could not be analyzed."; 
+        const sourceMethod = bookAnalysis[book.id]?.method || "headings";
+        const sourceNote = sourceMethod === "page-ranges" ? "Unit is a page range generated from the PDF page count." : "Unit label extracted from the PDF text layer; check it against the original book."; 
         tasks.push({ user_id: user.id, subject: book.subject || subjects[0] || "general", topic: book.title + " — " + unitLabel + ": " + phase, scheduled_date: format(date, "yyyy-MM-dd"), priority: sessionIndex % 3 === 2 ? "high" : "medium", notes: "Book-completion plan · " + planSettings.minutesPerSession + " min session. " + sourceNote });
         sessionIndex++;
       }
@@ -426,7 +434,8 @@ const StudyPlannerPage: React.FC = () => {
     fetchPlans();
   };
 
-  const bookPlanUnitCount = selectedBooks.reduce((sum, book) => sum + (bookAnalysis[book.id]?.units?.length || planSettings.unitsPerBook), 0);
+  const unanalyzedSelectedBookCount = selectedBooks.filter((book) => !bookAnalysis[book.id]?.units?.length).length;
+  const bookPlanUnitCount = selectedBooks.reduce((sum, book) => sum + (bookAnalysis[book.id]?.units?.length || 0), 0);
   const bookPlanRequiredSessions = bookPlanUnitCount * 3;
   const bookPlanEligibleDays = Array.from({ length: Math.max(1, Math.min(365, planSettings.finishDays)) }, (_, day) => {
     const date = addDays(new Date(), day);
@@ -434,7 +443,7 @@ const StudyPlannerPage: React.FC = () => {
     return weekday <= Math.max(1, Math.min(7, planSettings.daysPerWeek));
   }).filter(Boolean).length;
   const bookPlanCapacity = bookPlanEligibleDays * Math.max(1, Math.min(4, planSettings.sessionsPerDay));
-  const bookPlanFeasible = selectedBooks.length > 0 && bookPlanCapacity >= bookPlanRequiredSessions;
+  const bookPlanFeasible = selectedBooks.length > 0 && unanalyzedSelectedBookCount === 0 && bookPlanCapacity >= bookPlanRequiredSessions;
   const bookPlanMinimumDays = Math.ceil(bookPlanRequiredSessions / Math.max(1, Math.min(4, planSettings.sessionsPerDay)) * 7 / Math.max(1, Math.min(7, planSettings.daysPerWeek)));
   const todayPlans = plans.filter(p => isSameDay(new Date(p.scheduled_date), new Date()));
   const completedToday = todayPlans.filter(p => p.completed).length;
@@ -490,23 +499,23 @@ const StudyPlannerPage: React.FC = () => {
         </Button>
         </div>
         {showPlanSettings && <Card className="mt-3"><CardContent className="p-4 space-y-4">
-          <div><h3 className="font-semibold">Finish your selected books</h3><p className="text-sm text-muted-foreground">Analyze readable PDF text for chapter/unit headings first. If headings cannot be extracted, the planner uses page ranges or clearly marked estimates.</p></div>
+          <div><h3 className="font-semibold">Finish your selected books</h3><p className="text-sm text-muted-foreground">Analyze selected PDFs first. The planner schedules only extracted headings or page ranges; it will not invent textbook units.</p></div>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">Choose which books to finish</p><div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { const next = availableBooks.filter((book) => !subjects.length || subjects.some((subject) => normalizeSubject(subject) === book.subject)); setSelectedBooks(next); if (user?.id) localStorage.setItem("masterminds:study-plan-books:" + user.id, JSON.stringify(next.map((book) => book.id))); }}>Select all matching subjects</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setSelectedBooks([]); if (user?.id) localStorage.setItem("masterminds:study-plan-books:" + user.id, "[]"); }}>Clear</Button></div></div>
             <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border p-3">{availableBooks.length ? availableBooks.map((book) => <label key={book.id} className="flex cursor-pointer items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={selectedBooks.some((item) => item.id === book.id)} onChange={(event) => toggleBookSelection(book.id, event.target.checked)} /><span className="min-w-0 flex-1"><span className="font-medium">{book.title}</span><span className="block text-xs text-muted-foreground">{book.subject}{book.pdf_path ? " · PDF attached" : " · No PDF attached"}</span></span></label>) : <p className="text-sm text-muted-foreground">No library books are available to select.</p>}</div>
           </div>
-          <div className="space-y-2"><Button type="button" variant="outline" onClick={analyzeSelectedBookPdfs} disabled={isAnalyzingBooks}>{isAnalyzingBooks ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BookOpen className="mr-2 h-4 w-4"/>}Analyze selected book PDFs</Button>{selectedBooks.map((book) => { const analysis = bookAnalysis[book.id]; return <div key={book.id} className="rounded border p-2 text-sm"><p className="font-medium">{book.title}</p><p className="text-xs text-muted-foreground">{!analysis ? "Not analyzed yet" : analysis.method === "headings" ? analysis.units.length + " headings extracted from PDF text · " + analysis.pageCount + " pages" : analysis.method === "page-ranges" ? analysis.units.length + " page ranges · " + analysis.pageCount + " pages" : "Using estimated units"}{analysis?.message ? " · " + analysis.message : ""}</p></div>; })}</div>
+          <div className="space-y-2"><Button type="button" variant="outline" onClick={analyzeSelectedBookPdfs} disabled={isAnalyzingBooks}>{isAnalyzingBooks ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <BookOpen className="mr-2 h-4 w-4"/>}Analyze selected book PDFs</Button>{selectedBooks.map((book) => { const analysis = bookAnalysis[book.id]; return <div key={book.id} className="rounded border p-2 text-sm"><p className="font-medium">{book.title}</p><p className="text-xs text-muted-foreground">{!analysis ? "Not analyzed yet" : analysis.method === "headings" ? analysis.units.length + " headings extracted from PDF text · " + analysis.pageCount + " pages" : analysis.method === "page-ranges" ? analysis.units.length + " page ranges · " + analysis.pageCount + " pages" : "No reliable units extracted yet"}{analysis?.message ? " · " + analysis.message : ""}</p></div>; })}</div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <label className="text-sm">Sessions/day<Input type="number" min={1} max={4} value={planSettings.sessionsPerDay} onChange={e=>setPlanSettings(p=>({...p,sessionsPerDay:Math.max(1,Math.min(4,Number(e.target.value)||1))}))}/></label>
             <label className="text-sm">Days/week<Input type="number" min={1} max={7} value={planSettings.daysPerWeek} onChange={e=>setPlanSettings(p=>({...p,daysPerWeek:Math.max(1,Math.min(7,Number(e.target.value)||1))}))}/></label>
             <label className="text-sm">Minutes/session<Input type="number" min={10} max={240} step={5} value={planSettings.minutesPerSession} onChange={e=>setPlanSettings(p=>({...p,minutesPerSession:Math.max(10,Math.min(240,Number(e.target.value)||10))}))}/></label>
             <label className="text-sm">Finish in (days)<Input type="number" min={1} max={365} value={planSettings.finishDays} onChange={e=>setPlanSettings(p=>({...p,finishDays:Math.max(1,Math.min(365,Number(e.target.value)||1))}))}/></label>
           </div>
-          <label className="block text-sm">Fallback estimated units per book <Input type="number" min={1} max={200} value={planSettings.unitsPerBook} onChange={e=>setPlanSettings(p=>({...p,unitsPerBook:Math.max(1,Math.min(200,Number(e.target.value)||1))}))}/><span className="text-xs text-muted-foreground">Used only when a PDF has no usable text or no attached PDF. Analyzed headings/page ranges override this fallback.</span></label>
-          <div className="rounded-lg bg-muted p-3 text-sm"><p className="font-medium">{selectedBooks.length} selected books · {bookPlanUnitCount} units · {bookPlanRequiredSessions} reading/practice/review sessions needed</p><p className="text-muted-foreground">{planSettings.sessionsPerDay} sessions/day × {planSettings.daysPerWeek} days/week × {planSettings.minutesPerSession} min. Planned finish target: {format(addDays(new Date(),planSettings.finishDays),"PPP")}.</p><p className="mt-1 text-muted-foreground">This deadline fits about {bookPlanCapacity} sessions across eligible days.</p>{selectedBooks.length > 0 && !bookPlanFeasible && <p role="status" className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 font-medium text-amber-900 dark:text-amber-200">This schedule cannot fit all selected books yet. Add more finish days or sessions per day. At the current pace, plan for roughly {bookPlanMinimumDays} calendar days; the exact minimum can vary with the starting weekday.</p>}{selectedBooks.length === 0 && <p className="mt-2 text-muted-foreground">Select at least one book to calculate a completion schedule.</p>}</div>
+          <label className="block text-sm">Target analysis sections per PDF <Input type="number" min={1} max={200} value={planSettings.unitsPerBook} onChange={e=>setPlanSettings(p=>({...p,unitsPerBook:Math.max(1,Math.min(200,Number(e.target.value)||1))}))}/><span className="text-xs text-muted-foreground">Controls how a selected PDF is divided during analysis. The generated schedule uses only units actually extracted from your selected books.</span></label>
+          <div className="rounded-lg bg-muted p-3 text-sm"><p className="font-medium">{selectedBooks.length} selected books · {bookPlanUnitCount} units · {bookPlanRequiredSessions} reading/practice/review sessions needed</p><p className="text-muted-foreground">{planSettings.sessionsPerDay} sessions/day × {planSettings.daysPerWeek} days/week × {planSettings.minutesPerSession} min. Planned finish target: {format(addDays(new Date(),planSettings.finishDays),"PPP")}.</p><p className="mt-1 text-muted-foreground">This deadline fits about {bookPlanCapacity} sessions across eligible days.</p>{selectedBooks.length > 0 && unanalyzedSelectedBookCount > 0 && <p role="status" className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 font-medium text-amber-900 dark:text-amber-200">{unanalyzedSelectedBookCount} selected book{unanalyzedSelectedBookCount === 1 ? " needs" : "s need"} analysis before a real study schedule can be generated.</p>}{selectedBooks.length > 0 && unanalyzedSelectedBookCount === 0 && !bookPlanFeasible && <p role="status" className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 font-medium text-amber-900 dark:text-amber-200">This schedule cannot fit all analyzed book units yet. Add more finish days or sessions per day. At the current pace, plan for roughly {bookPlanMinimumDays} calendar days; the exact minimum can vary with the starting weekday.</p>}{selectedBooks.length === 0 && <p className="mt-2 text-muted-foreground">Select at least one book to calculate a completion schedule.</p>}</div>
           <div className="flex gap-2"><Button className="flex-1" onClick={generateBookCompletionPlan} disabled={isGenerating || !bookPlanFeasible}>{isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Target className="mr-2 h-4 w-4"/>}Generate book schedule</Button><Button variant="outline" onClick={savePlanSettings}>Save preferences</Button></div>
         </CardContent></Card>}
-        <p className="text-xs text-center text-muted-foreground mt-1">AI weak-topic recommendations and a separate book-completion schedule are available. Book sections are estimates until you match them to each book’s contents.</p>
+        <p className="text-xs text-center text-muted-foreground mt-1">AI weak-topic recommendations and a separate book-completion schedule are available. Book schedules use only units extracted from the selected books.</p>
       </div>
 
       {/* Today's Progress */}
