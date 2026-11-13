@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useUser } from "@/context/UserContext";
+import { safeStorage } from "@/lib/safeStorage";
 import { getUserTier } from "@/lib/getUserTier";
 import { supabase } from "@/integrations/supabase/client";
 import BackButton from "@/components/ui/BackButton";
@@ -68,10 +69,10 @@ const ParentDashboard: React.FC = () => {
   const [parentLinkCodeInput, setParentLinkCodeInput] = useState("");
   const [linkingChild, setLinkingChild] = useState(false);
 
-  const isParentMode = localStorage.getItem("masterminds_login_mode") === "parent";
+  const isParentMode = safeStorage.getItem("masterminds_login_mode") === "parent";
   const isEarlyStudent = getUserTier(user?.grade) === "early";
 
-  const handleLeaveParentPortal = () => { localStorage.removeItem("masterminds_login_mode"); toast.success("Exited parent view."); window.location.href = "/"; };
+  const handleLeaveParentPortal = () => { safeStorage.removeItem("masterminds_login_mode"); toast.success("Exited parent view."); window.location.href = "/"; };
   const handleSignOut = async () => { await logout(); window.location.href = "/"; };
 
   const loadAll = async () => {
