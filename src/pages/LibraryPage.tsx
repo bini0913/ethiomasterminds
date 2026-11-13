@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { safeStorage } from '@/lib/safeStorage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '@/context/UserContext';
 import { getUserTier } from '@/lib/getUserTier';
@@ -338,9 +339,9 @@ const LibraryPage: React.FC = () => {
       return;
     }
 
-    const cached = localStorage.getItem(`library:last-book:${user?.id}`);
+    const cached = safeStorage.getItem(`library:last-book:${user?.id}`);
     if (cached !== book.id) {
-      localStorage.setItem(`library:last-book:${user?.id}`, book.id);
+      safeStorage.setItem(`library:last-book:${user?.id}`, book.id);
     }
 
     setSelectedBook(book);
