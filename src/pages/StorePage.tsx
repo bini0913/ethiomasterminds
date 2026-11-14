@@ -320,7 +320,6 @@ const StorePage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-         </Card>
               </div>
             </TabsContent>
 
