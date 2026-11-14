@@ -378,23 +378,17 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: "You are a careful educational learning analyst. Return the requested structured report using only the supplied evidence.",
+              content: "You are a careful educational learning analyst. Return ONLY a JSON object matching the requested schema. The summary field must be a string, and every insights/recommendations field must be an array of strings. Use only the supplied evidence.",
             },
             { role: "user", content: prompt },
           ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "create_learning_dna_report",
-                description: "Return a structured evidence-based Learning DNA report for the authenticated student.",
-                parameters: learningDnaSchema,
-              },
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "learning_dna_report",
+              strict: true,
+              schema: learningDnaSchema,
             },
-          ],
-          tool_choice: {
-            type: "function",
-            function: { name: "create_learning_dna_report" },
           },
         }),
       });
@@ -412,18 +406,30 @@ serve(async (req) => {
       }
 
       const groqData = await groqResponse.json();
-      const toolCall = groqData.choices?.[0]?.message?.tool_calls?.find(
-        (call: any) => call.function?.name === "create_learning_dna_report",
-      );
-      const outputText = toolCall?.function?.arguments;
-      if (typeof outputText !== "string") throw new Error("Groq returned no structured Learning DNA report.");
+      const outputText = groqData.choices?.[0]?.message?.content;
+      if (typeof outputText !== "string" || !outputText.trim()) {
+        throw new Error("Groq returned no structured Learning DNA report content.");
+      }
       aiInsights = JSON.parse(outputText);
       const requiredArrays = ["learningPatterns", "readingInsights", "disciplineInsights", "multiplayerInsights", "recommendations", "evidenceLimitations"];
-      if (typeof aiInsights.summary !== "string" || requiredArrays.some((key) => !Array.isArray(aiInsights[key]) || !aiInsights[key].every((entry: unknown) => typeof entry === "string"))) {
-        throw new Error("Groq returned an invalid Learning DNA report.");
+      if (!aiInsights || typeof aiInsights !== "object" || Array.isArray(aiInsights)) {
+        throw new Error("Groq returned a Learning DNA report that is not an object.");
       }
-      for (const key of requiredArrays) aiInsights[key] = aiInsights[key].slice(0, 6).map((value: string) => value.slice(0, 320));
+
+      // Keep the UI contract stable even if a provider returns a field in a different shape.
+      if (Array.isArray(aiInsights.summary)) aiInsights.summary = aiInsights.summary.filter((part: unknown) => typeof part === "string").join(" ");
+      if (typeof aiInsights.summary !== "string") aiInsights.summary = "";
+      for (const key of requiredArrays) {
+        if (!Array.isArray(aiInsights[key])) aiInsights[key] = [];
+        aiInsights[key] = aiInsights[key]
+          .filter((entry: unknown): entry is string => typeof entry === "string")
+          .slice(0, 6)
+          .map((value: string) => value.slice(0, 320));
+      }
       aiInsights.summary = aiInsights.summary.slice(0, 1200);
+      if (!aiInsights.summary && requiredArrays.every((key) => aiInsights[key].length === 0)) {
+        throw new Error("Groq returned an empty Learning DNA report.");
+      }
     } finally {
       clearTimeout(timeoutId);
     }
