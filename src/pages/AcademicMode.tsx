@@ -19,6 +19,7 @@ const features = [
   { title: "Topic coverage", eyebrow: "MASTER", description: "Track your progress and find topics that need attention.", icon: BarChart3, path: "/academic/topics", action: "View topics" },
   { title: "Study planner", eyebrow: "ORGANIZE", description: "Turn your study goal into realistic daily tasks.", icon: CalendarDays, path: "/academic/planner", action: "Plan your week" },
   { title: "Academic insights", eyebrow: "IMPROVE", description: "See your performance, strengths and areas to improve.", icon: TrendingUp, path: "/academic/insights", action: "See progress" },
+  { title: "Learning DNA", eyebrow: "UNDERSTAND", description: "Explore patterns from your recorded study and practice activity.", icon: Brain, path: "/learning-dna", action: "Explore your profile" },
 ];
 
 const formatSubject = (subject: unknown): string => {
