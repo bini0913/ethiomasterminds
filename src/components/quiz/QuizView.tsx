@@ -233,22 +233,28 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       setEarnedXP(rewardEligible ? xpEarned : 0);
       setSubmissionReady(true);
 
-      // Update analytics, streak, and achievements
+      // Update analytics, streak, and achievements after the authoritative
+      // result has been saved. A secondary analytics failure must not mark the
+      // already-persisted quiz submission as failed.
       const avgTime = totalTimeTaken / quiz.questions.length;
-      const followUpResults = await Promise.all([
-        supabase.rpc('update_analytics', {
-          p_user_id: user!.id,
-          p_subject: quiz.subject,
-          p_correct: answeredCorrectly,
-          p_total: quiz.questions.length,
-          p_avg_time: avgTime
-        }),
-        supabase.rpc('update_user_streak', { p_user_id: user!.id }),
-        supabase.rpc('check_achievements', { p_user_id: user!.id })
-      ]);
-      followUpResults.forEach((result) => {
-        if (result.error) console.warn("A secondary quiz analytics update failed:", result.error);
-      });
+      try {
+        const followUpResults = await Promise.all([
+          supabase.rpc('update_analytics', {
+            p_user_id: user!.id,
+            p_subject: quiz.subject,
+            p_correct: answeredCorrectly,
+            p_total: quiz.questions.length,
+            p_avg_time: avgTime
+          }),
+          supabase.rpc('update_user_streak', { p_user_id: user!.id }),
+          supabase.rpc('check_achievements', { p_user_id: user!.id })
+        ]);
+        followUpResults.forEach((result) => {
+          if (result.error) console.warn("A secondary quiz analytics update failed:", result.error);
+        });
+      } catch (analyticsError) {
+        console.warn("A secondary quiz analytics update failed:", analyticsError);
+      }
       return true;
     } catch (err) {
       console.error('Failed to save quiz results:', err);
