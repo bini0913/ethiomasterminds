@@ -10,7 +10,7 @@ create table public.multiplayer_room_secrets (
 
 -- Preserve existing private-room passwords while moving them to a non-client-readable table.
 insert into public.multiplayer_room_secrets (room_id, password_hash)
-select id, extensions.crypt(password, extensions.gen_salt('bf'))
+select id, extensions.crypt(encode(extensions.digest(password, 'sha256'), 'hex'), extensions.gen_salt('bf'))
 from public.multiplayer_rooms
 where password is not null and length(password) > 0
 on conflict (room_id) do nothing;
@@ -193,6 +193,9 @@ begin
   if p_question_count is null or p_question_count < 1 or p_question_count > 50 then
     raise exception 'Question count must be between 1 and 50';
   end if;
+  if octet_length(coalesce(p_password, '')) > 256 then
+    raise exception 'Room password is too long';
+  end if;
 
   insert into public.multiplayer_rooms (
     name, host_id, max_players, subject, difficulty,
@@ -213,7 +216,7 @@ begin
 
   if nullif(trim(coalesce(p_password, '')), '') is not null then
     insert into public.multiplayer_room_secrets (room_id, password_hash)
-    values (v_room.id, extensions.crypt(p_password, extensions.gen_salt('bf')));
+    values (v_room.id, extensions.crypt(encode(extensions.digest(p_password, 'sha256'), 'hex'), extensions.gen_salt('bf')));
   end if;
 
   insert into public.room_players (room_id, user_id, is_ready)
@@ -240,6 +243,9 @@ declare
 begin
   if v_uid is null then
     raise exception 'Authentication required';
+  end if;
+  if octet_length(coalesce(p_password, '')) > 256 then
+    raise exception 'Room password is too long';
   end if;
 
   select * into v_room
@@ -269,7 +275,7 @@ begin
   where room_id = p_room_id;
 
   if v_password_hash is not null
-     and extensions.crypt(coalesce(p_password, ''), v_password_hash) <> v_password_hash then
+     and extensions.crypt(encode(extensions.digest(coalesce(p_password, ''), 'sha256'), 'hex'), v_password_hash) <> v_password_hash then
     raise exception 'Incorrect password';
   end if;
 
