@@ -150,7 +150,10 @@ begin
     raise exception 'Staff permission required';
   end if;
 
-  if public.get_user_role(p_user_id) is distinct from 'student'::public.app_role then
+  if not exists (
+    select 1 from public.user_roles
+    where user_id = p_user_id and role = 'student'::public.app_role
+  ) then
     raise exception 'Target account is not a student';
   end if;
 
