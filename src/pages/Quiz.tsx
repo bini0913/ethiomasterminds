@@ -24,6 +24,7 @@ const Quiz: React.FC = () => {
   const { quizzes } = useQuiz();
   const { user } = useUser();
   const tier = useTier();
+  const upperStudent = tier === "upper";
   const [activeQuiz, setActiveQuiz] = useState<QuizType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const defaultQuizGrade = tier === "upper" ? 9 : 5;
@@ -386,7 +387,7 @@ const Quiz: React.FC = () => {
   }
   
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
+    <div className={upperStudent ? "tier-upper relative min-h-screen overflow-hidden bg-background text-foreground" : "relative min-h-screen overflow-hidden bg-background text-foreground"}>
       
       <div className="relative z-10">
         {/* Header */}
