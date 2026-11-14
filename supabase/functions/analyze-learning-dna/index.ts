@@ -312,6 +312,12 @@ serve(async (req) => {
       },
       records: sourceRows,
       sampleLimits,
+      excludedSources: [
+        "topic_progress (client-editable snapshot; quiz mastery is derived from verified question_attempts instead)",
+        "user_missions and user_achievements (client-editable state; not used as proof of completed learning)",
+        "tournament rank and score (client-editable fields; only registration is counted)",
+        "early activity correctness/rewards (not used because the current reward RPC accepts client-supplied correctness/completion flags)",
+      ],
       window: "Most recent records returned by each source; source limits are recorded above.",
     };
 
@@ -336,7 +342,7 @@ serve(async (req) => {
       "Do not infer personality, intelligence, motivation, mental health, family circumstances, or career suitability.",
       "Do not shame, rank, diagnose, or label the student. Describe discipline as observable consistency and follow-through, never as a moral judgement.",
       "Reading progress and time do not prove comprehension. Reading progress is a per-book snapshot, not a complete session-by-session reading history. Early learning activity counts are engagement only and must not be treated as correctness or mastery. Video watch time is app-recorded and does not prove attention or comprehension. Revision counts are self-recorded. Tournament and study-competition participation counts do not prove performance. Multiplayer wins do not prove teamwork or fair play; answered-question completion is only an engagement measure. Never claim these things are measured.",
-      "Do not invent missing events, subjects, book titles, progress, or causes. If a source is unavailable or empty, say evidence is not available.",
+      "Do not invent missing events, subjects, book titles, progress, or causes. If a source is unavailable or empty, say evidence is not available. Do not use client-editable topic_progress, mission or achievement state, tournament scores/ranks, or early-activity correctness/reward values as proof of learning.",
       "Separate measured facts from possible interpretations. Give specific, age-appropriate, encouraging recommendations that are realistic for a student.",
       "Use only the provided evidence. Do not make predictions about careers. Return concise, useful content matching the required JSON schema.",
       "Verified activity data:",
