@@ -13,7 +13,7 @@ import { LoadingState, ErrorState } from "@/components/ui/status-state";
 import { useUser } from "@/context/UserContext";
 import { useTier } from "@/context/TierContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useLearningDNA, type LearningData } from "@/hooks/useLearningDNA";
+import { useLearningDNA } from "@/hooks/useLearningDNA";
 
 const LearningDNA: React.FC = () => {
   const { user } = useUser();
@@ -35,7 +35,7 @@ const LearningDNA: React.FC = () => {
       if (!data?.success || !data?.data) {
         throw new Error(data?.error || "The analysis could not be completed. Please try again.");
       }
-      setLearningData(data.data as LearningData);
+      // Reload the persisted report through the hook normalizers before rendering it.
       toast.success("Your Learning DNA has been updated!");
       await reload();
     } catch (analysisError: unknown) {
