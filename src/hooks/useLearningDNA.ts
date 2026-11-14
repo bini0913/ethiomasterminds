@@ -7,6 +7,15 @@ export interface TopicMastery {
 }
 
 export interface LearningActivitySummary {
+  earlyLearning: {
+    activitiesAttempted: number;
+    skills: string[];
+    videoViews: number;
+    videosCompleted: number;
+    secondsWatchedRecorded: number;
+  };
+  revision: { scheduledItems: number; reviewedItems: number; totalReviewsRecorded: number };
+  participation: { tournamentsJoined: number; studyCompetitionsJoined: number };
   quizzes: { attempts: number; accuracy: number | null; learningAreas: number; subjects: string[] };
   reading: {
     booksOpened: number;
