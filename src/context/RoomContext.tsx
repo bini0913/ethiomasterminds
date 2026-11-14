@@ -62,7 +62,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       await cleanupExpiredRooms();
       const { data, error } = await supabase
         .from('multiplayer_rooms')
-        .select('*')
+        .select('id, name, host_id, max_players, subject, difficulty, question_count, game_mode, status, created_at, current_question, started_at, finished_at')
         .in('status', ['waiting', 'countdown'])
         .is('password', null)
         .order('created_at', { ascending: false });
@@ -93,7 +93,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         hostName: hostNameMap.get(r.host_id) || 'Unknown',
         players: playerMap.get(r.id) || [],
         maxPlayers: r.max_players,
-        password: r.password || undefined,
+        password: undefined,
         gameSettings: {
           subject: r.subject || 'Mixed',
           difficulty: (r.difficulty || 'Medium') as Room['gameSettings']['difficulty'],
@@ -157,7 +157,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         hostName: user.name,
         players: [user.id],
         maxPlayers: data.max_players,
-        password: data.password || undefined,
+        password: password || undefined,
         gameSettings: settings,
         status: data.status as Room['status'],
         createdAt: new Date(data.created_at),
@@ -176,17 +176,6 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const joinRoom = async (roomId: string, playerName: string, password?: string): Promise<boolean> => {
     if (!user?.id) return false;
     try {
-      const { data: roomData, error: roomError } = await supabase
-        .from('multiplayer_rooms')
-        .select('*')
-        .eq('id', roomId)
-        .in('status', ['waiting', 'countdown', 'playing'])
-        .single();
-      if (roomError || !roomData) {
-        toast.error('Room is no longer available');
-        return false;
-      }
-
       const { data: existingRow } = await supabase
         .from('room_players')
         .select('user_id')
@@ -195,11 +184,23 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle();
       const existingMembership = Boolean(existingRow);
 
+      // Join through the password- and capacity-validated RPC before reading
+      // private room metadata. Membership RLS then authorizes the following read.
       const { error: joinError } = await db.rpc('multiplayer_join_room', {
         p_room_id: roomId,
         p_password: password || null,
       });
       if (joinError) throw joinError;
+
+      const { data: roomData, error: roomError } = await supabase
+        .from('multiplayer_rooms')
+        .select('id, name, host_id, max_players, subject, difficulty, question_count, game_mode, status, created_at, current_question, started_at, finished_at')
+        .eq('id', roomId)
+        .in('status', ['waiting', 'countdown', 'playing'])
+        .single();
+      if (roomError || !roomData) {
+        throw roomError || new Error('Room is no longer available');
+      }
 
       const room: Room = {
         id: roomData.id,
@@ -208,7 +209,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         hostName: undefined,
         players: [],
         maxPlayers: roomData.max_players,
-        password: roomData.password || undefined,
+        password: undefined,
         gameSettings: {
           subject: roomData.subject || 'Mixed',
           difficulty: (roomData.difficulty || 'Medium') as Room['gameSettings']['difficulty'],
