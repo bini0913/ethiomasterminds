@@ -155,8 +155,14 @@ const StudyPlannerPage: React.FC = () => {
   };
 
   const deletePlan = async (id: string) => {
-    await supabase.from("study_plans").delete().eq("id", id);
-    fetchPlans();
+    const { error } = await supabase.from("study_plans").delete().eq("id", id);
+    if (error) {
+      console.error("Could not delete study plan:", error);
+      toast.error("The study task could not be deleted. Please retry.");
+      return;
+    }
+    setPlans((previous) => previous.filter((plan) => plan.id !== id));
+    toast.success("Study task deleted.");
   };
 
   const analyzeSelectedBookPdfs = async () => {
