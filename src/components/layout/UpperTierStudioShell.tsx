@@ -14,40 +14,33 @@ type NavItem = { label: string; to: string; icon: React.ElementType };
 type NavGroup = { label: string; items: NavItem[] };
 
 const groups: NavGroup[] = [
-  { label: "Workspace", items: [
-    { label: "Overview", to: "/", icon: Home },
-    { label: "Academic preparation", to: "/academic", icon: GraduationCap },
-    { label: "Quizzes & practice", to: "/quiz", icon: Target },
-  ]},
-  { label: "Study", items: [
-    { label: "Study Mode", to: "/study-mode", icon: Timer },
-    { label: "Textbooks & library", to: "/library", icon: LibraryBig },
-    { label: "Exam preparation", to: "/academic/exam", icon: Target },
-    { label: "Entrance papers", to: "/academic/entrance-papers", icon: GraduationCap },
-    { label: "Flashcards", to: "/academic/flashcards", icon: Layers3 },
-    { label: "Study planner", to: "/academic/planner", icon: CalendarDays },
-    { label: "Topic coverage", to: "/academic/topics", icon: BookOpen },
-    { label: "Academic insights", to: "/academic/insights", icon: BarChart3 },
+  { label: "Student space", items: [
+    { label: "Dashboard", to: "/", icon: Home },
+    { label: "Learn", to: "/academic", icon: BookOpen },
+    { label: "Practice", to: "/quiz", icon: Target },
+    { label: "Rank", to: "/leaderboard", icon: Trophy },
+    { label: "Study Plan", to: "/academic/planner", icon: CalendarDays },
+    { label: "Library", to: "/library", icon: LibraryBig },
     { label: "AI Tutor", to: "/ai-tutor", icon: Bot },
-    { label: "Learning DNA", to: "/learning-dna", icon: BrainCircuit },
-  ]},
-  { label: "Compete", items: [
-    { label: "Multiplayer arena", to: "/multiplayer", icon: Swords },
-    { label: "Tournaments", to: "/tournaments", icon: Trophy },
-    { label: "Leaderboards", to: "/leaderboard", icon: BarChart3 },
-  ]},
-  { label: "Community", items: [
-    { label: "Social", to: "/social", icon: MessageCircle },
-    { label: "Friends", to: "/friends", icon: Users },
-    { label: "Chat", to: "/chat", icon: MessageCircle },
+    { label: "Community", to: "/social", icon: Users },
+    { label: "Competitions", to: "/tournaments", icon: Trophy },
+    { label: "Rewards", to: "/store", icon: Gift },
   ]},
 ];
 
 const extraItems: NavItem[] = [
+  { label: "Study Mode", to: "/study-mode", icon: Timer },
+  { label: "Exam Mode", to: "/academic/exam", icon: Target },
+  { label: "Entrance Papers", to: "/academic/entrance-papers", icon: GraduationCap },
+  { label: "Flashcards", to: "/academic/flashcards", icon: Layers3 },
+  { label: "Topic Coverage", to: "/academic/topics", icon: BookOpen },
+  { label: "Academic Insights", to: "/academic/insights", icon: BarChart3 },
+  { label: "Learning DNA", to: "/learning-dna", icon: BrainCircuit },
   { label: "Revision", to: "/revision", icon: BrainCircuit },
+  { label: "Multiplayer", to: "/multiplayer", icon: Swords },
   { label: "Challenge lobby", to: "/lobby", icon: Swords },
-  { label: "Rewards store", to: "/store", icon: Gift },
-  { label: "Avatar creator", to: "/avatar-creator", icon: UserRound },
+  { label: "Friends", to: "/friends", icon: Users },
+  { label: "Chat", to: "/chat", icon: MessageCircle },
   { label: "Notifications", to: "/notifications", icon: Bell },
   { label: "Settings", to: "/settings", icon: Settings },
 ];
