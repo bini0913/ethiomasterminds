@@ -91,7 +91,7 @@ export default function UpperTierStudioShell({ children }: { children: React.Rea
 
   const sidebar = (
     <>
-      <div className="flex h-20 items-center gap-3 border-b border-border px-5">
+      <div className="flex h-20 items-center justify-center gap-3 border-b border-border px-0 lg:justify-start lg:px-5">
         <img src="/brand/master-minds-icon.svg" alt="Master Minds" className="h-10 w-10 rounded-xl" />
         <div className="min-w-0 md:hidden lg:block">
           <p className="truncate text-base font-extrabold tracking-tight">Master Minds</p>
