@@ -115,12 +115,16 @@ const normalizeCoverage = (value: unknown): LearningData["dataCoverage"] => {
 
 const normalizeTopicMastery = (value: unknown): Record<string, TopicMastery> => {
   if (!isRecord(value)) return {};
-  return Object.fromEntries(Object.entries(value).flatMap(([topic, raw]) => {
-    if (!isRecord(raw)) return [];
+  return Object.entries(value).reduce<Record<string, TopicMastery>>((result, [topic, raw]) => {
+    if (!isRecord(raw)) return result;
     const mastery = Number(raw.mastery);
-    if (!Number.isFinite(mastery)) return [];
-    return [[topic, { mastery: Math.max(0, Math.min(100, mastery)), status: typeof raw.status === "string" ? raw.status : "developing" }]];
-  }));
+    if (!Number.isFinite(mastery)) return result;
+    result[topic] = {
+      mastery: Math.max(0, Math.min(100, mastery)),
+      status: typeof raw.status === "string" ? raw.status : "developing",
+    };
+    return result;
+  }, {});
 };
 export function useLearningDNA(userId?: string) {
   const [learningData, setLearningData] = useState<LearningData | null>(null);
