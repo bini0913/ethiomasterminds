@@ -83,7 +83,7 @@ serve(async (req) => {
       return { rows: asArray(data), available: true };
     };
 
-    const [attemptSource, readingSource, sessionSource, planSource, taskSource, flashcardSource, multiplayerSource, callSource] = await Promise.all([
+    const [attemptSource, readingSource, sessionSource, planSource, taskSource, flashcardSource, multiplayerSource, callSource, earlyAttemptSource, videoSource, revisionSource, tournamentSource, studyCompetitionSource] = await Promise.all([
       readSource("question_attempts", studentClient.from("question_attempts")
         .select("is_correct,time_taken_seconds,created_at,questions(subject,quizzes(subject,title))")
         .eq("user_id", user.id).order("created_at", { ascending: false }).limit(500)),
@@ -108,6 +108,23 @@ serve(async (req) => {
       readSource("study_call_participants", studentClient.from("study_call_participants")
         .select("status,created_at,responded_at")
         .eq("user_id", user.id).order("created_at", { ascending: false }).limit(200)),
+      // Early activity correctness is excluded because the reward RPC still accepts client-supplied correctness/completion flags.
+      readSource("early_activity_attempts", studentClient.from("early_activity_attempts")
+        .select("activity_id,skill,created_at")
+        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(500)),
+      readSource("early_video_views", studentClient.from("early_video_views")
+        .select("video_id,seconds_watched,completed,updated_at")
+        .eq("user_id", user.id).order("updated_at", { ascending: false }).limit(300)),
+      readSource("revision_schedule", studentClient.from("revision_schedule")
+        .select("last_reviewed_at,times_reviewed,status,scheduled_for")
+        .eq("user_id", user.id).order("scheduled_for", { ascending: false }).limit(500)),
+      // Tournament participation is counted only; client-editable rank/score are not trusted.
+      readSource("tournament_participants", studentClient.from("tournament_participants")
+        .select("tournament_id,registered_at")
+        .eq("user_id", user.id).order("registered_at", { ascending: false }).limit(200)),
+      readSource("study_participants", studentClient.from("study_participants")
+        .select("competition_id,joined_at")
+        .eq("user_id", user.id).order("joined_at", { ascending: false }).limit(200)),
     ]);
 
     const attempts = attemptSource.rows;
@@ -118,6 +135,11 @@ serve(async (req) => {
     const flashcards = flashcardSource.rows;
     const matches = multiplayerSource.rows;
     const calls = callSource.rows;
+    const earlyAttempts = earlyAttemptSource.rows;
+    const videoViews = videoSource.rows;
+    const revisions = revisionSource.rows;
+    const tournamentEntries = tournamentSource.rows;
+    const studyCompetitionEntries = studyCompetitionSource.rows;
 
     const topicStats: Record<string, { correct: number; total: number }> = {};
     for (const attempt of attempts) {
@@ -176,7 +198,27 @@ serve(async (req) => {
     const multiplayerPodiums = matches.filter((row: any) => numberOrZero(row.placement) > 0 && numberOrZero(row.placement) <= 3).length;
     const acceptedCalls = calls.filter((row: any) => row.status === "accepted" || row.status === "left").length;
 
+    const earlyLearning = {
+      activitiesAttempted: earlyAttempts.length,
+      skills: [...new Set(earlyAttempts.map((row: any) => String(row.skill || "General").slice(0, 80)))].slice(0, 20),
+      videoViews: videoViews.length,
+      videosCompleted: videoViews.filter((row: any) => row.completed === true).length,
+      secondsWatchedRecorded: videoViews.reduce((sum: number, row: any) => sum + numberOrZero(row.seconds_watched), 0),
+    };
+    const revisionActivity = {
+      scheduledItems: revisions.length,
+      reviewedItems: revisions.filter((row: any) => Boolean(row.last_reviewed_at)).length,
+      totalReviewsRecorded: revisions.reduce((sum: number, row: any) => sum + numberOrZero(row.times_reviewed), 0),
+    };
+    const participation = {
+      tournamentsJoined: tournamentEntries.length,
+      studyCompetitionsJoined: studyCompetitionEntries.length,
+    };
+
     const activitySummary = {
+      earlyLearning,
+      revision: revisionActivity,
+      participation,
       quizzes: {
         attempts: attempts.length,
         accuracy: percent(attempts.filter((row: any) => row.is_correct === true).length, attempts.length),
@@ -229,6 +271,11 @@ serve(async (req) => {
       flashcardProgress: flashcards.length,
       multiplayerMatches: matches.length,
       studyModeCalls: calls.length,
+      earlyLearningAttempts: earlyAttempts.length,
+      videoViews: videoViews.length,
+      revisionItems: revisions.length,
+      tournamentEntries: tournamentEntries.length,
+      studyCompetitionEntries: studyCompetitionEntries.length,
     };
     const totalActivityEvents = Object.values(sourceRows).reduce((sum, count) => sum + count, 0);
     if (totalActivityEvents === 0) {
@@ -243,7 +290,8 @@ serve(async (req) => {
     const sampleLimits = [
       ["quizAttempts", 500], ["readingProgress", 300], ["studySessions", 500],
       ["studyPlans", 500], ["studyTasks", 500], ["flashcardProgress", 500],
-      ["multiplayerMatches", 300], ["studyModeCalls", 200],
+      ["multiplayerMatches", 300], ["studyModeCalls", 200], ["earlyLearningAttempts", 500],
+      ["videoViews", 300], ["revisionItems", 500], ["tournamentEntries", 200], ["studyCompetitionEntries", 200],
     ].filter(([key, limit]) => sourceRows[key as keyof typeof sourceRows] >= (limit as number)).map(([key]) => key);
 
     const dataCoverage = {
@@ -256,6 +304,11 @@ serve(async (req) => {
         flashcardProgress: flashcardSource.available,
         multiplayerMatches: multiplayerSource.available,
         studyModeCalls: callSource.available,
+        earlyLearningAttempts: earlyAttemptSource.available,
+        videoViews: videoSource.available,
+        revisionItems: revisionSource.available,
+        tournamentEntries: tournamentSource.available,
+        studyCompetitionEntries: studyCompetitionSource.available,
       },
       records: sourceRows,
       sampleLimits,
@@ -282,7 +335,7 @@ serve(async (req) => {
       "Analyze only the supplied aggregated records for this one signed-in student.",
       "Do not infer personality, intelligence, motivation, mental health, family circumstances, or career suitability.",
       "Do not shame, rank, diagnose, or label the student. Describe discipline as observable consistency and follow-through, never as a moral judgement.",
-      "Reading progress and time do not prove comprehension. Reading progress is a per-book snapshot, not a complete session-by-session reading history. Multiplayer wins do not prove teamwork or fair play; answered-question completion is only an engagement measure. Never claim these things are measured.",
+      "Reading progress and time do not prove comprehension. Reading progress is a per-book snapshot, not a complete session-by-session reading history. Early learning activity counts are engagement only and must not be treated as correctness or mastery. Video watch time is app-recorded and does not prove attention or comprehension. Revision counts are self-recorded. Tournament and study-competition participation counts do not prove performance. Multiplayer wins do not prove teamwork or fair play; answered-question completion is only an engagement measure. Never claim these things are measured.",
       "Do not invent missing events, subjects, book titles, progress, or causes. If a source is unavailable or empty, say evidence is not available.",
       "Separate measured facts from possible interpretations. Give specific, age-appropriate, encouraging recommendations that are realistic for a student.",
       "Use only the provided evidence. Do not make predictions about careers. Return concise, useful content matching the required JSON schema.",
