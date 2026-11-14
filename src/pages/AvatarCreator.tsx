@@ -11,10 +11,12 @@ import FullAvatarEditor from '@/components/avatar/FullAvatarEditor';
 import { FullAvatarConfig } from '@/components/avatar/SVGAvatarParts';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
+import { getUserTier } from '@/lib/getUserTier';
 
 const AvatarCreator: React.FC = () => {
   const navigate = useNavigate();
   const { user, updateProfile } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -47,7 +49,7 @@ const AvatarCreator: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground relative overflow-hidden" : "min-h-screen bg-background relative overflow-hidden"}>
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
 
       {/* Header */}
