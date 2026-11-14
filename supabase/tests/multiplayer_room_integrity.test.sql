@@ -95,7 +95,7 @@ select ok(not exists (
   select 1 from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
-    and (p.proname like 'multiplayer\\_%' escape '\\' or p.proname = 'cleanup_expired_multiplayer_rooms')
+    and (left(p.proname, 12) = 'multiplayer_' or p.proname = 'cleanup_expired_multiplayer_rooms')
     and p.prosecdef
     and not coalesce(p.proconfig, array[]::text[]) @> array['search_path=pg_catalog, auth']
 ), 'multiplayer SECURITY DEFINER RPCs use a fixed search path that resolves auth.uid safely');
