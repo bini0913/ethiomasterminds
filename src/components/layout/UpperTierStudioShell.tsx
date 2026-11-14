@@ -194,7 +194,7 @@ export default function UpperTierStudioShell({ children }: { children: React.Rea
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-5 pb-28 sm:px-6 sm:py-7 lg:px-8 lg:pb-10">
+        <div className={location.pathname === "/chat" ? "mx-auto w-full max-w-none px-0 py-0 pb-0" : "mx-auto w-full max-w-[1600px] px-4 py-5 pb-28 sm:px-6 sm:py-7 lg:px-8 lg:pb-10"}>
           {children}
         </div>
       </div>
