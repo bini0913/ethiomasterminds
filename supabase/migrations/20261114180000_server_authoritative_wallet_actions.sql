@@ -250,7 +250,7 @@ BEGIN
     WHERE student_id = v_user_id AND total_questions > 0
       AND correct_answers = total_questions;
   ELSE
-    SELECT count(*)::integer INTO v_progress
+    SELECT count(DISTINCT CASE WHEN user_id = v_user_id THEN friend_id ELSE user_id END)::integer INTO v_progress
     FROM public.friends
     WHERE status = 'accepted' AND (user_id = v_user_id OR friend_id = v_user_id);
   END IF;
@@ -382,6 +382,52 @@ BEGIN
     'coins_awarded', v_coins, 'coins', v_wallet.coins);
 END;
 $function$;
+
+
+-- Advance supported daily mission counters only from trusted quiz-result inserts.
+-- Direct client INSERT on quiz_results is revoked below; this trigger therefore
+-- runs only for the secure submission RPC or trusted server operations.
+CREATE OR REPLACE FUNCTION public.advance_daily_missions_after_quiz()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+BEGIN
+  UPDATE public.user_missions AS um
+  SET progress = least(dm.target_value, um.progress + 1),
+      completed = (um.progress + 1) >= dm.target_value
+  FROM public.daily_missions AS dm
+  WHERE um.mission_id = dm.id
+    AND um.user_id = NEW.student_id
+    AND um.mission_date = current_date
+    AND um.claimed = false
+    AND dm.is_active = true
+    AND dm.mission_type IN ('quiz','quiz_completed','quizzes_completed','complete_quiz');
+
+  IF NEW.total_questions > 0 AND NEW.correct_answers = NEW.total_questions THEN
+    UPDATE public.user_missions AS um
+    SET progress = least(dm.target_value, um.progress + 1),
+        completed = (um.progress + 1) >= dm.target_value
+    FROM public.daily_missions AS dm
+    WHERE um.mission_id = dm.id
+      AND um.user_id = NEW.student_id
+      AND um.mission_date = current_date
+      AND um.claimed = false
+      AND dm.is_active = true
+      AND dm.mission_type IN ('perfect_score','perfect_scores');
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS trg_advance_daily_missions_after_quiz ON public.quiz_results;
+CREATE TRIGGER trg_advance_daily_missions_after_quiz
+AFTER INSERT ON public.quiz_results
+FOR EACH ROW EXECUTE FUNCTION public.advance_daily_missions_after_quiz();
+
+REVOKE ALL ON FUNCTION public.advance_daily_missions_after_quiz() FROM PUBLIC, anon, authenticated;
 
 -- The legacy helper had no caller identity check. It is internal-only now.
 REVOKE ALL ON FUNCTION public.add_xp(uuid, integer) FROM PUBLIC, anon, authenticated;
