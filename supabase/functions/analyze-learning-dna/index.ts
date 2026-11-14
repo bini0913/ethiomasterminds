@@ -227,7 +227,7 @@ serve(async (req) => {
       },
       reading: {
         booksOpened: reading.length,
-        booksCompleted,
+        booksCompleted: completedBooks,
         averageCompletionPercent: average(reading.map((row: any) => Math.max(0, Math.min(100, numberOrZero(row.completion_percent))))),
         totalReadingSeconds: readingTimeSeconds,
         books: bookSummaries,
