@@ -15,6 +15,7 @@ import {
   cancelDailyLearningReminder,
 } from "@/lib/notifications";
 import { toast } from "sonner";
+import { getUserTier } from "@/lib/getUserTier";
 
 const items: Array<{ key: keyof NotificationPreferences; label: string; description: string; icon: typeof Bell }> = [
   { key: "dailyReminders", label: "Daily learning reminders", description: "A gentle reminder to keep learning.", icon: Clock3 },
@@ -28,6 +29,7 @@ const items: Array<{ key: keyof NotificationPreferences; label: string; descript
 
 export default function NotificationSettingsPage() {
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -88,7 +90,7 @@ export default function NotificationSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground" : "min-h-screen bg-background"}>
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-2xl items-center gap-3 px-4">
           <BackButton />
