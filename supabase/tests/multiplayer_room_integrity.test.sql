@@ -97,7 +97,11 @@ select ok(not exists (
   where n.nspname = 'public'
     and (left(p.proname, 12) = 'multiplayer_' or p.proname = 'cleanup_expired_multiplayer_rooms')
     and p.prosecdef
-    and not coalesce(p.proconfig, array[]::text[]) @> array['search_path=pg_catalog, auth']
+    and not exists (
+      select 1
+      from unnest(coalesce(p.proconfig, array[]::text[])) as setting
+      where replace(setting, '"', '') = 'search_path=pg_catalog, auth'
+    )
 ), 'multiplayer SECURITY DEFINER RPCs use a fixed search path that resolves auth.uid safely');
 
 select * from finish();
