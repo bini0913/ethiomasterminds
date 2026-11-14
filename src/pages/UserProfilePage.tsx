@@ -543,7 +543,7 @@ const UserProfilePage = () => {
 
   const wins = Number(statsJson.total_wins ?? profile?.wins ?? 0);
   const streak = Number(statsJson.current_streak ?? profile?.streak ?? 0);
-  const weeklyXp = Number(statsJson.weekly_xp ?? Math.round((profile?.xp ?? 0) * 0.08));
+  const weeklyXp = Number.isFinite(Number(statsJson.weekly_xp)) ? Number(statsJson.weekly_xp) : null;
 
   const collectionCatalog = useMemo(() => {
     const categorize = (section: string, name: string) => {
@@ -584,20 +584,8 @@ const UserProfilePage = () => {
 
   const featuredItems = useMemo(() => collections.filter((item) => item.rarity === "legendary" || item.rarity === "epic" || item.equipped).slice(0, 4), [collections]);
 
-  const displayedAchievements = useMemo(
-    () => [
-      ...achievements,
-      ...Array.from({ length: Math.max(0, 8 - achievements.length) }).map((_, index) => ({
-        id: `locked-${index}`,
-        name: "Locked Achievement",
-        icon: "🔒",
-        description: "Keep leveling up and winning matches to unlock this badge.",
-        date: "",
-        locked: true,
-      })),
-    ],
-    [achievements],
-  );
+  // Only show achievements actually returned for this profile.
+  const displayedAchievements = achievements;
 
   useEffect(() => {
     if (!userId) return;
@@ -719,7 +707,7 @@ const UserProfilePage = () => {
 
   const relativeTime = (value: string) => {
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "recently";
+    if (Number.isNaN(parsed.getTime())) return "Time unavailable";
     const diff = Date.now() - parsed.getTime();
     const hour = 60 * 60 * 1000;
     const day = 24 * hour;
@@ -906,7 +894,7 @@ const UserProfilePage = () => {
           <CardContent className="grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4">
               <p className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-cyan-100"}>XP this week</p>
-              <p className="text-xl font-bold">+{weeklyXp}</p>
+              <p className="text-xl font-bold">{weeklyXp === null ? "—" : `+${weeklyXp}`}</p>
             </div>
             <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
               <p className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-emerald-100"}>Strong subjects</p>
@@ -925,7 +913,9 @@ const UserProfilePage = () => {
             <p className="text-xs text-muted-foreground">Tap a badge for details</p>
           </div>
           <div className="flex snap-x gap-3 overflow-x-auto pb-2">
-            {displayedAchievements.map((achievement) => (
+            {displayedAchievements.length === 0 ? (
+              <p className="w-full rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No achievements have been recorded for this profile yet.</p>
+            ) : displayedAchievements.map((achievement) => (
               <motion.button
                 key={achievement.id}
                 type="button"
@@ -940,7 +930,7 @@ const UserProfilePage = () => {
               >
                 <p className="text-4xl">{achievement.icon}</p>
                 <p className="mt-2 text-sm font-semibold">{achievement.name}</p>
-                <p className="text-xs text-muted-foreground">{achievement.locked ? "Locked" : `Unlocked ${achievement.date || "recently"}`}</p>
+                <p className="text-xs text-muted-foreground">{achievement.locked ? "Locked" : `Unlocked ${achievement.date || "Date unavailable"}`}</p>
               </motion.button>
             ))}
           </div>
