@@ -78,6 +78,7 @@ import NotificationBootstrap from "./components/notifications/NotificationBootst
 import NotificationRouteHandler from "./components/notifications/NotificationRouteHandler";
 import SocialRealtimeNotifications from "./components/notifications/SocialRealtimeNotifications";
 import StudentBottomNav from "./components/layout/StudentBottomNav";
+import UpperTierStudioShell from "./components/layout/UpperTierStudioShell";
 import { getUserTier } from "./lib/getUserTier";
 
 const queryClient = new QueryClient();
@@ -143,6 +144,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   if (location.pathname === "/finance" || location.pathname.startsWith("/finance/")) return <>{children}</>;
 
   if (!isAuthenticated || !user) return <>{children}</>;
+  if (user.role === "student" && getUserTier(user.grade) === "upper") return <UpperTierStudioShell>{children}</UpperTierStudioShell>;
 
   const isHome = location.pathname === "/";
   const isUpperStudent = getUserTier(user?.grade) === "upper";

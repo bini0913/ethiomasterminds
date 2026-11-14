@@ -585,3 +585,84 @@
     .mm-btn:active, .mm-btn-outline:active, .mm-option:active { transform: none; }
   }
 }
+
+
+/* Grades 9–12 design direction: warm canvas, teal primary, restrained coral/amber accents. */
+.mm-studio-upper {
+  --background: 75 22% 96%;
+  --foreground: 207 43% 16%;
+  --surface: 75 22% 96%;
+  --surface-elevated: 0 0% 100%;
+  --card: 0 0% 100%;
+  --card-foreground: 207 43% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 207 43% 16%;
+  --primary: 173 74% 29%;
+  --primary-hover: 174 80% 21%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 164 38% 92%;
+  --secondary-foreground: 207 43% 16%;
+  --accent: 12 69% 60%;
+  --accent-foreground: 0 0% 100%;
+  --muted: 164 12% 94%;
+  --muted-foreground: 207 10% 42%;
+  --border: 120 10% 89%;
+  --border-subtle: 120 10% 92%;
+  --input: 120 10% 84%;
+  --ring: 173 74% 29%;
+  --focus-ring: 173 74% 29%;
+  --card-hover: 164 38% 97%;
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 207 43% 16%;
+  --sidebar-primary: 173 74% 29%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 164 38% 92%;
+  --sidebar-accent-foreground: 207 43% 16%;
+  --sidebar-border: 120 10% 89%;
+  --sidebar-ring: 173 74% 29%;
+  --tier-upper: 173 74% 29%;
+  --upper-intelligence: 164 38% 92%;
+  --upper-intelligence-foreground: 174 80% 21%;
+  --upper-mastery: 151 56% 29%;
+  --upper-focus: 38 67% 52%;
+}
+.dark .mm-studio-upper {
+  --background: 200 30% 10%;
+  --foreground: 150 20% 95%;
+  --surface: 200 30% 10%;
+  --surface-elevated: 198 27% 15%;
+  --card: 198 27% 15%;
+  --card-foreground: 150 20% 95%;
+  --popover: 198 27% 15%;
+  --popover-foreground: 150 20% 95%;
+  --primary: 173 50% 55%;
+  --primary-hover: 173 54% 63%;
+  --primary-foreground: 207 43% 12%;
+  --secondary: 174 24% 22%;
+  --secondary-foreground: 150 25% 94%;
+  --accent: 12 76% 68%;
+  --accent-foreground: 207 43% 12%;
+  --muted: 174 14% 19%;
+  --muted-foreground: 150 12% 72%;
+  --border: 174 12% 28%;
+  --border-subtle: 174 12% 23%;
+  --input: 174 12% 31%;
+  --ring: 173 50% 55%;
+  --focus-ring: 173 50% 55%;
+  --card-hover: 174 18% 20%;
+  --sidebar-background: 198 27% 15%;
+  --sidebar-foreground: 150 20% 95%;
+  --sidebar-primary: 173 50% 55%;
+  --sidebar-primary-foreground: 207 43% 12%;
+  --sidebar-accent: 174 24% 22%;
+  --sidebar-accent-foreground: 150 25% 94%;
+  --sidebar-border: 174 12% 28%;
+  --sidebar-ring: 173 50% 55%;
+  --tier-upper: 173 50% 55%;
+  --upper-intelligence: 174 24% 22%;
+  --upper-intelligence-foreground: 173 60% 78%;
+  --upper-mastery: 151 47% 64%;
+  --upper-focus: 40 84% 69%;
+}
+.mm-studio-upper :where(button, a, input, select, textarea) { -webkit-tap-highlight-color: transparent; }
+.mm-studio-upper :where(button, a):focus-visible { outline-offset: 3px; }
