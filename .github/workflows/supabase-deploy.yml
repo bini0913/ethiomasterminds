@@ -6,7 +6,6 @@ on:
     paths:
       - "supabase/functions/**"
       - "supabase/migrations/**"
-      - "supabase/tests/**"
       - "supabase/config.toml"
       - ".github/workflows/supabase-deploy.yml"
   workflow_dispatch:
@@ -42,20 +41,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
-            supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
+          changed_files="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA" || true)"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || grep -q '^supabase/migrations/' <<< "$changed_files"; then
+            if [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
+              supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
+            else
+              echo "::warning::SUPABASE_DB_PASSWORD is not configured; database migrations were not pushed."
+            fi
           else
-            echo "::warning::SUPABASE_DB_PASSWORD is not configured; database migrations were not pushed."
+            echo "No database migration changed; skipping database push."
           fi
 
       - name: Deploy Edge Functions
         shell: bash
         run: |
           set -euo pipefail
-          for dir in supabase/functions/*; do
-            if [ -d "$dir" ] && [ -f "$dir/index.ts" ]; then
-              name="$(basename "$dir")"
-              echo "Deploying $name"
-              supabase functions deploy "$name" --project-ref "$SUPABASE_PROJECT_ID"
-            fi
-          done
+          changed_files="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA" || true)"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || grep -q '^supabase/functions/' <<< "$changed_files"; then
+            for dir in supabase/functions/*; do
+              if [ -d "$dir" ] && [ -f "$dir/index.ts" ]; then
+                name="$(basename "$dir")"
+                echo "Deploying $name"
+                supabase functions deploy "$name" --project-ref "$SUPABASE_PROJECT_ID"
+              fi
+            done
+          else
+            echo "No Edge Function changed; skipping function deployment."
+          fi
