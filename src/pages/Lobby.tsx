@@ -41,7 +41,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import BackButton from "@/components/ui/BackButton";
-import AnimatedBackground from "@/components/ui/AnimatedBackground";
 
 interface OnlinePlayer {
   id: string;
@@ -116,6 +115,7 @@ const Lobby: React.FC = () => {
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [createTournamentOpen, setCreateTournamentOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [mobilePanel, setMobilePanel] = useState<"rooms" | "players" | "chat">("rooms");
   const [newRoomData, setNewRoomData] = useState({
     name: "",
     maxPlayers: "2",
@@ -1071,19 +1071,18 @@ const Lobby: React.FC = () => {
   const friendsOnline = onlineFriends;
 
   return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-      <AnimatedBackground />
+    <div className="min-h-screen bg-background text-foreground relative pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-6">
       <div className="absolute inset-0 bg-transparent" />
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-xl">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
+        <div className="flex items-center justify-between gap-2 max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             <BackButton to="/" />
-            <div className="bg-cyan-500/15 rounded-xl p-2 border border-cyan-300/30">
+            <div className="hidden sm:block bg-primary/10 rounded-xl p-2">
               <Gamepad className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Nexus Lobby</h1>
-              <p className="text-xs text-muted-foreground">{onlinePlayers.length.toLocaleString()} players online • {liveMatchCount} matches live</p>
+              <h1 className="truncate text-lg sm:text-xl font-bold text-foreground">Lobby</h1>
+              <p className="truncate text-xs text-muted-foreground">{onlinePlayers.length.toLocaleString()} players online • {liveMatchCount} matches live</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1092,7 +1091,7 @@ const Lobby: React.FC = () => {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold truncate text-foreground">{user.name || "Player"}</p>
                 <div className="h-1.5 rounded-full bg-muted mt-1 overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-blue-400 to-accent animate-pulse" style={{ width: `${Math.min(100, ((user.xp || 0) % 1000) / 10)}%` }} />
+                  <div className="h-full bg-primary transition-[width] duration-500" style={{ width: `${Math.min(100, ((user.xp || 0) % 1000) / 10)}%` }} />
                 </div>
               </div>
               <Badge className="bg-primary/20 text-primary border-primary/40">Lv.{user.level || 1}</Badge>
@@ -1101,29 +1100,29 @@ const Lobby: React.FC = () => {
               <RefreshCw className={`h-4 w-4 text-foreground ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Button variant="secondary" size="sm" onClick={() => navigate("/")} className="gap-2 bg-card text-card-foreground hover:bg-muted border border-border">
-              <Home className="h-4 w-4" /> Menu
+              <Home className="h-4 w-4" /><span className="hidden sm:inline">Menu</span>
             </Button>
           </div>
         </div>
       </header>
 
       <div className="border-b border-border px-4 py-3 relative z-10">
-        <div className="max-w-7xl mx-auto flex flex-wrap gap-2">
-          <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 whitespace-nowrap bg-cyan-600 hover:bg-cyan-500">
+        <div className="max-w-7xl mx-auto flex flex-wrap gap-2 [&>button]:flex-1 sm:[&>button]:flex-none">
+          <Button onClick={() => setCreateRoomOpen(true)} className="gap-2 whitespace-nowrap ">
             <Plus className="h-4 w-4" /> Create Room
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap border-cyan-400/40 text-cyan-100 bg-cyan-500/10 hover:bg-cyan-500/20" onClick={handleRandomMatch}>
+          <Button variant="outline" className="gap-2 whitespace-nowrap " onClick={handleRandomMatch}>
             <Zap className="h-4 w-4" /> Find Match
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap border-primary/40 text-primary bg-primary/10 hover:bg-primary/20">
+          <Button variant="outline" className="gap-2 whitespace-nowrap " onClick={handleRandomMatch}>
             <Swords className="h-4 w-4" /> Ranked
           </Button>
-          <Button variant="outline" className="gap-2 whitespace-nowrap border-amber-300/40 text-amber-100 bg-amber-500/10 hover:bg-amber-500/20">
+          <Button variant="outline" className="gap-2 whitespace-nowrap " onClick={() => navigate("/tournaments")}>
             <Crown className="h-4 w-4" /> Tournament
           </Button>
           <div className="flex items-center gap-2 w-full lg:w-auto lg:ml-auto">
-            <Input value={joinByCode} onChange={(e) => setJoinByCode(e.target.value)} className="h-9 flex-1 min-w-[150px]" placeholder="Join by room code" />
-            <Input value={joinPasscode} onChange={(e) => setJoinPasscode(e.target.value)} className="h-9 flex-1 min-w-[170px]" placeholder="Passcode" />
+            <Input value={joinByCode} onChange={(e) => setJoinByCode(e.target.value)} className="h-10 flex-1 min-w-0" placeholder="Join by room code" />
+            <Input value={joinPasscode} onChange={(e) => setJoinPasscode(e.target.value)} className="h-10 flex-1 min-w-0" placeholder="Passcode" />
             <Button onClick={joinWithCode} className="whitespace-nowrap" variant="secondary">Join</Button>
           </div>
           {canManageTournaments && (
@@ -1135,11 +1134,11 @@ const Lobby: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 pt-4 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+        <div className="hidden md:grid md:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
           {[
             { title: "⚔️ Quick Match", desc: "Fast balanced duel queue", onClick: handleRandomMatch, style: "from-cyan-500/40 to-blue-500/30 border-cyan-300/30" },
             { title: "👥 Team Up", desc: "Invite friends and squad", onClick: () => setCreateRoomOpen(true), style: "from-primary/40 to-accent/30 border-primary/30" },
-            { title: "🏆 Tournaments", desc: "Join live competitive cups", onClick: () => {}, style: "from-amber-500/40 to-orange-500/30 border-amber-300/30" },
+            { title: "🏆 Tournaments", desc: "Join live competitive cups", onClick: () => navigate("/tournaments"), style: "from-amber-500/40 to-orange-500/30 border-amber-300/30" },
             { title: "🔐 Private Room", desc: "Code + pass protected lobby", onClick: () => setCreateRoomOpen(true), style: "from-emerald-500/40 to-teal-500/30 border-emerald-300/30" },
           ].map((card) => (
             <button
@@ -1152,49 +1151,50 @@ const Lobby: React.FC = () => {
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Card className="border-cyan-300/30 bg-cyan-500/10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+          <Card className="border-border bg-card">
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-cyan-100"><Users className="h-4 w-4" /> Players online now</div>
-              <p className="text-2xl font-bold mt-1 text-foreground">{onlinePlayers.length.toLocaleString()}</p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground"><Users className="h-4 w-4" /> Players online now</div>
+              <p className="text-xl sm:text-2xl font-bold mt-1 text-foreground">{onlinePlayers.length.toLocaleString()}</p>
             </CardContent>
           </Card>
-          <Card className="border-primary/30 bg-primary/10">
+          <Card className="border-border bg-card">
             <CardContent className="p-3 text-sm">
               <div className="flex items-center gap-2 text-primary"><Activity className="h-4 w-4" /> Matches in progress</div>
-              <p className="text-2xl font-bold mt-1 text-foreground">{liveMatchCount}</p>
+              <p className="text-xl sm:text-2xl font-bold mt-1 text-foreground">{liveMatchCount}</p>
             </CardContent>
           </Card>
-          <Card className="border-emerald-300/30 bg-emerald-500/10">
+          <Card className="border-border bg-card">
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-emerald-100"><Target className="h-4 w-4" /> Match Quality</div>
-              <p className="text-2xl font-bold mt-1 text-foreground">{matchQualityScore}% Balanced</p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground"><Target className="h-4 w-4" /> Match Quality</div>
+              <p className="text-xl sm:text-2xl font-bold mt-1 text-foreground">{matchQualityScore}% Balanced</p>
             </CardContent>
           </Card>
-          <Card className="border-orange-300/30 bg-orange-500/10">
+          <Card className="border-border bg-card">
             <CardContent className="p-3 text-sm">
-              <div className="flex items-center gap-2 text-orange-100"><Flame className="h-4 w-4" /> Win Streak Aura</div>
-              <p className="text-2xl font-bold mt-1 text-foreground">🔥 {Math.max(1, Math.floor((user?.xp || 0) / 1200))}</p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground"><Flame className="h-4 w-4" /> Win Streak Aura</div>
+              <p className="text-xl sm:text-2xl font-bold mt-1 text-foreground">🔥 {Math.max(1, Math.floor((user?.xp || 0) / 1200))}</p>
             </CardContent>
           </Card>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto py-4 px-4 relative z-10">
-        {loading && (
-          <div className="mb-4 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
-            Syncing lobby data...
-          </div>
-        )}
+        <div className="lg:hidden mb-3 grid grid-cols-3 gap-1 rounded-xl border border-border bg-muted p-1" role="tablist">
+          {([["rooms","Rooms"],["players","Players"],["chat","Chat"]] as const).map(([k,l]) => (
+            <button key={k} type="button" role="tab" aria-selected={mobilePanel===k} onClick={() => setMobilePanel(k)}
+              className={`h-10 rounded-lg text-sm font-semibold transition-colors ${mobilePanel===k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}>{l}</button>
+          ))}
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="bg-card border-border text-card-foreground">
+          <Card className={`bg-card border-border text-card-foreground ${mobilePanel==="players" ? "" : "hidden lg:block"}`}>
             <CardHeader className="border-b py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Users className="h-5 w-5" /> Online Players ({onlinePlayers.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[500px]">
+              <ScrollArea className="h-[60vh] lg:h-[500px]">
                 <div className="p-3 space-y-2">
                   {onlinePlayers.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">No players online</p>
@@ -1230,7 +1230,7 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          <Card className="bg-card border-border text-card-foreground">
+          <Card className={`bg-card border-border text-card-foreground ${mobilePanel==="rooms" ? "" : "hidden lg:block"}`}>
             <CardHeader className="border-b py-3">
               <CardTitle className="text-base">Play & Compete</CardTitle>
             </CardHeader>
@@ -1241,7 +1241,7 @@ const Lobby: React.FC = () => {
                   <TabsTrigger value="tournaments" className="gap-1"><Trophy className="h-3 w-3" /> Tournaments ({tournaments.length})</TabsTrigger>
                 </TabsList>
                 <TabsContent value="rooms" className="mt-3">
-                  <ScrollArea className="h-[400px]">
+                  <ScrollArea className="h-[55vh] lg:h-[400px]">
                     <div className="space-y-3 pr-2">
                       {activeRooms.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">No active rooms. Create one!</p>
@@ -1254,7 +1254,7 @@ const Lobby: React.FC = () => {
                   </ScrollArea>
                 </TabsContent>
                 <TabsContent value="tournaments" className="mt-3">
-                  <ScrollArea className="h-[400px]">
+                  <ScrollArea className="h-[55vh] lg:h-[400px]">
                     <div className="space-y-3">
                       {tournaments.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">No upcoming tournaments</p>
@@ -1298,13 +1298,13 @@ const Lobby: React.FC = () => {
             </CardContent>
           </Card>
           
-          <Card className="bg-card border-border text-card-foreground">
+          <Card className={`bg-card border-border text-card-foreground ${mobilePanel==="chat" ? "" : "hidden lg:block"}`}>
             <CardHeader className="border-b py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <MessageSquare className="h-5 w-5" /> Lobby Chat
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0 flex flex-col h-[500px]">
+            <CardContent className="p-0 flex flex-col h-[65vh] lg:h-[500px]">
               <ScrollArea className="flex-1 p-3">
                 <div className="space-y-3">
                   {chatMessages.length === 0 ? (

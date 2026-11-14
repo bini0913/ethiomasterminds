@@ -81,8 +81,7 @@ export default function EarlyDiscoverPage() {
     if (user?.id && contentIds[i]) {
       void db.from("early_item_exposure")
         .upsert({ user_id: user.id, item_id: contentIds[i], last_seen: new Date().toISOString(), times_seen: 1, last_correct: value === answer }, { onConflict: "user_id,item_id" })
-        .then(({ error }) => { if (error) console.warn("Could not record early discover exposure:", error); })
-        .catch((error) => console.warn("Could not record early discover exposure:", error));
+        .then(({ error }) => { if (error) console.warn("Could not record early discover exposure:", error); }, (error: unknown) => console.warn("Could not record early discover exposure:", error));
     }
     const ok = value === answer;
     setCorrect(ok);
