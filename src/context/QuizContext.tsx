@@ -201,23 +201,24 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     const properDifficulty = difficulty ? difficultyMapping[difficulty] : 'Medium';
     
-    // Filter available questions from existing quizzes
-    let availableQuestions: Question[] = [];
-    quizzes.forEach(quiz => {
-      if (category === 'all' || quiz.subject.toLowerCase() === category.toLowerCase()) {
-        if (!grade || quiz.grade === grade) {
-          if (!difficulty || quiz.difficulty === properDifficulty) {
-            availableQuestions.push(...quiz.questions);
-          }
-        }
-      }
+    // Keep each generated practice set inside one real source quiz. The
+    // secure submission RPC validates every question against that source quiz.
+    const sourceQuizzes = quizzes.filter(quiz => {
+      const categoryMatches = category === 'all' || quiz.subject.toLowerCase() === category.toLowerCase();
+      const gradeMatches = !grade || quiz.grade === grade;
+      const difficultyMatches = !difficulty || quiz.difficulty === properDifficulty;
+      return categoryMatches && gradeMatches && difficultyMatches;
     });
+    const sourceQuiz = sourceQuizzes.length > 0
+      ? sourceQuizzes[Math.floor(Math.random() * sourceQuizzes.length)]
+      : null;
 
-    // Filter out already asked questions
-    availableQuestions = availableQuestions.filter(q => !askedQuestions.includes(q.id));
+    // Filter out already asked questions from the selected real source quiz.
+    const availableQuestions = (sourceQuiz?.questions || [])
+      .filter(question => !askedQuestions.includes(question.id));
 
-    // Shuffle and pick
-    const shuffled = availableQuestions.sort(() => Math.random() - 0.5);
+    // Shuffle and pick only from that source quiz.
+    const shuffled = [...availableQuestions].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, Math.min(count, shuffled.length));
 
     // Never fabricate questions. Every student question must come from approved
@@ -228,17 +229,19 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     return {
       id: `quiz-${Math.random().toString(36).substring(2, 9)}`,
-      title: `${category} Quiz - Grade ${grade || 5}`,
+      sourceQuizId: sourceQuiz?.id,
+      title: `${category} Quiz - Grade ${grade || sourceQuiz?.grade || 5}`,
       description: `A ${properDifficulty} quiz about ${category}`,
       questions: selected,
-      subject: category,
-      grade: grade || 5,
-      difficulty: properDifficulty,
-      timeLimit: count * 30,
+      subject: sourceQuiz?.subject || category,
+      grade: sourceQuiz?.grade || grade || 5,
+      difficulty: sourceQuiz?.difficulty || properDifficulty,
+      timeLimit: selected.length * 30,
+      createdBy: sourceQuiz?.createdBy,
       createdAt: new Date(),
-      topics: [topic || 'General'],
-      category,
-      gradeLevel: grade || 5
+      topics: sourceQuiz?.topics || [topic || 'General'],
+      category: sourceQuiz?.category || category,
+      gradeLevel: sourceQuiz?.gradeLevel || grade || 5
     };
   };
 
