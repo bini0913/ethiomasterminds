@@ -19,8 +19,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 const xpTiers = [
   { xp: 100, coins: 10 },
-  { xp: 500, coins: 60 },
-  { xp: 1000, coins: 150 },
+  { xp: 500, coins: 50 },
+  { xp: 1000, coins: 100 },
 ];
 
 type TransactionRow = {
@@ -243,7 +243,7 @@ const StorePage: React.FC = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-sm">Current XP: <strong>{xp.toLocaleString()}</strong></p>
-                    <p className="text-xs text-muted-foreground">Rate: 100 XP = 10 Coins • Daily XP exchange cap enabled server-side.</p>
+                    <p className="text-xs text-muted-foreground">Rate: 100 XP = 10 Coins.</p>
                     <Input
                       type="number"
                       min={100}
@@ -296,10 +296,10 @@ const StorePage: React.FC = () => {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Coins → XP (Optional, Limited)</CardTitle>
+                    <CardTitle className="text-base">Coins → XP (Optional)</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <p className="text-sm text-muted-foreground">Rate: 1 coin = 10 XP • Daily cap applied.</p>
+                    <p className="text-sm text-muted-foreground">Rate: 1 coin = 10 XP.</p>
                     <Input type="number" min={10} value={coinsToXpInput} onChange={(e) => setCoinsToXpInput(e.target.value)} />
                     <div className="text-sm">You receive: <strong>{(Number(coinsToXpInput) || 0) * 10}</strong> XP</div>
                     <Button
