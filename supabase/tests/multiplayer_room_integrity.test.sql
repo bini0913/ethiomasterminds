@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(36);
+select plan(34);
 
 -- Isolated fixtures; the test transaction rolls back all inserted rows.
 insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)
