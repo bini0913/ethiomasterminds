@@ -80,6 +80,15 @@ ON CONFLICT (id) DO UPDATE SET
   correct_answer = EXCLUDED.correct_answer,
   active = true;
 
+
+-- Keep progress and achievement evidence read-only to clients. Only the verified
+-- answer and achievement RPCs may write these records.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
+  ON TABLE public.early_activity_attempts, public.early_activity_progress, public.early_user_achievements
+  FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.early_activity_attempts, public.early_activity_progress, public.early_user_achievements
+  TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.submit_early_quiz_answer(
   p_attempt_id uuid,
   p_question_id text,
