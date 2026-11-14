@@ -7,7 +7,6 @@ import {
   ChevronRight, Sparkles,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
-import { getUserTier } from "@/lib/getUserTier";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 
