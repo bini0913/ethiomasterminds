@@ -72,8 +72,6 @@ const EarlyQuizPage: React.FC = () => {
     return () => window.clearInterval(id);
   }, [index, subject, done, profile.timerSeconds, selected]);
 
-  const skillFor = (q: QuizItem) => QUIZ_SUBJECTS.find((s) => s.id === q.subject)?.skill ?? "general";
-
   const choose = (value: string) => {
     if (selected || !current) return;
     setSelected(value);
