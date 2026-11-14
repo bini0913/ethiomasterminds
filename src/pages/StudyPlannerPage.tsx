@@ -147,9 +147,10 @@ const StudyPlannerPage: React.FC = () => {
     if (error) { toast.error("Failed to update"); return; }
     setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, completed: !p.completed } : p));
 
-    if (!plan.completed && user) {
-      supabase.rpc("add_xp", { p_user_id: user.id, p_amount: 10 });
-      toast.success("+10 XP for completing a study task!");
+    if (!plan.completed) {
+      // Completing a planner item records study activity; it does not mint XP.
+      // XP is awarded only by the server-authoritative reward workflows.
+      toast.success("Study task completed.");
     }
   };
 
@@ -430,8 +431,13 @@ const StudyPlannerPage: React.FC = () => {
       priority: p.priority,
       notes: p.notes,
     }));
-    await supabase.from("study_plans").insert(inserts);
-    toast.success(`📚 Generated ${inserts.length} study tasks based on your weak areas!`);
+    const { error } = await supabase.from("study_plans").insert(inserts);
+    if (error) {
+      console.error("Could not save generated study plan:", error);
+      toast.error("The study plan could not be saved. Please retry.");
+      return;
+    }
+    toast.success(`Generated ${inserts.length} study tasks from your learning data.`);
     fetchPlans();
   };
 
