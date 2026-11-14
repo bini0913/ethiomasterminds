@@ -35,7 +35,7 @@ const LearningDNA: React.FC = () => {
       if (!data?.success || !data?.data) {
         throw new Error(data?.error || "The analysis could not be completed. Please try again.");
       }
-      setLearningData(data.data as LearningData);
+      // Reload the persisted report through the hook normalizers before rendering it.
       toast.success("Your Learning DNA has been updated!");
       await reload();
     } catch (analysisError: unknown) {
