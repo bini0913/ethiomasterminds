@@ -1,8 +1,7 @@
 import { db } from "@/integrations/untypedClient";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink, FileText, Search, ShieldCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ArrowLeft, ExternalLink, FileText, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -100,8 +99,10 @@ const EntranceExamPapersPage: React.FC = () => {
         <div className="flex items-start justify-between gap-2"><div className="rounded-lg bg-primary/10 p-2 text-primary"><FileText className="h-5 w-5"/></div><Badge variant="secondary">{p.gregorian_year} G.C.</Badge></div>
         <div><h2 className="font-semibold">{p.subject}</h2><p className="text-sm text-muted-foreground">{p.ethiopian_year} E.C. · Grade 12 entrance exam</p><p className="mt-1 text-xs text-muted-foreground">{p.stream}</p></div>
         <p className="flex-1 text-xs text-muted-foreground">{p.notes}</p>
-        <div className="flex flex-wrap items-center gap-2"><Badge variant={["verified", "permission_confirmed", "source_verified"].includes(String(p.source_status || "").toLowerCase()) ? "default" : "outline"}>{["verified", "permission_confirmed", "source_verified"].includes(String(p.source_status || "").toLowerCase()) ? "Source verified" : "Verification pending"}</Badge><Badge variant="outline">{p.stream || "Stream not specified"}</Badge></div>\n        <p className="text-xs font-medium">{p.source_name}</p>
-        {practiceSubjects.includes(normalizeSubject(p.subject)) && <Button variant="outline" className="w-full" onClick={() => navigate("/academic/exam", { state: { subject: p.subject } })}>Practice in Exam Mode</Button>}\n        <Button className="w-full" disabled={!isSafeHttpUrl(p.source_url)} onClick={() => { if (isSafeHttpUrl(p.source_url)) window.open(p.source_url, "_blank", "noopener,noreferrer"); }} >{isSafeHttpUrl(p.source_url) ? "Open source archive" : "Source link unavailable"} <ExternalLink className="ml-2 h-4 w-4"/></Button>
+        <div className="flex flex-wrap items-center gap-2"><Badge variant={["verified", "permission_confirmed", "source_verified"].includes(String(p.source_status || "").toLowerCase()) ? "default" : "outline"}>{["verified", "permission_confirmed", "source_verified"].includes(String(p.source_status || "").toLowerCase()) ? "Source verified" : "Verification pending"}</Badge><Badge variant="outline">{p.stream || "Stream not specified"}</Badge></div>
+        <p className="text-xs font-medium">{p.source_name}</p>
+        {practiceSubjects.includes(normalizeSubject(p.subject)) && <Button variant="outline" className="w-full" onClick={() => navigate("/academic/exam", { state: { subject: p.subject } })}>Practice in Exam Mode</Button>}
+        <Button className="w-full" disabled={!isSafeHttpUrl(p.source_url)} onClick={() => { if (isSafeHttpUrl(p.source_url)) window.open(p.source_url, "_blank", "noopener,noreferrer"); }} >{isSafeHttpUrl(p.source_url) ? "Open source archive" : "Source link unavailable"} <ExternalLink className="ml-2 h-4 w-4"/></Button>
       </CardContent></Card>)}</div>}
   </main>;
 };
