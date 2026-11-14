@@ -20,6 +20,7 @@ values (
 insert into public.room_players (room_id, user_id, is_ready)
 values
   ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', true),
+  ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', true),
   ('a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000002', true),
   ('a1000000-0000-4000-8000-000000000003', 'a2000000-0000-4000-8000-000000000003', true);
 
@@ -151,8 +152,8 @@ select is((public.multiplayer_advance_player('a1000000-0000-4000-8000-0000000000
 select throws_ok(
   'select public.multiplayer_question_payload(''a1000000-0000-4000-8000-000000000001'', 0)',
   'P0001',
-  'Match is not playing',
-  'question payload is unavailable after the match finishes'
+  'Question is not assigned to this player',
+  'completed players cannot retrieve further question payloads'
 );
 
 select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000002', true);
