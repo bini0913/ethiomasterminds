@@ -26,13 +26,14 @@ export interface LearningActivitySummary {
     totalTasks: number;
     taskCompletionPercent: number | null;
     sessionDurationAdherencePercent: number | null;
-    totalRecordedDuration: number;
+    totalStudyMinutes: number;
   };
   multiplayer: {
     matches: number;
     wins: number;
     podiumFinishes: number;
     averageAccuracy: number | null;
+    questionCompletionPercent: number | null;
     answeredQuestions: number;
     totalQuestions: number;
   };
