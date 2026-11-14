@@ -112,12 +112,9 @@ const ExamModePage: React.FC = () => {
           .eq("is_approved", true);
         if (quizError) throw quizError;
         const gradeQuizzes = (quizRows || []).filter((quiz: any) => normalizeGrade(quiz.grade, activeGrade) === activeGrade);
-        const profileMatching = gradeQuizzes.filter((quiz: any) =>
-          allowed.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject || ""))
-        );
-        // Load the full approved bank for this grade. A partial subject match must not
-        // hide other available subjects from the selector or from "all available" mode.
-        // Profile gaps are reported separately; no questions are fabricated.
+        // Keep the complete grade bank available for the subject selector, but
+        // "All selected subjects" must be scoped to the learner's saved subjects
+        // whenever at least one of those subjects has approved questions.
         const matching = gradeQuizzes;
         setBankSubjects(Array.from(new Set(matching.map((quiz: any) => normalizeSubject(quiz.subject || "")).filter(Boolean))).sort());
         if (!matching.length) {
@@ -188,12 +185,20 @@ const ExamModePage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  const hasSelectedSubjectQuizzes = sourceQuizzes.some((quiz) =>
+    profileSubjects.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject))
+  );
   const subjectQuizzes = useMemo(() => {
-    return sourceQuizzes.filter((quiz) =>
-      (subject === "all_selected" || subjectsMatch(subject, quiz.subject)) &&
-      (examTypeFilter === "mixed" || (examTypeFilter === "past_paper" ? (quiz.source_kind || (quiz.exam_type === "past_paper" ? "past_paper" : "topic_practice")) === "past_paper" : (quiz.source_kind || (quiz.exam_type === "past_paper" ? "past_paper" : "topic_practice")) !== "past_paper"))
-    ).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title));
-  }, [sourceQuizzes, profileSubjects, subject, goal, examTypeFilter]);
+    return sourceQuizzes.filter((quiz) => {
+      const matchesSubject = subject === "all_selected"
+        ? (!hasSelectedSubjectQuizzes || profileSubjects.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject)))
+        : subjectsMatch(subject, quiz.subject);
+      const sourceKind = quiz.source_kind || (quiz.exam_type === "past_paper" ? "past_paper" : "topic_practice");
+      const matchesSource = examTypeFilter === "mixed"
+        || (examTypeFilter === "past_paper" ? sourceKind === "past_paper" : sourceKind !== "past_paper");
+      return matchesSubject && matchesSource;
+    }).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title));
+  }, [sourceQuizzes, profileSubjects, subject, goal, examTypeFilter, hasSelectedSubjectQuizzes]);
   const selectedQuiz = useMemo(() => subjectQuizzes[0] || null, [subjectQuizzes]);
   const currentQuestion = questions[currentQ];
   const unansweredCount = questions.length - Object.keys(answers).length;
