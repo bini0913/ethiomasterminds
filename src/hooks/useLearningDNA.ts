@@ -83,6 +83,49 @@ export interface LearningData {
   totalActivityEvents: number;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
+
+// Migration defaults and legacy rows can contain empty JSON objects rather than reports.
+// Treat incomplete nested payloads as absent so the page renders its safe empty state.
+const normalizeActivitySummary = (value: unknown): LearningActivitySummary | null => {
+  if (!isRecord(value) || !isRecord(value.quizzes) || !isRecord(value.reading) ||
+      !isRecord(value.study) || !isRecord(value.multiplayer) || !isRecord(value.flashcards) ||
+      !isRecord(value.studyModeCalls) || !isRecord(value.earlyLearning) ||
+      !isRecord(value.revision) || !isRecord(value.participation) || !Array.isArray(value.reading.books)) return null;
+  return value as unknown as LearningActivitySummary;
+};
+
+const normalizeInsights = (value: unknown): LearningAIInsights | null => {
+  if (!isRecord(value) || typeof value.summary !== "string") return null;
+  const keys = ["learningPatterns", "readingInsights", "disciplineInsights", "multiplayerInsights", "recommendations", "evidenceLimitations"];
+  if (keys.some((key) => !isStringArray(value[key]))) return null;
+  return value as unknown as LearningAIInsights;
+};
+
+const normalizeCoverage = (value: unknown): LearningData["dataCoverage"] => {
+  if (!isRecord(value) || !isRecord(value.sources) || !isRecord(value.records) ||
+      !Array.isArray(value.sampleLimits) || !Array.isArray(value.excludedSources) ||
+      typeof value.window !== "string") return null;
+  return value as unknown as LearningData["dataCoverage"];
+};
+
+const normalizeTopicMastery = (value: unknown): Record<string, TopicMastery> => {
+  if (!isRecord(value)) return {};
+  return Object.entries(value).reduce<Record<string, TopicMastery>>((result, [topic, raw]) => {
+    if (!isRecord(raw)) return result;
+    const mastery = Number(raw.mastery);
+    if (!Number.isFinite(mastery)) return result;
+    result[topic] = {
+      mastery: Math.max(0, Math.min(100, mastery)),
+      status: typeof raw.status === "string" ? raw.status : "developing",
+    };
+    return result;
+  }, {});
+};
 export function useLearningDNA(userId?: string) {
   const [learningData, setLearningData] = useState<LearningData | null>(null);
   const [attemptCount, setAttemptCount] = useState(0);
@@ -112,11 +155,11 @@ export function useLearningDNA(userId?: string) {
       setAttemptCount(recordedAttempts);
 
       if (data) {
-        const activitySummary = (data.activity_summary || null) as unknown as LearningActivitySummary | null;
-        const aiInsights = (data.ai_insights || null) as unknown as LearningAIInsights | null;
-        const dataCoverage = (data.data_coverage || null) as unknown as LearningData["dataCoverage"];
+        const activitySummary = normalizeActivitySummary(data.activity_summary);
+        const aiInsights = normalizeInsights(data.ai_insights);
+        const dataCoverage = normalizeCoverage(data.data_coverage);
         setLearningData({
-          topicMastery: (data.topic_mastery as unknown as Record<string, TopicMastery>) || {},
+          topicMastery: normalizeTopicMastery(data.topic_mastery),
           strengths: (data.strengths as string[]) || [],
           weaknesses: (data.weaknesses as string[]) || [],
           learningStyle: data.learning_style || "not_assessed",

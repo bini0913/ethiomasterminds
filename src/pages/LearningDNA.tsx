@@ -119,7 +119,7 @@ const LearningDNA: React.FC = () => {
       ) : (
         <>
           {insights && <Card className={tier === "upper" ? "mm-dna-panel border-upper-intelligence/50 shadow-card" : "border-upper-intelligence/50 shadow-card"}>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />Grok's learning overview</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />Groq's learning overview</CardTitle></CardHeader>
             <CardContent>
               <p className="text-sm leading-7 text-foreground">{insights.summary}</p>
               <p className="mt-3 text-xs text-muted-foreground">Generated from your recorded Master Minds activity. Insights are educational guidance, not a judgement or diagnosis.</p>
