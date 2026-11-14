@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  Activity, Award, BookOpen, BrainCircuit, CalendarCheck, ChevronRight,
+  Activity, BookOpen, BrainCircuit, CalendarCheck, ChevronRight,
   Layers, Lightbulb, Loader2, RefreshCw, Sparkles, Target, Trophy, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
