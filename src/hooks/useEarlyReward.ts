@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const EARLY_REWARDS = {
   gameCorrect: { xp: 5, coins: 2 },
-  quizCorrect: { xp: 8, coins: 3 },
+  quizAnswer: { xp: 8, coins: 3 },
   discoverCorrect: { xp: 5, coins: 2 },
 } as const;
 
@@ -23,7 +23,7 @@ export function useEarlyReward() {
     try {
       // Only the fixed quiz bank currently has a server-owned answer key.
       // Client-generated game rounds and generated math prompts cannot mint rewards.
-      if (kind !== "quizCorrect" || !options?.questionId || options.answer === undefined) {
+      if (kind !== "quizAnswer" || !options?.questionId || options.answer === undefined) {
         return false;
       }
       if (options.questionId.startsWith("math-")) return false;
@@ -35,7 +35,11 @@ export function useEarlyReward() {
       const attemptId = options.attemptId ?? (
         typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
           ? crypto.randomUUID()
-          : `early-${Date.now()}-${Math.random().toString(36).slice(2)}`
+          : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+              const random = Math.floor(Math.random() * 16);
+              const value = character === "x" ? random : (random & 0x3) | 0x8;
+              return value.toString(16);
+            })
       );
 
       const { data, error } = await (supabase as any).rpc("submit_early_quiz_answer", {

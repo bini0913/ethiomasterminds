@@ -209,8 +209,7 @@ const StudentDashboard: React.FC = () => {
     if (!user) return;
 
     const today = new Date().toISOString().split('T')[0];
-
-    const { data: userMissions, error } = await db
+    const loadAssignedMissions = () => db
       .from('user_missions')
       .select(`
         id,
@@ -230,33 +229,49 @@ const StudentDashboard: React.FC = () => {
       .eq('user_id', user.id)
       .eq('mission_date', today);
 
-    if (!error && userMissions) {
-      const missions: DailyMission[] = userMissions.map((um: any) => ({
-        id: um.id,
-        title: um.daily_missions.title,
-        description: um.daily_missions.description,
-        progress: um.progress,
-        targetValue: um.daily_missions.target_value,
-        rewardXp: um.daily_missions.reward_xp || 0,
-        rewardCoins: um.daily_missions.reward_coins || 0,
-        completed: um.completed || false,
-        claimed: um.claimed || false,
-      }));
-      setDailyMissions(missions);
+    let result = await loadAssignedMissions();
+    if (result.error) {
+      console.error('Daily missions could not be loaded:', result.error);
       return;
     }
 
-    // Assignment is server-controlled. Do not insert missions from the browser.
-    const { error: assignError } = await supabase.functions.invoke('daily-missions', {
-      body: { action: 'assign', userId: user.id },
-    });
+    // An empty array is a valid query result, not a completed assignment.
+    // Ask the server to assign today's missions once, then load them again.
+    if (!result.data?.length) {
+      const { data: assignment, error: assignError } = await supabase.functions.invoke('daily-missions', {
+        body: { action: 'assign', userId: user.id },
+      });
 
-    if (assignError) {
-      console.error('Daily mission assignment failed:', assignError);
-      return;
+      if (assignError) {
+        console.error('Daily mission assignment failed:', assignError);
+        setDailyMissions([]);
+        return;
+      }
+
+      if (!assignment?.success || !Number(assignment.missionsAssigned)) {
+        setDailyMissions([]);
+        return;
+      }
+
+      result = await loadAssignedMissions();
+      if (result.error) {
+        console.error('Assigned daily missions could not be loaded:', result.error);
+        return;
+      }
     }
 
-    await fetchDailyMissions();
+    const missions: DailyMission[] = (result.data ?? []).map((um: any) => ({
+      id: um.id,
+      title: um.daily_missions.title,
+      description: um.daily_missions.description,
+      progress: um.progress,
+      targetValue: um.daily_missions.target_value,
+      rewardXp: um.daily_missions.reward_xp || 0,
+      rewardCoins: um.daily_missions.reward_coins || 0,
+      completed: um.completed || false,
+      claimed: um.claimed || false,
+    }));
+    setDailyMissions(missions);
   };
 
   const fetchStreak = async () => {
