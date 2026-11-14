@@ -80,13 +80,13 @@ const LearningDNA: React.FC = () => {
     {tier === "upper" && <style>{`
       .mm-learning-dna .mm-dna-panel{border-radius:1.15rem;border-color:var(--border);box-shadow:0 3px 12px rgba(15,23,42,.045)}
       .mm-learning-dna .mm-dna-topic{border-radius:.9rem;background:var(--card);transition:border-color .18s,transform .18s}
-      .mm-learning-dna .mm-dna-topic:hover{border-color:rgba(99,102,241,.45);transform:translateY(-1px)}
+      .mm-learning-dna .mm-dna-topic:hover{border-color:hsl(var(--primary) / .45);transform:translateY(-1px)}
       @media(max-width:640px){.mm-learning-dna .mm-dna-panel{border-radius:1rem}.mm-learning-dna main{padding-top:1.1rem}}
     `}</style>}
     <header className="sticky top-0 z-40 border-b border-border bg-background pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-8">
         <div className="flex min-w-0 items-center gap-3">
-          <BackButton />
+          {tier !== "upper" && <BackButton />}
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-upper-intelligence text-upper-intelligence-foreground"><BrainCircuit className="h-5 w-5" /></span>
           <div className="min-w-0"><h1 className="text-xl font-semibold tracking-tight">Learning DNA</h1><p className="truncate text-sm text-muted-foreground">Your complete learning journey</p></div>
         </div>

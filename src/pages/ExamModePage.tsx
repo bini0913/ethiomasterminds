@@ -12,10 +12,20 @@ import { ArrowLeft, Clock3, Target, Trophy, CheckCircle2, XCircle, BookOpen, Gra
 import { toast } from "sonner";
 import { getAcademicProfile, normalizeGrade, normalizeSubject, subjectsMatch } from "@/lib/academicProfile";
 
+const isSafeHttpUrl = (value: string | null | undefined) => {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
 type ExamState = "setup" | "running" | "results";
 type SourceQuiz = { id: string; title: string; description?: string; subject: string; grade: number; difficulty?: string; time_limit?: number | null; exam_type?: string; source_kind?: "past_paper" | "topic_practice" | "generated_practice" | "teacher_authored"; source_name?: string | null; source_year?: number | null; source_url?: string | null; source_verification_status?: "unverified" | "needs_review" | "verified" | "permission_confirmed"; questionCount: number };
 type EntrancePaperReference = { id: string; subject: string; ethiopian_year: number; gregorian_year: number; source_name: string; source_url: string; source_status: string; notes?: string };
-type ExamQuestion = { id: string; quiz_id?: string; subject?: string; sourceKind: "past_paper" | "topic_practice"; sourceTitle: string; question_text: string; options: string[]; correct_answer: string; explanation?: string; topic?: string };
+type ExamQuestion = { id: string; quiz_id?: string; subject?: string; sourceKind: "past_paper" | "topic_practice"; sourceTitle: string; sourceVerificationStatus?: SourceQuiz["source_verification_status"]; sourceName?: string | null; sourceYear?: number | null; question_text: string; options: string[]; correct_answer: string; correct_answer_raw?: string; explanation?: string; topic?: string };
 function goalRelevance(quiz: SourceQuiz, goal: string): number {
   const text = `${quiz.title} ${quiz.description || ""} ${quiz.difficulty || ""} ${(quiz.exam_type || "general").replace(/[_-]+/g, " ")}`.toLowerCase();
   const target = goal.toLowerCase().replace(/[_-]+/g, " ");
@@ -78,7 +88,7 @@ const ExamModePage: React.FC = () => {
   const [isLoadingBank, setIsLoadingBank] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [results, setResults] = useState<{ correct: number; total: number; elapsedSeconds: number; details: Array<{ q: ExamQuestion; answer: string; correct: boolean }> } | null>(null);
+  const [results, setResults] = useState<{ correct: number; total: number; elapsedSeconds: number; details: Array<{ q: ExamQuestion; answer: string; correct: boolean }>; xpAwarded: number | null; persistenceStatus: "pending" | "saved" | "partial" | "failed" } | null>(null);
   const [profileSubjects, setProfileSubjects] = useState<string[]>([]);
   const [bankSubjects, setBankSubjects] = useState<string[]>([]);
   const [bankLoadError, setBankLoadError] = useState<string | null>(null);
@@ -99,7 +109,7 @@ const ExamModePage: React.FC = () => {
         const profile = await getAcademicProfile(user.id);
         if (cancelled) return;
         const activeGrade = normalizeGrade(profile?.grade ?? user.grade, 9);
-        const allowed = (profile?.subjects?.length ? profile.subjects : ["math", "science", "english", "history"]).map(normalizeSubject);
+        const allowed = (profile?.subjects?.length ? profile.subjects : []).map(normalizeSubject);
         setGrade(activeGrade);
         setProfileSubjects(allowed);
         setSubject("all_selected");
@@ -112,12 +122,9 @@ const ExamModePage: React.FC = () => {
           .eq("is_approved", true);
         if (quizError) throw quizError;
         const gradeQuizzes = (quizRows || []).filter((quiz: any) => normalizeGrade(quiz.grade, activeGrade) === activeGrade);
-        const profileMatching = gradeQuizzes.filter((quiz: any) =>
-          allowed.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject || ""))
-        );
-        // Load the full approved bank for this grade. A partial subject match must not
-        // hide other available subjects from the selector or from "all available" mode.
-        // Profile gaps are reported separately; no questions are fabricated.
+        // Keep the complete grade bank available for the subject selector, but
+        // "All selected subjects" must be scoped to the learner's saved subjects
+        // whenever at least one of those subjects has approved questions.
         const matching = gradeQuizzes;
         setBankSubjects(Array.from(new Set(matching.map((quiz: any) => normalizeSubject(quiz.subject || "")).filter(Boolean))).sort());
         if (!matching.length) {
@@ -188,12 +195,20 @@ const ExamModePage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  const hasSelectedSubjectQuizzes = sourceQuizzes.some((quiz) =>
+    profileSubjects.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject))
+  );
   const subjectQuizzes = useMemo(() => {
-    return sourceQuizzes.filter((quiz) =>
-      (subject === "all_selected" || subjectsMatch(subject, quiz.subject)) &&
-      (examTypeFilter === "mixed" || (examTypeFilter === "past_paper" ? (quiz.source_kind || (quiz.exam_type === "past_paper" ? "past_paper" : "topic_practice")) === "past_paper" : (quiz.source_kind || (quiz.exam_type === "past_paper" ? "past_paper" : "topic_practice")) !== "past_paper"))
-    ).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title));
-  }, [sourceQuizzes, profileSubjects, subject, goal, examTypeFilter]);
+    return sourceQuizzes.filter((quiz) => {
+      const matchesSubject = subject === "all_selected"
+        ? (!hasSelectedSubjectQuizzes || profileSubjects.some((profileSubject) => subjectsMatch(profileSubject, quiz.subject)))
+        : subjectsMatch(subject, quiz.subject);
+      const sourceKind = quiz.source_kind || (quiz.exam_type === "past_paper" ? "past_paper" : "topic_practice");
+      const matchesSource = examTypeFilter === "mixed"
+        || (examTypeFilter === "past_paper" ? sourceKind === "past_paper" : sourceKind !== "past_paper");
+      return matchesSubject && matchesSource;
+    }).sort((a, b) => goalRelevance(b, goal) - goalRelevance(a, goal) || b.questionCount - a.questionCount || a.title.localeCompare(b.title));
+  }, [sourceQuizzes, profileSubjects, subject, goal, examTypeFilter, hasSelectedSubjectQuizzes]);
   const selectedQuiz = useMemo(() => subjectQuizzes[0] || null, [subjectQuizzes]);
   const currentQuestion = questions[currentQ];
   const unansweredCount = questions.length - Object.keys(answers).length;
@@ -207,6 +222,7 @@ const ExamModePage: React.FC = () => {
     if (examState !== "running" || submittedRef.current || !questions.length) return;
     submittedRef.current = true;
     setIsSaving(true);
+    try {
     const details = questions.map((q, index) => ({
       q,
       answer: answers[index] || "",
@@ -214,81 +230,93 @@ const ExamModePage: React.FC = () => {
     }));
     const correct = details.filter((item) => item.correct).length;
     const elapsedSeconds = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
-    setResults({ correct, total: questions.length, elapsedSeconds, details });
+    setResults({ correct, total: questions.length, elapsedSeconds, details, xpAwarded: null, persistenceStatus: "pending" });
     setExamState("results");
     if (user?.id && selectedQuiz?.id) {
-      const { error } = await supabase.from("quiz_results").insert({
-        quiz_id: selectedQuiz.id,
-        student_id: user.id,
-        exam_type: examTypeFilter === "mixed" ? "mixed_practice" : selectedQuiz.exam_type || "general",
-        subject: subject === "all_selected" ? "mixed" : selectedQuiz.subject,
-        score: Math.round((correct / questions.length) * 100),
-        total_questions: questions.length,
-        correct_answers: correct,
-        time_taken: elapsedSeconds,
-        xp_earned: correct * 5,
-      });
-      if (error) {
-        console.error("Could not save exam result:", error);
-        toast.error("Your result is shown, but couldn't be saved to your progress. Please try again later.");
-      } else {
-        // Feed the same topic_progress data used by Topic Coverage, the Study Planner,
-        // and Academic Insights so exam practice improves future recommendations.
-        const byTopic = new Map<string, { attempted: number; correct: number }>();
-        details.forEach(({ q, correct: isCorrect }) => {
-          const topic = (q.topic || "General").trim() || "General";
-          const key = `${q.subject || selectedQuiz.subject}::${topic.toLocaleLowerCase()}`;
-          const current = byTopic.get(key) || { attempted: 0, correct: 0 };
-          current.attempted += 1;
-          if (isCorrect) current.correct += 1;
-          byTopic.set(key, current);
-        });
-
-        for (const [topicKey, counts] of byTopic) {
-          const matchedQuestion = details.find(({ q }) => `${q.subject || selectedQuiz.subject}::${(q.topic || "General").trim().toLocaleLowerCase()}` === topicKey)?.q;
-          const topic = matchedQuestion?.topic?.trim() || "General";
-          const progressSubject = matchedQuestion?.subject || selectedQuiz.subject;
-          const { data: existing, error: lookupError } = await supabase
-            .from("topic_progress")
-            .select("id,questions_attempted,questions_correct")
-            .eq("user_id", user.id)
-            .eq("subject", progressSubject)
-            .ilike("topic", topic)
-            .maybeSingle();
-          if (lookupError) {
-            console.error("Could not load topic progress for exam result:", lookupError);
-            continue;
-          }
-
-          const previousAttempted = Number(existing?.questions_attempted || 0);
-          const previousCorrect = Number(existing?.questions_correct || 0);
-          const questionsAttempted = previousAttempted + counts.attempted;
-          const questionsCorrect = previousCorrect + counts.correct;
-          const progressUpdate = {
-            user_id: user.id,
-            subject: progressSubject,
-            topic,
-            questions_attempted: questionsAttempted,
-            questions_correct: questionsCorrect,
-            accuracy_percentage: questionsAttempted ? Math.round((questionsCorrect / questionsAttempted) * 100) : 0,
-            completion_percentage: Math.min(100, Math.round((questionsAttempted / 5) * 100)),
-          };
-          const { error: progressError } = existing
-            ? await supabase.from("topic_progress").update(progressUpdate).eq("id", existing.id)
-            : await supabase.from("topic_progress").insert(progressUpdate);
-          if (progressError) console.error("Could not save topic progress for exam result:", progressError);
-        }
-
-        if (correct > 0) {
-          const { error: xpError } = await supabase.rpc("add_xp", { p_user_id: user.id, p_amount: correct * 5 });
-          if (xpError) console.error("Exam XP award failed:", xpError);
-        }
-        await refreshProfile?.();
-        toast.success("Exam result saved. Topic mastery is being updated for your study recommendations.");
+      // Each source quiz is submitted separately, with the exact question subset
+      // presented in this exam. The database grades it, saves mastery evidence,
+      // and awards XP only through the protected reward-claim RPC.
+      const grouped = new Map<string, typeof details>();
+      for (const item of details) {
+        if (!item.q.quiz_id) continue;
+        const group = grouped.get(item.q.quiz_id) || [];
+        group.push(item);
+        grouped.set(item.q.quiz_id, group);
       }
+
+      let savedGroups = 0;
+      let rewardTotal = 0;
+      let rewardFailures = 0;
+
+      for (const [quizId, quizDetails] of grouped) {
+        const submissionId = crypto.randomUUID();
+        const secureAnswers: Record<string, string> = {};
+        for (const item of quizDetails) {
+          const selectedIndex = item.q.options.indexOf(item.answer);
+          if (selectedIndex < 0) continue;
+          const rawKey = String(item.q.correct_answer_raw || "").trim();
+          const expectsLetter = /^(?:OPTION\s*)?[A-D](?:[.)])?$/i.test(rawKey);
+          const expectsIndex = /^\d+$/.test(rawKey);
+          secureAnswers[item.q.id] = expectsLetter
+            ? String.fromCharCode(65 + selectedIndex)
+            : expectsIndex
+              ? String(selectedIndex)
+              : item.answer;
+        }
+
+        try {
+          const { error: submitError } = await (supabase as any).rpc("submit_exam_result_secure", {
+            p_quiz_id: quizId,
+            p_question_ids: quizDetails.map(({ q }) => q.id),
+            p_answers: secureAnswers,
+            p_time_taken: elapsedSeconds,
+            p_submission_id: submissionId,
+            p_exam_type: examTypeFilter === "mixed" ? "mixed_practice" : examTypeFilter,
+            p_subject: quizDetails[0]?.q.subject || selectedQuiz.subject,
+          });
+          if (submitError) throw submitError;
+          savedGroups += 1;
+
+          try {
+            const { data: rewardData, error: rewardError } = await (supabase as any).rpc("claim_quiz_reward", {
+              p_submission_id: submissionId,
+            });
+            if (rewardError) throw rewardError;
+            rewardTotal += Number(rewardData?.xp_awarded ?? 0);
+          } catch (rewardError) {
+            rewardFailures += 1;
+            console.error("Exam reward claim failed:", rewardError);
+          }
+        } catch (saveError) {
+          console.error("Could not securely save an exam source group:", quizId, saveError);
+        }
+      }
+
+      if (savedGroups > 0) {
+        await refreshProfile?.();
+        const persistenceStatus = savedGroups === grouped.size && rewardFailures === 0 ? "saved" : "partial";
+        setResults((current) => current ? { ...current, xpAwarded: rewardTotal, persistenceStatus } : current);
+        if (persistenceStatus === "saved") {
+          toast.success(`Exam result saved · ${rewardTotal} XP awarded`);
+        } else {
+          toast.warning(`Your result was saved for ${savedGroups} of ${grouped.size} quiz sources. Some progress or rewards may need retrying.`);
+        }
+      } else {
+        setResults((current) => current ? { ...current, xpAwarded: 0, persistenceStatus: "failed" } : current);
+        toast.error("Your result is shown, but could not be securely saved. Your progress and XP were not changed.");
+      }
+    } else {
+      setResults((current) => current ? { ...current, xpAwarded: 0, persistenceStatus: "failed" } : current);
+      toast.error("Your result is shown, but it has no valid account or quiz source to save against.");
     }
-    setIsSaving(false);
-  }, [examState, questions, answers, user?.id, selectedQuiz?.id, refreshProfile]);
+    } catch (error) {
+      console.error("Unexpected Exam Mode submission error:", error);
+      setResults((current) => current ? { ...current, xpAwarded: 0, persistenceStatus: "failed" } : current);
+      toast.error("Your result is visible, but saving it failed. Please check your connection.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [examState, questions, answers, user?.id, selectedQuiz?.id, selectedQuiz?.subject, examTypeFilter, refreshProfile]);
   submitExamRef.current = () => { void submitExam(); };
 
   useEffect(() => {
@@ -366,6 +394,7 @@ const ExamModePage: React.FC = () => {
           question_text: String(row.question_text || ""),
           options,
           correct_answer: answerText(row.correct_answer, options),
+          correct_answer_raw: String(row.correct_answer ?? ""),
           explanation: row.explanation || undefined,
           topic: row.topic || undefined,
         };
@@ -470,13 +499,23 @@ const ExamModePage: React.FC = () => {
                 {entrancePaperLoadState === "ready" && entrancePaperReferences.length === 0 && <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">No linked papers from 2013 onward are listed yet.</p>}
                 {entrancePaperReferences.length > 0 && <div className="mt-4 space-y-2">
                   {entrancePaperReferences.map((paper) => (
-                    <a key={paper.id} href={`https://webmail.temari.et/exam-prep/papers/grade-12-${paper.ethiopian_year}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      <span className="min-w-0">
-                        <span className="block font-medium">{paper.subject}</span>
-                        <span className="block text-xs text-muted-foreground">{paper.ethiopian_year} E.C. · {paper.gregorian_year} G.C. · {paper.source_name}</span>
-                      </span>
-                      <span className="shrink-0 text-xs font-semibold text-primary">Open archive ↗</span>
-                    </a>
+                    isSafeHttpUrl(paper.source_url) ? (
+                      <a key={paper.id} href={paper.source_url} target="_blank" rel="noopener noreferrer" aria-label={`Open source archive for ${paper.subject}, ${paper.ethiopian_year} E.C.`} className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <span className="min-w-0">
+                          <span className="block font-medium">{paper.subject}</span>
+                          <span className="block text-xs text-muted-foreground">{paper.ethiopian_year} E.C. · {paper.gregorian_year} G.C. · {paper.source_name}</span>
+                        </span>
+                        <span className="shrink-0 text-xs font-semibold text-primary">Open archive ↗</span>
+                      </a>
+                    ) : (
+                      <div key={paper.id} aria-disabled="true" className="flex items-center justify-between gap-3 rounded-xl border border-dashed p-3 text-muted-foreground">
+                        <span className="min-w-0">
+                          <span className="block font-medium">{paper.subject}</span>
+                          <span className="block text-xs">{paper.ethiopian_year} E.C. · {paper.gregorian_year} G.C. · {paper.source_name}</span>
+                        </span>
+                        <span className="shrink-0 text-xs">Archive link unavailable</span>
+                      </div>
+                    )
                   ))}
                   <p className="text-xs text-muted-foreground">Archive links can have incomplete coverage. Check the paper version and answer key before using them as verified exam material.</p>
                 </div>}
@@ -496,9 +535,9 @@ const ExamModePage: React.FC = () => {
     const percent = results.total ? Math.round((results.correct / results.total) * 100) : 0;
     return (
       <div className="min-h-screen bg-muted/30">
-        <Header title="Exam review" subtitle={selectedQuiz?.title || "Your completed practice"} />
+        <Header title="Exam review" subtitle={examTypeFilter === "mixed" ? "Mixed exam practice" : selectedQuiz?.title || "Your completed practice"} />
         <main className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6 sm:py-10">
-          <Card className="overflow-hidden rounded-3xl"><div className="h-2 bg-primary" /><CardContent className="p-6 text-center sm:p-10"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Trophy className="h-8 w-8" /></div><p className="mt-4 text-sm font-semibold text-primary">Exam completed</p><h2 className="mt-1 text-5xl font-bold tracking-tight">{percent}%</h2><p className="mt-2 text-muted-foreground">{results.correct} correct out of {results.total} questions</p><div className="mx-auto mt-5 max-w-sm"><Progress value={percent} className="h-2.5" /></div>{upperStudent && <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Total score</p><p className="mt-1 text-xl font-bold">{percent}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Answer accuracy</p><p className="mt-1 text-xl font-bold">{results.details.filter(d => d.answer).length ? Math.round(results.correct / results.details.filter(d => d.answer).length * 100) : 0}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Time spent</p><p className="mt-1 text-xl font-bold">{Math.floor(results.elapsedSeconds / 60)}m {results.elapsedSeconds % 60}s</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">XP earned</p><p className="mt-1 text-xl font-bold">+{results.correct * 5}</p></div></div>}<div className="mt-5 flex flex-wrap justify-center gap-2"><Badge variant="secondary">{percent >= 80 ? "Strong result" : percent >= 60 ? "Good progress" : "Keep building confidence"}</Badge><Badge variant="outline">+{results.correct * 5} potential XP</Badge>{isSaving && <Badge variant="outline">Saving progress…</Badge>}</div><div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row"><Button onClick={resetExam}><RotateCcw className="mr-2 h-4 w-4" />Try another exam</Button><Button variant="outline" onClick={() => navigate("/academic/insights")}>View academic insights</Button></div></CardContent></Card>
+          <Card className="overflow-hidden rounded-3xl"><div className="h-2 bg-primary" /><CardContent className="p-6 text-center sm:p-10"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Trophy className="h-8 w-8" /></div><p className="mt-4 text-sm font-semibold text-primary">Exam completed</p><h2 className="mt-1 text-5xl font-bold tracking-tight">{percent}%</h2><p className="mt-2 text-muted-foreground">{results.correct} correct out of {results.total} questions</p><div className="mx-auto mt-5 max-w-sm"><Progress value={percent} className="h-2.5" /></div>{upperStudent && <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Total score</p><p className="mt-1 text-xl font-bold">{percent}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Answer accuracy</p><p className="mt-1 text-xl font-bold">{results.details.filter(d => d.answer).length ? Math.round(results.correct / results.details.filter(d => d.answer).length * 100) : 0}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Time spent</p><p className="mt-1 text-xl font-bold">{Math.floor(results.elapsedSeconds / 60)}m {results.elapsedSeconds % 60}s</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">XP awarded</p><p className="mt-1 text-xl font-bold">{results.xpAwarded === null ? "—" : `+${results.xpAwarded}`}</p></div></div>}<div className="mt-5 flex flex-wrap justify-center gap-2"><Badge variant="secondary">{percent >= 80 ? "Strong result" : percent >= 60 ? "Good progress" : "Keep building confidence"}</Badge><Badge variant="outline">{isSaving ? "Saving progress…" : results.persistenceStatus === "saved" ? "Saved to progress" : results.persistenceStatus === "partial" ? "Partially saved" : results.persistenceStatus === "failed" ? "Not saved" : "Awaiting save"}</Badge></div><div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row"><Button onClick={resetExam}><RotateCcw className="mr-2 h-4 w-4" />Try another exam</Button><Button variant="outline" onClick={() => navigate("/academic/insights")}>View academic insights</Button></div></CardContent></Card>
           {upperStudent && <div className="mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-4"><h3 className="font-semibold">Mistakes to Review</h3><p className="mt-1 text-sm text-muted-foreground">Send missed questions to AI Tutor for step-by-step explanations.</p>{results.details.some(d => !d.correct) && <Button className="mt-3" onClick={() => { const context = results.details.filter(d => !d.correct).map((d, i) => "Mistake " + (i + 1) + ": " + d.q.question_text + " | My answer: " + (d.answer || "Not answered") + " | Correct answer: " + answerText(d.q.correct_answer, d.q.options) + " | Explanation: " + (d.q.explanation || "Not provided")).join("\n"); navigate("/ai-tutor?context=" + encodeURIComponent("Please explain these exam mistakes step by step:\n" + context)); }}>Send Mistakes to AI Tutor</Button>}</div>}<div className="space-y-3"><div><h3 className="text-lg font-bold">Answer review</h3><p className="text-sm text-muted-foreground">Review each response and explanation where one is available.</p></div>{results.details.map((detail, index) => <Card key={detail.q.id} className="rounded-2xl"><CardContent className="flex gap-3 p-4 sm:p-5"><div className={`mt-0.5 rounded-full p-1.5 ${detail.correct ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}>{detail.correct ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}</div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><p className="font-medium leading-6">{index + 1}. {detail.q.question_text}</p><Badge variant="outline">{detail.correct ? "Correct" : "Review"}</Badge></div>{!detail.correct && <p className="mt-2 text-sm text-muted-foreground">Your answer: <span className="text-foreground">{detail.answer || "Not answered"}</span></p>}<p className="mt-1 text-sm">Correct answer: <span className="font-semibold text-emerald-700 dark:text-emerald-400">{answerText(detail.q.correct_answer, detail.q.options)}</span></p>{detail.q.explanation && <p className="mt-2 rounded-xl bg-muted/60 p-3 text-sm leading-5 text-muted-foreground">{detail.q.explanation}</p>}</div></CardContent></Card>)}</div>
         </main>
       </div>
@@ -510,7 +549,7 @@ const ExamModePage: React.FC = () => {
   const timeWarning = timeLeft <= 300 && timeLeft > 60;
   return (
     <div className="min-h-screen bg-muted/30">
-      <header className={`sticky ${upperStudent ? "top-14" : "top-0"} z-20 border-b bg-background/95 backdrop-blur`}><div className="mx-auto max-w-4xl px-4 py-4 sm:px-6"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">{examTypeFilter === "mock_exam" ? "Mock exam" : "Timed practice"}</p><h1 className="font-bold sm:text-lg">{selectedQuiz?.title || "Exam mode"}</h1></div><div className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono font-semibold tabular-nums ${upperStudent ? (timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive animate-pulse" : timeWarning ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-card text-foreground") : (timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card")}`}><Clock3 className="h-4 w-4" />{formatTime(timeLeft)}</div></div><div className="mt-4 flex items-center justify-between text-sm text-muted-foreground"><span>Question {currentQ + 1} of {questions.length}</span><span>{Object.keys(answers).length} answered · {unansweredCount} remaining</span></div><Progress value={((currentQ + 1) / questions.length) * 100} className="mt-2 h-2" /></div></header>
+      <header className={`sticky ${upperStudent ? "top-14" : "top-0"} z-20 border-b bg-background/95 backdrop-blur`}><div className="mx-auto max-w-4xl px-4 py-4 sm:px-6"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">{examTypeFilter === "mock_exam" ? "Mock exam" : "Timed practice"}</p><h1 className="font-bold sm:text-lg">{examTypeFilter === "mixed" ? "Mixed exam practice" : selectedQuiz?.title || "Exam mode"}</h1></div><div className={`flex items-center gap-2 rounded-xl border px-3 py-2 font-mono font-semibold tabular-nums ${upperStudent ? (timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive animate-pulse" : timeWarning ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-card text-foreground") : (timeCritical ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card")}`}><Clock3 className="h-4 w-4" />{formatTime(timeLeft)}</div></div><div className="mt-4 flex items-center justify-between text-sm text-muted-foreground"><span>Question {currentQ + 1} of {questions.length}</span><span>{Object.keys(answers).length} answered · {unansweredCount} remaining</span></div><Progress value={((currentQ + 1) / questions.length) * 100} className="mt-2 h-2" /></div></header>
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10"><Card className="rounded-3xl shadow-sm"><CardContent className="p-5 sm:p-8"><div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><CircleHelp className="h-4 w-4 text-primary" />{currentQuestion.topic || prettySubject(currentQuestion.subject || subject)}<Badge variant="outline">{currentQuestion.sourceKind === "past_paper" ? `Past-paper-tagged quiz · ${selectedQuiz?.source_verification_status === "verified" ? "source verified" : "source not verified"}` : "Topic practice · approved quiz bank"}</Badge></div><h2 className="mt-4 text-xl font-semibold leading-8 sm:text-2xl">{currentQuestion.question_text}</h2><div className="mt-6 grid gap-3">{currentQuestion.options.map((option, index) => {const selected = answers[currentQ] === option; return <button key={`${currentQuestion.id}-${index}`} type="button" onClick={() => setAnswers((previous) => ({ ...previous, [currentQ]: option }))} className={`flex min-h-14 items-start gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${upperStudent ? (selected ? "border-primary bg-primary/10 text-primary ring-2 ring-primary" : "border-border bg-card hover:bg-muted") : (selected ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-background hover:bg-muted/60")}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold ${upperStudent ? (selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted text-muted-foreground") : (selected ? "border-primary bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}`}>{String.fromCharCode(65 + index)}</span><span className="pt-0.5 text-sm leading-6">{option}</span></button>;})}</div></CardContent></Card><div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between"><Button variant="outline" className="sm:min-w-32" disabled={currentQ === 0} onClick={() => setCurrentQ((index) => index - 1)}><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><div className="flex gap-3"><Button variant="outline" onClick={() => setCurrentQ((index) => Math.min(questions.length - 1, index + 1))} disabled={currentQ === questions.length - 1}>Skip <ChevronRight className="ml-1 h-4 w-4" /></Button><Button className="flex-1 sm:min-w-36" onClick={() => currentQ < questions.length - 1 ? setCurrentQ((index) => index + 1) : void submitExam()}>{currentQ < questions.length - 1 ? <>Next question <ChevronRight className="ml-1 h-4 w-4" /></> : "Submit exam"}</Button></div></div><p className="mt-4 text-center text-xs text-muted-foreground">Your answers are not revealed until you submit the exam.</p></main>
     </div>
   );

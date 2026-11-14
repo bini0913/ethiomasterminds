@@ -7,7 +7,6 @@ import {
   ChevronRight, Sparkles,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
-import { getUserTier } from "@/lib/getUserTier";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 
@@ -23,9 +22,12 @@ const groups: NavGroup[] = [
   { label: "Study", items: [
     { label: "Study Mode", to: "/study-mode", icon: Timer },
     { label: "Textbooks & library", to: "/library", icon: LibraryBig },
+    { label: "Exam preparation", to: "/academic/exam", icon: Target },
+    { label: "Entrance papers", to: "/academic/entrance-papers", icon: GraduationCap },
     { label: "Flashcards", to: "/academic/flashcards", icon: Layers3 },
     { label: "Study planner", to: "/academic/planner", icon: CalendarDays },
     { label: "Topic coverage", to: "/academic/topics", icon: BookOpen },
+    { label: "Academic insights", to: "/academic/insights", icon: BarChart3 },
     { label: "AI Tutor", to: "/ai-tutor", icon: Bot },
     { label: "Learning DNA", to: "/learning-dna", icon: BrainCircuit },
   ]},
@@ -41,8 +43,6 @@ const groups: NavGroup[] = [
 ];
 
 const extraItems: NavItem[] = [
-  { label: "Entrance paper catalogue", to: "/academic/entrance-papers", icon: GraduationCap },
-  { label: "Exam mode", to: "/academic/exam", icon: Target },
   { label: "Revision", to: "/revision", icon: BrainCircuit },
   { label: "Challenge lobby", to: "/lobby", icon: Swords },
   { label: "Rewards store", to: "/store", icon: Gift },
@@ -50,7 +50,8 @@ const extraItems: NavItem[] = [
   { label: "Notifications", to: "/notifications", icon: Bell },
 ];
 
-const allItems = groups.flatMap((group) => group.items).concat(extraItems);
+const navigationGroups: NavGroup[] = groups.concat([{ label: "More", items: extraItems }]);
+const allItems = navigationGroups.flatMap((group) => group.items);
 const titleFor = (pathname: string) =>
   allItems.slice().sort((a, b) => b.to.length - a.to.length)
     .find((item) => pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to + "/")))?.label
@@ -108,7 +109,7 @@ export default function UpperTierStudioShell({ children }: { children: React.Rea
         </div>
       </div>
       <nav aria-label="Grades 9 to 12 navigation" className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-5">
-        {groups.map((group) => (
+        {navigationGroups.map((group) => (
           <section key={group.label}>
             <h2 className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground md:hidden lg:block">{group.label}</h2>
             <div className="space-y-1">
@@ -199,7 +200,7 @@ export default function UpperTierStudioShell({ children }: { children: React.Rea
       <nav aria-label="Primary mobile navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
         {moreOpen && (
           <div className="mx-auto grid max-h-[45vh] max-w-lg grid-cols-2 gap-2 overflow-y-auto border-b border-border py-3">
-            {extraItems.concat(groups[1].items.slice(2), groups[2].items, groups[3].items).map((item) => {
+            {allItems.filter((item) => !["/", "/academic", "/study-mode", "/multiplayer"].includes(item.to)).map((item) => {
               const Icon = item.icon;
               return <button type="button" key={item.to} onClick={() => go(item.to)} className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold hover:bg-muted"><Icon className="h-4 w-4 text-primary" />{item.label}</button>;
             })}

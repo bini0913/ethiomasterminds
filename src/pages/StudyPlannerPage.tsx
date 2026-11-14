@@ -35,11 +35,11 @@ const StudyPlannerPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [newSubject, setNewSubject] = useState("math");
+  const [newSubject, setNewSubject] = useState("");
   const [newTopic, setNewTopic] = useState("");
   const [newDate, setNewDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [newPriority, setNewPriority] = useState("medium");
-  const [subjects, setSubjects] = useState<string[]>(["math", "science", "english", "history"]);
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string } | null>(null);
   const [availableBooks, setAvailableBooks] = useState<Array<{id:string;title:string;subject:string;pdf_path:string}>>([]);
   const [selectedBooks, setSelectedBooks] = useState<Array<{id:string;title:string;subject:string;pdf_path:string}>>([]);
@@ -76,8 +76,9 @@ const StudyPlannerPage: React.FC = () => {
       try {
         const profile = await getAcademicProfile(user.id);
         if (!profile || cancelled) return;
-        setSubjects(profile.subjects.map(normalizeSubject));
-        setNewSubject(normalizeSubject(profile.subjects[0] || "math"));
+        const savedSubjects = Array.isArray(profile.subjects) ? profile.subjects.map(normalizeSubject).filter(Boolean) : [];
+        setSubjects(savedSubjects);
+        setNewSubject(savedSubjects[0] || "");
 
         const selectedBookIds = Array.from(new Set([...(profile.book_ids || []), ...(profile.book_id ? [profile.book_id] : [])]));
         const { data: books, error: booksError } = await supabase.from("library_books").select("id,title,author,subject,pdf_path").limit(500);
@@ -125,8 +126,13 @@ const StudyPlannerPage: React.FC = () => {
 
   const addPlan = async () => {
     const auth = await supabase.auth.getUser();
-    if (!user || !auth.data.user?.id || !newTopic.trim()) {
-      toast.error("Please enter a topic"); return;
+    if (!subjects.length) {
+      toast.error("Choose your study subjects in Academic Prep before adding a task.");
+      return;
+    }
+    if (!user || !auth.data.user?.id || !newTopic.trim() || !newSubject) {
+      toast.error("Choose a subject and enter a topic.");
+      return;
     }
     const { error } = await supabase.from("study_plans").insert({
       user_id: auth.data.user.id,
@@ -147,15 +153,22 @@ const StudyPlannerPage: React.FC = () => {
     if (error) { toast.error("Failed to update"); return; }
     setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, completed: !p.completed } : p));
 
-    if (!plan.completed && user) {
-      supabase.rpc("add_xp", { p_user_id: user.id, p_amount: 10 });
-      toast.success("+10 XP for completing a study task!");
+    if (!plan.completed) {
+      // Completing a planner item records study activity; it does not mint XP.
+      // XP is awarded only by the server-authoritative reward workflows.
+      toast.success("Study task completed.");
     }
   };
 
   const deletePlan = async (id: string) => {
-    await supabase.from("study_plans").delete().eq("id", id);
-    fetchPlans();
+    const { error } = await supabase.from("study_plans").delete().eq("id", id);
+    if (error) {
+      console.error("Could not delete study plan:", error);
+      toast.error("The study task could not be deleted. Please retry.");
+      return;
+    }
+    setPlans((previous) => previous.filter((plan) => plan.id !== id));
+    toast.success("Study task deleted.");
   };
 
   const analyzeSelectedBookPdfs = async () => {
@@ -313,6 +326,10 @@ const StudyPlannerPage: React.FC = () => {
   };
   const generateAIPlan = async () => {
     if (!user) return;
+    if (!subjects.length) {
+      toast.error("Choose your study subjects in Academic Prep before generating a plan.");
+      return;
+    }
     setIsGenerating(true);
 
     try {
@@ -365,9 +382,10 @@ const StudyPlannerPage: React.FC = () => {
           priority: s.priority || "medium",
           notes: s.notes || "AI recommended",
         }));
-        await supabase.from("study_plans").insert(inserts);
-        toast.success(`✨ AI generated ${inserts.length} study tasks!`);
-        fetchPlans();
+        const { error: insertError } = await supabase.from("study_plans").insert(inserts);
+        if (insertError) throw insertError;
+        toast.success(`AI generated ${inserts.length} study tasks from your saved study profile.`);
+        await fetchPlans();
       }
     } catch (e) {
       console.error("AI planner error:", e);
@@ -383,42 +401,32 @@ const StudyPlannerPage: React.FC = () => {
     }
   };
 
-  const generateFallbackPlan = (weakTopics: any[], analytics: any[]) => {
-    const plans: Array<{ subject: string; topic: string; priority: string; day_offset: number; notes: string }> = [];
-    const today = new Date();
-
-    // Identify weak subjects
-    const subjectAccuracy: Record<string, number> = {};
-    analytics.forEach(a => { subjectAccuracy[a.subject] = a.accuracy || 0; });
-
-    // Add weak topics first
-    weakTopics.slice(0, 5).forEach((t, i) => {
-      plans.push({
-        subject: t.subject,
-        topic: `Review: ${t.topic} (${Math.round(t.accuracy_percentage)}% accuracy)`,
-        priority: t.accuracy_percentage < 40 ? "high" : "medium",
-        day_offset: i,
-        notes: "Focus on understanding core concepts",
-      });
-    });
-
-    // Fill remaining days with subject rotation
-    const allSubjects = subjects.length ? subjects : ["math", "science", "english", "history"];
-    for (let i = plans.length; i < 7; i++) {
-      const subj = allSubjects[i % allSubjects.length];
-      plans.push({
-        subject: subj,
-        topic: `Practice ${subj} problems`,
-        priority: (subjectAccuracy[subj] || 50) < 60 ? "high" : "low",
-        day_offset: i,
-        notes: "Daily practice session",
-      });
-    }
-
-    return plans;
+  const generateFallbackPlan = (weakTopics: any[], _analytics: any[]) => {
+    // Fallback recommendations must be grounded in topics the learner has
+    // actually attempted. Never invent generic subjects or placeholder tasks.
+    return weakTopics
+      .filter((topic) =>
+        topic &&
+        typeof topic.subject === "string" &&
+        typeof topic.topic === "string" &&
+        Number.isFinite(Number(topic.accuracy_percentage)) &&
+        subjects.some((subject) => normalizeSubject(subject) === normalizeSubject(topic.subject))
+      )
+      .slice(0, 7)
+      .map((topic, index) => ({
+        subject: topic.subject,
+        topic: `Review: ${topic.topic} (${Math.round(Number(topic.accuracy_percentage))}% accuracy)`,
+        priority: Number(topic.accuracy_percentage) < 40 ? "high" : "medium",
+        day_offset: index,
+        notes: "Recommended from your recorded topic practice.",
+      }));
   };
 
   const insertPlans = async (generatedPlans: Array<{ subject: string; topic: string; priority: string; day_offset: number; notes: string }>) => {
+    if (!generatedPlans.length) {
+      toast.info("There are no recorded weak topics to recommend yet. Complete some practice first.");
+      return;
+    }
     const auth = await supabase.auth.getUser();
     if (!auth.data.user?.id) return;
     const today = new Date();
@@ -430,8 +438,13 @@ const StudyPlannerPage: React.FC = () => {
       priority: p.priority,
       notes: p.notes,
     }));
-    await supabase.from("study_plans").insert(inserts);
-    toast.success(`📚 Generated ${inserts.length} study tasks based on your weak areas!`);
+    const { error } = await supabase.from("study_plans").insert(inserts);
+    if (error) {
+      console.error("Could not save generated study plan:", error);
+      toast.error("The study plan could not be saved. Please retry.");
+      return;
+    }
+    toast.success(`Generated ${inserts.length} study tasks from your learning data.`);
     fetchPlans();
   };
 
@@ -476,12 +489,26 @@ const StudyPlannerPage: React.FC = () => {
             <p className="text-xs text-muted-foreground">Today: {completedToday}/{todayPlans.length} completed</p>
           </div>
           <div className="flex gap-1">
-            <Button size="sm" variant="secondary" onClick={() => setShowAdd(true)}>
+            <Button size="sm" variant="secondary" disabled={!subjects.length} onClick={() => setShowAdd(true)}>
               <Plus className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
+
+      {!subjects.length && (
+        <div className="mx-auto max-w-4xl px-4 pt-4">
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold">Set up your study subjects first</p>
+                <p className="mt-1 text-sm text-muted-foreground">The planner only recommends work based on your saved subjects and recorded practice. It won't invent a subject list.</p>
+              </div>
+              <Button onClick={() => navigate("/academic/setup")}>Choose subjects</Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* AI Generate Button */}
       <div className="px-4 py-4 max-w-4xl mx-auto">
@@ -490,7 +517,7 @@ const StudyPlannerPage: React.FC = () => {
         <Button
           className={upperStudent ? "h-12" : "h-12 bg-gradient-to-r from-primary to-accent text-white hover:from-primary hover:to-accent"}
           onClick={generateAIPlan}
-          disabled={isGenerating}
+          disabled={isGenerating || !subjects.length}
         >
           {isGenerating ? (
             <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Analyzing your weak areas...</>

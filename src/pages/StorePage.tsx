@@ -2,10 +2,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { useCurrency } from '@/context/CurrencyContext';
+import { getUserTier } from '@/lib/getUserTier';
 import { useFriends } from '@/context/FriendsContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Home, Store, Coins, Gem, Gift, RefreshCcw, Sparkles, ArrowLeftRight, Wallet, Send, ShieldCheck } from 'lucide-react';
+import { Home, Store, Coins, Gem, Gift, ArrowLeftRight, Wallet, Send, ShieldCheck, Flame, Zap } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import AvatarStore from '@/components/store/AvatarStore';
@@ -36,6 +37,7 @@ type TransactionRow = {
 const StorePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === 'upper';
   const { friends } = useFriends();
   const {
     xp,
@@ -47,7 +49,6 @@ const StorePage: React.FC = () => {
     convertCoinsToXp,
     claimDailyReward,
     transferCoins,
-    luckySpin,
     refreshCurrency,
   } = useCurrency();
 
@@ -57,7 +58,6 @@ const StorePage: React.FC = () => {
   const [xpExchangeInput, setXpExchangeInput] = React.useState('100');
   const [coinsToXpInput, setCoinsToXpInput] = React.useState('10');
   const [claimingDaily, setClaimingDaily] = React.useState(false);
-  const [spinning, setSpinning] = React.useState(false);
   const [transactions, setTransactions] = React.useState<TransactionRow[]>([]);
   const [transferFriendId, setTransferFriendId] = React.useState('');
   const [transferSearch, setTransferSearch] = React.useState('');
@@ -146,21 +146,6 @@ const StorePage: React.FC = () => {
     setClaimingDaily(false);
   };
 
-  const handleLuckySpin = async () => {
-    if (spinning) return;
-    setSpinning(true);
-    const result = await luckySpin();
-
-    if (result.success) {
-      toast.success('🎰 Lucky spin complete. Reward added to your wallet.');
-      await loadTransactions();
-    } else {
-      toast.error(result.message ?? 'Spin unavailable right now.');
-    }
-
-    setSpinning(false);
-  };
-
   const handleTransfer = async () => {
     const amount = Number(transferAmount);
 
@@ -188,20 +173,20 @@ const StorePage: React.FC = () => {
   const transferPreview = Number(transferAmount) || 0;
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <AnimatedBackground variant="minimal" showIcons={false} />
+    <div className={upperStudent ? "tier-upper mm-store-page min-h-screen bg-background text-foreground" : "relative min-h-screen overflow-hidden"}>
+      {!upperStudent && <AnimatedBackground variant="minimal" showIcons={false} />}
 
       <div className="relative z-10">
-        <header className="glass border-b border-border/50 sticky top-0 z-20">
+        <header className={upperStudent ? "sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-xl" : "glass border-b border-border/50 sticky top-0 z-20"}>
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <BackButton to="/" />
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <Store className="h-5 w-5 text-white" />
+                {!upperStudent && <BackButton to="/" />}
+                <div className={upperStudent ? "flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary" : "w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center"}>
+                  <Store className={upperStudent ? "h-5 w-5" : "h-5 w-5 text-white"} />
                 </div>
                 <div>
-                  <h1 className="text-lg font-display font-bold text-foreground">Master Minds Economy Hub</h1>
+                  <h1 className="text-lg font-display font-bold text-foreground">{upperStudent ? "Rewards Store" : "Master Minds Economy Hub"}</h1>
                   <p className="text-xs text-muted-foreground">Store, exchange, wallet tracking, and friend transfer in one place.</p>
                 </div>
               </div>
@@ -212,10 +197,10 @@ const StorePage: React.FC = () => {
                 <div className="rounded-lg border bg-card/70 px-3 py-1 text-sm flex items-center gap-2">
                   <Gem className="h-4 w-4 text-primary" /> {gems.toLocaleString()}
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+                {!upperStudent && <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
                   <Home className="h-4 w-4 mr-2" />
                   Menu
-                </Button>
+                </Button>}
               </div>
             </div>
           </div>
@@ -223,12 +208,12 @@ const StorePage: React.FC = () => {
 
         <main className="container mx-auto px-4 py-6 space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full">
-              <TabsTrigger value="store">🛍️ Store</TabsTrigger>
-              <TabsTrigger value="exchange">💱 Exchange</TabsTrigger>
-              <TabsTrigger value="wallet">💳 Wallet</TabsTrigger>
-              <TabsTrigger value="transfer">🤝 Transfer</TabsTrigger>
-              <TabsTrigger value="inventory">🎒 Inventory</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5">
+              <TabsTrigger value="store"><Store className="mr-1.5 h-4 w-4" />Store</TabsTrigger>
+              <TabsTrigger value="exchange"><ArrowLeftRight className="mr-1.5 h-4 w-4" />Exchange</TabsTrigger>
+              <TabsTrigger value="wallet"><Wallet className="mr-1.5 h-4 w-4" />Wallet</TabsTrigger>
+              <TabsTrigger value="transfer"><Send className="mr-1.5 h-4 w-4" />Transfer</TabsTrigger>
+              <TabsTrigger value="inventory"><Gift className="mr-1.5 h-4 w-4" />Inventory</TabsTrigger>
             </TabsList>
 
             <TabsContent value="store" className="space-y-4">
@@ -327,7 +312,7 @@ const StorePage: React.FC = () => {
                 <Card>
                   <CardHeader><CardTitle className="text-base">Daily Reward</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
-                    <p className="text-sm">🔥 Current streak: <strong>{dailyStreak}</strong> day(s)</p>
+                    <p className="flex items-center gap-2 text-sm"><Flame className="h-4 w-4 text-amber-500" /> Current streak: <strong>{dailyStreak}</strong> day(s)</p>
                     <Button size="sm" className="w-full" onClick={handleClaimDaily} disabled={claimingDaily}>
                       <Gift className="h-4 w-4 mr-2" />
                       {claimingDaily ? 'Claiming...' : 'Claim Daily Reward'}
@@ -335,16 +320,6 @@ const StorePage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader><CardTitle className="text-base">Lucky Spin</CardTitle></CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button size="sm" className="w-full" onClick={handleLuckySpin} disabled={spinning}>
-                      {spinning ? <RefreshCcw className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                      {spinning ? 'Spinning...' : 'Spin (Daily)'}
-                    </Button>
-                    <p className="text-xs text-muted-foreground">Rewards include coins, gems, or random items.</p>
-                  </CardContent>
-                </Card>
               </div>
             </TabsContent>
 
@@ -352,15 +327,15 @@ const StorePage: React.FC = () => {
               <div className="grid gap-4 md:grid-cols-3">
                 <Card>
                   <CardHeader><CardTitle className="text-base">XP</CardTitle></CardHeader>
-                  <CardContent className="text-2xl font-bold">🎯 {xp.toLocaleString()}</CardContent>
+                  <CardContent className="flex items-center gap-2 text-2xl font-bold"><Zap className="h-5 w-5 text-primary" />{xp.toLocaleString()}</CardContent>
                 </Card>
                 <Card>
                   <CardHeader><CardTitle className="text-base">Coins</CardTitle></CardHeader>
-                  <CardContent className="text-2xl font-bold">💰 {coins.toLocaleString()}</CardContent>
+                  <CardContent className="flex items-center gap-2 text-2xl font-bold"><Coins className="h-5 w-5 text-amber-500" />{coins.toLocaleString()}</CardContent>
                 </Card>
                 <Card>
                   <CardHeader><CardTitle className="text-base">Gems</CardTitle></CardHeader>
-                  <CardContent className="text-2xl font-bold">💎 {gems.toLocaleString()}</CardContent>
+                  <CardContent className="flex items-center gap-2 text-2xl font-bold"><Gem className="h-5 w-5 text-primary" />{gems.toLocaleString()}</CardContent>
                 </Card>
               </div>
 

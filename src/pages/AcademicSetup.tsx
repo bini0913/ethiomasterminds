@@ -197,7 +197,7 @@ const AcademicSetup: React.FC = () => {
   const selectedBook = books.find((book) => book.id === bookId);
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 pb-24">
+    <div className={grade >= 9 ? "tier-upper min-h-screen bg-background px-4 py-6 pb-24 text-foreground" : "min-h-screen bg-background px-4 py-6 pb-24"}>
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-5 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => (step === 1 || (band === "high" && step === 2)) ? navigate("/academic") : setStep((current) => current - 1)} aria-label="Go back">
