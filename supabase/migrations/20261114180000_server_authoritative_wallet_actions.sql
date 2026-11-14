@@ -354,7 +354,7 @@ BEGIN
 
   SELECT * INTO v_mission
   FROM public.daily_missions
-  WHERE id = v_assignment.mission_id AND is_active = true;
+  WHERE id = v_assignment.mission_id;
 
   IF NOT FOUND THEN RAISE EXCEPTION 'Mission is no longer active'; END IF;
 
