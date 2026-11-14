@@ -35,11 +35,11 @@ const StudyPlannerPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [newSubject, setNewSubject] = useState("math");
+  const [newSubject, setNewSubject] = useState("");
   const [newTopic, setNewTopic] = useState("");
   const [newDate, setNewDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [newPriority, setNewPriority] = useState("medium");
-  const [subjects, setSubjects] = useState<string[]>(["math", "science", "english", "history"]);
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string } | null>(null);
   const [availableBooks, setAvailableBooks] = useState<Array<{id:string;title:string;subject:string;pdf_path:string}>>([]);
   const [selectedBooks, setSelectedBooks] = useState<Array<{id:string;title:string;subject:string;pdf_path:string}>>([]);
@@ -76,8 +76,9 @@ const StudyPlannerPage: React.FC = () => {
       try {
         const profile = await getAcademicProfile(user.id);
         if (!profile || cancelled) return;
-        setSubjects(profile.subjects.map(normalizeSubject));
-        setNewSubject(normalizeSubject(profile.subjects[0] || "math"));
+        const savedSubjects = Array.isArray(profile.subjects) ? profile.subjects.map(normalizeSubject).filter(Boolean) : [];
+        setSubjects(savedSubjects);
+        setNewSubject(savedSubjects[0] || "");
 
         const selectedBookIds = Array.from(new Set([...(profile.book_ids || []), ...(profile.book_id ? [profile.book_id] : [])]));
         const { data: books, error: booksError } = await supabase.from("library_books").select("id,title,author,subject,pdf_path").limit(500);
@@ -125,8 +126,13 @@ const StudyPlannerPage: React.FC = () => {
 
   const addPlan = async () => {
     const auth = await supabase.auth.getUser();
-    if (!user || !auth.data.user?.id || !newTopic.trim()) {
-      toast.error("Please enter a topic"); return;
+    if (!subjects.length) {
+      toast.error("Choose your study subjects in Academic Prep before adding a task.");
+      return;
+    }
+    if (!user || !auth.data.user?.id || !newTopic.trim() || !newSubject) {
+      toast.error("Choose a subject and enter a topic.");
+      return;
     }
     const { error } = await supabase.from("study_plans").insert({
       user_id: auth.data.user.id,
@@ -483,12 +489,26 @@ const StudyPlannerPage: React.FC = () => {
             <p className="text-xs text-muted-foreground">Today: {completedToday}/{todayPlans.length} completed</p>
           </div>
           <div className="flex gap-1">
-            <Button size="sm" variant="secondary" onClick={() => setShowAdd(true)}>
+            <Button size="sm" variant="secondary" disabled={!subjects.length} onClick={() => setShowAdd(true)}>
               <Plus className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
+
+      {!subjects.length && (
+        <div className="mx-auto max-w-4xl px-4 pt-4">
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold">Set up your study subjects first</p>
+                <p className="mt-1 text-sm text-muted-foreground">The planner only recommends work based on your saved subjects and recorded practice. It won't invent a subject list.</p>
+              </div>
+              <Button onClick={() => navigate("/academic/setup")}>Choose subjects</Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* AI Generate Button */}
       <div className="px-4 py-4 max-w-4xl mx-auto">
@@ -497,7 +517,7 @@ const StudyPlannerPage: React.FC = () => {
         <Button
           className={upperStudent ? "h-12" : "h-12 bg-gradient-to-r from-primary to-accent text-white hover:from-primary hover:to-accent"}
           onClick={generateAIPlan}
-          disabled={isGenerating}
+          disabled={isGenerating || !subjects.length}
         >
           {isGenerating ? (
             <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Analyzing your weak areas...</>
