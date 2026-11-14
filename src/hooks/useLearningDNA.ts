@@ -21,12 +21,14 @@ export interface LearningData {
 
 export function useLearningDNA(userId?: string) {
   const [learningData, setLearningData] = useState<LearningData | null>(null);
+  const [attemptCount, setAttemptCount] = useState(0);
   const [isLoading, setIsLoading] = useState(Boolean(userId));
   const [error, setError] = useState<Error | null>(null);
 
   const loadLearningDNA = useCallback(async () => {
     if (!userId) {
       setLearningData(null);
+      setAttemptCount(0);
       setIsLoading(false);
       return;
     }
@@ -34,7 +36,7 @@ export function useLearningDNA(userId?: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const [{ data, error: queryError }, { count: attemptCount, error: attemptsError }] = await Promise.all([
+      const [{ data, error: queryError }, { count, error: attemptsError }] = await Promise.all([
         supabase
           .from("learning_dna")
           .select("*")
@@ -49,6 +51,12 @@ export function useLearningDNA(userId?: string) {
       if (queryError && queryError.code !== "PGRST116") {
         throw new Error(queryError.message);
       }
+      if (attemptsError) {
+        throw new Error(attemptsError.message);
+      }
+
+      const recordedAttempts = count ?? 0;
+      setAttemptCount(recordedAttempts);
 
       if (data) {
         setLearningData({
@@ -57,16 +65,16 @@ export function useLearningDNA(userId?: string) {
           weaknesses: (data.weaknesses as string[]) || [],
           learningStyle: data.learning_style || "balanced",
           predictedPath: data.predicted_path as LearningData["predictedPath"],
-          totalAttempts: attemptsError ? 0 : (attemptCount ?? 0),
+          totalAttempts: recordedAttempts,
         });
       } else {
         setLearningData(null);
       }
-      if (attemptsError) console.warn("Learning DNA attempt count unavailable", attemptsError);
     } catch (loadError) {
       console.error("Learning DNA load failed", loadError);
       setError(loadError instanceof Error ? loadError : new Error("Unable to load Learning DNA."));
       setLearningData(null);
+      setAttemptCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -76,5 +84,5 @@ export function useLearningDNA(userId?: string) {
     void loadLearningDNA();
   }, [loadLearningDNA]);
 
-  return { learningData, isLoading, error, reload: loadLearningDNA, setLearningData };
+  return { learningData, attemptCount, isLoading, error, reload: loadLearningDNA, setLearningData };
 }
