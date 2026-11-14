@@ -679,9 +679,6 @@
   color: hsl(var(--foreground));
 }
 .mm-studio-upper .tier-upper :where(main, section, aside) { min-width: 0; }
-.mm-studio-upper .tier-upper :where([class*="bg-gradient-to-"]) {
-  background-image: none !important;
-}
 .mm-studio-upper .tier-upper :where([class*="rounded-3xl"][class*="border"], [data-slot="card"]) {
   border-color: hsl(var(--border));
   box-shadow: 0 1px 2px hsl(207 43% 16% / .035);
@@ -719,9 +716,6 @@
 .mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.border) {
   border-color: hsl(var(--border));
 }
-.mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.bg-gradient-to-r, .bg-gradient-to-br, .bg-gradient-to-b) {
-  background-image: none !important;
-}
 .mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.bg-card) {
   background-color: hsl(var(--card));
 }
@@ -755,9 +749,6 @@
 /* Consistent page surfaces inside the authenticated Grades 9–12 workspace. */
 .mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.border, [class*="border-"]) {
   border-color: hsl(var(--border));
-}
-.mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.bg-gradient-to-r, .bg-gradient-to-br, .bg-gradient-to-b) {
-  background-image: none !important;
 }
 .mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.bg-card) {
   background-color: hsl(var(--card));
@@ -795,9 +786,6 @@
 }
 
 /* Global Figma design system for every route inside the Grades 9–12 shell. */
-.mm-studio-upper :where([class*="bg-gradient-to-"]) {
-  background-image: none !important;
-}
 .mm-studio-upper :where([class*="border-border"]) {
   border-color: hsl(var(--border));
 }
