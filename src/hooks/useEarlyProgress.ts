@@ -1,4 +1,3 @@
-import { db } from "@/integrations/untypedClient";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
@@ -32,13 +31,38 @@ export function useEarlyProgress() {
 
     try {
       const { data, error: queryError } = await db
-        .from("early_activity_progress")
-        .select("activity_id,skill,attempts,correct_answers,completions,xp_earned,coins_earned,last_played_at")
+        .from("early_activity_attempts")
+        .select("activity_id,skill,correct,xp_earned,coins_earned,created_at")
         .eq("user_id", user.id)
-        .order("last_played_at", { ascending: false });
+        .not("question_id", "is", null)
+        .order("created_at", { ascending: false });
 
       if (queryError) throw queryError;
-      setRows((data ?? []) as EarlyProgressRow[]);
+
+      const grouped = new Map<string, EarlyProgressRow>();
+      for (const attempt of data ?? []) {
+        const existing = grouped.get(attempt.activity_id) ?? {
+          activity_id: attempt.activity_id,
+          skill: attempt.skill,
+          attempts: 0,
+          correct_answers: 0,
+          completions: 0,
+          xp_earned: 0,
+          coins_earned: 0,
+          last_played_at: attempt.created_at,
+        };
+        existing.attempts += 1;
+        existing.correct_answers += attempt.correct ? 1 : 0;
+        existing.xp_earned += Number(attempt.xp_earned ?? 0);
+        existing.coins_earned += Number(attempt.coins_earned ?? 0);
+        if (!existing.last_played_at || attempt.created_at > existing.last_played_at) {
+          existing.last_played_at = attempt.created_at;
+        }
+        grouped.set(attempt.activity_id, existing);
+      }
+      setRows([...grouped.values()].sort((a, b) =>
+        (b.last_played_at ?? "").localeCompare(a.last_played_at ?? "")
+      ));
     } catch (loadError) {
       console.error("Early progress load failed:", loadError);
       setError(loadError instanceof Error ? loadError.message : "Could not load learning progress.");
