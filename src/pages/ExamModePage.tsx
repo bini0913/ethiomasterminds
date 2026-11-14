@@ -15,7 +15,7 @@ import { getAcademicProfile, normalizeGrade, normalizeSubject, subjectsMatch } f
 type ExamState = "setup" | "running" | "results";
 type SourceQuiz = { id: string; title: string; description?: string; subject: string; grade: number; difficulty?: string; time_limit?: number | null; exam_type?: string; source_kind?: "past_paper" | "topic_practice" | "generated_practice" | "teacher_authored"; source_name?: string | null; source_year?: number | null; source_url?: string | null; source_verification_status?: "unverified" | "needs_review" | "verified" | "permission_confirmed"; questionCount: number };
 type EntrancePaperReference = { id: string; subject: string; ethiopian_year: number; gregorian_year: number; source_name: string; source_url: string; source_status: string; notes?: string };
-type ExamQuestion = { id: string; quiz_id?: string; subject?: string; sourceKind: "past_paper" | "topic_practice"; sourceTitle: string; question_text: string; options: string[]; correct_answer: string; explanation?: string; topic?: string };
+type ExamQuestion = { id: string; quiz_id?: string; subject?: string; sourceKind: "past_paper" | "topic_practice"; sourceTitle: string; question_text: string; options: string[]; correct_answer: string; correct_answer_raw?: string; explanation?: string; topic?: string };
 function goalRelevance(quiz: SourceQuiz, goal: string): number {
   const text = `${quiz.title} ${quiz.description || ""} ${quiz.difficulty || ""} ${(quiz.exam_type || "general").replace(/[_-]+/g, " ")}`.toLowerCase();
   const target = goal.toLowerCase().replace(/[_-]+/g, " ");
@@ -217,25 +217,69 @@ const ExamModePage: React.FC = () => {
     setResults({ correct, total: questions.length, elapsedSeconds, details });
     setExamState("results");
     if (user?.id && selectedQuiz?.id) {
-      const { error } = await supabase.from("quiz_results").insert({
-        quiz_id: selectedQuiz.id,
-        student_id: user.id,
-        exam_type: examTypeFilter === "mixed" ? "mixed_practice" : selectedQuiz.exam_type || "general",
-        subject: subject === "all_selected" ? "mixed" : selectedQuiz.subject,
-        score: Math.round((correct / questions.length) * 100),
-        total_questions: questions.length,
-        correct_answers: correct,
-        time_taken: elapsedSeconds,
-        xp_earned: correct * 5,
-      });
-      if (error) {
-        console.error("Could not save exam result:", error);
-        toast.error("Your result is shown, but couldn't be saved to your progress. Please try again later.");
-      } else {
-        // Feed the same topic_progress data used by Topic Coverage, the Study Planner,
-        // and Academic Insights so exam practice improves future recommendations.
+      // Exam Mode can mix questions from several approved quizzes. Persist each
+      // source quiz separately through the same server-authoritative, idempotent
+      // submission and reward RPCs used by the standard quiz flow.
+      const grouped = new Map<string, typeof details>();
+      for (const item of details) {
+        if (!item.q.quiz_id) continue;
+        const group = grouped.get(item.q.quiz_id) || [];
+        group.push(item);
+        grouped.set(item.q.quiz_id, group);
+      }
+
+      let savedGroups = 0;
+      let rewardTotal = 0;
+      let rewardFailures = 0;
+      const persistedDetails: typeof details = [];
+
+      for (const [quizId, quizDetails] of grouped) {
+        const submissionId = crypto.randomUUID();
+        const secureAnswers: Record<string, string> = {};
+        for (const item of quizDetails) {
+          const selectedIndex = item.q.options.indexOf(item.answer);
+          if (selectedIndex < 0) continue;
+          const rawKey = String(item.q.correct_answer_raw || "").trim();
+          const expectsLetter = /^(?:OPTION\\s*)?[A-D](?:[.)])?$/i.test(rawKey);
+          const expectsIndex = /^\\d+$/.test(rawKey);
+          secureAnswers[item.q.id] = expectsLetter
+            ? String.fromCharCode(65 + selectedIndex)
+            : expectsIndex
+              ? String(selectedIndex)
+              : item.answer;
+        }
+
+        try {
+          const { error: submitError } = await (supabase as any).rpc("submit_quiz_result_secure", {
+            p_quiz_id: quizId,
+            p_answers: secureAnswers,
+            p_time_taken: elapsedSeconds,
+            p_submission_id: submissionId,
+          });
+          if (submitError) throw submitError;
+          savedGroups += 1;
+          persistedDetails.push(...quizDetails);
+
+          try {
+            const { data: rewardData, error: rewardError } = await (supabase as any).rpc("claim_quiz_reward", {
+              p_submission_id: submissionId,
+            });
+            if (rewardError) throw rewardError;
+            rewardTotal += Number(rewardData?.xp_awarded ?? 0);
+          } catch (rewardError) {
+            rewardFailures += 1;
+            console.error("Exam reward claim failed:", rewardError);
+          }
+        } catch (saveError) {
+          console.error("Could not securely save an exam source group:", quizId, saveError);
+        }
+      }
+
+      if (savedGroups > 0) {
+        // Keep topic coverage based only on questions whose authoritative
+        // submission was accepted by the database.
         const byTopic = new Map<string, { attempted: number; correct: number }>();
-        details.forEach(({ q, correct: isCorrect }) => {
+        persistedDetails.forEach(({ q, correct: isCorrect }) => {
           const topic = (q.topic || "General").trim() || "General";
           const key = `${q.subject || selectedQuiz.subject}::${topic.toLocaleLowerCase()}`;
           const current = byTopic.get(key) || { attempted: 0, correct: 0 };
@@ -245,7 +289,7 @@ const ExamModePage: React.FC = () => {
         });
 
         for (const [topicKey, counts] of byTopic) {
-          const matchedQuestion = details.find(({ q }) => `${q.subject || selectedQuiz.subject}::${(q.topic || "General").trim().toLocaleLowerCase()}` === topicKey)?.q;
+          const matchedQuestion = persistedDetails.find(({ q }) => `${q.subject || selectedQuiz.subject}::${(q.topic || "General").trim().toLocaleLowerCase()}` === topicKey)?.q;
           const topic = matchedQuestion?.topic?.trim() || "General";
           const progressSubject = matchedQuestion?.subject || selectedQuiz.subject;
           const { data: existing, error: lookupError } = await supabase
@@ -279,13 +323,17 @@ const ExamModePage: React.FC = () => {
           if (progressError) console.error("Could not save topic progress for exam result:", progressError);
         }
 
-        if (correct > 0) {
-          const { error: xpError } = await supabase.rpc("add_xp", { p_user_id: user.id, p_amount: correct * 5 });
-          if (xpError) console.error("Exam XP award failed:", xpError);
-        }
         await refreshProfile?.();
-        toast.success("Exam result saved. Topic mastery is being updated for your study recommendations.");
+        if (savedGroups === grouped.size && rewardFailures === 0) {
+          toast.success(`Exam result saved · ${rewardTotal} XP awarded`);
+        } else {
+          toast.warning(`Your result was saved for ${savedGroups} of ${grouped.size} quiz sources. Check your connection before retrying.`);
+        }
+      } else {
+        toast.error("Your result is shown, but could not be securely saved. Your progress and XP were not changed.");
       }
+    } else {
+      toast.error("Your result is shown, but it has no valid account or quiz source to save against.");
     }
     setIsSaving(false);
   }, [examState, questions, answers, user?.id, selectedQuiz?.id, refreshProfile]);
@@ -366,6 +414,7 @@ const ExamModePage: React.FC = () => {
           question_text: String(row.question_text || ""),
           options,
           correct_answer: answerText(row.correct_answer, options),
+          correct_answer_raw: String(row.correct_answer ?? ""),
           explanation: row.explanation || undefined,
           topic: row.topic || undefined,
         };
