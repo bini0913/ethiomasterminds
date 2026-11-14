@@ -217,9 +217,9 @@ const ExamModePage: React.FC = () => {
     setResults({ correct, total: questions.length, elapsedSeconds, details, xpAwarded: null, persistenceStatus: "pending" });
     setExamState("results");
     if (user?.id && selectedQuiz?.id) {
-      // Exam Mode can mix questions from several approved quizzes. Persist each
-      // source quiz separately through the same server-authoritative, idempotent
-      // submission and reward RPCs used by the standard quiz flow.
+      // Each source quiz is submitted separately, with the exact question subset
+      // presented in this exam. The database grades it, saves mastery evidence,
+      // and awards XP only through the protected reward-claim RPC.
       const grouped = new Map<string, typeof details>();
       for (const item of details) {
         if (!item.q.quiz_id) continue;
@@ -231,7 +231,6 @@ const ExamModePage: React.FC = () => {
       let savedGroups = 0;
       let rewardTotal = 0;
       let rewardFailures = 0;
-      const persistedDetails: typeof details = [];
 
       for (const [quizId, quizDetails] of grouped) {
         const submissionId = crypto.randomUUID();
@@ -250,15 +249,17 @@ const ExamModePage: React.FC = () => {
         }
 
         try {
-          const { error: submitError } = await (supabase as any).rpc("submit_quiz_result_secure", {
+          const { error: submitError } = await (supabase as any).rpc("submit_exam_result_secure", {
             p_quiz_id: quizId,
+            p_question_ids: quizDetails.map(({ q }) => q.id),
             p_answers: secureAnswers,
             p_time_taken: elapsedSeconds,
             p_submission_id: submissionId,
+            p_exam_type: examTypeFilter === "mixed" ? "mixed_practice" : examTypeFilter,
+            p_subject: quizDetails[0]?.q.subject || selectedQuiz.subject,
           });
           if (submitError) throw submitError;
           savedGroups += 1;
-          persistedDetails.push(...quizDetails);
 
           try {
             const { data: rewardData, error: rewardError } = await (supabase as any).rpc("claim_quiz_reward", {
@@ -276,53 +277,6 @@ const ExamModePage: React.FC = () => {
       }
 
       if (savedGroups > 0) {
-        // Keep topic coverage based only on questions whose authoritative
-        // submission was accepted by the database.
-        const byTopic = new Map<string, { attempted: number; correct: number }>();
-        persistedDetails.forEach(({ q, correct: isCorrect }) => {
-          const topic = (q.topic || "General").trim() || "General";
-          const key = `${q.subject || selectedQuiz.subject}::${topic.toLocaleLowerCase()}`;
-          const current = byTopic.get(key) || { attempted: 0, correct: 0 };
-          current.attempted += 1;
-          if (isCorrect) current.correct += 1;
-          byTopic.set(key, current);
-        });
-
-        for (const [topicKey, counts] of byTopic) {
-          const matchedQuestion = persistedDetails.find(({ q }) => `${q.subject || selectedQuiz.subject}::${(q.topic || "General").trim().toLocaleLowerCase()}` === topicKey)?.q;
-          const topic = matchedQuestion?.topic?.trim() || "General";
-          const progressSubject = matchedQuestion?.subject || selectedQuiz.subject;
-          const { data: existing, error: lookupError } = await supabase
-            .from("topic_progress")
-            .select("id,questions_attempted,questions_correct")
-            .eq("user_id", user.id)
-            .eq("subject", progressSubject)
-            .ilike("topic", topic)
-            .maybeSingle();
-          if (lookupError) {
-            console.error("Could not load topic progress for exam result:", lookupError);
-            continue;
-          }
-
-          const previousAttempted = Number(existing?.questions_attempted || 0);
-          const previousCorrect = Number(existing?.questions_correct || 0);
-          const questionsAttempted = previousAttempted + counts.attempted;
-          const questionsCorrect = previousCorrect + counts.correct;
-          const progressUpdate = {
-            user_id: user.id,
-            subject: progressSubject,
-            topic,
-            questions_attempted: questionsAttempted,
-            questions_correct: questionsCorrect,
-            accuracy_percentage: questionsAttempted ? Math.round((questionsCorrect / questionsAttempted) * 100) : 0,
-            completion_percentage: Math.min(100, Math.round((questionsAttempted / 5) * 100)),
-          };
-          const { error: progressError } = existing
-            ? await supabase.from("topic_progress").update(progressUpdate).eq("id", existing.id)
-            : await supabase.from("topic_progress").insert(progressUpdate);
-          if (progressError) console.error("Could not save topic progress for exam result:", progressError);
-        }
-
         await refreshProfile?.();
         const persistenceStatus = savedGroups === grouped.size && rewardFailures === 0 ? "saved" : "partial";
         setResults((current) => current ? { ...current, xpAwarded: rewardTotal, persistenceStatus } : current);
