@@ -14,10 +14,14 @@ import { Label } from "@/components/ui/label";
 import { Check, Filter, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useQuiz } from "@/context/QuizContext";
+import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 
 const QuizFilter: React.FC = () => {
   const navigate = useNavigate();
   const { setQuizFilters } = useQuiz();
+  const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
 
   const [grade, setGrade] = useState<string>("");
   const [subject, setSubject] = useState<string>("");
@@ -26,7 +30,7 @@ const QuizFilter: React.FC = () => {
   const [questionType, setQuestionType] = useState<string>("");
 
   // Available options for filters
-  const grades = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+  const grades = upperStudent ? ["9", "10", "11", "12"] : ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
   const subjects = ["Mathematics", "Science", "English", "Social Studies", "General Knowledge"];
 
   const topics: {[key: string]: string[];} = {
@@ -62,25 +66,25 @@ const QuizFilter: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-primary px-4 py-3 shadow-md">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground" : "min-h-screen bg-gray-50"}>
+      <header className={upperStudent ? "border-b border-border bg-card px-4 py-3" : "bg-primary px-4 py-3 shadow-md"}>
         <div className="flex justify-between items-center">
           <div className="flex items-center">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate("/quiz")}
-              className="mr-2 text-white">
+              className={upperStudent ? "mr-2 text-muted-foreground" : "mr-2 text-white"}>
 
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-2xl font-bold text-white">Quiz Filters</h1>
+            <h1 className={upperStudent ? "text-2xl font-bold text-foreground" : "text-2xl font-bold text-white"}>Quiz Filters</h1>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={resetFilters}
-            className="bg-transparent border-white text-white hover:bg-white hover:text-primary">
+            className={upperStudent ? "border-border bg-card text-foreground hover:bg-muted" : "bg-transparent border-white text-white hover:bg-white hover:text-primary"}>
 
             Reset Filters
           </Button>
@@ -94,7 +98,7 @@ const QuizFilter: React.FC = () => {
           transition={{ duration: 0.5 }}>
 
           <Card className="shadow-md">
-            <CardHeader className="bg-gradient-to-r from-primary to-accent text-white">
+            <CardHeader className={upperStudent ? "border-b border-border bg-card text-foreground" : "bg-gradient-to-r from-primary to-accent text-white"}>
               <div className="flex items-center">
                 <Filter className="mr-2 h-5 w-5" />
                 <CardTitle>Customize Your Quiz</CardTitle>
@@ -180,7 +184,7 @@ const QuizFilter: React.FC = () => {
                 </div>
                 
                 <div className="pt-4 space-y-2">
-                  <h3 className="text-sm font-medium text-gray-500">Applied Filters:</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground">Applied Filters:</h3>
                   <div className="flex flex-wrap gap-2">
                     {grade &&
                     <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-300">
