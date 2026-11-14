@@ -12,6 +12,16 @@ import { ArrowLeft, Clock3, Target, Trophy, CheckCircle2, XCircle, BookOpen, Gra
 import { toast } from "sonner";
 import { getAcademicProfile, normalizeGrade, normalizeSubject, subjectsMatch } from "@/lib/academicProfile";
 
+const isSafeHttpUrl = (value: string | null | undefined) => {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
 type ExamState = "setup" | "running" | "results";
 type SourceQuiz = { id: string; title: string; description?: string; subject: string; grade: number; difficulty?: string; time_limit?: number | null; exam_type?: string; source_kind?: "past_paper" | "topic_practice" | "generated_practice" | "teacher_authored"; source_name?: string | null; source_year?: number | null; source_url?: string | null; source_verification_status?: "unverified" | "needs_review" | "verified" | "permission_confirmed"; questionCount: number };
 type EntrancePaperReference = { id: string; subject: string; ethiopian_year: number; gregorian_year: number; source_name: string; source_url: string; source_status: string; notes?: string };
@@ -99,7 +109,7 @@ const ExamModePage: React.FC = () => {
         const profile = await getAcademicProfile(user.id);
         if (cancelled) return;
         const activeGrade = normalizeGrade(profile?.grade ?? user.grade, 9);
-        const allowed = (profile?.subjects?.length ? profile.subjects : ["math", "science", "english", "history"]).map(normalizeSubject);
+        const allowed = (profile?.subjects?.length ? profile.subjects : []).map(normalizeSubject);
         setGrade(activeGrade);
         setProfileSubjects(allowed);
         setSubject("all_selected");
@@ -489,7 +499,7 @@ const ExamModePage: React.FC = () => {
                 {entrancePaperLoadState === "ready" && entrancePaperReferences.length === 0 && <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">No linked papers from 2013 onward are listed yet.</p>}
                 {entrancePaperReferences.length > 0 && <div className="mt-4 space-y-2">
                   {entrancePaperReferences.map((paper) => (
-                    <a key={paper.id} href={`https://webmail.temari.et/exam-prep/papers/grade-12-${paper.ethiopian_year}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <a key={paper.id} href={paper.source_url} target="_blank" rel="noopener noreferrer" aria-label={`Open source archive for ${paper.subject}, ${paper.ethiopian_year} E.C.`} className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       <span className="min-w-0">
                         <span className="block font-medium">{paper.subject}</span>
                         <span className="block text-xs text-muted-foreground">{paper.ethiopian_year} E.C. · {paper.gregorian_year} G.C. · {paper.source_name}</span>
