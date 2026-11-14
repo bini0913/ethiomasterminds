@@ -543,7 +543,7 @@ const UserProfilePage = () => {
 
   const wins = Number(statsJson.total_wins ?? profile?.wins ?? 0);
   const streak = Number(statsJson.current_streak ?? profile?.streak ?? 0);
-  const weeklyXp = Number.isFinite(Number(statsJson.weekly_xp)) ? Number(statsJson.weekly_xp) : null;
+  const weeklyXp = statsJson.weekly_xp !== null && statsJson.weekly_xp !== undefined && Number.isFinite(Number(statsJson.weekly_xp)) ? Number(statsJson.weekly_xp) : null;
 
   const collectionCatalog = useMemo(() => {
     const categorize = (section: string, name: string) => {
