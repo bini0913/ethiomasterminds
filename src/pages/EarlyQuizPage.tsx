@@ -66,20 +66,23 @@ const EarlyQuizPage: React.FC = () => {
     if (!subject || done || !current || profile.timerSeconds <= 0 || selected) return;
     setSecondsLeft(profile.timerSeconds);
     const id = window.setInterval(() => setSecondsLeft(v => {
-      if (v <= 1) { window.clearInterval(id); setSelected("__TIMEOUT__"); setStreak(0); return 0; }
+      if (v <= 1) { window.clearInterval(id); setSelected("__TIMEOUT__"); setStreak(0); void reward("quizAnswer", { questionId: current.id, answer: "__TIMEOUT__" }); return 0; }
       return v - 1;
     }), 1000);
     return () => window.clearInterval(id);
-  }, [index, subject, done, profile.timerSeconds, selected]);
+  }, [index, subject, done, profile.timerSeconds, selected, current?.id, reward]);
 
   const choose = (value: string) => {
     if (selected || !current) return;
     setSelected(value);
     const correct = value === current.answer;
     recordExposure(user?.id, "quiz", current.id, correct);
+    // Submit every answer. The server compares it with the private answer key
+    // and only awards XP/coins when the answer is correct.
+    void reward("quizAnswer", { questionId: current.id, answer: value });
+
     if (correct) {
       setScore((s) => s + 1); setStreak((s) => s + 1);
-      void reward("quizCorrect", { questionId: current.id, answer: value });
     } else setStreak(0);
   };
 
