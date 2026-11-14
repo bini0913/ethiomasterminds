@@ -212,6 +212,7 @@ const ExamModePage: React.FC = () => {
     if (examState !== "running" || submittedRef.current || !questions.length) return;
     submittedRef.current = true;
     setIsSaving(true);
+    try {
     const details = questions.map((q, index) => ({
       q,
       answer: answers[index] || "",
@@ -298,8 +299,14 @@ const ExamModePage: React.FC = () => {
       setResults((current) => current ? { ...current, xpAwarded: 0, persistenceStatus: "failed" } : current);
       toast.error("Your result is shown, but it has no valid account or quiz source to save against.");
     }
-    setIsSaving(false);
-  }, [examState, questions, answers, user?.id, selectedQuiz?.id, refreshProfile]);
+    } catch (error) {
+      console.error("Unexpected Exam Mode submission error:", error);
+      setResults((current) => current ? { ...current, xpAwarded: 0, persistenceStatus: "failed" } : current);
+      toast.error("Your result is visible, but saving it failed. Please check your connection.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [examState, questions, answers, user?.id, selectedQuiz?.id, selectedQuiz?.subject, examTypeFilter, refreshProfile]);
   submitExamRef.current = () => { void submitExam(); };
 
   useEffect(() => {
