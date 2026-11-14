@@ -144,7 +144,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   if (location.pathname === "/finance" || location.pathname.startsWith("/finance/")) return <>{children}</>;
 
   if (!isAuthenticated || !user) return <>{children}</>;
-  if (getUserTier(user.grade) === "upper") return <UpperTierStudioShell>{children}</UpperTierStudioShell>;
+  if (user.role === "student" && getUserTier(user.grade) === "upper") return <UpperTierStudioShell>{children}</UpperTierStudioShell>;
 
   const isHome = location.pathname === "/";
   const isUpperStudent = getUserTier(user?.grade) === "upper";
