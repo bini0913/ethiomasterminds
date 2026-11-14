@@ -96,7 +96,7 @@ const DailyChallenge: React.FC = () => {
       setAlreadyCompleted(true);
       setWasCorrect(data.was_correct === true);
       setXpAwarded(Number(data.xp_awarded ?? 0));
-      toast.info("You have already completed today\u0027s challenge.");
+      toast.info("You have already completed today's challenge.");
       return;
     }
 
@@ -148,7 +148,7 @@ const DailyChallenge: React.FC = () => {
       <CardContent className="space-y-3 pt-4">
         {alreadyCompleted ? (
           <div className="rounded-lg border p-4 text-center">
-            <p className="font-semibold">You have completed today\u0027s challenge.</p>
+            <p className="font-semibold">You have completed today's challenge.</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {wasCorrect ? `You earned ${xpAwarded} XP. Great work!` : "Come back tomorrow for a new challenge."}
             </p>
@@ -187,7 +187,7 @@ const DailyChallenge: React.FC = () => {
           <div className="w-full text-sm text-muted-foreground">
             {isAnswered
               ? (wasCorrect ? `Correct! +${xpAwarded} XP earned.` : `The correct answer was: ${correctAnswer ?? "not available"}`)
-              : "Submit your answer to complete today\u0027s challenge."}
+              : "Submit your answer to complete today's challenge."}
           </div>
         </CardFooter>
       )}
