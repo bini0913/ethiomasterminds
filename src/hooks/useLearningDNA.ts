@@ -76,6 +76,7 @@ export interface LearningData {
     sources: Record<string, boolean>;
     records: Record<string, number>;
     sampleLimits: string[];
+    excludedSources: string[];
     window: string;
   } | null;
   totalAttempts: number;
