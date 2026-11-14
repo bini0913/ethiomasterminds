@@ -83,7 +83,7 @@ begin
 
   select count(distinct selected_id)::integer
     into v_distinct_questions
-  from unnest(p_question_ids) selected_id;
+  from unnest(p_question_ids) as ids(selected_id);
   if v_distinct_questions <> cardinality(p_question_ids) then
     raise exception 'Duplicate question identifiers are not allowed';
   end if;
