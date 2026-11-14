@@ -24,7 +24,7 @@ const ProfileSetup: React.FC<ProfileSetupProps> = ({ onComplete }) => {
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error: gradeError } = await supabase.rpc("set_initial_student_grade", { p_grade: grade });
+    const { error: gradeError } = await (supabase as any).rpc("set_initial_student_grade", { p_grade: grade });
     if (gradeError) {
       console.error("Could not save initial student grade:", gradeError);
       toast.error(gradeError.message || "Could not save your grade. Please contact school staff if it is already set.");
