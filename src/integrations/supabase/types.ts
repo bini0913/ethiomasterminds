@@ -764,7 +764,10 @@ export type Database = {
       }
       learning_dna: {
         Row: {
+          activity_summary: Json
+          ai_insights: Json
           created_at: string
+          data_coverage: Json
           id: string
           last_analyzed_at: string | null
           learning_style: string | null
@@ -776,7 +779,10 @@ export type Database = {
           weaknesses: Json | null
         }
         Insert: {
+          activity_summary?: Json
+          ai_insights?: Json
           created_at?: string
+          data_coverage?: Json
           id?: string
           last_analyzed_at?: string | null
           learning_style?: string | null
@@ -788,7 +794,10 @@ export type Database = {
           weaknesses?: Json | null
         }
         Update: {
+          activity_summary?: Json
+          ai_insights?: Json
           created_at?: string
+          data_coverage?: Json
           id?: string
           last_analyzed_at?: string | null
           learning_style?: string | null
