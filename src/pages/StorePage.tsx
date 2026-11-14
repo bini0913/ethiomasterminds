@@ -6,7 +6,7 @@ import { getUserTier } from '@/lib/getUserTier';
 import { useFriends } from '@/context/FriendsContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Home, Store, Coins, Gem, Gift, Sparkles, ArrowLeftRight, Wallet, Send, ShieldCheck, Flame, Zap } from 'lucide-react';
+import { Home, Store, Coins, Gem, Gift, ArrowLeftRight, Wallet, Send, ShieldCheck, Flame, Zap } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import AvatarStore from '@/components/store/AvatarStore';
