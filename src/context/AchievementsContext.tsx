@@ -141,65 +141,36 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
     setUnlockedBadges(prev => [...prev, newBadge]);
   };
 
-  const updateAchievementProgress = async (requirementType: string, increment: number = 1) => {
+  const updateAchievementProgress = async (requirementType: string, _increment: number = 1) => {
     if (!user?.id) return;
 
+    const supportedTypes = new Set(['quizzes_completed', 'perfect_scores', 'friends_added']);
+    if (!supportedTypes.has(requirementType)) {
+      console.warn('Achievement progress is not supported without a trusted server activity source:', requirementType);
+      return;
+    }
+
     try {
-      // Find achievements matching this requirement type
-      const matchingAchievements = badges.filter(b => b.requirement_type === requirementType);
+      const previouslyCompleted = new Set(achievements.filter((item) => item.completed).map((item) => item.id));
+      const { error } = await (supabase as any).rpc('sync_student_achievement_progress', {
+        p_requirement_type: requirementType,
+      });
+      if (error) throw error;
 
-      for (const achievement of matchingAchievements) {
-        // Check if already completed
-        const existingAchievement = achievements.find(a => a.id === achievement.id);
-        if (existingAchievement?.completed) continue;
-
-        const currentProgress = existingAchievement?.condition.current || 0;
-        const newProgress = currentProgress + increment;
-        const isCompleted = newProgress >= achievement.requirement_value;
-
-        // Check if user already has this achievement tracked
-        const { data: existing } = await supabase
-          .from('user_achievements')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('achievement_id', achievement.id)
-          .single();
-
-        if (existing) {
-          // Update existing progress
-          await supabase
-            .from('user_achievements')
-            .update({ 
-              progress: newProgress,
-              completed: isCompleted,
-              unlocked_at: isCompleted ? new Date().toISOString() : null
-            })
-            .eq('id', existing.id);
-        } else {
-          // Create new progress record
-          await supabase
-            .from('user_achievements')
-            .insert({
-              user_id: user.id,
-              achievement_id: achievement.id,
-              progress: newProgress,
-              completed: isCompleted,
-              unlocked_at: isCompleted ? new Date().toISOString() : null
-            });
-        }
-
-        // Show notification if just completed
-        if (isCompleted && !existingAchievement?.completed) {
-          toast.success(`🏆 Achievement Unlocked: ${achievement.name}!`, {
-            description: `+${achievement.reward_xp} XP, +${achievement.reward_coins} Coins`
-          });
-        }
-      }
-
-      // Refresh achievements after update
       await fetchAchievements();
+      const newlyCompleted = badges.filter((badge) => {
+        const current = achievements.find((item) => item.id === badge.id);
+        return badge.requirement_type === requirementType && !previouslyCompleted.has(badge.id)
+          && current?.condition.current !== undefined
+          && current.condition.current >= badge.requirement_value;
+      });
+      for (const badge of newlyCompleted) {
+        toast.success(`🏆 Achievement Unlocked: ${badge.name}!`, {
+          description: `+${badge.reward_xp} XP, +${badge.reward_coins} Coins`,
+        });
+      }
     } catch (err) {
-      console.error('Error updating achievement progress:', err);
+      console.error('Error syncing achievement progress:', err);
     }
   };
 
