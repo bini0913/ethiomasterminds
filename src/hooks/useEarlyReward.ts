@@ -35,7 +35,11 @@ export function useEarlyReward() {
       const attemptId = options.attemptId ?? (
         typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
           ? crypto.randomUUID()
-          : `early-${Date.now()}-${Math.random().toString(36).slice(2)}`
+          : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+              const random = Math.floor(Math.random() * 16);
+              const value = character === "x" ? random : (random & 0x3) | 0x8;
+              return value.toString(16);
+            })
       );
 
       const { data, error } = await (supabase as any).rpc("submit_early_quiz_answer", {
