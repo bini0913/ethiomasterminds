@@ -320,6 +320,10 @@ const StudyPlannerPage: React.FC = () => {
   };
   const generateAIPlan = async () => {
     if (!user) return;
+    if (!subjects.length) {
+      toast.error("Choose your study subjects in Academic Prep before generating a plan.");
+      return;
+    }
     setIsGenerating(true);
 
     try {
@@ -372,9 +376,10 @@ const StudyPlannerPage: React.FC = () => {
           priority: s.priority || "medium",
           notes: s.notes || "AI recommended",
         }));
-        await supabase.from("study_plans").insert(inserts);
-        toast.success(`✨ AI generated ${inserts.length} study tasks!`);
-        fetchPlans();
+        const { error: insertError } = await supabase.from("study_plans").insert(inserts);
+        if (insertError) throw insertError;
+        toast.success(`AI generated ${inserts.length} study tasks from your saved study profile.`);
+        await fetchPlans();
       }
     } catch (e) {
       console.error("AI planner error:", e);
@@ -390,42 +395,32 @@ const StudyPlannerPage: React.FC = () => {
     }
   };
 
-  const generateFallbackPlan = (weakTopics: any[], analytics: any[]) => {
-    const plans: Array<{ subject: string; topic: string; priority: string; day_offset: number; notes: string }> = [];
-    const today = new Date();
-
-    // Identify weak subjects
-    const subjectAccuracy: Record<string, number> = {};
-    analytics.forEach(a => { subjectAccuracy[a.subject] = a.accuracy || 0; });
-
-    // Add weak topics first
-    weakTopics.slice(0, 5).forEach((t, i) => {
-      plans.push({
-        subject: t.subject,
-        topic: `Review: ${t.topic} (${Math.round(t.accuracy_percentage)}% accuracy)`,
-        priority: t.accuracy_percentage < 40 ? "high" : "medium",
-        day_offset: i,
-        notes: "Focus on understanding core concepts",
-      });
-    });
-
-    // Fill remaining days with subject rotation
-    const allSubjects = subjects.length ? subjects : ["math", "science", "english", "history"];
-    for (let i = plans.length; i < 7; i++) {
-      const subj = allSubjects[i % allSubjects.length];
-      plans.push({
-        subject: subj,
-        topic: `Practice ${subj} problems`,
-        priority: (subjectAccuracy[subj] || 50) < 60 ? "high" : "low",
-        day_offset: i,
-        notes: "Daily practice session",
-      });
-    }
-
-    return plans;
+  const generateFallbackPlan = (weakTopics: any[], _analytics: any[]) => {
+    // Fallback recommendations must be grounded in topics the learner has
+    // actually attempted. Never invent generic subjects or placeholder tasks.
+    return weakTopics
+      .filter((topic) =>
+        topic &&
+        typeof topic.subject === "string" &&
+        typeof topic.topic === "string" &&
+        Number.isFinite(Number(topic.accuracy_percentage)) &&
+        subjects.some((subject) => normalizeSubject(subject) === normalizeSubject(topic.subject))
+      )
+      .slice(0, 7)
+      .map((topic, index) => ({
+        subject: topic.subject,
+        topic: `Review: ${topic.topic} (${Math.round(Number(topic.accuracy_percentage))}% accuracy)`,
+        priority: Number(topic.accuracy_percentage) < 40 ? "high" : "medium",
+        day_offset: index,
+        notes: "Recommended from your recorded topic practice.",
+      }));
   };
 
   const insertPlans = async (generatedPlans: Array<{ subject: string; topic: string; priority: string; day_offset: number; notes: string }>) => {
+    if (!generatedPlans.length) {
+      toast.info("There are no recorded weak topics to recommend yet. Complete some practice first.");
+      return;
+    }
     const auth = await supabase.auth.getUser();
     if (!auth.data.user?.id) return;
     const today = new Date();
