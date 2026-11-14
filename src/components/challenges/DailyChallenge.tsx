@@ -1,136 +1,196 @@
-
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
-import { useQuiz, Question } from "@/context/QuizContext";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+type DailyQuestion = {
+  id: string;
+  text: string;
+  options: string[];
+};
 
 const DailyChallenge: React.FC = () => {
+  const { user, refreshProfile } = useUser();
+  const [question, setQuestion] = useState<DailyQuestion | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const { addXP } = useUser();
-  
-  // Get a random question for the daily challenge
-  const { quizzes, loading } = useQuiz();
-  const allQuestions: Question[] = quizzes.flatMap(quiz => quiz.questions);
-  
-  // Use a fixed seed for the day to ensure all users get the same daily question
-  const today = new Date();
-  const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-  const dailyQuestion = allQuestions.length > 0 ? allQuestions[seed % allQuestions.length] : null;
-  
-  const handleOptionSelect = (option: string) => {
-    if (isAnswered || !dailyQuestion) return;
-    
-    setIsLoading(true);
-    setSelectedOption(option);
-    
-    // Simulate loading/checking
-    setTimeout(() => {
-      setIsAnswered(true);
-      setIsLoading(false);
-      
-      if (option === dailyQuestion.correctAnswer) {
-        addXP(15); // Award XP for completing daily challenge
-        toast.success("Correct! +15 XP awarded!");
-      } else {
-        toast.error("Incorrect answer. Try again tomorrow!");
+  const [alreadyCompleted, setAlreadyCompleted] = useState(false);
+  const [wasCorrect, setWasCorrect] = useState(false);
+  const [xpAwarded, setXpAwarded] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadChallenge = async () => {
+      if (!user?.id) {
+        setQuestion(null);
+        setIsLoading(false);
+        return;
       }
-    }, 1000);
+
+      setIsLoading(true);
+      const { data, error } = await (supabase as any).rpc("get_daily_challenge_question");
+      if (!active) return;
+
+      if (error) {
+        console.error("Daily challenge load failed:", error);
+        setQuestion(null);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!data?.available || !data?.question_id) {
+        setQuestion(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setQuestion({
+        id: data.question_id,
+        text: data.question_text,
+        options: Array.isArray(data.options) ? data.options : [],
+      });
+      if (data.already_completed) {
+        setAlreadyCompleted(true);
+        setWasCorrect(data.was_correct === true);
+        setXpAwarded(Number(data.xp_awarded ?? 0));
+        setIsAnswered(true);
+      } else {
+        setAlreadyCompleted(false);
+        setWasCorrect(false);
+        setXpAwarded(0);
+        setIsAnswered(false);
+      }
+      setIsLoading(false);
+    };
+
+    void loadChallenge();
+    return () => { active = false; };
+  }, [user?.id]);
+
+  const handleOptionSelect = async (option: string) => {
+    if (isAnswered || isSubmitting || !question) return;
+
+    setIsSubmitting(true);
+    setSelectedOption(option);
+    const { data, error } = await (supabase as any).rpc("submit_daily_challenge_answer", {
+      p_question_id: question.id,
+      p_answer: option,
+    });
+    setIsSubmitting(false);
+
+    if (error) {
+      console.error("Daily challenge submission failed:", error);
+      setSelectedOption(null);
+      toast.error("Your answer could not be submitted. Please try again.");
+      return;
+    }
+
+    setIsAnswered(true);
+    if (data?.already_submitted) {
+      setAlreadyCompleted(true);
+      setWasCorrect(data.was_correct === true);
+      setXpAwarded(Number(data.xp_awarded ?? 0));
+      toast.info("You have already completed today\u0027s challenge.");
+      return;
+    }
+
+    setAlreadyCompleted(false);
+    setWasCorrect(data?.correct === true);
+    setCorrectAnswer(typeof data?.correct_answer === "string" ? data.correct_answer : null);
+    setXpAwarded(Number(data?.xp_awarded ?? 0));
+
+    if (data?.success && data?.correct) {
+      toast.success(`Correct! +${Number(data.xp_awarded ?? 0)} XP awarded!`);
+      await refreshProfile();
+    } else if (data?.success) {
+      toast.error("Not quite. Review the answer and come back tomorrow.");
+    } else {
+      toast.error("The daily challenge could not be completed.");
+    }
   };
 
-  // Show loading state
-  if (loading) {
+  if (isLoading) {
     return (
       <Card className="shadow-md">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-accent text-white">
-          <CardTitle className="flex items-center justify-between">
-            <span>Daily Challenge</span>
-            <div className="text-sm bg-white text-blue-600 px-2 py-1 rounded-full">
-              +15 XP
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4 flex items-center justify-center py-8">
+        <CardHeader><CardTitle>Daily Challenge</CardTitle></CardHeader>
+        <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </CardContent>
       </Card>
     );
   }
 
-  // Show empty state if no questions available
-  if (!dailyQuestion) {
+  if (!question) {
     return (
       <Card className="shadow-md">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-accent text-white">
-          <CardTitle className="flex items-center justify-between">
-            <span>Daily Challenge</span>
-            <div className="text-sm bg-white text-blue-600 px-2 py-1 rounded-full">
-              +15 XP
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <p className="text-muted-foreground text-center py-4">
-            No challenges available yet. Check back later!
-          </p>
+        <CardHeader><CardTitle>Daily Challenge</CardTitle></CardHeader>
+        <CardContent>
+          <p className="py-4 text-center text-muted-foreground">No approved challenge is available right now. Check back later.</p>
         </CardContent>
       </Card>
     );
   }
-  
+
   return (
     <Card className="shadow-md">
       <CardHeader className="bg-gradient-to-r from-blue-500 to-accent text-white">
         <CardTitle className="flex items-center justify-between">
           <span>Daily Challenge</span>
-          <div className="text-sm bg-white text-blue-600 px-2 py-1 rounded-full">
-            +15 XP
-          </div>
+          <span className="rounded-full bg-white px-2 py-1 text-sm text-blue-600">+15 XP</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-4">
-        <p className="font-medium mb-4">{dailyQuestion.text}</p>
-        <div className="space-y-2">
-          {dailyQuestion.options.map((option) => (
-            <div
-              key={option}
-              onClick={() => handleOptionSelect(option)}
-              className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                isLoading && selectedOption === option
-                  ? "border-blue-300 bg-blue-50 animate-pulse"
-                  : isAnswered && option === dailyQuestion.correctAnswer
-                  ? "border-green-500 bg-green-50"
-                  : isAnswered && option === selectedOption
-                  ? "border-red-500 bg-red-50"
-                  : selectedOption === option
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200 hover:border-blue-300"
-              }`}
-            >
-              {option}
+      <CardContent className="space-y-3 pt-4">
+        {alreadyCompleted ? (
+          <div className="rounded-lg border p-4 text-center">
+            <p className="font-semibold">You have completed today\u0027s challenge.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {wasCorrect ? `You earned ${xpAwarded} XP. Great work!` : "Come back tomorrow for a new challenge."}
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="mb-4 font-medium">{question.text}</p>
+            <div className="space-y-2">
+              {question.options.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  disabled={isAnswered || isSubmitting}
+                  onClick={() => void handleOptionSelect(option)}
+                  className={`w-full rounded-lg border-2 p-3 text-left transition-all disabled:cursor-default ${
+                    isSubmitting && selectedOption === option
+                      ? "border-blue-300 bg-blue-50 animate-pulse"
+                      : isAnswered && option === correctAnswer
+                      ? "border-green-500 bg-green-50"
+                      : isAnswered && option === selectedOption
+                      ? "border-red-500 bg-red-50"
+                      : selectedOption === option
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-blue-300"
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </CardContent>
-      <CardFooter className="border-t pt-3">
-        <div className="text-sm text-gray-500 w-full">
-          {isAnswered ? (
-            <div className="flex justify-between items-center">
-              <span>
-                {selectedOption === dailyQuestion.correctAnswer
-                  ? "Great job! Come back tomorrow for another challenge."
-                  : "The correct answer was: " + dailyQuestion.correctAnswer}
-              </span>
-            </div>
-          ) : (
-            <span>Complete this challenge to earn XP!</span>
-          )}
-        </div>
-      </CardFooter>
+      {!alreadyCompleted && (
+        <CardFooter className="border-t pt-3">
+          <div className="w-full text-sm text-muted-foreground">
+            {isAnswered
+              ? (wasCorrect ? `Correct! +${xpAwarded} XP earned.` : `The correct answer was: ${correctAnswer ?? "not available"}`)
+              : "Submit your answer to complete today\u0027s challenge."}
+          </div>
+        </CardFooter>
+      )}
     </Card>
   );
 };
