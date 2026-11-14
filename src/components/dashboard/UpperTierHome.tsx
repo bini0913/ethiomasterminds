@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2, Clock3, Flame, GraduationCap, LibraryBig, Play, Sparkles, Target, Timer, Trophy, Zap } from "lucide-react";
+import { Activity, ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2, Clock3, Flame, GraduationCap, LibraryBig, Play, Sparkles, Target, Timer, Trophy, Users, Zap } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -176,7 +176,7 @@ const UpperTierHome: React.FC = () => {
 
       <section className="grid gap-3 sm:grid-cols-2">
         <Link to="/multiplayer" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><UsersIcon /></span>
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Users className="h-5 w-5" /></span>
           <span className="min-w-0 flex-1"><strong className="block text-sm">Study and compete together</strong><span className="text-xs text-muted-foreground">Open the multiplayer arena and invite a friend.</span></span><ArrowRight className="h-4 w-4 text-primary" />
         </Link>
         <Link to="/learning-dna" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40">
@@ -188,8 +188,5 @@ const UpperTierHome: React.FC = () => {
   );
 };
 
-function UsersIcon() {
-  return <Trophy className="h-5 w-5" />;
-}
 
 export default UpperTierHome;
