@@ -7,9 +7,9 @@ select plan(28);
 -- Isolated fixtures; the test transaction rolls back all inserted rows.
 insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)
 values
-  ('a1000000-0000-4000-8000-000000000001', 'RLS public room', 'a2000000-0000-4000-8000-000000000001', 4, 'waiting'),
+  ('a1000000-0000-4000-8000-000000000001', 'RLS public room', 'a2000000-0000-4000-8000-000000000001', 4, 'waiting', false),
   ('a1000000-0000-4000-8000-000000000002', 'RLS private room', 'a2000000-0000-4000-8000-000000000002', 4, 'waiting', true),
-  ('a1000000-0000-4000-8000-000000000003', 'RLS second public room', 'a2000000-0000-4000-8000-000000000003', 4, 'waiting');
+  ('a1000000-0000-4000-8000-000000000003', 'RLS second public room', 'a2000000-0000-4000-8000-000000000003', 4, 'waiting', false);
 
 insert into public.multiplayer_room_secrets (room_id, password_hash)
 values (
@@ -97,7 +97,11 @@ select ok(not exists (
   where n.nspname = 'public'
     and (left(p.proname, 12) = 'multiplayer_' or p.proname = 'cleanup_expired_multiplayer_rooms')
     and p.prosecdef
-    and not coalesce(p.proconfig, array[]::text[]) @> array['search_path=pg_catalog, auth']
+    and not exists (
+      select 1
+      from unnest(coalesce(p.proconfig, array[]::text[])) as setting
+      where replace(setting, '"', '') = 'search_path=pg_catalog, auth'
+    )
 ), 'multiplayer SECURITY DEFINER RPCs use a fixed search path that resolves auth.uid safely');
 
 select * from finish();
