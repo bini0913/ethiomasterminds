@@ -78,7 +78,7 @@ const ExamModePage: React.FC = () => {
   const [isLoadingBank, setIsLoadingBank] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [results, setResults] = useState<{ correct: number; total: number; elapsedSeconds: number; details: Array<{ q: ExamQuestion; answer: string; correct: boolean }> } | null>(null);
+  const [results, setResults] = useState<{ correct: number; total: number; elapsedSeconds: number; details: Array<{ q: ExamQuestion; answer: string; correct: boolean }>; xpAwarded: number | null; persistenceStatus: "pending" | "saved" | "partial" | "failed" } | null>(null);
   const [profileSubjects, setProfileSubjects] = useState<string[]>([]);
   const [bankSubjects, setBankSubjects] = useState<string[]>([]);
   const [bankLoadError, setBankLoadError] = useState<string | null>(null);
@@ -214,7 +214,7 @@ const ExamModePage: React.FC = () => {
     }));
     const correct = details.filter((item) => item.correct).length;
     const elapsedSeconds = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
-    setResults({ correct, total: questions.length, elapsedSeconds, details });
+    setResults({ correct, total: questions.length, elapsedSeconds, details, xpAwarded: null, persistenceStatus: "pending" });
     setExamState("results");
     if (user?.id && selectedQuiz?.id) {
       // Exam Mode can mix questions from several approved quizzes. Persist each
@@ -240,8 +240,8 @@ const ExamModePage: React.FC = () => {
           const selectedIndex = item.q.options.indexOf(item.answer);
           if (selectedIndex < 0) continue;
           const rawKey = String(item.q.correct_answer_raw || "").trim();
-          const expectsLetter = /^(?:OPTION\\s*)?[A-D](?:[.)])?$/i.test(rawKey);
-          const expectsIndex = /^\\d+$/.test(rawKey);
+          const expectsLetter = /^(?:OPTION\s*)?[A-D](?:[.)])?$/i.test(rawKey);
+          const expectsIndex = /^\d+$/.test(rawKey);
           secureAnswers[item.q.id] = expectsLetter
             ? String.fromCharCode(65 + selectedIndex)
             : expectsIndex
@@ -324,15 +324,19 @@ const ExamModePage: React.FC = () => {
         }
 
         await refreshProfile?.();
-        if (savedGroups === grouped.size && rewardFailures === 0) {
+        const persistenceStatus = savedGroups === grouped.size && rewardFailures === 0 ? "saved" : "partial";
+        setResults((current) => current ? { ...current, xpAwarded: rewardTotal, persistenceStatus } : current);
+        if (persistenceStatus === "saved") {
           toast.success(`Exam result saved · ${rewardTotal} XP awarded`);
         } else {
-          toast.warning(`Your result was saved for ${savedGroups} of ${grouped.size} quiz sources. Check your connection before retrying.`);
+          toast.warning(`Your result was saved for ${savedGroups} of ${grouped.size} quiz sources. Some progress or rewards may need retrying.`);
         }
       } else {
+        setResults((current) => current ? { ...current, xpAwarded: 0, persistenceStatus: "failed" } : current);
         toast.error("Your result is shown, but could not be securely saved. Your progress and XP were not changed.");
       }
     } else {
+      setResults((current) => current ? { ...current, xpAwarded: 0, persistenceStatus: "failed" } : current);
       toast.error("Your result is shown, but it has no valid account or quiz source to save against.");
     }
     setIsSaving(false);
@@ -547,7 +551,7 @@ const ExamModePage: React.FC = () => {
       <div className="min-h-screen bg-muted/30">
         <Header title="Exam review" subtitle={selectedQuiz?.title || "Your completed practice"} />
         <main className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6 sm:py-10">
-          <Card className="overflow-hidden rounded-3xl"><div className="h-2 bg-primary" /><CardContent className="p-6 text-center sm:p-10"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Trophy className="h-8 w-8" /></div><p className="mt-4 text-sm font-semibold text-primary">Exam completed</p><h2 className="mt-1 text-5xl font-bold tracking-tight">{percent}%</h2><p className="mt-2 text-muted-foreground">{results.correct} correct out of {results.total} questions</p><div className="mx-auto mt-5 max-w-sm"><Progress value={percent} className="h-2.5" /></div>{upperStudent && <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Total score</p><p className="mt-1 text-xl font-bold">{percent}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Answer accuracy</p><p className="mt-1 text-xl font-bold">{results.details.filter(d => d.answer).length ? Math.round(results.correct / results.details.filter(d => d.answer).length * 100) : 0}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Time spent</p><p className="mt-1 text-xl font-bold">{Math.floor(results.elapsedSeconds / 60)}m {results.elapsedSeconds % 60}s</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">XP earned</p><p className="mt-1 text-xl font-bold">+{results.correct * 5}</p></div></div>}<div className="mt-5 flex flex-wrap justify-center gap-2"><Badge variant="secondary">{percent >= 80 ? "Strong result" : percent >= 60 ? "Good progress" : "Keep building confidence"}</Badge><Badge variant="outline">+{results.correct * 5} potential XP</Badge>{isSaving && <Badge variant="outline">Saving progress…</Badge>}</div><div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row"><Button onClick={resetExam}><RotateCcw className="mr-2 h-4 w-4" />Try another exam</Button><Button variant="outline" onClick={() => navigate("/academic/insights")}>View academic insights</Button></div></CardContent></Card>
+          <Card className="overflow-hidden rounded-3xl"><div className="h-2 bg-primary" /><CardContent className="p-6 text-center sm:p-10"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Trophy className="h-8 w-8" /></div><p className="mt-4 text-sm font-semibold text-primary">Exam completed</p><h2 className="mt-1 text-5xl font-bold tracking-tight">{percent}%</h2><p className="mt-2 text-muted-foreground">{results.correct} correct out of {results.total} questions</p><div className="mx-auto mt-5 max-w-sm"><Progress value={percent} className="h-2.5" /></div>{upperStudent && <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Total score</p><p className="mt-1 text-xl font-bold">{percent}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Answer accuracy</p><p className="mt-1 text-xl font-bold">{results.details.filter(d => d.answer).length ? Math.round(results.correct / results.details.filter(d => d.answer).length * 100) : 0}%</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Time spent</p><p className="mt-1 text-xl font-bold">{Math.floor(results.elapsedSeconds / 60)}m {results.elapsedSeconds % 60}s</p></div><div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">XP awarded</p><p className="mt-1 text-xl font-bold">{results.xpAwarded === null ? "—" : `+${results.xpAwarded}`}</p></div></div>}<div className="mt-5 flex flex-wrap justify-center gap-2"><Badge variant="secondary">{percent >= 80 ? "Strong result" : percent >= 60 ? "Good progress" : "Keep building confidence"}</Badge><Badge variant="outline">{isSaving ? "Saving progress…" : results.persistenceStatus === "saved" ? "Saved to progress" : results.persistenceStatus === "partial" ? "Partially saved" : results.persistenceStatus === "failed" ? "Not saved" : "Awaiting save"}</Badge></div><div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row"><Button onClick={resetExam}><RotateCcw className="mr-2 h-4 w-4" />Try another exam</Button><Button variant="outline" onClick={() => navigate("/academic/insights")}>View academic insights</Button></div></CardContent></Card>
           {upperStudent && <div className="mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-4"><h3 className="font-semibold">Mistakes to Review</h3><p className="mt-1 text-sm text-muted-foreground">Send missed questions to AI Tutor for step-by-step explanations.</p>{results.details.some(d => !d.correct) && <Button className="mt-3" onClick={() => { const context = results.details.filter(d => !d.correct).map((d, i) => "Mistake " + (i + 1) + ": " + d.q.question_text + " | My answer: " + (d.answer || "Not answered") + " | Correct answer: " + answerText(d.q.correct_answer, d.q.options) + " | Explanation: " + (d.q.explanation || "Not provided")).join("\n"); navigate("/ai-tutor?context=" + encodeURIComponent("Please explain these exam mistakes step by step:\n" + context)); }}>Send Mistakes to AI Tutor</Button>}</div>}<div className="space-y-3"><div><h3 className="text-lg font-bold">Answer review</h3><p className="text-sm text-muted-foreground">Review each response and explanation where one is available.</p></div>{results.details.map((detail, index) => <Card key={detail.q.id} className="rounded-2xl"><CardContent className="flex gap-3 p-4 sm:p-5"><div className={`mt-0.5 rounded-full p-1.5 ${detail.correct ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}>{detail.correct ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}</div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><p className="font-medium leading-6">{index + 1}. {detail.q.question_text}</p><Badge variant="outline">{detail.correct ? "Correct" : "Review"}</Badge></div>{!detail.correct && <p className="mt-2 text-sm text-muted-foreground">Your answer: <span className="text-foreground">{detail.answer || "Not answered"}</span></p>}<p className="mt-1 text-sm">Correct answer: <span className="font-semibold text-emerald-700 dark:text-emerald-400">{answerText(detail.q.correct_answer, detail.q.options)}</span></p>{detail.q.explanation && <p className="mt-2 rounded-xl bg-muted/60 p-3 text-sm leading-5 text-muted-foreground">{detail.q.explanation}</p>}</div></CardContent></Card>)}</div>
         </main>
       </div>
