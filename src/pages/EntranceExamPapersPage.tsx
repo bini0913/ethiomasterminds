@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { normalizeSubject } from "@/lib/academicProfile";
 
-type Paper = {
+const isSafeHttpUrl = (value: string) => {\n  try { const url = new URL(value); return url.protocol === "https:" || url.protocol === "http:"; }\n  catch { return false; }\n};\n\ntype Paper = {
   id: string; subject: string; ethiopian_year: number; gregorian_year: number;
   stream: string; source_name: string; source_url: string; source_status: string; notes: string;
 };
@@ -69,7 +69,7 @@ const EntranceExamPapersPage: React.FC = () => {
       && (!q || [p.subject, p.source_name, p.stream, String(p.gregorian_year), String(p.ethiopian_year)].some(v => v.toLowerCase().includes(q)));
   }), [papers, search, subject, year, stream, ecYear]);
 
-  return <main className="mx-auto w-full max-w-6xl space-y-6 p-4 pb-24 md:p-8">
+  return <main className="tier-upper mx-auto w-full max-w-6xl space-y-6 p-4 pb-24 md:p-8">
     <div className="flex items-center gap-3">
       <Button variant="ghost" size="icon" aria-label="Back to Academic Mode" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button>
       <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Academic Prep / Question Bank</p><h1 className="text-2xl font-bold md:text-3xl">University entrance past papers</h1></div>
@@ -91,8 +91,8 @@ const EntranceExamPapersPage: React.FC = () => {
         <div className="flex items-start justify-between gap-2"><div className="rounded-lg bg-primary/10 p-2 text-primary"><FileText className="h-5 w-5"/></div><Badge variant="secondary">{p.gregorian_year} G.C.</Badge></div>
         <div><h2 className="font-semibold">{p.subject}</h2><p className="text-sm text-muted-foreground">{p.ethiopian_year} E.C. · Grade 12 entrance exam</p><p className="mt-1 text-xs text-muted-foreground">{p.stream}</p></div>
         <p className="flex-1 text-xs text-muted-foreground">{p.notes}</p>
-        <div className="flex flex-wrap items-center gap-2"><Badge variant={p.source_status?.toLowerCase().includes("verif") ? "default" : "outline"}>{p.source_status?.toLowerCase().includes("verif") ? "Source verified" : "Verification pending"}</Badge><Badge variant="outline">{p.stream || "Stream not specified"}</Badge></div>\n        <p className="text-xs font-medium">{p.source_name}</p>
-        {practiceSubjects.includes(normalizeSubject(p.subject)) && <Button variant="outline" className="w-full" onClick={() => navigate("/academic/exam", { state: { subject: p.subject } })}>Practice in Exam Mode</Button>}\n        <Button className="w-full" onClick={() => window.open(p.source_url, "_blank", "noopener,noreferrer")}>Open source archive <ExternalLink className="ml-2 h-4 w-4"/></Button>
+        <div className="flex flex-wrap items-center gap-2"><Badge variant={["verified", "permission_confirmed", "source_verified"].includes(String(p.source_status || "").toLowerCase()) ? "default" : "outline"}>{["verified", "permission_confirmed", "source_verified"].includes(String(p.source_status || "").toLowerCase()) ? "Source verified" : "Verification pending"}</Badge><Badge variant="outline">{p.stream || "Stream not specified"}</Badge></div>\n        <p className="text-xs font-medium">{p.source_name}</p>
+        {practiceSubjects.includes(normalizeSubject(p.subject)) && <Button variant="outline" className="w-full" onClick={() => navigate("/academic/exam", { state: { subject: p.subject } })}>Practice in Exam Mode</Button>}\n        <Button className="w-full" disabled={!isSafeHttpUrl(p.source_url)} onClick={() => { if (isSafeHttpUrl(p.source_url)) window.open(p.source_url, "_blank", "noopener,noreferrer"); }} >{isSafeHttpUrl(p.source_url) ? "Open source archive" : "Source link unavailable"} <ExternalLink className="ml-2 h-4 w-4"/></Button>
       </CardContent></Card>)}</div>}
   </main>;
 };
