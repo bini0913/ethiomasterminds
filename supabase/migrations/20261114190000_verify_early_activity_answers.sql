@@ -118,7 +118,7 @@ BEGIN
 
   IF lower(trim(v_grade)) ~ '^(k|kindergarten|pre-?k)$' THEN
     v_grade_num := 0;
-  ELSIF lower(trim(v_grade)) ~ '^(?:grade\\s*)?[1-4]\\+?$' THEN
+  ELSIF lower(trim(v_grade)) ~ '^(?:grade\s*)?[1-4]\\+?$' THEN
     v_grade_num := substring(lower(trim(v_grade)) from '([1-4])')::integer;
   ELSE
     RAISE EXCEPTION 'Early quizzes are only available to KG through Grade 4';
@@ -233,14 +233,15 @@ DECLARE
   v_xp_total integer := 0;
   v_reward_xp integer := 0;
   v_reward_coins integer := 0;
+  v_has_existing boolean := false;
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
   IF nullif(trim(p_achievement_key), '') IS NULL THEN RAISE EXCEPTION 'Achievement key is required'; END IF;
 
   SELECT grade INTO v_grade FROM public.profiles WHERE id = v_user_id FOR UPDATE;
-  IF NOT FOUND OR NOT (
+  IF NOT FOUND OR v_grade IS NULL OR NOT (
     lower(trim(v_grade)) ~ '^(k|kindergarten|pre-?k)$'
-    OR lower(trim(v_grade)) ~ '^(?:grade\\s*)?[1-4]\\+?$'
+    OR lower(trim(v_grade)) ~ '^(?:grade\s*)?[1-4]\\+?$'
   ) THEN
     RAISE EXCEPTION 'Early achievements are only available to KG through Grade 4';
   END IF;
@@ -257,7 +258,8 @@ BEGIN
   WHERE user_id = v_user_id AND achievement_id = v_achievement.id
   FOR UPDATE;
 
-  IF FOUND AND v_existing.completed THEN
+  v_has_existing := FOUND;
+  IF v_has_existing AND v_existing.completed THEN
     RETURN jsonb_build_object('success', false, 'already_claimed', true);
   END IF;
 
@@ -301,7 +303,7 @@ BEGIN
   v_reward_xp := greatest(0, coalesce(v_achievement.reward_xp,0));
   v_reward_coins := greatest(0, coalesce(v_achievement.reward_coins,0));
 
-  IF FOUND THEN
+  IF v_has_existing THEN
     UPDATE public.early_user_achievements
     SET progress = v_progress, completed = true, unlocked_at = coalesce(unlocked_at, now())
     WHERE id = v_existing.id;
