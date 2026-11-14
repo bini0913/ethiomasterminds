@@ -3,12 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useEarlyProgress } from "./useEarlyProgress";
 import { toast } from "sonner";
-import { useEarlyReward } from "./useEarlyReward";
 
 export type EarlyAchievement={id:string;key:string;name:string;description:string;icon:string;requirement_type:string;requirement_value:number;reward_xp:number;reward_coins:number;progress:number;completed:boolean;};
 
 export function useEarlyAchievements(){
- const {summary,rows}=useEarlyProgress(); const reward=useEarlyReward(); const [items,setItems]=useState<EarlyAchievement[]>([]); const [loading,setLoading]=useState(true);
+ const {summary,rows}=useEarlyProgress(); const [items,setItems]=useState<EarlyAchievement[]>([]); const [loading,setLoading]=useState(true);
  const evaluate=useCallback(async()=>{
    setLoading(true);
    try {
@@ -37,8 +36,8 @@ export function useEarlyAchievements(){
      for(const d of defs??[]){
        const current=values[d.requirement_type]??0; const old=(mine??[]).find((x:any)=>x.achievement_id===d.id);
        if(current>=d.requirement_value && !old?.completed){
-         const rewarded=await reward("discoverCorrect",{activityId:`achievement-${d.key}`,skill:"achievement",completed:true});
-         if(!rewarded) continue;
+         const {data:claim,error:claimError}=await (supabase as any).rpc("claim_early_achievement",{p_achievement_key:d.key});
+         if(claimError || claim?.success !== true) continue;
          toast.success(`${d.icon} ${d.name} unlocked!`,{description:`${d.description} +${d.reward_xp} XP`});
        }
      }
@@ -47,7 +46,7 @@ export function useEarlyAchievements(){
    } finally {
      setLoading(false);
    }
- },[rows,summary,reward]);
+ },[rows,summary]);
  useEffect(()=>{void evaluate()},[evaluate]);
  const completed=useMemo(()=>items.filter(x=>x.completed),[items]);
  return {items,completed,loading,reload:evaluate};
