@@ -64,7 +64,6 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         .from('multiplayer_rooms')
         .select('id, name, host_id, max_players, subject, difficulty, question_count, game_mode, status, created_at, current_question, started_at, finished_at')
         .in('status', ['waiting', 'countdown'])
-        .is('password', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
 
