@@ -52,8 +52,15 @@ function answerText(answer: unknown, options: string[]) {
 }
 
 function parseOptions(row: any): string[] {
-  if (Array.isArray(row.options)) return row.options.filter((item: unknown) => typeof item === "string" && item.trim()).map((item: string) => item.trim());
-  return [row.option_a, row.option_b, row.option_c, row.option_d].filter((item) => typeof item === "string" && item.trim());
+  if (Array.isArray(row.options)) {
+    const parsed = row.options
+      .filter((item: unknown) => typeof item === "string" && item.trim())
+      .map((item: string) => item.trim());
+    if (parsed.length) return parsed;
+  }
+  return [row.option_a, row.option_b, row.option_c, row.option_d]
+    .filter((item) => typeof item === "string" && item.trim())
+    .map((item: string) => item.trim());
 }
 
 const prettySubject = (subject: string) => subject === "math" ? "Mathematics" : subject.replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -63,6 +70,9 @@ const ExamModePage: React.FC = () => {
   const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const location = useLocation();
+  const requestedSubject = typeof location.state?.subject === "string" && location.state.subject.trim()
+    ? normalizeSubject(location.state.subject)
+    : null;
   const [examState, setExamState] = useState<ExamState>("setup");
   const [subject, setSubject] = useState("all_selected");
   const [examTypeFilter, setExamTypeFilter] = useState("mixed");
@@ -112,7 +122,9 @@ const ExamModePage: React.FC = () => {
         const allowed = (profile?.subjects?.length ? profile.subjects : []).map(normalizeSubject);
         setGrade(activeGrade);
         setProfileSubjects(allowed);
-        setSubject("all_selected");
+        // Preserve a subject selected from the entrance-paper catalog after the
+        // asynchronous profile load; otherwise the route state is overwritten.
+        setSubject(requestedSubject || "all_selected");
         setGoal([profile?.study_goal || "School / Class", profile?.study_goal_detail || ""].filter(Boolean).join(" "));
 
         // Academic Prep and regular Quizzes share the same approved quizzes + linked question bank.
@@ -163,7 +175,7 @@ const ExamModePage: React.FC = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [user?.id, user?.grade, bankReload]);
+  }, [user?.id, user?.grade, bankReload, requestedSubject]);
 
   useEffect(() => {
     let cancelled = false;
