@@ -38,3 +38,6 @@ verify_jwt = true
 
 [functions.study-call-token]
 verify_jwt = true
+
+[functions.username-auth]
+verify_jwt = false

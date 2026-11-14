@@ -87,9 +87,11 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     setUsernameStatus("checking");
     const timer = window.setTimeout(async () => {
       try {
-        const { data, error } = await supabase.rpc("get_email_by_username", { _username: normalized } as any);
+        const { data, error } = await supabase.functions.invoke("username-auth", {
+          body: { action: "availability", username: normalized },
+        });
         if (!active) return;
-        setUsernameStatus(error ? "idle" : data ? "taken" : "available");
+        setUsernameStatus(error || typeof data?.available !== "boolean" ? "idle" : data.available ? "available" : "taken");
       } catch (error) {
         if (!active) return;
         console.warn("Username availability check failed:", error);
@@ -114,13 +116,15 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     }
     setUsernameStatus("checking");
     try {
-      const { data, error } = await supabase.rpc("get_email_by_username", { _username: normalized } as any);
-      if (error) {
+      const { data, error } = await supabase.functions.invoke("username-auth", {
+        body: { action: "availability", username: normalized },
+      });
+      if (error || typeof data?.available !== "boolean") {
         setUsernameStatus("idle");
         toast.error("We couldn't check that username. Please try again.");
         return false;
       }
-      if (data) {
+      if (!data.available) {
         setUsernameStatus("taken");
         toast.error("That username is already taken.");
         return false;

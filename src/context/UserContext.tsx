@@ -289,40 +289,35 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         return null;
       }
 
-      // Get email from username using RPC
-      const { data: email, error: lookupError } = await supabase
-        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() } as any);
-
-      if (lookupError) {
-        console.error('Username lookup error:', lookupError);
-        toast.error("Failed to find user. Please try again.");
-        return null;
-      }
-
-      if (!email) {
-        toast.error("Username not found");
-        return null;
-      }
-
-      // Login with email/password
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password.trim(),
+      // Resolve username and authenticate server-side. The edge function never
+      // returns the account email to the browser.
+      const { data: loginResult, error: lookupError } = await supabase.functions.invoke("username-auth", {
+        body: {
+          action: "login",
+          username: username.trim().toLowerCase(),
+          password: password.trim(),
+        },
       });
 
-      if (error) {
-        console.error('Login error:', error);
-        if (error.message.includes('Invalid login')) {
-          toast.error("Invalid username or password");
-        } else {
-          toast.error(error.message || "Login failed");
-        }
+      if (lookupError || !loginResult?.access_token || !loginResult?.refresh_token) {
+        console.error("Username login failed:", lookupError);
+        toast.error("Invalid username or password");
+        return null;
+      }
+
+      const { data, error } = await supabase.auth.setSession({
+        access_token: loginResult.access_token,
+        refresh_token: loginResult.refresh_token,
+      });
+
+      if (error || !data.user || !data.session) {
+        console.error("Username session setup failed:", error);
+        toast.error("Invalid username or password");
         return null;
       }
 
       if (data.user) {
-        // Resolve the profile immediately from the user returned by sign-in so
-        // callers can route on the real role without a reload.
+        // Resolve the profile immediately from the authenticated session.
         setSession(data.session);
         const profile = await fetchUserProfile(data.user.id, data.user);
         setUser(profile);
@@ -376,11 +371,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }
 
 
-      // Check if username is already taken
-      const { data: existingEmail } = await supabase
-        .rpc('get_email_by_username', { _username: username.trim().toLowerCase() } as any);
+      // Check username availability without exposing the account email.
+      const { data: availability, error: availabilityError } = await supabase.functions.invoke("username-auth", {
+        body: { action: "availability", username: username.trim().toLowerCase() },
+      });
 
-      if (existingEmail) {
+      if (availabilityError || typeof availability?.available !== "boolean") {
+        toast.error("We couldn't verify that username. Please try again.");
+        return null;
+      }
+
+      if (!availability.available) {
         toast.error("Username is already taken");
         return null;
       }
