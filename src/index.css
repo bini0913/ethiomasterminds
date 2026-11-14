@@ -793,3 +793,52 @@
   border-color: hsl(var(--primary) / .45);
   box-shadow: 0 2px 0 hsl(var(--primary) / .28);
 }
+
+/* Global Figma design system for every route inside the Grades 9–12 shell. */
+.mm-studio-upper :where([class*="bg-gradient-to-"]) {
+  background-image: none !important;
+}
+.mm-studio-upper :where([class*="border-border"]) {
+  border-color: hsl(var(--border));
+}
+.mm-studio-upper :where(.bg-card) {
+  background-color: hsl(var(--card));
+}
+.mm-studio-upper :where(.rounded-lg.border.bg-card, .rounded-xl.border.bg-card, .rounded-2xl.border.bg-card, .rounded-3xl.border.bg-card) {
+  border-color: hsl(var(--border));
+  box-shadow: 0 2px 8px hsl(207 43% 16% / .035);
+}
+.mm-studio-upper :where(input, select, textarea) {
+  border-color: hsl(var(--input));
+  border-radius: .8rem;
+  background-color: hsl(var(--card));
+}
+.mm-studio-upper :where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+.mm-studio-upper :where(h1) { letter-spacing: -.03em; }
+.mm-studio-upper :where(h2) { letter-spacing: -.02em; }
+.mm-studio-upper .btn-3d-primary {
+  color: hsl(var(--primary-foreground));
+  background: hsl(var(--primary));
+  border-bottom: 4px solid hsl(var(--primary-hover));
+  box-shadow: 0 5px 12px hsl(var(--primary) / .14);
+}
+.mm-studio-upper .btn-3d-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.mm-studio-upper .btn-3d-card {
+  border-color: hsl(var(--border));
+  background-color: hsl(var(--card));
+  box-shadow: 0 4px 0 hsl(var(--border));
+}
+.mm-studio-upper .btn-3d-card:hover {
+  border-color: hsl(var(--primary) / .42);
+  box-shadow: 0 2px 0 hsl(var(--primary) / .24);
+}
+@media (max-width: 640px) {
+  .mm-studio-upper :where([class*="grid-cols-4"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
