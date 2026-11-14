@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(13);
+SELECT plan(15);
 
 SELECT ok(
   has_function_privilege('authenticated', 'public.get_daily_challenge_question()', 'EXECUTE'),
@@ -53,6 +53,16 @@ SELECT ok(
 SELECT ok(
   NOT has_table_privilege('authenticated', 'public.early_activity_attempts', 'INSERT'),
   'students cannot forge early quiz attempt history'
+);
+
+SELECT ok(
+  has_column('public', 'user_streaks', 'last_daily_reward_date'),
+  'daily reward claims use a separate date from normal learning activity'
+);
+SELECT like(
+  pg_get_functiondef('public.wallet_action(text,integer,uuid)'::regprocedure),
+  '%INSERT INTO public.transactions%',
+  'wallet actions write to the existing transaction history'
 );
 
 SELECT * FROM finish();
