@@ -70,6 +70,10 @@ const LearningDNA: React.FC = () => {
     { label: "Multiplayer matches", value: activity.multiplayer.matches, detail: activity.multiplayer.wins + " wins · " + (activity.multiplayer.averageAccuracy === null ? "accuracy unavailable" : activity.multiplayer.averageAccuracy + "% accuracy") + " · " + (activity.multiplayer.questionCompletionPercent === null ? "completion unavailable" : activity.multiplayer.questionCompletionPercent + "% questions answered"), icon: Trophy },
     { label: "Flashcard reviews", value: activity.flashcards.reviewedCards, detail: activity.flashcards.totalRepetitions + " recorded repetitions", icon: Layers },
     { label: "Study Mode calls", value: activity.studyModeCalls.acceptedOrJoined, detail: "Accepted or joined invitations", icon: Zap },
+    { label: "Video learning", value: activity.earlyLearning.videoViews, detail: activity.earlyLearning.videosCompleted + " completed · " + Math.round(activity.earlyLearning.secondsWatchedRecorded / 60) + " min recorded", icon: BookOpen },
+    { label: "Revision reviews", value: activity.revision.reviewedItems, detail: activity.revision.totalReviewsRecorded + " reviews recorded", icon: RefreshCw },
+    { label: "Early learning activities", value: activity.earlyLearning.activitiesAttempted, detail: activity.earlyLearning.skills.length + " recorded skill areas · engagement only", icon: Layers },
+    { label: "Competitions joined", value: activity.participation.studyCompetitionsJoined + activity.participation.tournamentsJoined, detail: activity.participation.studyCompetitionsJoined + " study · " + activity.participation.tournamentsJoined + " tournaments", icon: Trophy },
   ] : [];
 
   return <div className={tier === "upper" ? "tier-upper mm-learning-dna min-h-screen bg-background text-foreground" : "min-h-screen bg-background text-foreground"}>
