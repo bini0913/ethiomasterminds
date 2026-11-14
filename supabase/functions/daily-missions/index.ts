@@ -12,6 +12,14 @@ const json = (data: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+const addisDate = (date = new Date()) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -33,8 +41,8 @@ serve(async (req) => {
         return json({ error: "Forbidden" }, 403);
       }
 
-      const today = new Date().toISOString().split("T")[0];
-      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const today = addisDate();
+      const cutoff = addisDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
       const { data: activeUsers, error: usersError } = await admin
         .from("user_streaks")
         .select("user_id")
@@ -52,13 +60,14 @@ serve(async (req) => {
 
       let assignedCount = 0;
       for (const activeUser of activeUsers ?? []) {
-        const { data: existing } = await admin
+        const { data: existing, error: existingError } = await admin
           .from("user_missions")
           .select("id")
           .eq("user_id", activeUser.user_id)
           .eq("mission_date", today)
           .limit(1);
 
+        if (existingError) throw existingError;
         if (existing?.length) continue;
 
         const selected = [...activeMissions]
@@ -74,7 +83,12 @@ serve(async (req) => {
           }));
 
         if (selected.length) {
-          const { error } = await admin.from("user_missions").insert(selected);
+          const { error } = await admin
+            .from("user_missions")
+            .upsert(selected, {
+              onConflict: "user_id,mission_id,mission_date",
+              ignoreDuplicates: true,
+            });
           if (!error) assignedCount++;
         }
       }
@@ -103,14 +117,15 @@ serve(async (req) => {
       if (rateLimit.error) throw rateLimit.error;
       if (!rateLimit.data) return json({ error: "Too many mission assignment attempts. Please try again later." }, 429);
 
-      const today = new Date().toISOString().split("T")[0];
-      const { data: existing } = await admin
+      const today = addisDate();
+      const { data: existing, error: existingError } = await admin
         .from("user_missions")
         .select("id")
         .eq("user_id", userId)
         .eq("mission_date", today)
         .limit(1);
 
+      if (existingError) throw existingError;
       if (existing?.length) return json({ message: "Missions already assigned for today" });
 
       const { data: activeMissions, error } = await admin
@@ -133,7 +148,12 @@ serve(async (req) => {
           claimed: false,
         }));
 
-      const { error: insertError } = await admin.from("user_missions").insert(selected);
+      const { error: insertError } = await admin
+        .from("user_missions")
+        .upsert(selected, {
+          onConflict: "user_id,mission_id,mission_date",
+          ignoreDuplicates: true,
+        });
       if (insertError) throw insertError;
 
       return json({ success: true, missionsAssigned: selected.length });
