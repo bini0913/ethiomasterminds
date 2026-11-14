@@ -12,7 +12,7 @@ begin
     where n.nspname = 'public'
       and p.prokind = 'f'
       and p.prosecdef
-      and p.proname like 'multiplayer\\_%' escape '\\'
+      and left(p.proname, 12) = 'multiplayer_'
   loop
     execute format('alter function %s set search_path = pg_catalog, auth', v_fn.signature);
   end loop;
