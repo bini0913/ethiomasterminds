@@ -1,5 +1,8 @@
 -- Complete server-verified daily challenge, mission assignment and wallet audit workflows.
 
+ALTER TABLE public.user_streaks
+  ADD COLUMN IF NOT EXISTS last_daily_reward_date date;
+
 CREATE UNIQUE INDEX IF NOT EXISTS daily_missions_type_title_uidx
   ON public.daily_missions (mission_type, title);
 CREATE UNIQUE INDEX IF NOT EXISTS user_missions_user_mission_date_uidx
@@ -128,7 +131,7 @@ BEGIN
   OFFSET v_offset LIMIT 1;
 
   IF v_question.id IS DISTINCT FROM p_question_id THEN
-    RAISE EXCEPTION 'This is not today\u0027s assigned challenge';
+    RAISE EXCEPTION 'This is not today''s assigned challenge';
   END IF;
 
   v_correct := p_answer = v_question.correct_answer;
@@ -317,13 +320,15 @@ BEGIN
     WHERE user_id = v_user_id
     FOR UPDATE;
 
-    IF v_streak.last_activity_date = current_date THEN
+    IF v_streak.last_daily_reward_date = current_date THEN
       RETURN jsonb_build_object('success', false, 'duplicate', true,
         'coins', v_wallet.coins, 'gems', v_wallet.gems, 'streak', v_streak.current_streak);
     END IF;
 
     v_previous_streak := coalesce(v_streak.current_streak, 0);
-    IF v_streak.last_activity_date = current_date - 1 THEN
+    IF v_streak.last_activity_date = current_date THEN
+      v_new_streak := greatest(1, v_previous_streak);
+    ELSIF v_streak.last_activity_date = current_date - 1 THEN
       v_new_streak := v_previous_streak + 1;
     ELSE
       v_new_streak := 1;
@@ -334,6 +339,7 @@ BEGIN
     SET current_streak = v_new_streak,
         longest_streak = greatest(longest_streak, v_new_streak),
         last_activity_date = current_date,
+        last_daily_reward_date = current_date,
         updated_at = now()
     WHERE user_id = v_user_id;
 
