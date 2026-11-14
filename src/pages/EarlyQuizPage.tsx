@@ -81,7 +81,7 @@ const EarlyQuizPage: React.FC = () => {
     recordExposure(user?.id, "quiz", current.id, correct);
     if (correct) {
       setScore((s) => s + 1); setStreak((s) => s + 1);
-      void reward("quizCorrect", { activityId: `early-quiz-${current.subject.toLowerCase()}`, skill: skillFor(current), completed: index === questions.length - 1 });
+      void reward("quizCorrect", { questionId: current.id, answer: value });
     } else setStreak(0);
   };
 
