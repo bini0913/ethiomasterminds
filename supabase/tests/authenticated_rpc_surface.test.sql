@@ -1,0 +1,38 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(31);
+
+select ok(not has_function_privilege('anon','public.disable_notification_device(text)','execute'),'anon cannot disable notification devices');
+select ok(has_function_privilege('authenticated','public.disable_notification_device(text)','execute'),'authenticated users can disable their own notification devices');
+select ok(not has_function_privilege('anon','public.get_early_profile_summary(uuid)','execute'),'anon cannot read early profile summaries');
+select ok(has_function_privilege('authenticated','public.get_early_profile_summary(uuid)','execute'),'authenticated users can read their own early profile summary');
+select ok(not has_function_privilege('anon','public.get_student_leaderboard()','execute'),'anon cannot call the signed-in student leaderboard');
+select ok(has_function_privilege('authenticated','public.get_student_leaderboard()','execute'),'authenticated users can call the student leaderboard');
+select ok(not has_function_privilege('anon','public.is_student_in_class(uuid,uuid)','execute'),'anon cannot query class membership');
+select ok(has_function_privilege('authenticated','public.is_student_in_class(uuid,uuid)','execute'),'authenticated callers retain class membership checks');
+select ok(not has_function_privilege('anon','public.is_teacher_of_class(uuid,uuid)','execute'),'anon cannot query teacher-class relationships');
+select ok(has_function_privilege('authenticated','public.is_teacher_of_class(uuid,uuid)','execute'),'authenticated callers retain teacher-class checks');
+select ok(not has_function_privilege('anon','public.is_teacher_of_student(uuid,uuid)','execute'),'anon cannot query teacher-student relationships');
+select ok(has_function_privilege('authenticated','public.is_teacher_of_student(uuid,uuid)','execute'),'authenticated callers retain teacher-student checks');
+select ok(not has_function_privilege('anon','public.manager_get_dashboard()','execute'),'anon cannot call manager dashboard RPC');
+select ok(has_function_privilege('authenticated','public.manager_get_dashboard()','execute'),'authenticated manager dashboard remains available behind its role guard');
+select ok(not has_function_privilege('anon','public.manager_list_users(text,public.app_role,integer,integer)','execute'),'anon cannot call manager user listing');
+select ok(has_function_privilege('authenticated','public.manager_list_users(text,public.app_role,integer,integer)','execute'),'authenticated manager user listing remains available behind its role guard');
+select ok(not has_function_privilege('anon','public.mark_direct_message_read(uuid)','execute'),'anon cannot mark direct messages read');
+select ok(has_function_privilege('authenticated','public.mark_direct_message_read(uuid)','execute'),'authenticated users can mark their own direct messages read');
+select ok(not has_function_privilege('anon','public.purchase_early_item(uuid)','execute'),'anon cannot purchase early collectibles');
+select ok(has_function_privilege('authenticated','public.purchase_early_item(uuid)','execute'),'authenticated users can purchase early collectibles');
+select ok(not has_function_privilege('anon','public.remove_friend(uuid)','execute'),'anon cannot remove friendships');
+select ok(has_function_privilege('authenticated','public.remove_friend(uuid)','execute'),'authenticated users can remove their own friendships');
+select ok(not has_function_privilege('anon','public.respond_friend_request(uuid,boolean)','execute'),'anon cannot respond to friend requests');
+select ok(has_function_privilege('authenticated','public.respond_friend_request(uuid,boolean)','execute'),'authenticated users can respond to their own friend requests');
+select ok(not has_function_privilege('anon','public.send_direct_message(uuid,text)','execute'),'anon cannot send direct messages');
+select ok(has_function_privilege('authenticated','public.send_direct_message(uuid,text)','execute'),'authenticated users can send direct messages');
+select ok(not has_function_privilege('anon','public.send_friend_request(uuid)','execute'),'anon cannot send friend requests');
+select ok(has_function_privilege('authenticated','public.send_friend_request(uuid)','execute'),'authenticated users can send friend requests');
+select ok(not has_function_privilege('anon','public.upsert_notification_device(text,text,text,boolean)','execute'),'anon cannot register notification devices');
+select ok(has_function_privilege('authenticated','public.upsert_notification_device(text,text,text,boolean)','execute'),'authenticated users can register their own notification devices');
+select ok((select count(*) = 15 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('disable_notification_device','get_early_profile_summary','get_student_leaderboard','is_student_in_class','is_teacher_of_class','is_teacher_of_student','manager_get_dashboard','manager_list_users','mark_direct_message_read','purchase_early_item','remove_friend','respond_friend_request','send_direct_message','send_friend_request','upsert_notification_device') and p.proconfig @> array['search_path=pg_catalog']),'all protected RPCs use a pg_catalog-only search path');
+
+select * from finish();
+rollback;
