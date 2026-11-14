@@ -108,7 +108,6 @@ DECLARE
   v_xp_reward integer := 8;
   v_coin_reward integer := 3;
   v_daily_rewards integer := 0;
-  v_question_rewarded boolean := false;
   v_xp integer := 0;
   v_level integer := 1;
   v_rank text;
@@ -155,20 +154,21 @@ BEGIN
 
   v_correct := p_answer = v_question.correct_answer;
 
+  IF EXISTS (
+    SELECT 1 FROM public.early_activity_attempts
+    WHERE user_id = v_user_id
+      AND question_id = v_question.id
+      AND created_at >= date_trunc('day', now())
+  ) THEN
+    RETURN jsonb_build_object('processed', false, 'duplicate', true, 'duplicate_question', true);
+  END IF;
+
   SELECT count(*) INTO v_daily_rewards
   FROM public.early_activity_attempts
   WHERE user_id = v_user_id
     AND question_id IS NOT NULL
     AND created_at >= date_trunc('day', now())
     AND (xp_earned > 0 OR coins_earned > 0);
-
-  SELECT EXISTS (
-    SELECT 1 FROM public.early_activity_attempts
-    WHERE user_id = v_user_id
-      AND question_id = v_question.id
-      AND created_at >= date_trunc('day', now())
-      AND xp_earned > 0
-  ) INTO v_question_rewarded;
 
   IF v_daily_rewards >= 100 OR v_question_rewarded THEN
     v_xp_reward := 0;
