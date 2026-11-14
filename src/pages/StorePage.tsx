@@ -6,7 +6,7 @@ import { getUserTier } from '@/lib/getUserTier';
 import { useFriends } from '@/context/FriendsContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Home, Store, Coins, Gem, Gift, RefreshCcw, Sparkles, ArrowLeftRight, Wallet, Send, ShieldCheck } from 'lucide-react';
+import { Home, Store, Coins, Gem, Gift, Sparkles, ArrowLeftRight, Wallet, Send, ShieldCheck, Flame, Zap } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import AvatarStore from '@/components/store/AvatarStore';
@@ -49,7 +49,6 @@ const StorePage: React.FC = () => {
     convertCoinsToXp,
     claimDailyReward,
     transferCoins,
-    luckySpin,
     refreshCurrency,
   } = useCurrency();
 
@@ -59,7 +58,6 @@ const StorePage: React.FC = () => {
   const [xpExchangeInput, setXpExchangeInput] = React.useState('100');
   const [coinsToXpInput, setCoinsToXpInput] = React.useState('10');
   const [claimingDaily, setClaimingDaily] = React.useState(false);
-  const [spinning, setSpinning] = React.useState(false);
   const [transactions, setTransactions] = React.useState<TransactionRow[]>([]);
   const [transferFriendId, setTransferFriendId] = React.useState('');
   const [transferSearch, setTransferSearch] = React.useState('');
@@ -146,21 +144,6 @@ const StorePage: React.FC = () => {
       toast.error('Daily reward already claimed or unavailable right now.');
     }
     setClaimingDaily(false);
-  };
-
-  const handleLuckySpin = async () => {
-    if (spinning) return;
-    setSpinning(true);
-    const result = await luckySpin();
-
-    if (result.success) {
-      toast.success('🎰 Lucky spin complete. Reward added to your wallet.');
-      await loadTransactions();
-    } else {
-      toast.error(result.message ?? 'Spin unavailable right now.');
-    }
-
-    setSpinning(false);
   };
 
   const handleTransfer = async () => {
@@ -329,7 +312,7 @@ const StorePage: React.FC = () => {
                 <Card>
                   <CardHeader><CardTitle className="text-base">Daily Reward</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
-                    <p className="text-sm">🔥 Current streak: <strong>{dailyStreak}</strong> day(s)</p>
+                    <p className="flex items-center gap-2 text-sm"><Flame className="h-4 w-4 text-amber-500" /> Current streak: <strong>{dailyStreak}</strong> day(s)</p>
                     <Button size="sm" className="w-full" onClick={handleClaimDaily} disabled={claimingDaily}>
                       <Gift className="h-4 w-4 mr-2" />
                       {claimingDaily ? 'Claiming...' : 'Claim Daily Reward'}
@@ -337,16 +320,7 @@ const StorePage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader><CardTitle className="text-base">Lucky Spin</CardTitle></CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button size="sm" className="w-full" onClick={handleLuckySpin} disabled={spinning}>
-                      {spinning ? <RefreshCcw className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                      {spinning ? 'Spinning...' : 'Spin (Daily)'}
-                    </Button>
-                    <p className="text-xs text-muted-foreground">Rewards include coins, gems, or random items.</p>
-                  </CardContent>
-                </Card>
+         </Card>
               </div>
             </TabsContent>
 
@@ -354,15 +328,15 @@ const StorePage: React.FC = () => {
               <div className="grid gap-4 md:grid-cols-3">
                 <Card>
                   <CardHeader><CardTitle className="text-base">XP</CardTitle></CardHeader>
-                  <CardContent className="text-2xl font-bold">🎯 {xp.toLocaleString()}</CardContent>
+                  <CardContent className="flex items-center gap-2 text-2xl font-bold"><Zap className="h-5 w-5 text-primary" />{xp.toLocaleString()}</CardContent>
                 </Card>
                 <Card>
                   <CardHeader><CardTitle className="text-base">Coins</CardTitle></CardHeader>
-                  <CardContent className="text-2xl font-bold">💰 {coins.toLocaleString()}</CardContent>
+                  <CardContent className="flex items-center gap-2 text-2xl font-bold"><Coins className="h-5 w-5 text-amber-500" />{coins.toLocaleString()}</CardContent>
                 </Card>
                 <Card>
                   <CardHeader><CardTitle className="text-base">Gems</CardTitle></CardHeader>
-                  <CardContent className="text-2xl font-bold">💎 {gems.toLocaleString()}</CardContent>
+                  <CardContent className="flex items-center gap-2 text-2xl font-bold"><Gem className="h-5 w-5 text-primary" />{gems.toLocaleString()}</CardContent>
                 </Card>
               </div>
 
