@@ -10,43 +10,48 @@ export const EARLY_REWARDS = {
 type RewardKind = keyof typeof EARLY_REWARDS;
 
 type EarlyRewardOptions = {
-  activityId: string;
-  skill: string;
+  activityId?: string;
+  skill?: string;
   completed?: boolean;
   attemptId?: string;
+  questionId?: string;
+  answer?: string;
 };
 
 export function useEarlyReward() {
   return useCallback(async (kind: RewardKind, options?: EarlyRewardOptions) => {
     try {
+      // Only the fixed quiz bank currently has a server-owned answer key.
+      // Client-generated game rounds and generated math prompts cannot mint rewards.
+      if (kind !== "quizCorrect" || !options?.questionId || options.answer === undefined) {
+        return false;
+      }
+      if (options.questionId.startsWith("math-")) return false;
+
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!auth.user?.id) return false;
 
-      const activityId = options?.activityId ?? `early-${kind}`;
-      const skill = options?.skill ?? "general";
-      const attemptId = options?.attemptId ?? (
+      const attemptId = options.attemptId ?? (
         typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
           ? crypto.randomUUID()
           : `early-${Date.now()}-${Math.random().toString(36).slice(2)}`
       );
 
-      const { error } = await (supabase as any).rpc("complete_early_activity", {
+      const { data, error } = await (supabase as any).rpc("submit_early_quiz_answer", {
         p_attempt_id: attemptId,
-        p_activity_id: activityId,
-        p_skill: skill,
-        p_correct: true,
-        p_completed: options?.completed ?? false,
+        p_question_id: options.questionId,
+        p_answer: options.answer,
       });
 
       if (error) {
-        console.error("Early reward failed:", error);
+        console.error("Verified early quiz submission failed:", error);
         return false;
       }
 
-      return true;
+      return data?.processed === true || data?.duplicate === true;
     } catch (error) {
-      console.error("Early reward failed:", error);
+      console.error("Verified early quiz submission failed:", error);
       return false;
     }
   }, []);

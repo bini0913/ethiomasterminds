@@ -72,8 +72,6 @@ const EarlyQuizPage: React.FC = () => {
     return () => window.clearInterval(id);
   }, [index, subject, done, profile.timerSeconds, selected]);
 
-  const skillFor = (q: QuizItem) => QUIZ_SUBJECTS.find((s) => s.id === q.subject)?.skill ?? "general";
-
   const choose = (value: string) => {
     if (selected || !current) return;
     setSelected(value);
@@ -81,7 +79,7 @@ const EarlyQuizPage: React.FC = () => {
     recordExposure(user?.id, "quiz", current.id, correct);
     if (correct) {
       setScore((s) => s + 1); setStreak((s) => s + 1);
-      void reward("quizCorrect", { activityId: `early-quiz-${current.subject.toLowerCase()}`, skill: skillFor(current), completed: index === questions.length - 1 });
+      void reward("quizCorrect", { questionId: current.id, answer: value });
     } else setStreak(0);
   };
 

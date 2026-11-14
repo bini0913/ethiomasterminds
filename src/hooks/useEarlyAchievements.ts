@@ -3,12 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useEarlyProgress } from "./useEarlyProgress";
 import { toast } from "sonner";
-import { useEarlyReward } from "./useEarlyReward";
 
 export type EarlyAchievement={id:string;key:string;name:string;description:string;icon:string;requirement_type:string;requirement_value:number;reward_xp:number;reward_coins:number;progress:number;completed:boolean;};
 
 export function useEarlyAchievements(){
- const {summary,rows}=useEarlyProgress(); const reward=useEarlyReward(); const [items,setItems]=useState<EarlyAchievement[]>([]); const [loading,setLoading]=useState(true);
+ const {summary,rows}=useEarlyProgress(); const [items,setItems]=useState<EarlyAchievement[]>([]); const [loading,setLoading]=useState(true);
  const evaluate=useCallback(async()=>{
    setLoading(true);
    try {
@@ -24,11 +23,11 @@ export function useEarlyAchievements(){
      if (mErr) throw mErr;
 
      const xp=rows.reduce((n,r)=>n+r.xp_earned,0);
-     const math=rows.filter(r=>["number sense","shapes","patterns"].includes(r.skill)).reduce((n,r)=>n+r.attempts,0);
-     const reading=rows.filter(r=>["vocabulary","phonics"].includes(r.skill)).reduce((n,r)=>n+r.attempts,0);
-     const science=rows.filter(r=>r.skill==="animals").reduce((n,r)=>n+r.attempts,0);
+     const math=rows.filter(r=>r.skill==="math").reduce((n,r)=>n+r.attempts,0);
+     const reading=rows.filter(r=>r.skill==="reading").reduce((n,r)=>n+r.attempts,0);
+     const science=rows.filter(r=>r.skill==="science").reduce((n,r)=>n+r.attempts,0);
      const coding=rows.filter(r=>r.skill==="sequencing").reduce((n,r)=>n+r.attempts,0);
-     const values:Record<string,number>={completions:summary.completions,math_attempts:math,reading_attempts:reading,science_attempts:science,coding_attempts:coding,accuracy_80:summary.attempts>=10&&summary.accuracy>=80?10:summary.attempts,xp_earned:xp};
+     const values:Record<string,number>={completions:rows.filter(r=>r.correct_answers>0).length,math_attempts:math,reading_attempts:reading,science_attempts:science,coding_attempts:coding,accuracy_80:summary.attempts>=10&&summary.accuracy>=80?10:summary.attempts,xp_earned:xp};
      const next=(defs??[]).map((d:any)=>{
        const current=values[d.requirement_type]??0; const old=(mine??[]).find((x:any)=>x.achievement_id===d.id);
        return {...d,progress:Math.min(current,d.requirement_value),completed:old?.completed||current>=d.requirement_value};
@@ -37,8 +36,8 @@ export function useEarlyAchievements(){
      for(const d of defs??[]){
        const current=values[d.requirement_type]??0; const old=(mine??[]).find((x:any)=>x.achievement_id===d.id);
        if(current>=d.requirement_value && !old?.completed){
-         const rewarded=await reward("discoverCorrect",{activityId:`achievement-${d.key}`,skill:"achievement",completed:true});
-         if(!rewarded) continue;
+         const {data:claim,error:claimError}=await (supabase as any).rpc("claim_early_achievement",{p_achievement_key:d.key});
+         if(claimError || claim?.success !== true) continue;
          toast.success(`${d.icon} ${d.name} unlocked!`,{description:`${d.description} +${d.reward_xp} XP`});
        }
      }
@@ -47,7 +46,7 @@ export function useEarlyAchievements(){
    } finally {
      setLoading(false);
    }
- },[rows,summary,reward]);
+ },[rows,summary]);
  useEffect(()=>{void evaluate()},[evaluate]);
  const completed=useMemo(()=>items.filter(x=>x.completed),[items]);
  return {items,completed,loading,reload:evaluate};
