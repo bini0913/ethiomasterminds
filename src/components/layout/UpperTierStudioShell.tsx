@@ -52,7 +52,8 @@ const extraItems: NavItem[] = [
 
 const allItems = groups.flatMap((group) => group.items).concat(extraItems);
 const titleFor = (pathname: string) =>
-  allItems.find((item) => pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to + "/")))?.label
+  allItems.slice().sort((a, b) => b.to.length - a.to.length)
+    .find((item) => pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to + "/")))?.label
   || (pathname === "/" ? "Overview" : "Student workspace");
 
 function isActive(pathname: string, to: string) {
@@ -92,7 +93,7 @@ export default function UpperTierStudioShell({ children }: { children: React.Rea
     <>
       <div className="flex h-20 items-center gap-3 border-b border-border px-5">
         <img src="/brand/master-minds-icon.svg" alt="Master Minds" className="h-10 w-10 rounded-xl" />
-        <div className="min-w-0 md:lg:block">
+        <div className="min-w-0 md:hidden lg:block">
           <p className="truncate text-base font-extrabold tracking-tight">Master Minds</p>
           <p className="text-xs text-muted-foreground">Grades 9–12 workspace</p>
         </div>
