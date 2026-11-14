@@ -13,7 +13,7 @@ export interface Room {
   hostName?: string;
   players: string[];
   maxPlayers: number;
-  password?: string;
+  hasPassword: boolean;
   gameSettings: {
     subject: string;
     difficulty: 'Easy' | 'Medium' | 'Hard';
@@ -62,7 +62,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       await cleanupExpiredRooms();
       const { data, error } = await supabase
         .from('multiplayer_rooms')
-        .select('id, name, host_id, max_players, subject, difficulty, question_count, game_mode, status, created_at, current_question, started_at, finished_at')
+        .select('id, name, host_id, max_players, subject, difficulty, question_count, game_mode, status, created_at, current_question, started_at, finished_at, has_password')
         .in('status', ['waiting', 'countdown'])
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -92,7 +92,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         hostName: hostNameMap.get(r.host_id) || 'Unknown',
         players: playerMap.get(r.id) || [],
         maxPlayers: r.max_players,
-        password: undefined,
+        hasPassword: Boolean(r.has_password),
         gameSettings: {
           subject: r.subject || 'Mixed',
           difficulty: (r.difficulty || 'Medium') as Room['gameSettings']['difficulty'],
@@ -156,7 +156,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         hostName: user.name,
         players: [user.id],
         maxPlayers: data.max_players,
-        password: password || undefined,
+        hasPassword: Boolean(password),
         gameSettings: settings,
         status: data.status as Room['status'],
         createdAt: new Date(data.created_at),
@@ -193,7 +193,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
 
       const { data: roomData, error: roomError } = await supabase
         .from('multiplayer_rooms')
-        .select('id, name, host_id, max_players, subject, difficulty, question_count, game_mode, status, created_at, current_question, started_at, finished_at')
+        .select('id, name, host_id, max_players, subject, difficulty, question_count, game_mode, status, created_at, current_question, started_at, finished_at, has_password')
         .eq('id', roomId)
         .in('status', ['waiting', 'countdown', 'playing'])
         .single();
@@ -208,7 +208,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         hostName: undefined,
         players: [],
         maxPlayers: roomData.max_players,
-        password: undefined,
+        hasPassword: Boolean(roomData.has_password),
         gameSettings: {
           subject: roomData.subject || 'Mixed',
           difficulty: (roomData.difficulty || 'Medium') as Room['gameSettings']['difficulty'],
@@ -253,7 +253,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       joinRoom,
       leaveRoom,
       getRoomById: (roomId) => rooms.find((room) => room.id === roomId),
-      getPublicRooms: () => rooms.filter((room) => !room.password && room.status === 'waiting'),
+      getPublicRooms: () => rooms.filter((room) => !room.hasPassword && room.status === 'waiting'),
       refreshRooms: fetchRooms,
     }}>
       {children}
