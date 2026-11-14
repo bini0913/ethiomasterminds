@@ -1,6 +1,6 @@
 begin;
 
-select plan(24);
+select plan(25);
 
 -- Direct mutation is denied for all five economy tables.
 select ok(not has_table_privilege('authenticated','public.user_currency','INSERT'), 'students cannot insert currency rows');
