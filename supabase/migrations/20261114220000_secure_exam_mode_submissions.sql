@@ -128,7 +128,7 @@ begin
     (v_correct_count * v_xp_per_correct)
       - ((v_total_questions - v_correct_count) * v_wrong_penalty)
   );
-  v_score := v_correct_count * 10;
+  v_score := round((v_correct_count::numeric / nullif(v_total_questions, 0)) * 100)::integer;
   v_subject := coalesce(nullif(btrim(p_subject), ''), v_quiz_subject, 'General');
   v_exam_type := case
     when p_exam_type in ('mixed_practice', 'mock_exam', 'past_paper', 'topic_practice', 'general')
