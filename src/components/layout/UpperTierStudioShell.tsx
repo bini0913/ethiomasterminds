@@ -39,6 +39,7 @@ const groups: NavGroup[] = [
   { label: "Community", items: [
     { label: "Social", to: "/social", icon: MessageCircle },
     { label: "Friends", to: "/friends", icon: Users },
+    { label: "Chat", to: "/chat", icon: MessageCircle },
   ]},
 ];
 
@@ -48,6 +49,7 @@ const extraItems: NavItem[] = [
   { label: "Rewards store", to: "/store", icon: Gift },
   { label: "Avatar creator", to: "/avatar-creator", icon: UserRound },
   { label: "Notifications", to: "/notifications", icon: Bell },
+  { label: "Settings", to: "/settings", icon: Settings },
 ];
 
 const navigationGroups: NavGroup[] = groups.concat([{ label: "More", items: extraItems }]);
@@ -192,7 +194,7 @@ export default function UpperTierStudioShell({ children }: { children: React.Rea
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-5 pb-28 sm:px-6 sm:py-7 lg:px-8 lg:pb-10">
+        <div className={location.pathname === "/chat" ? "mx-auto w-full max-w-none px-0 py-0 pb-0" : "mx-auto w-full max-w-[1600px] px-4 py-5 pb-28 sm:px-6 sm:py-7 lg:px-8 lg:pb-10"}>
           {children}
         </div>
       </div>

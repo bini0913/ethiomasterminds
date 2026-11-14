@@ -21,11 +21,13 @@ import BackButton from "@/components/ui/BackButton";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { safeStorage } from "@/lib/safeStorage";
+import { getUserTier } from "@/lib/getUserTier";
 
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 
 const Settings: React.FC = () => {
   const { user, logout } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   
@@ -72,8 +74,8 @@ const Settings: React.FC = () => {
   ];
   
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <AnimatedBackground />
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground relative overflow-hidden" : "min-h-screen bg-background relative overflow-hidden"}>
+      {!upperStudent && <AnimatedBackground />}
       
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
@@ -81,7 +83,7 @@ const Settings: React.FC = () => {
           <div className="flex items-center gap-4">
             <BackButton />
             <div>
-              <h1 className="text-2xl font-bold text-gradient">{t("settings")}</h1>
+              <h1 className={upperStudent ? "text-2xl font-bold text-foreground" : "text-2xl font-bold text-gradient"}>{t("settings")}</h1>
               <p className="text-sm text-muted-foreground">Customize your experience</p>
             </div>
           </div>

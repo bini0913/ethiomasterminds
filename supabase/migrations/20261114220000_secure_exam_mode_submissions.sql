@@ -20,6 +20,7 @@ declare
   v_user_id uuid := auth.uid();
   v_difficulty text;
   v_quiz_subject text;
+  v_quiz_source_kind text;
   v_subject text;
   v_exam_type text;
   v_total_questions integer;
@@ -72,8 +73,8 @@ begin
     raise exception 'Answers include a question outside this exam';
   end if;
 
-  select difficulty, subject
-    into v_difficulty, v_quiz_subject
+  select difficulty, subject, source_kind
+    into v_difficulty, v_quiz_subject, v_quiz_source_kind
   from public.quizzes
   where id = p_quiz_id
     and is_approved is true;
@@ -128,12 +129,21 @@ begin
     (v_correct_count * v_xp_per_correct)
       - ((v_total_questions - v_correct_count) * v_wrong_penalty)
   );
-  v_score := v_correct_count * 10;
-  v_subject := coalesce(nullif(btrim(p_subject), ''), v_quiz_subject, 'General');
+  v_score := round((v_correct_count::numeric / nullif(v_total_questions, 0)) * 100)::integer;
+  if v_quiz_subject is not null
+    and p_subject is not null
+    and btrim(p_subject) <> ''
+    and lower(btrim(p_subject)) <> lower(btrim(v_quiz_subject)) then
+    raise exception 'Subject does not match the approved quiz';
+  end if;
+  -- The approved quiz is the source of truth; never accept a client-selected subject.
+  v_subject := coalesce(nullif(btrim(v_quiz_subject), ''), 'General');
+  -- Preserve the selected session mode, but derive paper-vs-practice from the approved quiz.
   v_exam_type := case
-    when p_exam_type in ('mixed_practice', 'mock_exam', 'past_paper', 'topic_practice', 'general')
-      then p_exam_type
-    else 'mixed_practice'
+    when p_exam_type = 'mock_exam' then 'mock_exam'
+    when p_exam_type = 'mixed_practice' then 'mixed_practice'
+    when v_quiz_source_kind = 'past_paper' then 'past_paper'
+    else 'topic_practice'
   end;
 
   insert into public.quiz_results (
@@ -207,17 +217,20 @@ begin
           completion_percentage = least(
             100,
             round(((coalesce(v_existing_progress.questions_attempted, 0) + v_attempted)::numeric / 5) * 100)::integer
-          )
+          ),
+          last_practiced = now(),
+          updated_at = now()
       where id = v_existing_progress.id;
     else
       insert into public.topic_progress (
         user_id, subject, topic, questions_attempted, questions_correct,
-        accuracy_percentage, completion_percentage
+        accuracy_percentage, completion_percentage, last_practiced, updated_at
       )
       values (
         v_user_id, v_subject, v_topic, v_attempted, v_correct,
         case when v_attempted > 0 then round((v_correct::numeric / v_attempted) * 100)::integer else 0 end,
-        least(100, round((v_attempted::numeric / 5) * 100)::integer)
+        least(100, round((v_attempted::numeric / 5) * 100)::integer),
+        now(), now()
       );
     end if;
   end loop;

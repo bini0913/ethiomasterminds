@@ -9,6 +9,7 @@ import EnhancedChatSystem from '@/components/chat/EnhancedChatSystem';
 import CreatePostModal from '@/components/social/CreatePostModal';
 import { useUser } from '@/context/UserContext';
 import { Button } from '@/components/ui/button';
+import { getUserTier } from '@/lib/getUserTier';
 
 const feedTabs = [
   { id: 'explore', label: 'Explore', icon: Compass },
@@ -23,11 +24,12 @@ type FeedTab = (typeof feedTabs)[number]['id'];
 const EnhancedSocial: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const [activeTab, setActiveTab] = useState<FeedTab>('explore');
   const [showCreatePost, setShowCreatePost] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground" : "min-h-screen bg-background"}>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border/40">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">

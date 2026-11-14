@@ -11,9 +11,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import BackButton from "@/components/ui/BackButton";
 import { motion } from "framer-motion";
+import { getUserTier } from "@/lib/getUserTier";
 
 const Friends: React.FC = () => {
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const { 
     friends, 
     friendRequests, 
@@ -190,7 +192,7 @@ const Friends: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground flex flex-col" : "min-h-screen bg-background flex flex-col"}>
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">

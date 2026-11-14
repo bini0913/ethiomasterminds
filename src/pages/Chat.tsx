@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useUser } from '@/context/UserContext';
+import { getUserTier } from '@/lib/getUserTier';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -70,6 +71,7 @@ const BANNED_PATTERNS = ['kill yourself', 'hate you'];
 
 const Chat: React.FC = () => {
   const { user, isLoading } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -871,7 +873,7 @@ const Chat: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className={upperStudent ? "tier-upper flex h-[calc(100dvh_-_132px_-_env(safe-area-inset-bottom))] flex-col bg-background md:h-[calc(100dvh_-_68px)]" : "h-screen flex flex-col bg-background"}>
       {/* Desktop: side by side */}
       <div className="hidden md:flex flex-1 min-h-0">
         <div className="w-80 shrink-0">

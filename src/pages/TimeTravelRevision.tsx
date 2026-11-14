@@ -15,6 +15,7 @@ import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { getUserTier } from '@/lib/getUserTier';
 
 interface MissedQuestion {
   id: string;
@@ -38,6 +39,7 @@ interface RevisionStats {
 
 const TimeTravelRevision: React.FC = () => {
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const [missedQuestions, setMissedQuestions] = useState<MissedQuestion[]>([]);
   const [stats, setStats] = useState<RevisionStats>({ totalMissed: 0, reviewed: 0, mastered: 0, dueToday: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -211,8 +213,8 @@ const TimeTravelRevision: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <AnimatedBackground />
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground relative overflow-hidden" : "min-h-screen bg-background relative overflow-hidden"}>
+      {!upperStudent && <AnimatedBackground />}
       
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
