@@ -70,6 +70,20 @@ select throws_ok(
   'incorrect private-room password is rejected'
 );
 select is(public.multiplayer_join_room('a1000000-0000-4000-8000-000000000003', null), true, 'authenticated player can join a public waiting room');
+
+reset role;
+update public.multiplayer_rooms
+set status = 'playing'
+where id = 'a1000000-0000-4000-8000-000000000002';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000001', true);
+select throws_ok(
+  $select public.multiplayer_join_room('a1000000-0000-4000-8000-000000000002', 'private-pass')$,
+  'P0001',
+  'This match has already started',
+  'new players cannot join an active match'
+);
+
 select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000002', true);
 select is(public.multiplayer_join_room('a1000000-0000-4000-8000-000000000002', null), true, 'existing private-room member can reconnect without rejoining');
 select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000001', true);
