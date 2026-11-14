@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
@@ -44,11 +46,11 @@ jobs:
           set -euo pipefail
           changed_files="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA" || true)"
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || grep -q '^supabase/migrations/' <<< "$changed_files"; then
-            if [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
-              supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
-            else
-              echo "::warning::SUPABASE_DB_PASSWORD is not configured; database migrations were not pushed."
-            fi
+            test -n "${SUPABASE_DB_PASSWORD:-}" || {
+              echo "::error::A database migration is pending, but SUPABASE_DB_PASSWORD is not configured. Add this repository secret before deploying."
+              exit 1
+            }
+            supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
           else
             echo "No database migration changed; skipping database push."
           fi
@@ -59,6 +61,10 @@ jobs:
           set -euo pipefail
           changed_files="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA" || true)"
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || grep -q '^supabase/functions/' <<< "$changed_files"; then
+            test -n "$SUPABASE_ACCESS_TOKEN" || {
+              echo "::error::SUPABASE_ACCESS_TOKEN is required to deploy Edge Functions."
+              exit 1
+            }
             for dir in supabase/functions/*; do
               if [ -d "$dir" ] && [ -f "$dir/index.ts" ]; then
                 name="$(basename "$dir")"
