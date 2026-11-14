@@ -43,10 +43,7 @@ as $$
     from public.multiplayer_rooms mr
     where mr.id = p_room_id
       and mr.status in ('waiting', 'countdown')
-      and not exists (
-        select 1 from public.multiplayer_room_secrets s
-        where s.room_id = mr.id
-      )
+      and mr.has_password = false
   );
 $$;
 
@@ -193,7 +190,7 @@ begin
 
   insert into public.multiplayer_rooms (
     name, host_id, max_players, subject, difficulty,
-    question_count, status, game_mode
+    question_count, has_password, status, game_mode
   )
   values (
     left(trim(coalesce(p_name, 'Room')), 80),
@@ -202,6 +199,7 @@ begin
     coalesce(nullif(trim(p_subject), ''), 'Mixed'),
     coalesce(nullif(trim(p_difficulty), ''), 'Medium'),
     p_question_count,
+    nullif(trim(coalesce(p_password, '')), '') is not null,
     'waiting',
     'speed'
   )
@@ -286,6 +284,12 @@ $$;
 
 -- Remove the former exposed plaintext password column only after the room RPCs
 -- no longer reference it.
+alter table public.multiplayer_rooms add column has_password boolean not null default false;
+update public.multiplayer_rooms mr
+set has_password = exists (
+  select 1 from public.multiplayer_room_secrets s where s.room_id = mr.id
+);
+
 alter table public.multiplayer_rooms drop column password;
 
 -- A client may only assert existing membership; it cannot silently join a
