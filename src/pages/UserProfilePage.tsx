@@ -50,6 +50,7 @@ import {
 } from "@/lib/leaderboardApi";
 import { getNextRankTier, getRankTierByLevel, getXpProgressInLevel, playRankUpTone } from "@/lib/rankSystem";
 import { readPrefetchedProfile } from "@/lib/profilePrefetch";
+import { getUserTier } from "@/lib/getUserTier";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ const UserProfilePage = () => {
   const navigate = useNavigate();
   const { userId } = useParams();
   const { user: authUser, session } = useUser();
+  const upperStudent = getUserTier(authUser?.grade) === "upper";
   const { coins, transferCoins, refreshCurrency } = useCurrency();
 
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
@@ -760,23 +762,23 @@ const UserProfilePage = () => {
   if (profileMissing || !profile) return <div className="p-8">Profile not found.</div>;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-background px-3 pb-14 pt-4 text-foreground md:px-8">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={upperStudent ? "mm-upper-profile min-h-screen bg-background px-3 pb-14 pt-4 text-foreground md:px-8" : "min-h-screen bg-background px-3 pb-14 pt-4 text-foreground md:px-8"}>
       <div className="mx-auto max-w-6xl space-y-5">
         <header className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate(-1)} className="gap-2 border-border bg-card">
+          <Button variant="outline" onClick={() => navigate(-1)} className={upperStudent ? "gap-2 border-border bg-card md:hidden" : "gap-2 border-border bg-card"}>
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
-          <p className="text-xs text-muted-foreground">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "recently"}</p>
+          <p className="text-xs text-muted-foreground">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "Date unavailable"}</p>
         </header>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-border bg-gradient-to-br from-primary/70 via-primary/60 to-cyan-900/50 shadow-sm">
-          <motion.div
+        <section className={upperStudent ? "relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm" : "relative overflow-hidden rounded-[2rem] border border-border bg-gradient-to-br from-primary/70 via-primary/60 to-cyan-900/50 shadow-sm"}>
+          {!upperStudent && <motion.div
             aria-hidden
             className="absolute inset-0"
             animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
             transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
             style={{ backgroundImage: "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1), transparent 40%), radial-gradient(circle at 80% 0%, rgba(34,211,238,0.25), transparent 35%)" }}
-          />
+          />}
           <div className="pointer-events-none absolute -left-20 top-10 h-64 w-64 rounded-full bg-primary/20 hidden" />
           <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-500/20 hidden" />
 
@@ -788,8 +790,8 @@ const UserProfilePage = () => {
                 setTimeout(() => setAvatarReacting(false), 420);
               }}
               whileTap={{ scale: 0.96 }}
-              animate={avatarReacting ? { scale: [1, 1.04, 1], y: [0, -4, 0] } : { y: [0, -6, 0] }}
-              transition={avatarReacting ? { duration: 0.42 } : { duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
+              animate={avatarReacting ? { scale: [1, 1.04, 1], y: [0, -4, 0] } : upperStudent ? { y: 0 } : { y: [0, -6, 0] }}
+              transition={avatarReacting ? { duration: 0.42 } : upperStudent ? { duration: 0.15 } : { duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
               className="relative mx-auto shrink-0 md:mx-0"
             >
               <div className={`absolute inset-0 rounded-full blur-xl ${tierStyle(profile.level)} opacity-30`} />
@@ -823,23 +825,23 @@ const UserProfilePage = () => {
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profile.name || profile.username}</h1>
-                <Badge className={`bg-gradient-to-r ${tierStyle(profile.level)} px-3 py-1 text-xs shadow-sm`}>
+                <Badge className={upperStudent ? "border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary" : `bg-gradient-to-r ${tierStyle(profile.level)} px-3 py-1 text-xs shadow-sm`}>
                   {currentTier.icon} {currentTier.name}
                 </Badge>
               </div>
               <p className="text-sm text-foreground/80">@{profile.username}</p>
 
               <div className="max-w-2xl space-y-1">
-                <div className="flex items-center justify-between text-xs text-white/85">
+                <div className={upperStudent ? "flex items-center justify-between text-xs text-muted-foreground" : "flex items-center justify-between text-xs text-white/85"}>
                   <span>Level {profile.level}</span>
                   <span>{xpProgress.current}/220 XP</span>
                 </div>
-                <Progress value={progress} className="h-2 bg-white/20" />
+                <Progress value={progress} className={upperStudent ? "h-2 bg-muted" : "h-2 bg-white/20"} />
                 <p className="text-[11px] text-muted-foreground">Next tier: {nextTier ? nextTier.name : "MAX RANK"}</p>
               </div>
 
               <p className="text-sm text-foreground/80">
-                Level {profile.level} • {(profile.xp ?? 0).toLocaleString()} XP • #{profileRank > 0 ? profileRank : "-"} Rank • Grade {Math.max(1, Math.ceil((profile.level ?? 1) / 2))}
+                Level {profile.level} • {(profile.xp ?? 0).toLocaleString()} XP • #{profileRank > 0 ? profileRank : "-"} Rank • Grade {profile.grade ?? "Not set"}
               </p>
 
               {isSelf ? (
@@ -853,7 +855,7 @@ const UserProfilePage = () => {
                       {photoUploading ? "Uploading…" : "Add profile photo"}
                     </Button>
                   </div>
-                  <p className="text-xs text-white/65">Upload a photo or take one with your camera. JPG, PNG or WebP · up to 5 MB.</p>
+                  <p className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-white/65"}>Upload a photo or take one with your camera. JPG, PNG or WebP · up to 5 MB.</p>
                 </div>
               ) : null}
             </div>
@@ -881,14 +883,14 @@ const UserProfilePage = () => {
                 </Button>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">Premium profile mode</p>
+            <p className="text-xs text-muted-foreground">Student profile</p>
           </CardContent>
         </Card>
 
         <Card className="border-border bg-card/80 backdrop-blur">
           <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
             {[{ label: "Followers", value: followersCount, icon: Users }, { label: "Following", value: followingCount, icon: UserRoundPlus }, { label: "Streak", value: streak, icon: Flame }, { label: "Wins", value: wins, icon: Trophy }].map((stat) => (
-              <motion.div key={stat.label} whileHover={{ y: -4 }} className="rounded-full border border-border bg-card p-3 text-center">
+              <motion.div key={stat.label} whileHover={{ y: -4 }} className="rounded-2xl border border-border bg-card p-3 text-center">
                 <stat.icon className="mx-auto mb-1 h-4 w-4 text-primary" />
                 <p className="text-xs text-muted-foreground">{stat.label}</p>
                 <p className="text-xl font-extrabold">{stat.value.toLocaleString()}</p>
@@ -903,16 +905,16 @@ const UserProfilePage = () => {
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4">
-              <p className="text-xs text-cyan-100">XP this week</p>
+              <p className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-cyan-100"}>XP this week</p>
               <p className="text-xl font-bold">+{weeklyXp}</p>
             </div>
             <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-              <p className="text-xs text-emerald-100">Strong subjects</p>
-              <p className="mt-1 text-sm font-semibold">{insights.strong.length ? insights.strong.join(" • ") : "Math • Logic • Speed"}</p>
+              <p className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-emerald-100"}>Strong subjects</p>
+              <p className="mt-1 text-sm font-semibold">{insights.strong.length ? insights.strong.join(" • ") : "Not enough recorded data yet."}</p>
             </div>
             <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-              <p className="text-xs text-amber-100">Weak subjects</p>
-              <p className="mt-1 text-sm font-semibold">{insights.weak.length ? insights.weak.join(" • ") : "Grammar • Theory"}</p>
+              <p className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-amber-100"}>Weak subjects</p>
+              <p className="mt-1 text-sm font-semibold">{insights.weak.length ? insights.weak.join(" • ") : "Not enough recorded data yet."}</p>
             </div>
           </CardContent>
         </Card>
@@ -933,7 +935,7 @@ const UserProfilePage = () => {
                 className={`min-w-40 snap-start rounded-2xl border p-4 text-left transition ${
                   achievement.locked
                     ? "border-border bg-card opacity-55 blur-[0.4px]"
-                    : "border-cyan-400/30 bg-cyan-400/10 shadow-sm"
+                    : "border-primary/25 bg-primary/5 shadow-sm"
                 }`}
               >
                 <p className="text-4xl">{achievement.icon}</p>
@@ -965,7 +967,7 @@ const UserProfilePage = () => {
 
           <Tabs defaultValue="outfit" className="space-y-4">
             <TabsList className="grid grid-cols-2 gap-2 bg-transparent md:grid-cols-4">
-              <TabsTrigger value="outfit" className="gap-1 data-[state=active]:border-b-2 data-[state=active]:border-cyan-300"><Shirt className="h-4 w-4" />Clothes</TabsTrigger>
+              <TabsTrigger value="outfit" className="gap-1 data-[state=active]:border-b-2 data-[state=active]:border-primary"><Shirt className="h-4 w-4" />Clothes</TabsTrigger>
               <TabsTrigger value="garage" className="gap-1 data-[state=active]:border-b-2 data-[state=active]:border-cyan-300"><Car className="h-4 w-4" />Cars</TabsTrigger>
               <TabsTrigger value="lifestyle" className="gap-1 data-[state=active]:border-b-2 data-[state=active]:border-cyan-300"><Home className="h-4 w-4" />Houses</TabsTrigger>
               <TabsTrigger value="titles" className="gap-1 data-[state=active]:border-b-2 data-[state=active]:border-cyan-300"><Trophy className="h-4 w-4" />Titles</TabsTrigger>
@@ -999,10 +1001,10 @@ const UserProfilePage = () => {
 
         <section className="space-y-3 rounded-3xl border border-border bg-card/70 p-5">
           <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><Rocket className="h-5 w-5 text-primary" />Activity Feed</h2>
-          {(activities.length ? activities : [{ id: "0", text: "Reached a new learning milestone", time: new Date().toISOString(), icon: "spark" as const }]).map((activity, index) => (
+          {activities.length ? activities.map((activity, index) => (
             <motion.div key={activity.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
               <span className="rounded-full border border-border bg-card p-2">
-                {activity.icon === "trophy" ? <Trophy className="h-4 w-4 text-amber-300" /> : activity.icon === "zap" ? <Zap className="h-4 w-4 text-cyan-300" /> : <Sparkles className="h-4 w-4 text-primary" />}
+                {activity.icon === "trophy" ? <Trophy className="h-4 w-4 text-amber-500" /> : activity.icon === "zap" ? <Zap className="h-4 w-4 text-primary" /> : <Sparkles className="h-4 w-4 text-primary" />}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold leading-tight">{activity.text}</p>
@@ -1010,7 +1012,7 @@ const UserProfilePage = () => {
               </div>
               <Clock3 className="h-4 w-4 text-muted-foreground" />
             </motion.div>
-          ))}
+          )) : <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No recent activity has been recorded yet.</p>}
         </section>
 
         <section className="rounded-3xl border border-border bg-card p-5 backdrop-blur">
@@ -1023,7 +1025,7 @@ const UserProfilePage = () => {
               value={aboutText}
               onChange={(event) => setAboutText(event.target.value)}
               placeholder="Tell others about yourself..."
-              className="min-h-16 w-full resize-none rounded-2xl border border-border bg-card p-3 text-sm leading-relaxed text-foreground/80 outline-none focus:border-cyan-400/50"
+              className="min-h-16 w-full resize-none rounded-2xl border border-border bg-card p-3 text-sm leading-relaxed text-foreground/80 outline-none focus:border-primary"
             />
           ) : (
             <p className="text-sm leading-relaxed text-muted-foreground">{aboutText || "This learner hasn't added an about section yet."}</p>
