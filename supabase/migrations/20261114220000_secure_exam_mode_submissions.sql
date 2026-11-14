@@ -63,9 +63,9 @@ begin
   end if;
   if exists (
     select 1
-    from jsonb_object_keys(p_answers) answer_key
+    from jsonb_object_keys(p_answers) as keys(answer_key)
     where not exists (
-      select 1 from unnest(p_question_ids) selected_id
+      select 1 from unnest(p_question_ids) as ids(selected_id)
       where selected_id::text = answer_key
     )
   ) then
