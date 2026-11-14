@@ -7,23 +7,30 @@ import { useUser } from "@/context/UserContext";
 import { useLanguage } from "@/context/LanguageContext";
 import AvatarCreator from "./AvatarCreator";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ProfileSetupProps {
   onComplete: () => void;
 }
 
 const ProfileSetup: React.FC<ProfileSetupProps> = ({ onComplete }) => {
-  const { user, updateProfile } = useUser();
+  const { updateProfile } = useUser();
   const { t } = useLanguage();
   const [gender, setGender] = useState("");
   const [grade, setGrade] = useState("");
-  const [educationLevel, setEducationLevel] = useState("");
   const [avatar, setAvatar] = useState("avatar-1");
   const [step, setStep] = useState(1);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const saved = await updateProfile({ gender, grade, educationLevel, avatar });
+    const { error: gradeError } = await (supabase as any).rpc("set_initial_student_grade", { p_grade: grade });
+    if (gradeError) {
+      console.error("Could not save initial student grade:", gradeError);
+      toast.error(gradeError.message || "Could not save your grade. Please contact school staff if it is already set.");
+      return;
+    }
+    const saved = await updateProfile({ gender, avatar });
     if (saved) onComplete();
   };
 
@@ -81,27 +88,14 @@ const ProfileSetup: React.FC<ProfileSetupProps> = ({ onComplete }) => {
                 <Select value={grade} onValueChange={setGrade}>
                   <SelectTrigger><SelectValue placeholder={t("select-grade")} /></SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => (
+                    {[<SelectItem key="kg" value="KG">KG</SelectItem>, ...Array.from({ length: 12 }, (_, i) => (
                       <SelectItem key={i + 1} value={`${i + 1}`}>{t("grade")} {i + 1}</SelectItem>
-                    ))}
+                    ))]}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="educationLevel">{t("education-level")}</Label>
-                <Select value={educationLevel} onValueChange={setEducationLevel}>
-                  <SelectTrigger><SelectValue placeholder={t("select-education")} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="elementary">{t("elementary")}</SelectItem>
-                    <SelectItem value="middle">{t("middle")}</SelectItem>
-                    <SelectItem value="high">{t("high")}</SelectItem>
-                    <SelectItem value="university">{t("university")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button type="button" className="w-full bg-primary hover:bg-primary-dark" onClick={() => setStep(2)} disabled={!gender || !grade || !educationLevel}>
+              <Button type="button" className="w-full bg-primary hover:bg-primary-dark" onClick={() => setStep(2)} disabled={!gender || !grade}>
                 {t("next")}
               </Button>
             </motion.div>
