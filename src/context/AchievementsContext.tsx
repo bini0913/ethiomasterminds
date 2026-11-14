@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from './UserContext';
-import { toast } from 'sonner';
 
 export interface Badge {
   id: string;
