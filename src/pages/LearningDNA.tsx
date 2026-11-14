@@ -201,7 +201,7 @@ const LearningDNA: React.FC = () => {
             <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-primary" />Data coverage</CardTitle></CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">{Object.entries(learningData!.dataCoverage.sources).map(([source, available]) => <Badge key={source} variant={available ? "secondary" : "outline"}>{source.replace(/([A-Z])/g, " $1")}: {available ? "connected" : "unavailable"}</Badge>)}</div>
-              {learningData!.dataCoverage.sampleLimits.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Some sources reached their report sample limit. The report uses the most recent returned records.</p>}{learningData!.dataCoverage.excludedSources.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Some editable counters and unverified scores are intentionally excluded so they cannot distort your learning report.</p>}
+              {learningData!.dataCoverage.sampleLimits.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Some sources reached their report sample limit. The report uses the most recent returned records.</p>}{learningData!.dataCoverage.excludedSources.length > 0 && <p className="mt-3 text-xs text-muted-foreground">App-recorded activity shows how Master Minds is being used; it cannot prove attention or comprehension. Editable counters and unverified scores are excluded so they cannot distort your learning report.</p>}
             </CardContent>
           </Card>}
         </>
