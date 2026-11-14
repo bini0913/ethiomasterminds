@@ -170,7 +170,7 @@ BEGIN
     AND created_at >= date_trunc('day', now())
     AND (xp_earned > 0 OR coins_earned > 0);
 
-  IF v_daily_rewards >= 100 OR v_question_rewarded THEN
+  IF v_daily_rewards >= 100 THEN
     v_xp_reward := 0;
     v_coin_reward := 0;
   END IF;
