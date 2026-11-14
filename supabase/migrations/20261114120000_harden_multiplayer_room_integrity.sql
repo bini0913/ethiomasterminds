@@ -15,7 +15,6 @@ from public.multiplayer_rooms
 where password is not null and length(password) > 0
 on conflict (room_id) do nothing;
 
-alter table public.multiplayer_rooms drop column password;
 alter table public.multiplayer_room_secrets enable row level security;
 
 create or replace function public.is_multiplayer_room_member(p_room_id uuid)
@@ -284,6 +283,10 @@ begin
   return true;
 end;
 $$;
+
+-- Remove the former exposed plaintext password column only after the room RPCs
+-- no longer reference it.
+alter table public.multiplayer_rooms drop column password;
 
 -- A client may only assert existing membership; it cannot silently join a
 -- password-protected room through the old ensure-membership RPC.
