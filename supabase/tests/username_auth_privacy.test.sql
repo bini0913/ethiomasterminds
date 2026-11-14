@@ -1,0 +1,12 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(7);
+select ok(not has_function_privilege('anon','public.get_email_by_username(text)','execute'),'anonymous callers cannot retrieve account email by username');
+select ok(not has_function_privilege('authenticated','public.get_email_by_username(text)','execute'),'authenticated callers cannot retrieve account email by username');
+select ok(has_function_privilege('service_role','public.consume_username_auth_rate_limit(text)','execute'),'service role can consume username auth rate limits');
+select ok(not has_function_privilege('anon','public.consume_username_auth_rate_limit(text)','execute'),'anonymous callers cannot manipulate username auth rate limits');
+select ok(not has_function_privilege('authenticated','public.consume_username_auth_rate_limit(text)','execute'),'authenticated callers cannot manipulate username auth rate limits');
+select ok(not has_table_privilege('anon','public.username_auth_rate_limits','SELECT'),'anonymous callers cannot read username auth rate limits');
+select ok(not has_table_privilege('authenticated','public.username_auth_rate_limits','SELECT'),'authenticated callers cannot read username auth rate limits');
+select * from finish();
+rollback;
