@@ -1,6 +1,22 @@
 -- Multiplayer integrity hardening.
--- Direct client writes are removed: all state transitions remain behind validated RPCs.
--- Public room discovery exposes no room passwords or private match data.
+-- Room secrets are moved out of the exposed room row; clients never receive password hashes.
+-- Direct client writes are removed: state transitions remain behind validated RPCs.
+
+create table public.multiplayer_room_secrets (
+  room_id uuid primary key references public.multiplayer_rooms(id) on delete cascade,
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
+
+-- Preserve existing private-room passwords while moving them to a non-client-readable table.
+insert into public.multiplayer_room_secrets (room_id, password_hash)
+select id, extensions.crypt(password, extensions.gen_salt('bf'))
+from public.multiplayer_rooms
+where password is not null and length(password) > 0
+on conflict (room_id) do nothing;
+
+alter table public.multiplayer_rooms drop column password;
+alter table public.multiplayer_room_secrets enable row level security;
 
 create or replace function public.is_multiplayer_room_member(p_room_id uuid)
 returns boolean
@@ -9,10 +25,10 @@ stable
 security definer
 set search_path = ''
 as $$
-  select auth.uid() is not null
+  select (select auth.uid()) is not null
     and exists (
       select 1 from public.room_players rp
-      where rp.room_id = p_room_id and rp.user_id = auth.uid()
+      where rp.room_id = p_room_id and rp.user_id = (select auth.uid())
     );
 $$;
 
@@ -24,10 +40,14 @@ security definer
 set search_path = ''
 as $$
   select exists (
-    select 1 from public.multiplayer_rooms mr
+    select 1
+    from public.multiplayer_rooms mr
     where mr.id = p_room_id
       and mr.status in ('waiting', 'countdown')
-      and mr.password is null
+      and not exists (
+        select 1 from public.multiplayer_room_secrets s
+        where s.room_id = mr.id
+      )
   );
 $$;
 
@@ -72,7 +92,7 @@ on public.multiplayer_rooms
 for select to authenticated
 using (
   public.is_multiplayer_room_member(id)
-  or (status in ('waiting', 'countdown') and password is null)
+  or public.is_multiplayer_public_room(id)
 );
 
 -- Room rosters are visible to members and while an unlocked room is discoverable.
@@ -94,25 +114,27 @@ on public.room_chat_messages
 for select to authenticated
 using (public.is_multiplayer_room_member(room_id));
 
--- No client-facing policies for answers or assigned questions. Those records are
--- accessed only inside SECURITY DEFINER gameplay/result RPCs.
+-- No client-facing policies for answers, question assignments, or room secrets.
+-- Those records are accessed only inside validated SECURITY DEFINER routines.
 
--- Remove both table-level and any historical column-level grants.
 revoke all privileges on table
   public.multiplayer_rooms,
   public.room_players,
   public.room_answers,
   public.room_questions,
   public.room_state,
-  public.room_chat_messages
+  public.room_chat_messages,
+  public.multiplayer_room_secrets
 from anon, authenticated;
 
+-- Remove historical column-level grants as well as table-level grants.
 do $$
 declare
   v_table record;
 begin
   for v_table in
-    select table_name, string_agg(quote_ident(column_name), ', ' order by ordinal_position) as columns
+    select table_name,
+           string_agg(quote_ident(column_name), ', ' order by ordinal_position) as columns
     from information_schema.columns
     where table_schema = 'public'
       and table_name in (
@@ -121,7 +143,8 @@ begin
         'room_answers',
         'room_questions',
         'room_state',
-        'room_chat_messages'
+        'room_chat_messages',
+        'multiplayer_room_secrets'
       )
     group by table_name
   loop
@@ -134,17 +157,136 @@ begin
 end;
 $$;
 
--- Room passwords are deliberately not selectable by clients.
-grant select (
-  id, created_at, current_question, difficulty, finished_at, game_mode,
-  host_id, max_players, name, question_count, started_at, status, subject
-) on table public.multiplayer_rooms to authenticated;
+-- All room columns are now safe to read; table-level SELECT also preserves
+-- Supabase Realtime authorization. Password hashes live in the private table.
+grant select on table public.multiplayer_rooms to authenticated;
 grant select on table public.room_players to authenticated;
 grant select on table public.room_state to authenticated;
 grant select on table public.room_chat_messages to authenticated;
 
--- A client may only assert existing membership; it can no longer silently join
--- a password-protected room through the old ensure-membership RPC.
+-- Replace room creation/joining so password checks happen only in the database.
+create or replace function public.multiplayer_create_room(
+  p_name text,
+  p_subject text,
+  p_difficulty text,
+  p_question_count integer,
+  p_max_players integer,
+  p_password text default null
+)
+returns public.multiplayer_rooms
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := (select auth.uid());
+  v_room public.multiplayer_rooms%rowtype;
+begin
+  if v_uid is null then
+    raise exception 'Authentication required';
+  end if;
+  if p_max_players is null or p_max_players < 2 or p_max_players > 8 then
+    raise exception 'Player limit must be between 2 and 8';
+  end if;
+  if p_question_count is null or p_question_count < 1 or p_question_count > 50 then
+    raise exception 'Question count must be between 1 and 50';
+  end if;
+
+  insert into public.multiplayer_rooms (
+    name, host_id, max_players, subject, difficulty,
+    question_count, status, game_mode
+  )
+  values (
+    left(trim(coalesce(p_name, 'Room')), 80),
+    v_uid,
+    p_max_players,
+    coalesce(nullif(trim(p_subject), ''), 'Mixed'),
+    coalesce(nullif(trim(p_difficulty), ''), 'Medium'),
+    p_question_count,
+    'waiting',
+    'speed'
+  )
+  returning * into v_room;
+
+  if nullif(trim(coalesce(p_password, '')), '') is not null then
+    insert into public.multiplayer_room_secrets (room_id, password_hash)
+    values (v_room.id, extensions.crypt(p_password, extensions.gen_salt('bf')));
+  end if;
+
+  insert into public.room_players (room_id, user_id, is_ready)
+  values (v_room.id, v_uid, true);
+
+  return v_room;
+end;
+$$;
+
+create or replace function public.multiplayer_join_room(
+  p_room_id uuid,
+  p_password text default null
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := (select auth.uid());
+  v_room public.multiplayer_rooms%rowtype;
+  v_password_hash text;
+  v_count integer;
+begin
+  if v_uid is null then
+    raise exception 'Authentication required';
+  end if;
+
+  select * into v_room
+  from public.multiplayer_rooms
+  where id = p_room_id
+  for update;
+
+  if not found or v_room.status not in ('waiting', 'countdown', 'playing') then
+    raise exception 'Room is no longer available';
+  end if;
+
+  -- Existing players may reconnect to a live match without rejoining.
+  if exists (
+    select 1 from public.room_players
+    where room_id = p_room_id and user_id = v_uid
+  ) then
+    return true;
+  end if;
+
+  -- New players cannot enter after the match starts.
+  if v_room.status = 'playing' then
+    raise exception 'This match has already started';
+  end if;
+
+  select password_hash into v_password_hash
+  from public.multiplayer_room_secrets
+  where room_id = p_room_id;
+
+  if v_password_hash is not null
+     and extensions.crypt(coalesce(p_password, ''), v_password_hash) <> v_password_hash then
+    raise exception 'Incorrect password';
+  end if;
+
+  select count(*)::integer into v_count
+  from public.room_players
+  where room_id = p_room_id;
+
+  if v_count >= v_room.max_players then
+    raise exception 'Room is full';
+  end if;
+
+  insert into public.room_players (room_id, user_id, is_ready)
+  values (p_room_id, v_uid, false);
+
+  return true;
+end;
+$$;
+
+-- A client may only assert existing membership; it cannot silently join a
+-- password-protected room through the old ensure-membership RPC.
 create or replace function public.multiplayer_assert_room_member(p_room_id uuid)
 returns boolean
 language plpgsql
@@ -152,7 +294,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if auth.uid() is null then
+  if (select auth.uid()) is null then
     raise exception 'Authentication required';
   end if;
   if not public.is_multiplayer_room_member(p_room_id) then
@@ -179,7 +321,7 @@ declare
   v_end timestamptz := clock_timestamp() + interval '5 seconds';
   v_player_count integer;
 begin
-  if auth.uid() is null then
+  if (select auth.uid()) is null then
     raise exception 'Authentication required';
   end if;
 
@@ -192,7 +334,7 @@ begin
   if not found then
     raise exception 'Room not found';
   end if;
-  if v_host <> auth.uid() then
+  if v_host <> (select auth.uid()) then
     raise exception 'Only the host can start the countdown';
   end if;
   if v_status not in ('waiting', 'countdown') then
@@ -236,8 +378,8 @@ $$;
 revoke all on function public.multiplayer_set_countdown(uuid) from public, anon;
 grant execute on function public.multiplayer_set_countdown(uuid) to authenticated;
 
--- Harden answer submission: authentication, room/player/question existence,
--- option membership, server-measured elapsed time, and server-owned scoring.
+-- Harden answer submission: authentication, membership, assigned-question and
+-- option validation, server-measured elapsed time, and server-owned scoring.
 create or replace function public.multiplayer_submit_answer(
   p_room_id uuid,
   p_question_id uuid,
@@ -259,7 +401,7 @@ declare
   correct_index integer;
   elapsed integer;
 begin
-  if auth.uid() is null then
+  if (select auth.uid()) is null then
     raise exception 'Authentication required';
   end if;
 
@@ -273,7 +415,7 @@ begin
 
   select * into p
   from public.room_players
-  where room_id = p_room_id and user_id = auth.uid()
+  where room_id = p_room_id and user_id = (select auth.uid())
   for update;
 
   if not found then
@@ -305,7 +447,7 @@ begin
   if exists (
     select 1 from public.room_answers
     where room_id = p_room_id
-      and user_id = auth.uid()
+      and user_id = (select auth.uid())
       and question_id = p_question_id
   ) then
     raise exception 'Question already answered';
@@ -348,7 +490,7 @@ begin
     room_id, user_id, question_id, answer, is_correct, points, time_used
   )
   values (
-    p_room_id, auth.uid(), p_question_id, trim(p_answer), ok, pts, elapsed
+    p_room_id, (select auth.uid()), p_question_id, trim(p_answer), ok, pts, elapsed
   );
 
   update public.room_players
@@ -381,8 +523,7 @@ end;
 $$;
 
 -- RPCs are the only write path. Remove implicit PUBLIC/anon EXECUTE grants
--- from every multiplayer SECURITY DEFINER routine, then grant authenticated
--- callers the routines whose own bodies enforce membership/host ownership.
+-- from multiplayer SECURITY DEFINER routines and grant only authenticated callers.
 do $$
 declare
   v_fn record;
@@ -395,7 +536,7 @@ begin
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
       and p.prokind = 'f'
-      and (p.proname like 'multiplayer\_%' escape '\')
+      and p.proname like 'multiplayer\_%' escape '\'
   loop
     execute format('revoke execute on function %s from public, anon', v_fn.signature);
     execute format('alter function %s set search_path = %L', v_fn.signature, '');
@@ -410,7 +551,7 @@ begin
 end;
 $$;
 
--- Cleanup is a bounded maintenance RPC. It is never exposed to anonymous callers.
+-- Cleanup is a bounded maintenance RPC; it is never exposed to anonymous callers.
 revoke execute on function public.cleanup_expired_multiplayer_rooms() from public, anon;
 grant execute on function public.cleanup_expired_multiplayer_rooms() to authenticated;
 
@@ -418,3 +559,5 @@ comment on table public.room_answers is
   'Private gameplay records. Client access is denied; use validated multiplayer RPCs.';
 comment on table public.room_questions is
   'Private per-room question assignment. Client access is denied; use validated multiplayer RPCs.';
+comment on table public.multiplayer_room_secrets is
+  'Private room password hashes. No direct client privileges; access only through validated room RPCs.';
