@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(25);
+select plan(27);
 
 -- Isolated fixtures; the test transaction rolls back all inserted rows.
 insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)
@@ -46,6 +46,8 @@ select ok(not has_table_privilege('authenticated', 'public.room_state', 'update'
 select ok(not has_table_privilege('authenticated', 'public.room_chat_messages', 'insert'), 'authenticated must send chat through the RPC');
 select ok(has_table_privilege('authenticated', 'public.multiplayer_rooms', 'select'), 'authenticated retains table-level room SELECT for Realtime');
 select ok(not has_table_privilege('authenticated', 'public.multiplayer_room_secrets', 'select'), 'authenticated cannot read room password hashes');
+select ok(not has_function_privilege('anon', 'public.multiplayer_join_room(uuid,text)', 'execute'), 'anon cannot invoke room join RPC');
+select ok(has_function_privilege('authenticated', 'public.multiplayer_join_room(uuid,text)', 'execute'), 'authenticated can use validated room join RPC');
 select ok(not exists (
   select 1 from information_schema.columns
   where table_schema = 'public'
