@@ -710,3 +710,44 @@
   .mm-studio-upper .tier-upper :where(main) { padding-bottom: max(5.5rem, env(safe-area-inset-bottom)); }
   .mm-studio-upper .tier-upper :where([class*="grid-cols-4"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Apply the Figma workspace treatment to every Grade 9–12 academic route. */
+.mm-studio-upper :where(.tier-upper, .mm-academic-upper) {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+.mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.border) {
+  border-color: hsl(var(--border));
+}
+.mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.bg-gradient-to-r, .bg-gradient-to-br, .bg-gradient-to-b) {
+  background-image: none !important;
+}
+.mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.bg-card) {
+  background-color: hsl(var(--card));
+}
+.mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.rounded-lg.border, .rounded-xl.border, .rounded-2xl.border, .rounded-3xl.border) {
+  border-color: hsl(var(--border));
+  box-shadow: 0 1px 2px hsl(207 43% 16% / .04);
+}
+.mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.rounded-lg.border, .rounded-xl.border, .rounded-2xl.border, .rounded-3xl.border):hover {
+  border-color: hsl(var(--primary) / .28);
+}
+.mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(input, select, textarea) {
+  border-color: hsl(var(--input));
+  border-radius: .8rem;
+}
+.mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible) {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.mm-studio-upper :where(.tier-upper, .mm-academic-upper) h1 {
+  letter-spacing: -.025em;
+}
+@media (max-width: 640px) {
+  .mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(main) {
+    padding-bottom: max(5.5rem, env(safe-area-inset-bottom));
+  }
+  .mm-studio-upper :where(.tier-upper, .mm-academic-upper) :where(.grid-cols-4) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
