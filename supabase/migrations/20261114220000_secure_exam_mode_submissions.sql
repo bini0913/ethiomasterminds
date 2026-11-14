@@ -20,6 +20,7 @@ declare
   v_user_id uuid := auth.uid();
   v_difficulty text;
   v_quiz_subject text;
+  v_quiz_source_kind text;
   v_subject text;
   v_exam_type text;
   v_total_questions integer;
@@ -72,8 +73,8 @@ begin
     raise exception 'Answers include a question outside this exam';
   end if;
 
-  select difficulty, subject
-    into v_difficulty, v_quiz_subject
+  select difficulty, subject, source_kind
+    into v_difficulty, v_quiz_subject, v_quiz_source_kind
   from public.quizzes
   where id = p_quiz_id
     and is_approved is true;
@@ -137,10 +138,12 @@ begin
   end if;
   -- The approved quiz is the source of truth; never accept a client-selected subject.
   v_subject := coalesce(nullif(btrim(v_quiz_subject), ''), 'General');
+  -- Preserve the selected session mode, but derive paper-vs-practice from the approved quiz.
   v_exam_type := case
-    when p_exam_type in ('mixed_practice', 'mock_exam', 'past_paper', 'topic_practice', 'general')
-      then p_exam_type
-    else 'mixed_practice'
+    when p_exam_type = 'mock_exam' then 'mock_exam'
+    when p_exam_type = 'mixed_practice' then 'mixed_practice'
+    when v_quiz_source_kind = 'past_paper' then 'past_paper'
+    else 'topic_practice'
   end;
 
   insert into public.quiz_results (
