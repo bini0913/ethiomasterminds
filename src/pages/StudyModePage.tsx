@@ -418,8 +418,6 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    const minutesCompleted = Math.max(1, Math.ceil(elapsedSeconds / 60));
-
     let data: { xp_earned?: number; coins_earned?: number } | null = null;
     try {
       const result = await db.rpc("complete_study_session", {
@@ -436,8 +434,14 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    const rewardXp = (data?.xp_earned as number | undefined) ?? minutesCompleted * 10;
-    const rewardCoins = (data?.coins_earned as number | undefined) ?? minutesCompleted;
+    // Rewards are written by the server RPC. Never infer or display a reward
+    // from the client timer when the RPC response omits its authoritative totals.
+    const rewardXp = typeof data?.xp_earned === "number" && Number.isFinite(data.xp_earned)
+      ? Math.max(0, Math.floor(data.xp_earned))
+      : null;
+    const rewardCoins = typeof data?.coins_earned === "number" && Number.isFinite(data.coins_earned)
+      ? Math.max(0, Math.floor(data.coins_earned))
+      : null;
 
     setActiveSession(null);
     setTimerState("completed");
@@ -450,10 +454,18 @@ const StudyModePage: React.FC = () => {
       setBreakTargetSeconds(nextBreakSeconds);
       setBreakDeadlineMs(Date.now() + nextBreakSeconds * 1000);
       setCountdownSeconds(nextBreakSeconds);
-       toast.success(`Focus complete 🎉 +${rewardXp} XP +${rewardCoins} coins. Break started.`);
+      toast.success(
+        rewardXp !== null && rewardCoins !== null
+          ? `Focus complete. +${rewardXp} XP and +${rewardCoins} coins. Break started.`
+          : "Focus session completed. Reward totals could not be confirmed."
+      );
     } else {
       setBreakDeadlineMs(null);
-      toast.success(`Session completed ✅ +${rewardXp} XP +${rewardCoins} coins.`);
+      toast.success(
+        rewardXp !== null && rewardCoins !== null
+          ? `Session completed. +${rewardXp} XP and +${rewardCoins} coins.`
+          : "Session completed. Reward totals could not be confirmed."
+      );
     }
 
     try {
