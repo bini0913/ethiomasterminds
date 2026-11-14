@@ -1,150 +1,195 @@
-import React from "react";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  ArrowRight, BarChart3, BookOpen, BrainCircuit, CalendarDays, Flame, GraduationCap,
-  LibraryBig, LogOut, Play, Settings, Swords, Target, Timer, Trophy, Users, Bot, Zap,
-} from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Activity, ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2, Clock3, Flame, GraduationCap, LibraryBig, Play, Sparkles, Target, Timer, Trophy, Zap } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
+import { supabase } from "@/integrations/supabase/client";
 import { getXpProgressInLevel } from "@/lib/rankSystem";
-import AvatarRenderer from "@/components/avatar/AvatarRenderer";
-import ThemeToggle from "@/components/layout/ThemeToggle";
 
-const drill = [
-  { title: "Entrance exam drill", sub: "Timed past-paper questions", to: "/academic/exam", icon: Target },
-  { title: "Deep focus session", sub: "25 min study timer", to: "/study-mode", icon: Timer },
-  { title: "Flashcard review", sub: "Formulas & past mistakes", to: "/academic/flashcards", icon: BrainCircuit },
-  { title: "Past papers", sub: "Real national exams", to: "/academic/entrance-papers", icon: GraduationCap },
-];
-const tools = [
-  { title: "Topics", to: "/academic/topics", icon: BookOpen },
-  { title: "Planner", to: "/academic/planner", icon: CalendarDays },
-  { title: "Insights", to: "/academic/insights", icon: BarChart3 },
-  { title: "AI Tutor", to: "/ai-tutor", icon: Bot },
-  { title: "Library", to: "/library", icon: LibraryBig },
-  { title: "Battle", to: "/multiplayer", icon: Swords },
-  { title: "Tournaments", to: "/tournaments", icon: Trophy },
-  { title: "Friends", to: "/friends", icon: Users },
-];
-const days = ["M", "T", "W", "T", "F", "S", "S"];
+type TopicRow = { subject: string; topic: string; accuracy_percentage: number | null; questions_attempted: number | null };
+type ResultRow = { correct_answers: number | null; total_questions: number | null; completed_at: string | null };
 
-function Ring({ value }: { value: number }) {
-  const r = 34, c = 2 * Math.PI * r;
-  return <svg viewBox="0 0 80 80" className="h-28 w-28 -rotate-90" aria-hidden="true">
-    <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" className="stroke-primary-foreground/20" />
-    <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" strokeLinecap="round" className="stroke-primary-foreground transition-[stroke-dashoffset] duration-700" strokeDasharray={c} strokeDashoffset={c - (value / 100) * c} />
-  </svg>;
-}
+const actions = [
+  { title: "Academic preparation", detail: "Plan subjects and prepare for exams", to: "/academic", icon: GraduationCap },
+  { title: "Exam mode", detail: "Start a timed practice session", to: "/academic/exam", icon: Target },
+  { title: "Flashcards", detail: "Review and strengthen recall", to: "/academic/flashcards", icon: BrainCircuit },
+  { title: "Textbooks & library", detail: "Continue from your learning resources", to: "/library", icon: LibraryBig },
+];
 
 const UpperTierHome: React.FC = () => {
-  const { user, logout } = useUser();
+  const { user } = useUser();
   const { coins, dailyStreak } = useCurrency();
-  const navigate = useNavigate();
-  const firstName = user?.name?.trim().split(/\s+/)[0] || "Scholar";
-  const gradeNum = user?.grade?.replace(/^grade\s*/i, "") || "";
-  const xp = user?.xp ?? 0;
-  const level = user?.level ?? 1;
-  const levelProgress = getXpProgressInLevel(xp);
-  const progress = levelProgress.percentage;
-  const xpToNextLevel = levelProgress.max - levelProgress.current;
-  const todayIdx = (new Date().getDay() + 6) % 7;
-  const streakDays = Math.min(dailyStreak, todayIdx + 1);
+  const [topics, setTopics] = useState<TopicRow[]>([]);
+  const [recentResults, setRecentResults] = useState<ResultRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const xp = Number(user?.xp) || 0;
+  const level = Number(user?.level) || 1;
+  const xpProgress = getXpProgressInLevel(xp);
+  const firstName = user?.name?.trim().split(/\s+/)[0] || "Student";
+  const grade = user?.grade ? (/grade/i.test(user.grade) ? user.grade : "Grade " + user.grade) : "Grades 9–12";
   const hour = new Date().getHours();
-  const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  const stats = [
-    { label: "Streak", value: `${dailyStreak}`, icon: Flame, tone: "text-warning bg-warning/15" },
-    { label: "Total XP", value: xp.toLocaleString(), icon: Zap, tone: "text-primary bg-primary/10" },
-    { label: "Level", value: `${level}`, icon: GraduationCap, tone: "text-accent bg-accent/15" },
-  ];
+  useEffect(() => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      setLoadError(null);
+      const [topicResponse, resultResponse] = await Promise.all([
+        supabase.from("topic_progress")
+          .select("subject,topic,accuracy_percentage,questions_attempted")
+          .eq("user_id", user.id)
+          .gt("questions_attempted", 0)
+          .order("accuracy_percentage", { ascending: true })
+          .limit(6),
+        supabase.from("quiz_results")
+          .select("correct_answers,total_questions,completed_at")
+          .eq("student_id", user.id)
+          .order("completed_at", { ascending: false })
+          .limit(5),
+      ]);
+      if (!active) return;
+      if (topicResponse.error || resultResponse.error) {
+        console.error("Grades 9–12 dashboard data could not be fully loaded:", topicResponse.error || resultResponse.error);
+        setLoadError("Some learning information is temporarily unavailable. Your saved account data has not been changed.");
+      }
+      setTopics((topicResponse.data || []) as TopicRow[]);
+      setRecentResults((resultResponse.data || []) as ResultRow[]);
+      setLoading(false);
+    };
+    void load();
+    return () => { active = false; };
+  }, [user?.id]);
 
-  return <div className="min-h-screen bg-background pb-28 text-foreground lg:pb-10">
-    <header className="sticky top-0 z-30 border-b border-border/70 bg-background/90 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-        <Link to={user?.id ? `/profile/${user.id}` : "/settings"} aria-label="Open your profile" className="shrink-0 rounded-full"><AvatarRenderer avatar={user?.avatar} avatarConfig={user?.avatarConfig} size="md" className="h-10 w-10 ring-2 ring-primary/20" /></Link>
-        <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{greet}{gradeNum ? ` · Grade ${gradeNum}` : ""}</p><h1 className="truncate text-base font-bold">{firstName}</h1></div>
-        <div className="hidden items-center gap-2 sm:flex">
-          {stats.map(s => <span key={s.label} title={s.label} className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-bold tabular-nums"><s.icon className={`h-4 w-4 ${s.tone.split(" ")[0]}`} />{s.value}</span>)}
+  const totals = useMemo(() => recentResults.reduce((sum, result) => ({
+    correct: sum.correct + (Number(result.correct_answers) || 0),
+    questions: sum.questions + (Number(result.total_questions) || 0),
+  }), { correct: 0, questions: 0 }), [recentResults]);
+  const recentAccuracy = totals.questions ? Math.round((totals.correct / totals.questions) * 100) : null;
+  const nextLevelXp = Math.max(0, xpProgress.max - xpProgress.current);
+
+  return (
+    <div className="space-y-7">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">{grade} · Your learning workspace</p>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">{greeting}, {firstName}.</h1>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">A clear place to study, practise, track progress and learn with others.</p>
         </div>
-        <ThemeToggle className="h-10 w-10 rounded-xl" />
-        <Link to="/settings" aria-label="Settings" className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted"><Settings className="h-5 w-5" /></Link>
-        <button type="button" onClick={async () => { await logout(); navigate("/", { replace: true }); }} aria-label="Log out" className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><LogOut className="h-5 w-5" /></button>
-      </div>
-    </header>
+        <Link to="/study-mode" className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-105 sm:self-auto">
+          <Play className="h-4 w-4 fill-current" /> Start a study session
+        </Link>
+      </section>
 
-    <main className="mx-auto grid max-w-6xl gap-5 px-4 py-5 md:py-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
-      <div className="min-w-0 space-y-6">
-        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-foreground via-foreground to-primary p-6 text-background shadow-lg md:p-8">
-          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/30 blur-2xl" />
-          <div className="relative flex items-center gap-6">
-            <div className="min-w-0 flex-1">
-              <p className="inline-flex items-center gap-2 rounded-full bg-background/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em]"><GraduationCap className="h-3.5 w-3.5" /> Grade 9–12 learning workspace</p>
-              <h2 className="mt-3 text-2xl font-extrabold leading-tight md:text-4xl">Every session moves you closer, {firstName}.</h2>
-              <p className="mt-2 max-w-md text-sm opacity-80 md:text-base">Today's drill: timed questions, a focus block and a quick review. {100 - progress} XP to level {level + 1}.</p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Link to="/academic/exam" className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground shadow-[0_4px_0_hsl(var(--primary)/0.45)] transition active:translate-y-1 active:shadow-none"><Play className="h-5 w-5 fill-current" /> Start today's drill</Link>
-                <Link to="/academic/planner" className="inline-flex min-h-12 items-center gap-2 rounded-2xl border border-background/25 px-5 font-semibold transition hover:bg-background/10"><CalendarDays className="h-5 w-5" /> Plan</Link>
-              </div>
-            </div>
-            <div className="relative hidden shrink-0 text-primary-foreground sm:block">
-              <Ring value={progress} />
-              <span className="absolute inset-0 flex flex-col items-center justify-center text-background"><span className="text-2xl font-extrabold tabular-nums">{progress}%</span><span className="text-[10px] uppercase opacity-80">Level {level}</span></span>
+      <section className="relative overflow-hidden rounded-[28px] bg-[#0b625a] p-5 text-white shadow-[0_16px_38px_rgba(11,98,90,.16)] sm:p-8">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border-[36px] border-white/5" />
+        <div className="pointer-events-none absolute -bottom-28 right-1/4 h-56 w-56 rounded-full bg-[#137f72]/70 blur-3xl" />
+        <div className="relative grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em]"><Sparkles className="h-3.5 w-3.5" /> Learn · Compete · Level up</span>
+            <h2 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl">Make your next study session count.</h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-white/75">Pick up your preparation, practise a topic or join a study session. Your progress is based on activity saved to your account.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link to="/academic/exam" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[#0b625a] transition hover:bg-[#e4f3ef]"><Target className="h-4 w-4" /> Open exam mode</Link>
+              <Link to="/academic/planner" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/30 px-4 text-sm font-semibold text-white transition hover:bg-white/10"><CalendarDays className="h-4 w-4" /> Study planner</Link>
             </div>
           </div>
-        </section>
-
-        <section className="grid grid-cols-3 gap-2 sm:hidden">
-          {stats.map(s => <div key={s.label} className="rounded-2xl border bg-card p-3 text-center"><span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-lg ${s.tone}`}><s.icon className="h-4 w-4" /></span><p className="mt-1.5 text-lg font-extrabold tabular-nums">{s.value}</p><p className="text-[11px] text-muted-foreground">{s.label}</p></div>)}
-        </section>
-
-        <section>
-          <div className="mb-4"><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Exam preparation</p><h2 className="text-xl font-extrabold md:text-2xl">Recommended next steps</h2><p className="mt-1 text-sm text-muted-foreground">Choose a task to continue your preparation.</p></div>
-          <ol className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-            {drill.map((step, i) => {
-              const current = i === 0;
-              return <li key={step.to}>
-                <Link to={step.to} className={`flex items-center gap-4 rounded-2xl border-2 p-4 transition active:scale-[.99] ${current ? "border-primary bg-primary/5 shadow-[0_4px_0_hsl(var(--primary)/0.35)]" : "border-border bg-card hover:border-primary/40"}`}>
-                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                    <step.icon className="h-6 w-6" />
-                  </span>
-                  <span className="min-w-0 flex-1"><span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">Step {i + 1}</span><span className="block font-bold">{step.title}</span><span className="block text-sm text-muted-foreground">{step.sub}</span></span>
-                  <span className={current ? "rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground" : "text-xs font-semibold text-muted-foreground"}>{current ? "Recommended" : "Open"}</span>
-                </Link>
-              </li>;
-            })}
-          </ol>
-        </section>
-
-        <section>
-          <h2 className="mb-4 text-xl font-extrabold md:text-2xl">Study toolkit</h2>
-          <div className="grid grid-cols-4 gap-2 sm:gap-3">
-            {tools.map(t => <Link key={t.to} to={t.to} className="group flex flex-col items-center gap-2 rounded-2xl border bg-card p-3 text-center transition hover:-translate-y-0.5 hover:border-primary/40 sm:p-4">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary transition group-hover:bg-primary group-hover:text-primary-foreground sm:h-12 sm:w-12"><t.icon className="h-5 w-5" /></span>
-              <span className="text-xs font-bold sm:text-sm">{t.title}</span>
-            </Link>)}
+          <div className="flex items-center gap-4 rounded-2xl border border-white/15 bg-white/10 p-4 md:min-w-[220px] md:flex-col md:gap-2 md:text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-[5px] border-white/25 text-lg font-extrabold tabular-nums" style={{ background: "conic-gradient(#ffffff " + xpProgress.percentage + "%, rgba(255,255,255,.14) 0)" }}>
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0b625a]">{xpProgress.percentage}%</span>
+            </div>
+            <div><p className="text-sm font-bold">Level {level} progress</p><p className="text-xs text-white/70">{nextLevelXp.toLocaleString()} XP to next level</p></div>
           </div>
-        </section>
-      </div>
-
-      <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-        <section className="rounded-3xl border bg-card p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Entrance exam preparation</p>
-          <p className="mt-2 text-lg font-extrabold">Practice with verified papers</p>
-          <p className="mt-1 text-sm text-muted-foreground">Use available past papers and track coverage from your selected textbooks. Exam dates are shown only when officially configured.</p>
-          <Link to="/academic/topics" className="mt-4 flex items-center justify-between rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground hover:bg-secondary/80">Check topic coverage <ArrowRight className="h-4 w-4" /></Link>
-        </section>
-        <section className="rounded-3xl border bg-card p-5">
-          <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-warning/15 text-warning"><Flame className="h-6 w-6" /></span><div><p className="text-2xl font-extrabold tabular-nums">{dailyStreak} day{dailyStreak === 1 ? "" : "s"}</p><p className="text-sm text-muted-foreground">Study streak</p></div></div>
-          <div className="mt-4 grid grid-cols-7 gap-1.5">
-            {days.map((d, i) => { const lit = i <= todayIdx && i > todayIdx - streakDays; return <div key={i} className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${lit ? "bg-warning text-warning-foreground" : i === todayIdx ? "border-2 border-warning text-warning" : "bg-muted text-muted-foreground"}`}>{lit ? <Flame className="h-4 w-4" /> : d}</div>; })}
-          </div>
-        </section>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
-          <Link to="/leaderboard" className="flex items-center gap-3 rounded-3xl border bg-card p-4 hover:border-primary/40"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Trophy className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block font-bold">Leaderboard</span><span className="block truncate text-sm text-muted-foreground">See your rank</span></span></Link>
-          <Link to="/store" className="flex items-center gap-3 rounded-3xl border bg-card p-4 hover:border-primary/40"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent/15 text-accent"><Zap className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block font-bold">Store</span><span className="block truncate text-sm text-muted-foreground">{coins.toLocaleString()} coins</span></span></Link>
         </div>
-      </aside>
-    </main>
-  </div>;
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Experience", value: xp.toLocaleString() + " XP", icon: Zap },
+          { label: "Level", value: String(level), icon: GraduationCap },
+          { label: "Study streak", value: String(Number(dailyStreak) || 0) + " days", icon: Flame },
+          { label: "Coins", value: (Number(coins) || 0).toLocaleString(), icon: Trophy },
+        ].map((stat) => {
+          const Icon = stat.icon;
+          return <div key={stat.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-[18px] w-[18px]" /></span>
+            <p className="mt-3 text-xl font-extrabold tabular-nums">{stat.value}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{stat.label}</p>
+          </div>;
+        })}
+      </section>
+
+      <section>
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Your learning tools</p><h2 className="mt-1 text-xl font-extrabold sm:text-2xl">Choose what to work on</h2></div>
+          <Link to="/academic" className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">Academic hub <ArrowRight className="h-4 w-4" /></Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {actions.map((action) => {
+            const Icon = action.icon;
+            return <Link key={action.to} to={action.to} className="group flex min-h-[132px] flex-col rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
+              <span className="mt-3 font-bold">{action.title}</span>
+              <span className="mt-1 text-xs leading-5 text-muted-foreground">{action.detail}</span>
+              <ArrowRight className="ml-auto mt-2 h-4 w-4 text-primary transition group-hover:translate-x-1" />
+            </Link>;
+          })}
+        </div>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,.8fr)]">
+        <section className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Recorded performance</p><h2 className="mt-1 text-lg font-extrabold">Topic coverage</h2></div>
+            <Link to="/academic/topics" aria-label="Open topic coverage" className="flex h-9 w-9 items-center justify-center rounded-lg text-primary hover:bg-primary/10"><ArrowRight className="h-4 w-4" /></Link>
+          </div>
+          {loading ? <div className="mt-5 space-y-3" aria-label="Loading topic coverage"><div className="h-4 w-2/3 animate-pulse rounded bg-muted" /><div className="h-3 animate-pulse rounded bg-muted" /><div className="h-3 w-4/5 animate-pulse rounded bg-muted" /></div> :
+            topics.length ? <div className="mt-5 space-y-4">
+              {topics.slice(0, 5).map((topic, index) => {
+                const accuracy = Math.max(0, Math.min(100, Number(topic.accuracy_percentage) || 0));
+                return <div key={topic.subject + topic.topic + index}>
+                  <div className="mb-1.5 flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate font-semibold">{topic.topic}</span><span className="shrink-0 text-xs font-bold tabular-nums text-muted-foreground">{accuracy}%</span></div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: accuracy + "%" }} /></div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{topic.subject} · {Number(topic.questions_attempted) || 0} questions attempted</p>
+                </div>;
+              })}
+            </div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center"><BookOpen className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-2 text-sm font-semibold">No topic results recorded yet</p><p className="mt-1 text-xs text-muted-foreground">Complete practice to build your real topic coverage.</p><Link to="/quiz" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary">Start practising <ArrowRight className="h-4 w-4" /></Link></div>}
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Recent activity</p></div>
+          <h2 className="mt-1 text-lg font-extrabold">Your practice record</h2>
+          {loadError && <p role="status" className="mt-3 rounded-lg bg-warning/10 p-3 text-xs text-muted-foreground">{loadError}</p>}
+          {loading ? <p className="mt-5 text-sm text-muted-foreground">Loading saved activity…</p> : recentResults.length ? <div className="mt-5 space-y-3">
+            <div className="flex items-center gap-3 rounded-xl bg-secondary/70 p-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><CheckCircle2 className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="text-sm font-bold">Latest recorded practice</p><p className="text-xs text-muted-foreground">{recentResults[0].completed_at ? new Date(recentResults[0].completed_at).toLocaleString() : "Saved attempt"}</p></div><span className="text-sm font-extrabold tabular-nums">{Number(recentResults[0].correct_answers) || 0}/{Number(recentResults[0].total_questions) || 0}</span></div>
+            <div className="flex items-center justify-between border-t border-border pt-3"><span className="text-sm text-muted-foreground">Accuracy across latest {recentResults.length} attempts</span><strong className="text-lg tabular-nums">{recentAccuracy === null ? "—" : recentAccuracy + "%"}</strong></div>
+          </div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center"><Clock3 className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-2 text-sm font-semibold">Your activity will appear here</p><p className="mt-1 text-xs text-muted-foreground">We only show results saved to your account.</p></div>}
+          <Link to="/academic/insights" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-primary">View academic insights <ArrowRight className="h-4 w-4" /></Link>
+        </section>
+      </div>
+
+      <section className="grid gap-3 sm:grid-cols-2">
+        <Link to="/multiplayer" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><UsersIcon /></span>
+          <span className="min-w-0 flex-1"><strong className="block text-sm">Study and compete together</strong><span className="text-xs text-muted-foreground">Open the multiplayer arena and invite a friend.</span></span><ArrowRight className="h-4 w-4 text-primary" />
+        </Link>
+        <Link to="/learning-dna" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e4f3ef] text-[#0b625a] dark:bg-[#183c38] dark:text-[#78d7c6]"><BrainCircuit className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><strong className="block text-sm">Understand your learning</strong><span className="text-xs text-muted-foreground">Explore your Learning DNA and study patterns.</span></span><ArrowRight className="h-4 w-4 text-primary" />
+        </Link>
+      </section>
+    </div>
+  );
 };
+
+function UsersIcon() {
+  return <Trophy className="h-5 w-5" />;
+}
+
 export default UpperTierHome;
