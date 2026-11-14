@@ -552,7 +552,7 @@ begin
       and p.proname like 'multiplayer\_%' escape '\'
   loop
     execute format('revoke execute on function %s from public, anon', v_fn.signature);
-    execute format('alter function %s set search_path = %L', v_fn.signature, '');
+    execute format('alter function %s set search_path = %L', v_fn.signature, 'pg_catalog, auth');
 
     if v_fn.proname = 'multiplayer_record_ranked_result'
        or v_fn.prorettype = 'trigger'::regtype then
@@ -566,7 +566,7 @@ $$;
 
 -- Cleanup is a bounded maintenance RPC; it is never exposed to anonymous callers.
 revoke execute on function public.cleanup_expired_multiplayer_rooms() from public, anon;
-alter function public.cleanup_expired_multiplayer_rooms() set search_path = '';
+alter function public.cleanup_expired_multiplayer_rooms() set search_path = 'pg_catalog, auth';
 grant execute on function public.cleanup_expired_multiplayer_rooms() to authenticated;
 
 comment on table public.room_answers is

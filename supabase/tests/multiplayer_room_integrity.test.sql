@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(27);
+select plan(28);
 
 -- Isolated fixtures; the test transaction rolls back all inserted rows.
 insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)
@@ -90,6 +90,15 @@ select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000002
 select is(public.multiplayer_join_room('a1000000-0000-4000-8000-000000000002', null), true, 'existing private-room member can reconnect without rejoining');
 select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000001', true);
 
+
+select ok(not exists (
+  select 1 from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and (left(p.proname, 12) = 'multiplayer_' or p.proname = 'cleanup_expired_multiplayer_rooms')
+    and p.prosecdef
+    and not coalesce(p.proconfig, array[]::text[]) @> array['search_path=pg_catalog, auth']
+), 'multiplayer SECURITY DEFINER RPCs use a fixed search path that resolves auth.uid safely');
 
 select * from finish();
 rollback;
