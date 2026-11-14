@@ -43,6 +43,17 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (!url || !serviceRoleKey || !anonKey) return json({ error: "Authentication service unavailable" }, 503);
 
+    const payload = await req.json() as RequestBody;
+    const username = normalizeUsername(payload.username);
+    if (!/^[a-z0-9_]{3,20}$/.test(username)) return json({ error: "Invalid username" }, 400);
+    if (payload.action !== "availability" && payload.action !== "login") {
+      return json({ error: "Invalid action" }, 400);
+    }
+    if (payload.action === "login" && (typeof payload.password !== "string"
+      || payload.password.length < 1 || payload.password.length > 128)) {
+      return json({ error: "Invalid username or password" }, 400);
+    }
+
     const ip = req.headers.get("cf-connecting-ip")
       ?? req.headers.get("x-real-ip")
       ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -51,18 +62,19 @@ Deno.serve(async (req) => {
     const admin = createClient(url, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
+    const bucket = payload.action;
+    const rateKey = bucket === "login"
+      ? ip + "\nlogin\n" + username
+      : ip + "\navailability";
     const { data: allowed, error: rateError } = await admin.rpc("consume_username_auth_rate_limit", {
-      p_ip_hash: await hashIp(ip, serviceRoleKey),
+      p_key_hash: await hashIp(rateKey, serviceRoleKey),
+      p_bucket: bucket,
     });
     if (rateError) {
       console.error("Username auth rate limiter failed:", rateError);
       return json({ error: "Authentication service unavailable" }, 503);
     }
     if (allowed !== true) return json({ error: "Too many attempts. Please wait and try again." }, 429);
-
-    const payload = await req.json() as RequestBody;
-    const username = normalizeUsername(payload.username);
-    if (!/^[a-z0-9_]{3,20}$/.test(username)) return json({ error: "Invalid username" }, 400);
 
     if (payload.action === "availability") {
       const { data: profile, error } = await admin.from("profiles")
@@ -74,11 +86,6 @@ Deno.serve(async (req) => {
         return json({ error: "Unable to check username" }, 503);
       }
       return json({ available: !profile });
-    }
-
-    if (payload.action !== "login" || typeof payload.password !== "string"
-      || payload.password.length < 1 || payload.password.length > 128) {
-      return json({ error: "Invalid username or password" }, 400);
     }
 
     const { data: profile, error: profileError } = await admin.from("profiles")
