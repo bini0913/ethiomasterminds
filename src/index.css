@@ -770,3 +770,26 @@
   border-color: hsl(var(--input));
   border-radius: .8rem;
 }
+
+/* Figma-inspired academic hub components, populated only by live account data. */
+.mm-studio-upper .mm-academic-hero {
+  background-color: hsl(var(--card));
+  border-color: hsl(var(--primary) / .18);
+  box-shadow: 0 8px 28px hsl(207 43% 16% / .045);
+}
+.mm-studio-upper .mm-academic-metric {
+  border-color: hsl(var(--border));
+  border-radius: 1.1rem;
+  background-color: hsl(var(--card));
+}
+.mm-studio-upper .mm-academic-feature {
+  min-height: 12rem;
+  border-color: hsl(var(--border));
+  border-radius: 1.2rem;
+  background-color: hsl(var(--card));
+  box-shadow: 0 3px 0 hsl(var(--border));
+}
+.mm-studio-upper .mm-academic-feature:hover {
+  border-color: hsl(var(--primary) / .45);
+  box-shadow: 0 2px 0 hsl(var(--primary) / .28);
+}
