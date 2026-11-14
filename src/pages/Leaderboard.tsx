@@ -41,6 +41,7 @@ const Leaderboard = () => {
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("global");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const leaderboardTier = getUserTier(user?.grade);
+  const upperStudent = leaderboardTier === "upper";
   const leaderboardGradeMin = leaderboardTier === "early" ? 0 : leaderboardTier === "middle" ? 5 : leaderboardTier === "upper" ? 9 : 0;
   const leaderboardGradeMax = leaderboardTier === "early" ? 4 : leaderboardTier === "middle" ? 8 : leaderboardTier === "upper" ? 12 : 12;
   const leaderboardGrades = Array.from(
@@ -210,7 +211,7 @@ const Leaderboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/10 p-4 md:p-8">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background p-4 text-foreground md:p-8" : "min-h-screen bg-gradient-to-b from-background via-background to-primary/10 p-4 md:p-8"}>
       <div className="mx-auto max-w-6xl space-y-6 pb-24">
         <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
