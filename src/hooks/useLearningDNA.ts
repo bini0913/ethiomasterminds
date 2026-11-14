@@ -91,11 +91,26 @@ const isStringArray = (value: unknown): value is string[] =>
 
 // Migration defaults and legacy rows can contain empty JSON objects rather than reports.
 // Treat incomplete nested payloads as absent so the page renders its safe empty state.
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+const isNullableNumber = (value: unknown): value is number | null =>
+  value === null || isFiniteNumber(value);
+
 const normalizeActivitySummary = (value: unknown): LearningActivitySummary | null => {
-  if (!isRecord(value) || !isRecord(value.quizzes) || !isRecord(value.reading) ||
-      !isRecord(value.study) || !isRecord(value.multiplayer) || !isRecord(value.flashcards) ||
-      !isRecord(value.studyModeCalls) || !isRecord(value.earlyLearning) ||
-      !isRecord(value.revision) || !isRecord(value.participation) || !Array.isArray(value.reading.books)) return null;
+  if (!isRecord(value)) return null;
+  const { quizzes, reading, study, multiplayer, flashcards, studyModeCalls, earlyLearning, revision, participation } = value;
+  if (![quizzes, reading, study, multiplayer, flashcards, studyModeCalls, earlyLearning, revision, participation].every(isRecord)) return null;
+  if (!isFiniteNumber(quizzes.attempts) || !isNullableNumber(quizzes.accuracy) || !isFiniteNumber(quizzes.learningAreas) || !isStringArray(quizzes.subjects)) return null;
+  if (!isFiniteNumber(reading.booksOpened) || !isFiniteNumber(reading.booksCompleted) || !isFiniteNumber(reading.averageCompletionPercent) || !isFiniteNumber(reading.totalReadingSeconds) || !Array.isArray(reading.books)) return null;
+  if (!reading.books.every((book) => isRecord(book) && typeof book.title === "string" && typeof book.subject === "string" && isFiniteNumber(book.completionPercent) && isFiniteNumber(book.timeSpentSeconds) && isFiniteNumber(book.lastPageReached))) return null;
+  const studyNumbers = ["sessions", "completedSessions", "activeDaysLast30", "completedPlans", "totalPlans", "completedTasks", "totalTasks", "totalStudyMinutes"];
+  if (studyNumbers.some((key) => !isFiniteNumber(study[key])) || !["planCompletionPercent", "taskCompletionPercent", "sessionDurationAdherencePercent"].every((key) => isNullableNumber(study[key]))) return null;
+  if (!["matches", "wins", "podiumFinishes", "answeredQuestions", "totalQuestions"].every((key) => isFiniteNumber(multiplayer[key])) || !["averageAccuracy", "questionCompletionPercent"].every((key) => isNullableNumber(multiplayer[key]))) return null;
+  if (!["trackedCards", "reviewedCards", "totalRepetitions"].every((key) => isFiniteNumber(flashcards[key])) || !isFiniteNumber(studyModeCalls.acceptedOrJoined)) return null;
+  if (!["activitiesAttempted", "videoViews", "videosCompleted", "secondsWatchedRecorded"].every((key) => isFiniteNumber(earlyLearning[key])) || !isStringArray(earlyLearning.skills)) return null;
+  if (!["scheduledItems", "reviewedItems", "totalReviewsRecorded"].every((key) => isFiniteNumber(revision[key]))) return null;
+  if (!isFiniteNumber(participation.tournamentsJoined) || !isFiniteNumber(participation.studyCompetitionsJoined)) return null;
   return value as unknown as LearningActivitySummary;
 };
 
