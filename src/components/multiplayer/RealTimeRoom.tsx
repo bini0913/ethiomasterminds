@@ -297,6 +297,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const loadRoomData = async () => {
     setLoadError(null);
     try {
+      const { error: membershipError } = await db.rpc('multiplayer_assert_room_member', { p_room_id: roomId });
+      if (membershipError) throw membershipError;
+
       const { data: room } = await supabase
         .from('multiplayer_rooms')
         .select('host_id, question_count, subject, difficulty, max_players, game_mode, status, started_at')
@@ -319,9 +322,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         questionCount: room.question_count || 10,
         maxPlayers: room.max_players || initialMaxPlayers,
       });
-
-      const { error: membershipError } = await db.rpc('multiplayer_assert_room_member', { p_room_id: roomId });
-      if (membershipError) throw membershipError;
 
       await fetchPlayers();
 
