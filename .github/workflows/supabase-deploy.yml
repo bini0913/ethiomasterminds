@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then
-            supabase db push --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+            supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
           else
             echo "::warning::SUPABASE_DB_PASSWORD is not configured; database migrations were not pushed."
           fi
