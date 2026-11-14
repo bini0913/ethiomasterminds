@@ -418,8 +418,6 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    const minutesCompleted = Math.max(1, Math.ceil(elapsedSeconds / 60));
-
     let data: { xp_earned?: number; coins_earned?: number } | null = null;
     try {
       const result = await db.rpc("complete_study_session", {
