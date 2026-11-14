@@ -39,6 +39,7 @@ const groups: NavGroup[] = [
   { label: "Community", items: [
     { label: "Social", to: "/social", icon: MessageCircle },
     { label: "Friends", to: "/friends", icon: Users },
+    { label: "Chat", to: "/chat", icon: MessageCircle },
   ]},
 ];
 
@@ -48,6 +49,7 @@ const extraItems: NavItem[] = [
   { label: "Rewards store", to: "/store", icon: Gift },
   { label: "Avatar creator", to: "/avatar-creator", icon: UserRound },
   { label: "Notifications", to: "/notifications", icon: Bell },
+  { label: "Settings", to: "/settings", icon: Settings },
 ];
 
 const navigationGroups: NavGroup[] = groups.concat([{ label: "More", items: extraItems }]);
