@@ -81,6 +81,12 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
   const handleTimeout = () => {
     if (!isAnswered) {
       setIsAnswered(true);
+      // Record elapsed time even when the question times out.
+      questionTimes.current[currentQuestion.id] = Math.max(
+        0,
+        Math.round((Date.now() - questionStartTime.current) / 1000),
+      );
+
       // Record that the user didn't answer this question
       const nextAnswers = {
         ...userAnswersRef.current,
@@ -201,7 +207,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     }
   };
   
-  const saveQuizResults = async (finalScore: number, totalXP: number, answers = userAnswersRef.current) => {
+  const saveQuizResults = async (finalScore: number, totalXP: number, answers = userAnswersRef.current): Promise<boolean> => {
     try {
       const totalTimeTaken = Object.values(questionTimes.current).reduce((a, b) => a + b, 0);
       const persistedQuizId = quiz.sourceQuizId || quiz.id;
@@ -209,7 +215,8 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       // Some student practice sets are generated from existing questions and use
       // client-side ids, so we only persist if we have a valid db quiz UUID.
       if (!uuidLikeRegex.test(persistedQuizId)) {
-        return;
+        console.error("Quiz result cannot be saved because this practice set has no real source quiz ID.");
+        return false;
       }
       
       const submissionId = submissionIdRef.current || crypto.randomUUID();
@@ -228,7 +235,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
 
       // Update analytics, streak, and achievements
       const avgTime = totalTimeTaken / quiz.questions.length;
-      await Promise.all([
+      const followUpResults = await Promise.all([
         supabase.rpc('update_analytics', {
           p_user_id: user!.id,
           p_subject: quiz.subject,
@@ -239,12 +246,18 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
         supabase.rpc('update_user_streak', { p_user_id: user!.id }),
         supabase.rpc('check_achievements', { p_user_id: user!.id })
       ]);
+      followUpResults.forEach((result) => {
+        if (result.error) console.warn("A secondary quiz analytics update failed:", result.error);
+      });
+      return true;
     } catch (err) {
       console.error('Failed to save quiz results:', err);
+      toast.error("Your quiz result could not be saved. Please try again before starting another quiz.");
+      return false;
     }
   };
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = async () => {
     if (currentQuestionIndex < quiz.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
@@ -262,10 +275,10 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       
       // Save results to database
       if (user?.id) {
-        saveQuizResults(finalScore, totalXP);
+        await saveQuizResults(finalScore, totalXP);
       }
       
-      // Call the onComplete callback with completed question IDs
+      // Call the onComplete callback only after the secure submission has finished.
       onComplete(finalScore, completedQuestionIds);
     }
   };
