@@ -9,10 +9,12 @@ import { useFriends } from "@/context/FriendsContext";
 import { useUser } from "@/context/UserContext";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import BackButton from "@/components/ui/BackButton";
+import { getUserTier } from "@/lib/getUserTier";
 
 const SocialHub: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const { friends, friendRequests, messages, onlineFriends } = useFriends();
   const unread = messages.filter((message) => message.receiver === user?.id && !message.read).length;
   const incomingRequests = friendRequests.filter((request) => request.receiver.id === user?.id && request.status === "pending").length;
@@ -21,7 +23,7 @@ const SocialHub: React.FC = () => {
     { title: "Community", description: "Explore student posts, study ideas, challenges, trends, and learning conversations.", icon: Compass, path: "/social/community", stat: "Explore the community", secondary: "Posts • Study • Challenges", accent: "from-cyan-500/15 to-primary/5" },
   ];
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-8" : "min-h-screen bg-background pb-24"}>
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <BackButton />
