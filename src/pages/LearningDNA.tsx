@@ -13,7 +13,7 @@ import { LoadingState, ErrorState } from "@/components/ui/status-state";
 import { useUser } from "@/context/UserContext";
 import { useTier } from "@/context/TierContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useLearningDNA, type LearningData } from "@/hooks/useLearningDNA";
+import { useLearningDNA } from "@/hooks/useLearningDNA";
 
 const LearningDNA: React.FC = () => {
   const { user } = useUser();
