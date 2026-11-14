@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
-import type { Json } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -62,7 +61,6 @@ const EnhancedSettings: React.FC = () => {
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    grade: user?.grade || '',
     bio: ''
   });
 
@@ -95,24 +93,11 @@ const EnhancedSettings: React.FC = () => {
 
   const handleSaveProfile = async () => {
     if (!user?.id) return;
-    
+
     setSavingProfile(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          name: profileData.name,
-          grade: profileData.grade
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      // Update local user state
-      if (updateProfile) {
-        updateProfile({ name: profileData.name, grade: profileData.grade });
-      }
-
+      const saved = await updateProfile({ name: profileData.name.trim() });
+      if (!saved) return;
       toast.success("Profile saved successfully!");
     } catch (err) {
       console.error('Error saving profile:', err);
@@ -127,17 +112,8 @@ const EnhancedSettings: React.FC = () => {
     
     setSavingAvatar(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ avatar_config: config as unknown as Json })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      // Update local user state
-      if (updateProfile) {
-        updateProfile({ avatarConfig: config as any });
-      }
+      const saved = await updateProfile({ avatarConfig: config as unknown as AvatarConfig });
+      if (!saved) return;
 
       setAvatarConfig(config);
       toast.success("Avatar saved successfully!");
@@ -297,19 +273,11 @@ const EnhancedSettings: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="grade">Grade Level</Label>
-                  <Select value={profileData.grade} onValueChange={(value) => setProfileData({...profileData, grade: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select your grade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((grade) => (
-                        <SelectItem key={grade} value={grade.toString()}>
-                          Grade {grade}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Grade Level</Label>
+                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
+                    {user?.grade ? (/^(k|kg|kindergarten)$/i.test(user.grade) ? "KG" : `Grade ${user.grade.replace(/^grade\\s*/i, "")}`) : "Not set"}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Grade changes require school staff approval.</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Account Type</Label>
