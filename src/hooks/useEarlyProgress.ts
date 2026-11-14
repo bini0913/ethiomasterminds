@@ -1,3 +1,4 @@
+import { db } from "@/integrations/untypedClient";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
@@ -30,7 +31,7 @@ export function useEarlyProgress() {
     setError(null);
 
     try {
-      const { data, error: queryError } = await supabase
+      const { data, error: queryError } = await db
         .from("early_activity_attempts")
         .select("activity_id,skill,correct,xp_earned,coins_earned,created_at")
         .eq("user_id", user.id)
