@@ -100,7 +100,7 @@ const isNullableNumber = (value: unknown): value is number | null =>
 const normalizeActivitySummary = (value: unknown): LearningActivitySummary | null => {
   if (!isRecord(value)) return null;
   const { quizzes, reading, study, multiplayer, flashcards, studyModeCalls, earlyLearning, revision, participation } = value;
-  if (![quizzes, reading, study, multiplayer, flashcards, studyModeCalls, earlyLearning, revision, participation].every(isRecord)) return null;
+  if (!isRecord(quizzes) || !isRecord(reading) || !isRecord(study) || !isRecord(multiplayer) || !isRecord(flashcards) || !isRecord(studyModeCalls) || !isRecord(earlyLearning) || !isRecord(revision) || !isRecord(participation)) return null;
   if (!isFiniteNumber(quizzes.attempts) || !isNullableNumber(quizzes.accuracy) || !isFiniteNumber(quizzes.learningAreas) || !isStringArray(quizzes.subjects)) return null;
   if (!isFiniteNumber(reading.booksOpened) || !isFiniteNumber(reading.booksCompleted) || !isFiniteNumber(reading.averageCompletionPercent) || !isFiniteNumber(reading.totalReadingSeconds) || !Array.isArray(reading.books)) return null;
   if (!reading.books.every((book) => isRecord(book) && typeof book.title === "string" && typeof book.subject === "string" && isFiniteNumber(book.completionPercent) && isFiniteNumber(book.timeSpentSeconds) && isFiniteNumber(book.lastPageReached))) return null;
