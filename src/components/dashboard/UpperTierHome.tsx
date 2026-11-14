@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Activity, ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2, Clock3, Flame, GraduationCap, LibraryBig, Play, Sparkles, Target, Timer, Trophy, Users, Zap } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/untypedClient";
 import { getXpProgressInLevel } from "@/lib/rankSystem";
 
 type TopicRow = { subject: string; topic: string; accuracy_percentage: number | null; questions_attempted: number | null };
@@ -42,13 +42,13 @@ const UpperTierHome: React.FC = () => {
       setLoading(true);
       setLoadError(null);
       const [topicResponse, resultResponse] = await Promise.all([
-        supabase.from("topic_progress")
+        db.from("topic_progress")
           .select("subject,topic,accuracy_percentage,questions_attempted")
           .eq("user_id", user.id)
           .gt("questions_attempted", 0)
           .order("accuracy_percentage", { ascending: true })
           .limit(6),
-        supabase.from("quiz_results")
+        db.from("quiz_results")
           .select("correct_answers,total_questions,completed_at")
           .eq("student_id", user.id)
           .order("completed_at", { ascending: false })
