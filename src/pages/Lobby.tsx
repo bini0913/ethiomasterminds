@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
+import { getUserTier } from "@/lib/getUserTier";
 import { useRoom } from "@/context/RoomContext";
 import { useFriends } from "@/context/FriendsContext";
 import { toast } from "sonner";
@@ -108,6 +109,7 @@ const Lobby: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === "upper";
   const { rooms, createRoom: contextCreateRoom, joinRoom: contextJoinRoom, refreshRooms } = useRoom();
   const { friends, onlineFriends } = useFriends();
   
@@ -1071,7 +1073,7 @@ const Lobby: React.FC = () => {
   const friendsOnline = onlineFriends;
 
   return (
-    <div className="min-h-screen bg-background text-foreground relative pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-6">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground relative pb-8" : "min-h-screen bg-background text-foreground relative pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-6"}>
       <div className="absolute inset-0 bg-transparent" />
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-xl">
         <div className="flex items-center justify-between gap-2 max-w-7xl mx-auto">
