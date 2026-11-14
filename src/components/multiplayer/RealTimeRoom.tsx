@@ -297,6 +297,9 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const loadRoomData = async () => {
     setLoadError(null);
     try {
+      const { error: membershipError } = await db.rpc('multiplayer_assert_room_member', { p_room_id: roomId });
+      if (membershipError) throw membershipError;
+
       const { data: room } = await supabase
         .from('multiplayer_rooms')
         .select('host_id, question_count, subject, difficulty, max_players, game_mode, status, started_at')
@@ -319,9 +322,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         questionCount: room.question_count || 10,
         maxPlayers: room.max_players || initialMaxPlayers,
       });
-
-      const { error: membershipError } = await db.rpc('multiplayer_ensure_membership', { p_room_id: roomId });
-      if (membershipError) throw membershipError;
 
       await fetchPlayers();
 
@@ -853,19 +853,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     if (!isHost || players.length < 2) return;
     const endTime = new Date(Date.now() + 5000).toISOString();
 
-    await supabase
-      .from('room_state')
-      .upsert(
-        {
-          room_id: roomId,
-          status: 'starting',
-          question_started_at: new Date().toISOString(),
-          question_ends_at: endTime,
-        },
-        { onConflict: 'room_id' },
-      );
-
-    setCountdownEndsAt(endTime);
+    try {
+      const { data, error } = await db.rpc('multiplayer_set_countdown', { p_room_id: roomId });
+      if (error) throw error;
+      setCountdownEndsAt(data ? new Date(data).toISOString() : endTime);
+    } catch (error) {
+      console.error('Could not start multiplayer countdown:', error);
+      toast.error(error instanceof Error ? error.message : 'Could not start the countdown');
+    }
   };
 
   const kickPlayer = async (playerId: string, playerName: string) => {

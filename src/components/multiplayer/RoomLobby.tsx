@@ -170,7 +170,7 @@ const RoomLobby: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold truncate">{room.name}</h4>
-                    {room.password && <Lock className="w-4 h-4 text-muted-foreground" />}
+                    {room.hasPassword && <Lock className="w-4 h-4 text-muted-foreground" />}
                   </div>
                   
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground">
