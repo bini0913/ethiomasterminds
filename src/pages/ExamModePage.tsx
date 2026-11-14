@@ -499,13 +499,23 @@ const ExamModePage: React.FC = () => {
                 {entrancePaperLoadState === "ready" && entrancePaperReferences.length === 0 && <p className="mt-4 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">No linked papers from 2013 onward are listed yet.</p>}
                 {entrancePaperReferences.length > 0 && <div className="mt-4 space-y-2">
                   {entrancePaperReferences.map((paper) => (
-                    <a key={paper.id} href={paper.source_url} target="_blank" rel="noopener noreferrer" aria-label={`Open source archive for ${paper.subject}, ${paper.ethiopian_year} E.C.`} className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      <span className="min-w-0">
-                        <span className="block font-medium">{paper.subject}</span>
-                        <span className="block text-xs text-muted-foreground">{paper.ethiopian_year} E.C. · {paper.gregorian_year} G.C. · {paper.source_name}</span>
-                      </span>
-                      <span className="shrink-0 text-xs font-semibold text-primary">Open archive ↗</span>
-                    </a>
+                    isSafeHttpUrl(paper.source_url) ? (
+                      <a key={paper.id} href={paper.source_url} target="_blank" rel="noopener noreferrer" aria-label={`Open source archive for ${paper.subject}, ${paper.ethiopian_year} E.C.`} className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <span className="min-w-0">
+                          <span className="block font-medium">{paper.subject}</span>
+                          <span className="block text-xs text-muted-foreground">{paper.ethiopian_year} E.C. · {paper.gregorian_year} G.C. · {paper.source_name}</span>
+                        </span>
+                        <span className="shrink-0 text-xs font-semibold text-primary">Open archive ↗</span>
+                      </a>
+                    ) : (
+                      <div key={paper.id} aria-disabled="true" className="flex items-center justify-between gap-3 rounded-xl border border-dashed p-3 text-muted-foreground">
+                        <span className="min-w-0">
+                          <span className="block font-medium">{paper.subject}</span>
+                          <span className="block text-xs">{paper.ethiopian_year} E.C. · {paper.gregorian_year} G.C. · {paper.source_name}</span>
+                        </span>
+                        <span className="shrink-0 text-xs">Archive link unavailable</span>
+                      </div>
+                    )
                   ))}
                   <p className="text-xs text-muted-foreground">Archive links can have incomplete coverage. Check the paper version and answer key before using them as verified exam material.</p>
                 </div>}
