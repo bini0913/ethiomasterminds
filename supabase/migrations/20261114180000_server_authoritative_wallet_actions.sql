@@ -50,7 +50,7 @@ DECLARE
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
 
-  IF p_action NOT IN (
+  IF p_action IS NULL OR p_action NOT IN (
     'spend_coins','spend_gems','convert_xp_to_coins',
     'convert_coins_to_gems','convert_coins_to_xp',
     'transfer_coins','claim_daily_reward','lucky_spin'
@@ -229,6 +229,7 @@ DECLARE
   v_new_xp integer := 0;
   v_new_coins integer := 0;
   v_just_completed boolean := false;
+  v_was_completed boolean := false;
   v_profile public.profiles%rowtype;
   v_wallet public.user_currency%rowtype;
 BEGIN
@@ -259,6 +260,7 @@ BEGIN
     WHERE requirement_type = p_requirement_type
   LOOP
     v_just_completed := false;
+    v_was_completed := false;
     SELECT * INTO v_existing
     FROM public.user_achievements
     WHERE user_id = v_user_id AND achievement_id = v_achievement.id
@@ -277,6 +279,7 @@ BEGIN
         v_new_coins := v_new_coins + greatest(0, coalesce(v_achievement.reward_coins,0));
       END IF;
     ELSE
+      v_was_completed := v_existing.completed;
       UPDATE public.user_achievements
       SET progress = greatest(progress, least(v_progress, v_achievement.requirement_value)),
           completed = completed OR v_progress >= v_achievement.requirement_value,
@@ -285,7 +288,7 @@ BEGIN
       WHERE id = v_existing.id
       RETURNING * INTO v_existing;
 
-      IF NOT v_existing.completed AND v_progress >= v_achievement.requirement_value THEN
+      IF NOT v_was_completed AND v_existing.completed THEN
         v_just_completed := true;
       END IF;
       IF v_just_completed THEN
