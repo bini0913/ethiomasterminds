@@ -21,8 +21,15 @@ type RequestBody = {
 const normalizeUsername = (value: unknown) =>
   typeof value === "string" ? value.trim().toLowerCase() : "";
 
-async function hashIp(ip: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
+async function hashIp(ip: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(ip));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -45,7 +52,7 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { data: allowed, error: rateError } = await admin.rpc("consume_username_auth_rate_limit", {
-      p_ip_hash: await hashIp(ip),
+      p_ip_hash: await hashIp(ip, serviceRoleKey),
     });
     if (rateError) {
       console.error("Username auth rate limiter failed:", rateError);
