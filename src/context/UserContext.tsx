@@ -455,15 +455,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           profileFields.gender = profileDetails.gender;
           profileFields.avatar = profileDetails.avatar;
         }
-        if (normalizedGrade) {
-          profileFields.grade = normalizedGrade;
-          profileFields.education_level =
-            normalizedGrade.toLowerCase() === "k" || /^grade\s*[1-4]$/i.test(normalizedGrade)
-              ? "early"
-              : /^grade\s*[5-8]$/i.test(normalizedGrade)
-                ? "middle"
-                : "upper";
-        }
         // Ensure the base row exists first (creates it if the trigger hasn't).
         await fetchUserProfile(data.user.id, data.user);
         const { error: profileUpdateError } = await (supabase as any)
