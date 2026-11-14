@@ -15,7 +15,7 @@ interface ProfileSetupProps {
 }
 
 const ProfileSetup: React.FC<ProfileSetupProps> = ({ onComplete }) => {
-  const { user, updateProfile } = useUser();
+  const { updateProfile } = useUser();
   const { t } = useLanguage();
   const [gender, setGender] = useState("");
   const [grade, setGrade] = useState("");
