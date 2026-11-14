@@ -63,7 +63,6 @@ export default function UpperTierStudioShell({ children }: { children: React.Rea
   const location = useLocation();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [search, setSearch] = useState("");
 
   const grade = user?.grade ? (/grade/i.test(user.grade) ? user.grade : "Grade " + user.grade) : "Grades 9–12";
@@ -76,7 +75,6 @@ export default function UpperTierStudioShell({ children }: { children: React.Rea
   const go = (to: string) => {
     navigate(to);
     setDrawerOpen(false);
-    setMoreOpen(false);
     setSearch("");
   };
 
@@ -193,30 +191,20 @@ export default function UpperTierStudioShell({ children }: { children: React.Rea
       </div>
 
       <nav aria-label="Primary mobile navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
-        {moreOpen && (
-          <div className="mx-auto grid max-h-[45vh] max-w-lg grid-cols-2 gap-2 overflow-y-auto border-b border-border py-3">
-            {allItems.filter((item) => !["/", "/academic", "/study-mode", "/multiplayer"].includes(item.to)).map((item) => {
-              const Icon = item.icon;
-              return <button type="button" key={item.to} onClick={() => go(item.to)} className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-left text-xs font-semibold hover:bg-muted"><Icon className="h-4 w-4 text-primary" />{item.label}</button>;
-            })}
-          </div>
-        )}
         <div className="mx-auto flex h-16 max-w-lg items-center justify-around gap-1">
           {[
             { label: "Home", to: "/", icon: Home },
             { label: "Learn", to: "/academic", icon: BookOpen },
-            { label: "Study", to: "/study-mode", icon: Timer },
-            { label: "Arena", to: "/multiplayer", icon: Swords },
+            { label: "Practice", to: "/quiz", icon: Target },
+            { label: "Rank", to: "/leaderboard", icon: Trophy },
+            { label: "AI Tutor", to: "/ai-tutor", icon: Bot },
           ].map((item) => {
             const Icon = item.icon;
             const active = isActive(location.pathname, item.to);
-            return <button type="button" key={item.to} onClick={() => go(item.to)} aria-current={active ? "page" : undefined} className={"flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-bold " + (active ? "bg-primary/10 text-primary" : "text-muted-foreground")}>
+            return <button type="button" key={item.to} onClick={() => go(item.to)} aria-current={active ? "page" : undefined} className={"flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-bold " + (active ? "bg-primary/10 text-primary" : "text-muted-foreground")}>
               <Icon className="h-5 w-5" /><span>{item.label}</span>
             </button>;
           })}
-          <button type="button" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen} aria-label="More destinations" className={"flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-bold " + (moreOpen ? "bg-primary/10 text-primary" : "text-muted-foreground")}>
-            {moreOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}<span>More</span>
-          </button>
         </div>
       </nav>
     </div>
