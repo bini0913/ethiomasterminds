@@ -65,8 +65,9 @@ const LearningDNA: React.FC = () => {
     { label: "Quiz answers", value: activity.quizzes.attempts, detail: activity.quizzes.accuracy === null ? "Accuracy not available" : activity.quizzes.accuracy + "% accuracy", icon: Target },
     { label: "Books read", value: activity.reading.booksOpened, detail: activity.reading.booksCompleted + " completed · " + activity.reading.averageCompletionPercent + "% average progress", icon: BookOpen },
     { label: "Study sessions", value: activity.study.sessions, detail: activity.study.activeDaysLast30 + " active days in the last 30 days", icon: CalendarCheck },
+    { label: "Study time", value: activity.study.totalStudyMinutes >= 60 ? Math.floor(activity.study.totalStudyMinutes / 60) + "h " + (activity.study.totalStudyMinutes % 60) + "m" : activity.study.totalStudyMinutes + " min", detail: "Recorded completed and active session duration", icon: Activity },
     { label: "Study plans", value: activity.study.totalPlans, detail: activity.study.planCompletionPercent === null ? "No plan completion data" : activity.study.planCompletionPercent + "% completed", icon: Activity },
-    { label: "Multiplayer matches", value: activity.multiplayer.matches, detail: activity.multiplayer.wins + " wins · " + (activity.multiplayer.averageAccuracy === null ? "accuracy unavailable" : activity.multiplayer.averageAccuracy + "% answer accuracy"), icon: Trophy },
+    { label: "Multiplayer matches", value: activity.multiplayer.matches, detail: activity.multiplayer.wins + " wins · " + (activity.multiplayer.averageAccuracy === null ? "accuracy unavailable" : activity.multiplayer.averageAccuracy + "% accuracy") + " · " + (activity.multiplayer.questionCompletionPercent === null ? "completion unavailable" : activity.multiplayer.questionCompletionPercent + "% questions answered"), icon: Trophy },
     { label: "Flashcard reviews", value: activity.flashcards.reviewedCards, detail: activity.flashcards.totalRepetitions + " recorded repetitions", icon: Layers },
     { label: "Study Mode calls", value: activity.studyModeCalls.acceptedOrJoined, detail: "Accepted or joined invitations", icon: Zap },
   ] : [];
