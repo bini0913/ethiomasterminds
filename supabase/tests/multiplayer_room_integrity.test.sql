@@ -5,10 +5,10 @@ create extension if not exists pgtap with schema extensions;
 select plan(19);
 
 -- Isolated fixtures; the test transaction rolls back all inserted rows.
-insert into public.multiplayer_rooms (id, name, host_id, max_players, status)
+insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)
 values
   ('a1000000-0000-4000-8000-000000000001', 'RLS public room', 'a2000000-0000-4000-8000-000000000001', 4, 'waiting'),
-  ('a1000000-0000-4000-8000-000000000002', 'RLS private room', 'a2000000-0000-4000-8000-000000000002', 4, 'waiting'),
+  ('a1000000-0000-4000-8000-000000000002', 'RLS private room', 'a2000000-0000-4000-8000-000000000002', 4, 'waiting', true),
   ('a1000000-0000-4000-8000-000000000003', 'RLS second public room', 'a2000000-0000-4000-8000-000000000003', 4, 'waiting');
 
 insert into public.multiplayer_room_secrets (room_id, password_hash)
