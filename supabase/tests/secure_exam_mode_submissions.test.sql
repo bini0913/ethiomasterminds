@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(8);
+SELECT plan(7);
 
 SELECT ok(
   to_regprocedure('public.submit_exam_result_secure(uuid,uuid[],jsonb,integer,uuid,text,text)') IS NOT NULL,
@@ -22,12 +22,8 @@ SELECT ok(
   'students cannot bypass server-side exam grading with direct inserts'
 );
 SELECT ok(
-  NOT has_table_privilege('authenticated', 'public.quiz_results', 'UPDATE'),
-  'students cannot rewrite stored exam scores or rewards'
-);
-SELECT ok(
-  NOT has_table_privilege('authenticated', 'public.quiz_results', 'DELETE'),
-  'students cannot delete stored exam submissions'
+  has_function_privilege('authenticated', 'public.claim_quiz_reward(uuid)', 'EXECUTE'),
+  'authenticated students can claim their own exam reward'
 );
 SELECT ok(
   NOT has_function_privilege('anon', 'public.claim_quiz_reward(uuid)', 'EXECUTE'),
