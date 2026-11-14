@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useUser } from '@/context/UserContext';
+import { getUserTier } from '@/lib/getUserTier';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Bot, Send, Loader2, BookOpen, Calculator, Globe, Beaker, History,
@@ -25,12 +26,12 @@ interface Message {
 }
 
 const subjects = [
-  { id: 'math', name: 'Mathematics', icon: Calculator, color: 'from-blue-500 to-cyan-500' },
-  { id: 'science', name: 'Science', icon: Beaker, color: 'from-green-500 to-emerald-500' },
-  { id: 'english', name: 'English', icon: BookOpen, color: 'from-primary to-accent' },
-  { id: 'history', name: 'History', icon: History, color: 'from-amber-500 to-orange-500' },
-  { id: 'geography', name: 'Geography', icon: Globe, color: 'from-teal-500 to-cyan-500' },
-  { id: 'general', name: 'General', icon: Sparkles, color: 'from-pink-500 to-rose-500' },
+  { id: 'math', name: 'Mathematics', icon: Calculator, color: 'bg-primary/10 text-primary' },
+  { id: 'science', name: 'Science', icon: Beaker, color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
+  { id: 'english', name: 'English', icon: BookOpen, color: 'bg-accent/10 text-accent' },
+  { id: 'history', name: 'History', icon: History, color: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
+  { id: 'geography', name: 'Geography', icon: Globe, color: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' },
+  { id: 'general', name: 'General', icon: Sparkles, color: 'bg-muted text-muted-foreground' },
 ];
 
 const quickActions = [
@@ -51,6 +52,7 @@ const starterPrompts: Record<string, string[]> = {
 
 const AITutor: React.FC = () => {
   const { user } = useUser();
+  const upperStudent = getUserTier(user?.grade) === 'upper';
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -148,17 +150,17 @@ const AITutor: React.FC = () => {
   const prompts = starterPrompts[selectedSubject] || starterPrompts.general;
 
   return (
-    <div className="tier-upper min-h-screen bg-background text-foreground relative overflow-hidden">
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground relative overflow-hidden" : "min-h-screen bg-background text-foreground relative overflow-hidden"}>
 
       <header className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border/50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <BackButton />
-            <div className={cn("w-11 h-11 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg", subj.color)}>
-              <Bot className="h-5 w-5 text-white" />
+            {!upperStudent && <BackButton />}
+            <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center", subj.color)}>
+              <Bot className="h-5 w-5 text-current" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">AI Coach <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Plus</span></h1>
+              <h1 className="text-xl font-bold">AI Tutor</h1>
               <p className="text-xs text-muted-foreground">Academic reasoning · Exam preparation · Concept mastery</p>
             </div>
           </div>
@@ -180,8 +182,8 @@ const AITutor: React.FC = () => {
                 {subjects.map(s => (
                   <Button key={s.id} variant={selectedSubject === s.id ? 'default' : 'ghost'} size="sm"
                     className="w-full justify-start" onClick={() => setSelectedSubject(s.id)}>
-                    <div className={cn("w-6 h-6 rounded-md bg-gradient-to-br flex items-center justify-center mr-2", s.color)}>
-                      <s.icon className="h-3 w-3 text-white" />
+                    <div className={cn("w-6 h-6 rounded-md flex items-center justify-center mr-2", s.color)}>
+                      <s.icon className="h-3 w-3 text-current" />
                     </div>
                     {s.name}
                   </Button>
@@ -211,11 +213,11 @@ const AITutor: React.FC = () => {
             <Card className="glass border-border/50 h-[calc(100dvh-150px)] min-h-[520px] flex flex-col">
               <CardHeader className="pb-3 border-b border-border/50">
                 <div className="flex items-center gap-3">
-                  <div className={cn("w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center", subj.color)}>
+                  <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", subj.color)}>
                     <Bot className="h-5 w-5 text-white" />
                   </div>
                   <div className="flex-1">
-                    <CardTitle className="text-base">Plus · {subj.name} Coach</CardTitle>
+                    <CardTitle className="text-base">AI Tutor · {subj.name}</CardTitle>
                     <p className="text-xs text-muted-foreground">Encouraging, patient, step-by-step</p>
                   </div>
                   <Badge variant="secondary"><Sparkles className="h-3 w-3 mr-1" />Groq powered</Badge>
@@ -227,10 +229,10 @@ const AITutor: React.FC = () => {
                   {messages.length === 0 ? (
                     <div className="text-center py-12">
                       <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity }}
-                        className={cn("w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br flex items-center justify-center mb-4 shadow-xl", subj.color)}>
-                        <Bot className="h-10 w-10 text-white" />
+                        className={cn("w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-4", subj.color)}>
+                        <Bot className="h-10 w-10 text-current" />
                       </motion.div>
-                      <h3 className="text-xl font-bold mb-2">Hey {user?.name?.split(' ')[0] || 'there'} 👋</h3>
+                      <h3 className="text-xl font-bold mb-2">Welcome {user?.name?.split(' ')[0] || 'there'}</h3>
                       <p className="text-muted-foreground max-w-md mx-auto mb-6">
                         I'll explain anything, quiz you, give examples, and adapt to how you learn best.
                       </p>
@@ -281,7 +283,7 @@ const AITutor: React.FC = () => {
                       <div className="bg-muted/70 backdrop-blur rounded-2xl rounded-tl-sm px-4 py-3 border border-border/50">
                         <div className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          <span className="text-sm text-muted-foreground">Plus is thinking…</span>
+                          <span className="text-sm text-muted-foreground">Tutor is thinking…</span>
                         </div>
                       </div>
                     </motion.div>
@@ -309,7 +311,7 @@ const AITutor: React.FC = () => {
                   </Button>
                   <Input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    placeholder={isListening ? 'Listening…' : `Ask Plus about ${subj.name.toLowerCase()}…`}
+                    placeholder={isListening ? 'Listening…' : `Ask about ${subj.name.toLowerCase()}…`}
                     disabled={isLoading} className="flex-1" />
                   <Button onClick={() => send()} disabled={isLoading || !input.trim()} className="shrink-0">
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
