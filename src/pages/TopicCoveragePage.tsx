@@ -7,8 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
-import { ArrowLeft, BarChart3, CheckCircle, Lock, Star, Trophy, BookOpen, LibraryBig, GraduationCap } from "lucide-react";
+import { ArrowLeft, Star, Trophy, BookOpen, LibraryBig, GraduationCap } from "lucide-react";
 import { getAcademicProfile, normalizeSubject } from "@/lib/academicProfile";
 import { loadBookAnalyses } from "@/lib/bookAnalysis";
 import SkillTree from "@/components/academic/SkillTree";
@@ -117,59 +116,66 @@ const TopicCoveragePage: React.FC = () => {
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading your learning paths…</div>;
 
-  if (!selectedSubject) {
-    const total = subjects.reduce((sum, s) => sum + subjectProgress(s).total, 0);
-    const mastered = subjects.reduce((sum, s) => sum + subjectProgress(s).mastered, 0);
-    return (
-      <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background"}>
-        <header className={upperStudent ? "px-4 pt-5" : "sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 py-3"}>
-          <div className="mx-auto flex max-w-4xl items-center gap-3">
-            {!upperStudent && <Button variant="ghost" size="icon" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button>}
-            <div><h1 className="text-lg font-bold flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /> Topic Coverage</h1><p className="text-xs text-muted-foreground">Book-based units when available; otherwise suggested learning paths</p></div>
-          </div>
-        </header>
-        <main className="mx-auto max-w-4xl space-y-4 px-4 py-5 pb-24">
-          <Card className="border-primary/20 bg-primary/5"><CardContent className="p-4 flex items-center gap-3">
-            <div className="rounded-full bg-primary/10 p-3"><Trophy className="h-6 w-6 text-primary" /></div>
-            <div className="flex-1"><p className="font-semibold">Overall mastery</p><p className="text-sm text-muted-foreground">{mastered} of {total} topics mastered</p></div>
-            <div className="text-right"><p className="text-xl font-bold">{total ? Math.round(mastered / total * 100) : 0}%</p><p className="text-xs text-muted-foreground">Complete</p></div>
-          </CardContent></Card>
-          {subjects.length === 0 ? (
-            <Card><CardContent className="p-8 text-center"><BookOpen className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="font-semibold">Choose your subjects first</p><Button className="mt-4" onClick={() => navigate("/academic/setup")}>Edit Academic Prep</Button></CardContent></Card>
-          ) : subjects.map((subject, i) => {
-            const p = subjectProgress(subject);
-            return <motion.div key={subject} initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:i*.05}}>
-              <Card className="cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md" onClick={() => setSelectedSubject(subject)}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-3"><div><p className="font-semibold">{labelFor(subject)}</p><p className="text-xs text-muted-foreground">{p.mastered}/{p.total} mastered • {p.active} started</p></div><Badge variant={p.pct >= 80 ? "default" : "secondary"}>{p.pct}%</Badge></div>
-                  <Progress value={p.pct} className="mt-3 h-2" />
-                </CardContent>
-              </Card>
-            </motion.div>;
-          })}
-        </main>
-      </div>
-    );
-  }
+  const activeSubject = selectedSubject && subjects.includes(selectedSubject) ? selectedSubject : subjects[0] || null;
+  const overallTotal = subjects.reduce((sum, s) => sum + subjectProgress(s).total, 0);
+  const overallMastered = subjects.reduce((sum, s) => sum + subjectProgress(s).mastered, 0);
+  const path = activeSubject ? getPath(activeSubject) : [];
+  const progress = activeSubject ? subjectProgress(activeSubject) : { mastered: 0, active: 0, total: 0, pct: 0 };
+  const practice = (topic: string) => activeSubject && navigate(`/quiz?subject=${encodeURIComponent(activeSubject)}&topic=${encodeURIComponent(topic)}`);
+  const subjectBooks = activeSubject ? selectedBooks.filter((b) => normalizeSubject(b.subject) === normalizeSubject(activeSubject)) : [];
 
-  const path = getPath(selectedSubject);
-  const progress = subjectProgress(selectedSubject);
   return (
-    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-background"}>
-      <header className={upperStudent ? "px-4 pt-5" : "sticky top-0 z-50 border-b bg-background/95 backdrop-blur px-4 py-3"}>
-        <div className="mx-auto flex max-w-4xl items-center gap-3"><Button variant="ghost" size="icon" aria-label="All subjects" onClick={() => setSelectedSubject(null)}><ArrowLeft className="h-5 w-5" /></Button><div className="flex-1"><h1 className="font-bold">{labelFor(selectedSubject)}</h1><p className="text-xs text-muted-foreground">{progress.mastered}/{progress.total} mastered</p></div><Badge>{progress.pct}%</Badge></div>
-      </header>
-      <main className="mx-auto max-w-2xl px-4 py-5 pb-24">
-        <Progress value={progress.pct} className="mb-5 h-2" />
-        <Card className="mb-5 border-primary/20"><CardContent className="p-4 space-y-3">
-          <div className="flex items-start gap-3"><LibraryBig className="h-5 w-5 text-primary mt-0.5"/><div className="flex-1"><h2 className="font-semibold">Read and learn from your selected books</h2><p className="text-sm text-muted-foreground">When PDF analysis is available, coverage follows the selected book’s extracted headings or page ranges. Otherwise, suggested learning paths are shown separately and are not verified textbook chapters.</p></div></div>
-          {selectedBooks.length ? <div className="space-y-2">{selectedBooks.map(book=><div key={book.id} className="rounded-lg border p-3 flex items-center gap-3"><BookOpen className="h-4 w-4 shrink-0 text-primary"/><div className="min-w-0 flex-1"><p className="text-sm font-medium truncate">{book.title}</p><p className="text-xs text-muted-foreground">{book.author} · {labelFor(book.subject)}</p></div><Button size="sm" variant="outline" onClick={()=>navigate("/library")}>Open Library</Button></div>)}</div> : <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">No selected books were found in Academic Prep. You can still study topic pathways and practice questions, or select books in Academic Prep.</div>}
-          {selectedBooks.some((book) => (bookUnits[book.id]?.units || []).length > 0) && <div className="space-y-3 rounded-xl border p-3"><div><h3 className="font-semibold">Units from your selected book PDFs</h3><p className="text-xs text-muted-foreground">These are extracted PDF headings or page ranges, not generic topic suggestions. Page ranges are identified when reliable headings could not be extracted.</p></div>{selectedBooks.map((book) => { const analysis = bookUnits[book.id]; if (!analysis?.units?.length) return null; return <div key={book.id} className="space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{book.title}</p><Badge variant="outline">{analysis.method === "headings" ? "PDF headings" : analysis.method === "page-ranges" ? "PDF page ranges" : "Estimated"}</Badge></div>{analysis.units.map((unit, index) => <div key={book.id + unit + index} className="flex items-center gap-2 rounded-lg bg-muted/50 p-2"><span className="min-w-0 flex-1 text-sm">{index + 1}. {unit}</span><Button size="sm" variant="outline" onClick={() => navigate(`/quiz?subject=${encodeURIComponent(normalizeSubject(book.subject))}&topic=${encodeURIComponent(unit)}`)}>Find practice</Button></div>)}</div>; })}</div>}
-          <div className="flex flex-wrap gap-2"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Read in Library</Button><Button variant="outline" onClick={()=>navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(path[0] || "")}`)}><GraduationCap className="mr-2 h-4 w-4"/>Practice questions</Button></div>
-        </CardContent></Card>
-        <div className="space-y-3">
-          {path.length === 0 ? <Card><CardContent className="space-y-3 p-6 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground"/><h2 className="font-semibold">No verified units yet</h2><p className="text-sm text-muted-foreground">Topic Coverage will show units extracted from your selected book analysis and topics you have actually practised. Select or analyze a book, or complete a topic practice, to build your real coverage map. Suggested topics are not counted as covered units.</p><div className="flex flex-col justify-center gap-2 sm:flex-row"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Choose a book</Button><Button variant="outline" onClick={()=>navigate("/academic/setup")}>Academic Prep setup</Button></div></CardContent></Card> : <SkillTree onPractice={(topic)=>navigate(`/quiz?subject=${encodeURIComponent(selectedSubject)}&topic=${encodeURIComponent(topic)}`)} nodes={path.map((topic, index) => { const st = getStatus(selectedSubject, topic); return { topic, status: st.status, accuracy: st.accuracy, attempted: st.attempted, unlocked: index === 0 || getStatus(selectedSubject, path[index - 1]).status !== "new" }; })} />}
+    <div className={`${upperStudent ? "tier-upper " : ""}min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]`}>
+      <div className="sticky top-14 z-30 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+          {!upperStudent && <Button variant="ghost" size="icon" aria-label="Back" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button>}
+          <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+            {subjects.map((s) => {
+              const sp = subjectProgress(s); const on = s === activeSubject;
+              return <button key={s} type="button" onClick={() => setSelectedSubject(s)} aria-pressed={on}
+                className={`flex shrink-0 items-center gap-2 rounded-2xl border-2 border-b-4 px-4 py-2 text-sm font-bold transition active:translate-y-0.5 active:border-b-2 ${on ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}>
+                {labelFor(s)}<span className="text-xs opacity-70">{sp.pct}%</span></button>;
+            })}
+          </div>
+          <div className="hidden items-center gap-1.5 rounded-2xl border-2 border-border bg-card px-3 py-2 text-sm font-bold sm:flex"><Trophy className="h-4 w-4 text-accent" />{overallMastered}/{overallTotal}</div>
         </div>
+      </div>
+
+      <main className="mx-auto grid max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[1fr_300px]">
+        <div className="min-w-0">
+          {!activeSubject ? (
+            <Card><CardContent className="p-8 text-center"><BookOpen className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="font-semibold">Choose your subjects first</p><Button className="mt-4" onClick={() => navigate("/academic/setup")}>Edit Academic Prep</Button></CardContent></Card>
+          ) : (
+            <>
+              <div className="mb-6 rounded-3xl border-2 border-b-[6px] border-primary/40 bg-primary p-5 text-primary-foreground">
+                <p className="text-xs font-bold uppercase tracking-wider opacity-80">Your path</p>
+                <h1 className="text-2xl font-extrabold">{labelFor(activeSubject)}</h1>
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-primary-foreground/20"><div className="h-full rounded-full bg-primary-foreground transition-all" style={{ width: `${progress.pct}%` }} /></div>
+                  <span className="text-sm font-bold">{progress.mastered}/{progress.total}</span>
+                </div>
+              </div>
+              {path.length === 0 ? (
+                <Card><CardContent className="space-y-3 p-6 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground"/><h2 className="font-semibold">Your path is empty</h2><p className="text-sm text-muted-foreground">Pick a book for this subject or finish a practice quiz to build your path.</p><div className="flex flex-col justify-center gap-2 sm:flex-row"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Choose a book</Button><Button variant="outline" onClick={()=>practice("")}><GraduationCap className="mr-2 h-4 w-4"/>Practice now</Button></div></CardContent></Card>
+              ) : (
+                <SkillTree key={activeSubject} onPractice={practice} nodes={path.map((topic, index) => { const st = getStatus(activeSubject, topic); return { topic, status: st.status, accuracy: st.accuracy, attempted: st.attempted, unlocked: index === 0 || getStatus(activeSubject, path[index - 1]).status !== "new" }; })} />
+              )}
+            </>
+          )}
+        </div>
+        <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
+          <Card><CardContent className="space-y-3 p-4">
+            <p className="flex items-center gap-2 font-bold"><Star className="h-4 w-4 text-accent" /> Overall mastery</p>
+            <Progress value={overallTotal ? (overallMastered / overallTotal) * 100 : 0} className="h-3" />
+            <p className="text-xs text-muted-foreground">{overallMastered} of {overallTotal} topics mastered across {subjects.length} subjects</p>
+          </CardContent></Card>
+          {activeSubject && <Card><CardContent className="space-y-2 p-4">
+            <p className="flex items-center gap-2 font-bold"><LibraryBig className="h-4 w-4 text-primary" /> Books</p>
+            {subjectBooks.length ? subjectBooks.map((b) => <button key={b.id} type="button" onClick={() => navigate("/library")} className="flex w-full items-center gap-2 rounded-xl border border-border p-2 text-left text-sm hover:bg-muted"><BookOpen className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{b.title}</span></button>)
+              : <p className="text-xs text-muted-foreground">No book picked for this subject.</p>}
+            <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/library")}>Open Library</Button>
+          </CardContent></Card>}
+        </aside>
       </main>
     </div>
   );

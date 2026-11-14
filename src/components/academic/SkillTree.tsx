@@ -26,7 +26,8 @@ const SkillTree: React.FC<{ nodes: SkillNode[]; onPractice: (topic: string) => v
               </div>
               <span className="rounded-full bg-primary-foreground/15 px-3 py-1 text-xs font-bold">{done}/{unit.length}</span>
             </div>
-            <div className="flex flex-col items-center gap-5">
+            <div className="relative flex flex-col items-center gap-5">
+              <div aria-hidden className="pointer-events-none absolute inset-y-4 left-1/2 w-0 -translate-x-1/2 border-l-4 border-dashed border-border" />
               {unit.map((node, j) => {
                 const i = u * 4 + j;
                 const isCurrent = i === currentIndex;

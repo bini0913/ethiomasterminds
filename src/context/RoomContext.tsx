@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useUser } from './UserContext';
 import { toast } from 'sonner';
 
+let cleanupUnavailable = false;
+
 export interface Room {
   id: string;
   name: string;
@@ -44,9 +46,11 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const cleanupExpiredRooms = useCallback(async () => {
+    if (cleanupUnavailable) return;
     try {
       const { error } = await db.rpc('cleanup_expired_multiplayer_rooms' as any);
-      if (error) console.warn('Room cleanup failed:', error);
+      // The cleanup function is optional maintenance; stop calling it once the backend reports it missing.
+      if (error) cleanupUnavailable = true;
     } catch (error) {
       // Expiry cleanup is maintenance-only and must never interrupt room discovery.
       console.warn('Room cleanup request failed:', error);
