@@ -45,6 +45,7 @@ DECLARE
   v_offset integer := 0;
   v_question record;
   v_attempt public.daily_challenge_attempts%rowtype;
+  v_has_attempt boolean := false;
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
 
@@ -69,6 +70,7 @@ BEGIN
   SELECT * INTO v_attempt
   FROM public.daily_challenge_attempts
   WHERE user_id = v_user_id AND challenge_date = v_date;
+  v_has_attempt := FOUND;
 
   RETURN jsonb_build_object(
     'available', true,
@@ -76,9 +78,9 @@ BEGIN
     'question_text', v_question.question_text,
     'options', coalesce(v_question.options, '[]'::jsonb),
     'explanation', v_question.explanation,
-    'already_completed', FOUND,
-    'was_correct', CASE WHEN FOUND THEN v_attempt.is_correct ELSE false END,
-    'xp_awarded', CASE WHEN FOUND THEN v_attempt.xp_awarded ELSE 0 END
+    'already_completed', v_has_attempt,
+    'was_correct', CASE WHEN v_has_attempt THEN v_attempt.is_correct ELSE false END,
+    'xp_awarded', CASE WHEN v_has_attempt THEN v_attempt.xp_awarded ELSE 0 END
   );
 END;
 $function$;
