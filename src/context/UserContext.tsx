@@ -37,6 +37,8 @@ export type UserProfile = {
   badges?: string[];
 };
 
+export type EditableProfileData = Partial<Pick<UserProfile, 'name' | 'username' | 'gender' | 'avatar' | 'avatarConfig'>>;
+
 interface UserContextType {
   user: UserProfile | null;
   session: Session | null;
