@@ -278,6 +278,15 @@ serve(async (req) => {
       studyCompetitionEntries: studyCompetitionEntries.length,
     };
     const totalActivityEvents = Object.values(sourceRows).reduce((sum, count) => sum + count, 0);
+    const anySourceAvailable = [
+      attemptSource, readingSource, sessionSource, planSource, taskSource, flashcardSource,
+      multiplayerSource, callSource, earlyAttemptSource, videoSource, revisionSource,
+      tournamentSource, studyCompetitionSource,
+    ].some((source) => source.available);
+    if (totalActivityEvents === 0 && !anySourceAvailable) {
+      console.error("Learning DNA could not read any activity source for the authenticated student.");
+      return jsonResponse({ error: "Your learning activity could not be loaded. Please try again later." }, 500);
+    }
     if (totalActivityEvents === 0) {
       return jsonResponse({
         success: true,
