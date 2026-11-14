@@ -67,7 +67,7 @@ begin
     raise exception 'Authentication required';
   end if;
 
-  if public.get_user_role(v_uid) <> 'student'::public.app_role then
+  if public.get_user_role(v_uid) is distinct from 'student'::public.app_role then
     raise exception 'Only student accounts can set a student grade';
   end if;
 
@@ -125,7 +125,7 @@ $function$;
 revoke all on function public.set_initial_student_grade(text) from public, anon;
 grant execute on function public.set_initial_student_grade(text) to authenticated;
 
--- Staff grade corrections use an audited, role-checked database operation,
+-- Staff grade corrections use a role-checked, audit-logged database operation,
 -- never a direct client UPDATE of protected columns.
 create or replace function public.admin_update_student_grade(p_user_id uuid, p_grade text)
 returns boolean
@@ -150,7 +150,7 @@ begin
     raise exception 'Staff permission required';
   end if;
 
-  if public.get_user_role(p_user_id) <> 'student'::public.app_role then
+  if public.get_user_role(p_user_id) is distinct from 'student'::public.app_role then
     raise exception 'Target account is not a student';
   end if;
 
@@ -177,6 +177,10 @@ begin
   if not found then
     raise exception 'Student profile not found';
   end if;
+
+  insert into public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  values (auth.uid(), 'staff_set_student_grade', 'user', p_user_id,
+          jsonb_build_object('grade', v_grade, 'education_level', v_education_level));
 
   return true;
 end;
