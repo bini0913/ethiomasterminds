@@ -66,7 +66,7 @@ select is((select count(*)::integer from public.room_players where room_id = 'a1
 select is((select count(*)::integer from public.multiplayer_rooms where id = 'a1000000-0000-4000-8000-000000000003'), 1, 'authenticated users can discover public rooms');
 select is((select count(*)::integer from public.room_players where room_id = 'a1000000-0000-4000-8000-000000000003'), 1, 'public lobby roster remains visible');
 select throws_ok(
-  $select public.multiplayer_join_room('a1000000-0000-4000-8000-000000000002', 'wrong-pass')$,
+  'select public.multiplayer_join_room(''a1000000-0000-4000-8000-000000000002'', ''wrong-pass'')',
   'P0001',
   'Incorrect password',
   'incorrect private-room password is rejected'
@@ -80,7 +80,7 @@ where id = 'a1000000-0000-4000-8000-000000000002';
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000001', true);
 select throws_ok(
-  $select public.multiplayer_join_room('a1000000-0000-4000-8000-000000000002', 'private-pass')$,
+  'select public.multiplayer_join_room(''a1000000-0000-4000-8000-000000000002'', ''private-pass'')',
   'P0001',
   'This match has already started',
   'new players cannot join an active match'
