@@ -398,7 +398,7 @@ begin
       and (p.proname like 'multiplayer\_%' escape '\')
   loop
     execute format('revoke execute on function %s from public, anon', v_fn.signature);
-    execute format('alter function %s set search_path = ''''', v_fn.signature);
+    execute format('alter function %s set search_path = %L', v_fn.signature, '');
 
     if v_fn.proname = 'multiplayer_record_ranked_result'
        or v_fn.prorettype = 'trigger'::regtype then
