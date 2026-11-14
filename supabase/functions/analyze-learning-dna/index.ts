@@ -163,7 +163,7 @@ serve(async (req) => {
       .map((value: string) => value.slice(0, 10))).size;
     const plannedDuration = sessions.reduce((sum: number, row: any) => sum + numberOrZero(row.planned_duration), 0);
     const actualDuration = sessions.reduce((sum: number, row: any) => sum + numberOrZero(row.duration), 0);
-    const sessionAdherence = plannedDuration > 0 ? Math.min(150, Math.round((actualDuration / plannedDuration) * 100)) : null;
+    const sessionAdherence = plannedDuration > 0 ? Math.min(100, Math.round((actualDuration / plannedDuration) * 100)) : null;
 
     const completedPlans = plans.filter((row: any) => row.completed === true).length;
     const completedTasks = tasks.filter((row: any) => row.completed === true).length;
@@ -201,13 +201,14 @@ serve(async (req) => {
         totalTasks: tasks.length,
         taskCompletionPercent: percent(completedTasks, tasks.length),
         sessionDurationAdherencePercent: sessionAdherence,
-        totalRecordedDuration: actualDuration,
+        totalStudyMinutes: actualDuration,
       },
       multiplayer: {
         matches: matches.length,
         wins: multiplayerWins,
         podiumFinishes: multiplayerPodiums,
         averageAccuracy: percent(multiplayerCorrect, multiplayerAnswered),
+        questionCompletionPercent: percent(multiplayerAnswered, multiplayerTotal),
         answeredQuestions: multiplayerAnswered,
         totalQuestions: multiplayerTotal,
       },
@@ -281,7 +282,7 @@ serve(async (req) => {
       "Analyze only the supplied aggregated records for this one signed-in student.",
       "Do not infer personality, intelligence, motivation, mental health, family circumstances, or career suitability.",
       "Do not shame, rank, diagnose, or label the student. Describe discipline as observable consistency and follow-through, never as a moral judgement.",
-      "Reading progress and time do not prove comprehension. Multiplayer wins do not prove teamwork or fair play. Never claim these things are measured.",
+      "Reading progress and time do not prove comprehension. Reading progress is a per-book snapshot, not a complete session-by-session reading history. Multiplayer wins do not prove teamwork or fair play; answered-question completion is only an engagement measure. Never claim these things are measured.",
       "Do not invent missing events, subjects, book titles, progress, or causes. If a source is unavailable or empty, say evidence is not available.",
       "Separate measured facts from possible interpretations. Give specific, age-appropriate, encouraging recommendations that are realistic for a student.",
       "Use only the provided evidence. Do not make predictions about careers. Return concise, useful content matching the required JSON schema.",
