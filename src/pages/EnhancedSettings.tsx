@@ -98,7 +98,6 @@ const EnhancedSettings: React.FC = () => {
     try {
       const saved = await updateProfile({ name: profileData.name.trim() });
       if (!saved) return;
-      toast.success("Profile saved successfully!");
     } catch (err) {
       console.error('Error saving profile:', err);
       toast.error("Failed to save profile");
@@ -116,7 +115,6 @@ const EnhancedSettings: React.FC = () => {
       if (!saved) return;
 
       setAvatarConfig(config);
-      toast.success("Avatar saved successfully!");
     } catch (err) {
       console.error('Error saving avatar:', err);
       toast.error("Failed to save avatar");
