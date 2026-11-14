@@ -156,7 +156,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         hostName: user.name,
         players: [user.id],
         maxPlayers: data.max_players,
-        hasPassword: Boolean(password),
+        hasPassword: Boolean(password?.trim()),
         gameSettings: settings,
         status: data.status as Room['status'],
         createdAt: new Date(data.created_at),
