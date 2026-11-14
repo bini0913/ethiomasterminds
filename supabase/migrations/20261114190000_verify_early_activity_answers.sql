@@ -114,11 +114,11 @@ BEGIN
   FROM public.profiles
   WHERE id = v_user_id
   FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Profile not found'; END IF;
+  IF NOT FOUND OR v_grade IS NULL THEN RAISE EXCEPTION 'Profile not found or grade is missing'; END IF;
 
   IF lower(trim(v_grade)) ~ '^(k|kindergarten|pre-?k)$' THEN
     v_grade_num := 0;
-  ELSIF lower(trim(v_grade)) ~ '^(?:grade\s*)?[1-4]\\+?$' THEN
+  ELSIF lower(trim(v_grade)) ~ '^(?:grade\s*)?[1-4]\+?$' THEN
     v_grade_num := substring(lower(trim(v_grade)) from '([1-4])')::integer;
   ELSE
     RAISE EXCEPTION 'Early quizzes are only available to KG through Grade 4';
@@ -200,9 +200,9 @@ BEGIN
   END IF;
 
   INSERT INTO public.user_currency(user_id, coins, gems)
-  VALUES (v_user_id, CASE WHEN v_correct THEN v_coin_reward ELSE 0 END, 0)
+  VALUES (v_user_id, 100 + CASE WHEN v_correct THEN v_coin_reward ELSE 0 END, 10)
   ON CONFLICT (user_id) DO UPDATE SET
-    coins = public.user_currency.coins + EXCLUDED.coins,
+    coins = public.user_currency.coins + EXCLUDED.coins - 100,
     updated_at = now()
   RETURNING coins INTO v_coins;
 
@@ -241,7 +241,7 @@ BEGIN
   SELECT grade INTO v_grade FROM public.profiles WHERE id = v_user_id FOR UPDATE;
   IF NOT FOUND OR v_grade IS NULL OR NOT (
     lower(trim(v_grade)) ~ '^(k|kindergarten|pre-?k)$'
-    OR lower(trim(v_grade)) ~ '^(?:grade\s*)?[1-4]\\+?$'
+    OR lower(trim(v_grade)) ~ '^(?:grade\s*)?[1-4]\+?$'
   ) THEN
     RAISE EXCEPTION 'Early achievements are only available to KG through Grade 4';
   END IF;
@@ -321,9 +321,9 @@ BEGIN
   WHERE id = v_user_id;
 
   INSERT INTO public.user_currency(user_id, coins, gems)
-  VALUES (v_user_id, v_reward_coins, 0)
+  VALUES (v_user_id, 100 + v_reward_coins, 10)
   ON CONFLICT (user_id) DO UPDATE SET
-    coins = public.user_currency.coins + EXCLUDED.coins,
+    coins = public.user_currency.coins + EXCLUDED.coins - 100,
     updated_at = now();
 
   RETURN jsonb_build_object('success', true, 'xp_awarded', v_reward_xp, 'coins_awarded', v_reward_coins);
