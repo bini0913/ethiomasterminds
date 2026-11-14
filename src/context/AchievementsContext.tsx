@@ -151,24 +151,12 @@ export const AchievementsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const previouslyCompleted = new Set(achievements.filter((item) => item.completed).map((item) => item.id));
       const { error } = await (supabase as any).rpc('sync_student_achievement_progress', {
         p_requirement_type: requirementType,
       });
       if (error) throw error;
 
       await fetchAchievements();
-      const newlyCompleted = badges.filter((badge) => {
-        const current = achievements.find((item) => item.id === badge.id);
-        return badge.requirement_type === requirementType && !previouslyCompleted.has(badge.id)
-          && current?.condition.current !== undefined
-          && current.condition.current >= badge.requirement_value;
-      });
-      for (const badge of newlyCompleted) {
-        toast.success(`🏆 Achievement Unlocked: ${badge.name}!`, {
-          description: `+${badge.reward_xp} XP, +${badge.reward_coins} Coins`,
-        });
-      }
     } catch (err) {
       console.error('Error syncing achievement progress:', err);
     }
