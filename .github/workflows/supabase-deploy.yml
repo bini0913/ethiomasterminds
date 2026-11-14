@@ -28,9 +28,9 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
-          version: latest
+          version: 3.0.0
 
       - name: Validate access token
         shell: bash
@@ -69,7 +69,7 @@ jobs:
               if [ -d "$dir" ] && [ -f "$dir/index.ts" ]; then
                 name="$(basename "$dir")"
                 echo "Deploying $name"
-                supabase functions deploy "$name" --project-ref "$SUPABASE_PROJECT_ID"
+                supabase functions deploy "$name" --project-ref "$SUPABASE_PROJECT_ID" --yes
               fi
             done
           else
