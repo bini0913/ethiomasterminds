@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(20);
+select plan(21);
 
 select ok(not has_column_privilege('authenticated', 'public.profiles', 'grade', 'update'), 'students cannot update grade directly');
 select ok(not has_column_privilege('authenticated', 'public.profiles', 'education_level', 'update'), 'students cannot update education tier directly');
