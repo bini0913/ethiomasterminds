@@ -129,7 +129,14 @@ begin
       - ((v_total_questions - v_correct_count) * v_wrong_penalty)
   );
   v_score := round((v_correct_count::numeric / nullif(v_total_questions, 0)) * 100)::integer;
-  v_subject := coalesce(nullif(btrim(p_subject), ''), v_quiz_subject, 'General');
+  if v_quiz_subject is not null
+    and p_subject is not null
+    and btrim(p_subject) <> ''
+    and lower(btrim(p_subject)) <> lower(btrim(v_quiz_subject)) then
+    raise exception 'Subject does not match the approved quiz';
+  end if;
+  -- The approved quiz is the source of truth; never accept a client-selected subject.
+  v_subject := coalesce(nullif(btrim(v_quiz_subject), ''), 'General');
   v_exam_type := case
     when p_exam_type in ('mixed_practice', 'mock_exam', 'past_paper', 'topic_practice', 'general')
       then p_exam_type
@@ -207,17 +214,20 @@ begin
           completion_percentage = least(
             100,
             round(((coalesce(v_existing_progress.questions_attempted, 0) + v_attempted)::numeric / 5) * 100)::integer
-          )
+          ),
+          last_practiced = now(),
+          updated_at = now()
       where id = v_existing_progress.id;
     else
       insert into public.topic_progress (
         user_id, subject, topic, questions_attempted, questions_correct,
-        accuracy_percentage, completion_percentage
+        accuracy_percentage, completion_percentage, last_practiced, updated_at
       )
       values (
         v_user_id, v_subject, v_topic, v_attempted, v_correct,
         case when v_attempted > 0 then round((v_correct::numeric / v_attempted) * 100)::integer else 0 end,
-        least(100, round((v_attempted::numeric / 5) * 100)::integer)
+        least(100, round((v_attempted::numeric / 5) * 100)::integer),
+        now(), now()
       );
     end if;
   end loop;
