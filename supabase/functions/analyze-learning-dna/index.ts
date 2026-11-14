@@ -33,7 +33,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const xaiApiKey = Deno.env.get("XAI_API_KEY") || Deno.env.get("GROK_API_KEY");
+    const groqApiKey = Deno.env.get("GROQ_API_KEY");
     const authorization = req.headers.get("Authorization");
 
     if (!supabaseUrl || !anonKey || !serviceRoleKey) {
@@ -41,9 +41,9 @@ serve(async (req) => {
       return jsonResponse({ error: "Learning DNA is temporarily unavailable." }, 500);
     }
     if (!authorization) return jsonResponse({ error: "Unauthorized" }, 401);
-    if (!xaiApiKey) {
-      console.error("Learning DNA requires the existing xAI Grok secret (XAI_API_KEY or GROK_API_KEY).");
-      return jsonResponse({ error: "Grok AI is not configured for Learning DNA. Ask an administrator to verify the server-side xAI key." }, 503);
+    if (!groqApiKey) {
+      console.error("Learning DNA requires the existing Groq secret (GROQ_API_KEY).");
+      return jsonResponse({ error: "Groq AI is not configured for Learning DNA. Ask an administrator to verify the server-side GROQ_API_KEY." }, 503);
     }
 
     // All source reads use the student's JWT and existing RLS policies.
@@ -330,7 +330,7 @@ serve(async (req) => {
       window: "Most recent records returned by each source; source limits are recorded above.",
     };
 
-    const grokSchema = {
+    const learningDnaSchema = {
       type: "object",
       additionalProperties: false,
       properties: {
@@ -346,7 +346,7 @@ serve(async (req) => {
     };
 
     const prompt = [
-      "You are Grok, the learning intelligence engine inside Master Minds, an Ethiopian educational app.",
+      "You are the learning intelligence engine inside Master Minds, an Ethiopian educational app.",
       "Analyze only the supplied aggregated records for this one signed-in student.",
       "Do not infer personality, intelligence, motivation, mental health, family circumstances, or career suitability.",
       "Do not shame, rank, diagnose, or label the student. Describe discipline as observable consistency and follow-through, never as a moral judgement.",
@@ -358,47 +358,69 @@ serve(async (req) => {
       JSON.stringify({ activitySummary, topicMastery, strengths, weaknesses, dataCoverage }),
     ].join("\n\n");
 
+    // Use the same Groq endpoint and model already configured by Master Minds' AI Tutor,
+    // AI Helper, Academic Insights, and Study Planner functions.
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
     let aiInsights: any;
     try {
-      const grokResponse = await fetch("https://api.x.ai/v1/responses", {
+      const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         signal: controller.signal,
         headers: {
-          Authorization: "Bearer " + xaiApiKey,
+          Authorization: "Bearer " + groqApiKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "grok-4.7",
-          store: false,
-          input: prompt,
-          text: {
-            format: {
-              type: "json_schema",
-              name: "master_minds_learning_dna",
-              strict: true,
-              schema: grokSchema,
+          model: "openai/gpt-oss-20b",
+          temperature: 0.2,
+          max_completion_tokens: 1600,
+          messages: [
+            {
+              role: "system",
+              content: "You are a careful educational learning analyst. Return the requested structured report using only the supplied evidence.",
             },
+            { role: "user", content: prompt },
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "create_learning_dna_report",
+                description: "Return a structured evidence-based Learning DNA report for the authenticated student.",
+                parameters: learningDnaSchema,
+              },
+            },
+          ],
+          tool_choice: {
+            type: "function",
+            function: { name: "create_learning_dna_report" },
           },
-          max_output_tokens: 1600,
         }),
       });
 
-      if (!grokResponse.ok) {
-        const errorText = await grokResponse.text();
-        console.error("Grok Learning DNA request failed:", grokResponse.status, errorText.slice(0, 500));
-        return jsonResponse({ error: grokResponse.status === 429 ? "Grok is busy. Please try again shortly." : "Grok could not complete your Learning DNA analysis. Please try again." }, grokResponse.status === 429 ? 429 : 502);
+      if (!groqResponse.ok) {
+        const errorText = await groqResponse.text();
+        console.error("Groq Learning DNA request failed:", groqResponse.status, errorText.slice(0, 500));
+        if (groqResponse.status === 429) {
+          return jsonResponse({ error: "Groq is busy or its free-tier limit has been reached. Please try again later." }, 429);
+        }
+        if (groqResponse.status === 401 || groqResponse.status === 403) {
+          return jsonResponse({ error: "The server-side Groq API key was rejected. Ask an administrator to check GROQ_API_KEY." }, 503);
+        }
+        return jsonResponse({ error: "Groq could not complete your Learning DNA analysis. Please try again." }, 502);
       }
 
-      const grokData = await grokResponse.json();
-      const message = asArray<any>(grokData.output).find((item: any) => item.type === "message");
-      const outputText = asArray<any>(message?.content).find((item: any) => item.type === "output_text")?.text || grokData.output_text;
-      if (typeof outputText !== "string") throw new Error("Grok returned no structured Learning DNA report.");
+      const groqData = await groqResponse.json();
+      const toolCall = groqData.choices?.[0]?.message?.tool_calls?.find(
+        (call: any) => call.function?.name === "create_learning_dna_report",
+      );
+      const outputText = toolCall?.function?.arguments;
+      if (typeof outputText !== "string") throw new Error("Groq returned no structured Learning DNA report.");
       aiInsights = JSON.parse(outputText);
       const requiredArrays = ["learningPatterns", "readingInsights", "disciplineInsights", "multiplayerInsights", "recommendations", "evidenceLimitations"];
       if (typeof aiInsights.summary !== "string" || requiredArrays.some((key) => !Array.isArray(aiInsights[key]) || !aiInsights[key].every((entry: unknown) => typeof entry === "string"))) {
-        throw new Error("Grok returned an invalid Learning DNA report.");
+        throw new Error("Groq returned an invalid Learning DNA report.");
       }
       for (const key of requiredArrays) aiInsights[key] = aiInsights[key].slice(0, 6).map((value: string) => value.slice(0, 320));
       aiInsights.summary = aiInsights.summary.slice(0, 1200);
