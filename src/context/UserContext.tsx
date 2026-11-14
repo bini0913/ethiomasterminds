@@ -88,7 +88,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
     const { error } = await (supabase as any)
       .from("profiles")
-      .upsert({
+      .insert({
         id: userId,
         name: fallbackName,
         username: String(fallbackUsername).toLowerCase(),
