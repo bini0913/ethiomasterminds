@@ -47,7 +47,7 @@ interface UserContextType {
   signup: (email: string, password: string, name: string) => Promise<boolean>;
   signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string, profileDetails?: { age: number; gender: "male" | "female"; avatar: string; learningGoal?: { id: string; minutes: number; xp: number }; academicStream?: "Natural Science" | "Social Science" }) => Promise<UserProfile | null>;
   logout: () => Promise<void>;
-  updateProfile: (profileData: Partial<UserProfile>) => Promise<boolean>;
+  updateProfile: (profileData: EditableProfileData) => Promise<boolean>;
   addXP: (amount: number) => Promise<void>;
   deleteAccount: () => Promise<void>;
   getAllUsers: () => Promise<Array<Omit<UserProfile, 'password'>>>;
@@ -91,8 +91,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         name: fallbackName,
         username: String(fallbackUsername).toLowerCase(),
         avatar: "avatar-1",
-        level: 1,
-        xp: 0,
       });
 
     if (error) {
@@ -448,7 +446,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
         // Make sure the profile row exists and holds the signup fields, even if
         // the auth trigger only stored name/username.
-        const normalizedGrade = grade?.trim();
         const profileFields: Record<string, string | number> = {
           name: name.trim(),
           username: username.trim().toLowerCase(),
@@ -520,7 +517,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     toast.success("Logged out");
   };
 
-  const updateProfile = async (profileData: Partial<UserProfile>): Promise<boolean> => {
+  const updateProfile = async (profileData: EditableProfileData): Promise<boolean> => {
     if (!user || !session?.user) return false;
 
     try {
@@ -529,8 +526,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (profileData.name !== undefined) updateData.name = profileData.name;
       if (profileData.username !== undefined) updateData.username = profileData.username;
       if (profileData.gender !== undefined) updateData.gender = profileData.gender;
-      if (profileData.grade !== undefined) updateData.grade = profileData.grade;
-      if (profileData.educationLevel !== undefined) updateData.education_level = profileData.educationLevel;
       // XP/level/rank/badges are progression-owned fields and cannot be edited
       // through the general profile update path.
       if (profileData.avatar !== undefined) updateData.avatar = profileData.avatar;
