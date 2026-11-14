@@ -13,235 +13,359 @@ const jsonResponse = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+const asArray = <T>(value: T[] | null | undefined): T[] => Array.isArray(value) ? value : [];
+const numberOrZero = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+};
+const average = (values: number[]) => values.length
+  ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+  : 0;
+const percent = (numerator: number, denominator: number) => denominator > 0
+  ? Math.round((numerator / denominator) * 100)
+  : null;
 
-  if (req.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed" }, 405);
-  }
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const xaiApiKey = Deno.env.get("XAI_API_KEY") || Deno.env.get("GROK_API_KEY");
     const authorization = req.headers.get("Authorization");
 
     if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-      console.error("Learning DNA function is missing required Supabase environment configuration.");
+      console.error("Learning DNA is missing required Supabase environment configuration.");
       return jsonResponse({ error: "Learning DNA is temporarily unavailable." }, 500);
     }
-
-    if (!authorization) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
+    if (!authorization) return jsonResponse({ error: "Unauthorized" }, 401);
+    if (!xaiApiKey) {
+      console.error("Learning DNA requires the existing xAI Grok secret (XAI_API_KEY or GROK_API_KEY).");
+      return jsonResponse({ error: "Grok AI is not configured for Learning DNA. Ask an administrator to verify the server-side xAI key." }, 503);
     }
 
-    // Keep reads scoped to the caller's JWT and RLS policies.
-    const supabaseClient = createClient(supabaseUrl, anonKey, {
+    // All source reads use the student's JWT and existing RLS policies.
+    const studentClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authorization } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
+    const { data: { user }, error: authError } = await studentClient.auth.getUser();
+    if (authError || !user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-
-    const dailyLimit = await supabaseClient.rpc("consume_configured_ai_request");
+    const dailyLimit = await studentClient.rpc("consume_configured_ai_request");
     if (dailyLimit.error) {
       if (dailyLimit.error.code === "PGRST202") {
-        console.error("Admin AI settings migration is not applied; Learning DNA per-minute protection remains active.");
+        console.error("Admin AI settings migration is not applied; per-minute Learning DNA protection remains active.");
       } else {
         throw dailyLimit.error;
       }
     } else if (!dailyLimit.data) {
-      return jsonResponse({
-        error: "AI is disabled by the administrator or your rolling 24-hour request limit has been reached.",
-      }, 429);
+      return jsonResponse({ error: "AI is disabled by the administrator or your rolling 24-hour request limit has been reached." }, 429);
     }
 
-    const rateLimit = await supabaseClient.rpc("consume_edge_rate_limit", {
+    const rateLimit = await studentClient.rpc("consume_edge_rate_limit", {
       p_bucket: "learning-dna",
       p_limit: 5,
       p_window_seconds: 300,
     });
     if (rateLimit.error) throw rateLimit.error;
-    if (!rateLimit.data) {
-      return jsonResponse({ error: "Please wait before generating another report." }, 429);
-    }
+    if (!rateLimit.data) return jsonResponse({ error: "Please wait before generating another Learning DNA report." }, 429);
 
-    const { data: attempts, error: attemptsError } = await supabaseClient
-      .from("question_attempts")
-      .select("is_correct,time_taken_seconds,questions(subject,quizzes(subject))")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(500);
-
-    if (attemptsError) {
-      console.error("Error fetching Learning DNA attempts:", attemptsError);
-      return jsonResponse({ error: "Your quiz history could not be loaded. Please try again." }, 500);
-    }
-
-    const totalAttempts = attempts?.length ?? 0;
-    if (totalAttempts === 0) {
-      return jsonResponse({
-        success: true,
-        status: "insufficient_data",
-        message: "Complete at least one quiz first. Your Learning DNA will be created from your recorded answers.",
-        data: null,
-      });
-    }
-
-    const subjectStats: Record<string, { correct: number; total: number; times: number[] }> = {};
-
-    for (const attempt of attempts ?? []) {
-      const subject = attempt.questions?.quizzes?.subject || attempt.questions?.subject || "Uncategorized";
-      if (!subjectStats[subject]) {
-        subjectStats[subject] = { correct: 0, total: 0, times: [] };
+    // Each source is independently degradable: one unavailable feature does not hide valid activity from others.
+    const readSource = async (name: string, query: any) => {
+      const { data, error } = await query;
+      if (error) {
+        console.error("Learning DNA source unavailable:", name, error.message);
+        return { rows: [] as any[], available: false };
       }
+      return { rows: asArray(data), available: true };
+    };
 
-      subjectStats[subject].total += 1;
-      if (attempt.is_correct) subjectStats[subject].correct += 1;
-      subjectStats[subject].times.push(Math.max(0, Number(attempt.time_taken_seconds) || 0));
+    const [attemptSource, readingSource, sessionSource, planSource, taskSource, flashcardSource, multiplayerSource, callSource] = await Promise.all([
+      readSource("question_attempts", studentClient.from("question_attempts")
+        .select("is_correct,time_taken_seconds,created_at,questions(subject,quizzes(subject,title))")
+        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(500)),
+      readSource("reading_progress", studentClient.from("reading_progress")
+        .select("book_id,completion_percent,last_page,time_spent_seconds,updated_at,library_books(title,subject)")
+        .eq("user_id", user.id).order("updated_at", { ascending: false }).limit(300)),
+      readSource("study_sessions", studentClient.from("study_sessions")
+        .select("duration,planned_duration,status,start_time,end_time,mode,created_at")
+        .eq("user_id", user.id).order("start_time", { ascending: false }).limit(500)),
+      readSource("study_plans", studentClient.from("study_plans")
+        .select("completed,scheduled_date,subject,topic,created_at")
+        .eq("user_id", user.id).order("scheduled_date", { ascending: false }).limit(500)),
+      readSource("study_tasks", studentClient.from("study_tasks")
+        .select("completed,created_at")
+        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(500)),
+      readSource("user_flashcard_progress", studentClient.from("user_flashcard_progress")
+        .select("status,repetition_count,last_reviewed_at,next_review_date,flashcard_id")
+        .eq("user_id", user.id).order("last_reviewed_at", { ascending: false }).limit(500)),
+      readSource("multiplayer_match_results", studentClient.from("multiplayer_match_results")
+        .select("placement,player_count,correct_answers,answered_questions,total_questions,accuracy,created_at")
+        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(300)),
+      readSource("study_call_participants", studentClient.from("study_call_participants")
+        .select("status,created_at,responded_at")
+        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(200)),
+    ]);
+
+    const attempts = attemptSource.rows;
+    const reading = readingSource.rows;
+    const sessions = sessionSource.rows;
+    const plans = planSource.rows;
+    const tasks = taskSource.rows;
+    const flashcards = flashcardSource.rows;
+    const matches = multiplayerSource.rows;
+    const calls = callSource.rows;
+
+    const topicStats: Record<string, { correct: number; total: number }> = {};
+    for (const attempt of attempts) {
+      const question = Array.isArray(attempt.questions) ? attempt.questions[0] : attempt.questions;
+      const quiz = Array.isArray(question?.quizzes) ? question.quizzes[0] : question?.quizzes;
+      const subject = String(quiz?.subject || question?.subject || "Uncategorized").slice(0, 100);
+      const quizTitle = String(quiz?.title || "Practice questions").slice(0, 120);
+      const area = subject + " — " + quizTitle;
+      if (!topicStats[area]) topicStats[area] = { correct: 0, total: 0 };
+      topicStats[area].total += 1;
+      if (attempt.is_correct === true) topicStats[area].correct += 1;
     }
 
     const topicMastery: Record<string, { mastery: number; status: string }> = {};
     const strengths: string[] = [];
     const weaknesses: string[] = [];
-
-    for (const [subject, stats] of Object.entries(subjectStats)) {
-      const accuracy = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
-      let status = "needs-work";
-      if (accuracy >= 80) status = "mastered";
-      else if (accuracy >= 60) status = "learning";
-
-      topicMastery[subject] = { mastery: Math.round(accuracy), status };
-      if (accuracy >= 80) strengths.push(subject);
-      else if (accuracy < 50) weaknesses.push(subject);
+    for (const [area, stats] of Object.entries(topicStats)) {
+      const accuracy = percent(stats.correct, stats.total) ?? 0;
+      const status = stats.total < 3 ? "developing" : accuracy >= 80 ? "mastered" : accuracy >= 60 ? "learning" : "needs-work";
+      topicMastery[area] = { mastery: accuracy, status };
+      if (stats.total >= 5 && accuracy >= 80) strengths.push(area);
+      if (stats.total >= 5 && accuracy < 50) weaknesses.push(area);
     }
 
-    const avgTimeOverall = attempts.reduce(
-      (sum, attempt) => sum + Math.max(0, Number(attempt.time_taken_seconds) || 0),
-      0,
-    ) / totalAttempts;
+    const bookSummaries = reading.slice(0, 20).map((row: any) => {
+      const book = Array.isArray(row.library_books) ? row.library_books[0] : row.library_books;
+      return {
+        title: String(book?.title || "Untitled book").slice(0, 120),
+        subject: String(book?.subject || "Uncategorized").slice(0, 80),
+        completionPercent: Math.max(0, Math.min(100, numberOrZero(row.completion_percent))),
+        timeSpentSeconds: numberOrZero(row.time_spent_seconds),
+        lastPageReached: numberOrZero(row.last_page),
+      };
+    });
+    const readingTimeSeconds = reading.reduce((sum: number, row: any) => sum + numberOrZero(row.time_spent_seconds), 0);
+    const completedBooks = reading.filter((row: any) => numberOrZero(row.completion_percent) >= 100).length;
 
-    const learningStyle = avgTimeOverall > 60
-      ? "analytical"
-      : avgTimeOverall < 20
-        ? "quick-thinker"
-        : "balanced";
+    const completedSessions = sessions.filter((row: any) => String(row.status).toLowerCase() === "completed").length;
+    const activeCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const activeStudyDays = new Set(sessions
+      .map((row: any) => row.start_time)
+      .filter((value: unknown) => typeof value === "string" && new Date(value).getTime() >= activeCutoff)
+      .map((value: string) => value.slice(0, 10))).size;
+    const plannedDuration = sessions.reduce((sum: number, row: any) => sum + numberOrZero(row.planned_duration), 0);
+    const actualDuration = sessions.reduce((sum: number, row: any) => sum + numberOrZero(row.duration), 0);
+    const sessionAdherence = plannedDuration > 0 ? Math.min(150, Math.round((actualDuration / plannedDuration) * 100)) : null;
 
-    let predictedPath: {
-      recommendedFocus: string[];
-      studyTips: string[];
-      predictedCareerPaths: string[];
-    } | null = null;
+    const completedPlans = plans.filter((row: any) => row.completed === true).length;
+    const completedTasks = tasks.filter((row: any) => row.completed === true).length;
+    const reviewedCards = flashcards.filter((row: any) => Boolean(row.last_reviewed_at)).length;
+    const totalRepetitions = flashcards.reduce((sum: number, row: any) => sum + numberOrZero(row.repetition_count), 0);
+    const multiplayerCorrect = matches.reduce((sum: number, row: any) => sum + numberOrZero(row.correct_answers), 0);
+    const multiplayerAnswered = matches.reduce((sum: number, row: any) => sum + numberOrZero(row.answered_questions), 0);
+    const multiplayerTotal = matches.reduce((sum: number, row: any) => sum + numberOrZero(row.total_questions), 0);
+    const multiplayerWins = matches.filter((row: any) => numberOrZero(row.placement) === 1).length;
+    const multiplayerPodiums = matches.filter((row: any) => numberOrZero(row.placement) > 0 && numberOrZero(row.placement) <= 3).length;
+    const acceptedCalls = calls.filter((row: any) => row.status === "accepted" || row.status === "left").length;
 
-    const groqApiKey = Deno.env.get("GROQ_API_KEY");
-    if (groqApiKey && Object.keys(topicMastery).length > 0) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      try {
-        const aiResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            Authorization: "Bearer " + groqApiKey,
-            "Content-Type": "application/json",
+    const activitySummary = {
+      quizzes: {
+        attempts: attempts.length,
+        accuracy: percent(attempts.filter((row: any) => row.is_correct === true).length, attempts.length),
+        learningAreas: Object.keys(topicStats).length,
+        subjects: [...new Set(Object.keys(topicStats).map((key) => key.split(" — ")[0]))].slice(0, 20),
+      },
+      reading: {
+        booksOpened: reading.length,
+        booksCompleted,
+        averageCompletionPercent: average(reading.map((row: any) => Math.max(0, Math.min(100, numberOrZero(row.completion_percent))))),
+        totalReadingSeconds: readingTimeSeconds,
+        books: bookSummaries,
+      },
+      study: {
+        sessions: sessions.length,
+        completedSessions,
+        activeDaysLast30: activeStudyDays,
+        completedPlans,
+        totalPlans: plans.length,
+        planCompletionPercent: percent(completedPlans, plans.length),
+        completedTasks,
+        totalTasks: tasks.length,
+        taskCompletionPercent: percent(completedTasks, tasks.length),
+        sessionDurationAdherencePercent: sessionAdherence,
+        totalRecordedDuration: actualDuration,
+      },
+      multiplayer: {
+        matches: matches.length,
+        wins: multiplayerWins,
+        podiumFinishes: multiplayerPodiums,
+        averageAccuracy: percent(multiplayerCorrect, multiplayerAnswered),
+        answeredQuestions: multiplayerAnswered,
+        totalQuestions: multiplayerTotal,
+      },
+      flashcards: {
+        trackedCards: flashcards.length,
+        reviewedCards,
+        totalRepetitions,
+      },
+      studyModeCalls: { acceptedOrJoined: acceptedCalls },
+    };
+
+    const sourceRows = {
+      quizAttempts: attempts.length,
+      readingProgress: reading.length,
+      studySessions: sessions.length,
+      studyPlans: plans.length,
+      studyTasks: tasks.length,
+      flashcardProgress: flashcards.length,
+      multiplayerMatches: matches.length,
+      studyModeCalls: calls.length,
+    };
+    const totalActivityEvents = Object.values(sourceRows).reduce((sum, count) => sum + count, 0);
+    if (totalActivityEvents === 0) {
+      return jsonResponse({
+        success: true,
+        status: "insufficient_data",
+        message: "Your Learning DNA is ready to grow. Complete a learning activity such as reading, a study session, flashcard review, quiz or multiplayer match first.",
+        data: null,
+      });
+    }
+
+    const sampleLimits = [
+      ["quizAttempts", 500], ["readingProgress", 300], ["studySessions", 500],
+      ["studyPlans", 500], ["studyTasks", 500], ["flashcardProgress", 500],
+      ["multiplayerMatches", 300], ["studyModeCalls", 200],
+    ].filter(([key, limit]) => sourceRows[key as keyof typeof sourceRows] >= (limit as number)).map(([key]) => key);
+
+    const dataCoverage = {
+      sources: {
+        quizAttempts: attemptSource.available,
+        readingProgress: readingSource.available,
+        studySessions: sessionSource.available,
+        studyPlans: planSource.available,
+        studyTasks: taskSource.available,
+        flashcardProgress: flashcardSource.available,
+        multiplayerMatches: multiplayerSource.available,
+        studyModeCalls: callSource.available,
+      },
+      records: sourceRows,
+      sampleLimits,
+      window: "Most recent records returned by each source; source limits are recorded above.",
+    };
+
+    const grokSchema = {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        summary: { type: "string" },
+        learningPatterns: { type: "array", items: { type: "string" } },
+        readingInsights: { type: "array", items: { type: "string" } },
+        disciplineInsights: { type: "array", items: { type: "string" } },
+        multiplayerInsights: { type: "array", items: { type: "string" } },
+        recommendations: { type: "array", items: { type: "string" } },
+        evidenceLimitations: { type: "array", items: { type: "string" } },
+      },
+      required: ["summary", "learningPatterns", "readingInsights", "disciplineInsights", "multiplayerInsights", "recommendations", "evidenceLimitations"],
+    };
+
+    const prompt = [
+      "You are Grok, the learning intelligence engine inside Master Minds, an Ethiopian educational app.",
+      "Analyze only the supplied aggregated records for this one signed-in student.",
+      "Do not infer personality, intelligence, motivation, mental health, family circumstances, or career suitability.",
+      "Do not shame, rank, diagnose, or label the student. Describe discipline as observable consistency and follow-through, never as a moral judgement.",
+      "Reading progress and time do not prove comprehension. Multiplayer wins do not prove teamwork or fair play. Never claim these things are measured.",
+      "Do not invent missing events, subjects, book titles, progress, or causes. If a source is unavailable or empty, say evidence is not available.",
+      "Separate measured facts from possible interpretations. Give specific, age-appropriate, encouraging recommendations that are realistic for a student.",
+      "Use only the provided evidence. Do not make predictions about careers. Return concise, useful content matching the required JSON schema.",
+      "Verified activity data:",
+      JSON.stringify({ activitySummary, topicMastery, strengths, weaknesses, dataCoverage }),
+    ].join("\n\n");
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    let aiInsights: any;
+    try {
+      const grokResponse = await fetch("https://api.x.ai/v1/responses", {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Authorization: "Bearer " + xaiApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "grok-4.7",
+          store: false,
+          input: prompt,
+          text: {
+            format: {
+              type: "json_schema",
+              name: "master_minds_learning_dna",
+              strict: true,
+              schema: grokSchema,
+            },
           },
-          body: JSON.stringify({
-            model: "openai/gpt-oss-20b",
-            messages: [
-              {
-                role: "system",
-                content: "You are an educational AI that analyzes student learning patterns. Provide brief, actionable insights.",
-              },
-              {
-                role: "user",
-                content: [
-                  "Analyze this student's learning data and suggest a study path.",
-                  "Strengths: " + (strengths.join(", ") || "None identified yet"),
-                  "Weaknesses: " + (weaknesses.join(", ") || "None identified yet"),
-                  "Topic mastery: " + JSON.stringify(topicMastery),
-                  "Response pace category: " + learningStyle,
-                  "Total questions attempted: " + totalAttempts,
-                  "Return recommendedFocus, studyTips, and predictedCareerPaths as arrays of strings.",
-                ].join("\n"),
-              },
-            ],
-            tools: [{
-              type: "function",
-              function: {
-                name: "analyze_learning_path",
-                description: "Return structured learning path analysis",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    recommendedFocus: { type: "array", items: { type: "string" } },
-                    studyTips: { type: "array", items: { type: "string" } },
-                    predictedCareerPaths: { type: "array", items: { type: "string" } },
-                  },
-                  required: ["recommendedFocus", "studyTips", "predictedCareerPaths"],
-                },
-              },
-            }],
-            tool_choice: { type: "function", function: { name: "analyze_learning_path" } },
-          }),
-        });
+          max_output_tokens: 1600,
+        }),
+      });
 
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          const rawArguments = aiData.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-          if (typeof rawArguments === "string") {
-            const parsed = JSON.parse(rawArguments);
-            const isStringArray = (value: unknown) =>
-              Array.isArray(value) && value.every((entry) => typeof entry === "string");
-            if (
-              isStringArray(parsed.recommendedFocus) &&
-              isStringArray(parsed.studyTips) &&
-              isStringArray(parsed.predictedCareerPaths)
-            ) {
-              predictedPath = {
-                recommendedFocus: parsed.recommendedFocus.slice(0, 5),
-                studyTips: parsed.studyTips.slice(0, 5),
-                predictedCareerPaths: parsed.predictedCareerPaths.slice(0, 5),
-              };
-            }
-          }
-        } else {
-          console.error("Learning DNA AI recommendation request failed:", aiResponse.status);
-        }
-      } catch (aiError) {
-        console.error("Learning DNA AI recommendation error:", aiError);
-      } finally {
-        clearTimeout(timeoutId);
+      if (!grokResponse.ok) {
+        const errorText = await grokResponse.text();
+        console.error("Grok Learning DNA request failed:", grokResponse.status, errorText.slice(0, 500));
+        return jsonResponse({ error: grokResponse.status === 429 ? "Grok is busy. Please try again shortly." : "Grok could not complete your Learning DNA analysis. Please try again." }, grokResponse.status === 429 ? 429 : 502);
       }
+
+      const grokData = await grokResponse.json();
+      const message = asArray<any>(grokData.output).find((item: any) => item.type === "message");
+      const outputText = asArray<any>(message?.content).find((item: any) => item.type === "output_text")?.text || grokData.output_text;
+      if (typeof outputText !== "string") throw new Error("Grok returned no structured Learning DNA report.");
+      aiInsights = JSON.parse(outputText);
+      const requiredArrays = ["learningPatterns", "readingInsights", "disciplineInsights", "multiplayerInsights", "recommendations", "evidenceLimitations"];
+      if (typeof aiInsights.summary !== "string" || requiredArrays.some((key) => !Array.isArray(aiInsights[key]) || !aiInsights[key].every((entry: unknown) => typeof entry === "string"))) {
+        throw new Error("Grok returned an invalid Learning DNA report.");
+      }
+      for (const key of requiredArrays) aiInsights[key] = aiInsights[key].slice(0, 6).map((value: string) => value.slice(0, 320));
+      aiInsights.summary = aiInsights.summary.slice(0, 1200);
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     const now = new Date().toISOString();
-    const dnaData = {
+    const predictedPath = {
+      recommendedFocus: aiInsights.recommendations.slice(0, 5),
+      studyTips: aiInsights.disciplineInsights.concat(aiInsights.readingInsights).slice(0, 5),
+      predictedCareerPaths: [],
+    };
+    const report = {
       user_id: user.id,
       topic_mastery: topicMastery,
       strengths,
       weaknesses,
-      learning_style: learningStyle,
+      learning_style: "not_assessed",
       predicted_path: predictedPath,
+      activity_summary: activitySummary,
+      ai_insights: aiInsights,
+      data_coverage: dataCoverage,
       last_analyzed_at: now,
       updated_at: now,
     };
 
-    // Only this authenticated server function writes reports. The service key
-    // never leaves the Edge Function and is used only after auth.getUser().
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    // The service role is used only for this authenticated user's server-generated report.
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { error: upsertError } = await supabaseAdmin
+    const { error: upsertError } = await adminClient
       .from("learning_dna")
-      .upsert(dnaData, { onConflict: "user_id" });
-
+      .upsert(report, { onConflict: "user_id" });
     if (upsertError) {
-      console.error("Error saving Learning DNA report:", upsertError);
+      console.error("Learning DNA report save failed:", upsertError);
       return jsonResponse({ error: "Your Learning DNA report could not be saved. Please try again." }, 500);
     }
 
@@ -252,13 +376,17 @@ serve(async (req) => {
         topicMastery,
         strengths,
         weaknesses,
-        learningStyle,
+        learningStyle: "not_assessed",
         predictedPath,
-        totalAttempts,
+        activitySummary,
+        aiInsights,
+        dataCoverage,
+        totalAttempts: attempts.length,
+        totalActivityEvents,
       },
     });
   } catch (error) {
-    console.error("Error in analyze-learning-dna:", error);
+    console.error("Learning DNA analysis failed:", error instanceof Error ? error.message : "Unknown error");
     return jsonResponse({ error: "Learning DNA could not be updated. Please try again." }, 500);
   }
 });
