@@ -9,7 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { normalizeSubject } from "@/lib/academicProfile";
 
-const isSafeHttpUrl = (value: string) => {\n  try { const url = new URL(value); return url.protocol === "https:" || url.protocol === "http:"; }\n  catch { return false; }\n};\n\ntype Paper = {
+const isSafeHttpUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+type Paper = {
   id: string; subject: string; ethiopian_year: number; gregorian_year: number;
   stream: string; source_name: string; source_url: string; source_status: string; notes: string;
 };
