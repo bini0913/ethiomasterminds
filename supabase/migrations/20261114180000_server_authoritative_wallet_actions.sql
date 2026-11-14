@@ -228,6 +228,7 @@ DECLARE
   v_existing public.user_achievements%rowtype;
   v_new_xp integer := 0;
   v_new_coins integer := 0;
+  v_just_completed boolean := false;
   v_profile public.profiles%rowtype;
   v_wallet public.user_currency%rowtype;
 BEGIN
@@ -257,6 +258,7 @@ BEGIN
     SELECT * FROM public.achievements
     WHERE requirement_type = p_requirement_type
   LOOP
+    v_just_completed := false;
     SELECT * INTO v_existing
     FROM public.user_achievements
     WHERE user_id = v_user_id AND achievement_id = v_achievement.id
@@ -270,6 +272,7 @@ BEGIN
       RETURNING * INTO v_existing;
 
       IF v_existing.completed THEN
+        v_just_completed := true;
         v_new_xp := v_new_xp + greatest(0, coalesce(v_achievement.reward_xp,0));
         v_new_coins := v_new_coins + greatest(0, coalesce(v_achievement.reward_coins,0));
       END IF;
@@ -282,7 +285,10 @@ BEGIN
       WHERE id = v_existing.id
       RETURNING * INTO v_existing;
 
-      IF v_existing.completed AND v_existing.unlocked_at >= now() - interval '2 seconds' THEN
+      IF NOT v_existing.completed AND v_progress >= v_achievement.requirement_value THEN
+        v_just_completed := true;
+      END IF;
+      IF v_just_completed THEN
         v_new_xp := v_new_xp + greatest(0, coalesce(v_achievement.reward_xp,0));
         v_new_coins := v_new_coins + greatest(0, coalesce(v_achievement.reward_coins,0));
       END IF;
