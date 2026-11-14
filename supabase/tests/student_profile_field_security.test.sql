@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(23);
+select plan(24);
 
 select ok(exists (select 1 from pg_trigger where tgname = 'on_auth_user_created' and tgrelid = 'auth.users'::regclass and not tgisinternal), 'auth signup still creates profiles through the trusted trigger');
 select ok(position('v_age' in pg_get_functiondef('public.handle_new_user()'::regprocedure)) > 0, 'signup trigger persists validated age when email confirmation is enabled');
