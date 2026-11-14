@@ -30,7 +30,7 @@ export function useEarlyProgress() {
     setError(null);
 
     try {
-      const { data, error: queryError } = await db
+      const { data, error: queryError } = await supabase
         .from("early_activity_attempts")
         .select("activity_id,skill,correct,xp_earned,coins_earned,created_at")
         .eq("user_id", user.id)
