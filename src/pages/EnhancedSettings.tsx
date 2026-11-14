@@ -273,7 +273,7 @@ const EnhancedSettings: React.FC = () => {
                 <div className="space-y-2">
                   <Label>Grade Level</Label>
                   <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
-                    {user?.grade ? (/^(k|kg|kindergarten)$/i.test(user.grade) ? "KG" : `Grade ${user.grade.replace(/^grade\\s*/i, "")}`) : "Not set"}
+                    {user?.grade ? (/^(k|kg|kindergarten)$/i.test(user.grade) ? "KG" : `Grade ${user.grade.replace(/^grade\s*/i, "")}`) : "Not set"}
                   </div>
                   <p className="text-xs text-muted-foreground">Grade changes require school staff approval.</p>
                 </div>
