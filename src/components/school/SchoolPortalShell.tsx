@@ -12,17 +12,20 @@ export type SchoolNavItem = {
   icon: React.ComponentType<{ className?: string }>;
 };
 
-const roleLabels: Record<SchoolRole, string> = {
+type PortalRole = SchoolRole | "super_admin";
+
+const roleLabels: Record<PortalRole, string> = {
   manager: "School Manager",
   admin: "School Admin",
   teacher: "Teacher",
   finance: "Finance",
   parent: "Parent",
   student: "Student",
+  super_admin: "Super Admin",
 };
 
 type SchoolPortalShellProps = {
-  role: SchoolRole;
+  role: PortalRole;
   title: string;
   navItems: SchoolNavItem[];
   activeItem: string;
@@ -37,7 +40,7 @@ export default function SchoolPortalShell({
   const { user, logout } = useUser();
   const { memberships, activeMembership, activeSchool, switchSchool } = useSchoolPortal();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const roleMemberships = memberships.filter((membership) => membership.school_role === role);
+  const roleMemberships = role === "super_admin" ? [] : memberships.filter((membership) => membership.school_role === role);
   const initials = (user?.name || "User").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
   const renderNavigation = (mobile = false) => (
@@ -78,8 +81,8 @@ export default function SchoolPortalShell({
             <Building2 className="h-3.5 w-3.5" />
             School workspace
           </div>
-          <p className="mt-2 truncate text-sm font-semibold text-white">{activeSchool?.name || "Loading school"}</p>
-          <p className="mt-1 text-xs text-slate-400">{activeSchool?.school_code || " "}</p>
+          <p className="mt-2 truncate text-sm font-semibold text-white">{role === "super_admin" ? "All schools" : activeSchool?.name || "Loading school"}</p>
+          <p className="mt-1 text-xs text-slate-400">{role === "super_admin" ? "Platform-wide oversight" : activeSchool?.school_code || " "}</p>
           <span className="mt-3 inline-flex rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200">
             {roleLabels[role]}
           </span>
@@ -144,7 +147,7 @@ export default function SchoolPortalShell({
             </button>
             <div className="min-w-0">
               <h1 className="truncate text-base font-semibold text-slate-900 sm:text-lg">{title}</h1>
-              <p className="hidden truncate text-xs text-slate-500 sm:block">{activeSchool?.name || "School workspace"}</p>
+              <p className="hidden truncate text-xs text-slate-500 sm:block">{role === "super_admin" ? "Platform-wide school oversight" : activeSchool?.name || "School workspace"}</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
