@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(4);
+select plan(5);
 
 select ok(
   EXISTS (
@@ -31,6 +31,17 @@ select ok(
   pg_get_functiondef('public.school_validate_attendance_session()'::regprocedure)
     LIKE '%NEW.status <> ''open''%',
   'new attendance sessions must start open'
+);
+
+select ok(
+  EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'school_attendance_sessions'
+      AND policyname = 'school_attendance_sessions_read'
+      AND qual LIKE '%school_can_view_attendance_record%'
+  ),
+  'attendance sessions are visible only through authorized attendance-record access'
 );
 
 select * from finish();
