@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity, ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2,
-  Clock3, Play, Sparkles, Users,
+  Clock3, Play, Sparkles, Trophy, Users,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { db } from "@/integrations/untypedClient";
@@ -33,7 +33,9 @@ const UpperTierHome: React.FC = () => {
   const xp = Number(user?.xp) || 0;
   const level = Number(user?.level) || 1;
   const xpProgress = getXpProgressInLevel(xp);
-  const firstName = user?.name?.trim().split(/\s+/)[0] || "Student";
+  const firstName = typeof user?.name === "string"
+    ? user.name.trim().split(/\s+/)[0] || "Student"
+    : "Student";
   const grade = user?.grade
     ? (/grade/i.test(user.grade) ? user.grade : `Grade ${user.grade}`)
     : "Grades 9–12";

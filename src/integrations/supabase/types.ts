@@ -989,6 +989,7 @@ export type Database = {
           difficulty: string | null
           finished_at: string | null
           game_mode: string | null
+          has_password: boolean
           host_id: string
           id: string
           max_players: number
@@ -1005,6 +1006,7 @@ export type Database = {
           difficulty?: string | null
           finished_at?: string | null
           game_mode?: string | null
+          has_password?: boolean
           host_id: string
           id?: string
           max_players?: number
@@ -1021,6 +1023,7 @@ export type Database = {
           difficulty?: string | null
           finished_at?: string | null
           game_mode?: string | null
+          has_password?: boolean
           host_id?: string
           id?: string
           max_players?: number
