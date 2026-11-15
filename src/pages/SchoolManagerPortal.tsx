@@ -614,7 +614,8 @@ export default function SchoolManagerPortal() {
           <form onSubmit={addAcademicYear} className="space-y-3">
             <SchoolField label="Academic year name"><input className={schoolInputClass} value={yearName} onChange={(event) => setYearName(event.target.value)} placeholder="2026/2027" /></SchoolField>
             <SchoolField label="Start date"><input type="date" className={schoolInputClass} value={yearStart} onChange={(event) => setYearStart(event.target.value)} /></SchoolField>
-            <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} /></SchoolField>\n            <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={yearIsCurrent} onChange={(event) => setYearIsCurrent(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" /> Set as current academic year</label>
+            <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} /></SchoolField>
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={yearIsCurrent} onChange={(event) => setYearIsCurrent(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" /> Set as current academic year</label>
             <SchoolPrimaryButton type="submit">Add academic year</SchoolPrimaryButton>
           </form>
         </SchoolPanel>
