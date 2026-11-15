@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.school_memberships (
   status text NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'suspended', 'deactivated', 'transferred', 'graduated')),
   grade_label text,
+  age_at_enrollment integer CHECK (age_at_enrollment BETWEEN 1 AND 120),
   section_id uuid,
   student_number bigint,
   school_username text UNIQUE,
@@ -305,9 +306,9 @@ LANGUAGE plpgsql
 SET search_path = public
 AS $$
 BEGIN
-  IF ROW(NEW.school_id, NEW.user_id, NEW.school_role, NEW.student_number, NEW.school_username, NEW.created_by)
+  IF ROW(NEW.school_id, NEW.user_id, NEW.school_role, NEW.student_number, NEW.school_username, NEW.age_at_enrollment, NEW.created_by)
      IS DISTINCT FROM
-     ROW(OLD.school_id, OLD.user_id, OLD.school_role, OLD.student_number, OLD.school_username, OLD.created_by) THEN
+     ROW(OLD.school_id, OLD.user_id, OLD.school_role, OLD.student_number, OLD.school_username, OLD.age_at_enrollment, OLD.created_by) THEN
     RAISE EXCEPTION 'School membership identity and assigned student ID are immutable';
   END IF;
   RETURN NEW;
