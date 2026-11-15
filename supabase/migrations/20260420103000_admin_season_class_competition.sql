@@ -279,20 +279,20 @@ begin
 
   v_active_season := public.ensure_active_season();
 
-  update public.profiles
-  set coins = coalesce(coins, 0) + floor(coalesce(season_xp, 0) * v_rate)::integer,
+  update public.profiles p
+  set coins = coalesce(p.coins, 0) + floor(coalesce(p.season_xp, 0) * v_rate)::integer,
       updated_at = now()
   where exists (
     select 1 from public.user_roles ur
-    where ur.user_id = public.profiles.id and ur.role = 'student'
+    where ur.user_id = p.id and ur.role = 'student'
   );
 
   select coalesce(sum(floor(coalesce(season_xp, 0) * v_rate)), 0)
   into v_total_coins_credited
-  from public.profiles
+  from public.profiles p
   where exists (
     select 1 from public.user_roles ur
-    where ur.user_id = public.profiles.id and ur.role = 'student'
+    where ur.user_id = p.id and ur.role = 'student'
   );
 
   v_result := public.finalize_current_season(p_reason);
