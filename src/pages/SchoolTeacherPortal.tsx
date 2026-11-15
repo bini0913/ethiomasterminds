@@ -69,6 +69,7 @@ export default function SchoolTeacherPortal() {
   const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [behaviorReports, setBehaviorReports] = useState<any[]>([]);
+  const [behaviorReviewNotes, setBehaviorReviewNotes] = useState<Record<string, string>>({});
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [books, setBooks] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -149,7 +150,7 @@ export default function SchoolTeacherPortal() {
       db.from("school_student_marks").select("id,assessment_id,student_membership_id,score,status,teacher_note").eq("school_id", schoolId).eq("entered_by_membership_id", activeMembership.id),
       db.from("school_homework_assignments").select("id,title,section_id,subject_name,due_at,status,review_feedback,created_at").eq("school_id", schoolId).eq("teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("school_attendance_sessions").select("id,section_id,attendance_date,status,submitted_at").eq("school_id", schoolId).eq("recorded_by_membership_id", activeMembership.id).order("attendance_date", { ascending: false }).limit(60),
-      db.from("school_behavior_reports").select("id,student_membership_id,section_id,report_type,severity,description,status,created_at").eq("school_id", schoolId).eq("reported_by_membership_id", activeMembership.id).order("created_at", { ascending: false }).limit(100),
+      db.from("school_behavior_reports").select("id,student_membership_id,section_id,reported_by_membership_id,report_type,severity,description,status,review_note,created_at").eq("school_id", schoolId).eq("reported_by_membership_id", activeMembership.id).order("created_at", { ascending: false }).limit(100),
       db.from("quizzes").select("id,title,subject,grade,school_section_id,school_review_status,created_at").eq("school_id", schoolId).eq("school_teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("library_books").select("id,title,subject,grade,school_section_id,school_review_status,status,pdf_path").eq("school_id", schoolId).eq("uploader_id", user?.id),
       db.from("school_staff_tasks").select("id,title,description,status,due_date,priority,task_type,response,assigned_by_membership_id").eq("school_id", schoolId).eq("assigned_to_membership_id", activeMembership.id).order("created_at", { ascending: false }),
@@ -228,6 +229,7 @@ export default function SchoolTeacherPortal() {
   const pendingAssessmentCount = assessments.filter((item) => ["draft", "rejected"].includes(item.status)).length;
   const pendingHomeworkCount = homework.filter((item) => ["draft", "rejected", "pending"].includes(item.status)).length;
   const pendingQuizCount = quizzes.filter((item) => ["draft", "rejected", "pending"].includes(item.school_review_status)).length;
+  const behaviorReportsForReview = behaviorReports.filter((report) => report.status === "pending" && homeroomSectionIds.includes(report.section_id));
 
   const createAssessment = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -411,6 +413,18 @@ export default function SchoolTeacherPortal() {
     if (error) return toast.error(error.message);
     setBehaviorDescription("");
     toast.success("Behavior report submitted to the homeroom teacher for review.");
+    await load();
+  };
+
+  const reviewBehaviorReport = async (report: any, approve: boolean) => {
+    const { error } = await db.rpc("school_review_behavior_report", {
+      p_report_id: report.id,
+      p_approve: approve,
+      p_review_note: behaviorReviewNotes[report.id]?.trim() || null,
+    });
+    if (error) return toast.error(error.message);
+    setBehaviorReviewNotes((current) => ({ ...current, [report.id]: "" }));
+    toast.success(approve ? "Behavior report approved and added to the student record." : "Behavior report rejected.");
     await load();
   };
 
@@ -653,8 +667,11 @@ export default function SchoolTeacherPortal() {
           <div className="md:col-span-2"><SchoolPrimaryButton type="submit">Submit to homeroom teacher</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
+      <SchoolPanel title="Reports awaiting homeroom review">
+        {behaviorReportsForReview.length ? <div className="space-y-3">{behaviorReportsForReview.map((report) => <div key={report.id} className="rounded-md border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-slate-800">{memberName(report.student_membership_id)} · {sectionLabel(report.section_id)}</p><p className="mt-1 text-xs capitalize text-slate-500">{report.report_type} · {report.severity} severity</p></div><SchoolStatus value={report.status} /></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{report.description}</p><textarea className={schoolTextareaClass + " mt-3"} value={behaviorReviewNotes[report.id] || ""} onChange={(event) => setBehaviorReviewNotes((current) => ({ ...current, [report.id]: event.target.value }))} placeholder="Optional review note" /><div className="mt-3 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewBehaviorReport(report, true)}>Approve report</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewBehaviorReport(report, false)}>Reject report</SchoolSecondaryButton></div></div>)}</div> : <SchoolEmptyState title="No reports awaiting review" description="Pending reports for your homeroom sections will appear here." />}
+      </SchoolPanel>
       <SchoolPanel title="Reports you submitted">
-        {behaviorReports.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Class</th><th className="pb-2">Type</th><th className="pb-2">Severity</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{behaviorReports.map((report) => <tr key={report.id}><td className="py-3 font-medium text-slate-800">{memberName(report.student_membership_id)}</td><td className="py-3 text-slate-600">{sectionLabel(report.section_id)}</td><td className="py-3 capitalize text-slate-600">{report.report_type}</td><td className="py-3 capitalize text-slate-600">{report.severity}</td><td className="py-3"><SchoolStatus value={report.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No behavior reports" description="Your submitted reports will appear here." />}
+        {behaviorReports.filter((report) => report.reported_by_membership_id === activeMembership?.id).length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Class</th><th className="pb-2">Type</th><th className="pb-2">Severity</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{behaviorReports.filter((report) => report.reported_by_membership_id === activeMembership?.id).map((report) => <tr key={report.id}><td className="py-3 font-medium text-slate-800">{memberName(report.student_membership_id)}</td><td className="py-3 text-slate-600">{sectionLabel(report.section_id)}</td><td className="py-3 capitalize text-slate-600">{report.report_type}</td><td className="py-3 capitalize text-slate-600">{report.severity}</td><td className="py-3"><SchoolStatus value={report.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No behavior reports" description="Your submitted reports will appear here." />}
       </SchoolPanel>
     </div>
   );
