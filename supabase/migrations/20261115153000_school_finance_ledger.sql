@@ -430,7 +430,7 @@ BEGIN
     v_entity_id := NEW.id;
     v_entity_type := 'payment';
     v_event_type := CASE WHEN TG_OP = 'INSERT' THEN 'payment_recorded' ELSE 'payment_updated' END;
-    v_details := jsonb_build_object('invoice_id', NEW.invoice_id, 'amount', NEW.amount, 'status', NEW.status, 'receipt_number', NEW.receipt_number);
+    v_details := jsonb_build_object('invoice_id', NEW.invoice_id, 'amount', NEW.amount, 'status', NEW.status, 'receipt_number', NEW.receipt_number, 'reversal_reason', NEW.reversal_reason);
   END IF;
   INSERT INTO public.school_finance_audit_events(school_id, actor_id, entity_type, entity_id, event_type, details)
   VALUES (v_school_id, auth.uid(), v_entity_type, v_entity_id, v_event_type, v_details);
