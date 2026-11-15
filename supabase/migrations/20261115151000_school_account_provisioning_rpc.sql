@@ -196,18 +196,12 @@ BEGIN
       ) THEN
         RAISE EXCEPTION 'Teacher subject must be an active subject for the assigned grade';
       END IF;
-      IF v_assignment_kind = 'homeroom' THEN
-        IF EXISTS (
-          SELECT 1 FROM public.school_sections
-          WHERE id = v_assignment_section
-            AND homeroom_teacher_id IS NOT NULL
-            AND homeroom_teacher_id <> p_user_id
-        ) THEN
-          RAISE EXCEPTION 'This section already has a homeroom teacher';
-        END IF;
-        UPDATE public.school_sections
-        SET homeroom_teacher_id = p_user_id
-        WHERE id = v_assignment_section AND school_id = p_school_id;
+      IF v_assignment_kind = 'homeroom' AND EXISTS (
+        SELECT 1 FROM public.school_teacher_assignments
+        WHERE section_id = v_assignment_section
+          AND assignment_kind = 'homeroom'
+      ) THEN
+        RAISE EXCEPTION 'This section already has a homeroom teacher';
       END IF;
       INSERT INTO public.school_teacher_assignments(
         school_id, teacher_membership_id, section_id, subject_name,
