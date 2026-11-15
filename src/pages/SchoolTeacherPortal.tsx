@@ -149,7 +149,7 @@ export default function SchoolTeacherPortal() {
       db.from("school_assessments").select("id,title,section_id,subject_name,term_id,category_id,max_score,status,review_feedback,created_at").eq("school_id", schoolId).eq("created_by_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("school_student_marks").select("id,assessment_id,student_membership_id,score,status,teacher_note").eq("school_id", schoolId).eq("entered_by_membership_id", activeMembership.id),
       db.from("school_homework_assignments").select("id,title,section_id,subject_name,due_at,status,review_feedback,created_at").eq("school_id", schoolId).eq("teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
-      db.from("school_attendance_sessions").select("id,section_id,attendance_date,status,submitted_at").eq("school_id", schoolId).eq("recorded_by_membership_id", activeMembership.id).order("attendance_date", { ascending: false }).limit(60),
+      db.from("school_attendance_sessions").select("id,section_id,attendance_date,recorded_by_membership_id,status,submitted_at").eq("school_id", schoolId).order("attendance_date", { ascending: false }).limit(60),
       db.from("school_behavior_reports").select("id,student_membership_id,section_id,reported_by_membership_id,report_type,severity,description,status,review_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("quizzes").select("id,title,subject,grade,school_section_id,school_review_status,created_at").eq("school_id", schoolId).eq("school_teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("library_books").select("id,title,subject,grade,school_section_id,school_review_status,status,pdf_path").eq("school_id", schoolId).eq("uploader_id", user?.id),
@@ -206,6 +206,25 @@ export default function SchoolTeacherPortal() {
   }, [schoolId, activeMembership?.id, user?.id, db, assessmentTermId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!attendanceSectionId || !attendanceDate) {
+      setAttendanceValues({});
+      setAttendanceNotes({});
+      return;
+    }
+    const existingSession = attendanceSessions.find(
+      (session) => session.section_id === attendanceSectionId && session.attendance_date === attendanceDate
+    );
+    if (!existingSession) {
+      setAttendanceValues({});
+      setAttendanceNotes({});
+      return;
+    }
+    const existingRecords = attendanceRecords.filter((record) => record.session_id === existingSession.id);
+    setAttendanceValues(Object.fromEntries(existingRecords.map((record) => [record.student_membership_id, record.attendance_status])));
+    setAttendanceNotes(Object.fromEntries(existingRecords.map((record) => [record.student_membership_id, record.note || ""])));
+  }, [attendanceSectionId, attendanceDate, attendanceSessions, attendanceRecords]);
 
   const assignedSectionIds = useMemo(() => [...new Set(assignments.map((assignment) => assignment.section_id))], [assignments]);
   const assignedSections = sections.filter((section) => assignedSectionIds.includes(section.id));
@@ -373,11 +392,12 @@ export default function SchoolTeacherPortal() {
     const students = assignedStudents.filter((student) => student.section_id === section.id);
     if (!students.length) return toast.error("No active students are enrolled in this section.");
     const { data: existingSession, error: existingError } = await db.from("school_attendance_sessions")
-      .select("id,status")
+      .select("id,status,recorded_by_membership_id")
       .eq("school_id", schoolId).eq("section_id", section.id).eq("attendance_date", attendanceDate)
       .maybeSingle();
     if (existingError) return toast.error(existingError.message);
     if (existingSession && existingSession.status !== "open") return toast.error("Attendance has already been submitted or locked for this section and date.");
+    if (existingSession && existingSession.recorded_by_membership_id !== activeMembership?.id) return toast.error("This open attendance session was started by another homeroom teacher. Ask them to finish it before making changes.");
     let sessionId = existingSession?.id;
     if (!sessionId) {
       const { data: sessionRow, error: sessionError } = await db.from("school_attendance_sessions").insert({
