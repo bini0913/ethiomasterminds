@@ -1,18 +1,6 @@
 -- Hidden Extreme Admin root control layer
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_type t
-    JOIN pg_enum e ON e.enumtypid = t.oid
-    WHERE t.typname = 'app_role' AND e.enumlabel = 'extreme_admin'
-  ) THEN
-    ALTER TYPE public.app_role ADD VALUE 'extreme_admin';
-  END IF;
-END $$;
-
 CREATE TABLE IF NOT EXISTS public.extreme_admin_audit_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_id uuid NOT NULL,

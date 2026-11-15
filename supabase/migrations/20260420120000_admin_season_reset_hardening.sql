@@ -244,7 +244,10 @@ begin
       coalesce(p.coins, 0) as coins_before,
       floor(coalesce(p.season_xp, 0) * v_rate)::integer as coins_credited
     from public.profiles p
-    where p.role = 'student'
+    where exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = p.id and ur.role = 'student'
+    )
   )
   insert into public.season_reset_backups(
     season, user_id, rank_position, season_xp, total_xp, level, coins_before, coins_credited, backed_up_at, backed_up_by
@@ -262,15 +265,21 @@ begin
       backed_up_at = excluded.backed_up_at,
       backed_up_by = excluded.backed_up_by;
 
-  update public.profiles
-  set coins = coalesce(coins, 0) + floor(coalesce(season_xp, 0) * v_rate)::integer,
+  update public.profiles p
+  set coins = coalesce(p.coins, 0) + floor(coalesce(p.season_xp, 0) * v_rate)::integer,
       updated_at = now()
-  where role = 'student';
+  where exists (
+    select 1 from public.user_roles ur
+    where ur.user_id = p.id and ur.role = 'student'
+  );
 
   select coalesce(sum(floor(coalesce(season_xp, 0) * v_rate)), 0)
   into v_total_coins_credited
-  from public.profiles
-  where role = 'student';
+  from public.profiles p
+  where exists (
+    select 1 from public.user_roles ur
+    where ur.user_id = p.id and ur.role = 'student'
+  );
 
   v_result := public.finalize_current_season(p_reason);
 

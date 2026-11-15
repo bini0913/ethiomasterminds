@@ -78,44 +78,52 @@ alter table public.study_participants enable row level security;
 alter table public.study_live_status enable row level security;
 alter table public.study_tasks enable row level security;
 
-create policy if not exists "users_view_active_competitions"
+drop policy if exists "users_view_active_competitions" on public.study_competitions;
+create policy "users_view_active_competitions"
 on public.study_competitions
 for select
 using (true);
 
-create policy if not exists "users_create_competitions"
+drop policy if exists "users_create_competitions" on public.study_competitions;
+create policy "users_create_competitions"
 on public.study_competitions
 for insert
 with check (auth.uid() = created_by);
 
-create policy if not exists "creators_update_competitions"
+drop policy if exists "creators_update_competitions" on public.study_competitions;
+create policy "creators_update_competitions"
 on public.study_competitions
 for update
 using (auth.uid() = created_by)
 with check (auth.uid() = created_by);
 
-create policy if not exists "participants_view_participants"
+drop policy if exists "participants_view_participants" on public.study_participants;
+create policy "participants_view_participants"
 on public.study_participants
 for select
 using (true);
 
-create policy if not exists "users_join_competitions"
+drop policy if exists "users_join_competitions" on public.study_competitions;
+create policy "users_join_competitions"
 on public.study_participants
 for insert
 with check (auth.uid() = user_id);
 
-create policy if not exists "users_view_live_status"
+drop policy if exists "users_view_live_status" on public.study_live_status;
+create policy "users_view_live_status"
 on public.study_live_status
 for select
 using (true);
 
-create policy if not exists "users_upsert_own_live_status"
+drop policy if exists "users_upsert_own_live_status" on public.study_live_status;
+create policy "users_upsert_own_live_status"
 on public.study_live_status
 for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-create policy if not exists "users_manage_own_study_tasks"
+drop policy if exists "users_manage_own_study_tasks" on public.study_tasks;
+create policy "users_manage_own_study_tasks"
 on public.study_tasks
 for all
 using (auth.uid() = user_id)

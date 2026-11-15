@@ -36,7 +36,8 @@ create table if not exists public.study_settings (
 
 alter table public.study_settings enable row level security;
 
-create policy if not exists "users_manage_own_study_settings"
+drop policy if exists "users_manage_own_study_settings" on public.study_settings;
+create policy "users_manage_own_study_settings"
 on public.study_settings
 for all
 using (auth.uid() = user_id)

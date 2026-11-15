@@ -158,57 +158,69 @@ alter table public.study_rooms enable row level security;
 alter table public.room_members enable row level security;
 alter table public.study_room_invites enable row level security;
 
-create policy if not exists "users_manage_own_study_sessions"
+drop policy if exists "users_manage_own_study_sessions" on public.study_sessions;
+create policy "users_manage_own_study_sessions"
 on public.study_sessions for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-create policy if not exists "users_manage_own_study_tasks"
+drop policy if exists "users_manage_own_study_tasks" on public.study_tasks;
+create policy "users_manage_own_study_tasks"
 on public.study_tasks for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-create policy if not exists "users_view_active_competitions"
+drop policy if exists "users_view_active_competitions" on public.study_competitions;
+create policy "users_view_active_competitions"
 on public.study_competitions for select
 using (true);
 
-create policy if not exists "users_create_competitions"
+drop policy if exists "users_create_competitions" on public.study_competitions;
+create policy "users_create_competitions"
 on public.study_competitions for insert
 with check (auth.uid() = created_by);
 
-create policy if not exists "creators_update_competitions"
+drop policy if exists "creators_update_competitions" on public.study_competitions;
+create policy "creators_update_competitions"
 on public.study_competitions for update
 using (auth.uid() = created_by)
 with check (auth.uid() = created_by);
 
-create policy if not exists "participants_view_participants"
+drop policy if exists "participants_view_participants" on public.study_participants;
+create policy "participants_view_participants"
 on public.study_participants for select
 using (true);
 
-create policy if not exists "users_join_competitions"
+drop policy if exists "users_join_competitions" on public.study_participants;
+create policy "users_join_competitions"
 on public.study_participants for insert
 with check (auth.uid() = user_id);
 
-create policy if not exists "users_view_live_status"
+drop policy if exists "users_view_live_status" on public.study_live_status;
+create policy "users_view_live_status"
 on public.study_live_status for select
 using (true);
 
-create policy if not exists "users_upsert_own_live_status"
+drop policy if exists "users_upsert_own_live_status" on public.study_live_status;
+create policy "users_upsert_own_live_status"
 on public.study_live_status for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-create policy if not exists "users_manage_own_study_settings"
+drop policy if exists "users_manage_own_study_settings" on public.study_settings;
+create policy "users_manage_own_study_settings"
 on public.study_settings for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-create policy if not exists "hosts_manage_rooms"
+drop policy if exists "hosts_manage_rooms" on public.study_rooms;
+create policy "hosts_manage_rooms"
 on public.study_rooms for all
 using (auth.uid() = host_id)
 with check (auth.uid() = host_id);
 
-create policy if not exists "members_or_open_rooms_can_view_rooms"
+drop policy if exists "members_or_open_rooms_can_view_rooms" on public.study_rooms;
+create policy "members_or_open_rooms_can_view_rooms"
 on public.study_rooms for select
 using (
   status in ('open', 'live')
@@ -219,7 +231,8 @@ using (
   )
 );
 
-create policy if not exists "members_view_room_members"
+drop policy if exists "members_view_room_members" on public.room_members;
+create policy "members_view_room_members"
 on public.room_members for select
 using (
   exists (
@@ -229,20 +242,24 @@ using (
   )
 );
 
-create policy if not exists "users_manage_membership_rows"
+drop policy if exists "users_manage_membership_rows" on public.room_members;
+create policy "users_manage_membership_rows"
 on public.room_members for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-create policy if not exists "invite_participants_view_study_room_invites"
+drop policy if exists "invite_participants_view_study_room_invites" on public.study_room_invites;
+create policy "invite_participants_view_study_room_invites"
 on public.study_room_invites for select
 using (auth.uid() = sender_id or auth.uid() = receiver_id);
 
-create policy if not exists "senders_create_study_room_invites"
+drop policy if exists "senders_create_study_room_invites" on public.study_room_invites;
+create policy "senders_create_study_room_invites"
 on public.study_room_invites for insert
 with check (auth.uid() = sender_id);
 
-create policy if not exists "receivers_or_senders_update_study_room_invites"
+drop policy if exists "receivers_or_senders_update_study_room_invites" on public.study_room_invites;
+create policy "receivers_or_senders_update_study_room_invites"
 on public.study_room_invites for update
 using (auth.uid() = sender_id or auth.uid() = receiver_id)
 with check (auth.uid() = sender_id or auth.uid() = receiver_id);
