@@ -12,7 +12,9 @@ export default function SchoolPortalGate({
   fallback?: React.ReactNode;
 }) {
   const { memberships, activeMembership, loading, error, switchSchool } = useSchoolPortal();
-  const matchingMembership = memberships.find((membership) => membership.school_role === role) ?? null;
+  const matchingMembership = activeMembership?.school_role === role
+    ? activeMembership
+    : memberships.find((membership) => membership.school_role === role) ?? null;
 
   useEffect(() => {
     if (matchingMembership && activeMembership?.id !== matchingMembership.id) {
