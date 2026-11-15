@@ -213,7 +213,8 @@ export default function SchoolTeacherPortal() {
   const assignedStudents = members.filter((member) => member.status === "active" && assignedSectionIds.includes(member.section_id));
   const memberName = (membershipId: string) => {
     const member = members.find((item) => item.id === membershipId);
-    if (member) return profiles[member.user_id]?.name || member.school_username || "Student";\n    return parentContacts.find((parent) => parent.parent_membership_id === membershipId)?.parent_name || "School member";
+    if (member) return profiles[member.user_id]?.name || member.school_username || "Student";
+    return parentContacts.find((parent) => parent.parent_membership_id === membershipId)?.parent_name || "School member";
   };
   const sectionLabel = (sectionId: string | null) => {
     const section = sections.find((item) => item.id === sectionId);
