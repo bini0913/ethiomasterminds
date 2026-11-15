@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Menu, X, LogOut, ChevronDown, Building2, Bell,
 } from "lucide-react";
@@ -38,7 +37,6 @@ export default function SchoolPortalShell({
   const { user, logout } = useUser();
   const { memberships, activeMembership, activeSchool, switchSchool } = useSchoolPortal();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const navigate = useNavigate();
   const roleMemberships = memberships.filter((membership) => membership.school_role === role);
   const initials = (user?.name || "User").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
