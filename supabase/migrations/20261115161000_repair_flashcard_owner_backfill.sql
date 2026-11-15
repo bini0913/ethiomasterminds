@@ -3,7 +3,7 @@
 UPDATE public.flashcards
 SET user_id = btrim(created_by)::uuid
 WHERE user_id IS NULL
-  AND btrim(created_by) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+  AND pg_input_is_valid(btrim(created_by), 'uuid');
 
 DROP POLICY IF EXISTS "Users can view public or own flashcards" ON public.flashcards;
 CREATE POLICY "Users can view public or own flashcards"
