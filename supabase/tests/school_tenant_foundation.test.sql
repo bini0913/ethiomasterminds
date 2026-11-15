@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(24);
+select plan(29);
 
 select ok(exists (
   select 1 from pg_enum e
@@ -53,6 +53,35 @@ select ok(exists (
     and policyname = 'school_memberships_read'
     and coalesce(qual, '') like '%school_can_view_membership%'
 ), 'membership reads use non-recursive scoped access checks');
+
+select ok(exists (
+  select 1 from pg_trigger
+  where tgname = 'school_record_membership_change'
+    and tgrelid = 'public.school_memberships'::regclass
+    and not tgisinternal
+), 'student enrollment and grade changes are recorded in school history');
+
+select ok(exists (
+  select 1 from pg_trigger
+  where tgname = 'school_parent_student_link_validate'
+    and tgrelid = 'public.school_parent_student_links'::regclass
+    and not tgisinternal
+), 'parent links are validated against same-school parent and student memberships');
+
+select ok(exists (
+  select 1 from pg_trigger
+  where tgname = 'school_teacher_assignment_validate'
+    and tgrelid = 'public.school_teacher_assignments'::regclass
+    and not tgisinternal
+), 'teacher assignments are validated against active same-school teacher memberships');
+
+select ok(has_function_privilege('authenticated', 'public.school_can_view_profile(uuid)', 'execute'), 'profile scope helper is callable by authenticated users');
+select ok(exists (
+  select 1 from pg_policies
+  where schemaname = 'public' and tablename = 'profiles'
+    and policyname = 'school_members_can_view_scoped_profiles'
+    and coalesce(qual, '') like '%school_can_view_profile%'
+), 'school profile reads use the scoped profile helper');
 
 select * from finish();
 rollback;
