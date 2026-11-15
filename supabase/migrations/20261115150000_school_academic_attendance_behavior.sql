@@ -261,7 +261,7 @@ CREATE INDEX IF NOT EXISTS school_student_section_history_term_idx
   ON public.school_student_section_history(school_id, grade_label, section_id, effective_from, effective_to);
 
 CREATE OR REPLACE FUNCTION public.school_sync_student_section_history()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW.school_role = 'student' AND NEW.grade_label IS NOT NULL THEN
@@ -298,7 +298,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_sync_student_section_history ON public.school_memberships;
 CREATE TRIGGER school_sync_student_section_history
@@ -363,7 +363,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.school_student_was_in_section_for_term(
   p_student_membership_id uuid, p_section_id uuid, p_term_id uuid
 )
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (
     SELECT 1
     FROM public.school_student_section_history history
@@ -375,7 +375,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND history.effective_from <= term.ends_on
       AND (history.effective_to IS NULL OR history.effective_to >= term.starts_on)
   );
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_assessment(p_assessment_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
