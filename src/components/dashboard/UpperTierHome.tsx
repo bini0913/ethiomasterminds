@@ -134,8 +134,9 @@ const UpperTierHome: React.FC = () => {
 
     setLoading(true);
     setLoadError(null);
-    const yearAgo = offsetDateKey(todayKey, -365);
-    const [topicResponse, activityResponse, resultResponse, profileResponse, examResponse] = await Promise.all([
+    try {
+      const yearAgo = offsetDateKey(todayKey, -365);
+      const [topicResponse, activityResponse, resultResponse, profileResponse, examResponse] = await Promise.all([
       db.from("upper_student_topic_progress")
         .select("subject,topic,accuracy_percentage,questions_attempted,correct_answers,last_practiced_at")
         .eq("user_id", user.id)
@@ -175,12 +176,17 @@ const UpperTierHome: React.FC = () => {
       setLoadError("Some saved learning data could not be loaded. Your records have not been changed. Retry to reconnect.");
     }
 
-    setTopics((topicResponse.data || []) as TopicRow[]);
-    setDailyActivity((activityResponse.data || []) as DailyRow[]);
-    setRecentResults((resultResponse.data || []) as ResultRow[]);
-    setSelectedSubjects(Array.isArray(profileResponse.data?.subjects) ? profileResponse.data.subjects : []);
-    setExamTarget((examResponse.data || null) as ExamTarget | null);
-    setLoading(false);
+      setTopics((topicResponse.data || []) as TopicRow[]);
+      setDailyActivity((activityResponse.data || []) as DailyRow[]);
+      setRecentResults((resultResponse.data || []) as ResultRow[]);
+      setSelectedSubjects(Array.isArray(profileResponse.data?.subjects) ? profileResponse.data.subjects : []);
+      setExamTarget((examResponse.data || null) as ExamTarget | null);
+    } catch (error) {
+      console.error("Grades 9–12 home data request failed:", error);
+      setLoadError("Saved learning data could not be reached. Check your connection and retry.");
+    } finally {
+      setLoading(false);
+    }
   }, [user?.id, todayKey]);
 
   useEffect(() => {
