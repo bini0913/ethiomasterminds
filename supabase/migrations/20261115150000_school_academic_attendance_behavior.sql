@@ -373,14 +373,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND student.school_role = 'student'
       AND student.status IN ('active', 'suspended')
       AND student.section_id = assessment.section_id
-      AND EXISTS (
-        SELECT 1 FROM public.school_memberships creator
-        WHERE creator.id = assessment.created_by_membership_id
-          AND creator.user_id = auth.uid()
-          AND creator.school_role = 'teacher'
-          AND creator.status = 'active'
-          AND public.school_can_teach_subject(assessment.school_id, assessment.section_id, assessment.subject_name)
-      )
+      AND public.school_can_teach_subject(assessment.school_id, assessment.section_id, assessment.subject_name)
   );
 $$;
 
@@ -685,6 +678,7 @@ DECLARE
   v_school_id uuid;
   v_rows integer := 0;
   v_bad_weights integer;
+  v_missing_config integer;
 BEGIN
   SELECT school_id INTO v_school_id FROM public.school_terms WHERE id = p_term_id;
   IF v_school_id IS NULL OR NOT public.school_is_admin(v_school_id) THEN
@@ -701,10 +695,49 @@ BEGIN
     HAVING round(sum(category.weight_percent), 2) <> 100
   ) invalid;
   IF v_bad_weights > 0 THEN
-    RAISE EXCEPTION 'Every grade grading configuration must total exactly 100 percent';
+    RAISE EXCEPTION 'Every configured grade grading scheme must total exactly 100 percent';
   END IF;
 
-  WITH category_scores AS (
+  SELECT count(*) INTO v_missing_config
+  FROM public.school_sections section
+  JOIN public.school_subjects subject
+    ON subject.school_id = section.school_id
+   AND subject.grade_label = section.grade_label
+   AND subject.active = true
+  WHERE section.school_id = v_school_id
+    AND section.academic_year_id = (SELECT academic_year_id FROM public.school_terms WHERE id = p_term_id)
+    AND NOT EXISTS (
+      SELECT 1 FROM public.school_assessment_categories category
+      WHERE category.school_id = section.school_id
+        AND category.academic_year_id = (SELECT academic_year_id FROM public.school_terms WHERE id = p_term_id)
+        AND category.grade_label = section.grade_label
+    );
+  IF v_missing_config > 0 THEN
+    RAISE EXCEPTION 'Configure grading categories for every grade before calculating results';
+  END IF;
+
+  WITH student_subjects AS (
+    SELECT DISTINCT
+      student.id AS student_membership_id,
+      section.id AS section_id,
+      section.grade_label,
+      subject.subject_name,
+      p_term_id AS term_id,
+      section.school_id
+    FROM public.school_sections section
+    JOIN public.school_memberships student
+      ON student.school_id = section.school_id
+     AND student.section_id = section.id
+     AND student.school_role = 'student'
+     AND student.status IN ('active', 'suspended')
+    JOIN public.school_subjects subject
+      ON subject.school_id = section.school_id
+     AND subject.grade_label = section.grade_label
+     AND subject.active = true
+    WHERE section.school_id = v_school_id
+      AND section.academic_year_id = (SELECT academic_year_id FROM public.school_terms WHERE id = p_term_id)
+  ),
+  category_scores AS (
     SELECT
       mark.student_membership_id,
       assessment.section_id,
@@ -729,19 +762,23 @@ BEGIN
   ),
   completed AS (
     SELECT
-      scores.student_membership_id,
-      scores.section_id,
-      scores.grade_label,
-      scores.subject_name,
-      scores.term_id,
-      scores.school_id,
-      sum(scores.category_average * scores.weight_percent / 100) AS weighted_average,
-      count(DISTINCT scores.category_id) AS completed_categories,
+      subjects.student_membership_id,
+      subjects.section_id,
+      subjects.grade_label,
+      subjects.subject_name,
+      subjects.term_id,
+      subjects.school_id,
+      coalesce(sum(scores.category_average * scores.weight_percent / 100), 0) AS weighted_average,
       count(DISTINCT scores.category_id) FILTER (WHERE category.required) AS completed_required_categories
-    FROM category_scores scores
-    JOIN public.school_assessment_categories category ON category.id = scores.category_id
-    GROUP BY scores.student_membership_id, scores.section_id, scores.grade_label,
-             scores.subject_name, scores.term_id, scores.school_id
+    FROM student_subjects subjects
+    LEFT JOIN category_scores scores
+      ON scores.student_membership_id = subjects.student_membership_id
+     AND scores.section_id = subjects.section_id
+     AND scores.subject_name = subjects.subject_name
+     AND scores.term_id = subjects.term_id
+    LEFT JOIN public.school_assessment_categories category ON category.id = scores.category_id
+    GROUP BY subjects.student_membership_id, subjects.section_id, subjects.grade_label,
+             subjects.subject_name, subjects.term_id, subjects.school_id
   ),
   required_counts AS (
     SELECT school_id, academic_year_id, grade_label,
@@ -758,7 +795,7 @@ BEGIN
                   OR coalesce(policy.missing_mark_rule, 'incomplete') = 'zero'
            THEN round(completed.weighted_average, 2)
            ELSE NULL END AS final_average,
-      policy.rank_scope,
+      coalesce(policy.rank_scope, 'section') AS rank_scope,
       scales.letter_grade
     FROM completed
     JOIN required_counts USING (school_id, grade_label)
