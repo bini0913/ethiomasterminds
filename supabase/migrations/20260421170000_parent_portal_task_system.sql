@@ -43,7 +43,8 @@ end $$;
 
 alter table public.parent_tasks enable row level security;
 
-create policy if not exists "students_manage_own_parent_tasks"
+drop policy if exists "students_manage_own_parent_tasks" on public.parent_tasks;
+create policy "students_manage_own_parent_tasks"
 on public.parent_tasks
 for all
 using (student_id = auth.uid())
