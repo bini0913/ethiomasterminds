@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, BookOpen, ClipboardCheck, MessageSquare, Megaphone,
-  RefreshCw, Users,
+  RefreshCw, Users, CalendarCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
