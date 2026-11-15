@@ -311,6 +311,57 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
     OR public.is_active_school_member(p_school_id, ARRAY['admin']::text[]);
 $$;
 
+CREATE UNIQUE INDEX IF NOT EXISTS school_one_homeroom_teacher_per_section
+  ON public.school_teacher_assignments(section_id)
+  WHERE assignment_kind = 'homeroom';
+
+CREATE OR REPLACE FUNCTION public.school_sync_homeroom_teacher_field()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+DECLARE
+  v_section_id uuid;
+BEGIN
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+    v_section_id := OLD.section_id;
+    UPDATE public.school_sections section
+    SET homeroom_teacher_id = (
+      SELECT teacher.user_id
+      FROM public.school_teacher_assignments assignment
+      JOIN public.school_memberships teacher
+        ON teacher.id = assignment.teacher_membership_id
+       AND teacher.school_id = assignment.school_id
+      WHERE assignment.section_id = v_section_id
+        AND assignment.assignment_kind = 'homeroom'
+        AND teacher.status = 'active'
+      LIMIT 1
+    )
+    WHERE section.id = v_section_id;
+  END IF;
+
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    v_section_id := NEW.section_id;
+    UPDATE public.school_sections section
+    SET homeroom_teacher_id = (
+      SELECT teacher.user_id
+      FROM public.school_teacher_assignments assignment
+      JOIN public.school_memberships teacher
+        ON teacher.id = assignment.teacher_membership_id
+       AND teacher.school_id = assignment.school_id
+      WHERE assignment.section_id = v_section_id
+        AND assignment.assignment_kind = 'homeroom'
+        AND teacher.status = 'active'
+      LIMIT 1
+    )
+    WHERE section.id = v_section_id;
+  END IF;
+  RETURN coalesce(NEW, OLD);
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_sync_homeroom_teacher_field ON public.school_teacher_assignments;
+CREATE TRIGGER school_sync_homeroom_teacher_field
+AFTER INSERT OR UPDATE OR DELETE ON public.school_teacher_assignments
+FOR EACH ROW EXECUTE FUNCTION public.school_sync_homeroom_teacher_field();
+
 CREATE OR REPLACE FUNCTION public.school_can_teach_subject(
   p_school_id uuid, p_section_id uuid, p_subject_name text
 )
@@ -347,33 +398,6 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND teacher.status = 'active'
       AND assignment.section_id = p_section_id
       AND assignment.assignment_kind = 'homeroom'
-  ) OR EXISTS (
-    SELECT 1 FROM public.school_sections section
-    JOIN public.school_memberships teacher
-      ON teacher.user_id = auth.uid()
-     AND teacher.school_id = section.school_id
-     AND teacher.school_role = 'teacher'
-     AND teacher.status = 'active'
-    WHERE section.id = p_section_id
-      AND section.school_id = p_school_id
-      AND section.homeroom_teacher_id = auth.uid()
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION public.school_student_was_in_section_for_term(
-  p_student_membership_id uuid, p_section_id uuid, p_term_id uuid
-)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.school_student_section_history history
-    JOIN public.school_terms term
-      ON term.id = p_term_id
-     AND term.school_id = history.school_id
-    WHERE history.student_membership_id = p_student_membership_id
-      AND history.section_id = p_section_id
-      AND history.effective_from <= term.ends_on
-      AND (history.effective_to IS NULL OR history.effective_to >= term.starts_on)
   );
 $$;
 
@@ -1494,6 +1518,7 @@ GRANT SELECT, UPDATE ON public.school_parent_notifications TO authenticated;
 
 REVOKE ALL ON FUNCTION public.school_sync_student_section_history() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_student_was_in_section_for_term(uuid, uuid, uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_sync_homeroom_teacher_field() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_is_admin(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_can_teach_subject(uuid, uuid, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_is_homeroom_teacher(uuid, uuid) FROM PUBLIC, anon;
