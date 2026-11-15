@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const payload = await req.json() as RequestBody;
     const username = normalizeUsername(payload.username);
     const isLegacyUsername = /^[a-z0-9_]{3,20}$/.test(username);
-    const isSchoolStudentUsername = /^[a-z0-9]{2,8}\\/[0-9]{1,12}\\/[0-9]{1,3}$/.test(username);
+    const isSchoolStudentUsername = /^[a-z0-9]{2,8}\/[0-9]{1,12}\/[0-9]{1,3}$/.test(username);
     if (!isLegacyUsername && !isSchoolStudentUsername) return json({ error: "Invalid username" }, 400);
     if (payload.action !== "availability" && payload.action !== "login") {
       return json({ error: "Invalid action" }, 400);
