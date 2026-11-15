@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, School, BookOpen, UserCog, Wallet, ClipboardList,
-  FileBarChart, Settings, Plus, RefreshCw, CheckCircle2, Copy, AlertCircle,
+  FileBarChart, Settings, RefreshCw, CheckCircle2, Copy, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -186,7 +186,7 @@ export default function SchoolManagerPortal() {
     }
     if (accountRole === "parent") account.student_membership_ids = studentMembershipIds;
     if (accountRole === "teacher") {
-      if (!assignSectionId || !assignSubject) return setFormError("Choose a section and subject for the teacher.");
+      if (!assignSectionId || (accountAssignmentKind === "subject" && !accountSubject)) return setFormError("Choose a section and subject for the teacher.");
       account.assignments = [{
         section_id: assignSectionId,
         subject_name: assignKind === "homeroom" ? "Homeroom" : assignSubject,
