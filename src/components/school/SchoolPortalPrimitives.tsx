@@ -66,7 +66,7 @@ export function SchoolStatus({ value }: { value: string }) {
     graduated: "bg-slate-100 text-slate-600",
     draft: "bg-slate-100 text-slate-600",
   };
-  return <span className={["inline-flex rounded-md px-2 py-1 text-[11px] font-semibold capitalize", styles[key] || "bg-slate-100 text-slate-600"].join(" ")}>{value.replaceAll("_", " ")}</span>;
+  return <span className={["inline-flex rounded-md px-2 py-1 text-[11px] font-semibold capitalize", styles[key] || "bg-slate-100 text-slate-600"].join(" ")}>{value.replace(/_/g, " ")}</span>;
 }
 
 export function SchoolEmptyState({
