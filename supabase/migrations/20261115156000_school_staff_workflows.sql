@@ -250,7 +250,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_validate_disciplinary_recommendation()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_actor uuid;
   v_actor_role text;
@@ -359,7 +359,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_validate_staff_change_request()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_requester uuid;
   v_role text;
@@ -422,7 +422,7 @@ BEGIN
   PERFORM set_config('app.school_staff_change_review', '', true);
   RETURN true;
 END;
-$;
+$$;
 
 ALTER TABLE public.school_staff_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_staff_task_comments ENABLE ROW LEVEL SECURITY;
