@@ -64,64 +64,6 @@ interface OnlineFriend {
   online: boolean;
 }
 
-const UpperDesktopDashboard: React.FC = () => {
-  const { user } = useUser();
-  const navigate = useNavigate();
-  const [topics, setTopics] = useState<Array<{subject:string;topic:string;accuracy:number}>>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    if (!user?.id) { setLoading(false); return; }
-    let alive = true;
-    db.from("topic_progress").select("subject,topic,accuracy_percentage,questions_attempted").eq("user_id", user.id)
-      .then(({data}) => {
-        if (!alive) return;
-        setTopics((data || []).filter((r:any) => r.topic && Number(r.questions_attempted)>0)
-          .map((r:any) => ({subject:String(r.subject || "General"),topic:String(r.topic),accuracy:Number(r.accuracy_percentage)||0}))
-          .sort((x,y)=>x.accuracy-y.accuracy).slice(0,6));
-        setLoading(false);
-      }, ()=>{ if(alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [user?.id]);
-  const xp = Number((user as any)?.xp) || 0;
-  const streak = Number((user as any)?.streak ?? (user as any)?.dayStreak);
-  const nav = [
-    ["Home", "⌂", "/"], ["Drills", "ϟ", "/quiz"], ["Question bank", "▤", "/academic/entrance-papers"],
-    ["Mock tests", "▣", "/academic/exam"], ["Study plan", "▦", "/academic/planner"], ["Vocabulary", "✣", "/academic/flashcards"],
-    ["Courses", "▰", "/library"], ["Classroom", "♙", "/study-mode"], ["Leaderboard", "▥", "/leaderboard"],
-    ["AI tutor", "♧", "/ai-tutor"], ["Discord", "☻", "/friends"]
-  ] as const;
-  const schedule = [
-    {kind:"Drill", title:"Text Structure and Purpose", color:"pink", path:"/quiz"},
-    {kind:"Vocabulary", title:"Review your due flashcards", color:"orange", path:"/academic/flashcards"},
-    {kind:"Quiz", title:"Practice your selected exam subjects", color:"blue", path:"/academic/exam"}
-  ];
-  return <div className="mm-exact-desktop">
-    <aside className="mm-exact-sidebar">
-      <div className="mm-exact-brand"><span className="mm-exact-logo">◉</span><strong>{user?.name?.split(/\\s+/)[0] || "Master Minds"}</strong><span className="mm-exact-collapse">«</span></div>
-      <nav>{nav.map(([label,icon,path],i)=><button key={label} data-active={i===0} onClick={()=>navigate(path)}><span>{icon}</span>{label}</button>)}</nav>
-      <button className="mm-exact-settings" onClick={()=>navigate("/settings")}>⬡ <span>Settings &amp; more</span></button>
-    </aside>
-    <section className="mm-exact-main">
-      <header className="mm-exact-top"><span className="mm-exact-pill">🔷 {xp.toLocaleString()}</span><div><span className="mm-exact-pill">🔥 {Number.isFinite(streak) && streak>0 ? streak : "—"}</span><button aria-label="Notifications" onClick={()=>navigate("/notifications")}>♧</button></div></header>
-      <div className="mm-exact-grid">
-        <div className="mm-exact-primary">
-          <div className="mm-exact-topcards">
-            <section className="mm-exact-card mm-exact-score"><div className="mm-exact-card-title">Target score <button aria-label="Edit target score" onClick={()=>navigate("/academic/setup")}>↗</button></div><strong>—</strong><small>Set your target in Academic Preparation</small><div className="mm-exact-scorebar"><span /></div><div className="mm-exact-scorefoot">Your recorded results appear here when available.</div><button className="mm-exact-link" onClick={()=>navigate("/academic/insights")}>View academic insights</button></section>
-            <section className="mm-exact-card mm-exact-radar"><div className="mm-exact-card-title">Progress radar <span>R&amp;W&nbsp;&nbsp; Math</span></div><div className="mm-exact-radar-body"><svg viewBox="0 0 200 160" role="img" aria-label="Progress radar based on recorded topic performance"><g fill="none" stroke="#eadcf9" strokeWidth="1">{[25,45,65].map(r=><polygon key={r} points={`100,${80-r} ${100+r*.95},${80-r*.3} ${100+r*.6},${80+r*.8} ${100-r*.6},${80+r*.8} ${100-r*.95},${80-r*.3}`} />)}<path d="M100 15V145 M35 60L165 100 M35 100L165 60" /></g><polygon points={topics.length ? topics.slice(0,5).map((t,i)=>{const ang=(-90+i*72)*Math.PI/180; const r=20+Math.min(1,t.accuracy/100)*45; return `${100+Math.cos(ang)*r},${80+Math.sin(ang)*r}`}).join(" ") : "100,40 138,65 123,112 77,112 62,65"} fill="#a855f7" fillOpacity=".18" stroke="#a855f7" strokeWidth="2"/></svg><div className="mm-exact-radar-labels"><span>Recorded topics</span><span>{loading?"Loading…":topics.length ? `${topics.length} tracked` : "No data yet"}</span></div></div></section>
-          </div>
-          <section className="mm-exact-card mm-exact-schedule"><div className="mm-exact-card-title">Today's schedule <button aria-label="Open study planner" onClick={()=>navigate("/academic/planner")}>↗</button></div>{schedule.map(s=><button className={`mm-exact-task ${s.color}`} key={s.kind} onClick={()=>navigate(s.path)}><small>{s.kind}</small><strong>{s.title}</strong></button>)}</section>
-          <section className="mm-exact-card mm-exact-performance"><div className="mm-exact-card-title">Topic performance <button onClick={()=>navigate("/academic/topics")}>View all ↗</button></div>{loading?<p>Loading saved topic performance…</p>:topics.length?<div className="mm-exact-topicgrid">{topics.map(t=><button key={t.subject+t.topic} onClick={()=>navigate("/academic/topics")}><strong>{t.topic}</strong><span>{t.subject}</span><b>{t.accuracy}%</b><i><em style={{width:`${Math.max(0,Math.min(100,t.accuracy))}%`}} /></i></button>)}</div>:<p>No topic results recorded yet. Complete practice to build your performance view.</p>}</section>
-        </div>
-        <aside className="mm-exact-right">
-          <section className="mm-exact-card mm-exact-streak"><div className="mm-exact-big">🔥 {Number.isFinite(streak)&&streak>0?streak:"—"}</div><small>Day streak</small><div className="mm-exact-week">{["MO","TU","WE","TH","FR","SA","SU"].map(d=><span key={d}>{d}</span>)}</div><button className="mm-exact-link" onClick={()=>navigate("/study-mode")}>Start today's study session</button></section>
-          <section className="mm-exact-card mm-exact-xp"><div className="mm-exact-big blue">🔷 {xp.toLocaleString()}</div><small>XP (Experience Points)</small><div className="mm-exact-rank"><span>Your ranking</span><strong>—</strong><span>Ranking appears when leaderboard data is available.</span></div><button className="mm-exact-outline" onClick={()=>navigate("/leaderboard")}>See full leaderboard</button></section>
-          <section className="mm-exact-card mm-exact-countdown"><div className="mm-exact-calendar">🗓️</div><strong>Exam countdown</strong><p>No exam date set</p><button className="mm-exact-outline" onClick={()=>navigate("/academic/setup")}>Set exam details</button></section>
-        </aside>
-      </div>
-    </section>
-  </div>;
-};
-
 const StudentDashboard: React.FC = () => {
   const { user, logout } = useUser();
   const { coins, gems } = useCurrency();
@@ -374,12 +316,7 @@ const StudentDashboard: React.FC = () => {
     visible: { opacity: 1, y: 0 }
   };
 
-  const isUpperTier = Number(String(user?.grade ?? "").match(/\d+/)?.[0] || 0) >= 9;
-
   return (
-    <>
-      {isUpperTier && <UpperDesktopDashboard />}
-      <div className={isUpperTier ? "upper-current-dashboard" : ""}>
     <div className="relative min-h-screen overflow-hidden">
       <AnimatedBackground variant="minimal" showIcons={false} />
 
@@ -795,8 +732,6 @@ const StudentDashboard: React.FC = () => {
         </footer>
       </div>
     </div>
-      </div>
-    </>
   );
 };
 

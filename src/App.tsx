@@ -20,6 +20,7 @@ const StorePage = lazy(() => import("./pages/StorePage"));
 const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
 const AdminPortal = lazy(() => import("./pages/AdminPortal"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
+const StudentDashboardRoute = lazy(() => import("./components/dashboard/StudentDashboardRoute"));
 const ManagerDashboard = lazy(() => import("./pages/ManagerDashboard"));
 const ManagerControlCenter = lazy(() => import("./pages/ManagerControlCenter"));
 const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
@@ -334,7 +335,7 @@ const App = () => (
                                   </ProtectedRoute>
                                 } 
                               />
-                              <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboard /></ProtectedRoute>} />
+                              <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
                               <Route
                                 path="/manager"
                                 element={

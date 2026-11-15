@@ -2,11 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity, ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2,
-  Clock3, Flame, GraduationCap, LibraryBig, Play, Sparkles, Target, Trophy,
-  Users, Zap,
+  Clock3, Play, Sparkles, Users,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
-import { useCurrency } from "@/context/CurrencyContext";
 import { db } from "@/integrations/untypedClient";
 import { getXpProgressInLevel } from "@/lib/rankSystem";
 
@@ -22,18 +20,10 @@ type ResultRow = {
   completed_at: string | null;
 };
 
-const quickLinks = [
-  { title: "Academic preparation", detail: "Your subjects, syllabus and exam tools", to: "/academic", icon: GraduationCap },
-  { title: "Exam mode", detail: "Practise with a timed session", to: "/academic/exam", icon: Target },
-  { title: "Flashcards", detail: "Strengthen recall with review", to: "/academic/flashcards", icon: BrainCircuit },
-  { title: "Textbooks & library", detail: "Open your learning resources", to: "/library", icon: LibraryBig },
-];
-
 const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 
 const UpperTierHome: React.FC = () => {
   const { user } = useUser();
-  const { coins, dailyStreak } = useCurrency();
   const [topics, setTopics] = useState<TopicRow[]>([]);
   const [recentResults, setRecentResults] = useState<ResultRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,9 +116,9 @@ const UpperTierHome: React.FC = () => {
         </Link>
       </section>
 
-      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#102d46] p-5 text-white shadow-[0_18px_48px_rgba(15,45,70,.18)] sm:p-8">
+      <section className="relative overflow-hidden rounded-[20px] border border-white/10 bg-gradient-to-br from-[#0b625a] via-[#137f72] to-[#0b766c] p-5 text-white shadow-[0_18px_48px_rgba(15,45,70,.18)] sm:p-8">
         <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full border-[36px] border-white/5" />
-        <div className="pointer-events-none absolute -bottom-28 right-1/4 h-56 w-56 rounded-full bg-[#2563a5]/50 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 right-1/4 h-56 w-56 rounded-full bg-[#49b4a0]/30 blur-3xl" />
         <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_230px] lg:items-center">
           <div className="max-w-2xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em]"><Sparkles className="h-3.5 w-3.5" /> Learn · Compete · Level up</span>
@@ -139,33 +129,17 @@ const UpperTierHome: React.FC = () => {
                 : "Start a learning activity. Your saved topic coverage and practice history will appear here as you use Master Minds."}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Link to={focusTopic ? "/academic/topics" : "/academic"} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[#102d46] transition hover:bg-slate-100"><BookOpen className="h-4 w-4" /> {focusTopic ? "Review topic coverage" : "Open academic hub"}</Link>
+              <Link to={focusTopic ? "/academic/topics" : "/academic"} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[#0b625a] transition hover:bg-slate-100"><BookOpen className="h-4 w-4" /> {focusTopic ? "Review topic coverage" : "Open academic hub"}</Link>
               <Link to="/academic/planner" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/30 px-4 text-sm font-semibold text-white transition hover:bg-white/10"><CalendarDays className="h-4 w-4" /> Study planner</Link>
             </div>
           </div>
           <div className="flex items-center gap-4 rounded-2xl border border-white/15 bg-white/10 p-4 lg:flex-col lg:gap-2 lg:text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full border-[5px] border-white/25 text-lg font-extrabold tabular-nums" style={{ background: `conic-gradient(#ffffff ${xpProgress.percentage}%, rgba(255,255,255,.14) 0)` }}>
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#102d46]">{xpProgress.percentage}%</span>
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0b625a]">{xpProgress.percentage}%</span>
             </div>
             <div><p className="text-sm font-bold">Level {level} progress</p><p className="text-xs text-white/70">{nextLevelXp.toLocaleString()} XP to next level</p></div>
           </div>
         </div>
-      </section>
-
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: "Experience", value: xp.toLocaleString() + " XP", icon: Zap },
-          { label: "Level", value: String(level), icon: GraduationCap },
-          { label: "Study streak", value: String(Number(dailyStreak) || 0) + " days", icon: Flame },
-          { label: "Coins", value: (Number(coins) || 0).toLocaleString(), icon: Trophy },
-        ].map(stat => {
-          const Icon = stat.icon;
-          return <div key={stat.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-[18px] w-[18px]" /></span>
-            <p className="mt-3 text-xl font-extrabold tabular-nums">{stat.value}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{stat.label}</p>
-          </div>;
-        })}
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2">
@@ -179,24 +153,6 @@ const UpperTierHome: React.FC = () => {
           <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold uppercase tracking-wider text-sky-600">Play together</span><strong className="mt-1 block">Challenge a friend</strong><span className="text-xs text-muted-foreground">Open the multiplayer arena.</span></span>
           <ArrowRight className="h-4 w-4 text-primary transition group-hover:translate-x-1" />
         </Link>
-      </section>
-
-      <section>
-        <div className="mb-4 flex items-end justify-between gap-3">
-          <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Your learning tools</p><h2 className="mt-1 text-xl font-extrabold sm:text-2xl">Choose what to work on</h2></div>
-          <Link to="/academic" className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">Academic hub <ArrowRight className="h-4 w-4" /></Link>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {quickLinks.map(action => {
-            const Icon = action.icon;
-            return <Link key={action.to} to={action.to} className="group flex min-h-[132px] flex-col rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
-              <span className="mt-3 font-bold">{action.title}</span>
-              <span className="mt-1 text-xs leading-5 text-muted-foreground">{action.detail}</span>
-              <ArrowRight className="ml-auto mt-2 h-4 w-4 text-primary transition group-hover:translate-x-1" />
-            </Link>;
-          })}
-        </div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,.75fr)]">

@@ -1,13 +1,13 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { Home, BookOpen, Target, Trophy, Bot } from "lucide-react";
 const items = [
-  { label:"Home",to:"/",icon:Home },
+  { label:"Home",to:"/student-dashboard",icon:Home },
   { label:"Learn",to:"/academic",icon:BookOpen },
   { label:"Practice",to:"/quiz",icon:Target },
   { label:"Rank",to:"/leaderboard",icon:Trophy },
   { label:"AI Tutor",to:"/ai-tutor",icon:Bot },
 ];
-function isActive(path:string,to:string){if(to==="/")return path==="/";return path===to||path.startsWith(to+"/");}
+function isActive(path:string,to:string){return path===to||path.startsWith(to+"/");}
 export default function UpperTierMobileDock(){
  const location=useLocation();const navigate=useNavigate();
  return <nav aria-label="Primary mobile navigation" className="glass-nav-dock fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-50 mx-auto flex max-w-md items-center justify-around gap-1 rounded-full px-2 py-2 md:hidden">
