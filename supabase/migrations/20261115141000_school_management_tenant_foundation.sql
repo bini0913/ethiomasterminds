@@ -397,6 +397,189 @@ CREATE TRIGGER school_sync_parent_access_after_student_exit
 AFTER UPDATE OF status ON public.school_memberships
 FOR EACH ROW EXECUTE FUNCTION public.school_sync_parent_access_after_student_exit();
 
+CREATE OR REPLACE FUNCTION public.school_can_view_school(p_school_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT public._is_extreme_admin() OR public.is_active_school_member(p_school_id, NULL);
+$;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_membership(p_membership_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.school_memberships target
+    WHERE target.id = p_membership_id
+      AND (
+        target.user_id = auth.uid()
+        OR public._is_extreme_admin()
+        OR public.is_school_manager_or_admin(target.school_id)
+        OR (
+          target.school_role = 'student'
+          AND EXISTS (
+            SELECT 1
+            FROM public.school_memberships teacher
+            JOIN public.school_teacher_assignments assignment
+              ON assignment.teacher_membership_id = teacher.id
+             AND assignment.school_id = teacher.school_id
+            WHERE teacher.user_id = auth.uid()
+              AND teacher.school_id = target.school_id
+              AND teacher.school_role = 'teacher'
+              AND teacher.status = 'active'
+              AND assignment.section_id = target.section_id
+          )
+        )
+        OR (
+          target.school_role = 'student'
+          AND EXISTS (
+            SELECT 1
+            FROM public.school_parent_student_links link
+            JOIN public.school_memberships parent
+              ON parent.id = link.parent_membership_id
+            WHERE link.student_membership_id = target.id
+              AND link.status = 'active'
+              AND parent.user_id = auth.uid()
+              AND parent.school_role = 'parent'
+              AND parent.status = 'active'
+          )
+        )
+      )
+  );
+$;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_section(p_section_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.school_sections section
+    WHERE section.id = p_section_id
+      AND (
+        public._is_extreme_admin()
+        OR public.is_school_manager_or_admin(section.school_id)
+        OR EXISTS (
+          SELECT 1 FROM public.school_memberships teacher
+          JOIN public.school_teacher_assignments assignment
+            ON assignment.teacher_membership_id = teacher.id
+           AND assignment.school_id = teacher.school_id
+          WHERE teacher.user_id = auth.uid()
+            AND teacher.school_id = section.school_id
+            AND teacher.school_role = 'teacher'
+            AND teacher.status = 'active'
+            AND assignment.section_id = section.id
+        )
+        OR EXISTS (
+          SELECT 1 FROM public.school_memberships student
+          WHERE student.user_id = auth.uid()
+            AND student.school_id = section.school_id
+            AND student.section_id = section.id
+            AND student.school_role = 'student'
+            AND student.status = 'active'
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.school_parent_student_links link
+          JOIN public.school_memberships parent
+            ON parent.id = link.parent_membership_id
+          JOIN public.school_memberships student
+            ON student.id = link.student_membership_id
+          WHERE parent.user_id = auth.uid()
+            AND parent.school_id = section.school_id
+            AND parent.school_role = 'parent'
+            AND parent.status = 'active'
+            AND link.status = 'active'
+            AND student.section_id = section.id
+            AND student.status = 'active'
+        )
+      )
+  );
+$;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_teacher_assignment(p_assignment_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.school_teacher_assignments assignment
+    WHERE assignment.id = p_assignment_id
+      AND (
+        public._is_extreme_admin()
+        OR public.is_school_manager_or_admin(assignment.school_id)
+        OR EXISTS (
+          SELECT 1 FROM public.school_memberships teacher
+          WHERE teacher.id = assignment.teacher_membership_id
+            AND teacher.user_id = auth.uid()
+            AND teacher.school_role = 'teacher'
+            AND teacher.status = 'active'
+        )
+      )
+  );
+$;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_parent_link(p_link_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.school_parent_student_links link
+    JOIN public.school_memberships parent ON parent.id = link.parent_membership_id
+    WHERE link.id = p_link_id
+      AND (
+        public._is_extreme_admin()
+        OR public.is_school_manager_or_admin(link.school_id)
+        OR (parent.user_id = auth.uid() AND parent.school_role = 'parent' AND parent.status = 'active')
+      )
+  );
+$;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_record_event(p_event_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.school_record_events event
+    JOIN public.school_memberships membership ON membership.id = event.membership_id
+    WHERE event.id = p_event_id
+      AND (
+        public._is_extreme_admin()
+        OR public.is_school_manager_or_admin(event.school_id)
+        OR membership.user_id = auth.uid()
+      )
+  );
+$;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_profile(p_profile_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT auth.uid() IS NOT NULL AND (
+    public._is_extreme_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public.school_memberships staff
+      JOIN public.school_memberships target ON target.school_id = staff.school_id
+      WHERE staff.user_id = auth.uid()
+        AND staff.status = 'active'
+        AND staff.school_role IN ('manager', 'admin')
+        AND target.user_id = p_profile_id
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.school_memberships teacher
+      JOIN public.school_teacher_assignments assignment
+        ON assignment.teacher_membership_id = teacher.id
+       AND assignment.school_id = teacher.school_id
+      JOIN public.school_memberships student
+        ON student.school_id = teacher.school_id
+       AND student.section_id = assignment.section_id
+       AND student.school_role = 'student'
+      WHERE teacher.user_id = auth.uid()
+        AND teacher.school_role = 'teacher'
+        AND teacher.status = 'active'
+        AND student.user_id = p_profile_id
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.school_parent_student_links link
+      JOIN public.school_memberships parent ON parent.id = link.parent_membership_id
+      JOIN public.school_memberships student ON student.id = link.student_membership_id
+      WHERE parent.user_id = auth.uid()
+        AND parent.school_role = 'parent'
+        AND parent.status = 'active'
+        AND link.status = 'active'
+        AND student.user_id = p_profile_id
+        AND student.status = 'active'
+    )
+  );
+$;
+
 -- All school data tables are protected by row-level policies. A school member
 -- cannot read another school's records by changing a client-side school ID.
 ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
@@ -411,13 +594,7 @@ ALTER TABLE public.school_record_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS schools_member_read ON public.schools;
 CREATE POLICY schools_member_read ON public.schools
 FOR SELECT TO authenticated
-USING (
-  public._is_extreme_admin()
-  OR EXISTS (
-    SELECT 1 FROM public.school_memberships sm
-    WHERE sm.school_id = id AND sm.user_id = auth.uid() AND sm.status = 'active'
-  )
-);
+USING (public.school_can_view_school(id));
 
 DROP POLICY IF EXISTS schools_super_admin_insert ON public.schools;
 CREATE POLICY schools_super_admin_insert ON public.schools
@@ -433,33 +610,7 @@ WITH CHECK (public.is_school_manager(id));
 DROP POLICY IF EXISTS school_memberships_read ON public.school_memberships;
 CREATE POLICY school_memberships_read ON public.school_memberships
 FOR SELECT TO authenticated
-USING (
-  user_id = auth.uid()
-  OR public._is_extreme_admin()
-  OR public.is_active_school_member(school_id, ARRAY['manager', 'admin']::text[])
-  OR (
-    school_role = 'student'
-    AND EXISTS (
-      SELECT 1 FROM public.school_teacher_assignments sta
-      JOIN public.school_sections ss ON ss.id = sta.section_id
-      WHERE sta.school_id = school_memberships.school_id
-        AND ss.id = school_memberships.section_id
-        AND sta.teacher_membership_id IN (
-          SELECT id FROM public.school_memberships
-          WHERE user_id = auth.uid() AND school_role = 'teacher' AND status = 'active'
-        )
-    )
-  )
-  OR (
-    school_role = 'student'
-    AND EXISTS (
-      SELECT 1 FROM public.school_parent_student_links spl
-      JOIN public.school_memberships pm ON pm.id = spl.parent_membership_id
-      WHERE spl.student_membership_id = school_memberships.id
-        AND spl.status = 'active' AND pm.user_id = auth.uid() AND pm.status = 'active'
-    )
-  )
-);
+USING (public.school_can_view_membership(id));
 
 -- Membership creation is reserved for trusted account-provisioning workflows
 -- using the service role; client-side inserts cannot assign arbitrary roles.
@@ -486,16 +637,7 @@ WITH CHECK (public.is_school_manager_or_admin(school_id));
 DROP POLICY IF EXISTS school_sections_read ON public.school_sections;
 CREATE POLICY school_sections_read ON public.school_sections
 FOR SELECT TO authenticated
-USING (
-  public._is_extreme_admin()
-  OR public.is_active_school_member(school_id, ARRAY['manager', 'admin', 'teacher']::text[])
-  OR EXISTS (
-    SELECT 1 FROM public.school_memberships sm
-    WHERE sm.school_id = school_sections.school_id
-      AND sm.section_id = school_sections.id
-      AND sm.user_id = auth.uid() AND sm.status = 'active'
-  )
-);
+USING (public.school_can_view_section(id));
 
 DROP POLICY IF EXISTS school_sections_manager_write ON public.school_sections;
 CREATE POLICY school_sections_manager_insert ON public.school_sections
@@ -507,14 +649,7 @@ WITH CHECK (public.is_school_manager_or_admin(school_id));
 DROP POLICY IF EXISTS school_teacher_assignments_read ON public.school_teacher_assignments;
 CREATE POLICY school_teacher_assignments_read ON public.school_teacher_assignments
 FOR SELECT TO authenticated
-USING (
-  public._is_extreme_admin()
-  OR public.is_school_manager_or_admin(school_id)
-  OR teacher_membership_id IN (
-    SELECT id FROM public.school_memberships
-    WHERE user_id = auth.uid() AND school_role = 'teacher' AND status = 'active'
-  )
-);
+USING (public.school_can_view_teacher_assignment(id));
 
 DROP POLICY IF EXISTS school_teacher_assignments_manager_write ON public.school_teacher_assignments;
 CREATE POLICY school_teacher_assignments_manager_write ON public.school_teacher_assignments
@@ -525,14 +660,7 @@ WITH CHECK (public.is_school_manager_or_admin(school_id));
 DROP POLICY IF EXISTS school_parent_links_read ON public.school_parent_student_links;
 CREATE POLICY school_parent_links_read ON public.school_parent_student_links
 FOR SELECT TO authenticated
-USING (
-  public._is_extreme_admin()
-  OR public.is_school_manager_or_admin(school_id)
-  OR parent_membership_id IN (
-    SELECT id FROM public.school_memberships
-    WHERE user_id = auth.uid() AND school_role = 'parent' AND status = 'active'
-  )
-);
+USING (public.school_can_view_parent_link(id));
 
 DROP POLICY IF EXISTS school_parent_links_manager_write ON public.school_parent_student_links;
 CREATE POLICY school_parent_links_manager_insert ON public.school_parent_student_links
@@ -544,13 +672,7 @@ WITH CHECK (public.is_school_manager_or_admin(school_id));
 DROP POLICY IF EXISTS school_record_events_read ON public.school_record_events;
 CREATE POLICY school_record_events_read ON public.school_record_events
 FOR SELECT TO authenticated
-USING (
-  public._is_extreme_admin()
-  OR public.is_school_manager_or_admin(school_id)
-  OR membership_id IN (
-    SELECT id FROM public.school_memberships WHERE user_id = auth.uid()
-  )
-);
+USING (public.school_can_view_record_event(id));
 
 -- ID sequences are accessed only through the guarded allocator function.
 REVOKE ALL ON public.school_student_id_sequences FROM PUBLIC, anon, authenticated;
@@ -561,4 +683,18 @@ GRANT EXECUTE ON FUNCTION public.school_deactivate_student_membership(uuid, text
 GRANT EXECUTE ON FUNCTION public.is_active_school_member(uuid, text[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_school_manager_or_admin(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_school_manager(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_can_view_school(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_school(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_can_view_membership(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_membership(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_can_view_section(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_section(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_can_view_teacher_assignment(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_teacher_assignment(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_can_view_parent_link(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_parent_link(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_can_view_record_event(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_record_event(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_can_view_profile(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_profile(uuid) TO authenticated;
 
