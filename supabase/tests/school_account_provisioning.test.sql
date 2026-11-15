@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(10);
+select plan(12);
 
 select ok(has_function_privilege(
   'service_role',
@@ -63,6 +63,9 @@ select ok(exists (
 ), 'homeroom display field follows the authoritative assignment record');
 
 select ok(not has_table_privilege('authenticated', 'public.school_student_id_sequences', 'SELECT'), 'student ID sequences are not directly exposed to clients');
+
+select ok(to_regclass('public.school_student_id_reservations') is not null, 'grade-based student IDs are reserved before account creation');
+select ok(not has_table_privilege('authenticated', 'public.school_student_id_reservations', 'SELECT'), 'student ID reservations cannot be read or forged by clients');
 
 select * from finish();
 rollback;
