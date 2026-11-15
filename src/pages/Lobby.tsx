@@ -718,7 +718,7 @@ const Lobby: React.FC = () => {
     const normalizedCode = joinByCode.trim().toUpperCase();
     const { data: roomPool, error } = await supabase
       .from("multiplayer_rooms")
-      .select("id, name, password, status")
+      .select("id, name, has_password, status")
       .in("status", ["waiting", "countdown", "playing"]);
 
     if (error || !roomPool) {
@@ -732,7 +732,7 @@ const Lobby: React.FC = () => {
       return;
     }
 
-    if (matchedRoom.password && !joinPasscode.trim()) {
+    if (matchedRoom.has_password && !joinPasscode.trim()) {
       toast.error("This room is private. Enter passcode.");
       return;
     }
@@ -754,7 +754,7 @@ const Lobby: React.FC = () => {
       .from("multiplayer_rooms")
       .select("id, name, max_players")
       .eq("status", "waiting")
-      .is("password", null)
+      .eq("has_password", false)
       .order("created_at", { ascending: false })
       .limit(30);
 
@@ -828,12 +828,7 @@ const Lobby: React.FC = () => {
       return;
     }
 
-    const { error } = await supabase
-      .from('tournament_participants')
-      .insert({
-        tournament_id: tournamentId,
-        user_id: user.id
-      });
+    const { error } = await supabase.rpc("join_tournament" as any, { p_tournament_id: tournamentId });
 
     if (error) {
       if (error.code === '23505') {

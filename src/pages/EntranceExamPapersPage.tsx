@@ -61,8 +61,8 @@ const EntranceExamPapersPage: React.FC = () => {
           setPapers((data ?? []) as Paper[]);
         }
 
-        // Practice availability is derived from the real approved quiz bank.
-        // A failure here must not make the independently loaded paper catalog unusable.
+        // Practice availability is derived from approved quiz metadata only.
+        // Never load question answer keys for a catalog page.
         const { data: quizzes, error: quizError } = await db
           .from("quizzes")
           .select("id,subject,grade,is_approved")
@@ -76,33 +76,10 @@ const EntranceExamPapersPage: React.FC = () => {
         const grade12Quizzes = (quizzes || []).filter((quiz: any) => Number(quiz.grade) === 12);
         if (!grade12Quizzes.length) return;
 
-        const { data: questions, error: questionError } = await db
-          .from("questions")
-          .select("quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer")
-          .in("quiz_id", grade12Quizzes.map((quiz: any) => quiz.id));
-
-        if (questionError) {
-          console.warn("Entrance-paper practice questions could not be checked:", questionError);
-          return;
-        }
-
-        const quizById = new Map<string, string>(
-          grade12Quizzes.map((quiz: any) => [String(quiz.id), normalizeSubject(String(quiz.subject || ""))] as [string, string])
-        );
-        const available = new Set<string>();
-
-        (questions || []).forEach((question: any) => {
-          const storedOptions = Array.isArray(question.options) ? question.options : [];
-          const options = storedOptions.length
-            ? storedOptions
-            : [question.option_a, question.option_b, question.option_c, question.option_d].filter(Boolean);
-          if (question.question_text && question.correct_answer != null && options.length >= 2) {
-            const subjectName = quizById.get(String(question.quiz_id));
-            if (subjectName) available.add(subjectName);
-          }
-        });
-
-        if (active) setPracticeSubjects(Array.from(available));
+        const available = grade12Quizzes
+          .map((quiz: any) => normalizeSubject(String(quiz.subject || "")))
+          .filter(Boolean);
+        if (active) setPracticeSubjects(Array.from(new Set(available)));
       } catch (loadError) {
         console.error("Entrance-paper catalog load failed:", loadError);
         if (active) setError("We couldn't load the past-paper catalog. Please retry.");
