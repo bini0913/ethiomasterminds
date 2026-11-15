@@ -40,10 +40,14 @@ const TopicCoveragePage: React.FC = () => {
     if (!user?.id) return;
     let cancelled = false;
     (async () => {
+      const progressQuery = upperStudent
+        ? (supabase as any).from("upper_student_topic_progress").select("subject,topic,accuracy_percentage,questions_attempted,correct_answers,last_practiced_at").eq("user_id", user.id)
+        : supabase.from("topic_progress").select("*").eq("user_id", user.id);
       const [profileRes, progressRes] = await Promise.all([
         getAcademicProfile(user.id),
-        supabase.from("topic_progress").select("*").eq("user_id", user.id),
+        progressQuery,
       ]);
+      if (progressRes.error) throw progressRes.error;
       if (cancelled) return;
       setProfileSubjects((profileRes?.subjects || []).map(normalizeSubject));
       let cachedAnalysis: typeof bookUnits = {};
@@ -59,7 +63,13 @@ const TopicCoveragePage: React.FC = () => {
         console.warn("Could not load account textbook analysis; using this device's cache.", analysisError);
         if (!cancelled) setBookUnits(cachedAnalysis);
       }
-      setTopics((progressRes.data || []) as TopicData[]);
+      const observedTopics = upperStudent
+        ? (progressRes.data || []).map((row: any) => ({
+            ...row,
+            questions_correct: Number(row.correct_answers) || 0,
+          }))
+        : (progressRes.data || []);
+      setTopics(observedTopics as TopicData[]);
       let bookIds = Array.from(new Set([...(profileRes?.book_ids || []), ...(profileRes?.book_id ? [profileRes.book_id] : [])]));
       try { const selected = localStorage.getItem("masterminds:study-plan-books:" + user.id); if (selected !== null) bookIds = JSON.parse(selected) as string[]; } catch { /* keep Academic Prep selection */ }
       if (bookIds.length) {
