@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.school_memberships (
   status text NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'suspended', 'deactivated', 'transferred', 'graduated')),
   grade_label text,
-  age_at_enrollment integer CHECK (age_at_enrollment BETWEEN 1 AND 120),
+  age_at_enrollment integer CHECK (age_at_enrollment BETWEEN 3 AND 120),
   section_id uuid,
   student_number bigint,
   school_username text UNIQUE,
