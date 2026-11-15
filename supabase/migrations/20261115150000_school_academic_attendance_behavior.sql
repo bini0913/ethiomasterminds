@@ -891,27 +891,26 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.school_notify_parent_attendance()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE
-  v_date date;
+CREATE OR REPLACE FUNCTION public.school_notify_parents_attendance_session()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
 BEGIN
-  IF TG_OP = 'UPDATE' AND NEW.attendance_status IS NOT DISTINCT FROM OLD.attendance_status THEN
-    RETURN NEW;
+  IF NEW.status = 'submitted' AND OLD.status IS DISTINCT FROM NEW.status THEN
+    INSERT INTO public.school_parent_notifications(
+      school_id, parent_membership_id, student_membership_id, notification_type, title, message
+    )
+    SELECT link.school_id, link.parent_membership_id, record.student_membership_id,
+           'attendance', 'Daily attendance updated',
+           'Attendance for ' || to_char(NEW.attendance_date, 'DD Mon YYYY') ||
+           ' was recorded as ' || record.attendance_status || '.'
+    FROM public.school_attendance_records record
+    JOIN public.school_parent_student_links link
+      ON link.student_membership_id = record.student_membership_id
+     AND link.status = 'active'
+    WHERE record.session_id = NEW.id;
   END IF;
-  SELECT attendance_date INTO v_date
-  FROM public.school_attendance_sessions WHERE id = NEW.session_id;
-  INSERT INTO public.school_parent_notifications(
-    school_id, parent_membership_id, student_membership_id, notification_type, title, message
-  )
-  SELECT link.school_id, link.parent_membership_id, NEW.student_membership_id,
-         'attendance', 'Attendance updated',
-         'Attendance for ' || to_char(v_date, 'DD Mon YYYY') || ' was recorded as ' || NEW.attendance_status || '.'
-  FROM public.school_parent_student_links link
-  WHERE link.student_membership_id = NEW.student_membership_id AND link.status = 'active';
   RETURN NEW;
 END;
-$$;
+$;
 
 CREATE OR REPLACE FUNCTION public.school_notify_parent_behavior_approval()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -1366,9 +1365,10 @@ USING (public.school_can_mark_parent_notification_read(id))
 WITH CHECK (public.school_can_mark_parent_notification_read(id));
 
 DROP TRIGGER IF EXISTS school_attendance_notify_parent ON public.school_attendance_records;
-CREATE TRIGGER school_attendance_notify_parent
-AFTER INSERT OR UPDATE OF attendance_status ON public.school_attendance_records
-FOR EACH ROW EXECUTE FUNCTION public.school_notify_parent_attendance();
+DROP TRIGGER IF EXISTS school_attendance_session_notify_parents ON public.school_attendance_sessions;
+CREATE TRIGGER school_attendance_session_notify_parents
+AFTER UPDATE OF status ON public.school_attendance_sessions
+FOR EACH ROW EXECUTE FUNCTION public.school_notify_parents_attendance_session();
 
 DROP TRIGGER IF EXISTS school_behavior_notify_parent ON public.school_behavior_reports;
 CREATE TRIGGER school_behavior_notify_parent
@@ -1412,7 +1412,7 @@ REVOKE ALL ON FUNCTION public.school_review_assessment(uuid, boolean, text) FROM
 REVOKE ALL ON FUNCTION public.school_calculate_term_results(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_publish_term_results(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_review_behavior_report(uuid, boolean, text) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.school_notify_parent_attendance() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_notify_parents_attendance_session() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_notify_parent_behavior_approval() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_notify_parent_results_published() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_is_admin(uuid) TO authenticated;
