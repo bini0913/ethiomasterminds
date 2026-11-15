@@ -108,17 +108,17 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_is_manager(p_school_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT public._is_extreme_admin()
     OR public.is_active_school_member(p_school_id, ARRAY['manager']::text[]);
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_school_finance(p_school_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT public._is_extreme_admin()
     OR public.is_school_manager_or_admin(p_school_id)
     OR public.school_is_finance(p_school_id);
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_invoice(p_invoice_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
