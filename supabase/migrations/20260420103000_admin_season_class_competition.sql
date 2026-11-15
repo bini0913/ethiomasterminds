@@ -282,12 +282,18 @@ begin
   update public.profiles
   set coins = coalesce(coins, 0) + floor(coalesce(season_xp, 0) * v_rate)::integer,
       updated_at = now()
-  where role = 'student';
+  where exists (
+    select 1 from public.user_roles ur
+    where ur.user_id = public.profiles.id and ur.role = 'student'
+  );
 
   select coalesce(sum(floor(coalesce(season_xp, 0) * v_rate)), 0)
   into v_total_coins_credited
   from public.profiles
-  where role = 'student';
+  where exists (
+    select 1 from public.user_roles ur
+    where ur.user_id = public.profiles.id and ur.role = 'student'
+  );
 
   v_result := public.finalize_current_season(p_reason);
 
