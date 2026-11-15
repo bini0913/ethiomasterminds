@@ -743,19 +743,6 @@ CREATE POLICY school_sections_manager_update ON public.school_sections
 FOR UPDATE TO authenticated USING (public.is_school_manager_or_admin(school_id))
 WITH CHECK (public.is_school_manager_or_admin(school_id));
 
-DROP POLICY IF EXISTS school_subjects_read ON public.school_subjects;
-CREATE POLICY school_subjects_read ON public.school_subjects
-FOR SELECT TO authenticated
-USING (public.is_active_school_member(school_id, NULL) OR public._is_extreme_admin());
-
-DROP POLICY IF EXISTS school_subjects_manager_write ON public.school_subjects;
-CREATE POLICY school_subjects_manager_write ON public.school_subjects
-FOR ALL TO authenticated
-USING (public.is_school_manager_or_admin(school_id))
-WITH CHECK (public.is_school_manager_or_admin(school_id));
-
-GRANT SELECT, INSERT, UPDATE ON public.school_subjects TO authenticated;
-
 DROP POLICY IF EXISTS school_teacher_assignments_read ON public.school_teacher_assignments;
 CREATE POLICY school_teacher_assignments_read ON public.school_teacher_assignments
 FOR SELECT TO authenticated
