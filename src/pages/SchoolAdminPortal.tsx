@@ -63,7 +63,7 @@ export default function SchoolAdminPortal() {
         .select("id,student_membership_id,section_id,report_type,severity,description,status,created_at,review_note")
         .eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_announcements")
-        .select("id,title,audience_type,grade_label,section_id,status,created_at,review_feedback")
+        .select("id,title,body,audience_type,grade_label,section_id,status,created_at,review_feedback")
         .eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
     ]);
 
@@ -255,6 +255,7 @@ export default function SchoolAdminPortal() {
       <SchoolPanel title="School announcements">
         {announcements.length ? <div className="space-y-3">{announcements.map((announcement) => <div key={announcement.id} className="rounded-lg border border-slate-200 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{announcement.title}</p><p className="mt-1 text-xs capitalize text-slate-500">{announcement.audience_type}{announcement.grade_label ? ` · ${announcement.grade_label}` : ""}{announcement.section_id ? ` · ${sectionLabel(announcement.section_id)}` : ""}</p></div><SchoolStatus value={announcement.status} /></div>
+          <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{announcement.body}</p>
           {announcement.status === "pending" && <div className="mt-3 flex flex-wrap gap-2"><SchoolPrimaryButton disabled={busyId === announcement.id} onClick={() => void reviewAnnouncement(announcement.id, true)}>Publish</SchoolPrimaryButton><SchoolSecondaryButton disabled={busyId === announcement.id} onClick={() => void reviewAnnouncement(announcement.id, false)}>Reject</SchoolSecondaryButton></div>}
           {announcement.review_feedback && <p className="mt-2 text-xs text-slate-500">Feedback: {announcement.review_feedback}</p>}
         </div>)}</div> : <SchoolEmptyState title="No announcements" description="School announcements will appear here." />}
