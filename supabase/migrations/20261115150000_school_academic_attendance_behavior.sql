@@ -863,7 +863,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_notify_parent_attendance()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_date date;
 BEGIN
@@ -902,7 +902,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_validate_assessment_mutation()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 DECLARE
   v_section_grade text;
   v_term_year uuid;
@@ -959,7 +959,7 @@ BEFORE INSERT OR UPDATE ON public.school_assessments
 FOR EACH ROW EXECUTE FUNCTION public.school_validate_assessment_mutation();
 
 CREATE OR REPLACE FUNCTION public.school_validate_student_mark()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 DECLARE
   v_assessment public.school_assessments%ROWTYPE;
   v_student public.school_memberships%ROWTYPE;
@@ -1011,7 +1011,7 @@ BEFORE INSERT OR UPDATE ON public.school_student_marks
 FOR EACH ROW EXECUTE FUNCTION public.school_validate_student_mark();
 
 CREATE OR REPLACE FUNCTION public.school_validate_behavior_report()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 DECLARE
   v_student public.school_memberships%ROWTYPE;
   v_reporter public.school_memberships%ROWTYPE;
@@ -1047,7 +1047,7 @@ BEFORE INSERT OR UPDATE ON public.school_behavior_reports
 FOR EACH ROW EXECUTE FUNCTION public.school_validate_behavior_report();
 
 CREATE OR REPLACE FUNCTION public.school_validate_attendance_session()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 DECLARE
   v_recorder public.school_memberships%ROWTYPE;
 BEGIN
@@ -1071,7 +1071,7 @@ BEFORE INSERT OR UPDATE ON public.school_attendance_sessions
 FOR EACH ROW EXECUTE FUNCTION public.school_validate_attendance_session();
 
 CREATE OR REPLACE FUNCTION public.school_validate_attendance_record()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 DECLARE
   v_session public.school_attendance_sessions%ROWTYPE;
   v_student public.school_memberships%ROWTYPE;
@@ -1102,7 +1102,7 @@ BEFORE INSERT OR UPDATE ON public.school_attendance_records
 FOR EACH ROW EXECUTE FUNCTION public.school_validate_attendance_record();
 
 CREATE OR REPLACE FUNCTION public.school_protect_parent_notification()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN
   IF ROW(NEW.school_id, NEW.parent_membership_id, NEW.student_membership_id,
          NEW.notification_type, NEW.title, NEW.message, NEW.created_at)
@@ -1121,7 +1121,7 @@ BEFORE UPDATE ON public.school_parent_notifications
 FOR EACH ROW EXECUTE FUNCTION public.school_protect_parent_notification();
 
 CREATE OR REPLACE FUNCTION public.school_can_mark_parent_notification_read(p_notification_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.school_parent_notifications notification
     JOIN public.school_memberships parent ON parent.id = notification.parent_membership_id
@@ -1133,7 +1133,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
 $;
 
 CREATE OR REPLACE FUNCTION public.school_notify_parent_results_published()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF NEW.status = 'published' AND OLD.status IS DISTINCT FROM NEW.status THEN
     INSERT INTO public.school_parent_notifications(
