@@ -200,11 +200,16 @@ BEGIN
       END IF;
 
       IF v_assignment_kind = 'subject' AND NOT EXISTS (
-        SELECT 1 FROM public.school_subjects
-        WHERE school_id = p_school_id
-          AND grade_label = v_section_grade
-          AND subject_name = v_assignment_subject
-          AND active = true
+        SELECT 1
+        FROM public.school_subjects subject
+        JOIN public.school_sections section
+          ON section.school_id = subject.school_id
+         AND section.academic_year_id = subject.academic_year_id
+        WHERE section.id = v_assignment_section
+          AND subject.school_id = p_school_id
+          AND subject.grade_label = v_section_grade
+          AND subject.subject_name = v_assignment_subject
+          AND subject.active = true
       ) THEN
         RAISE EXCEPTION 'Teacher subject must be an active subject for the assigned grade';
       END IF;
