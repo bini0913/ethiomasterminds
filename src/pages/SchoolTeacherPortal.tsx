@@ -17,6 +17,7 @@ const navItems: SchoolNavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "classes", label: "My Classes", icon: Users },
   { id: "assessments", label: "Assessments & Marks", icon: ClipboardCheck },
+  { id: "attendance", label: "Homeroom Attendance", icon: CalendarCheck },
   { id: "behavior", label: "Behavior Reports", icon: MessageSquare },
   { id: "announcements", label: "Class Announcements", icon: Megaphone },
 ];
@@ -53,6 +54,11 @@ export default function SchoolTeacherPortal() {
   const [announcementSectionId, setAnnouncementSectionId] = useState("");
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementBody, setAnnouncementBody] = useState("");
+  const [attendanceSectionId, setAttendanceSectionId] = useState("");
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attendanceSession, setAttendanceSession] = useState<any | null>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [attendanceDrafts, setAttendanceDrafts] = useState<Record<string, string>>({});
   const db = supabase as any;
   const schoolId = activeSchool?.id;
   const teacherMembershipId = activeMembership?.id;
@@ -138,12 +144,45 @@ export default function SchoolTeacherPortal() {
     const nextSectionTerms = (termsRes.data ?? []).filter((term: any) => term.academic_year_id === nextSection?.academic_year_id);
     setAssessmentSectionId(nextSectionId);
     setAnnouncementSectionId((current) => sectionIds.includes(current) ? current : sectionIds[0]);
+    const homeroomSectionIds = nextAssignments.filter((item: any) => item.assignment_kind === "homeroom").map((item: any) => item.section_id);
+    setAttendanceSectionId((current) => homeroomSectionIds.includes(current) ? current : homeroomSectionIds[0] || "");
     setAssessmentTermId((current) => nextSectionTerms.some((term: any) => term.id === current) ? current : nextSectionTerms[0]?.id || "");
     setSelectedAssessmentId((current) => assessmentsRes.data?.some((item: any) => item.id === current) ? current : assessmentsRes.data?.[0]?.id || "");
     setLoading(false);
   }, [schoolId, teacherMembershipId, db]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const loadAttendanceSession = useCallback(async () => {
+    if (!schoolId || !attendanceSectionId) {
+      setAttendanceSession(null);
+      setAttendanceRecords([]);
+      setAttendanceDrafts({});
+      return;
+    }
+    const { data: session, error } = await db.from("school_attendance_sessions")
+      .select("id,section_id,attendance_date,status,submitted_at")
+      .eq("school_id", schoolId).eq("section_id", attendanceSectionId)
+      .eq("attendance_date", attendanceDate).maybeSingle();
+    if (error) return toast.error(error.message || "Could not load attendance session.");
+    setAttendanceSession(session ?? null);
+    if (session) {
+      const { data, error: recordsError } = await db.from("school_attendance_records")
+        .select("id,student_membership_id,attendance_status,note")
+        .eq("school_id", schoolId).eq("session_id", session.id);
+      if (recordsError) return toast.error(recordsError.message || "Could not load attendance records.");
+      const rows = data ?? [];
+      setAttendanceRecords(rows);
+      setAttendanceDrafts(Object.fromEntries(rows.map((record: any) => [record.student_membership_id, record.attendance_status])));
+    } else {
+      setAttendanceRecords([]);
+      setAttendanceDrafts(Object.fromEntries(students.filter((student) => student.section_id === attendanceSectionId).map((student) => [student.id, "present"])));
+    }
+  }, [schoolId, attendanceSectionId, attendanceDate, students, db]);
+
+  useEffect(() => {
+    if (page === "attendance") void loadAttendanceSession();
+  }, [page, loadAttendanceSession]);
 
   const activeSections = useMemo(() => sections.filter((section) => assignments.some((assignment) => assignment.section_id === section.id)), [sections, assignments]);
   const subjectAssignments = assignments.filter((item) => item.assignment_kind === "subject");
@@ -218,6 +257,67 @@ export default function SchoolTeacherPortal() {
     if (error) return toast.error(error.message || "Assessment could not be submitted.");
     toast.success("Assessment and marks submitted to the School Admin.");
     await load();
+  };
+
+  const saveAttendance = async () => {
+    if (!schoolId || !teacherMembershipId || !attendanceSectionId) return null;
+    const sectionStudents = students.filter((student) => student.section_id === attendanceSectionId);
+    if (!sectionStudents.length) {
+      toast.error("There are no enrolled students in this homeroom section.");
+      return null;
+    }
+    setBusy(true);
+    let session = attendanceSession;
+    if (!session) {
+      const { data, error } = await db.from("school_attendance_sessions").insert({
+        school_id: schoolId, section_id: attendanceSectionId, attendance_date: attendanceDate,
+        recorded_by_membership_id: teacherMembershipId, status: "open",
+      }).select("id,section_id,attendance_date,status,submitted_at").single();
+      if (error || !data) {
+        setBusy(false);
+        toast.error(error?.message || "Attendance session could not be created.");
+        return null;
+      }
+      session = data;
+      setAttendanceSession(data);
+    }
+    if (session.status !== "open") {
+      setBusy(false);
+      toast.error("This attendance session has already been submitted and is locked.");
+      return null;
+    }
+    for (const student of sectionStudents) {
+      const attendanceStatus = attendanceDrafts[student.id] || "present";
+      const existing = attendanceRecords.find((record) => record.student_membership_id === student.id);
+      const result = existing
+        ? await db.from("school_attendance_records").update({ attendance_status: attendanceStatus }).eq("id", existing.id)
+        : await db.from("school_attendance_records").insert({
+            school_id: schoolId, session_id: session.id, student_membership_id: student.id,
+            attendance_status: attendanceStatus, recorded_by_membership_id: teacherMembershipId,
+          });
+      if (result.error) {
+        setBusy(false);
+        toast.error(result.error.message || "An attendance record could not be saved.");
+        return null;
+      }
+    }
+    setBusy(false);
+    await loadAttendanceSession();
+    toast.success("Attendance saved.");
+    return session.id as string;
+  };
+
+  const submitAttendance = async () => {
+    const sessionId = await saveAttendance();
+    if (!sessionId) return;
+    setBusy(true);
+    const { error } = await db.from("school_attendance_sessions")
+      .update({ status: "submitted", submitted_at: new Date().toISOString() })
+      .eq("id", sessionId).eq("status", "open");
+    setBusy(false);
+    if (error) return toast.error(error.message || "Attendance could not be submitted.");
+    toast.success("Attendance submitted. Linked parents will be notified.");
+    await loadAttendanceSession();
   };
 
   const createBehaviorReport = async (event: React.FormEvent) => {
@@ -312,6 +412,29 @@ export default function SchoolTeacherPortal() {
     </div>;
   };
 
+  const renderAttendance = () => {
+    const homeroomSections = activeSections.filter((section) => homeroomAssignments.some((assignment) => assignment.section_id === section.id));
+    const sectionStudents = students.filter((student) => student.section_id === attendanceSectionId);
+    const locked = attendanceSession && attendanceSession.status !== "open";
+    return <div className="space-y-4">
+      <SchoolPageHeading title="Homeroom attendance" description="Record daily attendance for your assigned homeroom section. Parents are notified after submission." />
+      <SchoolPanel title="Attendance session">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SchoolField label="Homeroom section"><select className={schoolSelectClass} value={attendanceSectionId} onChange={(event) => setAttendanceSectionId(event.target.value)}><option value="">Choose section</option>{homeroomSections.map((section) => <option key={section.id} value={section.id}>{sectionLabel(section.id)}</option>)}</select></SchoolField>
+          <SchoolField label="Attendance date"><input type="date" className={schoolInputClass} value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} /></SchoolField>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">{attendanceSession ? <SchoolStatus value={attendanceSession.status} /> : <span className="text-xs text-slate-500">No session created for this date yet</span>}<SchoolSecondaryButton onClick={() => void loadAttendanceSession()}><RefreshCw className="mr-2 h-4 w-4" />Reload</SchoolSecondaryButton></div>
+      </SchoolPanel>
+      <SchoolPanel title="Student attendance" description="Every student starts as Present. Change individual statuses before saving or submitting.">
+        {sectionStudents.length ? <>
+          <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Attendance status</th></tr></thead><tbody className="divide-y divide-slate-100">{sectionStudents.map((student) => <tr key={student.id}><td className="py-2.5 font-medium text-slate-800">{studentName(student)}</td><td className="py-2.5"><select disabled={Boolean(locked)} className="h-9 w-40 rounded-md border border-slate-200 bg-white px-2 text-sm disabled:bg-slate-100" value={attendanceDrafts[student.id] || "present"} onChange={(event) => setAttendanceDrafts((current) => ({ ...current, [student.id]: event.target.value }))}><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></td></tr>)}</tbody></table></div>
+          {!locked && <div className="mt-4 flex flex-wrap gap-2"><SchoolPrimaryButton disabled={busy} onClick={() => void saveAttendance()}>Save attendance</SchoolPrimaryButton><SchoolSecondaryButton disabled={busy} onClick={() => void submitAttendance()}>Submit and notify parents</SchoolSecondaryButton></div>}
+          {locked && <p className="mt-3 text-sm text-slate-600">This session is submitted. Attendance is locked and parent notifications have been sent.</p>}
+        </> : <SchoolEmptyState title="No students in this section" description="Students will appear after enrollment is completed." />}
+      </SchoolPanel>
+    </div>;
+  };
+
   const renderBehavior = () => (
     <div className="space-y-4">
       <SchoolPageHeading title="Behavior reports" description="Submit a positive note or concern for a student in one of your assigned sections." />
@@ -351,9 +474,12 @@ export default function SchoolTeacherPortal() {
     overview: renderOverview,
     classes: renderClasses,
     assessments: renderAssessments,
+    attendance: renderAttendance,
     behavior: renderBehavior,
     announcements: renderAnnouncements,
   } as Record<string, () => React.ReactNode>)[page]?.() ?? renderOverview();
 
-  return <SchoolPortalShell role="teacher" title="Teacher Portal" navItems={navItems} activeItem={page} onNavigate={setPage} headerActions={<span className="hidden text-xs font-medium text-slate-500 sm:inline">{loading ? "Updating…" : `${students.length} assigned students`}</span>}>{content}</SchoolPortalShell>;
+  const visibleNavItems = homeroomAssignments.length ? navItems : navItems.filter((item) => item.id !== "attendance");
+
+  return <SchoolPortalShell role="teacher" title="Teacher Portal" navItems={visibleNavItems} activeItem={page} onNavigate={setPage} headerActions={<span className="hidden text-xs font-medium text-slate-500 sm:inline">{loading ? "Updating…" : `${students.length} assigned students`}</span>}>{content}</SchoolPortalShell>;
 }
