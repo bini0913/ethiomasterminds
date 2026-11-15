@@ -177,7 +177,7 @@ export default function SchoolAdminPortal() {
             <div key={grade} className="flex items-center gap-3">
               <span className="w-28 shrink-0 text-sm font-medium text-slate-700">{grade}</span>
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, Number(count) / Math.max(1, students.length) * 100)}%` }} /></div>
-              <span className="w-8 text-right text-sm tabular-nums text-slate-600">{count}</span>
+              <span className="w-8 text-right text-sm tabular-nums text-slate-600">{Number(count)}</span>
             </div>
           ))}</div> : <SchoolEmptyState title="No enrolled students" description="Student enrollment totals appear here after school accounts are created." />}
         </SchoolPanel>
