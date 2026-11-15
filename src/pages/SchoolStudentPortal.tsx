@@ -214,7 +214,24 @@ export default function SchoolStudentPortal() {
   const renderBehavior = () => (
     <div className="space-y-5">
       <SchoolPageHeading title="My behavior record" description="Reviewed and approved reports from your teachers and homeroom teacher." />
-      {behaviorReports.length ? <SchoolPanel title="Approved reports"><div className="space-y-3">{behaviorReports.map((report) => <div key={report.id} className="rounded-lg border border-slate-200 p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold capitalize text-slate-800">{report.report_type.replace(/_/g, " ")}</p><SchoolStatus value={report.severity} /></div><p className="mt-2 text-sm text-slate-700">{report.description}</p>{report.review_note && <p className="mt-2 text-xs text-slate-600">School note: {report.review_note}</p></div>)}</div></SchoolPanel> : <SchoolEmptyState title="No approved behavior reports" description="Reviewed reports will appear here." />}
+      {behaviorReports.length > 0 ? (
+        <SchoolPanel title="Approved reports">
+          <div className="space-y-3">
+            {behaviorReports.map((report) => (
+              <div key={report.id} className="rounded-lg border border-slate-200 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold capitalize text-slate-800">{report.report_type.replace(/_/g, " ")}</p>
+                  <SchoolStatus value={report.severity} />
+                </div>
+                <p className="mt-2 text-sm text-slate-700">{report.description}</p>
+                {report.review_note && <p className="mt-2 text-xs text-slate-600">School note: {report.review_note}</p>}
+              </div>
+            ))}
+          </div>
+        </SchoolPanel>
+      ) : (
+        <SchoolEmptyState title="No approved behavior reports" description="Reviewed reports will appear here." />
+      )}
     </div>
   );
 
