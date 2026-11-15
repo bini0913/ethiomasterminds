@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS public.school_fee_structures (
   grade_label text NOT NULL,
   fee_name text NOT NULL,
   description text,
-  amount numeric(12,2) NOT NULL CHECK (amount >= 0),
+  amount numeric(12,2) NOT NULL CHECK (amount > 0),
   currency text NOT NULL DEFAULT 'ETB' CHECK (currency ~ '^[A-Z]{3}$'),
   due_date date,
   is_mandatory boolean NOT NULL DEFAULT true,
@@ -106,6 +106,19 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
   SELECT public._is_extreme_admin()
     OR public.is_active_school_member(p_school_id, ARRAY['finance']::text[]);
 $$;
+
+CREATE OR REPLACE FUNCTION public.school_is_manager(p_school_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT public._is_extreme_admin()
+    OR public.is_active_school_member(p_school_id, ARRAY['manager']::text[]);
+$;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_school_finance(p_school_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT public._is_extreme_admin()
+    OR public.is_school_manager_or_admin(p_school_id)
+    OR public.school_is_finance(p_school_id);
+$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_invoice(p_invoice_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -261,7 +274,7 @@ BEGIN
   IF p_amount IS NULL OR p_amount <= 0 OR p_amount > v_invoice.balance THEN
     RAISE EXCEPTION 'Payment amount must be greater than zero and no more than the outstanding balance';
   END IF;
-  IF p_payment_method NOT IN ('cash', 'bank_transfer', 'mobile_money', 'other') THEN
+  IF p_payment_method IS NULL OR p_payment_method NOT IN ('cash', 'bank_transfer', 'mobile_money', 'other') THEN
     RAISE EXCEPTION 'Unsupported payment method';
   END IF;
 
@@ -298,28 +311,6 @@ BEGIN
   SET status = 'reversed', reversal_reason = trim(p_reason)
   WHERE id = p_payment_id;
   RETURN true;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.school_recalculate_invoice_from_payments()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE
-  v_invoice_id uuid := coalesce(NEW.invoice_id, OLD.invoice_id);
-  v_paid numeric(12,2);
-BEGIN
-  SELECT coalesce(sum(amount), 0) INTO v_paid
-  FROM public.school_fee_payments
-  WHERE invoice_id = v_invoice_id AND status = 'confirmed';
-
-  UPDATE public.school_student_invoices
-  SET paid_amount = v_paid,
-      balance = amount - v_paid,
-      status = CASE WHEN v_paid = amount THEN 'paid'
-                    WHEN v_paid > 0 THEN 'partial'
-                    ELSE 'unpaid' END,
-      updated_at = now()
-  WHERE id = v_invoice_id;
-  RETURN coalesce(NEW, OLD);
 END;
 $$;
 
@@ -451,9 +442,9 @@ REVOKE ALL ON public.school_invoice_sequences, public.school_receipt_sequences F
 
 CREATE POLICY school_fee_structures_read ON public.school_fee_structures
 FOR SELECT TO authenticated
-USING (public.is_active_school_member(school_id, NULL) OR public._is_extreme_admin());
+USING (public.school_can_view_school_finance(school_id));
 CREATE POLICY school_fee_structures_manager_insert ON public.school_fee_structures
-FOR INSERT TO authenticated WITH CHECK (public.is_school_manager(school_id));
+FOR INSERT TO authenticated WITH CHECK (public.school_is_manager(school_id));
 CREATE POLICY school_fee_structures_manager_update ON public.school_fee_structures
 FOR UPDATE TO authenticated USING (public.is_school_manager(school_id))
 WITH CHECK (public.is_school_manager(school_id));
@@ -476,6 +467,11 @@ GRANT SELECT, INSERT, UPDATE ON public.school_fee_structures TO authenticated;
 GRANT SELECT ON public.school_student_invoices TO authenticated;
 GRANT SELECT ON public.school_fee_payments TO authenticated;
 GRANT SELECT ON public.school_finance_audit_events TO authenticated;
+
+DROP TRIGGER IF EXISTS school_invoice_ledger_protect ON public.school_student_invoices;
+CREATE TRIGGER school_invoice_ledger_protect
+BEFORE UPDATE ON public.school_student_invoices
+FOR EACH ROW EXECUTE FUNCTION public.school_protect_invoice_ledger_fields();
 
 DROP TRIGGER IF EXISTS school_fee_payment_recalculate_invoice ON public.school_fee_payments;
 CREATE TRIGGER school_fee_payment_recalculate_invoice
@@ -515,12 +511,16 @@ REVOKE ALL ON FUNCTION public.school_next_receipt_number(uuid) FROM PUBLIC, anon
 REVOKE ALL ON FUNCTION public.school_generate_student_invoices(uuid, uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_record_fee_payment(uuid, numeric, text, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_reverse_fee_payment(uuid, text) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.school_recalculate_invoice_from_payments() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.school_recalculate_invoice_guarded() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.school_protect_invoice_ledger_fields() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.school_is_manager(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_can_view_school_finance(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_notify_parent_invoice_created() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.school_notify_parent_payment_recorded() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.school_record_finance_audit() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.school_is_finance(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.school_is_manager(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.school_can_view_school_finance(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_view_invoice(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_view_payment(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_generate_student_invoices(uuid, uuid) TO authenticated;
