@@ -335,19 +335,14 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.school_assessments assessment
     WHERE assessment.id = p_assessment_id
-      AND (
-        public.school_is_admin(assessment.school_id)
-        OR (
-          assessment.status IN ('draft', 'rejected')
-          AND EXISTS (
-            SELECT 1 FROM public.school_memberships creator
-            WHERE creator.id = assessment.created_by_membership_id
-              AND creator.user_id = auth.uid()
-              AND creator.school_role = 'teacher'
-              AND creator.status = 'active'
-              AND public.school_can_teach_subject(assessment.school_id, assessment.section_id, assessment.subject_name)
-          )
-        )
+      AND assessment.status IN ('draft', 'rejected')
+      AND EXISTS (
+        SELECT 1 FROM public.school_memberships creator
+        WHERE creator.id = assessment.created_by_membership_id
+          AND creator.user_id = auth.uid()
+          AND creator.school_role = 'teacher'
+          AND creator.status = 'active'
+          AND public.school_can_teach_subject(assessment.school_id, assessment.section_id, assessment.subject_name)
       )
   );
 $$;
@@ -393,6 +388,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         OR (
           mark.status = 'approved'
           AND student.user_id = auth.uid()
+          AND student.status IN ('active', 'suspended')
           AND EXISTS (
             SELECT 1 FROM public.school_term_results result
             WHERE result.term_id = assessment.term_id
@@ -1016,6 +1012,14 @@ BEGIN
   IF NEW.score > v_assessment.max_score THEN
     RAISE EXCEPTION 'Score cannot exceed the assessment maximum';
   END IF;
+  IF TG_OP = 'INSERT' AND v_assessment.status NOT IN ('draft', 'rejected') THEN
+    RAISE EXCEPTION 'Marks can only be entered before assessment submission';
+  END IF;
+  IF TG_OP = 'UPDATE'
+     AND v_transition = ''
+     AND v_assessment.status NOT IN ('draft', 'rejected') THEN
+    RAISE EXCEPTION 'Submitted or approved marks cannot be edited';
+  END IF;
   IF TG_OP = 'INSERT' THEN
     IF v_enterer.user_id <> auth.uid() OR NEW.status <> 'draft' THEN
       RAISE EXCEPTION 'New marks must be entered by the signed-in teacher in draft status';
@@ -1258,17 +1262,14 @@ FOR SELECT TO authenticated USING (public.school_can_view_assessment(id));
 CREATE POLICY school_assessments_insert ON public.school_assessments
 FOR INSERT TO authenticated
 WITH CHECK (
-  public.school_is_admin(school_id)
-  OR (
-    EXISTS (
-      SELECT 1 FROM public.school_memberships teacher
-      WHERE teacher.id = created_by_membership_id
-        AND teacher.user_id = auth.uid()
-        AND teacher.school_role = 'teacher'
-        AND teacher.status = 'active'
-    )
-    AND public.school_can_teach_subject(school_id, section_id, subject_name)
+  EXISTS (
+    SELECT 1 FROM public.school_memberships teacher
+    WHERE teacher.id = created_by_membership_id
+      AND teacher.user_id = auth.uid()
+      AND teacher.school_role = 'teacher'
+      AND teacher.status = 'active'
   )
+  AND public.school_can_teach_subject(school_id, section_id, subject_name)
 );
 CREATE POLICY school_assessments_update ON public.school_assessments
 FOR UPDATE TO authenticated
