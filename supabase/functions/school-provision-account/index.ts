@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
     const uniqueStaffUsername = async (prefix = "u") => {
       for (let attempt = 0; attempt < 12; attempt++) {
         const candidate = (prefix + randomDigits(10)).toLowerCase();
-        const { data, error } = await admin.from("profiles").select("id").eq("username", candidate).maybeSingle();
+        const { data, error } = await admin.from("profiles").select("id").ilike("username", candidate).maybeSingle();
         if (error) throw new Error("Could not check username availability");
         if (!data) return candidate;
       }
@@ -210,13 +210,27 @@ Deno.serve(async (req) => {
             if (!grade || !Number.isInteger(age) || age < 3 || age > 120 || !sectionId) {
               throw new Error("Student name, grade, age, and section are required");
             }
-            const { data: number, error: numberError } = await userClient.rpc("school_next_student_number", {
-              p_school_id: schoolId,
-              p_grade_label: grade,
-            });
-            if (numberError || !number) throw new Error("Could not allocate a student ID");
-            studentNumber = Number(number);
-            username = `${school.school_code.toLowerCase()}/${studentNumber}/${age}`;
+            for (let attempt = 0; attempt < 12; attempt++) {
+              const { data: number, error: numberError } = await userClient.rpc("school_next_student_number", {
+                p_school_id: schoolId,
+                p_grade_label: grade,
+              });
+              if (numberError || !number) throw new Error("Could not allocate a student ID");
+              const candidateNumber = Number(number);
+              const candidateUsername = `${school.school_code.toLowerCase()}/${candidateNumber}/${age}`;
+              const { data: existingProfile, error: usernameError } = await admin
+                .from("profiles")
+                .select("id")
+                .ilike("username", candidateUsername)
+                .maybeSingle();
+              if (usernameError) throw new Error("Could not verify student username availability");
+              if (!existingProfile) {
+                studentNumber = candidateNumber;
+                username = candidateUsername;
+                break;
+              }
+            }
+            if (!username || !studentNumber) throw new Error("Could not generate a unique student username");
           } else if (role === "parent") {
             username = await uniqueStaffUsername("pa");
           } else {
