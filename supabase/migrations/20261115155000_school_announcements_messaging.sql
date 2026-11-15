@@ -63,7 +63,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.school_is_assigned_to_section(
   p_school_id uuid, p_section_id uuid
 )
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1
     FROM public.school_memberships teacher
@@ -76,7 +76,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND teacher.status = 'active'
       AND assignment.section_id = p_section_id
   );
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_announcement(p_announcement_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -264,7 +264,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_notify_parents_announcement()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_just_published boolean := false;
 BEGIN
