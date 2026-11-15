@@ -40,8 +40,9 @@ export const getNextRankTier = (level: number): RankTierConfig | null => {
   return currentIndex >= 0 && currentIndex < RANK_TIERS.length - 1 ? RANK_TIERS[currentIndex + 1] : null;
 };
 
-export const getXpProgressInLevel = (xp: number, perLevel = 220) => {
-  const safePerLevel = Number.isFinite(perLevel) && perLevel > 0 ? perLevel : 220;
+export const getXpProgressInLevel = (xp: number, perLevel = 100) => {
+  // Keep this threshold aligned with server progression RPCs, which calculate level as floor(total_xp / 100) + 1.
+  const safePerLevel = Number.isFinite(perLevel) && perLevel > 0 ? perLevel : 100;
   const safeXp = Number.isFinite(xp) ? Math.max(0, xp) : 0;
   const progressInLevel = safeXp % safePerLevel;
   return {
