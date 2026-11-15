@@ -69,8 +69,10 @@ export default function SchoolTeacherPortal() {
   const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [behaviorReports, setBehaviorReports] = useState<any[]>([]);
+  const [behaviorReviewNotes, setBehaviorReviewNotes] = useState<Record<string, string>>({});
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [books, setBooks] = useState<any[]>([]);
+  const [bookUploads, setBookUploads] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState("");
@@ -137,7 +139,7 @@ export default function SchoolTeacherPortal() {
     const [
       assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes,
       membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes,
-      behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes,
+      behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes,
     ] = await Promise.all([
       db.from("school_teacher_assignments").select("id,section_id,subject_name,assignment_kind").eq("school_id", schoolId).eq("teacher_membership_id", activeMembership.id),
       db.from("school_sections").select("id,academic_year_id,grade_label,section_name,homeroom_teacher_id").eq("school_id", schoolId),
@@ -148,14 +150,15 @@ export default function SchoolTeacherPortal() {
       db.from("school_assessments").select("id,title,section_id,subject_name,term_id,category_id,max_score,status,review_feedback,created_at").eq("school_id", schoolId).eq("created_by_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("school_student_marks").select("id,assessment_id,student_membership_id,score,status,teacher_note").eq("school_id", schoolId).eq("entered_by_membership_id", activeMembership.id),
       db.from("school_homework_assignments").select("id,title,section_id,subject_name,due_at,status,review_feedback,created_at").eq("school_id", schoolId).eq("teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
-      db.from("school_attendance_sessions").select("id,section_id,attendance_date,status,submitted_at").eq("school_id", schoolId).eq("recorded_by_membership_id", activeMembership.id).order("attendance_date", { ascending: false }).limit(60),
-      db.from("school_behavior_reports").select("id,student_membership_id,section_id,report_type,severity,description,status,created_at").eq("school_id", schoolId).eq("reported_by_membership_id", activeMembership.id).order("created_at", { ascending: false }).limit(100),
-      db.from("quizzes").select("id,title,subject,grade,school_section_id,school_review_status,created_at").eq("school_id", schoolId).eq("school_teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
+      db.from("school_attendance_sessions").select("id,section_id,attendance_date,recorded_by_membership_id,status,submitted_at").eq("school_id", schoolId).order("attendance_date", { ascending: false }).limit(60),
+      db.from("school_behavior_reports").select("id,student_membership_id,section_id,reported_by_membership_id,report_type,severity,description,status,review_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+      db.from("quizzes").select("id,title,subject,grade,school_section_id,school_review_status,school_review_feedback,created_at").eq("school_id", schoolId).eq("school_teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("library_books").select("id,title,subject,grade,school_section_id,school_review_status,status,pdf_path").eq("school_id", schoolId).eq("uploader_id", user?.id),
       db.from("school_staff_tasks").select("id,title,description,status,due_date,priority,task_type,response,assigned_by_membership_id").eq("school_id", schoolId).eq("assigned_to_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("school_conversations").select("id,conversation_type,section_id,student_membership_id,subject_name,last_message_at").eq("school_id", schoolId).order("last_message_at", { ascending: false }).limit(100),
+      db.from("book_uploads").select("book_id,moderation_note,status").eq("uploader_id", user?.id || ""),
     ]);
-    const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes].find((result) => result.error)?.error;
+    const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes].find((result) => result.error)?.error;
     if (error) {
       toast.error(error.message || "Teacher workspace could not be loaded.");
       setLoading(false);
@@ -174,6 +177,7 @@ export default function SchoolTeacherPortal() {
     setBehaviorReports(behaviorRes.data ?? []);
     setQuizzes(quizzesRes.data ?? []);
     setBooks(booksRes.data ?? []);
+    setBookUploads(bookUploadsRes.data ?? []);
     setTasks(tasksRes.data ?? []);
     setConversations(conversationsRes.data ?? []);
     if (!assessmentTermId && termsRes.data?.length) setAssessmentTermId(termsRes.data[0].id);
@@ -206,6 +210,30 @@ export default function SchoolTeacherPortal() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    setMarkValues({});
+    setMarkNotes({});
+  }, [selectedAssessmentId]);
+
+  useEffect(() => {
+    if (!attendanceSectionId || !attendanceDate) {
+      setAttendanceValues({});
+      setAttendanceNotes({});
+      return;
+    }
+    const existingSession = attendanceSessions.find(
+      (session) => session.section_id === attendanceSectionId && session.attendance_date === attendanceDate
+    );
+    if (!existingSession) {
+      setAttendanceValues({});
+      setAttendanceNotes({});
+      return;
+    }
+    const existingRecords = attendanceRecords.filter((record) => record.session_id === existingSession.id);
+    setAttendanceValues(Object.fromEntries(existingRecords.map((record) => [record.student_membership_id, record.attendance_status])));
+    setAttendanceNotes(Object.fromEntries(existingRecords.map((record) => [record.student_membership_id, record.note || ""])));
+  }, [attendanceSectionId, attendanceDate, attendanceSessions, attendanceRecords]);
+
   const assignedSectionIds = useMemo(() => [...new Set(assignments.map((assignment) => assignment.section_id))], [assignments]);
   const assignedSections = sections.filter((section) => assignedSectionIds.includes(section.id));
   const homeroomSectionIds = useMemo(() => [...new Set(assignments.filter((assignment) => assignment.assignment_kind === "homeroom").map((assignment) => assignment.section_id))], [assignments]);
@@ -228,6 +256,7 @@ export default function SchoolTeacherPortal() {
   const pendingAssessmentCount = assessments.filter((item) => ["draft", "rejected"].includes(item.status)).length;
   const pendingHomeworkCount = homework.filter((item) => ["draft", "rejected", "pending"].includes(item.status)).length;
   const pendingQuizCount = quizzes.filter((item) => ["draft", "rejected", "pending"].includes(item.school_review_status)).length;
+  const behaviorReportsForReview = behaviorReports.filter((report) => report.status === "pending" && homeroomSectionIds.includes(report.section_id));
 
   const createAssessment = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -371,11 +400,12 @@ export default function SchoolTeacherPortal() {
     const students = assignedStudents.filter((student) => student.section_id === section.id);
     if (!students.length) return toast.error("No active students are enrolled in this section.");
     const { data: existingSession, error: existingError } = await db.from("school_attendance_sessions")
-      .select("id,status")
+      .select("id,status,recorded_by_membership_id")
       .eq("school_id", schoolId).eq("section_id", section.id).eq("attendance_date", attendanceDate)
       .maybeSingle();
     if (existingError) return toast.error(existingError.message);
     if (existingSession && existingSession.status !== "open") return toast.error("Attendance has already been submitted or locked for this section and date.");
+    if (existingSession && existingSession.recorded_by_membership_id !== activeMembership?.id) return toast.error("This open attendance session was started by another homeroom teacher. Ask them to finish it before making changes.");
     let sessionId = existingSession?.id;
     if (!sessionId) {
       const { data: sessionRow, error: sessionError } = await db.from("school_attendance_sessions").insert({
@@ -387,6 +417,7 @@ export default function SchoolTeacherPortal() {
     }
     const rows = students.map((student) => ({
       school_id: schoolId, session_id: sessionId, student_membership_id: student.id,
+      recorded_by_membership_id: activeMembership?.id,
       attendance_status: attendanceValues[student.id] || "present",
       note: attendanceNotes[student.id] || null,
     }));
@@ -411,6 +442,18 @@ export default function SchoolTeacherPortal() {
     if (error) return toast.error(error.message);
     setBehaviorDescription("");
     toast.success("Behavior report submitted to the homeroom teacher for review.");
+    await load();
+  };
+
+  const reviewBehaviorReport = async (report: any, approve: boolean) => {
+    const { error } = await db.rpc("school_review_behavior_report", {
+      p_report_id: report.id,
+      p_approve: approve,
+      p_review_note: behaviorReviewNotes[report.id]?.trim() || null,
+    });
+    if (error) return toast.error(error.message);
+    setBehaviorReviewNotes((current) => ({ ...current, [report.id]: "" }));
+    toast.success(approve ? "Behavior report approved and added to the student record." : "Behavior report rejected.");
     await load();
   };
 
@@ -523,9 +566,9 @@ export default function SchoolTeacherPortal() {
       <SchoolPanel title="Create assessment">
         <form onSubmit={createAssessment} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SchoolField label="Assessment title"><input className={schoolInputClass} value={assessmentTitle} onChange={(event) => setAssessmentTitle(event.target.value)} placeholder="Chapter 1 test" /></SchoolField>
-          <SchoolField label="Assigned section"><select className={schoolSelectClass} value={assessmentSectionId} onChange={(event) => setAssessmentSectionId(event.target.value)}><option value="">Choose section</option>{assignedSections.map((section) => <option key={section.id} value={section.id}>{sectionLabel(section.id)}</option>)}</select></SchoolField>
+          <SchoolField label="Assigned section"><select className={schoolSelectClass} value={assessmentSectionId} onChange={(event) => { const nextSectionId = event.target.value; const nextSection = sections.find((section) => section.id === nextSectionId); setAssessmentSectionId(nextSectionId); setAssessmentSubject(""); setAssessmentCategoryId(""); setAssessmentTermId(terms.find((term) => term.academic_year_id === nextSection?.academic_year_id)?.id || ""); }}><option value="">Choose section</option>{assignedSections.map((section) => <option key={section.id} value={section.id}>{sectionLabel(section.id)}</option>)}</select></SchoolField>
           <SchoolField label="Assigned subject"><select className={schoolSelectClass} value={assessmentSubject} onChange={(event) => setAssessmentSubject(event.target.value)}><option value="">Choose subject</option>{assignmentsForSection(assessmentSectionId).filter((assignment) => assignment.assignment_kind === "subject").map((assignment) => <option key={assignment.id} value={assignment.subject_name}>{assignment.subject_name}</option>)}</select></SchoolField>
-          <SchoolField label="Term"><select className={schoolSelectClass} value={assessmentTermId} onChange={(event) => setAssessmentTermId(event.target.value)}><option value="">Choose term</option>{terms.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}</select></SchoolField>
+          <SchoolField label="Term"><select className={schoolSelectClass} value={assessmentTermId} onChange={(event) => setAssessmentTermId(event.target.value)}><option value="">Choose term</option>{terms.filter((term) => term.academic_year_id === sections.find((section) => section.id === assessmentSectionId)?.academic_year_id).map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}</select></SchoolField>
           <SchoolField label="Assessment category"><select className={schoolSelectClass} value={assessmentCategoryId} onChange={(event) => setAssessmentCategoryId(event.target.value)}><option value="">Choose category</option>{categories.filter((category) => category.grade_label === sections.find((section) => section.id === assessmentSectionId)?.grade_label && category.academic_year_id === sections.find((section) => section.id === assessmentSectionId)?.academic_year_id).map((category) => <option key={category.id} value={category.id}>{category.category_name} · {category.weight_percent}%</option>)}</select></SchoolField>
           <SchoolField label="Maximum score"><input type="number" min="1" step="0.5" className={schoolInputClass} value={assessmentMaxScore} onChange={(event) => setAssessmentMaxScore(event.target.value)} /></SchoolField>
           <SchoolField label="Due date"><input type="datetime-local" className={schoolInputClass} value={assessmentDueAt} onChange={(event) => setAssessmentDueAt(event.target.value)} /></SchoolField>
@@ -535,12 +578,12 @@ export default function SchoolTeacherPortal() {
       </SchoolPanel>
       <SchoolPanel title="Enter student marks" description="Choose one of your draft or rejected assessments, enter scores, and save.">
         <div className="mb-4 max-w-md"><SchoolField label="Assessment"><select className={schoolSelectClass} value={selectedAssessmentId} onChange={(event) => setSelectedAssessmentId(event.target.value)}><option value="">Choose assessment</option>{assessments.filter((item) => ["draft", "rejected"].includes(item.status)).map((item) => <option key={item.id} value={item.id}>{item.title} · {sectionLabel(item.section_id)}</option>)}</select></SchoolField></div>
-        {selectedAssessmentId ? <div className="space-y-3">{assignedStudents.filter((student) => student.section_id === assessments.find((item) => item.id === selectedAssessmentId)?.section_id).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)] sm:items-center"><div><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><p className="text-xs text-slate-500">{student.school_username}</p></div><SchoolField label="Score"><input type="number" min="0" max={assessments.find((item) => item.id === selectedAssessmentId)?.max_score || 100} step="0.5" className={schoolInputClass} value={markValues[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.score ?? ""} onChange={(event) => setMarkValues((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField><SchoolField label="Teacher note"><input className={schoolInputClass} value={markNotes[student.id] ?? ""} onChange={(event) => setMarkNotes((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField></div>)}
+        {selectedAssessmentId ? <div className="space-y-3">{assignedStudents.filter((student) => student.section_id === assessments.find((item) => item.id === selectedAssessmentId)?.section_id).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)] sm:items-center"><div><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><p className="text-xs text-slate-500">{student.school_username}</p></div><SchoolField label="Score"><input type="number" min="0" max={assessments.find((item) => item.id === selectedAssessmentId)?.max_score || 100} step="0.5" className={schoolInputClass} value={markValues[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.score ?? ""} onChange={(event) => setMarkValues((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField><SchoolField label="Teacher note"><input className={schoolInputClass} value={markNotes[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.teacher_note ?? ""} onChange={(event) => setMarkNotes((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField></div>)}
           <div className="flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void saveMarks()}>Save draft marks</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void submitAssessment()}>Submit for Admin review</SchoolSecondaryButton></div>
         </div> : <SchoolEmptyState title="Choose an assessment" description="Student mark entry will appear after you select a draft or rejected assessment." />}
       </SchoolPanel>
       <SchoolPanel title="Your assessment records">
-        {assessments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Marks</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{assessments.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800">{item.title}</td><td className="py-3 text-slate-600">{sectionLabel(item.section_id)}</td><td className="py-3 text-slate-600">{item.subject_name}</td><td className="py-3 tabular-nums text-slate-600">{marks.filter((mark) => mark.assessment_id === item.id).length}</td><td className="py-3"><SchoolStatus value={item.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No assessments yet" description="Create your first assessment above." />}
+        {assessments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Marks</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{assessments.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800"><p>{item.title}</p>{item.review_feedback && <p className="mt-1 text-xs font-normal text-amber-700">Admin feedback: {item.review_feedback}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(item.section_id)}</td><td className="py-3 text-slate-600">{item.subject_name}</td><td className="py-3 tabular-nums text-slate-600">{marks.filter((mark) => mark.assessment_id === item.id).length}</td><td className="py-3"><SchoolStatus value={item.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No assessments yet" description="Create your first assessment above." />}
       </SchoolPanel>
     </div>
   );
@@ -577,7 +620,7 @@ export default function SchoolTeacherPortal() {
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your submitted quizzes">
-        {quizzes.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Quiz</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{quizzes.map((quiz) => <tr key={quiz.id}><td className="py-3 font-medium text-slate-800">{quiz.title}</td><td className="py-3 text-slate-600">{sectionLabel(quiz.school_section_id)}</td><td className="py-3 text-slate-600">{quiz.subject}</td><td className="py-3"><SchoolStatus value={quiz.school_review_status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No quizzes created" description="Create a quiz for one of your assigned subjects." />}
+        {quizzes.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Quiz</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{quizzes.map((quiz) => <tr key={quiz.id}><td className="py-3 font-medium text-slate-800"><p>{quiz.title}</p>{quiz.school_review_feedback && <p className="mt-1 text-xs font-normal text-amber-700">Admin feedback: {quiz.school_review_feedback}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(quiz.school_section_id)}</td><td className="py-3 text-slate-600">{quiz.subject}</td><td className="py-3"><SchoolStatus value={quiz.school_review_status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No quizzes created" description="Create a quiz for one of your assigned subjects." />}
       </SchoolPanel>
     </div>
   );
@@ -620,7 +663,7 @@ export default function SchoolTeacherPortal() {
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your submitted resources">
-        {books.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Resource</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{books.map((book) => <tr key={book.id}><td className="py-3 font-medium text-slate-800">{book.title}</td><td className="py-3 text-slate-600">{sectionLabel(book.school_section_id)}</td><td className="py-3 text-slate-600">{book.subject}</td><td className="py-3"><SchoolStatus value={book.school_review_status || book.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No resources uploaded" description="Upload textbooks, notes, and learning PDFs for your assigned classes." />}
+        {books.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Resource</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{books.map((book) => <tr key={book.id}><td className="py-3 font-medium text-slate-800"><p>{book.title}</p>{bookUploads.find((upload) => upload.book_id === book.id)?.moderation_note && <p className="mt-1 text-xs font-normal text-amber-700">Admin feedback: {bookUploads.find((upload) => upload.book_id === book.id)?.moderation_note}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(book.school_section_id)}</td><td className="py-3 text-slate-600">{book.subject}</td><td className="py-3"><SchoolStatus value={book.school_review_status || book.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No resources uploaded" description="Upload textbooks, notes, and learning PDFs for your assigned classes." />}
       </SchoolPanel>
     </div>
   );
@@ -653,8 +696,11 @@ export default function SchoolTeacherPortal() {
           <div className="md:col-span-2"><SchoolPrimaryButton type="submit">Submit to homeroom teacher</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
+      <SchoolPanel title="Reports awaiting homeroom review">
+        {behaviorReportsForReview.length ? <div className="space-y-3">{behaviorReportsForReview.map((report) => <div key={report.id} className="rounded-md border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-slate-800">{memberName(report.student_membership_id)} · {sectionLabel(report.section_id)}</p><p className="mt-1 text-xs capitalize text-slate-500">{report.report_type} · {report.severity} severity</p></div><SchoolStatus value={report.status} /></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{report.description}</p><textarea className={schoolTextareaClass + " mt-3"} value={behaviorReviewNotes[report.id] || ""} onChange={(event) => setBehaviorReviewNotes((current) => ({ ...current, [report.id]: event.target.value }))} placeholder="Optional review note" /><div className="mt-3 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewBehaviorReport(report, true)}>Approve report</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewBehaviorReport(report, false)}>Reject report</SchoolSecondaryButton></div></div>)}</div> : <SchoolEmptyState title="No reports awaiting review" description="Pending reports for your homeroom sections will appear here." />}
+      </SchoolPanel>
       <SchoolPanel title="Reports you submitted">
-        {behaviorReports.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Class</th><th className="pb-2">Type</th><th className="pb-2">Severity</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{behaviorReports.map((report) => <tr key={report.id}><td className="py-3 font-medium text-slate-800">{memberName(report.student_membership_id)}</td><td className="py-3 text-slate-600">{sectionLabel(report.section_id)}</td><td className="py-3 capitalize text-slate-600">{report.report_type}</td><td className="py-3 capitalize text-slate-600">{report.severity}</td><td className="py-3"><SchoolStatus value={report.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No behavior reports" description="Your submitted reports will appear here." />}
+        {behaviorReports.filter((report) => report.reported_by_membership_id === activeMembership?.id).length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Class</th><th className="pb-2">Type</th><th className="pb-2">Severity</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{behaviorReports.filter((report) => report.reported_by_membership_id === activeMembership?.id).map((report) => <tr key={report.id}><td className="py-3 font-medium text-slate-800">{memberName(report.student_membership_id)}</td><td className="py-3 text-slate-600">{sectionLabel(report.section_id)}</td><td className="py-3 capitalize text-slate-600">{report.report_type}</td><td className="py-3 capitalize text-slate-600">{report.severity}</td><td className="py-3"><SchoolStatus value={report.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No behavior reports" description="Your submitted reports will appear here." />}
       </SchoolPanel>
     </div>
   );
@@ -683,7 +729,7 @@ export default function SchoolTeacherPortal() {
     <div className="space-y-5">
       <SchoolPageHeading title="Assigned tasks" description="Complete follow-up tasks assigned by the School Manager or Admin, and submit your work for review." />
       <SchoolPanel title="Your task list">
-        {tasks.length ? <div className="space-y-3">{tasks.map((task) => <div key={task.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.task_type} · {task.priority} priority · {task.due_date ? `Due ${task.due_date}` : "No due date"}</p><p className="mt-2 text-sm text-slate-700">{task.description}</p></div><SchoolStatus value={task.status} /></div><textarea className={schoolTextareaClass + " mt-3"} value={taskResponseById[task.id] ?? task.response ?? ""} onChange={(event) => setTaskResponseById((current) => ({ ...current, [task.id]: event.target.value }))} placeholder="Describe your work or response" /><div className="mt-3 flex gap-2"><SchoolSecondaryButton onClick={() => void updateTask(task, "in_progress")}>Mark in progress</SchoolSecondaryButton><SchoolPrimaryButton onClick={() => void updateTask(task, "submitted")}>Submit for review</SchoolPrimaryButton></div></div>)}</div> : <SchoolEmptyState title="No assigned tasks" description="Tasks assigned to you will appear here." />}
+        {tasks.length ? <div className="space-y-3">{tasks.map((task) => <div key={task.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.task_type} · {task.priority} priority · {task.due_date ? `Due ${task.due_date}` : "No due date"}</p><p className="mt-2 text-sm text-slate-700">{task.description}</p></div><SchoolStatus value={task.status} /></div><textarea className={schoolTextareaClass + " mt-3"} disabled={!["open", "in_progress", "returned"].includes(task.status)} value={taskResponseById[task.id] ?? task.response ?? ""} onChange={(event) => setTaskResponseById((current) => ({ ...current, [task.id]: event.target.value }))} placeholder="Describe your work or response" />{["open", "in_progress", "returned"].includes(task.status) && <div className="mt-3 flex gap-2"><SchoolSecondaryButton onClick={() => void updateTask(task, "in_progress")}>Mark in progress</SchoolSecondaryButton><SchoolPrimaryButton onClick={() => void updateTask(task, "submitted")}>Submit for review</SchoolPrimaryButton></div>}</div>)}</div> : <SchoolEmptyState title="No assigned tasks" description="Tasks assigned to you will appear here." />}
       </SchoolPanel>
     </div>
   );
