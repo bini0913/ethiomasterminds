@@ -22,8 +22,9 @@ ALTER TABLE public.flashcards
   ADD COLUMN IF NOT EXISTS is_public boolean NOT NULL DEFAULT true;
 
 UPDATE public.flashcards
-SET user_id = created_by
-WHERE user_id IS NULL;
+SET user_id = btrim(created_by)::uuid
+WHERE user_id IS NULL
+  AND pg_input_is_valid(btrim(created_by), 'uuid');
 
 -- Ensure RLS on key tables
 ALTER TABLE public.social_posts ENABLE ROW LEVEL SECURITY;
@@ -45,7 +46,7 @@ FOR SELECT
 USING (
   is_public = true
   OR user_id = auth.uid()
-  OR created_by = auth.uid()
+  OR created_by = auth.uid()::text
   OR EXISTS (
     SELECT 1
     FROM public.user_roles ur
