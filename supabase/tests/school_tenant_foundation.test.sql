@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(29);
+select plan(30);
 
 select ok(exists (
   select 1 from pg_enum e
@@ -82,6 +82,8 @@ select ok(exists (
     and policyname = 'school_members_can_view_scoped_profiles'
     and coalesce(qual, '') like '%school_can_view_profile%'
 ), 'school profile reads use the scoped profile helper');
+
+select ok(to_regclass('public.school_subjects') is not null, 'school subject catalog exists for manager-managed structure');
 
 select * from finish();
 rollback;
