@@ -41,11 +41,14 @@ export const getNextRankTier = (level: number): RankTierConfig | null => {
 };
 
 export const getXpProgressInLevel = (xp: number, perLevel = 220) => {
-  const progressInLevel = xp % perLevel;
+  const safePerLevel = Number.isFinite(perLevel) && perLevel > 0 ? perLevel : 220;
+  const safeXp = Number.isFinite(xp) ? Math.max(0, xp) : 0;
+  const progressInLevel = safeXp % safePerLevel;
   return {
     current: progressInLevel,
-    max: perLevel,
-    percentage: (progressInLevel / perLevel) * 100,
+    max: safePerLevel,
+    // Keep the UI percentage human-readable; never expose floating-point precision noise.
+    percentage: Math.min(100, Math.max(0, Math.round((progressInLevel / safePerLevel) * 100))),
   };
 };
 
