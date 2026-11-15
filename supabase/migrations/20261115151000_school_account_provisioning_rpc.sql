@@ -217,10 +217,6 @@ BEGIN
     END LOOP;
   END IF;
 
-  UPDATE public.profiles
-  SET grade = CASE WHEN p_school_role = 'student' THEN trim(p_grade_label) ELSE grade END
-  WHERE id = p_user_id;
-
   RETURN v_membership_id;
 END;
 $$;
