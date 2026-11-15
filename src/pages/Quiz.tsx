@@ -21,7 +21,7 @@ import { normalizeSubject } from "@/lib/academicProfile";
 
 const Quiz: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { quizzes } = useQuiz();
+  const { quizzes, loading, loadError, fetchQuizzes } = useQuiz();
   const { user } = useUser();
   const tier = useTier();
   const upperStudent = tier === "upper";
@@ -455,10 +455,19 @@ const Quiz: React.FC = () => {
               <p className="text-xs font-bold uppercase tracking-widest text-primary">Ready when you are</p>
               <h2 className="mt-1 font-display text-2xl font-bold sm:text-3xl">Jump straight into practice</h2>
               <p className="mt-1 text-sm text-muted-foreground">{numQuestions} questions picked for your level. No setup needed.</p>
-              <button type="button" onClick={() => handleCreateRandomQuiz()} className="mm-btn mt-4 inline-flex h-14 w-full items-center justify-center gap-2 px-6 text-base font-bold uppercase tracking-wide sm:w-auto">
+              <button type="button" onClick={() => handleCreateRandomQuiz()} disabled={loading || Boolean(loadError) || !selectedCategory} className="mm-btn mt-4 inline-flex h-14 w-full items-center justify-center gap-2 px-6 text-base font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
                 <Play className="h-5 w-5" /> Start practice
               </button>
             </section>
+            {loadError && (
+              <div role="alert" className="mb-6 flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold text-destructive">Approved quizzes are temporarily unavailable.</p>
+                  <p className="mt-1 text-muted-foreground">Your previous catalog remains visible while we reconnect.</p>
+                </div>
+                <Button variant="outline" className="min-h-10 shrink-0" onClick={() => void fetchQuizzes()}>Retry quiz bank</Button>
+              </div>
+            )}
             <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-6">
               <TabsList className="grid w-full grid-cols-2 bg-card border-border">
                 <TabsTrigger value="browse" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -593,12 +602,17 @@ const Quiz: React.FC = () => {
                     </motion.div>
                   ))}
                   
-                  {filteredQuizzes.length === 0 && (
+                  {loading && (
+                    <div className="col-span-full rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+                      Loading approved quizzes…
+                    </div>
+                  )}
+                  {!loading && !loadError && filteredQuizzes.length === 0 && (
                     <div className="col-span-full">
                       <Card className="bg-card border-border">
                         <CardContent className="py-12 text-center">
                           <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                          <p className="text-muted-foreground">No quizzes available for this grade/subject yet.</p>
+                          <p className="text-muted-foreground">No approved quizzes are available for this grade/subject yet.</p>
                           <Button
                             variant="outline"
                             className="mt-4"

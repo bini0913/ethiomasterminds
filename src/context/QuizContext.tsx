@@ -61,6 +61,7 @@ export interface QuizContextType {
   getAvailableTopics: (subject?: string) => string[];
   getAvailableGrades: () => number[];
   loading: boolean;
+  loadError: string | null;
 }
 
 // Create the context with a default undefined value
@@ -74,10 +75,12 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>([]);
   const [askedQuestions, setAskedQuestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Fetch quizzes from database - approved quizzes only
   const fetchQuizzes = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       // Fetch approved quizzes with their questions
       const { data: quizzesData, error: quizzesError } = await supabase
@@ -88,8 +91,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (quizzesError) {
         console.error('Error fetching quizzes:', quizzesError);
-        setLoading(false);
-        return;
+        throw quizzesError;
       }
 
       if (!quizzesData || quizzesData.length === 0) {
@@ -109,6 +111,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (questionsError) {
         console.error('Error fetching questions:', questionsError);
+        throw questionsError;
       }
 
       // Group questions by quiz_id
@@ -187,6 +190,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setFilteredQuizzes(nonEmptyMappedQuizzes);
     } catch (err) {
       console.error('Error in fetchQuizzes:', err);
+      setLoadError('The approved quiz bank could not be loaded. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -423,7 +427,8 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     getAvailableSubjects,
     getAvailableTopics,
     getAvailableGrades,
-    loading
+    loading,
+    loadError,
   };
 
   return <QuizContext.Provider value={value}>{children}</QuizContext.Provider>;
