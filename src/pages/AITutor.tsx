@@ -5,9 +5,8 @@ import { useUser } from '@/context/UserContext';
 import { getUserTier } from '@/lib/getUserTier';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  Bot, Send, Loader2, BookOpen, Calculator, Globe, Beaker, History,
-  Sparkles, Mic, MicOff, Volume2, VolumeX, Lightbulb, ListChecks,
-  RefreshCw, Copy, Check, Brain, MessageSquare, MoreHorizontal, RotateCcw,
+  Send, Loader2, Sparkles, Mic, MicOff, Volume2, VolumeX, Lightbulb, ListChecks,
+  RefreshCw, Copy, Check, Brain, MessageSquare, RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,36 +21,13 @@ interface Message {
   timestamp: string;
 }
 
-type Subject = {
-  id: string;
-  name: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone: string;
-};
-
-const subjects: Subject[] = [
-  { id: 'math', name: 'Mathematics', icon: Calculator, tone: 'bg-[#e7f3ef] text-[#287c68]' },
-  { id: 'science', name: 'Science', icon: Beaker, tone: 'bg-emerald-50 text-emerald-700' },
-  { id: 'english', name: 'English', icon: BookOpen, tone: 'bg-amber-50 text-amber-700' },
-  { id: 'history', name: 'History', icon: History, tone: 'bg-orange-50 text-orange-700' },
-  { id: 'geography', name: 'Geography', icon: Globe, tone: 'bg-sky-50 text-sky-700' },
-  { id: 'general', name: 'General', icon: Sparkles, tone: 'bg-slate-100 text-slate-600' },
-];
-
 const quickActions = [
   { label: 'Show a worked example', prompt: 'Show me a clear worked example for this topic, explaining each step.', icon: Lightbulb },
   { label: 'Give me a hint', prompt: 'Give me a hint first, without revealing the full answer.', icon: Brain },
   { label: 'Practice questions', prompt: 'Generate 3 high-yield practice questions for this topic. Hide the answers until I attempt them.', icon: ListChecks },
 ];
 
-const starterPrompts: Record<string, string[]> = {
-  math: ['Explain Pythagoras theorem with a story', 'Help me solve quadratic equations', 'What is calculus used for?'],
-  science: ['Why is the sky blue?', 'How do vaccines work?', "Explain Newton's laws"],
-  english: ['Improve this sentence: ...', 'What is a metaphor?', 'Help me write an essay intro'],
-  history: ['Tell me about Ethiopian history', 'Who was Menelik II?', 'Explain World War II briefly'],
-  geography: ['What causes monsoons?', 'Tallest mountains on Earth', 'How are deserts formed?'],
-  general: ['Teach me something new today', 'Give me a study tip', 'Help me focus better'],
-};
+const starterPrompts = ['Explain a difficult topic step by step', 'Help me plan a focused study session', 'Quiz me on something I am learning'];
 
 const AITutor: React.FC = () => {
   const { user } = useUser();
@@ -60,7 +36,6 @@ const AITutor: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState('general');
   const [conversations, setConversations] = useState<any[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [voiceOut, setVoiceOut] = useState(false);
@@ -68,13 +43,10 @@ const AITutor: React.FC = () => {
   const [conversationLoadError, setConversationLoadError] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [lastFailedPrompt, setLastFailedPrompt] = useState<string | null>(null);
-  const [showFocusMenu, setShowFocusMenu] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  const subj = subjects.find((subject) => subject.id === selectedSubject) || subjects[subjects.length - 1];
-  const prompts = starterPrompts[selectedSubject] || starterPrompts.general;
   const gradeLabel = user?.grade ? `Grade ${user.grade}` : 'your learning level';
   const firstName = user?.name?.split(' ')[0] || 'there';
 
@@ -129,7 +101,6 @@ const AITutor: React.FC = () => {
 
   const loadConversation = (conversation: any) => {
     setConversationId(conversation.id);
-    setSelectedSubject(conversation.subject || 'general');
     setMessages((conversation.messages as Message[]) || []);
     setSendError(null);
     setLastFailedPrompt(null);
@@ -178,7 +149,7 @@ const AITutor: React.FC = () => {
     setLastFailedPrompt(null);
     try {
       const { data, error } = await supabase.functions.invoke('ai-tutor', {
-        body: { message: content, conversationId, subject: selectedSubject },
+        body: { message: content, conversationId, subject: 'general' },
       });
       if (error) throw error;
       if (!data?.message) throw new Error('The tutor returned an empty response. Please try again.');
@@ -257,27 +228,13 @@ const AITutor: React.FC = () => {
                 >
                   <MessageSquare className="mt-0.5 h-4 w-4 shrink-0" />
                   <span className="min-w-0">
-                    <span className="block truncate text-xs font-semibold">{conversation.title || conversation.subject || 'Study conversation'}</span>
+                    <span className="block truncate text-xs font-semibold">{conversation.title || 'Study conversation'}</span>
                     <span className="mt-0.5 block text-[11px] text-[#8a9891]">{conversation.updated_at ? new Date(conversation.updated_at).toLocaleDateString() : 'Recent'}</span>
                   </span>
                 </button>
               ))}
             </div>
 
-            <div className="mt-8 border-t border-[#edf1ee] pt-5">
-              <p className="mb-2 px-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8a9891]">Study focus</p>
-              <div className="space-y-1">
-                {subjects.map((subject) => {
-                  const Icon = subject.icon;
-                  return (
-                    <button key={subject.id} type="button" onClick={() => setSelectedSubject(subject.id)} className={cn('flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs font-semibold transition-colors', selectedSubject === subject.id ? 'bg-[#f0f6f3] text-[#287c68]' : 'text-[#66756e] hover:bg-[#f7f9f7]')}>
-                      <span className={cn('grid h-6 w-6 place-items-center rounded-lg', subject.tone)}><Icon className="h-3.5 w-3.5" /></span>
-                      {subject.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         </aside>
 
@@ -294,21 +251,8 @@ const AITutor: React.FC = () => {
               <Button variant="ghost" size="icon" onClick={() => setVoiceOut((value) => !value)} className="text-[#66756e] hover:bg-[#f0f6f3] hover:text-[#287c68]" aria-label={voiceOut ? 'Turn voice responses off' : 'Turn voice responses on'}>
                 {voiceOut ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => setShowFocusMenu((value) => !value)} className="text-[#66756e] hover:bg-[#f0f6f3] hover:text-[#287c68]" aria-label="Choose study focus"><MoreHorizontal className="h-5 w-5" /></Button>
             </div>
           </header>
-
-          {showFocusMenu && (
-            <div className="border-b border-[#dce6e0] bg-white px-4 py-3 sm:px-7 lg:hidden">
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8a9891]">Study focus</p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {subjects.map((subject) => {
-                  const Icon = subject.icon;
-                  return <button key={subject.id} type="button" onClick={() => { setSelectedSubject(subject.id); setShowFocusMenu(false); }} className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold', selectedSubject === subject.id ? 'border-[#287c68] bg-[#e7f3ef] text-[#287c68]' : 'border-[#dce6e0] text-[#66756e]')}><Icon className="h-3.5 w-3.5" />{subject.name}</button>;
-                })}
-              </div>
-            </div>
-          )}
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-[8%] sm:py-8">
             <div className="mx-auto max-w-[720px]">
@@ -321,7 +265,7 @@ const AITutor: React.FC = () => {
                   <h3 className="text-2xl font-bold tracking-tight text-[#1d2b26]">Hi {firstName}. What are you working on today?</h3>
                   <p className="mt-3 max-w-md text-sm leading-6 text-[#7e8d85]">Ask for an explanation, paste a problem, or tell me where you are stuck. I’ll meet you at the right step.</p>
                   <div className="mt-7 flex max-w-2xl flex-wrap justify-center gap-2">
-                    {prompts.map((prompt) => (
+                    {starterPrompts.map((prompt) => (
                       <button key={prompt} type="button" onClick={() => void send(prompt)} className="rounded-full border border-[#cfe1da] bg-white px-3.5 py-2 text-xs font-semibold text-[#287c68] transition-colors hover:bg-[#e7f3ef]">{prompt}</button>
                     ))}
                   </div>
@@ -373,7 +317,7 @@ const AITutor: React.FC = () => {
                 <Button type="button" variant="ghost" size="icon" onClick={toggleMic} className={cn('mb-0.5 shrink-0 rounded-xl text-[#718078] hover:bg-[#e7f3ef] hover:text-[#287c68]', isListening && 'bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700')} aria-label={isListening ? 'Stop voice input' : 'Start voice input'}>
                   {isListening ? <MicOff className="h-4 w-4 animate-pulse" /> : <Mic className="h-4 w-4" />}
                 </Button>
-                <Textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder={`Ask a question or paste a problem…`} disabled={isLoading} rows={1} className="max-h-32 min-h-[38px] resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0" />
+                <Textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Ask anything or paste a problem…" disabled={isLoading} rows={1} className="max-h-32 min-h-[38px] resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0" />
                 <Button type="button" onClick={() => void send()} disabled={isLoading || !input.trim()} className="mb-0.5 h-9 w-9 shrink-0 rounded-xl bg-[#287c68] p-0 text-white hover:bg-[#216b5a]" aria-label="Send message">
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
