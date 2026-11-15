@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { BookOpen, Brain, Target, CalendarDays, BarChart3, GraduationCap, TrendingUp, ArrowUpRight, Settings2, ClipboardCheck, Sparkles, Loader2 } from "lucide-react";
-import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
+import { getAcademicProfile, resolveAcademicGrade } from "@/lib/academicProfile";
 
 const features = [
   { title: "Exam practice", eyebrow: "PREPARE", description: "Timed practice using approved quizzes and real question sets.", icon: Target, path: "/academic/exam", action: "Start an exam", featured: true },
@@ -62,11 +62,14 @@ const AcademicMode: React.FC = () => {
       const weekAgo = new Date(now);
       weekAgo.setDate(now.getDate() - 6);
       const start = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, "0")}-${String(weekAgo.getDate()).padStart(2, "0")}`;
+      const topicsRequest = tier === "upper"
+        ? db.from("upper_student_topic_progress").select("subject,topic,accuracy_percentage,questions_attempted,correct_answers").eq("user_id", user.id)
+        : db.from("topic_progress").select("subject,topic,completion_percentage,accuracy_percentage,questions_attempted,questions_correct").eq("user_id", user.id);
       const [todayRes, weekRes, resultsRes, topicsRes] = await Promise.all([
         db.from("study_plans").select("id,completed").eq("user_id", user.id).eq("scheduled_date", today),
         db.from("study_plans").select("id,completed").eq("user_id", user.id).gte("scheduled_date", start).lte("scheduled_date", today),
         db.from("quiz_results").select("score,total_questions,created_at").eq("student_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        db.from("topic_progress").select("subject,topic,completion_percentage,accuracy_percentage,questions_attempted,questions_correct").eq("user_id", user.id),
+        topicsRequest,
       ]);
       if (cancelled) return;
       if (todayRes.error || weekRes.error || resultsRes.error || topicsRes.error) setLoadError(true);
@@ -75,7 +78,14 @@ const AcademicMode: React.FC = () => {
       setTodayCompleted(todayRes.data?.filter((item) => item.completed).length || 0);
       setWeekDone(weekRes.data?.filter((item) => item.completed).length || 0);
       setRecentResult(resultsRes.data || null);
-      setTopicProgress((topicsRes.data || []) as typeof topicProgress);
+      setTopicProgress((topicsRes.data || []).map((row: any) => ({
+        subject: row.subject,
+        topic: row.topic,
+        completion_percentage: row.completion_percentage ?? null,
+        accuracy_percentage: row.accuracy_percentage,
+        questions_attempted: row.questions_attempted,
+        questions_correct: row.questions_correct ?? row.correct_answers ?? null,
+      })) as typeof topicProgress);
       } catch (error) {
         console.error("Academic Mode data load failed:", error);
         if (!cancelled) setLoadError(true);
@@ -88,7 +98,7 @@ const AcademicMode: React.FC = () => {
 
   if (isLoading) return <div className="flex min-h-[60vh] items-center justify-center gap-3 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Loading your study space…</div>;
 
-  const grade = normalizeGrade(profile?.grade, normalizeGrade(user?.grade, 9));
+  const grade = resolveAcademicGrade(user?.grade, profile?.grade, 9);
   const goalLabels: Record<string, string> = { class: "School / Class", ministry_exam: "Ministry Exam", university_entrance: "University Entrance", national_exam: "National / Regional Exam", custom: "Custom goal" };
   const goal = profile?.study_goal_detail || goalLabels[profile?.study_goal] || "Study goal";
   const subjects: string[] = Array.isArray(profile?.subjects)

@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Calendar, Plus, Check, X, Sparkles, Brain, Loader2, Wand2, BookOpen, Clock3, Target } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
-import { getAcademicProfile, normalizeGrade, normalizeSubject } from "@/lib/academicProfile";
+import { getAcademicProfile, normalizeGrade, normalizeSubject, resolveAcademicGrade } from "@/lib/academicProfile";
 import { getPdfPublicUrl } from "@/lib/libraryApi";
 import { loadBookAnalyses, saveBookAnalyses } from "@/lib/bookAnalysis";
 
@@ -114,7 +114,7 @@ const StudyPlannerPage: React.FC = () => {
           if (saved) setPlanSettings((current) => ({ ...current, ...JSON.parse(saved) }));
         } catch { /* use defaults when local settings are unavailable */ }
         setAcademicContext({
-          grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 5)),
+          grade: resolveAcademicGrade(user.grade, profile.grade, 5),
           curriculum: profile.curriculum,
           goal: [profile.study_goal, profile.study_goal_detail].filter(Boolean).join(" — "),
           book: resourceContext.join("; ") || "Not specified",
