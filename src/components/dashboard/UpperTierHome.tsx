@@ -251,27 +251,34 @@ const UpperTierHome: React.FC = () => {
 
   const saveExamTarget = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!examDateInput || !examNameInput.trim()) return;
+    if (!examDateInput || !examNameInput.trim() || savingExam) return;
+
     setSavingExam(true);
-    const { data, error } = await supabase.rpc("set_upper_student_exam_target_once", {
-      p_exam_date: examDateInput,
-      p_exam_name: examNameInput.trim(),
-    });
-    setSavingExam(false);
-    if (error) {
-      console.error("One-time exam target save failed:", error);
-      toast.error(error.message?.includes("already been set")
-        ? "An exam date has already been saved for this account."
-        : error.message || "Your exam date could not be saved.");
-      await loadDashboard();
-      return;
+    try {
+      const { data, error } = await supabase.rpc("set_upper_student_exam_target_once", {
+        p_exam_date: examDateInput,
+        p_exam_name: examNameInput.trim(),
+      });
+      if (error) {
+        console.error("One-time exam target save failed:", error);
+        toast.error(error.message?.includes("already been set")
+          ? "An exam date has already been saved for this account."
+          : error.message || "Your exam date could not be saved.");
+        await loadDashboard();
+        return;
+      }
+      toast.success("Your exam countdown is now saved.");
+      setExamTarget({
+        exam_name: String((data as any)?.exam_name || examNameInput.trim()),
+        exam_date: String((data as any)?.exam_date || examDateInput),
+        created_at: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("One-time exam target request failed:", error);
+      toast.error("Your exam date could not be saved. Check your connection and try again.");
+    } finally {
+      setSavingExam(false);
     }
-    toast.success("Your exam countdown is now saved.");
-    setExamTarget({
-      exam_name: String((data as any)?.exam_name || examNameInput.trim()),
-      exam_date: String((data as any)?.exam_date || examDateInput),
-      created_at: new Date().toISOString(),
-    });
   };
 
   return (
