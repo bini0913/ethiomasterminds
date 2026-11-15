@@ -79,6 +79,7 @@ import NotificationBootstrap from "./components/notifications/NotificationBootst
 import NotificationRouteHandler from "./components/notifications/NotificationRouteHandler";
 import SocialRealtimeNotifications from "./components/notifications/SocialRealtimeNotifications";
 import StudentBottomNav from "./components/layout/StudentBottomNav";
+import MiddleTierShell from "./components/layout/MiddleTierShell";
 import UpperTierStudioShell from "./components/layout/UpperTierStudioShell";
 import { getUserTier } from "./lib/getUserTier";
 
@@ -149,12 +150,14 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
 
   const isHome = location.pathname === "/";
   const isUpperStudent = getUserTier(user?.grade) === "upper";
+  const isStudent = user.role === "student";
+  const isMiddleStudent = isStudent && getUserTier(user?.grade) === "middle";
   // Grades 9–12 home renders its own screenshot-matched responsive shell.
   // Wrapping it here creates a second sidebar, header and desktop navigation.
   if (isHome && !isUpperStudent) {
+    if (isMiddleStudent) return <MiddleTierShell>{children}</MiddleTierShell>;
     return <>{children}</>;
   }
-  const isStudent = user.role === "student";
   const showBottomNav = isStudent && !isUpperStudent ? true : isUpperStudent;
 
   const handleBack = () => {
@@ -170,6 +173,8 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
     await logout();
     navigate("/", { replace: true });
   };
+
+  if (isMiddleStudent) return <MiddleTierShell>{children}</MiddleTierShell>;
 
   return (
     <div className={isUpperStudent ? "min-h-screen bg-background mm-studio-upper" : "min-h-screen bg-background"}>
