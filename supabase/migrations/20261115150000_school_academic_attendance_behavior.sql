@@ -281,6 +281,11 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND assignment.assignment_kind = 'homeroom'
   ) OR EXISTS (
     SELECT 1 FROM public.school_sections section
+    JOIN public.school_memberships teacher
+      ON teacher.user_id = auth.uid()
+     AND teacher.school_id = section.school_id
+     AND teacher.school_role = 'teacher'
+     AND teacher.status = 'active'
     WHERE section.id = p_section_id
       AND section.school_id = p_school_id
       AND section.homeroom_teacher_id = auth.uid()
@@ -858,10 +863,13 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_notify_parent_attendance()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
 DECLARE
   v_date date;
 BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.attendance_status IS NOT DISTINCT FROM OLD.attendance_status THEN
+    RETURN NEW;
+  END IF;
   SELECT attendance_date INTO v_date
   FROM public.school_attendance_sessions WHERE id = NEW.session_id;
   INSERT INTO public.school_parent_notifications(
@@ -892,6 +900,260 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION public.school_validate_assessment_mutation()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+DECLARE
+  v_section_grade text;
+  v_term_year uuid;
+  v_category_grade text;
+  v_category_year uuid;
+  v_creator_role text;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.status <> 'draft' OR NEW.reviewed_by IS NOT NULL OR NEW.reviewed_at IS NOT NULL THEN
+      RAISE EXCEPTION 'New assessments must start in draft and cannot be pre-approved';
+    END IF;
+    SELECT grade_label INTO v_section_grade FROM public.school_sections
+      WHERE id = NEW.section_id AND school_id = NEW.school_id;
+    SELECT academic_year_id INTO v_term_year FROM public.school_terms
+      WHERE id = NEW.term_id AND school_id = NEW.school_id;
+    SELECT grade_label, academic_year_id INTO v_category_grade, v_category_year
+      FROM public.school_assessment_categories
+      WHERE id = NEW.category_id AND school_id = NEW.school_id;
+    IF v_section_grade IS NULL OR v_term_year IS DISTINCT FROM NEW.academic_year_id
+       OR v_category_grade IS DISTINCT FROM v_section_grade
+       OR v_category_year IS DISTINCT FROM NEW.academic_year_id THEN
+      RAISE EXCEPTION 'Assessment section, term, category, and academic year must match';
+    END IF;
+    SELECT school_role INTO v_creator_role FROM public.school_memberships
+      WHERE id = NEW.created_by_membership_id AND school_id = NEW.school_id;
+    IF v_creator_role NOT IN ('teacher', 'admin') THEN
+      RAISE EXCEPTION 'Only an assigned teacher or School Admin can create an assessment';
+    END IF;
+    IF v_creator_role = 'teacher'
+       AND NOT public.school_can_teach_subject(NEW.school_id, NEW.section_id, NEW.subject_name) THEN
+      RAISE EXCEPTION 'Teacher is not assigned to this subject and section';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF ROW(NEW.school_id, NEW.academic_year_id, NEW.term_id, NEW.section_id, NEW.category_id,
+         NEW.subject_name, NEW.created_by_membership_id, NEW.created_at)
+     IS DISTINCT FROM
+     ROW(OLD.school_id, OLD.academic_year_id, OLD.term_id, OLD.section_id, OLD.category_id,
+         OLD.subject_name, OLD.created_by_membership_id, OLD.created_at) THEN
+    RAISE EXCEPTION 'Assessment identity fields are immutable';
+  END IF;
+  IF NEW.status IS DISTINCT FROM OLD.status
+     AND coalesce(current_setting('app.school_assessment_transition', true), '') NOT IN ('submit', 'review') THEN
+    RAISE EXCEPTION 'Assessment status changes must use the guarded workflow';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_assessment_mutation_validate ON public.school_assessments;
+CREATE TRIGGER school_assessment_mutation_validate
+BEFORE INSERT OR UPDATE ON public.school_assessments
+FOR EACH ROW EXECUTE FUNCTION public.school_validate_assessment_mutation();
+
+CREATE OR REPLACE FUNCTION public.school_validate_student_mark()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+DECLARE
+  v_assessment public.school_assessments%ROWTYPE;
+  v_student public.school_memberships%ROWTYPE;
+  v_enterer public.school_memberships%ROWTYPE;
+  v_transition text := coalesce(current_setting('app.school_assessment_transition', true), '');
+BEGIN
+  SELECT * INTO v_assessment FROM public.school_assessments WHERE id = NEW.assessment_id;
+  SELECT * INTO v_student FROM public.school_memberships WHERE id = NEW.student_membership_id;
+  SELECT * INTO v_enterer FROM public.school_memberships WHERE id = NEW.entered_by_membership_id;
+  IF v_assessment.id IS NULL OR v_student.id IS NULL OR v_enterer.id IS NULL
+     OR v_assessment.school_id <> NEW.school_id OR v_student.school_id <> NEW.school_id
+     OR v_enterer.school_id <> NEW.school_id
+     OR v_student.school_role <> 'student'
+     OR v_student.section_id <> v_assessment.section_id
+     OR v_enterer.school_role <> 'teacher'
+     OR NOT public.school_can_teach_subject(NEW.school_id, v_assessment.section_id, v_assessment.subject_name) THEN
+    RAISE EXCEPTION 'Marks must belong to an assigned student and subject';
+  END IF;
+  IF NEW.score > v_assessment.max_score THEN
+    RAISE EXCEPTION 'Score cannot exceed the assessment maximum';
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    IF v_enterer.user_id <> auth.uid() OR NEW.status <> 'draft' THEN
+      RAISE EXCEPTION 'New marks must be entered by the signed-in teacher in draft status';
+    END IF;
+  ELSE
+    IF ROW(NEW.school_id, NEW.assessment_id, NEW.student_membership_id, NEW.entered_by_membership_id, NEW.created_at)
+       IS DISTINCT FROM
+       ROW(OLD.school_id, OLD.assessment_id, OLD.student_membership_id, OLD.entered_by_membership_id, OLD.created_at) THEN
+      RAISE EXCEPTION 'Mark identity fields are immutable';
+    END IF;
+    IF NEW.status IS DISTINCT FROM OLD.status THEN
+      IF v_transition = 'submit' AND v_enterer.user_id = auth.uid() THEN
+        NULL;
+      ELSIF v_transition = 'review' AND public.school_is_admin(NEW.school_id) THEN
+        NULL;
+      ELSE
+        RAISE EXCEPTION 'Mark status changes must use the guarded assessment workflow';
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_student_mark_validate ON public.school_student_marks;
+CREATE TRIGGER school_student_mark_validate
+BEFORE INSERT OR UPDATE ON public.school_student_marks
+FOR EACH ROW EXECUTE FUNCTION public.school_validate_student_mark();
+
+CREATE OR REPLACE FUNCTION public.school_validate_behavior_report()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+DECLARE
+  v_student public.school_memberships%ROWTYPE;
+  v_reporter public.school_memberships%ROWTYPE;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    SELECT * INTO v_student FROM public.school_memberships WHERE id = NEW.student_membership_id;
+    SELECT * INTO v_reporter FROM public.school_memberships WHERE id = NEW.reported_by_membership_id;
+    IF NEW.status <> 'pending' OR NEW.reviewed_by IS NOT NULL OR NEW.reviewed_at IS NOT NULL
+       OR v_student.id IS NULL OR v_reporter.id IS NULL
+       OR v_student.school_id <> NEW.school_id OR v_reporter.school_id <> NEW.school_id
+       OR v_student.section_id <> NEW.section_id
+       OR v_reporter.user_id <> auth.uid() OR v_reporter.school_role <> 'teacher'
+       OR NOT public.school_can_submit_behavior_report(NEW.student_membership_id) THEN
+      RAISE EXCEPTION 'Behavior reports must be submitted by a teacher assigned to the student';
+    END IF;
+  ELSE
+    IF ROW(NEW.school_id, NEW.student_membership_id, NEW.section_id, NEW.reported_by_membership_id, NEW.created_at)
+       IS DISTINCT FROM
+       ROW(OLD.school_id, OLD.student_membership_id, OLD.section_id, OLD.reported_by_membership_id, OLD.created_at) THEN
+      RAISE EXCEPTION 'Behavior report identity fields are immutable';
+    END IF;
+    IF coalesce(current_setting('app.school_behavior_review', true), '') <> 'true' THEN
+      RAISE EXCEPTION 'Behavior report review must use the guarded workflow';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_behavior_report_validate ON public.school_behavior_reports;
+CREATE TRIGGER school_behavior_report_validate
+BEFORE INSERT OR UPDATE ON public.school_behavior_reports
+FOR EACH ROW EXECUTE FUNCTION public.school_validate_behavior_report();
+
+CREATE OR REPLACE FUNCTION public.school_validate_attendance_session()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+DECLARE
+  v_recorder public.school_memberships%ROWTYPE;
+BEGIN
+  SELECT * INTO v_recorder FROM public.school_memberships WHERE id = NEW.recorded_by_membership_id;
+  IF v_recorder.id IS NULL OR v_recorder.school_id <> NEW.school_id
+     OR v_recorder.user_id <> auth.uid() OR v_recorder.school_role <> 'teacher'
+     OR NOT public.school_is_homeroom_teacher(NEW.school_id, NEW.section_id) THEN
+    RAISE EXCEPTION 'Only the assigned homeroom teacher can create or update this attendance session';
+  END IF;
+  IF TG_OP = 'UPDATE' AND ROW(NEW.school_id, NEW.section_id, NEW.attendance_date, NEW.recorded_by_membership_id, NEW.created_at)
+     IS DISTINCT FROM ROW(OLD.school_id, OLD.section_id, OLD.attendance_date, OLD.recorded_by_membership_id, OLD.created_at) THEN
+    RAISE EXCEPTION 'Attendance session identity fields are immutable';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_attendance_session_validate ON public.school_attendance_sessions;
+CREATE TRIGGER school_attendance_session_validate
+BEFORE INSERT OR UPDATE ON public.school_attendance_sessions
+FOR EACH ROW EXECUTE FUNCTION public.school_validate_attendance_session();
+
+CREATE OR REPLACE FUNCTION public.school_validate_attendance_record()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+DECLARE
+  v_session public.school_attendance_sessions%ROWTYPE;
+  v_student public.school_memberships%ROWTYPE;
+  v_recorder public.school_memberships%ROWTYPE;
+BEGIN
+  SELECT * INTO v_session FROM public.school_attendance_sessions WHERE id = NEW.session_id;
+  SELECT * INTO v_student FROM public.school_memberships WHERE id = NEW.student_membership_id;
+  SELECT * INTO v_recorder FROM public.school_memberships WHERE id = NEW.recorded_by_membership_id;
+  IF v_session.id IS NULL OR v_student.id IS NULL OR v_recorder.id IS NULL
+     OR v_session.school_id <> NEW.school_id OR v_student.school_id <> NEW.school_id
+     OR v_recorder.school_id <> NEW.school_id
+     OR v_student.section_id <> v_session.section_id
+     OR v_recorder.user_id <> auth.uid() OR v_recorder.school_role <> 'teacher'
+     OR NOT public.school_is_homeroom_teacher(NEW.school_id, v_session.section_id) THEN
+    RAISE EXCEPTION 'Attendance must be recorded by the assigned homeroom teacher for that section';
+  END IF;
+  IF TG_OP = 'UPDATE' AND ROW(NEW.school_id, NEW.session_id, NEW.student_membership_id, NEW.recorded_by_membership_id, NEW.created_at)
+     IS DISTINCT FROM ROW(OLD.school_id, OLD.session_id, OLD.student_membership_id, OLD.recorded_by_membership_id, OLD.created_at) THEN
+    RAISE EXCEPTION 'Attendance record identity fields are immutable';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_attendance_record_validate ON public.school_attendance_records;
+CREATE TRIGGER school_attendance_record_validate
+BEFORE INSERT OR UPDATE ON public.school_attendance_records
+FOR EACH ROW EXECUTE FUNCTION public.school_validate_attendance_record();
+
+CREATE OR REPLACE FUNCTION public.school_protect_parent_notification()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+BEGIN
+  IF ROW(NEW.school_id, NEW.parent_membership_id, NEW.student_membership_id,
+         NEW.notification_type, NEW.title, NEW.message, NEW.created_at)
+     IS DISTINCT FROM
+     ROW(OLD.school_id, OLD.parent_membership_id, OLD.student_membership_id,
+         OLD.notification_type, OLD.title, OLD.message, OLD.created_at) THEN
+    RAISE EXCEPTION 'Notification content is immutable';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_parent_notification_immutable ON public.school_parent_notifications;
+CREATE TRIGGER school_parent_notification_immutable
+BEFORE UPDATE ON public.school_parent_notifications
+FOR EACH ROW EXECUTE FUNCTION public.school_protect_parent_notification();
+
+CREATE OR REPLACE FUNCTION public.school_can_mark_parent_notification_read(p_notification_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.school_parent_notifications notification
+    JOIN public.school_memberships parent ON parent.id = notification.parent_membership_id
+    WHERE notification.id = p_notification_id
+      AND parent.user_id = auth.uid()
+      AND parent.school_role = 'parent'
+      AND parent.status = 'active'
+  );
+$;
+
+CREATE OR REPLACE FUNCTION public.school_notify_parent_results_published()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+BEGIN
+  IF NEW.status = 'published' AND OLD.status IS DISTINCT FROM NEW.status THEN
+    INSERT INTO public.school_parent_notifications(
+      school_id, parent_membership_id, student_membership_id, notification_type, title, message
+    )
+    SELECT link.school_id, link.parent_membership_id, NEW.student_membership_id,
+           'academic', 'Academic results published',
+           'Official results for ' || NEW.subject_name || ' are now available.'
+    FROM public.school_parent_student_links link
+    WHERE link.student_membership_id = NEW.student_membership_id
+      AND link.status = 'active';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_results_notify_parent ON public.school_term_results;
+CREATE TRIGGER school_results_notify_parent
+AFTER UPDATE OF status ON public.school_term_results
+FOR EACH ROW EXECUTE FUNCTION public.school_notify_parent_results_published();
 
 ALTER TABLE public.school_terms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_subjects ENABLE ROW LEVEL SECURITY;
@@ -1054,8 +1316,8 @@ CREATE POLICY school_parent_notifications_read ON public.school_parent_notificat
 FOR SELECT TO authenticated USING (public.school_can_view_parent_notification(id));
 CREATE POLICY school_parent_notifications_mark_read ON public.school_parent_notifications
 FOR UPDATE TO authenticated
-USING (public.school_can_view_parent_notification(id))
-WITH CHECK (public.school_can_view_parent_notification(id));
+USING (public.school_can_mark_parent_notification_read(id))
+WITH CHECK (public.school_can_mark_parent_notification_read(id));
 
 DROP TRIGGER IF EXISTS school_attendance_notify_parent ON public.school_attendance_records;
 CREATE TRIGGER school_attendance_notify_parent
@@ -1066,6 +1328,21 @@ DROP TRIGGER IF EXISTS school_behavior_notify_parent ON public.school_behavior_r
 CREATE TRIGGER school_behavior_notify_parent
 AFTER UPDATE OF status ON public.school_behavior_reports
 FOR EACH ROW EXECUTE FUNCTION public.school_notify_parent_behavior_approval();
+
+-- Explicitly expose only RLS-protected tables to authenticated clients.
+-- Supabase no longer auto-exposes newly created public tables.
+GRANT SELECT, INSERT, UPDATE ON public.school_terms TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.school_subjects TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.school_grading_policies TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.school_assessment_categories TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.school_grade_scales TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.school_assessments TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.school_student_marks TO authenticated;
+GRANT SELECT ON public.school_term_results TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.school_attendance_sessions TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.school_attendance_records TO authenticated;
+GRANT SELECT, INSERT ON public.school_behavior_reports TO authenticated;
+GRANT SELECT, UPDATE ON public.school_parent_notifications TO authenticated;
 
 REVOKE ALL ON FUNCTION public.school_is_admin(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_can_teach_subject(uuid, uuid, text) FROM PUBLIC, anon;
@@ -1081,6 +1358,8 @@ REVOKE ALL ON FUNCTION public.school_can_view_behavior_report(uuid) FROM PUBLIC,
 REVOKE ALL ON FUNCTION public.school_can_submit_behavior_report(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_can_review_behavior_report(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_can_view_parent_notification(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_can_mark_parent_notification_read(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_notify_parent_results_published() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_seed_default_grading_categories(uuid, uuid, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_submit_assessment(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_review_assessment(uuid, boolean, text) FROM PUBLIC, anon;
@@ -1104,6 +1383,7 @@ GRANT EXECUTE ON FUNCTION public.school_can_view_behavior_report(uuid) TO authen
 GRANT EXECUTE ON FUNCTION public.school_can_submit_behavior_report(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_review_behavior_report(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_view_parent_notification(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.school_can_mark_parent_notification_read(uuid) TO authenticated;
 REVOKE ALL ON FUNCTION public.school_can_mark_parent_notification_read(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_can_mark_parent_notification_read(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_seed_default_grading_categories(uuid, uuid, text) TO authenticated;
