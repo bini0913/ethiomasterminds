@@ -98,7 +98,7 @@ const LibraryPage: React.FC = () => {
     author: '',
     subject: '',
     description: '',
-    gradeLevel: '9',
+    gradeLevel: String(Math.min(12, Math.max(1, Number((user?.grade || '').match(/\d{1,2}/)?.[0] || 9)))),
     type: 'textbook' as LibraryBook['type'],
     bookCategory: 'academic' as LibraryBook['book_category'],
     file: null as File | null,

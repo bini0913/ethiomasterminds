@@ -10,13 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuiz } from "@/context/QuizContext";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
+import { normalizeGrade } from "@/lib/academicProfile";
 
 const QuizFilter: React.FC = () => {
   const navigate = useNavigate();
   const { quizzes, loading } = useQuiz();
   const { user } = useUser();
   const upperStudent = getUserTier(user?.grade) === "upper";
-  const [grade, setGrade] = useState("");
+  const [grade, setGrade] = useState<string>(() => upperStudent ? String(normalizeGrade(user?.grade, 9)) : "");
   const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState("");
