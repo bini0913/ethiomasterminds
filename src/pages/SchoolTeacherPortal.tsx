@@ -72,6 +72,7 @@ export default function SchoolTeacherPortal() {
   const [behaviorReviewNotes, setBehaviorReviewNotes] = useState<Record<string, string>>({});
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [books, setBooks] = useState<any[]>([]);
+  const [bookUploads, setBookUploads] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState("");
@@ -138,7 +139,7 @@ export default function SchoolTeacherPortal() {
     const [
       assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes,
       membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes,
-      behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes,
+      behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes,
     ] = await Promise.all([
       db.from("school_teacher_assignments").select("id,section_id,subject_name,assignment_kind").eq("school_id", schoolId).eq("teacher_membership_id", activeMembership.id),
       db.from("school_sections").select("id,academic_year_id,grade_label,section_name,homeroom_teacher_id").eq("school_id", schoolId),
@@ -151,12 +152,13 @@ export default function SchoolTeacherPortal() {
       db.from("school_homework_assignments").select("id,title,section_id,subject_name,due_at,status,review_feedback,created_at").eq("school_id", schoolId).eq("teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("school_attendance_sessions").select("id,section_id,attendance_date,recorded_by_membership_id,status,submitted_at").eq("school_id", schoolId).order("attendance_date", { ascending: false }).limit(60),
       db.from("school_behavior_reports").select("id,student_membership_id,section_id,reported_by_membership_id,report_type,severity,description,status,review_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
-      db.from("quizzes").select("id,title,subject,grade,school_section_id,school_review_status,created_at").eq("school_id", schoolId).eq("school_teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
+      db.from("quizzes").select("id,title,subject,grade,school_section_id,school_review_status,school_review_feedback,created_at").eq("school_id", schoolId).eq("school_teacher_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("library_books").select("id,title,subject,grade,school_section_id,school_review_status,status,pdf_path").eq("school_id", schoolId).eq("uploader_id", user?.id),
       db.from("school_staff_tasks").select("id,title,description,status,due_date,priority,task_type,response,assigned_by_membership_id").eq("school_id", schoolId).eq("assigned_to_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("school_conversations").select("id,conversation_type,section_id,student_membership_id,subject_name,last_message_at").eq("school_id", schoolId).order("last_message_at", { ascending: false }).limit(100),
+      db.from("book_uploads").select("book_id,moderation_note,status").eq("uploader_id", user?.id || ""),
     ]);
-    const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes].find((result) => result.error)?.error;
+    const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes].find((result) => result.error)?.error;
     if (error) {
       toast.error(error.message || "Teacher workspace could not be loaded.");
       setLoading(false);
@@ -175,6 +177,7 @@ export default function SchoolTeacherPortal() {
     setBehaviorReports(behaviorRes.data ?? []);
     setQuizzes(quizzesRes.data ?? []);
     setBooks(booksRes.data ?? []);
+    setBookUploads(bookUploadsRes.data ?? []);
     setTasks(tasksRes.data ?? []);
     setConversations(conversationsRes.data ?? []);
     if (!assessmentTermId && termsRes.data?.length) setAssessmentTermId(termsRes.data[0].id);
@@ -580,7 +583,7 @@ export default function SchoolTeacherPortal() {
         </div> : <SchoolEmptyState title="Choose an assessment" description="Student mark entry will appear after you select a draft or rejected assessment." />}
       </SchoolPanel>
       <SchoolPanel title="Your assessment records">
-        {assessments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Marks</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{assessments.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800">{item.title}</td><td className="py-3 text-slate-600">{sectionLabel(item.section_id)}</td><td className="py-3 text-slate-600">{item.subject_name}</td><td className="py-3 tabular-nums text-slate-600">{marks.filter((mark) => mark.assessment_id === item.id).length}</td><td className="py-3"><SchoolStatus value={item.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No assessments yet" description="Create your first assessment above." />}
+        {assessments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Marks</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{assessments.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800"><p>{item.title}</p>{item.review_feedback && <p className="mt-1 text-xs font-normal text-amber-700">Admin feedback: {item.review_feedback}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(item.section_id)}</td><td className="py-3 text-slate-600">{item.subject_name}</td><td className="py-3 tabular-nums text-slate-600">{marks.filter((mark) => mark.assessment_id === item.id).length}</td><td className="py-3"><SchoolStatus value={item.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No assessments yet" description="Create your first assessment above." />}
       </SchoolPanel>
     </div>
   );
@@ -617,7 +620,7 @@ export default function SchoolTeacherPortal() {
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your submitted quizzes">
-        {quizzes.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Quiz</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{quizzes.map((quiz) => <tr key={quiz.id}><td className="py-3 font-medium text-slate-800">{quiz.title}</td><td className="py-3 text-slate-600">{sectionLabel(quiz.school_section_id)}</td><td className="py-3 text-slate-600">{quiz.subject}</td><td className="py-3"><SchoolStatus value={quiz.school_review_status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No quizzes created" description="Create a quiz for one of your assigned subjects." />}
+        {quizzes.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Quiz</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{quizzes.map((quiz) => <tr key={quiz.id}><td className="py-3 font-medium text-slate-800"><p>{quiz.title}</p>{quiz.school_review_feedback && <p className="mt-1 text-xs font-normal text-amber-700">Admin feedback: {quiz.school_review_feedback}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(quiz.school_section_id)}</td><td className="py-3 text-slate-600">{quiz.subject}</td><td className="py-3"><SchoolStatus value={quiz.school_review_status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No quizzes created" description="Create a quiz for one of your assigned subjects." />}
       </SchoolPanel>
     </div>
   );
@@ -660,7 +663,7 @@ export default function SchoolTeacherPortal() {
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your submitted resources">
-        {books.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Resource</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{books.map((book) => <tr key={book.id}><td className="py-3 font-medium text-slate-800">{book.title}</td><td className="py-3 text-slate-600">{sectionLabel(book.school_section_id)}</td><td className="py-3 text-slate-600">{book.subject}</td><td className="py-3"><SchoolStatus value={book.school_review_status || book.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No resources uploaded" description="Upload textbooks, notes, and learning PDFs for your assigned classes." />}
+        {books.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Resource</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{books.map((book) => <tr key={book.id}><td className="py-3 font-medium text-slate-800"><p>{book.title}</p>{bookUploads.find((upload) => upload.book_id === book.id)?.moderation_note && <p className="mt-1 text-xs font-normal text-amber-700">Admin feedback: {bookUploads.find((upload) => upload.book_id === book.id)?.moderation_note}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(book.school_section_id)}</td><td className="py-3 text-slate-600">{book.subject}</td><td className="py-3"><SchoolStatus value={book.school_review_status || book.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No resources uploaded" description="Upload textbooks, notes, and learning PDFs for your assigned classes." />}
       </SchoolPanel>
     </div>
   );
