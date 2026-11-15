@@ -116,6 +116,16 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'Student ID is already assigned in this school';
     END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.school_student_id_reservations reservation
+      WHERE reservation.school_id = p_school_id
+        AND reservation.student_number = p_student_number
+        AND reservation.grade_label = lower(trim(p_grade_label))
+        AND reservation.reserved_by = p_actor_id
+        AND reservation.used_by_user_id IS NULL
+    ) THEN
+      RAISE EXCEPTION 'Student ID must be reserved by the trusted grade-based allocator';
+    END IF;
     IF coalesce(cardinality(p_parent_membership_ids), 0) > 0 AND EXISTS (
       SELECT 1
       FROM unnest(p_parent_membership_ids) AS parent_ids(parent_id)
@@ -167,6 +177,19 @@ BEGIN
     p_actor_id
   )
   RETURNING id INTO v_membership_id;
+
+  IF p_school_role = 'student' THEN
+    UPDATE public.school_student_id_reservations
+    SET used_by_user_id = p_user_id, used_at = now()
+    WHERE school_id = p_school_id
+      AND student_number = p_student_number
+      AND grade_label = lower(trim(p_grade_label))
+      AND reserved_by = p_actor_id
+      AND used_by_user_id IS NULL;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Student ID reservation is missing or already used';
+    END IF;
+  END IF;
 
   IF p_school_role = 'student' AND coalesce(cardinality(p_parent_membership_ids), 0) > 0 THEN
     INSERT INTO public.school_parent_student_links(
