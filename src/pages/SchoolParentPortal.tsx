@@ -65,7 +65,7 @@ export default function SchoolParentPortal() {
       setLoading(false);
       return;
     }
-    const studentIds = [...new Set((links ?? []).map((link: any) => link.student_membership_id))];
+    const studentIds: string[] = [...new Set<string>((links ?? []).map((link: any) => String(link.student_membership_id)))];
     if (!studentIds.length) {
       setChildren([]); setResults([]); setAttendanceRecords([]); setAttendanceSessions([]);
       setBehaviorReports([]); setHomework([]); setHomeworkSubmissions([]); setInvoices([]);
