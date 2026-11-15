@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS public.school_staff_tasks (
   FOREIGN KEY (assigned_by_membership_id, school_id)
     REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
   FOREIGN KEY (verified_by_membership_id, school_id)
-    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
+  UNIQUE (id, school_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.school_staff_task_comments (
@@ -200,7 +201,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND (
         public._is_extreme_admin()
         OR public.is_school_manager_or_admin(evaluation.school_id)
-        OR target.user_id = auth.uid()
+        OR (target.user_id = auth.uid() AND target.status IN ('active', 'suspended'))
       )
   );
 $$;
@@ -242,19 +243,33 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND (
         public._is_extreme_admin()
         OR public.is_school_manager_or_admin(recommendation.school_id)
-        OR target.user_id = auth.uid()
+        OR (target.user_id = auth.uid() AND target.status IN ('active', 'suspended'))
         OR recommendation.submitted_by_membership_id = public.school_my_membership_id(recommendation.school_id)
       )
   );
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_validate_disciplinary_recommendation()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
 DECLARE
   v_actor uuid;
   v_actor_role text;
   v_target_role text;
+  v_review text := coalesce(current_setting('app.school_discipline_review', true), '');
 BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF v_review <> 'true'
+       OR OLD.status <> 'pending'
+       OR NEW.status NOT IN ('accepted', 'rejected')
+       OR ROW(NEW.school_id, NEW.target_membership_id, NEW.target_kind, NEW.submitted_by_membership_id,
+              NEW.reason, NEW.recommendation, NEW.created_at)
+          IS DISTINCT FROM
+          ROW(OLD.school_id, OLD.target_membership_id, OLD.target_kind, OLD.submitted_by_membership_id,
+              OLD.reason, OLD.recommendation, OLD.created_at) THEN
+      RAISE EXCEPTION 'Disciplinary review must use the guarded workflow';
+    END IF;
+    RETURN NEW;
+  END IF;
   IF TG_OP = 'INSERT' THEN
     v_actor := public.school_my_membership_id(NEW.school_id);
     SELECT school_role INTO v_actor_role FROM public.school_memberships WHERE id = v_actor;
@@ -302,6 +317,7 @@ BEGIN
     RAISE EXCEPTION 'Only the Super Admin can review staff disciplinary recommendations';
   END IF;
 
+  PERFORM set_config('app.school_discipline_review', 'true', true);
   UPDATE public.school_disciplinary_recommendations
   SET status = CASE WHEN p_accept THEN 'accepted' ELSE 'rejected' END,
       reviewed_by_membership_id = v_actor_membership,
@@ -309,6 +325,7 @@ BEGIN
       reviewed_at = now(),
       decision_note = nullif(trim(p_note), '')
   WHERE id = p_recommendation_id;
+  PERFORM set_config('app.school_discipline_review', '', true);
 
   IF p_accept AND v_recommendation.target_kind = 'student' THEN
     INSERT INTO public.school_parent_notifications(
@@ -342,12 +359,26 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_validate_staff_change_request()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
 DECLARE
   v_requester uuid;
   v_role text;
   v_target public.school_memberships%ROWTYPE;
+  v_review text := coalesce(current_setting('app.school_staff_change_review', true), '');
 BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF v_review <> 'true'
+       OR OLD.status <> 'pending'
+       OR NEW.status NOT IN ('approved', 'rejected')
+       OR ROW(NEW.school_id, NEW.target_membership_id, NEW.requester_membership_id, NEW.request_type,
+              NEW.requested_role, NEW.requested_details, NEW.reason, NEW.created_at)
+          IS DISTINCT FROM
+          ROW(OLD.school_id, OLD.target_membership_id, OLD.requester_membership_id, OLD.request_type,
+              OLD.requested_role, OLD.requested_details, OLD.reason, OLD.created_at) THEN
+      RAISE EXCEPTION 'Staff change request review must use the guarded workflow';
+    END IF;
+    RETURN NEW;
+  END IF;
   IF TG_OP = 'INSERT' THEN
     v_requester := public.school_my_membership_id(NEW.school_id);
     SELECT school_role INTO v_role FROM public.school_memberships WHERE id = v_requester;
@@ -381,15 +412,17 @@ BEGIN
   IF v_request.id IS NULL OR v_request.status <> 'pending' THEN
     RAISE EXCEPTION 'Pending staff change request not found';
   END IF;
+  PERFORM set_config('app.school_staff_change_review', 'true', true);
   UPDATE public.school_staff_change_requests
   SET status = CASE WHEN p_approve THEN 'approved' ELSE 'rejected' END,
       reviewed_by_user_id = auth.uid(),
       reviewed_at = now(),
       review_note = nullif(trim(p_note), '')
   WHERE id = p_request_id;
+  PERFORM set_config('app.school_staff_change_review', '', true);
   RETURN true;
 END;
-$$;
+$;
 
 ALTER TABLE public.school_staff_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_staff_task_comments ENABLE ROW LEVEL SECURITY;
