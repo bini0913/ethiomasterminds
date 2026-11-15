@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, BookOpen, Check, GraduationCap, Library, Target } from "lucide-react";
 import { toast } from "sonner";
+import { resolveAcademicGrade } from "@/lib/academicProfile";
 
 type Goal = "class" | "ministry_exam" | "university_entrance" | "national_exam" | "entrance_exam" | "exit_exam" | "mock_exam" | "past_papers" | "custom";
 type Curriculum = "oromia" | "addis_ababa";
@@ -82,9 +83,13 @@ const AcademicSetup: React.FC = () => {
         if (error) throw error;
 
         if (!cancelled && data) {
-          setGrade(data.grade);
-          setStep(Number(data.grade) >= 9 ? 2 : 1);
-          if (Number(data.grade) >= 9) setStep((current) => current === 1 ? 2 : current);
+          // The main authenticated profile owns the learner's grade band.
+          // Older academic setup rows remain useful fallback data, but must not
+          // render Grade 9 inside a Grade 12 workspace.
+          const savedGrade = resolveAcademicGrade(user?.grade, data.grade, 9);
+          setGrade(savedGrade);
+          setStep(savedGrade >= 9 ? 2 : 1);
+          if (savedGrade >= 9) setStep((current) => current === 1 ? 2 : current);
           setGoal(data.study_goal as Goal);
           setGoalDetail(data.study_goal_detail || "");
           setCurriculum(data.curriculum as Curriculum);

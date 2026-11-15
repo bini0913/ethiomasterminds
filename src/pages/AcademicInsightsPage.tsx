@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { ArrowLeft, TrendingUp, Target, Zap, Brain, Calendar, Award, Loader2, Sparkles, BookOpen, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
+import { getAcademicProfile, normalizeGrade, resolveAcademicGrade } from "@/lib/academicProfile";
 
 const AcademicInsightsPage: React.FC = () => {
   const { user } = useUser();
@@ -53,7 +53,7 @@ const AcademicInsightsPage: React.FC = () => {
           ...(profile.book_title ? [profile.book_title] : []),
         ]));
         setAcademicContext({
-          grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 12)),
+          grade: resolveAcademicGrade(user.grade, profile.grade, 12),
           curriculum: profile.curriculum,
           goal: [profile.study_goal, profile.study_goal_detail].filter(Boolean).join(" — "),
           book: resources.join("; ") || "Not specified",

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { BookOpen, Brain, Target, CalendarDays, BarChart3, GraduationCap, TrendingUp, ArrowUpRight, Settings2, ClipboardCheck, Sparkles, Loader2 } from "lucide-react";
-import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
+import { getAcademicProfile, resolveAcademicGrade } from "@/lib/academicProfile";
 
 const features = [
   { title: "Exam practice", eyebrow: "PREPARE", description: "Timed practice using approved quizzes and real question sets.", icon: Target, path: "/academic/exam", action: "Start an exam", featured: true },
@@ -88,7 +88,7 @@ const AcademicMode: React.FC = () => {
 
   if (isLoading) return <div className="flex min-h-[60vh] items-center justify-center gap-3 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Loading your study space…</div>;
 
-  const grade = normalizeGrade(profile?.grade, normalizeGrade(user?.grade, 9));
+  const grade = resolveAcademicGrade(user?.grade, profile?.grade, 9);
   const goalLabels: Record<string, string> = { class: "School / Class", ministry_exam: "Ministry Exam", university_entrance: "University Entrance", national_exam: "National / Regional Exam", custom: "Custom goal" };
   const goal = profile?.study_goal_detail || goalLabels[profile?.study_goal] || "Study goal";
   const subjects: string[] = Array.isArray(profile?.subjects)
