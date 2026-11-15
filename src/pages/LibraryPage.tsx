@@ -55,37 +55,6 @@ interface GeneratedCard {
   back: string;
 }
 
-function generateAiContent(action: AiAction, text: string, grade: number) {
-  const normalized = text.trim();
-  if (!normalized) {
-    return 'Please add page text or selected text first so AI can help.';
-  }
-
-  const sentences = normalized.split(/(?<=[.!?])\s+/).filter(Boolean);
-  const easyTone = grade <= 4;
-
-  if (action === 'summary') {
-    return sentences.slice(0, 3).join(' ') || normalized.slice(0, 220);
-  }
-
-  if (action === 'simple') {
-    return easyTone
-      ? `Simple explanation: ${sentences[0] || normalized.slice(0, 120)}. Think of it like learning one step at a time.`
-      : `Detailed explanation: ${sentences.slice(0, 2).join(' ')} This topic connects to deeper subject understanding and exam application.`;
-  }
-
-  if (action === 'concepts') {
-    const words = Array.from(new Set(normalized.toLowerCase().match(/[a-z]{5,}/g) || []));
-    return words.slice(0, 8).map((w, idx) => `${idx + 1}. ${w}`).join('\n') || 'No key concepts extracted yet.';
-  }
-
-  if (action === 'questions') {
-    return Array.from({ length: 5 }).map((_, i) => `Q${i + 1}: What is a key idea from this section?\nA${i + 1}: ${sentences[i % Math.max(1, sentences.length)] || normalized.slice(0, 100)}`).join('\n\n');
-  }
-
-  return Array.from({ length: 5 }).map((_, i) => `Card ${i + 1}: ${sentences[i % Math.max(1, sentences.length)] || normalized.slice(0, 90)}`).join('\n');
-}
-
 const LibraryPage: React.FC = () => {
   const { user } = useUser();
 
@@ -363,7 +332,9 @@ const LibraryPage: React.FC = () => {
       toast.error('Select text or add page text first.');
       return;
     }
-    const cacheKey = shortHash(`${action}:${selectedBook.id}:${limitedText}`);
+    // Version the cache namespace so previously stored client-generated fallback text
+    // is not mistaken for a response produced by the real library AI service.
+    const cacheKey = shortHash(`server-ai-v2:${action}:${selectedBook.id}:${limitedText}`);
 
     let output = '';
     const cached = await findCachedAIContent({
@@ -383,10 +354,14 @@ const LibraryPage: React.FC = () => {
           grade: Number(user.grade || 9),
           subject: selectedBook.subject,
         });
-      } catch {
-        output = generateAiContent(action, limitedText, Number(user.grade || 9));
+        if (!output.trim()) throw new Error("The AI service returned an empty response. Please try again.");
+      } catch (error) {
+        console.error("Library AI request failed:", error);
+        toast.error(error instanceof Error ? error.message : "Library AI is temporarily unavailable. Please try again.");
+        return;
       }
 
+      // Only responses returned by the real AI service are persisted in the AI cache.
       await saveAIContent({
         user_id: user.id,
         book_id: selectedBook.id,
@@ -394,7 +369,9 @@ const LibraryPage: React.FC = () => {
         source_hash: cacheKey,
         source_excerpt: limitedText.slice(0, 350),
         response: output,
-      }).catch(() => undefined);
+      }).catch((error) => {
+        console.warn("Library AI response could not be cached:", error);
+      });
     }
 
     setAiOutput(output);
