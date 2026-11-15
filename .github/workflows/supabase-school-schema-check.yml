@@ -1,6 +1,14 @@
 name: Supabase school schema checks
 
 on:
+  push:
+    branches:
+      - feat/school-management-portals-foundation
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "supabase/config.toml"
+      - "supabase/functions/school-provision-account/**"
   pull_request:
     paths:
       - "supabase/migrations/**"
