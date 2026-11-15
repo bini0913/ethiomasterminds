@@ -21,12 +21,11 @@ ALTER TABLE public.flashcards
 ALTER TABLE public.flashcards
   ADD COLUMN IF NOT EXISTS is_public boolean NOT NULL DEFAULT true;
 
--- Legacy flashcards store creator identifiers as text, including the
--- non-user sentinel "system". Only copy values that are valid auth UUIDs.
 UPDATE public.flashcards
 SET user_id = btrim(created_by)::uuid
 WHERE user_id IS NULL
-  AND btrim(created_by) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
+  AND length(btrim(created_by)) = 36
+  AND btrim(created_by) ~* '^[0-9a-f-]+
 
 -- Ensure RLS on key tables
 ALTER TABLE public.social_posts ENABLE ROW LEVEL SECURITY;
