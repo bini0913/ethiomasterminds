@@ -820,6 +820,7 @@ BEGIN
     WHERE history.effective_from <= term.ends_on
       AND (history.effective_to IS NULL OR history.effective_to >= term.starts_on)
       AND section.academic_year_id = term.academic_year_id
+  ),
   category_scores AS (
     SELECT
       mark.student_membership_id,
@@ -835,13 +836,15 @@ BEGIN
     JOIN public.school_assessments assessment ON assessment.id = mark.assessment_id
     JOIN public.school_assessment_categories category ON category.id = assessment.category_id
     JOIN public.school_sections section ON section.id = assessment.section_id
-    JOIN public.school_student_section_history history
-      ON history.student_membership_id = mark.student_membership_id
-     AND history.school_id = assessment.school_id
-     AND history.section_id = assessment.section_id
-     AND history.effective_from <= (SELECT ends_on FROM public.school_terms WHERE id = p_term_id)
-     AND (history.effective_to IS NULL OR history.effective_to >= (SELECT starts_on FROM public.school_terms WHERE id = p_term_id))
     WHERE assessment.term_id = p_term_id
+      AND EXISTS (
+        SELECT 1 FROM public.school_student_section_history history
+        WHERE history.student_membership_id = mark.student_membership_id
+          AND history.school_id = assessment.school_id
+          AND history.section_id = assessment.section_id
+          AND history.effective_from <= (SELECT ends_on FROM public.school_terms WHERE id = p_term_id)
+          AND (history.effective_to IS NULL OR history.effective_to >= (SELECT starts_on FROM public.school_terms WHERE id = p_term_id))
+      )
       AND assessment.school_id = v_school_id
       AND assessment.status = 'approved'
       AND mark.status = 'approved'
