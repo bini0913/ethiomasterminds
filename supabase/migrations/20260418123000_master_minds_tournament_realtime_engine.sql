@@ -192,24 +192,30 @@ end;
 $$;
 
 -- Canonical matches compatibility view requested by product prompt
+-- Keep the original view's column names and order for CREATE OR REPLACE
+-- compatibility. New aliases are appended after the legacy columns.
 create or replace view public.matches as
 select
   tm.id,
   tm.tournament_id,
-  coalesce(tm.round_number, tm.round) as round_number,
   tm.player1_id,
   tm.player2_id,
-  tm.score_player1 as player1_score,
-  tm.score_player2 as player2_score,
-  tm.winner_id,
+  tm.round,
   case
     when tm.status in ('pending', 'ready') then 'waiting'
     when tm.status = 'live' then 'playing'
     else tm.status
   end as status,
+  tm.winner_id,
+  tm.score_player1,
+  tm.score_player2,
+  tm.created_at,
+  tm.updated_at,
+  coalesce(tm.round_number, tm.round) as round_number,
+  tm.score_player1 as player1_score,
+  tm.score_player2 as player2_score,
   tm.starts_at as started_at,
-  tm.finished_at as ended_at,
-  tm.created_at
+  tm.finished_at as ended_at
 from public.tournament_matches tm;
 
 -- manager can add users by username
