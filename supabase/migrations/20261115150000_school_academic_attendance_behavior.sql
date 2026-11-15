@@ -1304,6 +1304,7 @@ AFTER UPDATE OF status ON public.school_term_results
 FOR EACH ROW EXECUTE FUNCTION public.school_notify_parent_results_published();
 
 ALTER TABLE public.school_student_section_history ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.school_student_section_history FROM PUBLIC, anon, authenticated;
 ALTER TABLE public.school_terms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_grading_policies ENABLE ROW LEVEL SECURITY;
