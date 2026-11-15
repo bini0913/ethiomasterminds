@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, UserCog, ClipboardCheck, CalendarCheck, ShieldCheck,
   BookOpen, Megaphone, MessageSquare, ClipboardList, FileBarChart, RefreshCw,
-  Check, X, Plus, Send, Calculator,
+  Check, X, Plus, Send, Calculator, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -116,6 +116,7 @@ export default function SchoolAdminPortal() {
       db.from("school_subjects").select("id,academic_year_id,grade_label,subject_name,active").eq("school_id", schoolId).eq("active", true).order("grade_label"),
       db.from("school_terms").select("id,academic_year_id,name,term_number,starts_on,ends_on").eq("school_id", schoolId).order("term_number"),
       db.from("school_assessments").select("id,title,subject_name,section_id,term_id,status,created_by_membership_id,review_feedback,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+      db.from("school_homework_assignments").select("id,title,section_id,teacher_membership_id,subject_name,instructions,due_at,status,review_feedback,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(200),
       db.from("school_student_marks").select("id,assessment_id,student_membership_id,score,status,teacher_note").eq("school_id", schoolId).limit(500),
       db.from("school_attendance_sessions").select("id,section_id,attendance_date,status,recorded_by_membership_id").eq("school_id", schoolId).order("attendance_date", { ascending: false }).limit(100),
       db.from("school_attendance_records").select("id,session_id,student_membership_id,attendance_status").eq("school_id", schoolId).limit(1000),
@@ -143,6 +144,7 @@ export default function SchoolAdminPortal() {
     setSubjects(subjectsRes.data ?? []);
     setTerms(termsRes.data ?? []);
     setAssessments(assessmentsRes.data ?? []);
+    setHomeworkAssignments(homeworkRes.data ?? []);
     setMarks(marksRes.data ?? []);
     setAttendanceSessions(sessionsRes.data ?? []);
     setAttendanceRecords(attendanceRes.data ?? []);
