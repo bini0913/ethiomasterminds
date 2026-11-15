@@ -77,7 +77,7 @@ export default function SchoolTeacherPortal() {
     }
     const nextAssignments = assignmentRes.data ?? [];
     setAssignments(nextAssignments);
-    const sectionIds = [...new Set(nextAssignments.map((item: any) => item.section_id))];
+    const sectionIds: string[] = [...new Set<string>(nextAssignments.map((item: any) => String(item.section_id)))];
     if (!sectionIds.length) {
       setSections([]); setStudents([]); setTerms([]); setCategories([]);
       setAssessments([]); setMarks([]); setAnnouncements([]); setBehaviorReports([]);
@@ -144,7 +144,7 @@ export default function SchoolTeacherPortal() {
     const nextSectionTerms = (termsRes.data ?? []).filter((term: any) => term.academic_year_id === nextSection?.academic_year_id);
     setAssessmentSectionId(nextSectionId);
     setAnnouncementSectionId((current) => sectionIds.includes(current) ? current : sectionIds[0]);
-    const homeroomSectionIds = nextAssignments.filter((item: any) => item.assignment_kind === "homeroom").map((item: any) => item.section_id);
+    const homeroomSectionIds: string[] = nextAssignments.filter((item: any) => item.assignment_kind === "homeroom").map((item: any) => String(item.section_id));
     setAttendanceSectionId((current) => homeroomSectionIds.includes(current) ? current : homeroomSectionIds[0] || "");
     setAssessmentTermId((current) => nextSectionTerms.some((term: any) => term.id === current) ? current : nextSectionTerms[0]?.id || "");
     setSelectedAssessmentId((current) => assessmentsRes.data?.some((item: any) => item.id === current) ? current : assessmentsRes.data?.[0]?.id || "");
