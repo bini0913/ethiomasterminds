@@ -64,54 +64,13 @@ DROP POLICY IF EXISTS school_staff_view_same_school_profiles ON public.profiles;
 CREATE POLICY school_staff_view_same_school_profiles
 ON public.profiles
 FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1
-    FROM public.school_memberships staff
-    JOIN public.school_memberships target
-      ON target.school_id = staff.school_id
-    WHERE staff.user_id = auth.uid()
-      AND staff.status = 'active'
-      AND staff.school_role IN ('manager', 'admin')
-      AND target.user_id = profiles.id
-  )
-  OR EXISTS (
-    SELECT 1
-    FROM public.school_memberships teacher
-    JOIN public.school_teacher_assignments assignment
-      ON assignment.teacher_membership_id = teacher.id
-     AND assignment.school_id = teacher.school_id
-    JOIN public.school_memberships student
-      ON student.school_id = teacher.school_id
-     AND student.section_id = assignment.section_id
-     AND student.school_role = 'student'
-    WHERE teacher.user_id = auth.uid()
-      AND teacher.school_role = 'teacher'
-      AND teacher.status = 'active'
-      AND student.user_id = profiles.id
-  )
-);
+USING (public.school_can_view_profile(id));
 
 DROP POLICY IF EXISTS school_parents_view_linked_child_profiles ON public.profiles;
 CREATE POLICY school_parents_view_linked_child_profiles
 ON public.profiles
 FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1
-    FROM public.school_parent_student_links link
-    JOIN public.school_memberships parent_membership
-      ON parent_membership.id = link.parent_membership_id
-    JOIN public.school_memberships student_membership
-      ON student_membership.id = link.student_membership_id
-    WHERE parent_membership.user_id = auth.uid()
-      AND parent_membership.school_role = 'parent'
-      AND parent_membership.status = 'active'
-      AND link.status = 'active'
-      AND student_membership.user_id = profiles.id
-      AND student_membership.status = 'active'
-  )
-);
+USING (public.school_can_view_profile(id));
 
 -- Keep student directory lookup within the caller's actual school scope.
 CREATE OR REPLACE FUNCTION public.find_student_by_username(_username text)
