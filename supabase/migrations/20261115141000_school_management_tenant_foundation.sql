@@ -271,17 +271,6 @@ BEGIN
       updated_at = now()
   WHERE id = p_membership_id;
 
-  INSERT INTO public.school_record_events(school_id, membership_id, event_type, details, actor_id)
-  VALUES (
-    v_membership.school_id,
-    v_membership.id,
-    CASE WHEN p_status = 'transferred' THEN 'transferred'
-         WHEN p_status = 'graduated' THEN 'graduated'
-         ELSE 'deactivated' END,
-    jsonb_build_object('reason', nullif(trim(p_reason), '')),
-    auth.uid()
-  );
-
   RETURN true;
 END;
 $$;
@@ -363,6 +352,56 @@ CREATE TRIGGER school_parent_student_link_validate
 BEFORE INSERT OR UPDATE ON public.school_parent_student_links
 FOR EACH ROW EXECUTE FUNCTION public.school_validate_parent_student_link();
 
+CREATE OR REPLACE FUNCTION public.school_record_membership_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.school_role = 'student' THEN
+      INSERT INTO public.school_record_events(school_id, membership_id, event_type, details, actor_id)
+      VALUES (NEW.school_id, NEW.id, 'enrolled',
+              jsonb_build_object('grade', NEW.grade_label, 'section_id', NEW.section_id),
+              auth.uid());
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF NEW.school_role = 'student' AND NEW.grade_label IS DISTINCT FROM OLD.grade_label THEN
+    INSERT INTO public.school_record_events(school_id, membership_id, event_type, details, actor_id)
+    VALUES (NEW.school_id, NEW.id, 'grade_changed',
+            jsonb_build_object('from_grade', OLD.grade_label, 'to_grade', NEW.grade_label),
+            auth.uid());
+  END IF;
+
+  IF NEW.school_role = 'student' AND NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NEW.status IN ('transferred', 'graduated', 'deactivated') THEN
+      INSERT INTO public.school_record_events(school_id, membership_id, event_type, details, actor_id)
+      VALUES (
+        NEW.school_id, NEW.id,
+        CASE NEW.status WHEN 'transferred' THEN 'transferred'
+                        WHEN 'graduated' THEN 'graduated'
+                        ELSE 'deactivated' END,
+        jsonb_build_object('reason', NEW.end_reason),
+        auth.uid()
+      );
+    ELSIF OLD.status IN ('transferred', 'graduated', 'deactivated') AND NEW.status = 'active' THEN
+      INSERT INTO public.school_record_events(school_id, membership_id, event_type, details, actor_id)
+      VALUES (NEW.school_id, NEW.id, 'reactivated', '{}'::jsonb, auth.uid());
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_record_membership_change ON public.school_memberships;
+CREATE TRIGGER school_record_membership_change
+AFTER INSERT OR UPDATE OF grade_label, status ON public.school_memberships
+FOR EACH ROW EXECUTE FUNCTION public.school_record_membership_change();
+
 CREATE OR REPLACE FUNCTION public.school_sync_parent_access_after_student_exit()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -433,6 +472,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
               AND teacher.school_role = 'teacher'
               AND teacher.status = 'active'
               AND assignment.section_id = target.section_id
+              AND target.status IN ('active', 'suspended')
           )
         )
         OR (
@@ -573,6 +613,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         AND teacher.school_role = 'teacher'
         AND teacher.status = 'active'
         AND student.user_id = p_profile_id
+        AND student.status IN ('active', 'suspended')
     )
     OR EXISTS (
       SELECT 1
@@ -638,10 +679,10 @@ USING (public.is_active_school_member(school_id, NULL) OR public._is_extreme_adm
 
 DROP POLICY IF EXISTS school_years_manager_write ON public.school_academic_years;
 CREATE POLICY school_years_manager_insert ON public.school_academic_years
-FOR INSERT TO authenticated WITH CHECK (public.is_school_manager_or_admin(school_id));
+FOR INSERT TO authenticated WITH CHECK (public.is_school_manager(school_id));
 CREATE POLICY school_years_manager_update ON public.school_academic_years
-FOR UPDATE TO authenticated USING (public.is_school_manager_or_admin(school_id))
-WITH CHECK (public.is_school_manager_or_admin(school_id));
+FOR UPDATE TO authenticated USING (public.is_school_manager(school_id))
+WITH CHECK (public.is_school_manager(school_id));
 
 DROP POLICY IF EXISTS school_sections_read ON public.school_sections;
 CREATE POLICY school_sections_read ON public.school_sections
