@@ -4,6 +4,12 @@
 -- Canonical tournament column aliases required by product spec
 alter table public.tournaments add column if not exists question_count integer;
 alter table public.tournaments add column if not exists paused_at timestamptz;
+-- Earlier installations may already have a legacy tournaments table. Ensure
+-- the scheduling columns required by the realtime workflow exist on it.
+alter table public.tournaments add column if not exists starts_at timestamptz;
+alter table public.tournaments add column if not exists start_time timestamptz;
+alter table public.tournaments add column if not exists ends_at timestamptz;
+alter table public.tournaments add column if not exists end_time timestamptz;
 
 update public.tournaments
 set question_count = coalesce(question_count, questions_count)
@@ -36,6 +42,9 @@ execute function public.sync_tournament_question_count();
 
 -- Round number alias on tournament_matches for API/UI compatibility
 alter table public.tournament_matches add column if not exists round_number integer;
+-- Backfill scheduling columns when tournament_matches predates this schema.
+alter table public.tournament_matches add column if not exists starts_at timestamptz;
+alter table public.tournament_matches add column if not exists finished_at timestamptz;
 
 update public.tournament_matches
 set round_number = round
