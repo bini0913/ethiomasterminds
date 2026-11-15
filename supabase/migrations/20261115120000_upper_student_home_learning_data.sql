@@ -99,7 +99,8 @@ BEGIN
   WHERE id = v_user_id
   FOR SHARE;
 
-  IF v_grade IS NULL
+  IF public.get_user_role(v_user_id) <> 'student'
+     OR v_grade IS NULL
      OR substring(lower(trim(v_grade)) from '[0-9]+') IS NULL
      OR substring(lower(trim(v_grade)) from '[0-9]+')::integer NOT BETWEEN 9 AND 12 THEN
     RAISE EXCEPTION 'This exam target is available to Grades 9–12 students';
@@ -152,7 +153,8 @@ BEGIN
   FROM public.profiles
   WHERE id = NEW.student_id;
 
-  IF substring(lower(trim(COALESCE(v_grade, ''))) from '[0-9]+') IS NULL
+  IF public.get_user_role(NEW.student_id) <> 'student'
+     OR substring(lower(trim(COALESCE(v_grade, ''))) from '[0-9]+') IS NULL
      OR substring(lower(trim(v_grade)) from '[0-9]+')::integer NOT BETWEEN 9 AND 12 THEN
     RETURN NEW;
   END IF;
