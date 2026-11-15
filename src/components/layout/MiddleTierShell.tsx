@@ -65,9 +65,6 @@ const connectLinks = [
 ];
 
 const moreLinks = [
-  { label: "Friends", path: "/friends", icon: Users },
-  { label: "Community", path: "/social/community", icon: MessageCircle },
-  { label: "Chat", path: "/chat", icon: MessageCircle },
   { label: "Flashcards", path: "/academic/flashcards", icon: Layers3 },
   { label: "Topic coverage", path: "/academic/topics", icon: Target },
   { label: "Study planner", path: "/academic/planner", icon: CalendarDays },
@@ -87,6 +84,7 @@ const MiddleTierShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const { coins, dailyStreak } = useCurrency();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [profileOpen, setProfileOpen] = React.useState(false);
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
   const firstName = user?.name?.trim().split(/\s+/)[0] || "Learner";
   const xpProgress = getXpProgressInLevel(user?.xp ?? 0);
   const pageTitle = location.pathname === "/" ? "Today" : location.pathname.startsWith("/leaderboard") ? "Rank" : primaryNav.find((item) => isActivePath(location.pathname, item.match))?.label ?? "Master Minds";
@@ -109,7 +107,7 @@ const MiddleTierShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </span>
         </Link>
 
-        <nav aria-label="Grades 5–8 navigation" className="min-h-0 flex-1 space-y-6 overflow-y-auto px-1">
+        <nav aria-label="Grades 5–8 navigation" className="min-h-0 flex-1 space-y-5 overflow-y-auto px-1">
           <div>
             <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Your workspace</p>
             <div className="space-y-1">
@@ -122,14 +120,41 @@ const MiddleTierShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </div>
 
           <div>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Explore</p>
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Learn</p>
             <div className="space-y-1">
-              {[...learnLinks.slice(3), ...playLinks, ...connectLinks, ...moreLinks].map((item) => {
+              {learnLinks.filter((item) => item.path !== "/study-mode").map((item) => {
                 const Icon = item.icon;
                 const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
                 return <Link key={item.path} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-4 w-4" />{item.label}</Link>;
               })}
             </div>
+          </div>
+
+          <div>
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Play</p>
+            <div className="space-y-1">
+              {playLinks.map((item) => {
+                const Icon = item.icon;
+                const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+                return <Link key={item.path} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-4 w-4" />{item.label}</Link>;
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Connect</p>
+            <div className="space-y-1">
+              {connectLinks.map((item) => {
+                const Icon = item.icon;
+                const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+                return <Link key={item.path} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-4 w-4" />{item.label}</Link>;
+              })}
+            </div>
+          </div>
+
+          <div>
+            <button type="button" onClick={() => setAdvancedOpen((open) => !open)} aria-expanded={advancedOpen} className="flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"><Sparkles className="h-4 w-4" />More tools<ChevronRight className={`ml-auto h-4 w-4 transition-transform ${advancedOpen ? "rotate-90" : ""}`} /></button>
+            {advancedOpen && <div className="mt-1 space-y-1 border-l border-border/70 pl-3">{moreLinks.map((item) => { const Icon = item.icon; const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`); return <Link key={item.path} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-9 items-center gap-3 rounded-lg px-3 text-xs font-semibold transition-colors ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-4 w-4" />{item.label}</Link>; })}</div>}
           </div>
         </nav>
 
