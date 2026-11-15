@@ -53,4 +53,4 @@ jobs:
         with:
           deno-version: v2.x
       - name: Type-check school account provisioning function
-        run: deno check supabase/functions/school-provision-account/index.ts
+        run: deno check --node-modules-dir=auto supabase/functions/school-provision-account/index.ts
