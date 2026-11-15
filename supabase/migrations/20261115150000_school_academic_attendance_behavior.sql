@@ -951,7 +951,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_assessment_mutation_validate ON public.school_assessments;
 CREATE TRIGGER school_assessment_mutation_validate
@@ -1003,7 +1003,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_student_mark_validate ON public.school_student_marks;
 CREATE TRIGGER school_student_mark_validate
@@ -1039,7 +1039,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_behavior_report_validate ON public.school_behavior_reports;
 CREATE TRIGGER school_behavior_report_validate
@@ -1063,7 +1063,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_attendance_session_validate ON public.school_attendance_sessions;
 CREATE TRIGGER school_attendance_session_validate
@@ -1094,7 +1094,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_attendance_record_validate ON public.school_attendance_records;
 CREATE TRIGGER school_attendance_record_validate
@@ -1113,7 +1113,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_parent_notification_immutable ON public.school_parent_notifications;
 CREATE TRIGGER school_parent_notification_immutable
@@ -1130,7 +1130,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND parent.school_role = 'parent'
       AND parent.status = 'active'
   );
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_notify_parent_results_published()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -1148,7 +1148,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_results_notify_parent ON public.school_term_results;
 CREATE TRIGGER school_results_notify_parent
