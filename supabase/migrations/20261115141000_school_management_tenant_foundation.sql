@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.school_memberships (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (school_id, user_id, school_role),
+  UNIQUE (id, school_id),
   CHECK (
     (school_role = 'student' AND (student_number IS NOT NULL OR status <> 'active'))
     OR school_role <> 'student'
@@ -92,13 +93,15 @@ ALTER TABLE public.school_memberships
 CREATE TABLE IF NOT EXISTS public.school_teacher_assignments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
-  teacher_membership_id uuid NOT NULL REFERENCES public.school_memberships(id) ON DELETE RESTRICT,
+  teacher_membership_id uuid NOT NULL,
   section_id uuid NOT NULL,
   subject_name text NOT NULL,
   assignment_kind text NOT NULL DEFAULT 'subject'
     CHECK (assignment_kind IN ('subject', 'homeroom')),
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (teacher_membership_id, school_id)
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
   FOREIGN KEY (section_id, school_id)
     REFERENCES public.school_sections(id, school_id) ON DELETE RESTRICT,
   UNIQUE (teacher_membership_id, section_id, subject_name, assignment_kind)
@@ -135,7 +138,7 @@ CREATE TABLE IF NOT EXISTS public.school_record_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
   membership_id uuid NOT NULL REFERENCES public.school_memberships(id) ON DELETE RESTRICT,
-  event_type text NOT NULL CHECK (event_type IN ('enrolled', 'grade_changed', 'transferred', 'graduated', 'reactivated')),
+  event_type text NOT NULL CHECK (event_type IN ('enrolled', 'grade_changed', 'transferred', 'graduated', 'deactivated', 'reactivated')),
   details jsonb NOT NULL DEFAULT '{}'::jsonb,
   actor_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -245,7 +248,7 @@ BEGIN
     v_membership.id,
     CASE WHEN p_status = 'transferred' THEN 'transferred'
          WHEN p_status = 'graduated' THEN 'graduated'
-         ELSE 'transferred' END,
+         ELSE 'deactivated' END,
     jsonb_build_object('reason', nullif(trim(p_reason), '')),
     auth.uid()
   );
@@ -267,10 +270,13 @@ BEGIN
   SELECT * INTO v_parent FROM public.school_memberships WHERE id = NEW.parent_membership_id;
   SELECT * INTO v_student FROM public.school_memberships WHERE id = NEW.student_membership_id;
 
+  IF NEW.status = 'deactivated' THEN
+    RETURN NEW;
+  END IF;
   IF v_parent.id IS NULL OR v_student.id IS NULL
      OR v_parent.school_id <> NEW.school_id OR v_student.school_id <> NEW.school_id
      OR v_parent.school_role <> 'parent' OR v_student.school_role <> 'student' THEN
-    RAISE EXCEPTION 'Parent and student must be active memberships in the same school';
+    RAISE EXCEPTION 'Parent and student must be memberships in the same school';
   END IF;
   IF v_parent.status <> 'active' OR v_student.status <> 'active' THEN
     RAISE EXCEPTION 'Only active parent and student memberships can be linked';
