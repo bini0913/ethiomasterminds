@@ -140,7 +140,7 @@ const UpperTierHome: React.FC = () => {
         .select("subject,topic,accuracy_percentage,questions_attempted,correct_answers,last_practiced_at")
         .eq("user_id", user.id)
         .order("accuracy_percentage", { ascending: true })
-        .limit(100),
+        .limit(500),
       db.from("upper_student_daily_activity")
         .select("activity_date,quiz_count,question_count,correct_count,xp_earned")
         .eq("user_id", user.id)
@@ -239,6 +239,8 @@ const UpperTierHome: React.FC = () => {
   const maxActivity = Math.max(1, ...weeklyActivity.map((day) => day.count));
   const focusTopic = topics[0] || null;
   const coveredSubjects = new Set(topics.map((topic) => topic.subject)).size;
+  const masteredTopics = topics.filter((topic) => Number(topic.accuracy_percentage) >= 80 && Number(topic.questions_attempted) >= 5).length;
+  const topicMastery = topics.length ? Math.round((masteredTopics / topics.length) * 100) : null;
   const daysToExam = examTarget ? dayDifference(todayKey, examTarget.exam_date) : null;
 
   const saveExamTarget = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -288,7 +290,7 @@ const UpperTierHome: React.FC = () => {
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current streak</span><Flame className="h-4 w-4 text-orange-500" /></div>
+          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Practice streak</span><Flame className="h-4 w-4 text-orange-500" /></div>
           <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : currentStreak}<span className="ml-1 text-sm font-semibold text-muted-foreground">days</span></p>
           <p className="mt-1 text-xs text-muted-foreground">{longestStreak ? `Longest: ${longestStreak} days` : "Complete a practice quiz to start a streak."}</p>
         </div>
@@ -304,8 +306,8 @@ const UpperTierHome: React.FC = () => {
         </div>
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Topics practised</span><BookOpen className="h-4 w-4 text-primary" /></div>
-          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : topics.length}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{coveredSubjects} of {selectedSubjects.length} selected subjects started</p>
+          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : topicMastery === null ? "—" : topicMastery + "%"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{masteredTopics} of {topics.length} practised topics mastered · {coveredSubjects}/{selectedSubjects.length} subjects started</p>
         </div>
       </section>
 
