@@ -1,22 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { useUser } from '@/context/UserContext';
 import { getUserTier } from '@/lib/getUserTier';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  Bot, Send, Loader2, BookOpen, Calculator, Globe, Beaker, History,
-  Sparkles, Mic, MicOff, Volume2, VolumeX, Lightbulb, ListChecks,
-  RefreshCw, Copy, Check, Brain
+  Send, Loader2, Sparkles, Mic, MicOff, Volume2, VolumeX, Lightbulb, ListChecks,
+  RefreshCw, Copy, Check, Brain, MessageSquare, RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '@/components/ui/BackButton';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -25,30 +21,13 @@ interface Message {
   timestamp: string;
 }
 
-const subjects = [
-  { id: 'math', name: 'Mathematics', icon: Calculator, color: 'bg-primary/10 text-primary' },
-  { id: 'science', name: 'Science', icon: Beaker, color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
-  { id: 'english', name: 'English', icon: BookOpen, color: 'bg-accent/10 text-accent' },
-  { id: 'history', name: 'History', icon: History, color: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
-  { id: 'geography', name: 'Geography', icon: Globe, color: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' },
-  { id: 'general', name: 'General', icon: Sparkles, color: 'bg-muted text-muted-foreground' },
-];
-
 const quickActions = [
-  { label: 'Proof / derivation', prompt: 'Give a rigorous step-by-step mathematical proof or derivation. State assumptions, show each step, and explain why it follows.', icon: Calculator },
-  { label: 'Entrance exam analysis', prompt: 'Analyze this as an Ethiopian Grade 12 Entrance Exam question. Identify the tested concept, solve it methodically, explain distractors, and show an efficient exam approach.', icon: Brain },
-  { label: 'Formulas & mnemonics', prompt: 'Summarize the key formulas, define each symbol, explain when each formula applies, and suggest accurate mnemonic devices.', icon: BookOpen },
-  { label: '3 high-yield questions', prompt: 'Generate 3 high-yield practice questions for this topic, ordered from foundational to exam-level. Hide answers until I attempt them.', icon: ListChecks },
+  { label: 'Show a worked example', prompt: 'Show me a clear worked example for this topic, explaining each step.', icon: Lightbulb },
+  { label: 'Give me a hint', prompt: 'Give me a hint first, without revealing the full answer.', icon: Brain },
+  { label: 'Practice questions', prompt: 'Generate 3 high-yield practice questions for this topic. Hide the answers until I attempt them.', icon: ListChecks },
 ];
 
-const starterPrompts: Record<string, string[]> = {
-  math: ['Explain Pythagoras theorem with a story', 'Help me solve quadratic equations', 'What is calculus used for?'],
-  science: ['Why is the sky blue?', 'How do vaccines work?', 'Explain Newton\'s laws'],
-  english: ['Improve this sentence: ...', 'What is a metaphor?', 'Help me write an essay intro'],
-  history: ['Tell me about Ethiopian history', 'Who was Menelik II?', 'Explain World War II briefly'],
-  geography: ['What causes monsoons?', 'Tallest mountains on Earth', 'How are deserts formed?'],
-  general: ['Teach me something new today', 'Give me a study tip', 'Help me focus better'],
-};
+const starterPrompts = ['Explain a difficult topic step by step', 'Help me plan a focused study session', 'Quiz me on something I am learning'];
 
 const AITutor: React.FC = () => {
   const { user } = useUser();
@@ -57,270 +36,296 @@ const AITutor: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState('general');
   const [conversations, setConversations] = useState<any[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [voiceOut, setVoiceOut] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [conversationLoadError, setConversationLoadError] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [lastFailedPrompt, setLastFailedPrompt] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  useEffect(() => { if (user?.id) loadConversations(); }, [user?.id]);
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, isLoading]);
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  const gradeLabel = user?.grade ? `Grade ${user.grade}` : 'your learning level';
+  const firstName = user?.name?.split(' ')[0] || 'there';
 
   useEffect(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const rec = new SR();
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onresult = (e: any) => { setInput(e.results[0][0].transcript); setIsListening(false); };
-    rec.onerror = () => setIsListening(false);
-    rec.onend = () => setIsListening(false);
-    recognitionRef.current = rec;
+    if (user?.id) void loadConversations();
+  }, [user?.id]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages, isLoading]);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event: any) => {
+      setInput(event.results[0][0].transcript);
+      setIsListening(false);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    return () => recognition.stop();
+  }, []);
+
+  const loadConversations = async () => {
+    if (!user?.id) {
+      setConversations([]);
+      return;
+    }
+    setConversationLoadError(false);
+    try {
+      const { data, error } = await supabase
+        .from('ai_tutor_conversations')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(15);
+      if (error) throw error;
+      setConversations(data || []);
+    } catch (error) {
+      console.error('AI Tutor conversation list load failed:', error);
+      setConversationLoadError(true);
+    }
+  };
+
+  const loadConversation = (conversation: any) => {
+    setConversationId(conversation.id);
+    setMessages((conversation.messages as Message[]) || []);
+    setSendError(null);
+    setLastFailedPrompt(null);
+    textareaRef.current?.focus();
+  };
+
+  const startNew = () => {
+    setConversationId(null);
+    setMessages([]);
+    setSendError(null);
+    setLastFailedPrompt(null);
+    textareaRef.current?.focus();
+  };
 
   const speak = (text: string) => {
     if (!voiceOut || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, ''));
-    u.rate = 1; u.pitch = 1.05;
-    window.speechSynthesis.speak(u);
+    const utterance = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, ''));
+    utterance.rate = 1;
+    utterance.pitch = 1.05;
+    window.speechSynthesis.speak(utterance);
   };
 
   const toggleMic = () => {
-    if (!recognitionRef.current) { toast.error('Voice input not supported'); return; }
-    if (isListening) { recognitionRef.current.stop(); setIsListening(false); }
-    else { recognitionRef.current.start(); setIsListening(true); }
-  };
-
-  const loadConversations = async () => {
-    if (!user?.id) { setConversations([]); return; }
-    try {
-      const { data, error } = await supabase.from('ai_tutor_conversations')
-        .select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(15);
-      if (error) throw error;
-      setConversations(data || []);
-    } catch (error) {
-      console.error("AI Tutor conversation list load failed:", error);
-      toast.error("Your saved AI Tutor conversations could not be loaded.");
+    if (!recognitionRef.current) {
+      toast.error('Voice input is not supported in this browser.');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
     }
   };
-
-  const loadConversation = (conv: any) => {
-    setConversationId(conv.id);
-    setSelectedSubject(conv.subject || 'general');
-    setMessages((conv.messages as Message[]) || []);
-  };
-
-  const startNew = () => { setConversationId(null); setMessages([]); inputRef.current?.focus(); };
 
   const send = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content || isLoading) return;
-    const userMsg: Message = { role: 'user', content, timestamp: new Date().toISOString() };
-    setMessages(p => [...p, userMsg]);
+    const userMessage: Message = { role: 'user', content, timestamp: new Date().toISOString() };
+    setMessages((previous) => [...previous, userMessage]);
     setInput('');
     setIsLoading(true);
+    setSendError(null);
+    setLastFailedPrompt(null);
     try {
       const { data, error } = await supabase.functions.invoke('ai-tutor', {
-        body: { message: content, conversationId, subject: selectedSubject },
+        body: { message: content, conversationId, subject: 'general' },
       });
       if (error) throw error;
+      if (!data?.message) throw new Error('The tutor returned an empty response. Please try again.');
       if (data.conversationId && !conversationId) setConversationId(data.conversationId);
-      const aiMsg: Message = { role: 'assistant', content: data.message, timestamp: new Date().toISOString() };
-      setMessages(p => [...p, aiMsg]);
+      const assistantMessage: Message = { role: 'assistant', content: data.message, timestamp: new Date().toISOString() };
+      setMessages((previous) => [...previous, assistantMessage]);
       speak(data.message);
-      loadConversations();
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e.message || 'Failed to get response');
-    } finally { setIsLoading(false); inputRef.current?.focus(); }
+      void loadConversations();
+    } catch (error: any) {
+      console.error('AI Tutor response failed:', error);
+      setSendError(error?.message || 'The tutor could not respond right now.');
+      setLastFailedPrompt(content);
+    } finally {
+      setIsLoading(false);
+      textareaRef.current?.focus();
+    }
   };
 
-  const copyMsg = (text: string, idx: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(null), 1500);
+  const copyMessage = async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIdx(index);
+      window.setTimeout(() => setCopiedIdx(null), 1500);
+    } catch {
+      toast.error('Could not copy this response.');
+    }
   };
-
-  const subj = subjects.find(s => s.id === selectedSubject)!;
-  const prompts = starterPrompts[selectedSubject] || starterPrompts.general;
 
   return (
-    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground relative overflow-hidden" : "min-h-screen bg-background text-foreground relative overflow-hidden"}>
-
-      <header className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border/50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {!upperStudent && <BackButton />}
-            <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center", subj.color)}>
-              <Bot className="h-5 w-5 text-current" />
+    <div className={cn('min-h-screen bg-[#fbfcfa] text-[#1d2b26]', upperStudent && 'tier-upper')}>
+      <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col lg:flex-row">
+        <aside className="w-full border-b border-[#dce6e0] bg-white px-4 py-4 lg:w-[246px] lg:shrink-0 lg:border-b-0 lg:border-r lg:px-3 lg:py-5">
+          <div className="mb-5 flex items-center justify-between gap-3 px-1 lg:block">
+            <div className="flex items-center gap-3">
+              {!upperStudent && <BackButton />}
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e7f3ef] text-[#287c68]">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div className="lg:mt-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a9891]">Study workspace</p>
+                <h1 className="text-lg font-bold tracking-tight">AI Tutor</h1>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold">AI Tutor</h1>
-              <p className="text-xs text-muted-foreground">Academic reasoning · Exam preparation · Concept mastery</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setVoiceOut(v => !v)} title="Toggle voice">
-              {voiceOut ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4" />}
+            <Button variant="ghost" size="icon" className="text-[#61716a] lg:hidden" onClick={() => void loadConversations()} aria-label="Refresh conversations">
+              <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={startNew}><RefreshCw className="h-4 w-4 mr-2" />New chat</Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="container max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-4 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1 space-y-4">
-            <Card className="glass border-border/50">
-              <CardHeader className="pb-3"><CardTitle className="text-sm">Subject focus</CardTitle></CardHeader>
-              <CardContent className="space-y-1.5">
-                {subjects.map(s => (
-                  <Button key={s.id} variant={selectedSubject === s.id ? 'default' : 'ghost'} size="sm"
-                    className="w-full justify-start" onClick={() => setSelectedSubject(s.id)}>
-                    <div className={cn("w-6 h-6 rounded-md flex items-center justify-center mr-2", s.color)}>
-                      <s.icon className="h-3 w-3 text-current" />
-                    </div>
-                    {s.name}
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="glass border-border/50">
-              <CardHeader className="pb-3"><CardTitle className="text-sm">Recent chats</CardTitle></CardHeader>
-              <CardContent className="space-y-1.5 max-h-72 overflow-y-auto">
-                {conversations.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No conversations yet</p>
-                ) : conversations.map(c => (
-                  <Button key={c.id} variant={conversationId === c.id ? 'secondary' : 'ghost'} size="sm"
-                    className="w-full justify-start text-left h-auto py-2" onClick={() => loadConversation(c)}>
-                    <div className="truncate">
-                      <div className="text-xs font-medium truncate capitalize">{c.subject || 'general'}</div>
-                      <div className="text-[10px] text-muted-foreground">{new Date(c.updated_at).toLocaleDateString()}</div>
-                    </div>
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
           </div>
 
-          <div className="lg:col-span-3">
-            <Card className="glass border-border/50 h-[calc(100dvh-150px)] min-h-[520px] flex flex-col">
-              <CardHeader className="pb-3 border-b border-border/50">
-                <div className="flex items-center gap-3">
-                  <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", subj.color)}>
-                    <Bot className="h-5 w-5 text-white" />
+          <Button onClick={startNew} className="mb-6 h-11 w-full justify-start gap-2 rounded-xl bg-[#287c68] px-4 text-white shadow-none hover:bg-[#216b5a]">
+            <span className="text-lg leading-none">+</span> New conversation
+          </Button>
+
+          <div className="hidden lg:block">
+            <div className="mb-2 flex items-center justify-between px-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8a9891]">Recent</p>
+              <button type="button" onClick={() => void loadConversations()} className="rounded-md p-1 text-[#8a9891] hover:bg-[#f1f5f2] hover:text-[#287c68]" aria-label="Refresh recent conversations">
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {conversationLoadError && (
+              <div role="alert" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <p>Recent chats could not be loaded.</p>
+                <button type="button" onClick={() => void loadConversations()} className="mt-2 font-bold underline">Try again</button>
+              </div>
+            )}
+            <div className="space-y-1">
+              {!conversationLoadError && conversations.length === 0 && (
+                <p className="px-2 py-3 text-xs leading-5 text-[#8a9891]">Your saved conversations will appear here.</p>
+              )}
+              {conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  className={cn('flex w-full items-start gap-2 rounded-xl px-2.5 py-2.5 text-left transition-colors', conversationId === conversation.id ? 'bg-[#e7f3ef] text-[#287c68]' : 'text-[#56665f] hover:bg-[#f4f7f5]')}
+                  onClick={() => loadConversation(conversation)}
+                >
+                  <MessageSquare className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-semibold">{conversation.title || 'Study conversation'}</span>
+                    <span className="mt-0.5 block text-[11px] text-[#8a9891]">{conversation.updated_at ? new Date(conversation.updated_at).toLocaleDateString() : 'Recent'}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+
+          </div>
+        </aside>
+
+        <main className="flex min-h-[calc(100vh-88px)] min-w-0 flex-1 flex-col bg-[#fbfcfa] lg:min-h-screen">
+          <header className="flex min-h-[72px] items-center gap-3 border-b border-[#dce6e0] bg-white px-4 py-3 sm:px-7">
+            <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#287c68] text-white shadow-[0_5px_12px_rgba(40,124,104,0.18)]')}>
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-bold sm:text-base">Selam AI Tutor</h2>
+              <p className="flex items-center gap-1.5 truncate text-xs text-[#7e8d85]"><span className="h-1.5 w-1.5 rounded-full bg-[#39a67c]" /> Online · Personalised for {gradeLabel}</p>
+            </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" onClick={() => setVoiceOut((value) => !value)} className="text-[#66756e] hover:bg-[#f0f6f3] hover:text-[#287c68]" aria-label={voiceOut ? 'Turn voice responses off' : 'Turn voice responses on'}>
+                {voiceOut ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </Button>
+            </div>
+          </header>
+
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-[8%] sm:py-8">
+            <div className="mx-auto max-w-[720px]">
+              {messages.length === 0 ? (
+                <div className="flex min-h-[52vh] flex-col items-center justify-center text-center">
+                  <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 2.4, repeat: Infinity }} className="mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-[#287c68] text-white shadow-[0_12px_24px_rgba(40,124,104,0.18)]">
+                    <Sparkles className="h-8 w-8" />
+                  </motion.div>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#287c68]">Your study companion</p>
+                  <h3 className="text-2xl font-bold tracking-tight text-[#1d2b26]">Hi {firstName}. What are you working on today?</h3>
+                  <p className="mt-3 max-w-md text-sm leading-6 text-[#7e8d85]">Ask for an explanation, paste a problem, or tell me where you are stuck. I’ll meet you at the right step.</p>
+                  <div className="mt-7 flex max-w-2xl flex-wrap justify-center gap-2">
+                    {starterPrompts.map((prompt) => (
+                      <button key={prompt} type="button" onClick={() => void send(prompt)} className="rounded-full border border-[#cfe1da] bg-white px-3.5 py-2 text-xs font-semibold text-[#287c68] transition-colors hover:bg-[#e7f3ef]">{prompt}</button>
+                    ))}
                   </div>
-                  <div className="flex-1">
-                    <CardTitle className="text-base">AI Tutor · {subj.name}</CardTitle>
-                    <p className="text-xs text-muted-foreground">Encouraging, patient, step-by-step</p>
-                  </div>
-                  <Badge variant="secondary"><Sparkles className="h-3 w-3 mr-1" />Groq powered</Badge>
                 </div>
-              </CardHeader>
-
-              <ScrollArea className="flex-1 p-4" ref={scrollRef as any}>
-                <div className="space-y-4">
-                  {messages.length === 0 ? (
-                    <div className="text-center py-12">
-                      <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity }}
-                        className={cn("w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-4", subj.color)}>
-                        <Bot className="h-10 w-10 text-current" />
-                      </motion.div>
-                      <h3 className="text-xl font-bold mb-2">Welcome {user?.name?.split(' ')[0] || 'there'}</h3>
-                      <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                        I'll explain anything, quiz you, give examples, and adapt to how you learn best.
-                      </p>
-                      <div className="flex flex-wrap gap-2 justify-center max-w-lg mx-auto">
-                        {prompts.map(p => (
-                          <Button key={p} variant="outline" size="sm" onClick={() => send(p)}
-                            className="hover-scale">
-                            <Sparkles className="h-3 w-3 mr-1.5 text-primary" />{p}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <AnimatePresence initial={false}>
-                      {messages.map((msg, idx) => (
-                        <motion.div key={idx} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                          className={cn('flex group', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                          <div className={cn('max-w-[92%] sm:max-w-[85%] rounded-2xl px-4 py-3 relative min-w-0',
-                            msg.role === 'user'
-                              ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                              : 'bg-muted/70 backdrop-blur rounded-tl-sm border border-border/50')}>
-                            {msg.role === 'assistant' ? (
-                              <div className="prose prose-sm dark:prose-invert max-w-none text-[15px] leading-7 prose-p:my-2 prose-p:leading-7 prose-headings:text-base prose-headings:font-semibold prose-headings:leading-6 prose-headings:mt-4 prose-headings:mb-2 prose-h1:text-lg prose-h2:text-base prose-h3:text-sm prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-strong:font-semibold prose-code:text-primary prose-code:bg-background/50 prose-code:px-1 prose-code:rounded prose-pre:bg-background/70">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                              </div>
-                            ) : (
-                              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                            )}
-                            <div className="flex items-center justify-between gap-2 mt-1.5">
-                              <p className={cn('text-[10px]', msg.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
-                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                              {msg.role === 'assistant' && (
-                                <button onClick={() => copyMsg(msg.content, idx)}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
-                                  {copiedIdx === idx ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  )}
-
-                  {isLoading && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                      <div className="bg-muted/70 backdrop-blur rounded-2xl rounded-tl-sm px-4 py-3 border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          <span className="text-sm text-muted-foreground">Tutor is thinking…</span>
+              ) : (
+                <AnimatePresence initial={false}>
+                  {messages.map((message, index) => (
+                    <motion.div key={`${message.timestamp}-${index}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn('mb-6 flex gap-2.5', message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                      {message.role === 'assistant' && <div className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#287c68] text-white"><Sparkles className="h-3.5 w-3.5" /></div>}
+                      <div className={cn('max-w-[92%] min-w-0 rounded-2xl px-4 py-3.5 text-sm leading-6 sm:max-w-[78%]', message.role === 'user' ? 'rounded-tr-sm bg-[#287c68] text-white' : 'rounded-tl-sm border border-[#e1ebe5] bg-[#f0f3f0] text-[#304139]')}>
+                        {message.role === 'assistant' ? <div className="prose prose-sm max-w-none text-[#304139] prose-p:my-2 prose-p:leading-6 prose-headings:mb-2 prose-headings:mt-4 prose-headings:text-base prose-strong:text-[#1d2b26] prose-code:rounded prose-code:bg-white/70 prose-code:px-1"><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown></div> : <p className="whitespace-pre-wrap">{message.content}</p>}
+                        <div className="mt-2 flex items-center justify-between gap-3 border-t border-black/5 pt-1.5">
+                          <span className={cn('text-[10px]', message.role === 'user' ? 'text-white/65' : 'text-[#8a9891]')}>{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          {message.role === 'assistant' && <button type="button" onClick={() => void copyMessage(message.content, index)} className="text-[#8a9891] transition-colors hover:text-[#287c68]" aria-label="Copy response">{copiedIdx === index ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</button>}
                         </div>
                       </div>
                     </motion.div>
-                  )}
-                </div>
-              </ScrollArea>
-
-              {messages.length > 0 && !isLoading && (
-                <div className="px-4 pb-2 flex flex-wrap gap-1.5 border-t border-border/30 pt-2">
-                  {quickActions.map(a => (
-                    <Button key={a.label} variant="outline" size="sm" className="h-7 text-xs"
-                      onClick={() => send(a.prompt)}>
-                      <a.icon className="h-3 w-3 mr-1" />{a.label}
-                    </Button>
                   ))}
+                </AnimatePresence>
+              )}
+
+              {isLoading && (
+                <div className="mb-6 flex gap-2.5">
+                  <div className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#287c68] text-white"><Sparkles className="h-3.5 w-3.5" /></div>
+                  <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-[#e1ebe5] bg-[#f0f3f0] px-4 py-3 text-sm text-[#7e8d85]"><Loader2 className="h-4 w-4 animate-spin text-[#287c68]" /> Selam is thinking…</div>
                 </div>
               )}
 
-              <div className="p-3 border-t border-border/50 bg-card/30">
-                <div className="flex gap-2">
-                  <Button type="button" variant={isListening ? 'default' : 'outline'} size="icon"
-                    onClick={toggleMic}
-                    className={cn('shrink-0', isListening && 'bg-destructive hover:bg-destructive/90 animate-pulse')}>
-                    {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  </Button>
-                  <Input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    placeholder={isListening ? 'Listening…' : `Ask about ${subj.name.toLowerCase()}…`}
-                    disabled={isLoading} className="flex-1" />
-                  <Button onClick={() => send()} disabled={isLoading || !input.trim()} className="shrink-0">
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  </Button>
+              {sendError && (
+                <div role="alert" className="mb-5 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+                  <span>{sendError}</span>
+                  {lastFailedPrompt && <button type="button" onClick={() => void send(lastFailedPrompt)} className="inline-flex items-center gap-1 font-bold text-[#287c68] underline"><RotateCcw className="h-3.5 w-3.5" /> Retry</button>}
                 </div>
-              </div>
-            </Card>
+              )}
+            </div>
           </div>
-        </div>
+
+          <div className="border-t border-[#dce6e0] bg-white px-4 pb-4 pt-3 sm:px-[8%] sm:pb-5">
+            <div className="mx-auto max-w-[720px]">
+              {messages.length > 0 && !isLoading && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {quickActions.map((action) => {
+                    const Icon = action.icon;
+                    return <button key={action.label} type="button" onClick={() => void send(action.prompt)} className="inline-flex items-center gap-1.5 rounded-full border border-[#cfe1da] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#287c68] hover:bg-[#e7f3ef]"><Icon className="h-3 w-3" />{action.label}</button>;
+                  })}
+                </div>
+              )}
+              <div className="flex items-end gap-2 rounded-2xl border border-[#cbd9d1] bg-white p-2 shadow-[0_5px_20px_rgba(27,51,43,0.06)] focus-within:border-[#287c68] focus-within:ring-2 focus-within:ring-[#287c68]/10">
+                <Button type="button" variant="ghost" size="icon" onClick={toggleMic} className={cn('mb-0.5 shrink-0 rounded-xl text-[#718078] hover:bg-[#e7f3ef] hover:text-[#287c68]', isListening && 'bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700')} aria-label={isListening ? 'Stop voice input' : 'Start voice input'}>
+                  {isListening ? <MicOff className="h-4 w-4 animate-pulse" /> : <Mic className="h-4 w-4" />}
+                </Button>
+                <Textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Ask anything or paste a problem…" disabled={isLoading} rows={1} className="max-h-32 min-h-[38px] resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0" />
+                <Button type="button" onClick={() => void send()} disabled={isLoading || !input.trim()} className="mb-0.5 h-9 w-9 shrink-0 rounded-xl bg-[#287c68] p-0 text-white hover:bg-[#216b5a]" aria-label="Send message">
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="mt-2 text-center text-[11px] text-[#929c97]">Selam can make mistakes. Check important answers with your textbook.</p>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   );
