@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.school_announcements (
     REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
   FOREIGN KEY (section_id, school_id)
     REFERENCES public.school_sections(id, school_id) ON DELETE RESTRICT,
+  UNIQUE (id, school_id),
   CHECK (
     (audience_type = 'grade' AND grade_label IS NOT NULL AND section_id IS NULL)
     OR (audience_type = 'section' AND grade_label IS NOT NULL AND section_id IS NOT NULL)
@@ -59,62 +60,89 @@ RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   LIMIT 1;
 $$;
 
+CREATE OR REPLACE FUNCTION public.school_is_assigned_to_section(
+  p_school_id uuid, p_section_id uuid
+)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM public.school_memberships teacher
+    JOIN public.school_teacher_assignments assignment
+      ON assignment.teacher_membership_id = teacher.id
+     AND assignment.school_id = teacher.school_id
+    WHERE teacher.user_id = auth.uid()
+      AND teacher.school_id = p_school_id
+      AND teacher.school_role = 'teacher'
+      AND teacher.status = 'active'
+      AND assignment.section_id = p_section_id
+  );
+$;
+
 CREATE OR REPLACE FUNCTION public.school_can_view_announcement(p_announcement_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.school_announcements announcement
     WHERE announcement.id = p_announcement_id
-      AND announcement.status = 'published'
       AND (
         public._is_extreme_admin()
         OR public.is_school_manager_or_admin(announcement.school_id)
-        OR EXISTS (
-          SELECT 1 FROM public.school_memberships staff
-          WHERE staff.user_id = auth.uid()
-            AND staff.school_id = announcement.school_id
-            AND staff.status = 'active'
-            AND staff.school_role IN ('teacher', 'finance')
-            AND announcement.audience_type IN ('school', 'grade', 'section', 'staff')
-            AND (
-              announcement.audience_type IN ('school', 'staff')
-              OR (announcement.audience_type = 'grade' AND staff.grade_label = announcement.grade_label)
-              OR (announcement.audience_type = 'section' AND EXISTS (
-                SELECT 1 FROM public.school_teacher_assignments assignment
-                WHERE assignment.teacher_membership_id = staff.id
-                  AND assignment.section_id = announcement.section_id
-              ))
-            )
+        OR (
+          announcement.created_by_membership_id = public.school_my_membership_id(announcement.school_id)
+          AND announcement.status IN ('draft', 'pending', 'rejected')
         )
-        OR EXISTS (
-          SELECT 1 FROM public.school_memberships student
-          WHERE student.user_id = auth.uid()
-            AND student.school_id = announcement.school_id
-            AND student.school_role = 'student'
-            AND student.status IN ('active', 'suspended')
-            AND announcement.audience_type IN ('school', 'grade', 'section', 'students')
-            AND (
-              announcement.audience_type IN ('school', 'students')
-              OR (announcement.audience_type = 'grade' AND student.grade_label = announcement.grade_label)
-              OR (announcement.audience_type = 'section' AND student.section_id = announcement.section_id)
+        OR (
+          announcement.status = 'published'
+          AND (
+            EXISTS (
+              SELECT 1 FROM public.school_memberships staff
+              WHERE staff.user_id = auth.uid()
+                AND staff.school_id = announcement.school_id
+                AND staff.status = 'active'
+                AND staff.school_role IN ('teacher', 'finance')
+                AND announcement.audience_type IN ('school', 'grade', 'section', 'staff')
+                AND (
+                  announcement.audience_type IN ('school', 'staff')
+                  OR (announcement.audience_type = 'grade' AND EXISTS (
+                    SELECT 1 FROM public.school_teacher_assignments assignment
+                    JOIN public.school_sections section ON section.id = assignment.section_id
+                    WHERE assignment.teacher_membership_id = staff.id
+                      AND section.grade_label = announcement.grade_label
+                  ))
+                  OR (announcement.audience_type = 'section' AND public.school_is_assigned_to_section(announcement.school_id, announcement.section_id))
+                )
             )
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM public.school_parent_student_links link
-          JOIN public.school_memberships parent ON parent.id = link.parent_membership_id
-          JOIN public.school_memberships student ON student.id = link.student_membership_id
-          WHERE parent.user_id = auth.uid()
-            AND parent.school_id = announcement.school_id
-            AND parent.school_role = 'parent'
-            AND parent.status = 'active'
-            AND link.status = 'active'
-            AND student.status IN ('active', 'suspended')
-            AND announcement.audience_type IN ('school', 'grade', 'section', 'parents')
-            AND (
-              announcement.audience_type IN ('school', 'parents')
-              OR (announcement.audience_type = 'grade' AND student.grade_label = announcement.grade_label)
-              OR (announcement.audience_type = 'section' AND student.section_id = announcement.section_id)
+            OR EXISTS (
+              SELECT 1 FROM public.school_memberships student
+              WHERE student.user_id = auth.uid()
+                AND student.school_id = announcement.school_id
+                AND student.school_role = 'student'
+                AND student.status IN ('active', 'suspended')
+                AND announcement.audience_type IN ('school', 'grade', 'section', 'students')
+                AND (
+                  announcement.audience_type IN ('school', 'students')
+                  OR (announcement.audience_type = 'grade' AND student.grade_label = announcement.grade_label)
+                  OR (announcement.audience_type = 'section' AND student.section_id = announcement.section_id)
+                )
             )
+            OR EXISTS (
+              SELECT 1
+              FROM public.school_parent_student_links link
+              JOIN public.school_memberships parent ON parent.id = link.parent_membership_id
+              JOIN public.school_memberships student ON student.id = link.student_membership_id
+              WHERE parent.user_id = auth.uid()
+                AND parent.school_id = announcement.school_id
+                AND parent.school_role = 'parent'
+                AND parent.status = 'active'
+                AND link.status = 'active'
+                AND student.status IN ('active', 'suspended')
+                AND announcement.audience_type IN ('school', 'grade', 'section', 'parents')
+                AND (
+                  announcement.audience_type IN ('school', 'parents')
+                  OR (announcement.audience_type = 'grade' AND student.grade_label = announcement.grade_label)
+                  OR (announcement.audience_type = 'section' AND student.section_id = announcement.section_id)
+                )
+            )
+          )
         )
       )
   );
@@ -131,7 +159,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
           announcement.created_by_membership_id = public.school_my_membership_id(announcement.school_id)
           AND announcement.status IN ('draft', 'rejected')
           AND announcement.audience_type = 'section'
-          AND public.school_can_teach_subject(announcement.school_id, announcement.section_id, NULL)
+          AND public.school_is_assigned_to_section(announcement.school_id, announcement.section_id)
         )
       )
   );
@@ -151,7 +179,7 @@ BEGIN
     END IF;
     IF v_creator.school_role = 'teacher' THEN
       IF NEW.audience_type <> 'section' OR NEW.status <> 'draft'
-         OR NOT public.school_can_teach_subject(NEW.school_id, NEW.section_id, NULL) THEN
+         OR NOT public.school_is_assigned_to_section(NEW.school_id, NEW.section_id) THEN
         RAISE EXCEPTION 'Teachers can create draft announcements only for assigned sections';
       END IF;
     ELSIF v_creator.school_role = 'admin' OR public._is_extreme_admin() THEN
@@ -279,6 +307,7 @@ CREATE TABLE IF NOT EXISTS public.school_conversations (
     REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
   FOREIGN KEY (created_by_membership_id, school_id)
     REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
+  UNIQUE (id, school_id),
   CHECK (
     (conversation_type = 'class' AND section_id IS NOT NULL AND student_membership_id IS NULL)
     OR (conversation_type = 'direct' AND student_membership_id IS NOT NULL AND section_id IS NULL)
@@ -311,7 +340,8 @@ CREATE TABLE IF NOT EXISTS public.school_messages (
   FOREIGN KEY (conversation_id, school_id)
     REFERENCES public.school_conversations(id, school_id) ON DELETE CASCADE,
   FOREIGN KEY (sender_membership_id, school_id)
-    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
+  UNIQUE (id, school_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.school_message_reads (
@@ -342,14 +372,6 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND (
         public._is_extreme_admin()
         OR public.is_school_manager_or_admin(conversation.school_id)
-        OR EXISTS (
-          SELECT 1
-          FROM public.school_conversation_participants participant
-          JOIN public.school_memberships membership ON membership.id = participant.membership_id
-          WHERE participant.conversation_id = conversation.id
-            AND membership.user_id = auth.uid()
-            AND membership.status = 'active'
-        )
         OR (
           conversation.conversation_type = 'class'
           AND EXISTS (
@@ -373,6 +395,36 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
                     AND student.section_id = conversation.section_id
                     AND student.status IN ('active', 'suspended')
                 ))
+              )
+          )
+        )
+        OR (
+          conversation.conversation_type = 'direct'
+          AND EXISTS (
+            SELECT 1
+            FROM public.school_conversation_participants participant
+            JOIN public.school_memberships membership ON membership.id = participant.membership_id
+            WHERE participant.conversation_id = conversation.id
+              AND membership.user_id = auth.uid()
+              AND membership.status = 'active'
+              AND (
+                (membership.school_role = 'student' AND membership.id = conversation.student_membership_id
+                  AND membership.status IN ('active', 'suspended'))
+                OR (membership.school_role = 'parent' AND EXISTS (
+                  SELECT 1 FROM public.school_parent_student_links link
+                  WHERE link.parent_membership_id = membership.id
+                    AND link.student_membership_id = conversation.student_membership_id
+                    AND link.status = 'active'
+                ))
+                OR (membership.school_role = 'teacher' AND EXISTS (
+                  SELECT 1 FROM public.school_teacher_assignments assignment
+                  WHERE assignment.teacher_membership_id = membership.id
+                    AND assignment.section_id = (
+                      SELECT student.section_id FROM public.school_memberships student
+                      WHERE student.id = conversation.student_membership_id
+                    )
+                ))
+                OR membership.school_role = 'admin'
               )
           )
         )
@@ -501,13 +553,13 @@ BEGIN
 
   SELECT array_agg(DISTINCT participant_id)
   INTO v_ids
-  FROM unnest(coalesce(p_participant_membership_ids, '{}'::uuid[]) || ARRAY[v_creator_id]) participant_id;
+  FROM unnest(coalesce(p_participant_membership_ids, '{}'::uuid[]) || ARRAY[v_creator_id]) AS participants(participant_id);
   IF coalesce(cardinality(v_ids), 0) < 2 OR cardinality(v_ids) > 6 THEN
     RAISE EXCEPTION 'Direct conversations require 2 to 6 participants';
   END IF;
 
   IF EXISTS (
-    SELECT 1 FROM unnest(v_ids) participant_id
+    SELECT 1 FROM unnest(v_ids) AS participants(participant_id)
     WHERE NOT EXISTS (
       SELECT 1 FROM public.school_memberships membership
       WHERE membership.id = participant_id
@@ -573,7 +625,7 @@ BEGIN
     school_id, conversation_id, membership_id, added_by_membership_id
   )
   SELECT p_school_id, v_conversation_id, participant_id, v_creator_id
-  FROM unnest(v_ids) participant_id;
+  FROM unnest(v_ids) AS participants(participant_id);
 
   RETURN v_conversation_id;
 END;
@@ -647,7 +699,7 @@ WITH CHECK (
     created_by_membership_id = public.school_my_membership_id(school_id)
     AND audience_type = 'section'
     AND status = 'draft'
-    AND public.school_can_teach_subject(school_id, section_id, NULL)
+    AND public.school_is_assigned_to_section(school_id, section_id)
   )
 );
 CREATE POLICY school_announcements_update ON public.school_announcements
@@ -669,8 +721,14 @@ WITH CHECK (
 );
 CREATE POLICY school_announcement_reads_update ON public.school_announcement_reads
 FOR UPDATE TO authenticated
-USING (membership_id = public.school_my_membership_id(school_id))
-WITH CHECK (membership_id = public.school_my_membership_id(school_id));
+USING (
+  membership_id = public.school_my_membership_id(school_id)
+  AND public.school_can_view_announcement(announcement_id)
+)
+WITH CHECK (
+  membership_id = public.school_my_membership_id(school_id)
+  AND public.school_can_view_announcement(announcement_id)
+);
 
 CREATE POLICY school_conversations_read ON public.school_conversations
 FOR SELECT TO authenticated USING (public.school_can_access_conversation(id));
@@ -702,8 +760,18 @@ WITH CHECK (
 );
 CREATE POLICY school_message_reads_update ON public.school_message_reads
 FOR UPDATE TO authenticated
-USING (membership_id = public.school_my_membership_id(school_id))
-WITH CHECK (membership_id = public.school_my_membership_id(school_id));
+USING (
+  membership_id = public.school_my_membership_id(school_id)
+  AND public.school_can_access_conversation(
+    (SELECT message.conversation_id FROM public.school_messages message WHERE message.id = message_id)
+  )
+)
+WITH CHECK (
+  membership_id = public.school_my_membership_id(school_id)
+  AND public.school_can_access_conversation(
+    (SELECT message.conversation_id FROM public.school_messages message WHERE message.id = message_id)
+  )
+);
 
 GRANT SELECT, INSERT, UPDATE ON public.school_announcements TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.school_announcement_reads TO authenticated;
@@ -733,6 +801,7 @@ AFTER INSERT ON public.school_messages
 FOR EACH ROW EXECUTE FUNCTION public.school_update_conversation_last_message();
 
 REVOKE ALL ON FUNCTION public.school_my_membership_id(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_is_assigned_to_section(uuid, uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_can_view_announcement(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_can_manage_announcement(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_validate_announcement() FROM PUBLIC, anon, authenticated;
@@ -746,6 +815,7 @@ REVOKE ALL ON FUNCTION public.school_notify_parent_message() FROM PUBLIC, anon, 
 REVOKE ALL ON FUNCTION public.school_update_conversation_last_message() FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.school_my_membership_id(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.school_is_assigned_to_section(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_view_announcement(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_manage_announcement(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_submit_announcement(uuid) TO authenticated;
