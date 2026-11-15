@@ -804,6 +804,7 @@ BEGIN
   FROM public.school_sections section
   JOIN public.school_subjects subject
     ON subject.school_id = section.school_id
+   AND subject.academic_year_id = section.academic_year_id
    AND subject.grade_label = section.grade_label
    AND subject.active = true
   WHERE section.school_id = v_school_id
@@ -836,6 +837,7 @@ BEGIN
      AND student.school_role = 'student'
     JOIN public.school_subjects subject
       ON subject.school_id = history.school_id
+     AND subject.academic_year_id = section.academic_year_id
      AND subject.grade_label = history.grade_label
      AND subject.active = true
     JOIN public.school_terms term
