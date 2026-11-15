@@ -316,7 +316,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS school_one_homeroom_teacher_per_section
   WHERE assignment_kind = 'homeroom';
 
 CREATE OR REPLACE FUNCTION public.school_sync_homeroom_teacher_field()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_section_id uuid;
 BEGIN
@@ -355,7 +355,7 @@ BEGIN
   END IF;
   RETURN coalesce(NEW, OLD);
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_sync_homeroom_teacher_field ON public.school_teacher_assignments;
 CREATE TRIGGER school_sync_homeroom_teacher_field
