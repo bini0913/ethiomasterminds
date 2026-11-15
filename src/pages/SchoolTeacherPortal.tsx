@@ -133,9 +133,12 @@ export default function SchoolTeacherPortal() {
       setProfiles(Object.fromEntries((profileRows ?? []).map((profile: any) => [profile.id, profile])));
     } else setProfiles({});
 
-    setAssessmentSectionId((current) => sectionIds.includes(current) ? current : sectionIds[0]);
+    const nextSectionId = sectionIds.includes(assessmentSectionId) ? assessmentSectionId : sectionIds[0];
+    const nextSection = (sectionsRes.data ?? []).find((section: any) => section.id === nextSectionId);
+    const nextSectionTerms = (termsRes.data ?? []).filter((term: any) => term.academic_year_id === nextSection?.academic_year_id);
+    setAssessmentSectionId(nextSectionId);
     setAnnouncementSectionId((current) => sectionIds.includes(current) ? current : sectionIds[0]);
-    setAssessmentTermId((current) => termsRes.data?.some((term: any) => term.id === current) ? current : termsRes.data?.[0]?.id || "");
+    setAssessmentTermId((current) => nextSectionTerms.some((term: any) => term.id === current) ? current : nextSectionTerms[0]?.id || "");
     setSelectedAssessmentId((current) => assessmentsRes.data?.some((item: any) => item.id === current) ? current : assessmentsRes.data?.[0]?.id || "");
     setLoading(false);
   }, [schoolId, teacherMembershipId, db]);
@@ -147,7 +150,6 @@ export default function SchoolTeacherPortal() {
   const homeroomAssignments = assignments.filter((item) => item.assignment_kind === "homeroom");
   const pendingAssessments = assessments.filter((item) => ["draft", "rejected"].includes(item.status));
   const selectedAssessment = assessments.find((item) => item.id === selectedAssessmentId);
-  const selectedAssessmentSection = selectedAssessment ? sections.find((section) => section.id === selectedAssessment.section_id) : null;
   const selectedAssessmentStudents = selectedAssessment ? students.filter((student) => student.section_id === selectedAssessment.section_id) : [];
 
   const sectionLabel = (id: string) => {
@@ -288,7 +290,7 @@ export default function SchoolTeacherPortal() {
       <SchoolPageHeading title="Assessments and marks" description="Create assessments for your assigned subjects, enter marks, and submit them to the School Admin for verification." />
       <SchoolPanel title="Create assessment">
         <form onSubmit={createAssessment} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <SchoolField label="Assigned section"><select className={schoolSelectClass} value={assessmentSectionId} onChange={(event) => { setAssessmentSectionId(event.target.value); setAssessmentSubject(""); setAssessmentCategoryId(""); }}><option value="">Choose section</option>{activeSections.map((section) => <option key={section.id} value={section.id}>{sectionLabel(section.id)}</option>)}</select></SchoolField>
+          <SchoolField label="Assigned section"><select className={schoolSelectClass} value={assessmentSectionId} onChange={(event) => { const nextId = event.target.value; const nextSection = sections.find((section) => section.id === nextId); setAssessmentSectionId(nextId); setAssessmentSubject(""); setAssessmentCategoryId(""); setAssessmentTermId(terms.find((term) => term.academic_year_id === nextSection?.academic_year_id)?.id || ""); }}><option value="">Choose section</option>{activeSections.map((section) => <option key={section.id} value={section.id}>{sectionLabel(section.id)}</option>)}</select></SchoolField>
           <SchoolField label="Subject"><select className={schoolSelectClass} value={assessmentSubject} onChange={(event) => setAssessmentSubject(event.target.value)}><option value="">Choose assigned subject</option>{availableSubjects.map((item) => <option key={item.id} value={item.subject_name}>{item.subject_name}</option>)}</select></SchoolField>
           <SchoolField label="Term"><select className={schoolSelectClass} value={assessmentTermId} onChange={(event) => setAssessmentTermId(event.target.value)}><option value="">Choose term</option>{availableTerms.map((term) => <option key={term.id} value={term.id}>{term.name} · Term {term.term_number}</option>)}</select></SchoolField>
           <SchoolField label="Assessment category"><select className={schoolSelectClass} value={assessmentCategoryId} onChange={(event) => setAssessmentCategoryId(event.target.value)}><option value="">Choose category</option>{availableCategories.map((category) => <option key={category.id} value={category.id}>{category.category_name} ({category.weight_percent}%)</option>)}</select></SchoolField>
