@@ -47,9 +47,8 @@ Deno.serve(async (req) => {
     const callerIsSuperAdmin = (callerRoles ?? []).some((entry: { role: string }) => entry.role === "extreme_admin");
 
     // Self-assignment is only allowed for the normal student role.
-    // Use the service-role client for the final insert because the RPC's auth.uid()
-    // refers to the service-role request context and therefore cannot authorize
-    // this authenticated caller.
+    // Use the service-role client for the final insert because clients must not
+    // write platform-wide role assignments directly.
     if (!targetUserId || targetUserId === callerId) {
       if (role !== "student") return json({ ok: false, error: "You cannot self-assign a privileged role" }, 403);
 
