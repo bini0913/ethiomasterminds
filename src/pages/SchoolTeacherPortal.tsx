@@ -389,6 +389,7 @@ export default function SchoolTeacherPortal() {
     }
     const rows = students.map((student) => ({
       school_id: schoolId, session_id: sessionId, student_membership_id: student.id,
+      recorded_by_membership_id: activeMembership?.id,
       attendance_status: attendanceValues[student.id] || "present",
       note: attendanceNotes[student.id] || null,
     }));
