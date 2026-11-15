@@ -887,6 +887,14 @@
 
 
 /* Upper-tier frosted navigation surfaces. Semantic HSL tokens keep light/dark themes aligned. */
+.mm-studio-upper .upper-tier-sidebar {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+  box-shadow: 8px 0 28px hsl(207 43% 16% / .035);
+}
+.dark .mm-studio-upper .upper-tier-sidebar {
+  box-shadow: 8px 0 28px hsl(0 0% 0% / .16);
+}
 .glass-nav-top {
   background: hsl(var(--card) / 0.72);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
