@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, School, BookOpen, UserCog, Wallet, ClipboardList,
-  FileBarChart, Settings, RefreshCw, CheckCircle2, Copy, AlertCircle,
+  FileBarChart, Settings, RefreshCw, CheckCircle2, Copy, AlertCircle, Scale, Percent,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +10,7 @@ import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPort
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
-  schoolInputClass, schoolSelectClass,
+  schoolInputClass, schoolSelectClass, schoolTextareaClass,
 } from "@/components/school/SchoolPortalPrimitives";
 
 const navItems: SchoolNavItem[] = [
@@ -18,11 +18,13 @@ const navItems: SchoolNavItem[] = [
   { id: "accounts", label: "People & Accounts", icon: Users },
   { id: "structure", label: "School Structure", icon: School },
   { id: "assignments", label: "Teacher Assignments", icon: UserCog },
+  { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
   { id: "tasks", label: "Staff Tasks", icon: ClipboardList },
   { id: "evaluations", label: "Staff Evaluations", icon: CheckCircle2 },
   { id: "requests", label: "Change Requests", icon: Settings },
   { id: "reports", label: "Reports", icon: FileBarChart },
+  { id: "discipline", label: "Disciplinary Reviews", icon: Scale },
 ];
 
 type AccountRole = "admin" | "teacher" | "finance" | "parent" | "student";
@@ -39,9 +41,22 @@ export default function SchoolManagerPortal() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [feeStructures, setFeeStructures] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [financeFollowups, setFinanceFollowups] = useState<any[]>([]);
+  const [disciplinaryRecommendations, setDisciplinaryRecommendations] = useState<any[]>([]);
+  const [staffConductReports, setStaffConductReports] = useState<any[]>([]);
+  const [assignmentRecommendations, setAssignmentRecommendations] = useState<any[]>([]);
+  const [managerReviewNotes, setManagerReviewNotes] = useState<Record<string, string>>({});
+  const [staffDisciplineTargetId, setStaffDisciplineTargetId] = useState("");
+  const [staffDisciplineReason, setStaffDisciplineReason] = useState("");
+  const [staffDisciplineRecommendation, setStaffDisciplineRecommendation] = useState("");
+  const [disciplineReviewNotes, setDisciplineReviewNotes] = useState<Record<string, string>>({});
   const [tasks, setTasks] = useState<any[]>([]);
   const [evaluations, setEvaluations] = useState<any[]>([]);
   const [changeRequests, setChangeRequests] = useState<any[]>([]);
+  const [gradingCategories, setGradingCategories] = useState<any[]>([]);
+  const [gradingPolicies, setGradingPolicies] = useState<any[]>([]);
+  const [gradeScales, setGradeScales] = useState<any[]>([]);
+  const [policySettings, setPolicySettings] = useState<any>(null);
   const [createdCredentials, setCreatedCredentials] = useState<any[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -64,6 +79,17 @@ export default function SchoolManagerPortal() {
   const [subjectYearId, setSubjectYearId] = useState("");
   const [subjectGrade, setSubjectGrade] = useState("Grade 9");
   const [subjectName, setSubjectName] = useState("");
+  const [gradingYearId, setGradingYearId] = useState("");
+  const [gradingGradeLabel, setGradingGradeLabel] = useState("Grade 9");
+  const [passMark, setPassMark] = useState("50");
+  const [rankScope, setRankScope] = useState("section");
+  const [missingMarkRule, setMissingMarkRule] = useState("incomplete");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryWeight, setNewCategoryWeight] = useState("0");
+  const [newScaleMin, setNewScaleMin] = useState("0");
+  const [newScaleMax, setNewScaleMax] = useState("100");
+  const [newScaleLetter, setNewScaleLetter] = useState("");
+  const [newScaleDescription, setNewScaleDescription] = useState("");
 
   const [assignTeacherId, setAssignTeacherId] = useState("");
   const [assignSectionId, setAssignSectionId] = useState("");
@@ -104,7 +130,7 @@ export default function SchoolManagerPortal() {
     setLoading(true);
     const [
       membershipsRes, yearsRes, sectionsRes, subjectsRes, assignmentsRes,
-      feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes,
+      feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, staffConductRes, assignmentRecommendationsRes,
     ] = await Promise.all([
       db.from("school_memberships").select("id,user_id,school_role,status,grade_label,section_id,student_number,school_username,age_at_enrollment,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }),
       db.from("school_academic_years").select("id,name,starts_on,ends_on,is_current").eq("school_id", schoolId).order("starts_on", { ascending: false }),
@@ -116,9 +142,17 @@ export default function SchoolManagerPortal() {
       db.from("school_staff_tasks").select("id,title,assigned_to_membership_id,assigned_by_membership_id,status,due_date,priority,task_type,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_staff_evaluations").select("id,target_membership_id,evaluation_type,rating,period_start,period_end,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(50),
       db.from("school_staff_change_requests").select("id,target_membership_id,request_type,status,reason,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(50),
+      db.from("school_assessment_categories").select("id,academic_year_id,grade_label,category_key,category_name,weight_percent,required").eq("school_id", schoolId).order("grade_label"),
+      db.from("school_grading_policies").select("id,academic_year_id,grade_label,pass_mark,rank_scope,missing_mark_rule").eq("school_id", schoolId),
+      db.from("school_grade_scales").select("id,grade_label,minimum_score,maximum_score,letter_grade,description").eq("school_id", schoolId).order("grade_label"),
+      db.from("school_policy_settings").select("school_id,attendance_notifications_enabled,behavior_notifications_enabled,report_card_notifications_enabled,absence_review_threshold").eq("school_id", schoolId).maybeSingle(),
+      db.from("school_finance_followups").select("id,invoice_id,student_membership_id,submitted_by_membership_id,note,status,reviewed_at,resolution_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+      db.from("school_disciplinary_recommendations").select("id,target_membership_id,target_kind,submitted_by_membership_id,reason,recommendation,status,decision_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+      db.from("school_staff_conduct_reports").select("id,target_teacher_membership_id,submitted_by_membership_id,report_type,severity,description,status,manager_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+      db.from("school_teacher_assignment_recommendations").select("id,teacher_membership_id,submitted_by_membership_id,current_assignment_id,recommendation_type,requested_section_id,requested_subject_name,requested_assignment_kind,reason,status,manager_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
     ]);
 
-    const firstError = [membershipsRes, yearsRes, sectionsRes, subjectsRes, assignmentsRes, feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes].find((result) => result.error)?.error;
+    const firstError = [membershipsRes, yearsRes, sectionsRes, subjectsRes, assignmentsRes, feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, staffConductRes, assignmentRecommendationsRes].find((result) => result.error)?.error;
     if (firstError) {
       toast.error(firstError.message || "Could not load school records");
       setLoading(false);
@@ -136,6 +170,14 @@ export default function SchoolManagerPortal() {
     setTasks(tasksRes.data ?? []);
     setEvaluations(evaluationsRes.data ?? []);
     setChangeRequests(requestsRes.data ?? []);
+    setGradingCategories(categoriesRes.data ?? []);
+    setGradingPolicies(gradingPoliciesRes.data ?? []);
+    setGradeScales(gradeScalesRes.data ?? []);
+    setPolicySettings(policySettingsRes.data ?? null);
+    setFinanceFollowups(financeFollowupsRes.data ?? []);
+    setDisciplinaryRecommendations(disciplinaryRes.data ?? []);
+    setStaffConductReports(staffConductRes.data ?? []);
+    setAssignmentRecommendations(assignmentRecommendationsRes.data ?? []);
 
     const userIds = [...new Set(nextMembers.map((membership: any) => membership.user_id))];
     if (userIds.length) {
@@ -149,8 +191,10 @@ export default function SchoolManagerPortal() {
     if (!sectionYearId && yearsRes.data?.length) setSectionYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
     if (!subjectYearId && yearsRes.data?.length) setSubjectYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
     if (!feeYearId && yearsRes.data?.length) setFeeYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
+    if (!gradingYearId && yearsRes.data?.length) setGradingYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
+    if (sectionsRes.data?.length && gradingGradeLabel === "Grade 9" && !sectionsRes.data.some((section: any) => section.grade_label === "Grade 9")) setGradingGradeLabel(sectionsRes.data[0].grade_label);
     setLoading(false);
-  }, [schoolId, db, sectionYearId, subjectYearId, feeYearId]);
+  }, [schoolId, db, sectionYearId, subjectYearId, feeYearId, gradingYearId, gradingGradeLabel]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -215,16 +259,24 @@ export default function SchoolManagerPortal() {
     event.preventDefault();
     if (!yearName.trim() || !yearStart || !yearEnd) return toast.error("Complete the academic year details.");
     if (yearEnd < yearStart) return toast.error("Academic year end date must follow its start date.");
+    const { data: createdYear, error } = await db.from("school_academic_years").insert({
+      school_id: schoolId, name: yearName.trim(), starts_on: yearStart, ends_on: yearEnd, is_current: false,
+    }).select("id").single();
+    if (error || !createdYear) return toast.error(error?.message || "Academic year could not be created.");
     if (yearIsCurrent) {
-      const { error: clearCurrentError } = await db.from("school_academic_years").update({ is_current: false }).eq("school_id", schoolId).eq("is_current", true);
-      if (clearCurrentError) return toast.error(clearCurrentError.message);
+      const { error: currentError } = await db.rpc("school_set_current_academic_year", { p_academic_year_id: createdYear.id });
+      if (currentError) toast.error("Year created, but the current-year setting could not be changed: " + currentError.message);
     }
-    const { error } = await db.from("school_academic_years").insert({
-      school_id: schoolId, name: yearName.trim(), starts_on: yearStart, ends_on: yearEnd, is_current: yearIsCurrent,
-    });
-    if (error) return toast.error(error.message);
     setYearName(""); setYearStart(""); setYearEnd(""); setYearIsCurrent(false);
-    toast.success("Academic year created.");
+    if (yearIsCurrent) toast.success("Academic year created and set as current.");
+    else toast.success("Academic year created.");
+    await load();
+  };
+
+  const setCurrentYear = async (yearId: string) => {
+    const { error } = await db.rpc("school_set_current_academic_year", { p_academic_year_id: yearId });
+    if (error) return toast.error(error.message);
+    toast.success("Current academic year updated.");
     await load();
   };
 
@@ -267,6 +319,149 @@ export default function SchoolManagerPortal() {
     });
     if (error) return toast.error(error.message);
     toast.success("Teacher assignment saved.");
+    await load();
+  };
+
+  const selectedGradingCategories = gradingCategories.filter((category) => category.academic_year_id === gradingYearId && category.grade_label === gradingGradeLabel);
+  const selectedGradingPolicy = gradingPolicies.find((policy) => policy.academic_year_id === gradingYearId && policy.grade_label === gradingGradeLabel);
+  const selectedGradeScales = gradeScales.filter((scale) => scale.grade_label === gradingGradeLabel);
+  const categoryWeightTotal = selectedGradingCategories.reduce((total, category) => total + Number(category.weight_percent || 0), 0);
+
+  const seedGradingDefaults = async () => {
+    if (!gradingYearId || !gradingGradeLabel.trim()) return toast.error("Choose an academic year and grade.");
+    const { error } = await db.rpc("school_seed_default_grading_categories", {
+      p_school_id: schoolId, p_academic_year_id: gradingYearId, p_grade_label: gradingGradeLabel.trim(),
+    });
+    if (error) return toast.error(error.message);
+    toast.success("Default grading categories created: Class Activities 10%, Tests 30%, Final Examination 60%.");
+    await load();
+  };
+
+  const saveCategory = async (category: any) => {
+    const weight = Number(category.weight_percent);
+    if (!Number.isFinite(weight) || weight < 0 || weight > 100 || !category.category_name.trim()) return toast.error("Enter a valid category name and weight from 0 to 100.");
+    const { error } = await db.from("school_assessment_categories").update({
+      category_name: category.category_name.trim(), weight_percent: weight, required: Boolean(category.required),
+    }).eq("id", category.id);
+    if (error) return toast.error(error.message);
+    toast.success("Assessment category updated.");
+    await load();
+  };
+
+  const addGradingCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!gradingYearId || !gradingGradeLabel.trim() || !newCategoryName.trim()) return toast.error("Complete the new category details.");
+    const categoryKey = newCategoryName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    if (!categoryKey) return toast.error("Category name must contain letters or numbers.");
+    const { error } = await db.from("school_assessment_categories").insert({
+      school_id: schoolId, academic_year_id: gradingYearId, grade_label: gradingGradeLabel.trim(),
+      category_key: categoryKey, category_name: newCategoryName.trim(), weight_percent: Number(newCategoryWeight), required: true,
+    });
+    if (error) return toast.error(error.message);
+    setNewCategoryName(""); setNewCategoryWeight("0");
+    toast.success("Grading category added.");
+    await load();
+  };
+
+  const saveGradingPolicy = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!gradingYearId || !gradingGradeLabel.trim()) return toast.error("Choose an academic year and grade.");
+    const { error } = await db.from("school_grading_policies").upsert({
+      school_id: schoolId, academic_year_id: gradingYearId, grade_label: gradingGradeLabel.trim(),
+      pass_mark: Number(passMark), rank_scope: rankScope, missing_mark_rule: missingMarkRule,
+      updated_by: members.find((member) => member.id === activeMembership?.id)?.user_id,
+    }, { onConflict: "school_id,academic_year_id,grade_label" });
+    if (error) return toast.error(error.message);
+    toast.success("Grading policy saved.");
+    await load();
+  };
+
+  const addGradeScale = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!gradingGradeLabel.trim() || !newScaleLetter.trim()) return toast.error("Enter the grade and letter scale.");
+    const min = Number(newScaleMin), max = Number(newScaleMax);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max > 100 || min > max) return toast.error("Enter a valid score range from 0 to 100.");
+    const overlaps = selectedGradeScales.some((scale) => min <= Number(scale.maximum_score) && max >= Number(scale.minimum_score));
+    if (overlaps) return toast.error("This score range overlaps an existing grade scale.");
+    const { error } = await db.from("school_grade_scales").insert({
+      school_id: schoolId, grade_label: gradingGradeLabel.trim(), minimum_score: min, maximum_score: max,
+      letter_grade: newScaleLetter.trim(), description: newScaleDescription.trim() || null,
+    });
+    if (error) return toast.error(error.message);
+    setNewScaleLetter(""); setNewScaleDescription("");
+    toast.success("Grade scale added.");
+    await load();
+  };
+
+  const savePolicySettings = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!policySettings) return toast.error("School policy settings are not available.");
+    const { error } = await db.from("school_policy_settings").update({
+      attendance_notifications_enabled: policySettings.attendance_notifications_enabled,
+      behavior_notifications_enabled: policySettings.behavior_notifications_enabled,
+      report_card_notifications_enabled: policySettings.report_card_notifications_enabled,
+      absence_review_threshold: Number(policySettings.absence_review_threshold),
+      updated_by: members.find((member) => member.id === activeMembership?.id)?.user_id,
+      updated_at: new Date().toISOString(),
+    }).eq("school_id", schoolId);
+    if (error) return toast.error(error.message);
+    toast.success("School notification and attendance settings saved.");
+    await load();
+  };
+
+  const reviewStaffConductReport = async (report: any, status: "reviewed" | "resolved" | "dismissed") => {
+    const { error } = await db.rpc("school_review_staff_conduct_report", {
+      p_report_id: report.id, p_status: status, p_note: managerReviewNotes[report.id] || null,
+    });
+    if (error) return toast.error(error.message);
+    toast.success("Staff conduct report updated.");
+    await load();
+  };
+
+  const reviewAssignmentRecommendation = async (recommendation: any, accept: boolean) => {
+    const { error } = await db.rpc("school_review_teacher_assignment_recommendation", {
+      p_recommendation_id: recommendation.id, p_accept: accept, p_note: managerReviewNotes[recommendation.id] || null,
+    });
+    if (error) return toast.error(error.message);
+    toast.success(accept ? "Recommendation accepted. Apply the assignment in Teacher Assignments." : "Recommendation declined.");
+    await load();
+  };
+
+  const deleteTeacherAssignment = async (assignment: any) => {
+    if (!window.confirm("Remove this teacher assignment? Existing academic records will remain unchanged.")) return;
+    const { error } = await db.from("school_teacher_assignments").delete().eq("id", assignment.id);
+    if (error) return toast.error(error.message);
+    toast.success("Teacher assignment removed.");
+    await load();
+  };
+
+  const submitStaffDisciplineRecommendation = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!staffDisciplineTargetId || !staffDisciplineReason.trim() || !staffDisciplineRecommendation.trim()) return toast.error("Choose a staff member and provide the reason and recommendation.");
+    const { error } = await db.from("school_disciplinary_recommendations").insert({
+      school_id: schoolId, target_membership_id: staffDisciplineTargetId, target_kind: "staff",
+      submitted_by_membership_id: activeMembership?.id, reason: staffDisciplineReason.trim(),
+      recommendation: staffDisciplineRecommendation.trim(), status: "pending",
+    });
+    if (error) return toast.error(error.message);
+    setStaffDisciplineReason(""); setStaffDisciplineRecommendation("");
+    toast.success("Staff disciplinary recommendation submitted to the Super Admin.");
+    await load();
+  };
+
+  const reviewStudentDisciplineRecommendation = async (item: any, accept: boolean) => {
+    const { error } = await db.rpc("school_review_disciplinary_recommendation", {
+      p_recommendation_id: item.id, p_accept: accept, p_note: disciplineReviewNotes[item.id] || null,
+    });
+    if (error) return toast.error(error.message);
+    toast.success(accept ? "Student disciplinary recommendation accepted." : "Student disciplinary recommendation rejected.");
+    await load();
+  };
+
+  const resolveFinanceFollowup = async (followupId: string) => {
+    const { error } = await db.rpc("school_resolve_finance_followup", { p_followup_id: followupId, p_note: "Reviewed by School Manager." });
+    if (error) return toast.error(error.message);
+    toast.success("Finance follow-up marked resolved.");
     await load();
   };
 
@@ -419,7 +614,8 @@ export default function SchoolManagerPortal() {
           <form onSubmit={addAcademicYear} className="space-y-3">
             <SchoolField label="Academic year name"><input className={schoolInputClass} value={yearName} onChange={(event) => setYearName(event.target.value)} placeholder="2026/2027" /></SchoolField>
             <SchoolField label="Start date"><input type="date" className={schoolInputClass} value={yearStart} onChange={(event) => setYearStart(event.target.value)} /></SchoolField>
-            <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} /></SchoolField>\n            <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={yearIsCurrent} onChange={(event) => setYearIsCurrent(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" /> Set as current academic year</label>
+            <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} /></SchoolField>
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={yearIsCurrent} onChange={(event) => setYearIsCurrent(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" /> Set as current academic year</label>
             <SchoolPrimaryButton type="submit">Add academic year</SchoolPrimaryButton>
           </form>
         </SchoolPanel>
@@ -441,7 +637,7 @@ export default function SchoolManagerPortal() {
         </SchoolPanel>
       </div>
       <div className="grid gap-4 xl:grid-cols-3">
-        <SchoolPanel title="Academic years"><div className="space-y-2">{years.map((year) => <div key={year.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-100 p-3"><div><p className="text-sm font-medium text-slate-800">{year.name}</p><p className="text-xs text-slate-500">{year.starts_on} – {year.ends_on}</p></div>{year.is_current && <SchoolStatus value="active" />}</div>)}{!years.length && <SchoolEmptyState title="No years yet" description="Add the first academic year." />}</div></SchoolPanel>
+        <SchoolPanel title="Academic years"><div className="space-y-2">{years.map((year) => <div key={year.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-100 p-3"><div><p className="text-sm font-medium text-slate-800">{year.name}</p><p className="text-xs text-slate-500">{year.starts_on} – {year.ends_on}</p></div>{year.is_current ? <SchoolStatus value="active" /> : <button type="button" onClick={() => void setCurrentYear(year.id)} className="text-xs font-semibold text-blue-700 hover:underline">Set current</button>}</div>)}{!years.length && <SchoolEmptyState title="No years yet" description="Add the first academic year." />}</div></SchoolPanel>
         <SchoolPanel title="Sections"><div className="space-y-2">{sections.map((section) => <div key={section.id} className="flex items-center justify-between rounded-md border border-slate-100 p-3"><p className="text-sm font-medium text-slate-800">{section.grade_label} {section.section_name}</p><span className="text-xs text-slate-500">{years.find((year) => year.id === section.academic_year_id)?.name || "Academic year"}</span></div>)}{!sections.length && <SchoolEmptyState title="No sections yet" description="Create sections for the current year." />}</div></SchoolPanel>
         <SchoolPanel title="Subjects"><div className="space-y-2">{subjects.map((subject) => <div key={subject.id} className="flex items-center justify-between rounded-md border border-slate-100 p-3"><div><p className="text-sm font-medium text-slate-800">{subject.subject_name}</p><p className="text-xs text-slate-500">{subject.grade_label}</p></div><SchoolStatus value={subject.active ? "active" : "deactivated"} /></div>)}{!subjects.length && <SchoolEmptyState title="No subjects yet" description="Add subjects by grade and academic year." />}</div></SchoolPanel>
       </div>
@@ -461,7 +657,52 @@ export default function SchoolManagerPortal() {
         </form>
       </SchoolPanel>
       <SchoolPanel title="Current assignments">
-        {assignments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Teacher</th><th className="pb-2">Section</th><th className="pb-2">Subject / responsibility</th><th className="pb-2">Type</th></tr></thead><tbody className="divide-y divide-slate-100">{assignments.map((assignment) => <tr key={assignment.id}><td className="py-3 font-medium text-slate-800">{memberName(assignment.teacher_membership_id)}</td><td className="py-3 text-slate-600">{sectionLabel(assignment.section_id)}</td><td className="py-3 text-slate-600">{assignment.subject_name}</td><td className="py-3 capitalize text-slate-600">{assignment.assignment_kind}</td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No teacher assignments" description="Create assignments after teachers, sections, and subjects have been added." />}
+        {assignments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Teacher</th><th className="pb-2">Section</th><th className="pb-2">Subject / responsibility</th><th className="pb-2">Type</th><th className="pb-2">Action</th></tr></thead><tbody className="divide-y divide-slate-100">{assignments.map((assignment) => <tr key={assignment.id}><td className="py-3 font-medium text-slate-800">{memberName(assignment.teacher_membership_id)}</td><td className="py-3 text-slate-600">{sectionLabel(assignment.section_id)}</td><td className="py-3 text-slate-600">{assignment.subject_name}</td><td className="py-3 capitalize text-slate-600">{assignment.assignment_kind}</td><td className="py-3"><button type="button" onClick={() => void deleteTeacherAssignment(assignment)} className="text-xs font-semibold text-red-700 hover:underline">Remove</button></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No teacher assignments" description="Create assignments after teachers, sections, and subjects have been added." />}
+      </SchoolPanel>
+    </div>
+  );
+
+  useEffect(() => {
+    const policy = gradingPolicies.find((item) => item.academic_year_id === gradingYearId && item.grade_label === gradingGradeLabel);
+    setPassMark(String(policy?.pass_mark ?? 50));
+    setRankScope(policy?.rank_scope ?? "section");
+    setMissingMarkRule(policy?.missing_mark_rule ?? "incomplete");
+  }, [gradingYearId, gradingGradeLabel, gradingPolicies]);
+
+  const renderGrading = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Grading & school policies" description="Configure each grade's assessment weights, pass mark, ranking scope, grade scale, and parent notification policies." />
+      <SchoolPanel title="Select academic year and grade">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SchoolField label="Academic year"><select className={schoolSelectClass} value={gradingYearId} onChange={(event) => setGradingYearId(event.target.value)}><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}{year.is_current ? " · Current" : ""}</option>)}</select></SchoolField>
+          <SchoolField label="Grade"><select className={schoolSelectClass} value={gradingGradeLabel} onChange={(event) => setGradingGradeLabel(event.target.value)}>{[...new Set(sections.map((section) => section.grade_label))].sort().map((grade) => <option key={grade} value={grade}>{grade}</option>)}</select></SchoolField>
+        </div>
+      </SchoolPanel>
+      <SchoolPanel title="Assessment categories and weights" description="The default grading model is Class Activities 10%, Tests 30%, and Final Examination 60%. The total must equal 100% before term results can be calculated.">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-700">Current total: <span className={categoryWeightTotal === 100 ? "text-emerald-700" : "text-amber-700"}>{categoryWeightTotal.toFixed(2)}%</span></p><SchoolSecondaryButton onClick={() => void seedGradingDefaults()} disabled={!gradingYearId || !gradingGradeLabel}>Seed default 10/30/60 categories</SchoolSecondaryButton></div>
+        {selectedGradingCategories.length ? <div className="space-y-2">{selectedGradingCategories.map((category) => <div key={category.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_120px_100px_auto] sm:items-end"><SchoolField label="Category name"><input className={schoolInputClass} value={category.category_name} onChange={(event) => setGradingCategories((current) => current.map((item) => item.id === category.id ? { ...item, category_name: event.target.value } : item))} /></SchoolField><SchoolField label="Weight (%)"><input type="number" min="0" max="100" step="0.01" className={schoolInputClass} value={category.weight_percent} onChange={(event) => setGradingCategories((current) => current.map((item) => item.id === category.id ? { ...item, weight_percent: event.target.value } : item))} /></SchoolField><label className="flex min-h-10 items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={Boolean(category.required)} onChange={(event) => setGradingCategories((current) => current.map((item) => item.id === category.id ? { ...item, required: event.target.checked } : item))} />Required</label><SchoolSecondaryButton onClick={() => void saveCategory(category)}>Save</SchoolSecondaryButton></div>)}</div> : <SchoolEmptyState title="No grading categories configured" description="Seed the default 10/30/60 categories or add your own." />}
+        <form onSubmit={addGradingCategory} className="mt-4 grid gap-2 border-t border-slate-100 pt-4 sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-end"><SchoolField label="New category"><input className={schoolInputClass} value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} placeholder="Project work" /></SchoolField><SchoolField label="Weight (%)"><input type="number" min="0" max="100" step="0.01" className={schoolInputClass} value={newCategoryWeight} onChange={(event) => setNewCategoryWeight(event.target.value)} /></SchoolField><SchoolPrimaryButton type="submit">Add category</SchoolPrimaryButton></form>
+      </SchoolPanel>
+      <SchoolPanel title="Grading and ranking policy">
+        <form onSubmit={saveGradingPolicy} className="grid gap-3 md:grid-cols-3">
+          <SchoolField label="Pass mark (%)"><input type="number" min="0" max="100" step="0.5" className={schoolInputClass} value={passMark} onChange={(event) => setPassMark(event.target.value)} /></SchoolField>
+          <SchoolField label="Ranking scope"><select className={schoolSelectClass} value={rankScope} onChange={(event) => setRankScope(event.target.value)}><option value="section">Within each section</option><option value="grade">Across the whole grade</option></select></SchoolField>
+          <SchoolField label="Missing mark rule"><select className={schoolSelectClass} value={missingMarkRule} onChange={(event) => setMissingMarkRule(event.target.value)}><option value="incomplete">Mark term incomplete</option><option value="zero">Treat missing mark as zero</option></select></SchoolField>
+          <div className="md:col-span-3"><SchoolPrimaryButton type="submit">Save grading policy</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <SchoolPanel title="Grade scale" description="Define non-overlapping percentage ranges for the selected grade.">
+        <div className="mb-3 overflow-x-auto"><table className="w-full min-w-[500px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Letter</th><th className="pb-2">Minimum</th><th className="pb-2">Maximum</th><th className="pb-2">Description</th></tr></thead><tbody className="divide-y divide-slate-100">{selectedGradeScales.map((scale) => <tr key={scale.id}><td className="py-2 font-semibold text-slate-800">{scale.letter_grade}</td><td className="py-2 text-slate-600">{scale.minimum_score}%</td><td className="py-2 text-slate-600">{scale.maximum_score}%</td><td className="py-2 text-slate-600">{scale.description || "—"}</td></tr>)}</tbody></table></div>
+        <form onSubmit={addGradeScale} className="grid gap-2 sm:grid-cols-5 sm:items-end"><SchoolField label="Letter"><input className={schoolInputClass} value={newScaleLetter} onChange={(event) => setNewScaleLetter(event.target.value)} placeholder="A" /></SchoolField><SchoolField label="Minimum %"><input type="number" min="0" max="100" className={schoolInputClass} value={newScaleMin} onChange={(event) => setNewScaleMin(event.target.value)} /></SchoolField><SchoolField label="Maximum %"><input type="number" min="0" max="100" className={schoolInputClass} value={newScaleMax} onChange={(event) => setNewScaleMax(event.target.value)} /></SchoolField><SchoolField label="Description"><input className={schoolInputClass} value={newScaleDescription} onChange={(event) => setNewScaleDescription(event.target.value)} /></SchoolField><SchoolPrimaryButton type="submit">Add scale</SchoolPrimaryButton></form>
+      </SchoolPanel>
+      <SchoolPanel title="Attendance and parent notification policies" description="Attendance and behavior remain separate from academic marks by default. These settings control notifications and the absence review threshold.">
+        {policySettings ? <form onSubmit={savePolicySettings} className="space-y-3">
+          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.attendance_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, attendance_notifications_enabled: event.target.checked }))} />Send automatic parent notifications when homeroom attendance is submitted</label>
+          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.behavior_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, behavior_notifications_enabled: event.target.checked }))} />Notify parents after a behavior report is approved</label>
+          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.report_card_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, report_card_notifications_enabled: event.target.checked }))} />Notify parents when official report cards are published</label>
+          <SchoolField label="Absences requiring Admin review"><input type="number" min="1" max="60" className={schoolInputClass} value={policySettings.absence_review_threshold} onChange={(event) => setPolicySettings((current: any) => ({ ...current, absence_review_threshold: event.target.value }))} /></SchoolField>
+          <SchoolPrimaryButton type="submit">Save school policies</SchoolPrimaryButton>
+        </form> : <SchoolEmptyState title="Policy settings unavailable" description="The school's policy settings row has not been created." />}
       </SchoolPanel>
     </div>
   );
@@ -480,6 +721,9 @@ export default function SchoolManagerPortal() {
           <SchoolField label="Due date"><input type="date" className={schoolInputClass} value={feeDueDate} onChange={(event) => setFeeDueDate(event.target.value)} /></SchoolField>
           <div className="md:col-span-2 xl:col-span-5"><SchoolPrimaryButton type="submit">Save fee structure</SchoolPrimaryButton></div>
         </form>
+      </SchoolPanel>
+      <SchoolPanel title="Finance follow-ups from Finance staff" description="Review unpaid invoice reports and confirm that the school has addressed them.">
+        {financeFollowups.length ? <div className="space-y-3">{financeFollowups.map((item) => <div key={item.id} className="rounded-md border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.student_membership_id)} · Invoice {item.invoice_id}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-600">{item.note}</p>{item.status !== "resolved" && <div className="mt-2"><SchoolSecondaryButton onClick={() => void resolveFinanceFollowup(item.id)}>Mark resolved</SchoolSecondaryButton></div>}{item.resolution_note && <p className="mt-2 text-xs text-emerald-700">{item.resolution_note}</p>}</div>)}</div> : <SchoolEmptyState title="No finance follow-ups" description="Reports from the School Finance team will appear here." />}
       </SchoolPanel>
       <SchoolPanel title="Outstanding invoices" description="Read-only oversight for the Manager.">
         {invoices.filter((invoice) => Number(invoice.balance) > 0).length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Invoice</th><th className="pb-2">Student</th><th className="pb-2">Amount</th><th className="pb-2">Balance</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{invoices.filter((invoice) => Number(invoice.balance) > 0).map((invoice) => <tr key={invoice.id}><td className="py-3 font-medium text-slate-800">{invoice.invoice_number}</td><td className="py-3 text-slate-600">{memberName(invoice.student_membership_id)}</td><td className="py-3 text-slate-600">{invoice.currency} {Number(invoice.amount).toLocaleString()}</td><td className="py-3 font-medium text-slate-800">{invoice.currency} {Number(invoice.balance).toLocaleString()}</td><td className="py-3"><SchoolStatus value={invoice.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No outstanding invoices" description="Finance-generated invoices with balances will appear here." />}
@@ -545,6 +789,32 @@ export default function SchoolManagerPortal() {
     </div>
   );
 
+  const renderDiscipline = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Disciplinary oversight" description="Submit staff recommendations to the Super Admin and review student recommendations from the School Admin." />
+      <SchoolPanel title="Recommend staff disciplinary action">
+        <form onSubmit={submitStaffDisciplineRecommendation} className="grid gap-3 md:grid-cols-2">
+          <SchoolField label="Staff member"><select className={schoolSelectClass} value={staffDisciplineTargetId} onChange={(event) => setStaffDisciplineTargetId(event.target.value)}><option value="">Choose staff member</option>{members.filter((member) => ["admin", "teacher", "finance"].includes(member.school_role) && member.status === "active").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
+          <SchoolField label="Reason"><input className={schoolInputClass} value={staffDisciplineReason} onChange={(event) => setStaffDisciplineReason(event.target.value)} /></SchoolField>
+          <div className="md:col-span-2"><SchoolField label="Recommendation"><textarea className={schoolTextareaClass} value={staffDisciplineRecommendation} onChange={(event) => setStaffDisciplineRecommendation(event.target.value)} /></SchoolField></div>
+          <div className="md:col-span-2"><SchoolPrimaryButton type="submit">Submit to Super Admin</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <SchoolPanel title="Teacher conduct reports from School Admin">
+        {staffConductReports.length ? <div className="space-y-3">{staffConductReports.map((report) => <div key={report.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(report.target_teacher_membership_id)} · {report.report_type.replace(/_/g, " ")}</p><SchoolStatus value={report.status} /></div><p className="mt-1 text-xs text-slate-500">Submitted by {memberName(report.submitted_by_membership_id)} · {report.severity}</p><p className="mt-2 text-sm text-slate-700">{report.description}</p>{report.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={managerReviewNotes[report.id] || ""} onChange={(event) => setManagerReviewNotes((current) => ({ ...current, [report.id]: event.target.value }))} placeholder="Manager review note" /><div className="mt-2 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewStaffConductReport(report, "reviewed")}>Mark reviewed</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewStaffConductReport(report, "resolved")}>Resolve</SchoolSecondaryButton><SchoolSecondaryButton onClick={() => void reviewStaffConductReport(report, "dismissed")}>Dismiss</SchoolSecondaryButton></div></>}{report.manager_note && <p className="mt-2 text-xs text-emerald-700">Manager note: {report.manager_note}</p>}</div>)}</div> : <SchoolEmptyState title="No staff conduct reports" description="Admin-submitted reports will appear here." />}
+      </SchoolPanel>
+      <SchoolPanel title="Teacher assignment recommendations">
+        {assignmentRecommendations.length ? <div className="space-y-3">{assignmentRecommendations.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.teacher_membership_id)} · {item.recommendation_type.replace(/_/g, " ")}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-500">Requested: {item.requested_section_id ? sectionLabel(item.requested_section_id) : "—"} · {item.requested_subject_name || "—"} · {item.requested_assignment_kind || "—"}</p><p className="mt-2 text-sm text-slate-700">{item.reason}</p>{item.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={managerReviewNotes[item.id] || ""} onChange={(event) => setManagerReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Manager decision note" /><div className="mt-2 flex gap-2"><SchoolPrimaryButton onClick={() => void reviewAssignmentRecommendation(item, true)}>Accept</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewAssignmentRecommendation(item, false)}>Decline</SchoolSecondaryButton></div></>}{item.manager_note && <p className="mt-2 text-xs text-emerald-700">Manager note: {item.manager_note}</p>}</div>)}</div> : <SchoolEmptyState title="No assignment recommendations" description="Admin recommendations will appear here." />}
+      </SchoolPanel>
+      <SchoolPanel title="Student disciplinary recommendations">
+        {disciplinaryRecommendations.filter((item) => item.target_kind === "student").length ? <div className="space-y-3">{disciplinaryRecommendations.filter((item) => item.target_kind === "student").map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.target_membership_id)}</p><SchoolStatus value={item.status} /></div><p className="mt-2 text-sm text-slate-700">Reason: {item.reason}</p><p className="mt-1 text-sm text-slate-700">Recommendation: {item.recommendation}</p>{item.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={disciplineReviewNotes[item.id] || ""} onChange={(event) => setDisciplineReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Decision note (optional)" /><div className="mt-2 flex gap-2"><SchoolPrimaryButton onClick={() => void reviewStudentDisciplineRecommendation(item, true)}>Accept</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewStudentDisciplineRecommendation(item, false)}>Reject</SchoolSecondaryButton></div></>}{item.decision_note && <p className="mt-2 text-xs text-slate-500">Decision: {item.decision_note}</p>}</div>)}</div> : <SchoolEmptyState title="No student recommendations" description="Admin-submitted student recommendations will appear here." />}
+      </SchoolPanel>
+      <SchoolPanel title="Staff disciplinary recommendations">
+        {disciplinaryRecommendations.filter((item) => item.target_kind === "staff").length ? <div className="space-y-2">{disciplinaryRecommendations.filter((item) => item.target_kind === "staff").map((item) => <div key={item.id} className="rounded-md border border-slate-100 p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.target_membership_id)}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-600">{item.reason}</p><p className="mt-1 text-xs text-slate-600">Recommendation: {item.recommendation}</p><p className="mt-2 text-xs text-slate-500">Staff recommendations are reviewed by the Super Admin.</p></div>)}</div> : <SchoolEmptyState title="No staff recommendations" description="Staff recommendations submitted by the Manager will appear here." />}
+      </SchoolPanel>
+    </div>
+  );
+
   const renderReports = () => (
     <div className="space-y-5">
       <SchoolPageHeading title="School reports" description="Live operational records available to the School Manager." />
@@ -555,7 +825,7 @@ export default function SchoolManagerPortal() {
         <SchoolMetric label="Evaluations" value={evaluations.length} detail="Recorded staff reviews" icon={CheckCircle2} />
       </div>
       <SchoolPanel title="Enrollment by grade">
-        {students.length ? <div className="space-y-3">{(Object.entries(students.reduce((acc: Record<string, number>, student) => { const grade = student.grade_label || "Unassigned"; acc[grade] = (acc[grade] || 0) + 1; return acc; }, {})) as Array<[string, number]>).sort(([a], [b]) => a.localeCompare(b)).map(([grade, count]) => <div key={grade} className="flex items-center gap-3"><span className="w-28 shrink-0 text-sm font-medium text-slate-700">{grade}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, (count / Math.max(1, students.length)) * 100)}%` }} /></div><span className="w-8 text-right text-sm tabular-nums text-slate-600">{count}</span></div>)}</div> : <SchoolEmptyState title="No student enrollment data" description="Student enrollment totals will appear when accounts are created." />}
+        {students.length ? <div className="space-y-3">{Object.entries(students.reduce((acc: Record<string, number>, student) => { const grade = student.grade_label || "Unassigned"; acc[grade] = (acc[grade] || 0) + 1; return acc; }, {})).sort(([a], [b]) => a.localeCompare(b)).map(([grade, count]) => <div key={grade} className="flex items-center gap-3"><span className="w-28 shrink-0 text-sm font-medium text-slate-700">{grade}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, (Number(count) / Math.max(1, students.length)) * 100)}%` }} /></div><span className="w-8 text-right text-sm tabular-nums text-slate-600">{Number(count)}</span></div>)}</div> : <SchoolEmptyState title="No student enrollment data" description="Student enrollment totals will appear when accounts are created." />}
       </SchoolPanel>
     </div>
   );
@@ -565,11 +835,13 @@ export default function SchoolManagerPortal() {
     case "accounts": content = renderAccounts(); break;
     case "structure": content = renderStructure(); break;
     case "assignments": content = renderAssignments(); break;
+    case "grading": content = renderGrading(); break;
     case "finance": content = renderFinance(); break;
     case "tasks": content = renderTasks(); break;
     case "evaluations": content = renderEvaluations(); break;
     case "requests": content = renderRequests(); break;
     case "reports": content = renderReports(); break;
+    case "discipline": content = renderDiscipline(); break;
     default: content = renderOverview();
   }
 

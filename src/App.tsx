@@ -25,6 +25,11 @@ const ManagerDashboard = lazy(() => import("./pages/ManagerDashboard"));
 const ManagerControlCenter = lazy(() => import("./pages/ManagerControlCenter"));
 const SchoolManagerPortal = lazy(() => import("./pages/SchoolManagerPortal"));
 const SchoolAdminPortal = lazy(() => import("./pages/SchoolAdminPortal"));
+const SchoolTeacherPortal = lazy(() => import("./pages/SchoolTeacherPortal"));
+const SchoolParentPortal = lazy(() => import("./pages/SchoolParentPortal"));
+const SchoolFinancePortal = lazy(() => import("./pages/SchoolFinancePortal"));
+const SchoolStudentPortal = lazy(() => import("./pages/SchoolStudentPortal"));
+const SchoolGlobalAdminPortal = lazy(() => import("./pages/SchoolGlobalAdminPortal"));
 const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
 const Chat = lazy(() => import("./pages/Chat"));
 const AITutor = lazy(() => import("./pages/AITutor"));
@@ -131,6 +136,11 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/admin", title: "Admin Portal" },
   { prefix: "/school/manager", title: "School Manager Portal" },
   { prefix: "/school/admin", title: "School Admin Portal" },
+  { prefix: "/school/teacher", title: "School Teacher Portal" },
+  { prefix: "/school/parent", title: "School Parent Portal" },
+  { prefix: "/school/finance", title: "School Finance Portal" },
+  { prefix: "/school/student", title: "School Student Portal" },
+  { prefix: "/school/super-admin", title: "School Network Administration" },
   { prefix: "/manager", title: "Manager Control Center" },
   { prefix: "/manager-dashboard", title: "Manager Dashboard" },
   { prefix: "/finance", title: "Finance Portal" },
@@ -350,6 +360,11 @@ const App = () => (
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
                               <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["admin"]}><SchoolPortalGate role="admin"><SchoolAdminPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolPortalGate role="teacher"><SchoolTeacherPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/parent" element={<ProtectedRoute allowedRoles={["parent"]}><SchoolPortalGate role="parent"><SchoolParentPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/finance" element={<ProtectedRoute allowedRoles={["finance"]}><SchoolPortalGate role="finance"><SchoolFinancePortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/student" element={<ProtectedRoute allowedRoles={["student"]}><SchoolPortalGate role="student"><SchoolStudentPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/super-admin" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><SchoolGlobalAdminPortal /></ProtectedRoute>} />
                               <Route
                                 path="/manager"
                                 element={
