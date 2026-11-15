@@ -295,6 +295,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       AND (
         public._is_extreme_admin()
         OR public.is_school_manager_or_admin(assessment.school_id)
+        OR public.school_can_teach_subject(assessment.school_id, assessment.section_id, assessment.subject_name)
         OR EXISTS (
           SELECT 1 FROM public.school_memberships creator
           WHERE creator.id = assessment.created_by_membership_id
@@ -632,6 +633,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.school_student_marks WHERE assessment_id = p_assessment_id) THEN
     RAISE EXCEPTION 'Enter student marks before submitting the assessment';
   END IF;
+  PERFORM set_config('app.school_assessment_transition', 'submit', true);
   UPDATE public.school_assessments
   SET status = 'submitted', updated_at = now()
   WHERE id = p_assessment_id AND status IN ('draft', 'rejected');
@@ -639,6 +641,7 @@ BEGIN
   UPDATE public.school_student_marks
   SET status = 'submitted', updated_at = now()
   WHERE assessment_id = p_assessment_id AND status IN ('draft', 'rejected');
+  PERFORM set_config('app.school_assessment_transition', '', true);
   RETURN true;
 END;
 $$;
@@ -655,6 +658,7 @@ BEGIN
   IF v_school_id IS NULL OR NOT public.school_is_admin(v_school_id) THEN
     RAISE EXCEPTION 'School Admin approval is required';
   END IF;
+  PERFORM set_config('app.school_assessment_transition', 'review', true);
   UPDATE public.school_assessments
   SET status = CASE WHEN p_approve THEN 'approved' ELSE 'rejected' END,
       reviewed_by = auth.uid(), reviewed_at = now(),
@@ -665,6 +669,7 @@ BEGIN
   SET status = CASE WHEN p_approve THEN 'approved' ELSE 'rejected' END,
       updated_at = now()
   WHERE assessment_id = p_assessment_id AND status = 'submitted';
+  PERFORM set_config('app.school_assessment_transition', '', true);
   RETURN true;
 END;
 $$;
@@ -745,6 +750,7 @@ BEGIN
     SELECT
       completed.*,
       CASE WHEN completed.completed_required_categories >= required_counts.required_categories
+                  OR coalesce(policy.missing_mark_rule, 'incomplete') = 'zero'
            THEN round(completed.weighted_average, 2)
            ELSE NULL END AS final_average,
       policy.rank_scope,
@@ -839,12 +845,14 @@ BEGIN
   IF v_school_id IS NULL OR NOT public.school_can_review_behavior_report(p_report_id) THEN
     RAISE EXCEPTION 'Homeroom teacher or School Admin review is required';
   END IF;
+  PERFORM set_config('app.school_behavior_review', 'true', true);
   UPDATE public.school_behavior_reports
   SET status = CASE WHEN p_approve THEN 'approved' ELSE 'rejected' END,
       reviewed_by = auth.uid(), reviewed_at = now(),
       review_note = nullif(trim(p_review_note), '')
   WHERE id = p_report_id AND status = 'pending';
   IF NOT FOUND THEN RAISE EXCEPTION 'Only pending behavior reports can be reviewed'; END IF;
+  PERFORM set_config('app.school_behavior_review', '', true);
   RETURN true;
 END;
 $$;
@@ -1079,6 +1087,9 @@ REVOKE ALL ON FUNCTION public.school_review_assessment(uuid, boolean, text) FROM
 REVOKE ALL ON FUNCTION public.school_calculate_term_results(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_publish_term_results(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_review_behavior_report(uuid, boolean, text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_notify_parent_attendance() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_notify_parent_behavior_approval() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_notify_parent_results_published() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_is_admin(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_teach_subject(uuid, uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_is_homeroom_teacher(uuid, uuid) TO authenticated;
@@ -1093,6 +1104,8 @@ GRANT EXECUTE ON FUNCTION public.school_can_view_behavior_report(uuid) TO authen
 GRANT EXECUTE ON FUNCTION public.school_can_submit_behavior_report(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_review_behavior_report(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_view_parent_notification(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_can_mark_parent_notification_read(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_mark_parent_notification_read(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_seed_default_grading_categories(uuid, uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_submit_assessment(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_review_assessment(uuid, boolean, text) TO authenticated;
