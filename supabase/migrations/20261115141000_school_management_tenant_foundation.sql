@@ -47,7 +47,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS school_one_active_student_enrollment
   WHERE school_role = 'student' AND status = 'active';
 
 CREATE UNIQUE INDEX IF NOT EXISTS school_student_number_unique
-  ON public.school_memberships(school_id, grade_label, student_number)
+  ON public.school_memberships(school_id, student_number)
   WHERE school_role = 'student' AND student_number IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS school_memberships_school_role_status_idx
@@ -218,12 +218,21 @@ BEGIN
     RAISE EXCEPTION 'Grade is required for student ID allocation';
   END IF;
 
-  INSERT INTO public.school_student_id_sequences(school_id, grade_label, next_number)
-  VALUES (p_school_id, v_grade, 2)
-  ON CONFLICT (school_id, grade_label)
-  DO UPDATE SET next_number = public.school_student_id_sequences.next_number + 1,
-                updated_at = now()
-  RETURNING next_number - 1 INTO v_number;
+  LOOP
+    INSERT INTO public.school_student_id_sequences(school_id, grade_label, next_number)
+    VALUES (p_school_id, v_grade, 2)
+    ON CONFLICT (school_id, grade_label)
+    DO UPDATE SET next_number = public.school_student_id_sequences.next_number + 1,
+                  updated_at = now()
+    RETURNING next_number - 1 INTO v_number;
+
+    EXIT WHEN NOT EXISTS (
+      SELECT 1 FROM public.school_memberships existing
+      WHERE existing.school_id = p_school_id
+        AND existing.school_role = 'student'
+        AND existing.student_number = v_number
+    );
+  END LOOP;
 
   RETURN v_number;
 END;
@@ -385,7 +394,7 @@ BEGIN
           ON active_student.id = remaining_link.student_membership_id
         WHERE remaining_link.parent_membership_id = parent_membership.id
           AND remaining_link.status = 'active'
-          AND active_student.status = 'active'
+          AND active_student.status IN ('active', 'suspended')
       );
   END IF;
   RETURN NEW;
