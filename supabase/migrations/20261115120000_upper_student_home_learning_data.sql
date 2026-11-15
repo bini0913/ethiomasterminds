@@ -145,8 +145,18 @@ SET search_path = public
 AS $$
 DECLARE
   v_subject text;
+  v_grade text;
   v_activity_date date;
 BEGIN
+  SELECT grade INTO v_grade
+  FROM public.profiles
+  WHERE id = NEW.student_id;
+
+  IF substring(lower(trim(COALESCE(v_grade, ''))) from '[0-9]+') IS NULL
+     OR substring(lower(trim(v_grade)) from '[0-9]+')::integer NOT BETWEEN 9 AND 12 THEN
+    RETURN NEW;
+  END IF;
+
   SELECT subject INTO v_subject
   FROM public.quizzes
   WHERE id = NEW.quiz_id;
@@ -243,6 +253,67 @@ CREATE TRIGGER record_upper_student_quiz_activity
 AFTER INSERT ON public.quiz_results
 FOR EACH ROW
 EXECUTE FUNCTION public.record_upper_student_quiz_activity();
+
+
+-- Backfill historical upper-tier quiz activity so existing students do not
+-- start with an empty dashboard after the migration is installed.
+INSERT INTO public.upper_student_topic_progress (
+  user_id, subject, topic, questions_attempted, correct_answers,
+  accuracy_percentage, last_practiced_at
+)
+SELECT
+  attempts.student_id,
+  attempts.subject,
+  attempts.topic,
+  count(*)::integer,
+  count(*) FILTER (WHERE attempts.is_correct)::integer,
+  round(
+    count(*) FILTER (WHERE attempts.is_correct)::numeric
+    / greatest(count(*), 1)::numeric * 100,
+    2
+  ),
+  max(attempts.completed_at)
+FROM (
+  SELECT
+    qr.student_id,
+    qu.subject,
+    COALESCE(NULLIF(trim(q.topic), ''), 'General') AS topic,
+    (answer.value = q.correct_answer) AS is_correct,
+    COALESCE(qr.completed_at, now()) AS completed_at
+  FROM public.quiz_results qr
+  JOIN public.profiles p ON p.id = qr.student_id
+  JOIN public.quizzes qu ON qu.id = qr.quiz_id
+  CROSS JOIN LATERAL jsonb_each_text(
+    CASE WHEN jsonb_typeof(qr.answers) = 'object'
+      THEN qr.answers ELSE '{}'::jsonb END
+  ) AS answer(key, value)
+  JOIN public.questions q
+    ON q.id::text = answer.key
+   AND q.quiz_id = qr.quiz_id
+  WHERE substring(lower(trim(COALESCE(p.grade, ''))) from '[0-9]+') IS NOT NULL
+    AND substring(lower(trim(p.grade)) from '[0-9]+')::integer BETWEEN 9 AND 12
+) AS attempts
+GROUP BY attempts.student_id, attempts.subject, attempts.topic
+ON CONFLICT (user_id, subject, topic) DO NOTHING;
+
+INSERT INTO public.upper_student_daily_activity (
+  user_id, activity_date, quiz_count, question_count,
+  correct_count, xp_earned, last_activity_at
+)
+SELECT
+  qr.student_id,
+  (COALESCE(qr.completed_at, now()) AT TIME ZONE 'Africa/Addis_Ababa')::date,
+  count(*)::integer,
+  sum(GREATEST(COALESCE(qr.total_questions, 0), 0))::integer,
+  sum(GREATEST(COALESCE(qr.correct_answers, 0), 0))::integer,
+  sum(GREATEST(COALESCE(qr.xp_earned, 0), 0))::integer,
+  max(COALESCE(qr.completed_at, now()))
+FROM public.quiz_results qr
+JOIN public.profiles p ON p.id = qr.student_id
+WHERE substring(lower(trim(COALESCE(p.grade, ''))) from '[0-9]+') IS NOT NULL
+  AND substring(lower(trim(p.grade)) from '[0-9]+')::integer BETWEEN 9 AND 12
+GROUP BY qr.student_id, (COALESCE(qr.completed_at, now()) AT TIME ZONE 'Africa/Addis_Ababa')::date
+ON CONFLICT (user_id, activity_date) DO NOTHING;
 
 REVOKE ALL ON FUNCTION public.record_upper_student_quiz_activity() FROM PUBLIC, anon, authenticated;
 
