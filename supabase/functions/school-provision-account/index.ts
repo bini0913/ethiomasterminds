@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     if (rolesError) return json({ error: "Unable to verify account permissions" }, 503);
     const isSuperAdmin = (globalRoles ?? []).some((row: { role: string }) => row.role === "extreme_admin");
 
-    const createAuthAccount = async (name: string, username: string, grade?: string) => {
+    const createAuthAccount = async (name: string, username: string, grade?: string, age?: number) => {
       const password = randomString(18);
       const email = `${crypto.randomUUID()}@accounts.masterminds.app`;
       const { data, error } = await admin.auth.admin.createUser({
@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
           name: name.trim(),
           username: username.toLowerCase(),
           ...(grade ? { grade } : {}),
+          ...(age !== undefined ? { age } : {}),
           must_change_password: true,
         },
       });
@@ -206,7 +207,7 @@ Deno.serve(async (req) => {
             const grade = normalize(input.grade_label);
             const age = Number(input.age);
             const sectionId = normalize(input.section_id);
-            if (!grade || !Number.isInteger(age) || age < 1 || age > 120 || !sectionId) {
+            if (!grade || !Number.isInteger(age) || age < 3 || age > 120 || !sectionId) {
               throw new Error("Student name, grade, age, and section are required");
             }
             const { data: number, error: numberError } = await userClient.rpc("school_next_student_number", {
@@ -222,7 +223,7 @@ Deno.serve(async (req) => {
             username = await uniqueStaffUsername();
           }
 
-          const account = await createAuthAccount(name, username, role === "student" ? normalize(input.grade_label) : undefined);
+          const account = await createAuthAccount(name, username, role === "student" ? normalize(input.grade_label) : undefined, role === "student" ? Number(input.age) : undefined);
           const membershipId = await attachAccount(schoolId, role, account.userId, username, input, studentNumber);
           created.push({
             index,
