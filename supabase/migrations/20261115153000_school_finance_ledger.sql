@@ -338,9 +338,10 @@ $$;
 CREATE OR REPLACE FUNCTION public.school_recalculate_invoice_guarded()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_invoice_id uuid := coalesce(NEW.invoice_id, OLD.invoice_id);
+  v_invoice_id uuid;
   v_paid numeric(12,2);
 BEGIN
+  IF TG_OP = 'DELETE' THEN v_invoice_id := OLD.invoice_id; ELSE v_invoice_id := NEW.invoice_id; END IF;
   SELECT coalesce(sum(amount), 0) INTO v_paid
   FROM public.school_fee_payments
   WHERE invoice_id = v_invoice_id AND status = 'confirmed';
@@ -380,8 +381,14 @@ CREATE OR REPLACE FUNCTION public.school_notify_parent_payment_recorded()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_invoice public.school_student_invoices%ROWTYPE;
+  v_notify boolean := false;
 BEGIN
-  IF NEW.status = 'confirmed' AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM NEW.status) THEN
+  IF TG_OP = 'INSERT' THEN
+    v_notify := NEW.status = 'confirmed';
+  ELSIF TG_OP = 'UPDATE' THEN
+    v_notify := NEW.status = 'confirmed' AND OLD.status IS DISTINCT FROM NEW.status;
+  END IF;
+  IF v_notify THEN
     SELECT * INTO v_invoice FROM public.school_student_invoices WHERE id = NEW.invoice_id;
     INSERT INTO public.school_parent_notifications(
       school_id, parent_membership_id, student_membership_id, notification_type, title, message
