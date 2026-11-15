@@ -40,12 +40,15 @@ Deno.serve(async (req) => {
 
     const callerId = authData.user.id;
     const adminClient = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    const { data: callerRole, error: callerRoleError } = await adminClient.rpc("get_user_role", { _user_id: callerId });
+    const { data: callerRoles, error: callerRoleError } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", callerId);
+    const callerIsSuperAdmin = (callerRoles ?? []).some((entry: { role: string }) => entry.role === "extreme_admin");
 
     // Self-assignment is only allowed for the normal student role.
-    // Use the service-role client for the final insert because the RPC's auth.uid()
-    // refers to the service-role request context and therefore cannot authorize
-    // this authenticated caller.
+    // Use the service-role client for the final insert because clients must not
+    // write platform-wide role assignments directly.
     if (!targetUserId || targetUserId === callerId) {
       if (role !== "student") return json({ ok: false, error: "You cannot self-assign a privileged role" }, 403);
 
@@ -60,17 +63,14 @@ Deno.serve(async (req) => {
     }
 
     if (callerRoleError) {
-      console.error("Error resolving caller role:", callerRoleError);
+      console.error("Error resolving caller's global role:", callerRoleError);
       return json({ ok: false, error: "Unable to verify permissions" }, 500);
     }
 
-    if (callerRole !== "admin" && callerRole !== "manager" && callerRole !== "extreme_admin") {
-      return json({ ok: false, error: "Not authorized to change other users' roles" }, 403);
-    }
-
-    // Managers may manage student/teacher roles; only admins/extreme_admin can grant admin/manager.
-    if ((role === "admin" || role === "manager") && callerRole !== "admin" && callerRole !== "extreme_admin") {
-      return json({ ok: false, error: "Only admins can grant admin or manager roles" }, 403);
+    // School roles are stored in school_memberships, not user_roles. Only the
+    // global Super Admin may grant platform-wide roles through this endpoint.
+    if (!callerIsSuperAdmin) {
+      return json({ ok: false, error: "Only the Super Admin can assign platform-wide roles" }, 403);
     }
 
     const { error } = await adminClient

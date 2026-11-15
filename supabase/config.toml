@@ -41,3 +41,6 @@ verify_jwt = true
 
 [functions.username-auth]
 verify_jwt = false
+
+[functions.school-provision-account]
+verify_jwt = true
