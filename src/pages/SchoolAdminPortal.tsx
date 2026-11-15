@@ -194,14 +194,43 @@ export default function SchoolAdminPortal() {
     const section = sections.find((item) => item.id === id);
     return section ? `${section.grade_label} ${section.section_name}` : "—";
   };
-  const pendingAssessments = assessments.filter((item) => item.status === "submitted");\n  const pendingHomework = homeworkAssignments.filter((item) => item.status === "pending");
+  const pendingAssessments = assessments.filter((item) => item.status === "submitted");
+  const pendingHomework = homeworkAssignments.filter((item) => item.status === "pending");
   const pendingBehaviors = behaviorReports.filter((item) => item.status === "pending");
   const pendingQuizzes = quizzes.filter((item) => item.school_review_status === "pending");
   const pendingBooks = books.filter((item) => item.school_review_status === "pending");
   const pendingAnnouncements = announcements.filter((item) => item.status === "pending");
   const pendingContentCount = pendingQuizzes.length + pendingBooks.length + pendingAnnouncements.length;
   const today = new Date().toLocaleDateString("en-CA");
-  const todaySessions = attendanceSessions.filter((session) => session.attendance_date === today);\n\n  const changeStudentPlacement = async (student: any) => {\n    const nextSection = sections.find((section) => section.id === placementByStudent[student.id]);\n    if (!nextSection) return toast.error("Choose the new class section.");\n    const { error } = await db.from("school_memberships").update({ grade_label: nextSection.grade_label, section_id: nextSection.id }).eq("id", student.id).eq("school_id", schoolId);\n    if (error) return toast.error(error.message);\n    toast.success("Student class placement updated. Their Student ID and account remain unchanged.");\n    await load();\n  };\n\n  const endStudentEnrollment = async (student: any, action: "transfer_student" | "graduate_student") => {\n    const label = action === "transfer_student" ? "transfer this student out" : "mark this student as graduated";\n    if (!window.confirm(`Are you sure you want to ${label}? Historical school records will remain archived.`)) return;\n    const { error } = await supabase.functions.invoke("school-provision-account", { body: { action, membership_id: student.id, reason: action === "transfer_student" ? "Transferred to another school" : "Graduated" } });\n    if (error) return toast.error(error.message);\n    toast.success(action === "transfer_student" ? "Student enrollment deactivated and records archived." : "Student marked as graduated and records archived.");\n    await load();\n  };\n\n  const linkExistingParent = async (event: React.FormEvent) => {\n    event.preventDefault();\n    if (!linkParentId || !linkStudentIds.length) return toast.error("Choose a parent and at least one student.");\n    const { data, error } = await supabase.functions.invoke("school-provision-account", { body: { action: "link_parent_students", parent_membership_id: linkParentId, student_membership_ids: linkStudentIds } });\n    if (error) return toast.error(error.message);\n    toast.success(`Parent linked to ${data?.linked ?? linkStudentIds.length} student(s).`);\n    setLinkParentId(""); setLinkStudentIds([]);\n    await load();\n  };
+  const todaySessions = attendanceSessions.filter((session) => session.attendance_date === today);
+
+  const changeStudentPlacement = async (student: any) => {
+    const nextSection = sections.find((section) => section.id === placementByStudent[student.id]);
+    if (!nextSection) return toast.error("Choose the new class section.");
+    const { error } = await db.from("school_memberships").update({ grade_label: nextSection.grade_label, section_id: nextSection.id }).eq("id", student.id).eq("school_id", schoolId);
+    if (error) return toast.error(error.message);
+    toast.success("Student class placement updated. Their Student ID and account remain unchanged.");
+    await load();
+  };
+
+  const endStudentEnrollment = async (student: any, action: "transfer_student" | "graduate_student") => {
+    const label = action === "transfer_student" ? "transfer this student out" : "mark this student as graduated";
+    if (!window.confirm(`Are you sure you want to ${label}? Historical school records will remain archived.`)) return;
+    const { error } = await supabase.functions.invoke("school-provision-account", { body: { action, membership_id: student.id, reason: action === "transfer_student" ? "Transferred to another school" : "Graduated" } });
+    if (error) return toast.error(error.message);
+    toast.success(action === "transfer_student" ? "Student enrollment deactivated and records archived." : "Student marked as graduated and records archived.");
+    await load();
+  };
+
+  const linkExistingParent = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!linkParentId || !linkStudentIds.length) return toast.error("Choose a parent and at least one student.");
+    const { data, error } = await supabase.functions.invoke("school-provision-account", { body: { action: "link_parent_students", parent_membership_id: linkParentId, student_membership_ids: linkStudentIds } });
+    if (error) return toast.error(error.message);
+    toast.success(`Parent linked to ${data?.linked ?? linkStudentIds.length} student(s).`);
+    setLinkParentId(""); setLinkStudentIds([]);
+    await load();
+  };
 
   const reviewAssessment = async (id: string, approve: boolean) => {
     const { error } = await db.rpc("school_review_assessment", { p_assessment_id: id, p_approve: approve, p_feedback: reviewFeedback[id] || null });
@@ -453,7 +482,14 @@ export default function SchoolAdminPortal() {
     <div className="space-y-5">
       <SchoolPageHeading title="Students & parents" description="Enroll students in bulk, create parent accounts, and keep family links accurate." />
       <SchoolBulkStudentEnrollment schoolId={schoolId!} sections={sections} parents={parents} memberName={memberName} onCreated={load} />
-      <SchoolPanel title="Link an existing parent account to students" description="A parent can be linked to multiple children.">\n        <form onSubmit={linkExistingParent} className="grid gap-3 md:grid-cols-2">\n          <SchoolField label="Parent account"><select className={schoolSelectClass} value={linkParentId} onChange={(event) => setLinkParentId(event.target.value)}><option value="">Choose parent</option>{parents.map((parent) => <option key={parent.id} value={parent.id}>{memberName(parent.id)}</option>)}</select></SchoolField>\n          <SchoolField label="Children"><select multiple className="min-h-24 w-full rounded-md border border-slate-200 bg-white p-2 text-sm" value={linkStudentIds} onChange={(event) => setLinkStudentIds(Array.from(event.target.selectedOptions).map((option) => option.value))}>{students.map((student) => <option key={student.id} value={student.id}>{memberName(student.id)} · {student.grade_label}</option>)}</select></SchoolField>\n          <div className="md:col-span-2"><SchoolPrimaryButton type="submit">Save parent-child links</SchoolPrimaryButton></div>\n        </form>\n      </SchoolPanel>\n      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+      <SchoolPanel title="Link an existing parent account to students" description="A parent can be linked to multiple children.">
+        <form onSubmit={linkExistingParent} className="grid gap-3 md:grid-cols-2">
+          <SchoolField label="Parent account"><select className={schoolSelectClass} value={linkParentId} onChange={(event) => setLinkParentId(event.target.value)}><option value="">Choose parent</option>{parents.map((parent) => <option key={parent.id} value={parent.id}>{memberName(parent.id)}</option>)}</select></SchoolField>
+          <SchoolField label="Children"><select multiple className="min-h-24 w-full rounded-md border border-slate-200 bg-white p-2 text-sm" value={linkStudentIds} onChange={(event) => setLinkStudentIds(Array.from(event.target.selectedOptions).map((option) => option.value))}>{students.map((student) => <option key={student.id} value={student.id}>{memberName(student.id)} · {student.grade_label}</option>)}</select></SchoolField>
+          <div className="md:col-span-2"><SchoolPrimaryButton type="submit">Save parent-child links</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
         <SchoolPanel title="Student register">
           {allStudents.length ? <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Student ID</th><th className="pb-2">Class</th><th className="pb-2">Status</th><th className="pb-2">Placement</th><th className="pb-2">Enrollment</th></tr></thead><tbody className="divide-y divide-slate-100">{allStudents.map((student) => <tr key={student.id}><td className="py-3 font-medium text-slate-800">{memberName(student.id)}<p className="mt-0.5 text-xs text-slate-500">{student.school_username}</p></td><td className="py-3 text-slate-600">{student.student_number ?? "—"}</td><td className="py-3 text-slate-600">{sectionLabel(student.section_id)}</td><td className="py-3"><SchoolStatus value={student.end_reason === "transferred" ? "transferred" : student.status === "deactivated" && student.end_reason === "graduated" ? "graduated" : student.status} /></td><td className="py-3">{student.status === "active" ? <div className="flex min-w-[220px] gap-2"><select className={schoolSelectClass} value={placementByStudent[student.id] || student.section_id || ""} onChange={(event) => setPlacementByStudent((current) => ({ ...current, [student.id]: event.target.value }))}><option value="">Choose section</option>{sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}</select><button type="button" onClick={() => void changeStudentPlacement(student)} className="rounded-md border border-slate-200 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Move</button></div> : <span className="text-xs text-slate-400">Archived</span>}</td><td className="py-3">{student.status === "active" ? <div className="flex gap-2"><button type="button" onClick={() => void endStudentEnrollment(student, "transfer_student")} className="text-xs font-semibold text-amber-700 hover:underline">Transfer out</button><button type="button" onClick={() => void endStudentEnrollment(student, "graduate_student")} className="text-xs font-semibold text-slate-600 hover:underline">Graduate</button></div> : <span className="text-xs text-slate-400">{student.ended_at ? new Date(student.ended_at).toLocaleDateString() : "—"}</span>}</td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No students enrolled" description="Use bulk enrollment to add students to the school." />}
         </SchoolPanel>
