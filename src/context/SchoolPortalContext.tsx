@@ -7,6 +7,7 @@ export type SchoolRole = "manager" | "admin" | "teacher" | "finance" | "parent" 
 export type SchoolMembership = {
   id: string;
   school_id: string;
+  user_id: string;
   school_role: SchoolRole;
   status: string;
   grade_label: string | null;
@@ -14,6 +15,8 @@ export type SchoolMembership = {
   student_number: number | null;
   school_username: string | null;
   age_at_enrollment: number | null;
+  question_submission_suspended: boolean;
+  question_submission_suspension_reason: string | null;
   created_at: string;
   school: {
     id: string;
@@ -55,7 +58,7 @@ export function SchoolPortalProvider({ children }: { children: React.ReactNode }
     const db = supabase as any;
     const { data: membershipRows, error: membershipError } = await db
       .from("school_memberships")
-      .select("id,school_id,school_role,status,grade_label,section_id,student_number,school_username,age_at_enrollment,created_at")
+      .select("id,school_id,user_id,school_role,status,grade_label,section_id,student_number,school_username,age_at_enrollment,question_submission_suspended,question_submission_suspension_reason,created_at")
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: true });
