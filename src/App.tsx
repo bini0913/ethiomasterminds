@@ -25,6 +25,7 @@ const ManagerDashboard = lazy(() => import("./pages/ManagerDashboard"));
 const ManagerControlCenter = lazy(() => import("./pages/ManagerControlCenter"));
 const SchoolManagerPortal = lazy(() => import("./pages/SchoolManagerPortal"));
 const SchoolAdminPortal = lazy(() => import("./pages/SchoolAdminPortal"));
+const SchoolTeacherPortal = lazy(() => import("./pages/SchoolTeacherPortal"));
 const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
 const Chat = lazy(() => import("./pages/Chat"));
 const AITutor = lazy(() => import("./pages/AITutor"));
@@ -130,6 +131,7 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/admin", title: "Admin Portal" },
   { prefix: "/school/manager", title: "School Manager Portal" },
   { prefix: "/school/admin", title: "School Admin Portal" },
+  { prefix: "/school/teacher", title: "School Teacher Portal" },
   { prefix: "/manager", title: "Manager Control Center" },
   { prefix: "/manager-dashboard", title: "Manager Dashboard" },
   { prefix: "/finance", title: "Finance Portal" },
@@ -345,6 +347,7 @@ const App = () => (
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
                               <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["admin"]}><SchoolPortalGate role="admin"><SchoolAdminPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolPortalGate role="teacher"><SchoolTeacherPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route
                                 path="/manager"
                                 element={
