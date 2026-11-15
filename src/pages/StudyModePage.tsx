@@ -95,6 +95,7 @@ const StudyModePage: React.FC = () => {
   const upperStudent = getUserTier(user?.grade) === "upper";
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [tasks, setTasks] = useState<StudyTask[]>([]);
   const [competitions, setCompetitions] = useState<StudyCompetition[]>([]);
   const [participants, setParticipants] = useState<StudyParticipant[]>([]);
@@ -159,6 +160,7 @@ const StudyModePage: React.FC = () => {
   const loadData = async () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
+    setLoadError(false);
     try {
       try {
         const { error: expiryError } = await db.rpc("expire_study_competitions");
@@ -177,12 +179,11 @@ const StudyModePage: React.FC = () => {
       db.rpc("get_study_mode_stats", { p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }),
     ]);
 
-    if (sessionsRes.error) toast.error(sessionsRes.error.message);
-    if (tasksRes.error) toast.error(tasksRes.error.message);
-    if (competitionsRes.error) toast.error(competitionsRes.error.message);
-    if (participantsRes.error) toast.error(participantsRes.error.message);
-    if (liveRes.error) toast.error(liveRes.error.message);
-    if (settingsRes.error) toast.error(settingsRes.error.message);
+    const queryErrors = [sessionsRes.error, tasksRes.error, competitionsRes.error, participantsRes.error, liveRes.error, settingsRes.error].filter(Boolean);
+    if (queryErrors.length) {
+      console.error("Some Study Mode data sources failed:", queryErrors);
+      setLoadError(true);
+    }
     if (statsRes.error) console.error("Study statistics load failed", statsRes.error);
     if (!statsRes.error && statsRes.data) {
       setStudyStats({
@@ -245,7 +246,7 @@ const StudyModePage: React.FC = () => {
 
     } catch (error) {
       console.error("Study Mode data load failed:", error);
-      toast.error("Your Study Mode data could not be refreshed. Please try again.");
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -649,6 +650,16 @@ const StudyModePage: React.FC = () => {
             {liveStatuses.length} studying now
           </div>
         </header>
+
+        {loadError && (
+          <div role="alert" className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">Some Study Mode data could not be loaded.</p>
+              <p className="mt-1 text-muted-foreground">Your timer remains safe. Retry to reconnect before relying on tasks, competitions, or statistics.</p>
+            </div>
+            <Button variant="outline" className="min-h-10 shrink-0" onClick={() => void loadData()} disabled={loading}>Retry Study Mode</Button>
+          </div>
+        )}
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <main className="space-y-5">
