@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(36);
+select plan(38);
 
 select ok(to_regclass('public.school_student_section_history') is not null, 'student grade and section history table exists');
 select ok(to_regclass('public.school_terms') is not null, 'school terms table exists');
