@@ -52,7 +52,7 @@ ALTER TABLE public.messages
   ADD COLUMN IF NOT EXISTS is_edited boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS is_deleted boolean NOT NULL DEFAULT false;
 
-DO $
+DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
@@ -80,7 +80,7 @@ BEGIN
       ON DELETE SET NULL;
   END IF;
 END;
-$;
+$$;
 
 create table if not exists public.message_reads (
   id uuid primary key default gen_random_uuid(),
