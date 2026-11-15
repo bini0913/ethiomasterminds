@@ -357,7 +357,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW.school_role = 'student' THEN
@@ -395,7 +395,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_record_membership_change ON public.school_memberships;
 CREATE TRIGGER school_record_membership_change
@@ -409,7 +409,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF OLD.school_role = 'student' AND OLD.status = 'active'
+  IF OLD.school_role = 'student' AND OLD.status IN ('active', 'suspended')
      AND NEW.status IN ('transferred', 'graduated', 'deactivated') THEN
     UPDATE public.school_parent_student_links
     SET status = 'deactivated', ended_at = now()
@@ -446,12 +446,12 @@ AFTER UPDATE OF status ON public.school_memberships
 FOR EACH ROW EXECUTE FUNCTION public.school_sync_parent_access_after_student_exit();
 
 CREATE OR REPLACE FUNCTION public.school_can_view_school(p_school_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT public._is_extreme_admin() OR public.is_active_school_member(p_school_id, NULL);
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_membership(p_membership_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.school_memberships target
     WHERE target.id = p_membership_id
@@ -491,10 +491,10 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         )
       )
   );
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_section(p_section_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.school_sections section
     WHERE section.id = p_section_id
@@ -537,10 +537,10 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         )
       )
   );
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_teacher_assignment(p_assignment_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.school_teacher_assignments assignment
     WHERE assignment.id = p_assignment_id
@@ -556,10 +556,10 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         )
       )
   );
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_parent_link(p_link_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.school_parent_student_links link
     JOIN public.school_memberships parent ON parent.id = link.parent_membership_id
@@ -570,10 +570,10 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         OR (parent.user_id = auth.uid() AND parent.school_role = 'parent' AND parent.status = 'active')
       )
   );
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_record_event(p_event_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.school_record_events event
     JOIN public.school_memberships membership ON membership.id = event.membership_id
@@ -584,10 +584,10 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         OR membership.user_id = auth.uid()
       )
   );
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_profile(p_profile_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND (
     public._is_extreme_admin()
     OR EXISTS (
@@ -628,7 +628,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         AND student.status = 'active'
     )
   );
-$;
+$$;
 
 -- All school data tables are protected by row-level policies. A school member
 -- cannot read another school's records by changing a client-side school ID.
