@@ -2,7 +2,7 @@
 -- Room secrets are moved out of the exposed room row; clients never receive password hashes.
 -- Direct client writes are removed: state transitions remain behind validated RPCs.
 
-create table public.multiplayer_room_secrets (
+create table if not exists public.multiplayer_room_secrets (
   room_id uuid primary key references public.multiplayer_rooms(id) on delete cascade,
   password_hash text not null,
   created_at timestamptz not null default now()
@@ -15,7 +15,7 @@ from public.multiplayer_rooms
 where password is not null and length(password) > 0
 on conflict (room_id) do nothing;
 
-alter table public.multiplayer_rooms add column has_password boolean not null default false;
+alter table public.multiplayer_rooms add column if not exists has_password boolean not null default false;
 update public.multiplayer_rooms mr
 set has_password = exists (
   select 1 from public.multiplayer_room_secrets s where s.room_id = mr.id
@@ -296,7 +296,7 @@ $$;
 
 -- Remove the former exposed plaintext password column only after the room RPCs
 -- no longer reference it.
-alter table public.multiplayer_rooms drop column password;
+alter table public.multiplayer_rooms drop column if exists password;
 
 -- A client may only assert existing membership; it cannot silently join a
 -- password-protected room through the old ensure-membership RPC.
