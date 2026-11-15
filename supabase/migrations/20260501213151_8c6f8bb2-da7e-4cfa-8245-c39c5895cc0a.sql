@@ -355,13 +355,27 @@ BEGIN
 END;
 $$;
 
--- Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.study_sessions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.study_tasks;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.study_competitions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.study_participants;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.study_live_status;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.study_settings;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.season_runtime_state;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.season_history;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+-- Realtime: migrations may have already added these tables to the publication.
+DO $
+DECLARE
+  v_table text;
+BEGIN
+  FOREACH v_table IN ARRAY ARRAY[
+    'study_sessions',
+    'study_tasks',
+    'study_competitions',
+    'study_participants',
+    'study_live_status',
+    'study_settings',
+    'season_runtime_state',
+    'season_history',
+    'profiles'
+  ] LOOP
+    BEGIN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', v_table);
+    EXCEPTION WHEN duplicate_object THEN
+      NULL;
+    END;
+  END LOOP;
+END;
+$;
