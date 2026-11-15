@@ -28,6 +28,7 @@ const UpperTierHome: React.FC = () => {
   const [recentResults, setRecentResults] = useState<ResultRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const xp = Number(user?.xp) || 0;
   const level = Number(user?.level) || 1;
@@ -44,6 +45,7 @@ const UpperTierHome: React.FC = () => {
     if (!user?.id) {
       setTopics([]);
       setRecentResults([]);
+      setLoadError(null);
       setLoading(false);
       return;
     }
@@ -51,31 +53,40 @@ const UpperTierHome: React.FC = () => {
     const load = async () => {
       setLoading(true);
       setLoadError(null);
-      const [topicResponse, resultResponse] = await Promise.all([
-        db.from("topic_progress")
-          .select("subject,topic,accuracy_percentage,questions_attempted")
-          .eq("user_id", user.id)
-          .gt("questions_attempted", 0)
-          .order("accuracy_percentage", { ascending: true })
-          .limit(6),
-        db.from("quiz_results")
-          .select("correct_answers,total_questions,completed_at")
-          .eq("student_id", user.id)
-          .order("completed_at", { ascending: false })
-          .limit(30),
-      ]);
-      if (!active) return;
-      if (topicResponse.error || resultResponse.error) {
-        console.error("Grades 9–12 dashboard data could not be fully loaded:", topicResponse.error || resultResponse.error);
-        setLoadError("Some saved learning information is temporarily unavailable. Your account data has not been changed.");
+      try {
+        const [topicResponse, resultResponse] = await Promise.all([
+          db.from("topic_progress")
+            .select("subject,topic,accuracy_percentage,questions_attempted")
+            .eq("user_id", user.id)
+            .gt("questions_attempted", 0)
+            .order("accuracy_percentage", { ascending: true })
+            .limit(6),
+          db.from("quiz_results")
+            .select("correct_answers,total_questions,completed_at")
+            .eq("student_id", user.id)
+            .order("completed_at", { ascending: false })
+            .limit(30),
+        ]);
+        if (!active) return;
+        if (topicResponse.error || resultResponse.error) {
+          console.error("Grades 9–12 dashboard data could not be fully loaded:", topicResponse.error || resultResponse.error);
+          setLoadError("Some saved learning information is temporarily unavailable. Your account data has not been changed.");
+        }
+        setTopics((topicResponse.data || []) as TopicRow[]);
+        setRecentResults((resultResponse.data || []) as ResultRow[]);
+      } catch (error) {
+        if (!active) return;
+        console.error("Grades 9–12 dashboard data could not be loaded:", error);
+        setTopics([]);
+        setRecentResults([]);
+        setLoadError("Saved learning information could not be loaded right now. Check your connection and try again.");
+      } finally {
+        if (active) setLoading(false);
       }
-      setTopics((topicResponse.data || []) as TopicRow[]);
-      setRecentResults((resultResponse.data || []) as ResultRow[]);
-      setLoading(false);
     };
     void load();
     return () => { active = false; };
-  }, [user?.id]);
+  }, [user?.id, retryCount]);
 
   const totals = useMemo(() => recentResults.reduce((sum, result) => ({
     correct: sum.correct + (Number(result.correct_answers) || 0),
@@ -176,7 +187,7 @@ const UpperTierHome: React.FC = () => {
           <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Last 7 days</p></div>
           <h2 className="mt-1 text-lg font-extrabold">Practice activity</h2>
           <p className="mt-1 text-xs text-muted-foreground">Completed quiz attempts recorded to your account.</p>
-          {loadError && <p role="status" className="mt-3 rounded-lg bg-amber-500/10 p-3 text-xs text-muted-foreground">{loadError}</p>}
+          {loadError && <div role="status" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-500/10 p-3 text-xs text-muted-foreground"><span>{loadError}</span><button type="button" onClick={() => setRetryCount((count) => count + 1)} className="rounded-md px-2 py-1 font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Try again</button></div>}
           {loading ? <p className="mt-5 text-sm text-muted-foreground">Loading saved activity…</p> : <>
             <div className="mt-6 flex h-28 items-end justify-between gap-2">
               {weeklyActivity.map((day, index) => <div key={dayKey(day.date)} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
