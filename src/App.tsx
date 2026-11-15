@@ -23,6 +23,7 @@ const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const StudentDashboardRoute = lazy(() => import("./components/dashboard/StudentDashboardRoute"));
 const ManagerDashboard = lazy(() => import("./pages/ManagerDashboard"));
 const ManagerControlCenter = lazy(() => import("./pages/ManagerControlCenter"));
+const SchoolManagerPortal = lazy(() => import("./pages/SchoolManagerPortal"));
 const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
 const Chat = lazy(() => import("./pages/Chat"));
 const AITutor = lazy(() => import("./pages/AITutor"));
@@ -61,6 +62,8 @@ const SupabaseMigration = lazy(() => import("./pages/SupabaseMigration"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import EarlyTierRestrictedRoute from "./components/auth/EarlyTierRestrictedRoute";
 import { UserProvider } from "./context/UserContext";
+import { SchoolPortalProvider } from "./context/SchoolPortalContext";
+import SchoolPortalGate from "./components/school/SchoolPortalGate";
 import { TierProvider } from "./context/TierContext";
 import { QuizProvider } from "./context/QuizContext";
 import { AIHelperProvider } from "./context/AIHelperContext";
@@ -124,6 +127,7 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/teacher", title: "Teacher Portal" },
   { prefix: "/admin/early-content", title: "Early Content" },
   { prefix: "/admin", title: "Admin Portal" },
+  { prefix: "/school/manager", title: "School Manager Portal" },
   { prefix: "/manager", title: "Manager Control Center" },
   { prefix: "/manager-dashboard", title: "Manager Dashboard" },
   { prefix: "/finance", title: "Finance Portal" },
@@ -141,8 +145,8 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useUser();
 
-  // Finance is a standalone staff workspace with its own header and navigation.
-  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/")) return <>{children}</>;
+  // Standalone role workspaces provide their own navigation and layout.
+  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/") || location.pathname.startsWith("/school/")) return <>{children}</>;
 
   if (!isAuthenticated || !user) return <>{children}</>;
   if (user.role === "student" && getUserTier(user.grade) === "upper") return <UpperTierStudioShell>{children}</UpperTierStudioShell>;
@@ -266,6 +270,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <UserProvider>
+        <SchoolPortalProvider>
         <TierProvider>
           <LanguageProvider>
             <CurrencyProvider>
@@ -336,6 +341,7 @@ const App = () => (
                                 } 
                               />
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
+                              <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route
                                 path="/manager"
                                 element={
@@ -441,6 +447,7 @@ const App = () => (
             </CurrencyProvider>
           </LanguageProvider>
         </TierProvider>
+        </SchoolPortalProvider>
       </UserProvider>
     </ThemeProvider>
   </QueryClientProvider>
