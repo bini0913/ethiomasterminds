@@ -100,6 +100,7 @@ BEGIN
   FOR SHARE;
 
   IF v_grade IS NULL
+     OR substring(lower(trim(v_grade)) from '[0-9]+') IS NULL
      OR substring(lower(trim(v_grade)) from '[0-9]+')::integer NOT BETWEEN 9 AND 12 THEN
     RAISE EXCEPTION 'This exam target is available to Grades 9–12 students';
   END IF;
