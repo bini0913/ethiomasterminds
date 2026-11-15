@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Calendar, Plus, Check, X, Sparkles, Brain, Loader2, Wand2, BookOpen, Clock3, Target } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
-import { getAcademicProfile, normalizeGrade, normalizeSubject } from "@/lib/academicProfile";
+import { getAcademicProfile, normalizeGrade, normalizeSubject, resolveAcademicGrade } from "@/lib/academicProfile";
 import { getPdfPublicUrl } from "@/lib/libraryApi";
 import { loadBookAnalyses, saveBookAnalyses } from "@/lib/bookAnalysis";
 
@@ -30,6 +30,8 @@ interface StudyPlan {
 const StudyPlannerPage: React.FC = () => {
   const { user } = useUser();
   const upperStudent = getUserTier(user?.grade) === "upper";
+  const topicProgressSource = upperStudent ? (supabase as any) : supabase;
+  const topicProgressTable = upperStudent ? "upper_student_topic_progress" : "topic_progress";
   const navigate = useNavigate();
   const [plans, setPlans] = useState<StudyPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,7 +114,7 @@ const StudyPlannerPage: React.FC = () => {
           if (saved) setPlanSettings((current) => ({ ...current, ...JSON.parse(saved) }));
         } catch { /* use defaults when local settings are unavailable */ }
         setAcademicContext({
-          grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 5)),
+          grade: resolveAcademicGrade(user.grade, profile.grade, 5),
           curriculum: profile.curriculum,
           goal: [profile.study_goal, profile.study_goal_detail].filter(Boolean).join(" — "),
           book: resourceContext.join("; ") || "Not specified",
@@ -336,7 +338,7 @@ const StudyPlannerPage: React.FC = () => {
       // Fetch weak areas from analytics and topic progress
       const [analyticsRes, topicRes] = await Promise.all([
         supabase.from("analytics").select("subject, accuracy, total_questions_attempted").eq("user_id", user.id),
-        supabase.from("topic_progress").select("subject, topic, accuracy_percentage, questions_attempted").eq("user_id", user.id).order("accuracy_percentage", { ascending: true }).limit(20),
+        topicProgressSource.from(topicProgressTable).select("subject, topic, accuracy_percentage, questions_attempted").eq("user_id", user.id).order("accuracy_percentage", { ascending: true }).limit(20),
       ]);
 
       const weakTopics = (topicRes.data || []).filter(t => t.accuracy_percentage < 70 && subjects.some(subject => normalizeSubject(subject) === normalizeSubject(t.subject)));
@@ -391,7 +393,7 @@ const StudyPlannerPage: React.FC = () => {
       console.error("AI planner error:", e);
       // Fallback to smart generation
       const [topicRes, analyticsRes] = await Promise.all([
-        supabase.from("topic_progress").select("*").eq("user_id", user.id).order("accuracy_percentage", { ascending: true }).limit(10),
+        topicProgressSource.from(topicProgressTable).select("*").eq("user_id", user.id).order("accuracy_percentage", { ascending: true }).limit(10),
         supabase.from("analytics").select("*").eq("user_id", user.id),
       ]);
       const fallbackPlans = generateFallbackPlan((topicRes.data || []).filter(t => subjects.some(subject => normalizeSubject(subject) === normalizeSubject(t.subject))), analyticsRes.data || []);

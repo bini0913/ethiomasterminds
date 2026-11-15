@@ -136,9 +136,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
       if (roleError) {
         console.error('Error fetching role:', roleError);
+        // A role lookup failure is an authorization failure. Never default to
+        // student here: doing so can admit an account while the authoritative
+        // role contract is unavailable or has drifted.
+        return null;
       }
 
-      const role = (roleData as UserRole) || 'student';
+      const role = roleData as UserRole | null;
+      if (!role || !['student', 'teacher', 'admin', 'manager', 'extreme_admin'].includes(role)) {
+        console.error('Role lookup returned no valid role:', roleData);
+        return null;
+      }
 
       return {
         id: profile.id,

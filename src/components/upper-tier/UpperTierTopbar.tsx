@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Search, Flame, Coins, Sparkles, GraduationCap } from "lucide-react";
+import { Bell, Search, Flame, Coins, Sparkles, GraduationCap, Menu } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -69,9 +69,9 @@ export default function UpperTierTopbar({ onOpenMenu }: Props) {
           type="button"
           onClick={onOpenMenu}
           aria-label="Open navigation"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted/70 md:hidden"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-sm hover:bg-muted md:hidden"
         >
-          <span className="text-xl" aria-hidden="true">☰</span>
+          <Menu className="h-5 w-5" aria-hidden="true" />
         </button>
         <div className="hidden min-w-0 md:block md:w-40 lg:w-48">
           <p className="truncate text-sm font-bold">{title}</p>

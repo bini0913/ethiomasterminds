@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { ArrowLeft, TrendingUp, Target, Zap, Brain, Calendar, Award, Loader2, Sparkles, BookOpen, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { getAcademicProfile, normalizeGrade } from "@/lib/academicProfile";
+import { getAcademicProfile, normalizeGrade, resolveAcademicGrade } from "@/lib/academicProfile";
 
 const AcademicInsightsPage: React.FC = () => {
   const { user } = useUser();
@@ -53,7 +53,7 @@ const AcademicInsightsPage: React.FC = () => {
           ...(profile.book_title ? [profile.book_title] : []),
         ]));
         setAcademicContext({
-          grade: normalizeGrade(profile.grade, normalizeGrade(user.grade, 12)),
+          grade: resolveAcademicGrade(user.grade, profile.grade, 12),
           curriculum: profile.curriculum,
           goal: [profile.study_goal, profile.study_goal_detail].filter(Boolean).join(" — "),
           book: resources.join("; ") || "Not specified",
@@ -66,9 +66,12 @@ const AcademicInsightsPage: React.FC = () => {
     void loadAcademicContext();
     const fetchAll = async () => {
       try {
+        const topicQuery = upperStudent
+          ? (supabase as any).from("upper_student_topic_progress").select("subject,topic,accuracy_percentage,questions_attempted,correct_answers,last_practiced_at").eq("user_id", user.id)
+          : supabase.from("topic_progress").select("*").eq("user_id", user.id);
         const [statsRes, topicsRes, streakRes] = await Promise.all([
           supabase.rpc("get_user_stats", { p_user_id: user.id }),
-          supabase.from("topic_progress").select("*").eq("user_id", user.id),
+          topicQuery,
           // A student with no recorded streak yet is a valid empty state.
           supabase.from("user_streaks").select("*").eq("user_id", user.id).maybeSingle(),
         ]);
@@ -78,7 +81,9 @@ const AcademicInsightsPage: React.FC = () => {
         if (cancelled) return;
 
         setStats(statsRes.data ?? null);
-        setTopicData(topicsRes.data ?? []);
+        setTopicData(upperStudent
+          ? (topicsRes.data || []).map((row: any) => ({ ...row, questions_correct: Number(row.correct_answers) || 0 }))
+          : (topicsRes.data ?? []));
         setStreak(streakRes.data ?? null);
       } catch (error) {
         console.error("Academic insights data load failed:", error);

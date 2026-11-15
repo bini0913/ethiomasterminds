@@ -19,6 +19,15 @@ export function normalizeGrade(value: string | number | null | undefined, fallba
   return Math.min(12, Math.max(5, grade));
 }
 
+/** The authenticated profile owns the learner's grade band; setup data is fallback data. */
+export function resolveAcademicGrade(
+  userGrade: string | number | null | undefined,
+  academicGrade: string | number | null | undefined,
+  fallback = 5,
+) {
+  return normalizeGrade(userGrade ?? academicGrade, fallback);
+}
+
 export function normalizeSubject(value: string) {
   const key = value.trim().toLowerCase();
   const aliases: Record<string, string> = {

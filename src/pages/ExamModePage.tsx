@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Clock3, Target, Trophy, CheckCircle2, XCircle, BookOpen, GraduationCap, Loader2, RotateCcw, ChevronLeft, ChevronRight, CircleHelp, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { getAcademicProfile, normalizeGrade, normalizeSubject, subjectsMatch } from "@/lib/academicProfile";
+import { getAcademicProfile, normalizeGrade, normalizeSubject, resolveAcademicGrade, subjectsMatch } from "@/lib/academicProfile";
 
 const isSafeHttpUrl = (value: string | null | undefined) => {
   if (!value) return false;
@@ -118,7 +118,7 @@ const ExamModePage: React.FC = () => {
       try {
         const profile = await getAcademicProfile(user.id);
         if (cancelled) return;
-        const activeGrade = normalizeGrade(profile?.grade ?? user.grade, 9);
+        const activeGrade = resolveAcademicGrade(user.grade, profile?.grade, 9);
         const allowed = (profile?.subjects?.length ? profile.subjects : []).map(normalizeSubject);
         setGrade(activeGrade);
         setProfileSubjects(allowed);

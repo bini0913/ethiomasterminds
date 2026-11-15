@@ -291,7 +291,7 @@ const App = () => (
                             <RouteErrorBoundary>
                             <Routes>
                               <Route path="/" element={<Index />} />
-                              <Route path="/quiz" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Quiz /></ProtectedRoute>} />
+                              <Route path="/quiz" element={<EarlyTierRestrictedRoute><ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Quiz /></ProtectedRoute></EarlyTierRestrictedRoute>} />
                               <Route path="/early-games" element={<EarlyTierOnlyRoute><EarlyGamesPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-quiz" element={<EarlyTierOnlyRoute><EarlyQuizPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-videos" element={<EarlyTierOnlyRoute><EarlyVideosPage /></EarlyTierOnlyRoute>} />
@@ -301,7 +301,7 @@ const App = () => (
                               <Route path="/early-collection" element={<EarlyTierOnlyRoute><EarlyCollectionPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-profile" element={<EarlyTierOnlyRoute><EarlyProfilePage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-ranks" element={<EarlyTierOnlyRoute><EarlyLeaderboardPage /></EarlyTierOnlyRoute>} />
-                              <Route path="/quiz/filter" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><QuizFilter /></ProtectedRoute>} />
+                              <Route path="/quiz/filter" element={<EarlyTierRestrictedRoute><ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><QuizFilter /></ProtectedRoute></EarlyTierRestrictedRoute>} />
                               <Route path="/multiplayer" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Multiplayer /></ProtectedRoute>} />
                               <Route path="/lobby" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Lobby /></ProtectedRoute>} />
                               <Route path="/leaderboard" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Leaderboard /></ProtectedRoute>} />
@@ -371,7 +371,7 @@ const App = () => (
                               <Route path="/avatar-creator" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AvatarCreator /></ProtectedRoute>} />
                               <Route path="/academic" element={<EarlyTierRestrictedRoute><AcademicMode /></EarlyTierRestrictedRoute>} />
                               <Route path="/study-mode" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><StudyModePage /></ProtectedRoute>} />
-                              <Route path="/academic/setup" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AcademicSetup /></ProtectedRoute>} />
+                              <Route path="/academic/setup" element={<EarlyTierRestrictedRoute><AcademicSetup /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/flashcards" element={<EarlyTierRestrictedRoute><FlashcardsPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/topics" element={<EarlyTierRestrictedRoute><TopicCoveragePage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/exam" element={<EarlyTierRestrictedRoute><ExamModePage /></EarlyTierRestrictedRoute>} />

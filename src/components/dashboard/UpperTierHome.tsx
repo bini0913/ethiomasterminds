@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity, ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2,
@@ -6,13 +6,17 @@ import {
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { db } from "@/integrations/untypedClient";
+import { supabase } from "@/integrations/supabase/client";
 import { getXpProgressInLevel } from "@/lib/rankSystem";
+import { toast } from "sonner";
 
 type TopicRow = {
   subject: string;
   topic: string;
   accuracy_percentage: number | null;
   questions_attempted: number | null;
+  correct_answers: number | null;
+  last_practiced_at: string | null;
 };
 type ResultRow = {
   correct_answers: number | null;
@@ -46,19 +50,26 @@ const UpperTierHome: React.FC = () => {
   const [retryCount, setRetryCount] = useState(0);
 
   const xp = Number(user?.xp) || 0;
-  const level = Number(user?.level) || 1;
-  const xpProgress = getXpProgressInLevel(xp);
+  const level = Math.max(1, Number(user?.level) || 1);
+  // The server progression functions advance one level per 100 total XP.
+  const xpProgress = getXpProgressInLevel(xp, 100);
   const firstName = typeof user?.name === "string"
-    ? user.name.trim().split(/\s+/)[0] || "Student"
+    ? user.name.trim().split(/\\s+/)[0] || "Student"
     : "Student";
   const grade = user?.grade
     ? (/grade/i.test(user.grade) ? user.grade : `Grade ${user.grade}`)
     : "Grades 9–12";
   const now = new Date();
+  const todayKey = addisDateKey(now);
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening";
-  const dateLabel = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const dateLabel = now.toLocaleDateString(undefined, {
+    timeZone: ADDIS_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
-  useEffect(() => {
+  const loadDashboard = useCallback(async () => {
     if (!user?.id) {
       setTopics([]);
       setRecentResults([]);
@@ -67,6 +78,65 @@ const UpperTierHome: React.FC = () => {
       setLoading(false);
       return;
     }
+
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const yearAgo = offsetDateKey(todayKey, -365);
+      const [topicResponse, activityResponse, resultResponse, profileResponse, examResponse] = await Promise.all([
+      db.from("upper_student_topic_progress")
+        .select("subject,topic,accuracy_percentage,questions_attempted,correct_answers,last_practiced_at")
+        .eq("user_id", user.id)
+        .order("accuracy_percentage", { ascending: true })
+        .limit(500),
+      db.from("upper_student_daily_activity")
+        .select("activity_date,quiz_count,question_count,correct_count,xp_earned")
+        .eq("user_id", user.id)
+        .gte("activity_date", yearAgo)
+        .order("activity_date", { ascending: false })
+        .limit(400),
+      db.from("quiz_results")
+        .select("correct_answers,total_questions,completed_at")
+        .eq("student_id", user.id)
+        .order("completed_at", { ascending: false })
+        .limit(5),
+      db.from("academic_profiles")
+        .select("subjects")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      db.from("student_exam_targets")
+        .select("exam_name,exam_date,created_at")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
+
+    const errors = [
+      topicResponse.error,
+      activityResponse.error,
+      resultResponse.error,
+      profileResponse.error,
+      examResponse.error,
+    ].filter(Boolean);
+
+    if (errors.length) {
+      console.error("Grades 9–12 home data load failed:", errors);
+      setLoadError("Some saved learning data could not be loaded. Your records have not been changed. Retry to reconnect.");
+    }
+
+      setTopics((topicResponse.data || []) as TopicRow[]);
+      setDailyActivity((activityResponse.data || []) as DailyRow[]);
+      setRecentResults((resultResponse.data || []) as ResultRow[]);
+      setSelectedSubjects(Array.isArray(profileResponse.data?.subjects) ? profileResponse.data.subjects : []);
+      setExamTarget((examResponse.data || null) as ExamTarget | null);
+    } catch (error) {
+      console.error("Grades 9–12 home data request failed:", error);
+      setLoadError("Saved learning data could not be reached. Check your connection and retry.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, todayKey]);
+
+  useEffect(() => {
     let active = true;
     const load = async () => {
       setLoading(true);
@@ -116,34 +186,35 @@ const UpperTierHome: React.FC = () => {
         if (active) setLoading(false);
       }
     };
-    void load();
-    return () => { active = false; };
-  }, [user?.id, retryCount]);
+  }, [user?.id, loadDashboard, retryCount]);
 
-  const totals = useMemo(() => recentResults.reduce((sum, result) => ({
-    correct: sum.correct + (Number(result.correct_answers) || 0),
-    questions: sum.questions + (Number(result.total_questions) || 0),
-  }), { correct: 0, questions: 0 }), [recentResults]);
-  const recentAccuracy = totals.questions ? Math.round((totals.correct / totals.questions) * 100) : null;
+  const totals = useMemo(() => dailyActivity.reduce((sum, day) => ({
+    correct: sum.correct + (Number(day.correct_count) || 0),
+    questions: sum.questions + (Number(day.question_count) || 0),
+    quizzes: sum.quizzes + (Number(day.quiz_count) || 0),
+    xp: sum.xp + (Number(day.xp_earned) || 0),
+  }), { correct: 0, questions: 0, quizzes: 0, xp: 0 }), [dailyActivity]);
+
+  const recentAccuracy = totals.questions > 0
+    ? Math.round((totals.correct / totals.questions) * 100)
+    : null;
+  const currentStreak = useMemo(() => getCurrentStreak(dailyActivity, todayKey), [dailyActivity, todayKey]);
+  const longestStreak = useMemo(() => getLongestStreak(dailyActivity), [dailyActivity]);
   const nextLevelXp = Math.max(0, xpProgress.max - xpProgress.current);
   const weeklyActivity = useMemo(() => {
-    const days = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date();
-      date.setHours(0, 0, 0, 0);
-      date.setDate(date.getDate() - (6 - index));
-      return { date, count: 0 };
+    const dailyByDate = new Map(dailyActivity.map((day) => [day.activity_date, day]));
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = offsetDateKey(todayKey, index - 6);
+      const row = dailyByDate.get(date);
+      return {
+        date,
+        count: Number(row?.quiz_count) || 0,
+        questions: Number(row?.question_count) || 0,
+      };
     });
-    const counts = new Map(days.map(day => [dayKey(day.date), day]));
-    recentResults.forEach(result => {
-      if (!result.completed_at) return;
-      const date = new Date(result.completed_at);
-      if (Number.isNaN(date.getTime())) return;
-      const bucket = counts.get(dayKey(date));
-      if (bucket) bucket.count += 1;
-    });
-    return days;
-  }, [recentResults]);
-  const maxActivity = Math.max(1, ...weeklyActivity.map(day => day.count));
+  }, [dailyActivity, todayKey]);
+  const weeklyQuizCount = weeklyActivity.reduce((sum, day) => sum + day.count, 0);
+  const maxActivity = Math.max(1, ...weeklyActivity.map((day) => day.count));
   const focusTopic = topics[0] || null;
   const todayKey = calendarDate(new Date());
   const todayPlans = studyPlans.filter((plan) => plan.scheduled_date === todayKey);
@@ -163,11 +234,41 @@ const UpperTierHome: React.FC = () => {
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">{grade} · {dateLabel}</p>
           <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">{greeting}, {firstName}.</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">Your space to learn with direction, practise with purpose and see your progress.</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">Your learning dashboard, built from your saved practice and study progress.</p>
         </div>
         <Link to="/study-mode" className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-105 sm:self-auto">
           <Play className="h-4 w-4 fill-current" /> Start focus session
         </Link>
+      </section>
+
+      {loadError && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => setRetryCount((count) => count + 1)} className="font-bold text-primary underline-offset-2 hover:underline">Retry loading</button>
+        </div>
+      )}
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Practice streak</span><Flame className="h-4 w-4 text-orange-500" /></div>
+          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : currentStreak}<span className="ml-1 text-sm font-semibold text-muted-foreground">days</span></p>
+          <p className="mt-1 text-xs text-muted-foreground">{longestStreak ? `Longest: ${longestStreak} days` : "Complete a practice quiz to start a streak."}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Practice this week</span><Activity className="h-4 w-4 text-primary" /></div>
+          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : weeklyQuizCount}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Completed quizzes in the last 7 days</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Practice accuracy</span><Target className="h-4 w-4 text-emerald-600" /></div>
+          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : recentAccuracy === null ? "—" : recentAccuracy + "%"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{totals.questions.toLocaleString()} questions recorded over the last year</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Topics practised</span><BookOpen className="h-4 w-4 text-primary" /></div>
+          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : topicMastery === null ? "—" : topicMastery + "%"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{masteredTopics} of {topics.length} practised topics mastered · {coveredSubjects}/{selectedSubjects.length} subjects started</p>
+        </div>
       </section>
 
       <section className="relative overflow-hidden rounded-[20px] border border-white/10 bg-gradient-to-br from-[#0b625a] via-[#137f72] to-[#0b766c] p-5 text-white shadow-[0_18px_48px_rgba(15,45,70,.18)] sm:p-8">
@@ -179,8 +280,8 @@ const UpperTierHome: React.FC = () => {
             <h2 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl">{focusTopic ? "Build confidence in " + focusTopic.topic : "Make your next study session count."}</h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-white/75">
               {focusTopic
-                ? `Your recorded accuracy in ${focusTopic.subject} is ${Math.round(Math.max(0, Math.min(100, Number(focusTopic.accuracy_percentage) || 0)))}%. Continue practising to strengthen this topic.`
-                : "Start a learning activity. Your saved topic coverage and practice history will appear here as you use Master Minds."}
+                ? `Your recorded accuracy in ${focusTopic.subject} is ${Math.round(Number(focusTopic.accuracy_percentage) || 0)}% across ${Number(focusTopic.questions_attempted) || 0} attempted questions.`
+                : "Your topic coverage will build automatically from completed quizzes. Every saved answer is used to update your real progress."}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link to={focusTopic ? "/academic/topics" : "/academic"} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[#0b625a] transition hover:bg-slate-100"><BookOpen className="h-4 w-4" /> {focusTopic ? "Review topic coverage" : "Open academic hub"}</Link>
@@ -241,36 +342,35 @@ const UpperTierHome: React.FC = () => {
             <Link to="/academic/topics" aria-label="Open topic coverage" className="flex h-9 w-9 items-center justify-center rounded-lg text-primary hover:bg-primary/10"><ArrowRight className="h-4 w-4" /></Link>
           </div>
           {loading ? <div className="mt-5 space-y-3" aria-label="Loading topic coverage"><div className="h-4 w-2/3 animate-pulse rounded bg-muted" /><div className="h-3 animate-pulse rounded bg-muted" /><div className="h-3 w-4/5 animate-pulse rounded bg-muted" /></div> :
-            topics.length ? <div className="mt-5 space-y-4">{topics.slice(0, 5).map((topic, index) => {
+            topics.length ? <div className="mt-5 space-y-4">{topics.slice(0, 6).map((topic) => {
               const accuracy = Math.max(0, Math.min(100, Number(topic.accuracy_percentage) || 0));
-              return <div key={topic.subject + topic.topic + index}>
+              return <div key={topic.subject + topic.topic}>
                 <div className="mb-1.5 flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate font-semibold">{topic.topic}</span><span className="shrink-0 text-xs font-bold tabular-nums text-muted-foreground">{accuracy}%</span></div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: accuracy + "%" }} /></div>
                 <p className="mt-1 text-[11px] text-muted-foreground">{topic.subject} · {Number(topic.questions_attempted) || 0} questions attempted</p>
               </div>;
-            })}</div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center"><BookOpen className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-2 text-sm font-semibold">No topic results recorded yet</p><p className="mt-1 text-xs text-muted-foreground">Complete practice to build your real topic coverage.</p><Link to="/quiz" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary">Start practising <ArrowRight className="h-4 w-4" /></Link></div>}
-        </section>
+            })}</div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center"><BookOpen className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-2 text-sm font-semibold">No topic results recorded yet</p><p className="mt-1 text-xs text-muted-foreground">Complete a quiz using approved question-bank content to build your real topic coverage.</p><Link to="/quiz" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary">Start practising <ArrowRight className="h-4 w-4" /></Link></div>}
+        </div>
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Last 7 days</p></div>
           <h2 className="mt-1 text-lg font-extrabold">Practice activity</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Completed quiz attempts recorded to your account.</p>
-          {loadError && <div role="status" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-500/10 p-3 text-xs text-muted-foreground"><span>{loadError}</span><button type="button" onClick={() => setRetryCount((count) => count + 1)} className="rounded-md px-2 py-1 font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Try again</button></div>}
+          <p className="mt-1 text-xs text-muted-foreground">Completed quizzes saved to your account.</p>
           {loading ? <p className="mt-5 text-sm text-muted-foreground">Loading saved activity…</p> : <>
             <div className="mt-6 flex h-28 items-end justify-between gap-2">
-              {weeklyActivity.map((day, index) => <div key={dayKey(day.date)} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+              {weeklyActivity.map((day) => <div key={day.date} className="flex h-full flex-1 flex-col items-center justify-end gap-2" title={`${day.count} completed quizzes · ${day.questions} questions`}>
                 <span className="text-[10px] font-semibold tabular-nums text-muted-foreground">{day.count || ""}</span>
-                <div className="flex h-20 w-full items-end rounded-md bg-muted/70"><div className={`w-full rounded-md ${index === 6 ? "bg-primary" : "bg-primary/55"}`} style={{ height: `${day.count ? Math.max(8, day.count / maxActivity * 100) : 0}%` }} /></div>
-                <span className="text-[10px] text-muted-foreground">{day.date.toLocaleDateString(undefined, { weekday: "narrow" })}</span>
+                <div className="flex h-20 w-full items-end rounded-md bg-muted/70"><div className="w-full rounded-md bg-primary/75" style={{ height: `${day.count ? Math.max(8, day.count / maxActivity * 100) : 0}%` }} /></div>
+                <span className="text-[10px] text-muted-foreground">{formatDay(day.date)}</span>
               </div>)}
             </div>
-            <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-sm text-muted-foreground">Accuracy across loaded attempts</span><strong className="text-lg tabular-nums">{recentAccuracy === null ? "—" : recentAccuracy + "%"}</strong></div>
-            {recentResults.length > 0 && <div className="mt-4 space-y-2">{recentResults.slice(0, 3).map((result, index) => <div key={result.completed_at + "-" + index} className="flex items-center gap-3 rounded-xl bg-secondary/60 p-3"><CheckCircle2 className="h-4 w-4 shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="text-xs font-semibold">Completed practice</p><p className="text-[11px] text-muted-foreground">{result.completed_at ? new Date(result.completed_at).toLocaleString() : "Saved attempt"}</p></div><span className="text-xs font-bold tabular-nums">{Number(result.correct_answers) || 0}/{Number(result.total_questions) || 0}</span></div>)}</div>}
+            <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-sm text-muted-foreground">Questions answered correctly</span><strong className="text-lg tabular-nums">{totals.correct.toLocaleString()}/{totals.questions.toLocaleString()}</strong></div>
+            {recentResults.length > 0 && <div className="mt-4 space-y-2">{recentResults.slice(0, 3).map((result, index) => <div key={(result.completed_at || "saved") + "-" + index} className="flex items-center gap-3 rounded-xl bg-secondary/60 p-3"><CheckCircle2 className="h-4 w-4 shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="text-xs font-semibold">Completed practice</p><p className="text-[11px] text-muted-foreground">{result.completed_at ? new Date(result.completed_at).toLocaleString() : "Saved attempt"}</p></div><span className="text-xs font-bold tabular-nums">{Number(result.correct_answers) || 0}/{Number(result.total_questions) || 0}</span></div>)}</div>}
             {!recentResults.length && <div className="mt-4 rounded-xl border border-dashed border-border p-4 text-center"><Clock3 className="mx-auto h-6 w-6 text-muted-foreground" /><p className="mt-2 text-xs font-semibold">No completed practice recorded yet</p></div>}
           </>}
           <Link to="/academic/insights" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-primary">View academic insights <ArrowRight className="h-4 w-4" /></Link>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Pick up where you left off</p><h2 className="mt-1 text-lg font-extrabold">Continue studying</h2></div><Link to="/academic" className="text-sm font-bold text-primary">View all</Link></div>
