@@ -237,6 +237,74 @@ CREATE TABLE IF NOT EXISTS public.school_parent_notifications (
     REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT
 );
 
+CREATE TABLE IF NOT EXISTS public.school_student_section_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
+  student_membership_id uuid NOT NULL,
+  section_id uuid,
+  grade_label text NOT NULL,
+  effective_from date NOT NULL,
+  effective_to date,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (student_membership_id, school_id)
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
+  FOREIGN KEY (section_id, school_id)
+    REFERENCES public.school_sections(id, school_id) ON DELETE RESTRICT,
+  CHECK (effective_to IS NULL OR effective_to >= effective_from)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS school_student_one_current_section_history
+  ON public.school_student_section_history(student_membership_id)
+  WHERE effective_to IS NULL;
+
+CREATE INDEX IF NOT EXISTS school_student_section_history_term_idx
+  ON public.school_student_section_history(school_id, grade_label, section_id, effective_from, effective_to);
+
+CREATE OR REPLACE FUNCTION public.school_sync_student_section_history()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.school_role = 'student' AND NEW.grade_label IS NOT NULL THEN
+      INSERT INTO public.school_student_section_history(
+        school_id, student_membership_id, section_id, grade_label, effective_from
+      )
+      VALUES (NEW.school_id, NEW.id, NEW.section_id, NEW.grade_label, coalesce(NEW.joined_at::date, current_date));
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF OLD.school_role <> 'student' THEN RETURN NEW; END IF;
+
+  IF OLD.status IN ('active', 'suspended')
+     AND NEW.status IN ('transferred', 'graduated', 'deactivated') THEN
+    UPDATE public.school_student_section_history
+    SET effective_to = GREATEST(effective_from, coalesce(NEW.ended_at::date, current_date))
+    WHERE student_membership_id = NEW.id AND effective_to IS NULL;
+  ELSIF OLD.status IN ('transferred', 'graduated', 'deactivated') AND NEW.status = 'active' THEN
+    INSERT INTO public.school_student_section_history(
+      school_id, student_membership_id, section_id, grade_label, effective_from
+    )
+    VALUES (NEW.school_id, NEW.id, NEW.section_id, NEW.grade_label, current_date);
+  ELSIF NEW.status IN ('active', 'suspended')
+     AND (NEW.grade_label IS DISTINCT FROM OLD.grade_label
+          OR NEW.section_id IS DISTINCT FROM OLD.section_id) THEN
+    UPDATE public.school_student_section_history
+    SET effective_to = GREATEST(effective_from, current_date - 1)
+    WHERE student_membership_id = NEW.id AND effective_to IS NULL;
+    INSERT INTO public.school_student_section_history(
+      school_id, student_membership_id, section_id, grade_label, effective_from
+    )
+    VALUES (NEW.school_id, NEW.id, NEW.section_id, NEW.grade_label, current_date);
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_sync_student_section_history ON public.school_memberships;
+CREATE TRIGGER school_sync_student_section_history
+AFTER INSERT OR UPDATE OF grade_label, section_id, status ON public.school_memberships
+FOR EACH ROW EXECUTE FUNCTION public.school_sync_student_section_history();
+
 CREATE OR REPLACE FUNCTION public.school_is_admin(p_school_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT public._is_extreme_admin()
@@ -1204,6 +1272,7 @@ CREATE TRIGGER school_results_notify_parent
 AFTER UPDATE OF status ON public.school_term_results
 FOR EACH ROW EXECUTE FUNCTION public.school_notify_parent_results_published();
 
+ALTER TABLE public.school_student_section_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_terms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_grading_policies ENABLE ROW LEVEL SECURITY;
@@ -1391,6 +1460,7 @@ GRANT SELECT, INSERT, UPDATE ON public.school_attendance_records TO authenticate
 GRANT SELECT, INSERT ON public.school_behavior_reports TO authenticated;
 GRANT SELECT, UPDATE ON public.school_parent_notifications TO authenticated;
 
+REVOKE ALL ON FUNCTION public.school_sync_student_section_history() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_is_admin(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_can_teach_subject(uuid, uuid, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_is_homeroom_teacher(uuid, uuid) FROM PUBLIC, anon;
