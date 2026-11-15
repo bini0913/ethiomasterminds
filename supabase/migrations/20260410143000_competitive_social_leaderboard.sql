@@ -88,16 +88,14 @@ on public.social_notifications for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-DO $
-BEGIN
+DO 'BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.followers;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
-END $;
+END';
 
-DO $
-BEGIN
+DO 'BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.social_notifications;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
-END $;
+END';
