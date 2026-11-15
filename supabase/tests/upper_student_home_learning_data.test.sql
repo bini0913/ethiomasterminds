@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(12);
+SELECT plan(13);
 
 SELECT ok(
   to_regclass('public.upper_student_topic_progress') IS NOT NULL,
