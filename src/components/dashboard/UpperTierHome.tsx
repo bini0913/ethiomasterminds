@@ -8,6 +8,7 @@ import { useUser } from "@/context/UserContext";
 import { db } from "@/integrations/untypedClient";
 import { supabase } from "@/integrations/supabase/client";
 import { getXpProgressInLevel } from "@/lib/rankSystem";
+import { toast } from "sonner";
 
 type TopicRow = {
   subject: string;
@@ -255,7 +256,7 @@ const UpperTierHome: React.FC = () => {
 
     setSavingExam(true);
     try {
-      const { data, error } = await supabase.rpc("set_upper_student_exam_target_once", {
+      const { data, error } = await (supabase as any).rpc("set_upper_student_exam_target_once", {
         p_exam_date: examDateInput,
         p_exam_name: examNameInput.trim(),
       });
