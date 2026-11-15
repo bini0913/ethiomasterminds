@@ -22,10 +22,6 @@ import { normalizeSubject } from "@/lib/academicProfile";
 const Quiz: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { quizzes } = useQuiz();
-  const requestedGrade = searchParams.get("grade");
-  const requestedDifficulty = (searchParams.get("difficulty") || "").trim().toLowerCase();
-  const requestedTopic = (searchParams.get("topic") || "").trim();
-  const requestedQuestionType = (searchParams.get("questionType") || "").trim();
   const { user } = useUser();
   const tier = useTier();
   const upperStudent = tier === "upper";
@@ -34,7 +30,7 @@ const Quiz: React.FC = () => {
   const defaultQuizGrade = tier === "upper" ? 9 : 5;
   const quizGradeMin = tier === "upper" ? 9 : tier === "middle" ? 5 : 5;
   const quizGradeMax = tier === "upper" ? 12 : tier === "middle" ? 8 : 12;
-  const [selectedGrade, setSelectedGrade] = useState<string>(searchParams.get("grade") || String(defaultQuizGrade));
+  const [selectedGrade, setSelectedGrade] = useState<string>(String(defaultQuizGrade));
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "extreme">("easy");
   const [activeTab, setActiveTab] = useState<string>("browse");
   const [numQuestions, setNumQuestions] = useState<number>(10);
@@ -47,12 +43,10 @@ const Quiz: React.FC = () => {
   const [performanceOffset, setPerformanceOffset] = useState(0);
   
   useEffect(() => {
-    const queryGrade = Number.parseInt(requestedGrade || "", 10);
-    const profileGrade = Number.parseInt(user?.grade || String(defaultQuizGrade), 10);
-    const preferredGrade = Number.isFinite(queryGrade) ? queryGrade : profileGrade;
+    const preferredGrade = parseInt(user?.grade || String(defaultQuizGrade), 10);
     const boundedGrade = Number.isNaN(preferredGrade) ? defaultQuizGrade : Math.min(quizGradeMax, Math.max(quizGradeMin, preferredGrade));
     setSelectedGrade(boundedGrade.toString());
-  }, [user?.grade, defaultQuizGrade, quizGradeMin, quizGradeMax, requestedGrade]);
+  }, [user?.grade, defaultQuizGrade, quizGradeMin, quizGradeMax]);
 
   useEffect(() => {
     const base = difficultyFromLevel(user?.level || 1).toLowerCase() as "easy" | "medium" | "hard" | "extreme";
@@ -78,9 +72,8 @@ const Quiz: React.FC = () => {
   }, [user?.level]);
 
   useEffect(() => {
-    const validDifficulties = ["easy", "medium", "hard", "extreme"];
-    setDifficulty(validDifficulties.includes(requestedDifficulty) ? requestedDifficulty as "easy" | "medium" | "hard" | "extreme" : adaptiveDifficulty);
-  }, [adaptiveDifficulty, requestedDifficulty]);
+    setDifficulty(adaptiveDifficulty);
+  }, [adaptiveDifficulty]);
 
   const normalizeCategory = (value: string) => value.toLowerCase().trim();
   const rotateOptionsForBalance = (question: Question, quizIndexSeed: number, questionIndex: number): Question => {
@@ -103,10 +96,9 @@ const Quiz: React.FC = () => {
     () => [...new Set(
       quizzes
         .filter((quiz) => quiz.gradeLevel === selectedGradeNumber)
-        .filter((quiz) => !requestedDifficulty || quiz.difficulty.toLowerCase() === requestedDifficulty)
         .map((quiz) => quiz.category)
     )],
-    [quizzes, selectedGradeNumber, requestedDifficulty]
+    [quizzes, selectedGradeNumber]
   );
 
   useEffect(() => {
@@ -131,12 +123,9 @@ const Quiz: React.FC = () => {
   // Topic Coverage can deep-link into regular Quizzes with a subject preselected.
   useEffect(() => {
     const requestedSubject = searchParams.get("subject");
-    if (!requestedSubject) {
-      setSelectedCategory(null);
-      return;
-    }
+    if (!requestedSubject || !categories.length) return;
     const match = categories.find((category) => normalizeSubject(category) === normalizeSubject(requestedSubject));
-    setSelectedCategory(match || null);
+    if (match) setSelectedCategory(match);
   }, [searchParams, categories]);
 
   // Create 10 practice sets per grade+subject with 10 questions each.
@@ -147,24 +136,17 @@ const Quiz: React.FC = () => {
     const quizzesByCategory = new Map<string, QuizType[]>();
     quizzes
       .filter((quiz) => quiz.gradeLevel === grade)
-      .filter((quiz) => !requestedDifficulty || quiz.difficulty.toLowerCase() === requestedDifficulty)
       .forEach((quiz) => {
         if (!quizzesByCategory.has(quiz.category)) quizzesByCategory.set(quiz.category, []);
         quizzesByCategory.get(quiz.category)!.push(quiz);
       });
 
-    const buildSet = (subjectQuizzes: QuizType[], category: string, index: number): QuizType | null => {
-      // Keep each set inside one real source quiz because the secure submission
-      // RPC grades against that quiz's original question IDs.
+    const buildSet = (subjectQuizzes: QuizType[], category: string, questionCount: number, index: number): QuizType | null => {
+      // Keep every practice set inside one real database quiz. The secure
+      // submission RPC grades by quiz_id, so mixing questions from several
+      // source quizzes would make client and server grade different sets.
       const sourceQuiz = subjectQuizzes[index % Math.max(subjectQuizzes.length, 1)];
-      if (!sourceQuiz) return null;
-
-      const matchingQuestions = sourceQuiz.questions.filter((question) =>
-        (!requestedTopic || question.topic.trim().toLowerCase() === requestedTopic.toLowerCase()) &&
-        (!requestedQuestionType || question.type === requestedQuestionType)
-      );
-      const questionCount = Math.min(10, matchingQuestions.length);
-      if (questionCount === 0) return null;
+      if (!sourceQuiz || sourceQuiz.questions.length < questionCount) return null;
 
       const matchingQuestions = sourceQuiz.questions.filter((question) => {
         const topicMatches = !topicFilter || question.topic === topicFilter || question.topic === "General";
@@ -182,7 +164,7 @@ const Quiz: React.FC = () => {
         id: `practice-g${grade}-${category.toLowerCase().replace(/\s+/g, "-")}-${questionCount}-${setNumber}`,
         sourceQuizId,
         title: `${category} Grade ${grade} Practice ${setNumber}`,
-        description: `${questionCount} available questions for Grade ${grade} ${category}`,
+        description: `${questionCount} grade-level questions for Grade ${grade} ${category}`,
         questions: selectedQuestions,
         subject: sourceQuiz.subject || category,
         grade,
@@ -190,7 +172,7 @@ const Quiz: React.FC = () => {
         timeLimit: questionCount * 30,
         createdBy: sourceQuizId,
         createdAt: new Date(),
-        topics: Array.from(new Set(selectedQuestions.map((question) => question.topic).filter(Boolean))),
+        topics: sourceQuiz.topics || ["General"],
         category,
         gradeLevel: grade
       };
@@ -202,7 +184,8 @@ const Quiz: React.FC = () => {
     categoriesToBuild.forEach((category) => {
       const subjectQuizzes = quizzesByCategory.get(category) || [];
       for (let i = 0; i < 10; i++) {
-        const practiceSet = buildSet(subjectQuizzes, category, i);
+        const questionCount = 10;
+        const practiceSet = buildSet(subjectQuizzes, category, questionCount, i);
         if (practiceSet) practiceSets.push(practiceSet);
       }
     });
