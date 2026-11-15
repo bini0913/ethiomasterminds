@@ -61,6 +61,7 @@ BEGIN
     AND user_id = p_actor_id
     AND status = 'active'
     AND school_role IN ('manager', 'admin')
+  ORDER BY CASE school_role WHEN 'manager' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END
   LIMIT 1;
 
   IF NOT v_is_super_admin AND v_actor_role IS NULL THEN

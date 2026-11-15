@@ -183,6 +183,8 @@ Deno.serve(async (req) => {
           .eq("user_id", actorId)
           .eq("status", "active")
           .in("school_role", ["manager", "admin"])
+          .order("school_role", { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (error || !membership) return json({ error: "Only this school's Manager or Admin can create accounts" }, 403);
       }
