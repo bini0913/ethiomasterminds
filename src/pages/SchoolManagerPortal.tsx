@@ -191,8 +191,8 @@ export default function SchoolManagerPortal() {
       if (!assignSectionId || (accountAssignmentKind === "subject" && !accountSubject)) return setFormError("Choose a section and subject for the teacher.");
       account.assignments = [{
         section_id: assignSectionId,
-        subject_name: assignKind === "homeroom" ? "Homeroom" : assignSubject,
-        assignment_kind: assignKind,
+        subject_name: accountAssignmentKind === "homeroom" ? "Homeroom" : accountSubject,
+        assignment_kind: accountAssignmentKind,
       }];
     }
 
