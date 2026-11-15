@@ -186,6 +186,9 @@ BEGIN
     RAISE EXCEPTION 'School quiz ownership and scope are immutable';
   END IF;
 
+  IF NEW.is_public IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'School quizzes cannot be made public outside the school';
+  END IF;
   IF (NEW.school_review_status IS DISTINCT FROM OLD.school_review_status
       OR NEW.is_approved IS DISTINCT FROM OLD.is_approved
       OR NEW.approved_by IS DISTINCT FROM OLD.approved_by
@@ -211,7 +214,8 @@ BEGIN
      AND NOT public.school_can_manage_school_quiz(v_quiz_id) THEN
     RAISE EXCEPTION 'Questions can only be changed while the assigned teacher quiz is a draft or rejected';
   END IF;
-  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
 END;
 $$;
 
@@ -379,7 +383,8 @@ BEGIN
            OLD.school_grade_label, OLD.uploader_id, OLD.subject, OLD.created_at) THEN
       RAISE EXCEPTION 'School library content ownership and scope are immutable';
     END IF;
-    IF NEW.school_review_status IS DISTINCT FROM OLD.school_review_status
+    IF (NEW.school_review_status IS DISTINCT FROM OLD.school_review_status
+        OR NEW.status IS DISTINCT FROM OLD.status)
        AND v_transition <> 'review' THEN
       RAISE EXCEPTION 'School library review status must use the guarded workflow';
     END IF;
@@ -400,7 +405,15 @@ BEGIN
   SELECT * INTO v_book FROM public.library_books WHERE id = NEW.book_id;
   IF v_book.id IS NULL THEN RAISE EXCEPTION 'Library book not found'; END IF;
   IF TG_OP = 'INSERT' THEN
-    IF NEW.school_id IS NOT NULL THEN RAISE EXCEPTION 'School upload must be created by the submission workflow'; END IF;
+    IF NEW.school_id IS NOT NULL THEN
+      IF v_transition <> 'submit'
+         OR v_book.school_id IS DISTINCT FROM NEW.school_id
+         OR v_book.school_section_id IS DISTINCT FROM NEW.school_section_id
+         OR v_book.school_teacher_membership_id IS DISTINCT FROM NEW.school_teacher_membership_id
+         OR v_book.school_review_status IS DISTINCT FROM NEW.school_review_status THEN
+        RAISE EXCEPTION 'School upload must be created by the submission workflow';
+      END IF;
+    END IF;
     RETURN NEW;
   END IF;
   IF NEW.school_id IS DISTINCT FROM OLD.school_id
@@ -435,9 +448,16 @@ BEGIN
   IF v_book.id IS NULL OR v_book.uploader_id <> auth.uid() OR v_book.school_id IS NOT NULL THEN
     RAISE EXCEPTION 'Only the uploader can submit an unassigned library item to a school';
   END IF;
-  SELECT * INTO v_teacher FROM public.school_memberships
-  WHERE user_id = auth.uid() AND school_role = 'teacher' AND status = 'active'
-  ORDER BY created_at DESC LIMIT 1;
+  SELECT teacher.* INTO v_teacher
+  FROM public.school_memberships teacher
+  JOIN public.school_sections section
+    ON section.id = p_section_id
+   AND section.school_id = teacher.school_id
+  WHERE teacher.user_id = auth.uid()
+    AND teacher.school_role = 'teacher'
+    AND teacher.status = 'active'
+  ORDER BY teacher.created_at DESC
+  LIMIT 1;
   IF v_teacher.id IS NULL THEN RAISE EXCEPTION 'Active School Teacher membership required'; END IF;
   SELECT grade_label INTO v_grade FROM public.school_sections
   WHERE id = p_section_id AND school_id = v_teacher.school_id;
@@ -703,6 +723,7 @@ ALTER TABLE public.school_content_review_events ENABLE ROW LEVEL SECURITY;
 CREATE POLICY school_content_review_events_read ON public.school_content_review_events
 FOR SELECT TO authenticated
 USING (public.school_can_view_content_review_event(id));
+GRANT SELECT ON public.school_content_review_events TO authenticated;
 
 CREATE TRIGGER school_quiz_validate
 BEFORE INSERT OR UPDATE ON public.quizzes
