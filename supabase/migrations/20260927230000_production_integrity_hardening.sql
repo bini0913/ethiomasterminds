@@ -539,7 +539,7 @@ BEGIN
     RAISE EXCEPTION 'Authentication required';
   END IF;
 
-  SELECT um.*, dm.reward_xp, dm.reward_coins
+  SELECT um, dm.reward_xp, dm.reward_coins
     INTO v_mission, v_reward_xp, v_reward_coins
   FROM public.user_missions um
   JOIN public.daily_missions dm ON dm.id = um.mission_id
