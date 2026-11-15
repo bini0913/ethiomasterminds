@@ -140,13 +140,20 @@ $$;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS season_xp integer NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS public.season_runtime_state (
-  id integer PRIMARY KEY DEFAULT 1,
-  current_season_name text NOT NULL DEFAULT 'Season 1',
-  season_number integer NOT NULL DEFAULT 1,
-  started_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (id = 1)
+  id boolean PRIMARY KEY DEFAULT true CHECK (id = true),
+  tournaments_paused boolean NOT NULL DEFAULT false,
+  xp_updates_locked boolean NOT NULL DEFAULT false,
+  current_season text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  updated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
 );
-INSERT INTO public.season_runtime_state (id) VALUES (1) ON CONFLICT DO NOTHING;
+
+ALTER TABLE public.season_runtime_state
+  ADD COLUMN IF NOT EXISTS current_season_name text NOT NULL DEFAULT 'Season 1',
+  ADD COLUMN IF NOT EXISTS season_number integer NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS started_at timestamptz NOT NULL DEFAULT now();
+
+INSERT INTO public.season_runtime_state (id) VALUES (true) ON CONFLICT DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.season_history (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -236,7 +243,7 @@ CREATE OR REPLACE FUNCTION public.admin_get_current_season_stats()
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_state season_runtime_state%ROWTYPE; v_total_users int; v_total_xp bigint; v_top_name text;
 BEGIN
-  SELECT * INTO v_state FROM season_runtime_state WHERE id = 1;
+  SELECT * INTO v_state FROM season_runtime_state WHERE id = true;
   SELECT COUNT(*), COALESCE(SUM(season_xp),0) INTO v_total_users, v_total_xp
     FROM profiles WHERE season_xp > 0;
   SELECT name INTO v_top_name FROM profiles ORDER BY season_xp DESC NULLS LAST LIMIT 1;
@@ -294,7 +301,7 @@ BEGIN
     RAISE EXCEPTION 'Confirmation text required';
   END IF;
 
-  SELECT * INTO v_state FROM season_runtime_state WHERE id = 1;
+  SELECT * INTO v_state FROM season_runtime_state WHERE id = true;
 
   SELECT COUNT(*), COALESCE(SUM(season_xp),0) INTO v_total_users, v_total_xp
     FROM profiles WHERE season_xp > 0;
@@ -335,7 +342,7 @@ BEGIN
      SET current_season_name = v_next_name,
          season_number = v_state.season_number + 1,
          started_at = now()
-   WHERE id = 1;
+   WHERE id = true;
 
   RETURN jsonb_build_object('next_season', v_next_name, 'archived_users', COALESCE(v_total_users,0));
 END;
