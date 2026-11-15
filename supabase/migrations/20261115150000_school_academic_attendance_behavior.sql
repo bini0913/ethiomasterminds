@@ -324,6 +324,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
               AND link.status = 'active'
               AND student.school_id = assessment.school_id
               AND student.section_id = assessment.section_id
+              AND student.status IN ('active', 'suspended')
           )
         )
       )
@@ -892,7 +893,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_notify_parents_attendance_session()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF NEW.status = 'submitted' AND OLD.status IS DISTINCT FROM NEW.status THEN
     INSERT INTO public.school_parent_notifications(
@@ -910,7 +911,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.school_notify_parent_behavior_approval()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
