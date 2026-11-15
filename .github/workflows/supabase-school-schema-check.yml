@@ -3,22 +3,30 @@ name: Supabase school schema checks
 on:
   push:
     branches:
+      - main
       - feat/school-management-portals-foundation
     paths:
       - "supabase/migrations/**"
       - "supabase/tests/**"
+      - "supabase/functions/**"
       - "supabase/config.toml"
-      - "supabase/functions/school-provision-account/**"
+      - "supabase/seed.sql"
   pull_request:
     paths:
       - "supabase/migrations/**"
       - "supabase/tests/**"
+      - "supabase/functions/**"
       - "supabase/config.toml"
-      - "supabase/functions/school-provision-account/**"
+      - "supabase/seed.sql"
+
+concurrency:
+  group: school-schema-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   database-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
@@ -36,6 +44,7 @@ jobs:
 
   edge-function-typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v2
