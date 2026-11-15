@@ -356,7 +356,7 @@ END;
 $$;
 
 -- Realtime: migrations may have already added these tables to the publication.
-DO $
+DO $publication$
 DECLARE
   v_table text;
 BEGIN
@@ -378,4 +378,4 @@ BEGIN
     END;
   END LOOP;
 END;
-$;
+$publication$;
