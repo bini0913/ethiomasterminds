@@ -182,10 +182,10 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
   SELECT public._is_extreme_admin()
     OR public.is_active_school_member(p_school_id, ARRAY['manager']::text[]);
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.is_school_manager_or_admin(p_school_id uuid)
 RETURNS boolean
@@ -282,7 +282,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 DECLARE
   v_teacher public.school_memberships%ROWTYPE;
 BEGIN
@@ -294,7 +294,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_teacher_assignment_validate ON public.school_teacher_assignments;
 CREATE TRIGGER school_teacher_assignment_validate
@@ -305,7 +305,7 @@ CREATE OR REPLACE FUNCTION public.school_protect_membership_identity()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = public
-AS $
+AS $$
 BEGIN
   IF ROW(NEW.school_id, NEW.user_id, NEW.school_role, NEW.student_number, NEW.school_username, NEW.created_by)
      IS DISTINCT FROM
@@ -314,7 +314,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_membership_identity_immutable ON public.school_memberships;
 CREATE TRIGGER school_membership_identity_immutable
