@@ -28,7 +28,7 @@ const navItems: SchoolNavItem[] = [
 type AccountRole = "admin" | "teacher" | "finance" | "parent" | "student";
 
 export default function SchoolManagerPortal() {
-  const { activeSchool, activeMembership, refresh: refreshSchoolContext } = useSchoolPortal();
+  const { activeSchool, activeMembership } = useSchoolPortal();
   const [page, setPage] = useState("overview");
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
@@ -57,6 +57,7 @@ export default function SchoolManagerPortal() {
   const [yearName, setYearName] = useState("");
   const [yearStart, setYearStart] = useState("");
   const [yearEnd, setYearEnd] = useState("");
+  const [yearIsCurrent, setYearIsCurrent] = useState(true);
   const [sectionYearId, setSectionYearId] = useState("");
   const [sectionGrade, setSectionGrade] = useState("Grade 9");
   const [sectionName, setSectionName] = useState("A");
@@ -158,13 +159,14 @@ export default function SchoolManagerPortal() {
   const teachers = activeMembers.filter((member) => member.school_role === "teacher");
   const parents = activeMembers.filter((member) => member.school_role === "parent");
   const staff = activeMembers.filter((member) => ["admin", "teacher", "finance"].includes(member.school_role));
-  const outstanding = invoices.reduce((sum, invoice) => sum + Number(invoice.balance || 0), 0);
+  const outstandingByCurrency = invoices.reduce((totals: Record<string, number>, invoice) => { const currency = invoice.currency || "ETB"; totals[currency] = (totals[currency] || 0) + Number(invoice.balance || 0); return totals; }, {});
+  const outstandingSummary = Object.entries(outstandingByCurrency).map(([currency, amount]) => `${currency} ${amount.toLocaleString()}`).join(" · ") || "0";
 
   const memberName = (membershipId: string) => {
     const membership = members.find((item) => item.id === membershipId);
     return membership ? (profiles[membership.user_id]?.name || membership.school_username || "School member") : "Unknown member";
   };
-  const sectionLabel = (sectionId: string) => {
+  const sectionLabel = (sectionId: string | null | undefined) => {
     const section = sections.find((item) => item.id === sectionId);
     return section ? `${section.grade_label} ${section.section_name}` : "—";
   };
@@ -213,11 +215,15 @@ export default function SchoolManagerPortal() {
     event.preventDefault();
     if (!yearName.trim() || !yearStart || !yearEnd) return toast.error("Complete the academic year details.");
     if (yearEnd < yearStart) return toast.error("Academic year end date must follow its start date.");
+    if (yearIsCurrent) {
+      const { error: clearCurrentError } = await db.from("school_academic_years").update({ is_current: false }).eq("school_id", schoolId).eq("is_current", true);
+      if (clearCurrentError) return toast.error(clearCurrentError.message);
+    }
     const { error } = await db.from("school_academic_years").insert({
-      school_id: schoolId, name: yearName.trim(), starts_on: yearStart, ends_on: yearEnd,
+      school_id: schoolId, name: yearName.trim(), starts_on: yearStart, ends_on: yearEnd, is_current: yearIsCurrent,
     });
     if (error) return toast.error(error.message);
-    setYearName(""); setYearStart(""); setYearEnd("");
+    setYearName(""); setYearStart(""); setYearEnd(""); setYearIsCurrent(false);
     toast.success("Academic year created.");
     await load();
   };
@@ -382,7 +388,7 @@ export default function SchoolManagerPortal() {
             {accountRole === "teacher" && <>
               <SchoolField label="Assigned section"><select className={schoolSelectClass} value={assignSectionId} onChange={(event) => setAssignSectionId(event.target.value)}><option value="">Choose section</option>{sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}</select></SchoolField>
               <SchoolField label="Assignment type"><select className={schoolSelectClass} value={accountAssignmentKind} onChange={(event) => setAccountAssignmentKind(event.target.value as "subject" | "homeroom")}><option value="subject">Subject teacher</option><option value="homeroom">Homeroom teacher</option></select></SchoolField>
-              {accountAssignmentKind === "subject" && <SchoolField label="Subject"><select className={schoolSelectClass} value={accountSubject} onChange={(event) => setAccountSubject(event.target.value)}><option value="">Choose subject</option>{subjects.filter((subject) => subject.active && sections.find((section) => section.id === assignSectionId)?.grade_label === subject.grade_label).map((subject) => <option key={subject.id} value={subject.subject_name}>{subject.subject_name}</option>)}</select></SchoolField>}
+              {accountAssignmentKind === "subject" && <SchoolField label="Subject"><select className={schoolSelectClass} value={accountSubject} onChange={(event) => setAccountSubject(event.target.value)}><option value="">Choose subject</option>{subjects.filter((subject) => subject.active && subject.grade_label === sections.find((section) => section.id === assignSectionId)?.grade_label && subject.academic_year_id === sections.find((section) => section.id === assignSectionId)?.academic_year_id).map((subject) => <option key={subject.id} value={subject.subject_name}>{subject.subject_name}</option>)}</select></SchoolField>}
             </>}
             {formError && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{formError}</p>}
             <SchoolPrimaryButton type="submit">Create account</SchoolPrimaryButton>
@@ -413,7 +419,7 @@ export default function SchoolManagerPortal() {
           <form onSubmit={addAcademicYear} className="space-y-3">
             <SchoolField label="Academic year name"><input className={schoolInputClass} value={yearName} onChange={(event) => setYearName(event.target.value)} placeholder="2026/2027" /></SchoolField>
             <SchoolField label="Start date"><input type="date" className={schoolInputClass} value={yearStart} onChange={(event) => setYearStart(event.target.value)} /></SchoolField>
-            <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} /></SchoolField>
+            <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} /></SchoolField>\n            <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={yearIsCurrent} onChange={(event) => setYearIsCurrent(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" /> Set as current academic year</label>
             <SchoolPrimaryButton type="submit">Add academic year</SchoolPrimaryButton>
           </form>
         </SchoolPanel>
@@ -450,7 +456,7 @@ export default function SchoolManagerPortal() {
           <SchoolField label="Teacher"><select className={schoolSelectClass} value={assignTeacherId} onChange={(event) => setAssignTeacherId(event.target.value)}><option value="">Choose teacher</option>{teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{memberName(teacher.id)}</option>)}</select></SchoolField>
           <SchoolField label="Section"><select className={schoolSelectClass} value={assignSectionId} onChange={(event) => setAssignSectionId(event.target.value)}><option value="">Choose section</option>{sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}</select></SchoolField>
           <SchoolField label="Assignment type"><select className={schoolSelectClass} value={assignKind} onChange={(event) => setAssignKind(event.target.value as "subject" | "homeroom")}><option value="subject">Subject teacher</option><option value="homeroom">Homeroom teacher</option></select></SchoolField>
-          {assignKind === "subject" && <SchoolField label="Subject"><select className={schoolSelectClass} value={assignSubject} onChange={(event) => setAssignSubject(event.target.value)}><option value="">Choose subject</option>{subjects.filter((subject) => subject.active && subject.grade_label === sections.find((section) => section.id === assignSectionId)?.grade_label).map((subject) => <option key={subject.id} value={subject.subject_name}>{subject.subject_name}</option>)}</select></SchoolField>}
+          {assignKind === "subject" && <SchoolField label="Subject"><select className={schoolSelectClass} value={assignSubject} onChange={(event) => setAssignSubject(event.target.value)}><option value="">Choose subject</option>{subjects.filter((subject) => subject.active && subject.grade_label === sections.find((section) => section.id === assignSectionId)?.grade_label && subject.academic_year_id === sections.find((section) => section.id === assignSectionId)?.academic_year_id).map((subject) => <option key={subject.id} value={subject.subject_name}>{subject.subject_name}</option>)}</select></SchoolField>}
           <div className="md:col-span-2 xl:col-span-4"><SchoolPrimaryButton type="submit">Save assignment</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
