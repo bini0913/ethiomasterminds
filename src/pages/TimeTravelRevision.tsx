@@ -49,6 +49,7 @@ const TimeTravelRevision: React.FC = () => {
   const [showResult, setShowResult] = useState(false);
   const [revisionQueue, setRevisionQueue] = useState<MissedQuestion[]>([]);
   const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0 });
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -59,6 +60,8 @@ const TimeTravelRevision: React.FC = () => {
   const loadMissedQuestions = async () => {
     if (!user?.id) return;
 
+    setIsLoading(true);
+    setLoadError(false);
     try {
       // Get questions the user got wrong
       const { data: attempts, error } = await supabase
@@ -84,10 +87,11 @@ const TimeTravelRevision: React.FC = () => {
       if (error) throw error;
 
       // Get revision schedule
-      const { data: schedules } = await supabase
+      const { data: schedules, error: schedulesError } = await supabase
         .from('revision_schedule')
         .select('*')
         .eq('user_id', user.id);
+      if (schedulesError) throw schedulesError;
 
       const scheduleMap = new Map(schedules?.map(s => [s.question_id, s]) || []);
 
@@ -130,8 +134,10 @@ const TimeTravelRevision: React.FC = () => {
         mastered,
         dueToday,
       });
+      setLoadError(false);
     } catch (error) {
-      console.error('Error loading missed questions:', error);
+      console.error('Error loading revision questions:', error);
+      setLoadError(true);
       toast.error('Failed to load revision data');
     } finally {
       setIsLoading(false);
@@ -174,7 +180,7 @@ const TimeTravelRevision: React.FC = () => {
       const nextReviewDate = new Date();
       nextReviewDate.setDate(nextReviewDate.getDate() + nextReviewDays);
 
-      await supabase
+      const { error } = await supabase
         .from('revision_schedule')
         .upsert({
           user_id: user.id,
@@ -185,6 +191,10 @@ const TimeTravelRevision: React.FC = () => {
           status: isCorrect ? 'reviewed' : 'pending',
           difficulty_rating: isCorrect ? Math.max(1, (currentQuestion.timesReviewed || 3) - 1) : 5,
         }, { onConflict: 'user_id,question_id' });
+      if (error) {
+        toast.error('Your result was recorded, but the revision schedule could not be saved. Please try again.');
+        return;
+      }
     }
   };
 
@@ -208,6 +218,22 @@ const TimeTravelRevision: React.FC = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader><CardTitle>Revision data unavailable</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">We could not load your revision queue. Your saved progress is unchanged.</p>
+            <Button onClick={loadMissedQuestions} className="w-full" variant="outline">
+              <RotateCcw className="mr-2 h-4 w-4" /> Try again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
