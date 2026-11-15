@@ -62,8 +62,7 @@ CREATE TABLE IF NOT EXISTS public.student_exam_targets (
   user_id uuid PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
   exam_name text NOT NULL CHECK (char_length(trim(exam_name)) BETWEEN 2 AND 100),
   exam_date date NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (exam_date >= (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date)
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE public.student_exam_targets ENABLE ROW LEVEL SECURITY;
@@ -99,7 +98,7 @@ BEGIN
   WHERE id = v_user_id
   FOR SHARE;
 
-  IF public.get_user_role(v_user_id) <> 'student'
+  IF public.get_user_role(v_user_id) IS DISTINCT FROM 'student'
      OR v_grade IS NULL
      OR substring(lower(trim(v_grade)) from '[0-9]+') IS NULL
      OR substring(lower(trim(v_grade)) from '[0-9]+')::integer NOT BETWEEN 9 AND 12 THEN
@@ -153,7 +152,7 @@ BEGIN
   FROM public.profiles
   WHERE id = NEW.student_id;
 
-  IF public.get_user_role(NEW.student_id) <> 'student'
+  IF public.get_user_role(NEW.student_id) IS DISTINCT FROM 'student'
      OR substring(lower(trim(COALESCE(v_grade, ''))) from '[0-9]+') IS NULL
      OR substring(lower(trim(v_grade)) from '[0-9]+')::integer NOT BETWEEN 9 AND 12 THEN
     RETURN NEW;
@@ -231,7 +230,7 @@ BEGIN
     v_activity_date,
     1,
     GREATEST(COALESCE(NEW.total_questions, 0), 0),
-    GREATEST(COALESCE(NEW.correct_answers, 0), 0),
+    LEAST(GREATEST(COALESCE(NEW.correct_answers, 0), 0), GREATEST(COALESCE(NEW.total_questions, 0), 0)),
     GREATEST(COALESCE(NEW.xp_earned, 0), 0),
     COALESCE(NEW.completed_at, now())
   )
@@ -307,7 +306,7 @@ SELECT
   (COALESCE(qr.completed_at, now()) AT TIME ZONE 'Africa/Addis_Ababa')::date,
   count(*)::integer,
   sum(GREATEST(COALESCE(qr.total_questions, 0), 0))::integer,
-  sum(GREATEST(COALESCE(qr.correct_answers, 0), 0))::integer,
+  sum(LEAST(GREATEST(COALESCE(qr.correct_answers, 0), 0), GREATEST(COALESCE(qr.total_questions, 0), 0)))::integer,
   sum(GREATEST(COALESCE(qr.xp_earned, 0), 0))::integer,
   max(COALESCE(qr.completed_at, now()))
 FROM public.quiz_results qr
