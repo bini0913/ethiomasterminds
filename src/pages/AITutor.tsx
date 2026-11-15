@@ -9,7 +9,6 @@ import {
   Plus, RefreshCw, RotateCcw, Sparkles, Volume2, VolumeX,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -49,7 +48,6 @@ const AITutor: React.FC = () => {
   const [sendError, setSendError] = useState<string | null>(null);
   const [lastFailedPrompt, setLastFailedPrompt] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
   const firstName = user?.name?.split(' ')[0] || 'there';
@@ -58,10 +56,6 @@ const AITutor: React.FC = () => {
   useEffect(() => {
     if (user?.id) void loadConversations();
   }, [user?.id]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, isLoading]);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -218,7 +212,7 @@ const AITutor: React.FC = () => {
         </div>
       )}
 
-      <main ref={scrollRef} className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[800px] px-4 pb-44 pt-8 sm:px-6 sm:pt-12">
           {messages.length === 0 ? (
             <div className="flex min-h-[58vh] flex-col items-center justify-center text-center">
@@ -230,9 +224,8 @@ const AITutor: React.FC = () => {
               </div>
             </div>
           ) : (
-            <AnimatePresence initial={false}>
-              {messages.map((message, index) => (
-                <motion.div key={`${message.timestamp}-${index}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="group mb-8 flex gap-4">
+              messages.map((message, index) => (
+                <div key={`${message.timestamp}-${index}`} className="group mb-8 flex gap-4">
                   <div className={cn('mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full', message.role === 'assistant' ? 'bg-[#287c68] text-white' : 'bg-[#ececf1] text-[#565869]')}>
                     {message.role === 'assistant' ? <Bot className="h-4 w-4" /> : <span className="text-[10px] font-bold">YOU</span>}
                   </div>
@@ -243,9 +236,8 @@ const AITutor: React.FC = () => {
                       {message.role === 'assistant' && <button type="button" onClick={() => void copyMessage(message.content, index)} className="rounded p-1 text-[#8e8ea0] hover:bg-[#f7f7f8] hover:text-[#287c68]" aria-label="Copy response">{copiedIdx === index ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</button>}
                     </div>
                   </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                </div>
+              ))
           )}
 
           {isLoading && <div className="mb-8 flex gap-4"><div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#287c68] text-white"><Bot className="h-4 w-4" /></div><div className="flex items-center gap-2 pt-1 text-sm text-[#8e8ea0]"><Loader2 className="h-4 w-4 animate-spin text-[#287c68]" /> Thinking…</div></div>}
