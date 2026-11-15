@@ -208,8 +208,9 @@ $$;
 CREATE OR REPLACE FUNCTION public.school_validate_school_quiz_question()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_quiz_id uuid := CASE WHEN TG_OP = 'DELETE' THEN OLD.quiz_id ELSE NEW.quiz_id END;
+  v_quiz_id uuid;
 BEGIN
+  IF TG_OP = 'DELETE' THEN v_quiz_id := OLD.quiz_id; ELSE v_quiz_id := NEW.quiz_id; END IF;
   IF EXISTS (SELECT 1 FROM public.quizzes WHERE id = v_quiz_id AND school_id IS NOT NULL)
      AND NOT public.school_can_manage_school_quiz(v_quiz_id) THEN
     RAISE EXCEPTION 'Questions can only be changed while the assigned teacher quiz is a draft or rejected';
