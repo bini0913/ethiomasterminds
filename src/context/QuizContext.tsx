@@ -12,7 +12,7 @@ export interface Question {
   subject: string;
   grade: number;
   topic: string;
-  type: 'Multiple Choice' | 'True/False' | 'Fill in the blank';
+  type: 'Multiple Choice' | 'True/False' | 'Fill in the blank' | 'Matching';
   points: number;
   timeLimit?: number;
   explanation?: string;
@@ -130,8 +130,16 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ) as 'Easy' | 'Medium' | 'Hard' | 'Extreme',
           subject: '', // Will be set from quiz
           grade: 0, // Will be set from quiz
-          topic: 'General',
-          type: options.length === 2 ? 'True/False' : 'Multiple Choice',
+          topic: typeof q.topic === 'string' && q.topic.trim() ? q.topic.trim() : 'General',
+          type: (() => {
+            const rawType = String(q.question_type ?? q.type ?? '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+            if (rawType.includes('true') && rawType.includes('false')) return 'True/False';
+            if (rawType.includes('fill')) return 'Fill in the blank';
+            if (rawType.includes('match')) return 'Matching';
+            const optionLabels = options.map((option) => String(option).trim().toLowerCase());
+            if (optionLabels.length === 2 && optionLabels.includes('true') && optionLabels.includes('false')) return 'True/False';
+            return 'Multiple Choice';
+          })(),
           points: q.points || 10,
           timeLimit: 30,
           explanation: q.explanation || ''
@@ -168,7 +176,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           timeLimit: q.time_limit || questions.length * 30,
           createdBy: q.created_by,
           createdAt: new Date(q.created_at),
-          topics: ['General'],
+          topics: Array.from(new Set(questions.map((question) => question.topic).filter(Boolean))),
           category: q.subject,
           gradeLevel: gradeNum
         };
@@ -308,7 +316,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setFilteredQuizzes(filtered);
   };
 
-  const setQuizFilters = (filters: { 
+  const setQuizFilters = (filters: {
     grade?: string;
     subject?: string;
     topic?: string;
@@ -316,28 +324,35 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     questionType?: string;
   }) => {
     let filtered = [...quizzes];
-    
+
     if (filters.subject) {
-      filtered = filtered.filter(quiz => quiz.subject === filters.subject);
+      filtered = filtered.filter((quiz) => quiz.subject === filters.subject);
     }
-    
+
     if (filters.grade) {
-      const gradeNum = parseInt(filters.grade);
-      if (!isNaN(gradeNum)) {
-        filtered = filtered.filter(quiz => quiz.grade === gradeNum);
-      }
+      const gradeNum = Number.parseInt(filters.grade, 10);
+      if (Number.isFinite(gradeNum)) filtered = filtered.filter((quiz) => quiz.grade === gradeNum);
     }
-    
+
     if (filters.difficulty) {
-      filtered = filtered.filter(quiz => quiz.difficulty === filters.difficulty);
+      const wantedDifficulty = filters.difficulty.trim().toLowerCase();
+      filtered = filtered.filter((quiz) => quiz.difficulty.toLowerCase() === wantedDifficulty);
     }
-    
-    if (filters.topic) {
-      filtered = filtered.filter(
-        quiz => quiz.topics && quiz.topics.includes(filters.topic as string)
-      );
+
+    if (filters.topic || filters.questionType) {
+      filtered = filtered.map((quiz) => {
+        const matchingQuestions = quiz.questions.filter((question) =>
+          (!filters.topic || question.topic.toLowerCase() === filters.topic!.trim().toLowerCase()) &&
+          (!filters.questionType || question.type === filters.questionType)
+        );
+        return {
+          ...quiz,
+          questions: matchingQuestions,
+          topics: Array.from(new Set(matchingQuestions.map((question) => question.topic).filter(Boolean))),
+        };
+      }).filter((quiz) => quiz.questions.length > 0);
     }
-    
+
     setFilteredQuizzes(filtered);
   };
   
