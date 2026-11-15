@@ -264,11 +264,16 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.school_notify_parents_announcement()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+DECLARE
+  v_just_published boolean := false;
 BEGIN
-  IF NEW.status = 'published' AND (
-    TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM NEW.status
-  ) THEN
+  IF TG_OP = 'INSERT' THEN
+    v_just_published := NEW.status = 'published';
+  ELSIF TG_OP = 'UPDATE' THEN
+    v_just_published := NEW.status = 'published' AND OLD.status IS DISTINCT FROM NEW.status;
+  END IF;
+  IF v_just_published THEN
     INSERT INTO public.school_parent_notifications(
       school_id, parent_membership_id, student_membership_id,
       notification_type, title, message
@@ -378,7 +383,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
             SELECT 1 FROM public.school_memberships membership
             WHERE membership.user_id = auth.uid()
               AND membership.school_id = conversation.school_id
-              AND membership.status = 'active'
+              AND membership.status IN ('active', 'suspended')
               AND (
                 (membership.school_role = 'teacher' AND EXISTS (
                   SELECT 1 FROM public.school_teacher_assignments assignment
@@ -551,7 +556,7 @@ BEGIN
     AND status IN ('active', 'suspended');
   IF v_student.id IS NULL THEN RAISE EXCEPTION 'Student is not active in this school'; END IF;
 
-  SELECT array_agg(DISTINCT participant_id)
+  SELECT array_agg(DISTINCT participants.participant_id)
   INTO v_ids
   FROM unnest(coalesce(p_participant_membership_ids, '{}'::uuid[]) || ARRAY[v_creator_id]) AS participants(participant_id);
   IF coalesce(cardinality(v_ids), 0) < 2 OR cardinality(v_ids) > 6 THEN
@@ -562,7 +567,7 @@ BEGIN
     SELECT 1 FROM unnest(v_ids) AS participants(participant_id)
     WHERE NOT EXISTS (
       SELECT 1 FROM public.school_memberships membership
-      WHERE membership.id = participant_id
+      WHERE membership.id = participants.participant_id
         AND membership.school_id = p_school_id
         AND membership.status = 'active'
         AND membership.school_role IN ('admin', 'teacher', 'parent', 'student')
@@ -624,7 +629,7 @@ BEGIN
   INSERT INTO public.school_conversation_participants(
     school_id, conversation_id, membership_id, added_by_membership_id
   )
-  SELECT p_school_id, v_conversation_id, participant_id, v_creator_id
+  SELECT p_school_id, v_conversation_id, participants.participant_id, v_creator_id
   FROM unnest(v_ids) AS participants(participant_id);
 
   RETURN v_conversation_id;
