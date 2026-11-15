@@ -11,8 +11,12 @@ BEGIN
      OR NOT public.school_is_homeroom_teacher(NEW.school_id, NEW.section_id) THEN
     RAISE EXCEPTION 'Only the assigned homeroom teacher can create or update this attendance session';
   END IF;
-  IF TG_OP = 'INSERT' AND v_recorder.user_id <> auth.uid() THEN
-    RAISE EXCEPTION 'The signed-in homeroom teacher must create the attendance session';
+  IF TG_OP = 'INSERT' AND (
+    v_recorder.user_id <> auth.uid()
+    OR NEW.status <> 'open'
+    OR NEW.submitted_at IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'The signed-in homeroom teacher must create an open attendance session';
   END IF;
   IF TG_OP = 'UPDATE' THEN
     IF ROW(NEW.school_id, NEW.section_id, NEW.attendance_date, NEW.recorded_by_membership_id, NEW.created_at)
