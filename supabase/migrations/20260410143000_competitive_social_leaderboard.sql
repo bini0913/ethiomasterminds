@@ -88,6 +88,7 @@ on public.social_notifications for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+-- Add realtime tables idempotently; PostgreSQL has no ADD TABLE IF NOT EXISTS syntax.
 DO 'BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.followers;
 EXCEPTION
