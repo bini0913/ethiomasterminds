@@ -371,7 +371,7 @@ const App = () => (
                               <Route path="/avatar-creator" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AvatarCreator /></ProtectedRoute>} />
                               <Route path="/academic" element={<EarlyTierRestrictedRoute><AcademicMode /></EarlyTierRestrictedRoute>} />
                               <Route path="/study-mode" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><StudyModePage /></ProtectedRoute>} />
-                              <Route path="/academic/setup" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><AcademicSetup /></ProtectedRoute>} />
+                              <Route path="/academic/setup" element={<EarlyTierRestrictedRoute><AcademicSetup /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/flashcards" element={<EarlyTierRestrictedRoute><FlashcardsPage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/topics" element={<EarlyTierRestrictedRoute><TopicCoveragePage /></EarlyTierRestrictedRoute>} />
                               <Route path="/academic/exam" element={<EarlyTierRestrictedRoute><ExamModePage /></EarlyTierRestrictedRoute>} />

@@ -279,11 +279,16 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       
       setEarnedXP(totalXP);
       
-      // Save results to database
+      // Do not mark the quiz complete locally when the authoritative save fails.
+      // The learner can retry from the result screen without losing the attempt.
       if (user?.id) {
-        await saveQuizResults(finalScore, totalXP);
+        const saved = await saveQuizResults(finalScore, totalXP);
+        if (!saved) {
+          setQuizCompleted(false);
+          return;
+        }
       }
-      
+
       // Call the onComplete callback only after the secure submission has finished.
       onComplete(finalScore, completedQuestionIds);
     }

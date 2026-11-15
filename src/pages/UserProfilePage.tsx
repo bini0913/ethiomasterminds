@@ -511,12 +511,12 @@ const UserProfilePage = () => {
 
     const channel = supabase
       .channel(`profile-live-${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, refreshCore)
-      .on("postgres_changes", { event: "*", schema: "public", table: "followers" }, refreshSocial)
-      .on("postgres_changes", { event: "*", schema: "public", table: "quiz_results" }, refreshProfileDetails)
-      .on("postgres_changes", { event: "*", schema: "public", table: "user_achievements" }, refreshProfileDetails)
-       .on("postgres_changes", { event: "*", schema: "public", table: "user_items" }, refreshProfileDetails)
-      .on("postgres_changes", { event: "*", schema: "public", table: "profile_achievement_history" }, refreshProfileDetails)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${userId}` }, refreshCore)
+      .on("postgres_changes", { event: "*", schema: "public", table: "followers", filter: `followee_id=eq.${userId}` }, refreshSocial)
+      .on("postgres_changes", { event: "*", schema: "public", table: "quiz_results", filter: `student_id=eq.${userId}` }, refreshProfileDetails)
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_achievements", filter: `user_id=eq.${userId}` }, refreshProfileDetails)
+       .on("postgres_changes", { event: "*", schema: "public", table: "user_items", filter: `user_id=eq.${userId}` }, refreshProfileDetails)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profile_achievement_history", filter: `user_id=eq.${userId}` }, refreshProfileDetails)
       .subscribe();
 
     return () => {
@@ -535,6 +535,8 @@ const UserProfilePage = () => {
 
   const currentViewerId = session?.user?.id ?? authUser?.id ?? "";
   const isSelf = currentViewerId === (profile?.id ?? "");
+  const canViewPublicSections = isSelf || privacy.isPublic;
+  const canViewStats = isSelf || (privacy.isPublic && !privacy.hideStats);
   const isFollowing = profile ? followingIds.includes(profile.id) : false;
   const xpProgress = getXpProgressInLevel(profile?.xp ?? 0);
   const progress = xpProgress.percentage;
@@ -644,15 +646,23 @@ const UserProfilePage = () => {
 
     try {
       await createFollowChallenge(authUser.id, profile.id);
-      const { data, error } = await (supabase as any).rpc("create_multiplayer_invite", {
-        p_receiver_id: profile.id,
-        p_room_id: null,
-        p_max_players: 2,
+      const { data, error } = await (supabase as any).rpc("multiplayer_create_room", {
+        p_name: `${authUser.name || "Player"}'s Challenge`,
         p_subject: "Mixed",
         p_difficulty: "Medium",
+        p_question_count: 10,
+        p_max_players: 2,
+        p_password: null,
       });
       if (error) throw error;
-      navigate(data?.room_id ? `/multiplayer?room=${data.room_id}` : "/multiplayer");
+      const roomId = data?.room_id || data?.id;
+      if (!roomId) throw new Error("Challenge room could not be created");
+      const { error: inviteError } = await (supabase as any).rpc("create_multiplayer_invite", {
+        _room_id: roomId,
+        _receiver_id: profile.id,
+      });
+      if (inviteError) throw inviteError;
+      navigate(`/multiplayer?room=${roomId}`);
       toast.success(`Challenge sent to ${profile.name || profile.username}`);
     } catch (error: any) {
       toast.error(error.message ?? "Could not send challenge");
@@ -850,7 +860,14 @@ const UserProfilePage = () => {
           </div>
         </section>
 
-        <Card className="border-border bg-card/80">
+        {!canViewPublicSections && (
+          <Card className="border-border bg-card/80">
+            <CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
+              <Lock className="h-4 w-4" /> This learner has a private profile.
+            </CardContent>
+          </Card>
+        )}
+        {canViewPublicSections && <Card className="border-border bg-card/80">
           <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4">
             <div className="flex flex-wrap gap-2">
               {!isSelf ? (
@@ -873,9 +890,9 @@ const UserProfilePage = () => {
             </div>
             <p className="text-xs text-muted-foreground">Student profile</p>
           </CardContent>
-        </Card>
+        </Card>}
 
-        <Card className="border-border bg-card/80 backdrop-blur">
+        {canViewStats && <Card className="border-border bg-card/80 backdrop-blur">
           <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
             {[{ label: "Followers", value: followersCount, icon: Users }, { label: "Following", value: followingCount, icon: UserRoundPlus }, { label: "Streak", value: streak, icon: Flame }, { label: "Wins", value: wins, icon: Trophy }].map((stat) => (
               <motion.div key={stat.label} whileHover={{ y: -4 }} className="rounded-2xl border border-border bg-card p-3 text-center">
@@ -885,9 +902,9 @@ const UserProfilePage = () => {
               </motion.div>
             ))}
           </CardContent>
-        </Card>
+        </Card>}
 
-        <Card className="border-border bg-card/80">
+        {canViewStats && <Card className="border-border bg-card/80">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary" />Learning Progress</CardTitle>
           </CardHeader>
@@ -905,9 +922,9 @@ const UserProfilePage = () => {
               <p className="mt-1 text-sm font-semibold">{insights.weak.length ? insights.weak.join(" • ") : "Not enough recorded data yet."}</p>
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
-        <section className="space-y-3 rounded-3xl border border-border bg-card/70 p-5">
+        {canViewStats && <section className="space-y-3 rounded-3xl border border-border bg-card/70 p-5">
           <div className="flex items-center justify-between">
             <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="h-5 w-5 text-primary" />Achievements</h2>
             <p className="text-xs text-muted-foreground">Tap a badge for details</p>
@@ -934,9 +951,9 @@ const UserProfilePage = () => {
               </motion.button>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <section className="space-y-4 rounded-3xl border border-border bg-card/70 p-5">
+        {canViewStats && <section className="space-y-4 rounded-3xl border border-border bg-card/70 p-5">
           <div className="flex items-center justify-between">
             <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><Sparkles className="h-5 w-5 text-primary" />Collection Showroom</h2>
             <Badge variant="secondary">{collections.length}/{totalCollectionItems || 0} owned</Badge>
@@ -987,9 +1004,9 @@ const UserProfilePage = () => {
               </TabsContent>
             ))}
           </Tabs>
-        </section>
+        </section>}
 
-        <section className="space-y-3 rounded-3xl border border-border bg-card/70 p-5">
+        {canViewStats && <section className="space-y-3 rounded-3xl border border-border bg-card/70 p-5">
           <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><Rocket className="h-5 w-5 text-primary" />Activity Feed</h2>
           {activities.length ? activities.map((activity, index) => (
             <motion.div key={activity.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
@@ -1003,7 +1020,7 @@ const UserProfilePage = () => {
               <Clock3 className="h-4 w-4 text-muted-foreground" />
             </motion.div>
           )) : <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No recent activity has been recorded yet.</p>}
-        </section>
+        </section>}
 
         <section className="rounded-3xl border border-border bg-card p-5 backdrop-blur">
           <div className="mb-2 flex items-center justify-between">
