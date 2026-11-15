@@ -89,12 +89,18 @@ begin
   select count(*)::integer, coalesce(sum(coalesce(p.season_xp, 0)), 0)::bigint
   into v_total_students, v_total_season_xp
   from public.profiles p
-  where p.role = 'student';
+  where exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = p.id and ur.role = 'student'
+    );
 
   select coalesce(p.name, p.username, p.id::text)
   into v_top_user
   from public.profiles p
-  where p.role = 'student'
+  where exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = p.id and ur.role = 'student'
+    )
   order by coalesce(p.season_xp, 0) desc, coalesce(p.total_xp, 0) desc, p.created_at asc
   limit 1;
 
@@ -131,7 +137,10 @@ as $$
       coalesce(p.season_xp, 0) as season_xp,
       row_number() over (order by coalesce(p.season_xp, 0) desc, coalesce(p.total_xp, 0) desc, p.created_at asc) as projected_rank
     from public.profiles p
-    where p.role = 'student'
+    where exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = p.id and ur.role = 'student'
+    )
   )
   select
     r.user_id,
@@ -212,7 +221,10 @@ begin
       row_number() over (order by coalesce(p.season_xp, 0) desc, coalesce(p.total_xp, 0) desc, p.created_at asc) as global_rank,
       row_number() over (partition by coalesce(p.grade, 'Unassigned') order by coalesce(p.season_xp, 0) desc, coalesce(p.total_xp, 0) desc, p.created_at asc) as class_rank
     from public.profiles p
-    where p.role = 'student'
+    where exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = p.id and ur.role = 'student'
+    )
   ), rewards as (
     select
       r.*,
@@ -244,7 +256,10 @@ begin
       coalesce(p.season_xp, 0) as season_xp,
       row_number() over (order by coalesce(p.season_xp, 0) desc, coalesce(p.total_xp, 0) desc, p.created_at asc) as global_rank
     from public.profiles p
-    where p.role = 'student'
+    where exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = p.id and ur.role = 'student'
+    )
   ), payout as (
     select
       r.user_id,
@@ -281,7 +296,10 @@ begin
       coalesce(p.season_xp, 0) as season_xp,
       row_number() over (order by coalesce(p.season_xp, 0) desc, coalesce(p.total_xp, 0) desc, p.created_at asc) as global_rank
     from public.profiles p
-    where p.role = 'student'
+    where exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = p.id and ur.role = 'student'
+    )
   )
   update public.profiles p
   set coins = coalesce(p.coins, 0)
@@ -333,7 +351,10 @@ begin
       coalesce(sum(coalesce(p.season_xp, 0)), 0)::numeric as total_xp,
       case when count(*) > 0 then round(coalesce(sum(coalesce(p.season_xp, 0)), 0)::numeric / count(*)::numeric, 2) else 0 end as avg_xp
     from public.profiles p
-    where p.role = 'student'
+    where exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = p.id and ur.role = 'student'
+    )
     group by coalesce(p.grade, 'Unassigned')
   ), ranked_classes as (
     select cs.*, row_number() over (order by cs.avg_xp desc, cs.total_xp desc, cs.class_name asc) as rank
