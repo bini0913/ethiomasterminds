@@ -9,12 +9,13 @@ AS $$
 DECLARE
   v_account_type text := coalesce(NEW.raw_user_meta_data ->> 'account_type', 'individual');
 BEGIN
-  INSERT INTO public.profiles (id, name, username, grade)
+  INSERT INTO public.profiles (id, name, username, grade, age)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data ->> 'name', NEW.email),
     COALESCE(NEW.raw_user_meta_data ->> 'username', split_part(NEW.email, '@', 1)),
-    NULLIF(NEW.raw_user_meta_data ->> 'grade', '')
+    NULLIF(NEW.raw_user_meta_data ->> 'grade', ''),
+    NULLIF(NEW.raw_user_meta_data ->> 'age', '')::integer
   );
 
   IF v_account_type = 'school' THEN
@@ -23,7 +24,7 @@ BEGIN
   ELSIF v_account_type = 'individual_parent' THEN
     INSERT INTO public.user_roles (user_id, role)
     VALUES (NEW.id, 'parent'::public.app_role)
-    ON CONFLICT (user_id, role) DO NOTHING;
+    ON CONFLICT DO NOTHING;
   ELSE
     INSERT INTO public.user_roles (user_id, role)
     VALUES (NEW.id, 'student'::public.app_role)
