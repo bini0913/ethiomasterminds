@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { ArrowLeft, TrendingUp, Target, Zap, Brain, Calendar, Award, Loader2, Sparkles, BookOpen, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
 import { getAcademicProfile, normalizeGrade, resolveAcademicGrade } from "@/lib/academicProfile";
 
 const AcademicInsightsPage: React.FC = () => {
@@ -22,15 +21,22 @@ const AcademicInsightsPage: React.FC = () => {
   const [aiInsights, setAiInsights] = useState<string | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [academicContext, setAcademicContext] = useState<{ grade: number; curriculum: string; goal: string; book: string; subjects: string[] } | null>(null);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    setLoadError(false);
     const loadAcademicContext = async () => {
       try {
         const profile = await getAcademicProfile(user.id);
-        if (!profile || cancelled) return;
+        if (cancelled) return;
+        if (!profile) {
+          setLoadError(true);
+          return;
+        }
         const selectedBookIds = Array.from(new Set([
           ...(profile.book_ids || []),
           ...(profile.book_id ? [profile.book_id] : []),
@@ -61,6 +67,7 @@ const AcademicInsightsPage: React.FC = () => {
         });
       } catch (error) {
         console.error("Academic insights profile context failed:", error);
+        if (!cancelled) setLoadError(true);
       }
     };
     void loadAcademicContext();
@@ -76,19 +83,27 @@ const AcademicInsightsPage: React.FC = () => {
           supabase.from("user_streaks").select("*").eq("user_id", user.id).maybeSingle(),
         ]);
 
-        if (statsRes.error) throw statsRes.error;
-        if (topicsRes.error) throw topicsRes.error;
         if (cancelled) return;
 
-        setStats(statsRes.data ?? null);
-        setTopicData(upperStudent
-          ? (topicsRes.data || []).map((row: any) => ({ ...row, questions_correct: Number(row.correct_answers) || 0 }))
-          : (topicsRes.data ?? []));
-        setStreak(streakRes.data ?? null);
+        if (statsRes.error || topicsRes.error || streakRes.error) {
+          console.error("Academic insights partial data load failed:", {
+            stats: statsRes.error,
+            topics: topicsRes.error,
+            streak: streakRes.error,
+          });
+          setLoadError(true);
+        }
+        if (!statsRes.error) setStats(statsRes.data ?? null);
+        if (!topicsRes.error) {
+          setTopicData(upperStudent
+            ? (topicsRes.data || []).map((row: any) => ({ ...row, questions_correct: Number(row.correct_answers) || 0 }))
+            : (topicsRes.data ?? []));
+        }
+        if (!streakRes.error) setStreak(streakRes.data ?? null);
       } catch (error) {
         console.error("Academic insights data load failed:", error);
         if (!cancelled) {
-          toast.error("Some learning insights could not be loaded. Please retry.");
+          setLoadError(true);
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -96,7 +111,7 @@ const AcademicInsightsPage: React.FC = () => {
     };
     void fetchAll();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, retryKey]);
 
   const generateAIInsights = async () => {
     if (!user) return;
@@ -221,6 +236,15 @@ const AcademicInsightsPage: React.FC = () => {
       </header>
 
       <div className="px-4 py-4 max-w-4xl mx-auto space-y-4">
+        {loadError && (
+          <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">Some learning insights could not be loaded.</p>
+              <p className="mt-1 text-muted-foreground">Available data is still shown. Retry to reconnect before relying on incomplete totals.</p>
+            </div>
+            <Button variant="outline" className="min-h-10 shrink-0" onClick={() => setRetryKey((value) => value + 1)}>Retry insights</Button>
+          </div>
+        )}
         {/* Academic Rank */}
         <Card className="bg-card/80 border-border/50">
           <CardContent className="p-4 text-center">
