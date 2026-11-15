@@ -1,286 +1,161 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity, ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2,
-  Clock3, Flame, Play, Sparkles, Target, Trophy, Users,
+  Clock3, ListChecks, Play, Sparkles, Trophy, Users,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { db } from "@/integrations/untypedClient";
-import { supabase } from "@/integrations/supabase/client";
 import { getXpProgressInLevel } from "@/lib/rankSystem";
-import { toast } from "sonner";
 
 type TopicRow = {
   subject: string;
   topic: string;
   accuracy_percentage: number | null;
   questions_attempted: number | null;
-  correct_answers: number | null;
-  last_practiced_at: string | null;
 };
 type ResultRow = {
   correct_answers: number | null;
   total_questions: number | null;
   completed_at: string | null;
 };
-type DailyRow = {
-  activity_date: string;
-  quiz_count: number;
-  question_count: number;
-  correct_count: number;
-  xp_earned: number;
-};
-type ExamTarget = {
-  exam_name: string;
-  exam_date: string;
-  created_at: string;
+type StudyPlanRow = {
+  id: string;
+  subject: string | null;
+  topic: string | null;
+  scheduled_date: string | null;
+  completed: boolean | null;
+  priority: string | null;
 };
 
-const ADDIS_TIME_ZONE = "Africa/Addis_Ababa";
-const addisDateKey = (date: Date) => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: ADDIS_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const part = (type: string) => parts.find((item) => item.type === type)?.value || "";
-  return part("year") + "-" + part("month") + "-" + part("day");
-};
-const offsetDateKey = (key: string, offset: number) => {
-  const date = new Date(key + "T00:00:00Z");
-  date.setUTCDate(date.getUTCDate() + offset);
-  return date.toISOString().slice(0, 10);
-};
-const dayDifference = (from: string, to: string) => {
-  const a = new Date(from + "T00:00:00Z").getTime();
-  const b = new Date(to + "T00:00:00Z").getTime();
-  return Math.round((b - a) / 86400000);
-};
-const formatDay = (key: string) => new Date(key + "T00:00:00+03:00").toLocaleDateString(undefined, {
-  timeZone: ADDIS_TIME_ZONE,
-  weekday: "short",
-});
-
-const getCurrentStreak = (rows: DailyRow[], today: string) => {
-  const dates = Array.from(new Set(rows.map((row) => row.activity_date))).sort().reverse();
-  if (!dates.length || (dates[0] !== today && dates[0] !== offsetDateKey(today, -1))) return 0;
-  let streak = 0;
-  let expected = dates[0];
-  for (const date of dates) {
-    if (date !== expected) break;
-    streak += 1;
-    expected = offsetDateKey(expected, -1);
-  }
-  return streak;
-};
-
-const getLongestStreak = (rows: DailyRow[]) => {
-  const dates = Array.from(new Set(rows.map((row) => row.activity_date))).sort();
-  let longest = 0;
-  let current = 0;
-  let previous = "";
-  for (const date of dates) {
-    current = previous && dayDifference(previous, date) === 1 ? current + 1 : 1;
-    longest = Math.max(longest, current);
-    previous = date;
-  }
-  return longest;
+const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+const calendarDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 const UpperTierHome: React.FC = () => {
   const { user } = useUser();
   const [topics, setTopics] = useState<TopicRow[]>([]);
   const [recentResults, setRecentResults] = useState<ResultRow[]>([]);
-  const [dailyActivity, setDailyActivity] = useState<DailyRow[]>([]);
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-  const [examTarget, setExamTarget] = useState<ExamTarget | null>(null);
-  const [examDateInput, setExamDateInput] = useState("");
-  const [examNameInput, setExamNameInput] = useState("Grade 12 Exit Exam");
-  const [savingExam, setSavingExam] = useState(false);
+  const [studyPlans, setStudyPlans] = useState<StudyPlanRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   const xp = Number(user?.xp) || 0;
-  const level = Math.max(1, Number(user?.level) || 1);
-  // The server progression functions advance one level per 100 total XP.
-  const xpProgress = getXpProgressInLevel(xp, 100);
+  const level = Number(user?.level) || 1;
+  const xpProgress = getXpProgressInLevel(xp);
   const firstName = typeof user?.name === "string"
-    ? user.name.trim().split(/\\s+/)[0] || "Student"
+    ? user.name.trim().split(/\s+/)[0] || "Student"
     : "Student";
   const grade = user?.grade
     ? (/grade/i.test(user.grade) ? user.grade : `Grade ${user.grade}`)
     : "Grades 9–12";
   const now = new Date();
-  const todayKey = addisDateKey(now);
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening";
-  const dateLabel = now.toLocaleDateString(undefined, {
-    timeZone: ADDIS_TIME_ZONE,
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const dateLabel = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
 
-  const loadDashboard = useCallback(async () => {
+  useEffect(() => {
     if (!user?.id) {
       setTopics([]);
       setRecentResults([]);
-      setDailyActivity([]);
-      setSelectedSubjects([]);
-      setExamTarget(null);
+      setStudyPlans([]);
+      setLoadError(null);
       setLoading(false);
       return;
     }
-
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const yearAgo = offsetDateKey(todayKey, -365);
-      const [topicResponse, activityResponse, resultResponse, profileResponse, examResponse] = await Promise.all([
-      db.from("upper_student_topic_progress")
-        .select("subject,topic,accuracy_percentage,questions_attempted,correct_answers,last_practiced_at")
-        .eq("user_id", user.id)
-        .order("accuracy_percentage", { ascending: true })
-        .limit(500),
-      db.from("upper_student_daily_activity")
-        .select("activity_date,quiz_count,question_count,correct_count,xp_earned")
-        .eq("user_id", user.id)
-        .gte("activity_date", yearAgo)
-        .order("activity_date", { ascending: false })
-        .limit(400),
-      db.from("quiz_results")
-        .select("correct_answers,total_questions,completed_at")
-        .eq("student_id", user.id)
-        .order("completed_at", { ascending: false })
-        .limit(5),
-      db.from("academic_profiles")
-        .select("subjects")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      db.from("student_exam_targets")
-        .select("exam_name,exam_date,created_at")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ]);
-
-    const errors = [
-      topicResponse.error,
-      activityResponse.error,
-      resultResponse.error,
-      profileResponse.error,
-      examResponse.error,
-    ].filter(Boolean);
-
-    if (errors.length) {
-      console.error("Grades 9–12 home data load failed:", errors);
-      setLoadError("Some saved learning data could not be loaded. Your records have not been changed. Retry to reconnect.");
-    }
-
-      setTopics((topicResponse.data || []) as TopicRow[]);
-      setDailyActivity((activityResponse.data || []) as DailyRow[]);
-      setRecentResults((resultResponse.data || []) as ResultRow[]);
-      setSelectedSubjects(Array.isArray(profileResponse.data?.subjects) ? profileResponse.data.subjects : []);
-      setExamTarget((examResponse.data || null) as ExamTarget | null);
-    } catch (error) {
-      console.error("Grades 9–12 home data request failed:", error);
-      setLoadError("Saved learning data could not be reached. Check your connection and retry.");
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, todayKey]);
-
-  useEffect(() => {
     let active = true;
-    void loadDashboard();
-    if (!user?.id) return () => { active = false; };
-
-    const channel = supabase
-      .channel("upper-tier-home-" + user.id)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "upper_student_daily_activity",
-        filter: "user_id=eq." + user.id,
-      }, () => { if (active) void loadDashboard(); })
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "upper_student_topic_progress",
-        filter: "user_id=eq." + user.id,
-      }, () => { if (active) void loadDashboard(); })
-      .subscribe();
-
-    return () => {
-      active = false;
-      void supabase.removeChannel(channel);
+    const load = async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const weekStart = new Date();
+        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const formatDate = calendarDate;
+        const [topicResponse, resultResponse, planResponse] = await Promise.all([
+          db.from("topic_progress")
+            .select("subject,topic,accuracy_percentage,questions_attempted")
+            .eq("user_id", user.id)
+            .gt("questions_attempted", 0)
+            .order("accuracy_percentage", { ascending: true })
+            .limit(6),
+          db.from("quiz_results")
+            .select("correct_answers,total_questions,completed_at")
+            .eq("student_id", user.id)
+            .order("completed_at", { ascending: false })
+            .limit(30),
+          db.from("study_plans")
+            .select("id,subject,topic,scheduled_date,completed,priority")
+            .eq("user_id", user.id)
+            .gte("scheduled_date", formatDate(weekStart))
+            .lte("scheduled_date", formatDate(weekEnd))
+            .order("scheduled_date", { ascending: true }),
+        ]);
+        if (!active) return;
+        if (topicResponse.error || resultResponse.error || planResponse.error) {
+          console.error("Grades 9–12 dashboard data could not be fully loaded:", topicResponse.error || resultResponse.error || planResponse.error);
+          setLoadError("Some saved learning information is temporarily unavailable. Your account data has not been changed.");
+        }
+        setTopics((topicResponse.data || []) as TopicRow[]);
+        setRecentResults((resultResponse.data || []) as ResultRow[]);
+        setStudyPlans((planResponse.data || []) as StudyPlanRow[]);
+      } catch (error) {
+        if (!active) return;
+        console.error("Grades 9–12 dashboard data could not be loaded:", error);
+        setTopics([]);
+        setRecentResults([]);
+        setStudyPlans([]);
+        setLoadError("Saved learning information could not be loaded right now. Check your connection and try again.");
+      } finally {
+        if (active) setLoading(false);
+      }
     };
-  }, [user?.id, loadDashboard, retryCount]);
+    void load();
+    return () => { active = false; };
+  }, [user?.id, retryCount]);
 
-  const totals = useMemo(() => dailyActivity.reduce((sum, day) => ({
-    correct: sum.correct + (Number(day.correct_count) || 0),
-    questions: sum.questions + (Number(day.question_count) || 0),
-    quizzes: sum.quizzes + (Number(day.quiz_count) || 0),
-    xp: sum.xp + (Number(day.xp_earned) || 0),
-  }), { correct: 0, questions: 0, quizzes: 0, xp: 0 }), [dailyActivity]);
-
-  const recentAccuracy = totals.questions > 0
-    ? Math.round((totals.correct / totals.questions) * 100)
-    : null;
-  const currentStreak = useMemo(() => getCurrentStreak(dailyActivity, todayKey), [dailyActivity, todayKey]);
-  const longestStreak = useMemo(() => getLongestStreak(dailyActivity), [dailyActivity]);
+  const totals = useMemo(() => recentResults.reduce((sum, result) => ({
+    correct: sum.correct + (Number(result.correct_answers) || 0),
+    questions: sum.questions + (Number(result.total_questions) || 0),
+  }), { correct: 0, questions: 0 }), [recentResults]);
+  const recentAccuracy = totals.questions ? Math.round((totals.correct / totals.questions) * 100) : null;
   const nextLevelXp = Math.max(0, xpProgress.max - xpProgress.current);
   const weeklyActivity = useMemo(() => {
-    const dailyByDate = new Map(dailyActivity.map((day) => [day.activity_date, day]));
-    return Array.from({ length: 7 }, (_, index) => {
-      const date = offsetDateKey(todayKey, index - 6);
-      const row = dailyByDate.get(date);
-      return {
-        date,
-        count: Number(row?.quiz_count) || 0,
-        questions: Number(row?.question_count) || 0,
-      };
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - (6 - index));
+      return { date, count: 0 };
     });
-  }, [dailyActivity, todayKey]);
-  const weeklyQuizCount = weeklyActivity.reduce((sum, day) => sum + day.count, 0);
-  const maxActivity = Math.max(1, ...weeklyActivity.map((day) => day.count));
+    const counts = new Map(days.map(day => [dayKey(day.date), day]));
+    recentResults.forEach(result => {
+      if (!result.completed_at) return;
+      const date = new Date(result.completed_at);
+      if (Number.isNaN(date.getTime())) return;
+      const bucket = counts.get(dayKey(date));
+      if (bucket) bucket.count += 1;
+    });
+    return days;
+  }, [recentResults]);
+  const maxActivity = Math.max(1, ...weeklyActivity.map(day => day.count));
   const focusTopic = topics[0] || null;
-  const coveredSubjects = new Set(topics.map((topic) => topic.subject)).size;
-  const masteredTopics = topics.filter((topic) => Number(topic.accuracy_percentage) >= 80 && Number(topic.questions_attempted) >= 5).length;
-  const topicMastery = topics.length ? Math.round((masteredTopics / topics.length) * 100) : null;
-  const daysToExam = examTarget ? dayDifference(todayKey, examTarget.exam_date) : null;
-
-  const saveExamTarget = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!examDateInput || !examNameInput.trim() || savingExam) return;
-
-    setSavingExam(true);
-    try {
-      const { data, error } = await (supabase as any).rpc("set_upper_student_exam_target_once", {
-        p_exam_date: examDateInput,
-        p_exam_name: examNameInput.trim(),
-      });
-      if (error) {
-        console.error("One-time exam target save failed:", error);
-        toast.error(error.message?.includes("already been set")
-          ? "An exam date has already been saved for this account."
-          : error.message || "Your exam date could not be saved.");
-        await loadDashboard();
-        return;
-      }
-      toast.success("Your exam countdown is now saved.");
-      setExamTarget({
-        exam_name: String((data as any)?.exam_name || examNameInput.trim()),
-        exam_date: String((data as any)?.exam_date || examDateInput),
-        created_at: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error("One-time exam target request failed:", error);
-      toast.error("Your exam date could not be saved. Check your connection and try again.");
-    } finally {
-      setSavingExam(false);
-    }
-  };
+  const todayKey = calendarDate(new Date());
+  const todayPlans = studyPlans.filter((plan) => plan.scheduled_date === todayKey);
+  const upcomingPlan = studyPlans.find((plan) => !plan.completed) || null;
+  const completedPlans = studyPlans.filter((plan) => plan.completed).length;
+  const planProgress = studyPlans.length ? Math.round((completedPlans / studyPlans.length) * 100) : 0;
+  const resumeItems = topics.slice(0, 3).map((topic) => ({
+    label: topic.topic,
+    subject: topic.subject,
+    progress: Math.max(0, Math.min(100, Number(topic.accuracy_percentage) || 0)),
+    href: "/academic/topics",
+  }));
 
   return (
     <div className="space-y-7 pb-4">
@@ -288,41 +163,11 @@ const UpperTierHome: React.FC = () => {
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">{grade} · {dateLabel}</p>
           <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">{greeting}, {firstName}.</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">Your learning dashboard, built from your saved practice and study progress.</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">Your space to learn with direction, practise with purpose and see your progress.</p>
         </div>
         <Link to="/study-mode" className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-105 sm:self-auto">
           <Play className="h-4 w-4 fill-current" /> Start focus session
         </Link>
-      </section>
-
-      {loadError && (
-        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-          <span>{loadError}</span>
-          <button type="button" onClick={() => setRetryCount((count) => count + 1)} className="font-bold text-primary underline-offset-2 hover:underline">Retry loading</button>
-        </div>
-      )}
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Practice streak</span><Flame className="h-4 w-4 text-orange-500" /></div>
-          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : currentStreak}<span className="ml-1 text-sm font-semibold text-muted-foreground">days</span></p>
-          <p className="mt-1 text-xs text-muted-foreground">{longestStreak ? `Longest: ${longestStreak} days` : "Complete a practice quiz to start a streak."}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Practice this week</span><Activity className="h-4 w-4 text-primary" /></div>
-          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : weeklyQuizCount}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Completed quizzes in the last 7 days</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Practice accuracy</span><Target className="h-4 w-4 text-emerald-600" /></div>
-          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : recentAccuracy === null ? "—" : recentAccuracy + "%"}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{totals.questions.toLocaleString()} questions recorded over the last year</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Topics practised</span><BookOpen className="h-4 w-4 text-primary" /></div>
-          <p className="mt-3 text-3xl font-extrabold tabular-nums">{loading ? "—" : topicMastery === null ? "—" : topicMastery + "%"}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{masteredTopics} of {topics.length} practised topics mastered · {coveredSubjects}/{selectedSubjects.length} subjects started</p>
-        </div>
       </section>
 
       <section className="relative overflow-hidden rounded-[20px] border border-white/10 bg-gradient-to-br from-[#0b625a] via-[#137f72] to-[#0b766c] p-5 text-white shadow-[0_18px_48px_rgba(15,45,70,.18)] sm:p-8">
@@ -334,8 +179,8 @@ const UpperTierHome: React.FC = () => {
             <h2 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl">{focusTopic ? "Build confidence in " + focusTopic.topic : "Make your next study session count."}</h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-white/75">
               {focusTopic
-                ? `Your recorded accuracy in ${focusTopic.subject} is ${Math.round(Number(focusTopic.accuracy_percentage) || 0)}% across ${Number(focusTopic.questions_attempted) || 0} attempted questions.`
-                : "Your topic coverage will build automatically from completed quizzes. Every saved answer is used to update your real progress."}
+                ? `Your recorded accuracy in ${focusTopic.subject} is ${Math.round(Math.max(0, Math.min(100, Number(focusTopic.accuracy_percentage) || 0)))}%. Continue practising to strengthen this topic.`
+                : "Start a learning activity. Your saved topic coverage and practice history will appear here as you use Master Minds."}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link to={focusTopic ? "/academic/topics" : "/academic"} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[#0b625a] transition hover:bg-slate-100"><BookOpen className="h-4 w-4" /> {focusTopic ? "Review topic coverage" : "Open academic hub"}</Link>
@@ -351,81 +196,96 @@ const UpperTierHome: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(300px,.85fr)]">
-        <div className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="grid gap-3 sm:grid-cols-2">
+        <Link to="/study-mode" className="group flex min-h-[104px] items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="h-6 w-6" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold uppercase tracking-wider text-primary">Focus session</span><strong className="mt-1 block">Study mode</strong><span className="text-xs text-muted-foreground">Start or join a focused learning session.</span></span>
+          <ArrowRight className="h-4 w-4 text-primary transition group-hover:translate-x-1" />
+        </Link>
+        <Link to="/multiplayer" className="group flex min-h-[104px] items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600"><Users className="h-6 w-6" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold uppercase tracking-wider text-sky-600">Play together</span><strong className="mt-1 block">Challenge a friend</strong><span className="text-xs text-muted-foreground">Open the multiplayer arena.</span></span>
+          <ArrowRight className="h-4 w-4 text-primary transition group-hover:translate-x-1" />
+        </Link>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,.8fr)]">
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Next up</p><h2 className="mt-1 text-lg font-extrabold">Keep your momentum</h2></div>
+            <ListChecks className="h-5 w-5 text-primary" />
+          </div>
+          {upcomingPlan ? <div className="mt-5 rounded-xl bg-muted/55 p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-primary">{upcomingPlan.subject || "Study plan"}</p>
+            <h3 className="mt-1 text-xl font-extrabold">{upcomingPlan.topic || "Continue your study plan"}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Planned for {upcomingPlan.scheduled_date ? new Date(upcomingPlan.scheduled_date + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" }) : "this week"}.</p>
+            <Link to="/study-mode" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground">Start focus session <ArrowRight className="h-4 w-4" /></Link>
+          </div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center">
+            <p className="text-sm font-semibold">Your next study step will appear here.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Add a session in the planner to build a focused routine.</p>
+            <Link to="/academic/planner" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary">Open study planner <ArrowRight className="h-4 w-4" /></Link>
+          </div>}
+        </section>
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Your week</p><h2 className="mt-1 text-lg font-extrabold">Study plan progress</h2></div><Link to="/academic/planner" aria-label="Open study planner" className="flex h-9 w-9 items-center justify-center rounded-lg text-primary hover:bg-primary/10"><ArrowRight className="h-4 w-4" /></Link></div>
+          <div className="mt-5 flex items-end justify-between gap-3"><div><p className="text-3xl font-extrabold tabular-nums">{planProgress}%</p><p className="text-xs text-muted-foreground">{completedPlans} of {studyPlans.length} planned tasks complete</p></div><CalendarDays className="h-8 w-8 text-primary" /></div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${planProgress}%` }} /></div>
+          {todayPlans.length > 0 && <p className="mt-4 text-xs font-semibold text-muted-foreground">{todayPlans.filter((plan) => plan.completed).length}/{todayPlans.length} of today’s tasks complete</p>}
+        </section>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,.75fr)]">
+        <section className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Recorded performance</p><h2 className="mt-1 text-lg font-extrabold">Topic coverage</h2></div>
             <Link to="/academic/topics" aria-label="Open topic coverage" className="flex h-9 w-9 items-center justify-center rounded-lg text-primary hover:bg-primary/10"><ArrowRight className="h-4 w-4" /></Link>
           </div>
           {loading ? <div className="mt-5 space-y-3" aria-label="Loading topic coverage"><div className="h-4 w-2/3 animate-pulse rounded bg-muted" /><div className="h-3 animate-pulse rounded bg-muted" /><div className="h-3 w-4/5 animate-pulse rounded bg-muted" /></div> :
-            topics.length ? <div className="mt-5 space-y-4">{topics.slice(0, 6).map((topic) => {
+            topics.length ? <div className="mt-5 space-y-4">{topics.slice(0, 5).map((topic, index) => {
               const accuracy = Math.max(0, Math.min(100, Number(topic.accuracy_percentage) || 0));
-              return <div key={topic.subject + topic.topic}>
+              return <div key={topic.subject + topic.topic + index}>
                 <div className="mb-1.5 flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate font-semibold">{topic.topic}</span><span className="shrink-0 text-xs font-bold tabular-nums text-muted-foreground">{accuracy}%</span></div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: accuracy + "%" }} /></div>
                 <p className="mt-1 text-[11px] text-muted-foreground">{topic.subject} · {Number(topic.questions_attempted) || 0} questions attempted</p>
               </div>;
-            })}</div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center"><BookOpen className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-2 text-sm font-semibold">No topic results recorded yet</p><p className="mt-1 text-xs text-muted-foreground">Complete a quiz using approved question-bank content to build your real topic coverage.</p><Link to="/quiz" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary">Start practising <ArrowRight className="h-4 w-4" /></Link></div>}
-        </div>
+            })}</div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center"><BookOpen className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-2 text-sm font-semibold">No topic results recorded yet</p><p className="mt-1 text-xs text-muted-foreground">Complete practice to build your real topic coverage.</p><Link to="/quiz" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary">Start practising <ArrowRight className="h-4 w-4" /></Link></div>}
+        </section>
 
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Last 7 days</p></div>
           <h2 className="mt-1 text-lg font-extrabold">Practice activity</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Completed quizzes saved to your account.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Completed quiz attempts recorded to your account.</p>
+          {loadError && <div role="status" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-500/10 p-3 text-xs text-muted-foreground"><span>{loadError}</span><button type="button" onClick={() => setRetryCount((count) => count + 1)} className="rounded-md px-2 py-1 font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Try again</button></div>}
           {loading ? <p className="mt-5 text-sm text-muted-foreground">Loading saved activity…</p> : <>
             <div className="mt-6 flex h-28 items-end justify-between gap-2">
-              {weeklyActivity.map((day) => <div key={day.date} className="flex h-full flex-1 flex-col items-center justify-end gap-2" title={`${day.count} completed quizzes · ${day.questions} questions`}>
+              {weeklyActivity.map((day, index) => <div key={dayKey(day.date)} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
                 <span className="text-[10px] font-semibold tabular-nums text-muted-foreground">{day.count || ""}</span>
-                <div className="flex h-20 w-full items-end rounded-md bg-muted/70"><div className="w-full rounded-md bg-primary/75" style={{ height: `${day.count ? Math.max(8, day.count / maxActivity * 100) : 0}%` }} /></div>
-                <span className="text-[10px] text-muted-foreground">{formatDay(day.date)}</span>
+                <div className="flex h-20 w-full items-end rounded-md bg-muted/70"><div className={`w-full rounded-md ${index === 6 ? "bg-primary" : "bg-primary/55"}`} style={{ height: `${day.count ? Math.max(8, day.count / maxActivity * 100) : 0}%` }} /></div>
+                <span className="text-[10px] text-muted-foreground">{day.date.toLocaleDateString(undefined, { weekday: "narrow" })}</span>
               </div>)}
             </div>
-            <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-sm text-muted-foreground">Questions answered correctly</span><strong className="text-lg tabular-nums">{totals.correct.toLocaleString()}/{totals.questions.toLocaleString()}</strong></div>
-            {recentResults.length > 0 && <div className="mt-4 space-y-2">{recentResults.slice(0, 3).map((result, index) => <div key={(result.completed_at || "saved") + "-" + index} className="flex items-center gap-3 rounded-xl bg-secondary/60 p-3"><CheckCircle2 className="h-4 w-4 shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="text-xs font-semibold">Completed practice</p><p className="text-[11px] text-muted-foreground">{result.completed_at ? new Date(result.completed_at).toLocaleString() : "Saved attempt"}</p></div><span className="text-xs font-bold tabular-nums">{Number(result.correct_answers) || 0}/{Number(result.total_questions) || 0}</span></div>)}</div>}
+            <div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-sm text-muted-foreground">Accuracy across loaded attempts</span><strong className="text-lg tabular-nums">{recentAccuracy === null ? "—" : recentAccuracy + "%"}</strong></div>
+            {recentResults.length > 0 && <div className="mt-4 space-y-2">{recentResults.slice(0, 3).map((result, index) => <div key={result.completed_at + "-" + index} className="flex items-center gap-3 rounded-xl bg-secondary/60 p-3"><CheckCircle2 className="h-4 w-4 shrink-0 text-primary" /><div className="min-w-0 flex-1"><p className="text-xs font-semibold">Completed practice</p><p className="text-[11px] text-muted-foreground">{result.completed_at ? new Date(result.completed_at).toLocaleString() : "Saved attempt"}</p></div><span className="text-xs font-bold tabular-nums">{Number(result.correct_answers) || 0}/{Number(result.total_questions) || 0}</span></div>)}</div>}
             {!recentResults.length && <div className="mt-4 rounded-xl border border-dashed border-border p-4 text-center"><Clock3 className="mx-auto h-6 w-6 text-muted-foreground" /><p className="mt-2 text-xs font-semibold">No completed practice recorded yet</p></div>}
           </>}
           <Link to="/academic/insights" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-primary">View academic insights <ArrowRight className="h-4 w-4" /></Link>
-        </div>
+        </section>
+      </div>
+
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Pick up where you left off</p><h2 className="mt-1 text-lg font-extrabold">Continue studying</h2></div><Link to="/academic" className="text-sm font-bold text-primary">View all</Link></div>
+        {resumeItems.length ? <div className="mt-5 grid gap-3 md:grid-cols-3">{resumeItems.map((item) => <Link key={item.subject + item.label} to={item.href} className="group rounded-xl border border-border p-4 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm"><div className="flex items-start justify-between gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-sm font-extrabold text-primary">{item.subject.slice(0, 1).toUpperCase()}</span><ArrowRight className="h-4 w-4 text-primary transition group-hover:translate-x-1" /></div><p className="mt-4 truncate text-sm font-bold">{item.label}</p><p className="mt-1 text-xs text-muted-foreground">{item.subject} · {item.progress}% recorded</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${item.progress}%` }} /></div></Link>)}</div> : <p className="mt-4 rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Complete a practice activity to create your first resume card.</p>}
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-center gap-2"><Target className="h-4 w-4 text-primary" /><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Exam countdown</p></div>
-          {examTarget ? <div className="mt-3">
-            <p className="text-sm font-semibold">{examTarget.exam_name}</p>
-            <p className="mt-2 text-4xl font-extrabold tabular-nums">{daysToExam !== null && daysToExam > 0 ? daysToExam : 0}<span className="ml-2 text-base font-semibold text-muted-foreground">days</span></p>
-            <p className="mt-1 text-xs text-muted-foreground">{daysToExam === 0 ? "Your exam date is today." : daysToExam !== null && daysToExam < 0 ? "This saved exam date has passed." : `Scheduled for ${new Date(examTarget.exam_date + "T00:00:00+03:00").toLocaleDateString(undefined, { timeZone: ADDIS_TIME_ZONE, dateStyle: "long" })}`}</p>
-            <p className="mt-3 rounded-lg bg-secondary/70 px-3 py-2 text-xs text-muted-foreground">This date is saved once and locked to protect your countdown.</p>
-          </div> : <form className="mt-4 space-y-3" onSubmit={saveExamTarget}>
-            <p className="text-sm text-muted-foreground">Set your target exam date once. It will be saved to your account and cannot be changed afterwards.</p>
-            <label className="block space-y-1.5"><span className="text-xs font-semibold">Exam name</span><input required minLength={2} maxLength={100} value={examNameInput} onChange={(event) => setExamNameInput(event.target.value)} placeholder="e.g. Grade 12 Exit Exam" className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary" /></label>
-            <label className="block space-y-1.5"><span className="text-xs font-semibold">Exam date</span><input required type="date" min={todayKey} value={examDateInput} onChange={(event) => setExamDateInput(event.target.value)} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary" /></label>
-            <button type="submit" disabled={savingExam || !examDateInput || examNameInput.trim().length < 2} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60">{savingExam ? "Saving…" : "Save exam date once"} <ArrowRight className="h-4 w-4" /></button>
-          </form>}
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Link to="/study-mode" className="group flex min-h-[104px] items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="h-6 w-6" /></span>
-            <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold uppercase tracking-wider text-primary">Focus session</span><strong className="mt-1 block">Study mode</strong><span className="text-xs text-muted-foreground">Start or join a focused learning session.</span></span>
-            <ArrowRight className="h-4 w-4 text-primary transition group-hover:translate-x-1" />
-          </Link>
-          <Link to="/multiplayer" className="group flex min-h-[104px] items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600"><Users className="h-6 w-6" /></span>
-            <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold uppercase tracking-wider text-sky-600">Play together</span><strong className="mt-1 block">Challenge a friend</strong><span className="text-xs text-muted-foreground">Open the multiplayer arena.</span></span>
-            <ArrowRight className="h-4 w-4 text-primary transition group-hover:translate-x-1" />
-          </Link>
-          <Link to="/learning-dna" className="group flex min-h-[104px] items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600"><BrainCircuit className="h-6 w-6" /></span>
-            <span className="min-w-0 flex-1"><strong className="block text-sm">Learning DNA</strong><span className="text-xs text-muted-foreground">Explore your real study patterns.</span></span>
-            <ArrowRight className="h-4 w-4 text-primary transition group-hover:translate-x-1" />
-          </Link>
-          <Link to="/leaderboard" className="group flex min-h-[104px] items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600"><Trophy className="h-5 w-5" /></span>
-            <span className="min-w-0 flex-1"><strong className="block text-sm">Achievements & rankings</strong><span className="text-xs text-muted-foreground">See your position and earned rewards.</span></span>
-            <ArrowRight className="h-4 w-4 text-primary" />
-          </Link>
-        </div>
+      <section className="grid gap-3 sm:grid-cols-2">
+        <Link to="/learning-dna" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BrainCircuit className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><strong className="block text-sm">Understand your learning</strong><span className="text-xs text-muted-foreground">Explore your Learning DNA and study patterns.</span></span><ArrowRight className="h-4 w-4 text-primary" />
+        </Link>
+        <Link to="/leaderboard" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600"><Trophy className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><strong className="block text-sm">Achievements & rankings</strong><span className="text-xs text-muted-foreground">See your position and earned rewards.</span></span><ArrowRight className="h-4 w-4 text-primary" />
+        </Link>
       </section>
     </div>
   );
