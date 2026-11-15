@@ -94,6 +94,25 @@ ALTER TABLE public.school_memberships
   REFERENCES public.school_sections(id, school_id)
   ON DELETE RESTRICT;
 
+CREATE TABLE IF NOT EXISTS public.school_subjects (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
+  academic_year_id uuid NOT NULL,
+  grade_label text NOT NULL,
+  subject_name text NOT NULL CHECK (length(trim(subject_name)) BETWEEN 2 AND 100),
+  active boolean NOT NULL DEFAULT true,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (school_id, academic_year_id, grade_label, subject_name),
+  UNIQUE (id, school_id),
+  FOREIGN KEY (academic_year_id, school_id)
+    REFERENCES public.school_academic_years(id, school_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS school_subjects_grade_idx
+  ON public.school_subjects(school_id, academic_year_id, grade_label, active);
+
 CREATE TABLE IF NOT EXISTS public.school_teacher_assignments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
@@ -637,6 +656,7 @@ ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_academic_years ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_sections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_teacher_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_parent_student_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_student_id_sequences ENABLE ROW LEVEL SECURITY;
@@ -696,6 +716,19 @@ FOR INSERT TO authenticated WITH CHECK (public.is_school_manager_or_admin(school
 CREATE POLICY school_sections_manager_update ON public.school_sections
 FOR UPDATE TO authenticated USING (public.is_school_manager_or_admin(school_id))
 WITH CHECK (public.is_school_manager_or_admin(school_id));
+
+DROP POLICY IF EXISTS school_subjects_read ON public.school_subjects;
+CREATE POLICY school_subjects_read ON public.school_subjects
+FOR SELECT TO authenticated
+USING (public.is_active_school_member(school_id, NULL) OR public._is_extreme_admin());
+
+DROP POLICY IF EXISTS school_subjects_manager_write ON public.school_subjects;
+CREATE POLICY school_subjects_manager_write ON public.school_subjects
+FOR ALL TO authenticated
+USING (public.is_school_manager_or_admin(school_id))
+WITH CHECK (public.is_school_manager_or_admin(school_id));
+
+GRANT SELECT, INSERT, UPDATE ON public.school_subjects TO authenticated;
 
 DROP POLICY IF EXISTS school_teacher_assignments_read ON public.school_teacher_assignments;
 CREATE POLICY school_teacher_assignments_read ON public.school_teacher_assignments
