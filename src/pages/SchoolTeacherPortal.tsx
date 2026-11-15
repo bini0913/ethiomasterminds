@@ -208,6 +208,11 @@ export default function SchoolTeacherPortal() {
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
+    setMarkValues({});
+    setMarkNotes({});
+  }, [selectedAssessmentId]);
+
+  useEffect(() => {
     if (!attendanceSectionId || !attendanceDate) {
       setAttendanceValues({});
       setAttendanceNotes({});
@@ -570,7 +575,7 @@ export default function SchoolTeacherPortal() {
       </SchoolPanel>
       <SchoolPanel title="Enter student marks" description="Choose one of your draft or rejected assessments, enter scores, and save.">
         <div className="mb-4 max-w-md"><SchoolField label="Assessment"><select className={schoolSelectClass} value={selectedAssessmentId} onChange={(event) => setSelectedAssessmentId(event.target.value)}><option value="">Choose assessment</option>{assessments.filter((item) => ["draft", "rejected"].includes(item.status)).map((item) => <option key={item.id} value={item.id}>{item.title} · {sectionLabel(item.section_id)}</option>)}</select></SchoolField></div>
-        {selectedAssessmentId ? <div className="space-y-3">{assignedStudents.filter((student) => student.section_id === assessments.find((item) => item.id === selectedAssessmentId)?.section_id).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)] sm:items-center"><div><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><p className="text-xs text-slate-500">{student.school_username}</p></div><SchoolField label="Score"><input type="number" min="0" max={assessments.find((item) => item.id === selectedAssessmentId)?.max_score || 100} step="0.5" className={schoolInputClass} value={markValues[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.score ?? ""} onChange={(event) => setMarkValues((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField><SchoolField label="Teacher note"><input className={schoolInputClass} value={markNotes[student.id] ?? ""} onChange={(event) => setMarkNotes((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField></div>)}
+        {selectedAssessmentId ? <div className="space-y-3">{assignedStudents.filter((student) => student.section_id === assessments.find((item) => item.id === selectedAssessmentId)?.section_id).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)] sm:items-center"><div><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><p className="text-xs text-slate-500">{student.school_username}</p></div><SchoolField label="Score"><input type="number" min="0" max={assessments.find((item) => item.id === selectedAssessmentId)?.max_score || 100} step="0.5" className={schoolInputClass} value={markValues[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.score ?? ""} onChange={(event) => setMarkValues((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField><SchoolField label="Teacher note"><input className={schoolInputClass} value={markNotes[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.teacher_note ?? ""} onChange={(event) => setMarkNotes((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField></div>)}
           <div className="flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void saveMarks()}>Save draft marks</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void submitAssessment()}>Submit for Admin review</SchoolSecondaryButton></div>
         </div> : <SchoolEmptyState title="Choose an assessment" description="Student mark entry will appear after you select a draft or rejected assessment." />}
       </SchoolPanel>
