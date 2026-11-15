@@ -577,16 +577,16 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM unnest(v_ids) participant_id
-    JOIN public.school_memberships membership ON membership.id = participant_id
+    SELECT 1 FROM unnest(v_ids) AS participants(participant_id)
+    JOIN public.school_memberships membership ON membership.id = participants.participant_id
     WHERE membership.school_role IN ('admin', 'teacher')
   ) THEN
     RAISE EXCEPTION 'A teacher or School Admin must participate in direct conversations';
   END IF;
 
   IF EXISTS (
-    SELECT 1 FROM unnest(v_ids) participant_id
-    JOIN public.school_memberships membership ON membership.id = participant_id
+    SELECT 1 FROM unnest(v_ids) AS participants(participant_id)
+    JOIN public.school_memberships membership ON membership.id = participants.participant_id
     WHERE membership.school_role = 'parent'
       AND NOT EXISTS (
         SELECT 1 FROM public.school_parent_student_links link
@@ -599,8 +599,8 @@ BEGIN
   END IF;
 
   IF EXISTS (
-    SELECT 1 FROM unnest(v_ids) participant_id
-    JOIN public.school_memberships membership ON membership.id = participant_id
+    SELECT 1 FROM unnest(v_ids) AS participants(participant_id)
+    JOIN public.school_memberships membership ON membership.id = participants.participant_id
     WHERE membership.school_role = 'teacher'
       AND NOT EXISTS (
         SELECT 1 FROM public.school_teacher_assignments assignment
@@ -612,8 +612,8 @@ BEGIN
   END IF;
 
   IF EXISTS (
-    SELECT 1 FROM unnest(v_ids) participant_id
-    JOIN public.school_memberships membership ON membership.id = participant_id
+    SELECT 1 FROM unnest(v_ids) AS participants(participant_id)
+    JOIN public.school_memberships membership ON membership.id = participants.participant_id
     WHERE membership.school_role = 'student'
       AND membership.id <> p_student_membership_id
   ) THEN
