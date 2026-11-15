@@ -28,6 +28,7 @@ const QuizFilter: React.FC = () => {
   const [topic, setTopic] = useState<string>("");
   const [difficulty, setDifficulty] = useState<string>("");
   const [questionType, setQuestionType] = useState<string>("");
+  const [questionCount, setQuestionCount] = useState("10");
 
   // Available options for filters
   const grades = upperStudent ? ["9", "10", "11", "12"] : ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
@@ -41,7 +42,7 @@ const QuizFilter: React.FC = () => {
     "General Knowledge": ["Current Affairs", "Sports", "Arts", "Technology"]
   };
 
-  const difficulties = ["Easy", "Medium", "Hard"];
+  const difficulties = ["Easy", "Medium", "Hard", "Extreme"];
   const questionTypes = ["Multiple Choice", "True/False", "Fill in the Blank", "Matching"];
 
   const applyFilters = () => {
@@ -54,7 +55,10 @@ const QuizFilter: React.FC = () => {
     };
 
     setQuizFilters(filters);
-    navigate("/quiz");
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, value); });
+    params.set("count", questionCount);
+    navigate(`/quiz?${params.toString()}`);
   };
 
   const resetFilters = () => {
@@ -63,6 +67,7 @@ const QuizFilter: React.FC = () => {
     setTopic("");
     setDifficulty("");
     setQuestionType("");
+    setQuestionCount("10");
   };
 
   return (
@@ -179,6 +184,13 @@ const QuizFilter: React.FC = () => {
                         <SelectItem key={qt} value={qt}>{qt}</SelectItem>
                         )}
                       </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="questionCount">Questions</Label>
+                    <Select value={questionCount} onValueChange={setQuestionCount}>
+                      <SelectTrigger id="questionCount"><SelectValue placeholder="Select question count" /></SelectTrigger>
+                      <SelectContent>{[5, 10, 15, 20].map((count) => <SelectItem key={count} value={String(count)}>{count} Questions</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </div>

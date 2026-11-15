@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity, ArrowRight, BookOpen, BrainCircuit, CalendarDays, CheckCircle2,
-  Clock3, Play, Sparkles, Trophy, Users,
+  Clock3, ListChecks, Play, Sparkles, Trophy, Users,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { db } from "@/integrations/untypedClient";
@@ -19,13 +19,28 @@ type ResultRow = {
   total_questions: number | null;
   completed_at: string | null;
 };
+type StudyPlanRow = {
+  id: string;
+  subject: string | null;
+  topic: string | null;
+  scheduled_date: string | null;
+  completed: boolean | null;
+  priority: string | null;
+};
 
 const dayKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+const calendarDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const UpperTierHome: React.FC = () => {
   const { user } = useUser();
   const [topics, setTopics] = useState<TopicRow[]>([]);
   const [recentResults, setRecentResults] = useState<ResultRow[]>([]);
+  const [studyPlans, setStudyPlans] = useState<StudyPlanRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -47,6 +62,7 @@ const UpperTierHome: React.FC = () => {
     if (!user?.id) {
       setTopics([]);
       setRecentResults([]);
+      setStudyPlans([]);
       setLoadError(null);
       setLoading(false);
       return;
@@ -56,7 +72,13 @@ const UpperTierHome: React.FC = () => {
       setLoading(true);
       setLoadError(null);
       try {
-        const [topicResponse, resultResponse] = await Promise.all([
+        const weekStart = new Date();
+        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const formatDate = calendarDate;
+        const [topicResponse, resultResponse, planResponse] = await Promise.all([
           db.from("topic_progress")
             .select("subject,topic,accuracy_percentage,questions_attempted")
             .eq("user_id", user.id)
@@ -68,19 +90,27 @@ const UpperTierHome: React.FC = () => {
             .eq("student_id", user.id)
             .order("completed_at", { ascending: false })
             .limit(30),
+          db.from("study_plans")
+            .select("id,subject,topic,scheduled_date,completed,priority")
+            .eq("user_id", user.id)
+            .gte("scheduled_date", formatDate(weekStart))
+            .lte("scheduled_date", formatDate(weekEnd))
+            .order("scheduled_date", { ascending: true }),
         ]);
         if (!active) return;
-        if (topicResponse.error || resultResponse.error) {
-          console.error("Grades 9–12 dashboard data could not be fully loaded:", topicResponse.error || resultResponse.error);
+        if (topicResponse.error || resultResponse.error || planResponse.error) {
+          console.error("Grades 9–12 dashboard data could not be fully loaded:", topicResponse.error || resultResponse.error || planResponse.error);
           setLoadError("Some saved learning information is temporarily unavailable. Your account data has not been changed.");
         }
         setTopics((topicResponse.data || []) as TopicRow[]);
         setRecentResults((resultResponse.data || []) as ResultRow[]);
+        setStudyPlans((planResponse.data || []) as StudyPlanRow[]);
       } catch (error) {
         if (!active) return;
         console.error("Grades 9–12 dashboard data could not be loaded:", error);
         setTopics([]);
         setRecentResults([]);
+        setStudyPlans([]);
         setLoadError("Saved learning information could not be loaded right now. Check your connection and try again.");
       } finally {
         if (active) setLoading(false);
@@ -115,6 +145,17 @@ const UpperTierHome: React.FC = () => {
   }, [recentResults]);
   const maxActivity = Math.max(1, ...weeklyActivity.map(day => day.count));
   const focusTopic = topics[0] || null;
+  const todayKey = calendarDate(new Date());
+  const todayPlans = studyPlans.filter((plan) => plan.scheduled_date === todayKey);
+  const upcomingPlan = studyPlans.find((plan) => !plan.completed) || null;
+  const completedPlans = studyPlans.filter((plan) => plan.completed).length;
+  const planProgress = studyPlans.length ? Math.round((completedPlans / studyPlans.length) * 100) : 0;
+  const resumeItems = topics.slice(0, 3).map((topic) => ({
+    label: topic.topic,
+    subject: topic.subject,
+    progress: Math.max(0, Math.min(100, Number(topic.accuracy_percentage) || 0)),
+    href: "/academic/topics",
+  }));
 
   return (
     <div className="space-y-7 pb-4">
@@ -168,6 +209,31 @@ const UpperTierHome: React.FC = () => {
         </Link>
       </section>
 
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,.8fr)]">
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Next up</p><h2 className="mt-1 text-lg font-extrabold">Keep your momentum</h2></div>
+            <ListChecks className="h-5 w-5 text-primary" />
+          </div>
+          {upcomingPlan ? <div className="mt-5 rounded-xl bg-muted/55 p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-primary">{upcomingPlan.subject || "Study plan"}</p>
+            <h3 className="mt-1 text-xl font-extrabold">{upcomingPlan.topic || "Continue your study plan"}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Planned for {upcomingPlan.scheduled_date ? new Date(upcomingPlan.scheduled_date + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" }) : "this week"}.</p>
+            <Link to="/study-mode" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground">Start focus session <ArrowRight className="h-4 w-4" /></Link>
+          </div> : <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-center">
+            <p className="text-sm font-semibold">Your next study step will appear here.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Add a session in the planner to build a focused routine.</p>
+            <Link to="/academic/planner" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary">Open study planner <ArrowRight className="h-4 w-4" /></Link>
+          </div>}
+        </section>
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Your week</p><h2 className="mt-1 text-lg font-extrabold">Study plan progress</h2></div><Link to="/academic/planner" aria-label="Open study planner" className="flex h-9 w-9 items-center justify-center rounded-lg text-primary hover:bg-primary/10"><ArrowRight className="h-4 w-4" /></Link></div>
+          <div className="mt-5 flex items-end justify-between gap-3"><div><p className="text-3xl font-extrabold tabular-nums">{planProgress}%</p><p className="text-xs text-muted-foreground">{completedPlans} of {studyPlans.length} planned tasks complete</p></div><CalendarDays className="h-8 w-8 text-primary" /></div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${planProgress}%` }} /></div>
+          {todayPlans.length > 0 && <p className="mt-4 text-xs font-semibold text-muted-foreground">{todayPlans.filter((plan) => plan.completed).length}/{todayPlans.length} of today’s tasks complete</p>}
+        </section>
+      </section>
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,.75fr)]">
         <section className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
@@ -205,6 +271,11 @@ const UpperTierHome: React.FC = () => {
           <Link to="/academic/insights" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-primary">View academic insights <ArrowRight className="h-4 w-4" /></Link>
         </section>
       </div>
+
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Pick up where you left off</p><h2 className="mt-1 text-lg font-extrabold">Continue studying</h2></div><Link to="/academic" className="text-sm font-bold text-primary">View all</Link></div>
+        {resumeItems.length ? <div className="mt-5 grid gap-3 md:grid-cols-3">{resumeItems.map((item) => <Link key={item.subject + item.label} to={item.href} className="group rounded-xl border border-border p-4 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm"><div className="flex items-start justify-between gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-sm font-extrabold text-primary">{item.subject.slice(0, 1).toUpperCase()}</span><ArrowRight className="h-4 w-4 text-primary transition group-hover:translate-x-1" /></div><p className="mt-4 truncate text-sm font-bold">{item.label}</p><p className="mt-1 text-xs text-muted-foreground">{item.subject} · {item.progress}% recorded</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${item.progress}%` }} /></div></Link>)}</div> : <p className="mt-4 rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Complete a practice activity to create your first resume card.</p>}
+      </section>
 
       <section className="grid gap-3 sm:grid-cols-2">
         <Link to="/learning-dna" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40">

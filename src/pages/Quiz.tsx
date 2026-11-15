@@ -34,6 +34,8 @@ const Quiz: React.FC = () => {
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "extreme">("easy");
   const [activeTab, setActiveTab] = useState<string>("browse");
   const [numQuestions, setNumQuestions] = useState<number>(10);
+  const [topicFilter, setTopicFilter] = useState<string>("");
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<string>("");
   const [askedQuestions, setAskedQuestions] = useState<Set<string>>(new Set());
   const [attemptedQuestionIds, setAttemptedQuestionIds] = useState<Set<string>>(new Set());
   const [completedQuizIds, setCompletedQuizIds] = useState<Set<string>>(new Set());
@@ -99,6 +101,25 @@ const Quiz: React.FC = () => {
     [quizzes, selectedGradeNumber]
   );
 
+  useEffect(() => {
+    const requestedGrade = searchParams.get("grade");
+    const requestedSubject = searchParams.get("subject");
+    const requestedTopic = searchParams.get("topic") || "";
+    const requestedType = searchParams.get("questionType") || "";
+    const requestedDifficulty = searchParams.get("difficulty")?.toLowerCase();
+    const requestedCount = Number(searchParams.get("count"));
+    if (requestedGrade && !Number.isNaN(Number(requestedGrade))) setSelectedGrade(requestedGrade);
+    if (requestedSubject) {
+      const match = categories.find((category) => normalizeSubject(category) === normalizeSubject(requestedSubject));
+      if (match) setSelectedCategory(match);
+    }
+    if (requestedTopic) setTopicFilter(requestedTopic);
+    if (requestedType) setQuestionTypeFilter(requestedType);
+    if (["easy", "medium", "hard", "extreme"].includes(requestedDifficulty || "")) setDifficulty(requestedDifficulty as typeof difficulty);
+    if ([5, 10, 15, 20].includes(requestedCount)) setNumQuestions(requestedCount);
+    if (requestedSubject || requestedTopic || requestedType || requestedDifficulty || requestedCount) setActiveTab("random");
+  }, [categories, searchParams]);
+
   // Topic Coverage can deep-link into regular Quizzes with a subject preselected.
   useEffect(() => {
     const requestedSubject = searchParams.get("subject");
@@ -127,7 +148,12 @@ const Quiz: React.FC = () => {
       const sourceQuiz = subjectQuizzes[index % Math.max(subjectQuizzes.length, 1)];
       if (!sourceQuiz || sourceQuiz.questions.length < questionCount) return null;
 
-      const selectedQuestions = sourceQuiz.questions
+      const matchingQuestions = sourceQuiz.questions.filter((question) => {
+        const topicMatches = !topicFilter || question.topic === topicFilter || question.topic === "General";
+        const typeMatches = !questionTypeFilter || question.type.toLowerCase() === questionTypeFilter.toLowerCase().replace("fill in the blank", "fill in the blank");
+        return topicMatches && typeMatches;
+      });
+      const selectedQuestions = matchingQuestions
         .slice(0, questionCount)
         .map((question, pickIndex) => rotateOptionsForBalance(question, index, pickIndex));
 
@@ -165,7 +191,7 @@ const Quiz: React.FC = () => {
     });
 
     return practiceSets;
-  }, [categories, quizzes, selectedCategory, selectedGradeNumber]);
+  }, [categories, quizzes, selectedCategory, selectedGradeNumber, topicFilter, questionTypeFilter, numQuestions]);
   
   const filteredQuizzes = generatedPracticeQuizzes;
 
@@ -272,7 +298,7 @@ const Quiz: React.FC = () => {
       hard: "Hard",
       extreme: "Extreme",
     };
-    const targetDifficulty = difficultyMap[adaptiveDifficulty];
+    const targetDifficulty = difficultyMap[difficulty];
 
     const matchingQuizzes = quizzes.filter((quiz) => {
       const sameGrade = quiz.gradeLevel === selectedGradeNumber;
@@ -289,7 +315,12 @@ const Quiz: React.FC = () => {
     // Quick quizzes also use one real source quiz so secure server grading
     // matches exactly the questions shown to the student.
     const sourceQuiz = matchingQuizzes[Math.floor(Math.random() * matchingQuizzes.length)];
-    const freshQuestions = sourceQuiz.questions.filter((question) => !attemptedQuestionIds.has(question.id));
+    const filteredQuestions = sourceQuiz.questions.filter((question) => {
+      const topicMatches = !topicFilter || question.topic === topicFilter || question.topic === "General";
+      const typeMatches = !questionTypeFilter || question.type.toLowerCase() === questionTypeFilter.toLowerCase();
+      return topicMatches && typeMatches;
+    });
+    const freshQuestions = filteredQuestions.filter((question) => !attemptedQuestionIds.has(question.id));
     const candidateQuestions = freshQuestions.length >= numQuestions ? freshQuestions : sourceQuiz.questions;
     const shuffledQuestions = [...candidateQuestions].sort(() => Math.random() - 0.5);
     const selectedQuestions = shuffledQuestions
@@ -297,7 +328,7 @@ const Quiz: React.FC = () => {
       .map((question, index) => rotateOptionsForBalance(question, selectedGradeNumber, index));
 
     if (selectedQuestions.length < numQuestions) {
-      toast.error(`This ${category} quiz has only ${selectedQuestions.length} questions available. Choose 5 or 10 questions.`);
+      toast.error(`This ${category} quiz has only ${selectedQuestions.length} matching questions available.`);
       return;
     }
 
@@ -636,7 +667,7 @@ const Quiz: React.FC = () => {
                       
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Adaptive Difficulty</label>
-                        <Select value={difficulty} disabled>
+                        <Select value={difficulty} onValueChange={(value) => setDifficulty(value as typeof difficulty)}>
                           <SelectTrigger className="glass border-border/50">
                             <SelectValue placeholder="Adaptive difficulty" />
                           </SelectTrigger>
@@ -659,7 +690,7 @@ const Quiz: React.FC = () => {
                             <SelectValue placeholder="Questions" />
                           </SelectTrigger>
                           <SelectContent>
-                            {[5, 10].map((num) => (
+                            {[5, 10, 15, 20].map((num) => (
                               <SelectItem key={num} value={num.toString()}>
                                 {num} Questions
                               </SelectItem>
