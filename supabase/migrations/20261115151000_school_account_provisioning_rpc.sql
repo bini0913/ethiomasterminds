@@ -36,8 +36,11 @@ BEGIN
   IF p_actor_id IS NULL OR p_user_id IS NULL OR p_school_id IS NULL THEN
     RAISE EXCEPTION 'Actor, school, and new user are required';
   END IF;
-  IF p_school_role NOT IN ('manager', 'admin', 'teacher', 'finance', 'parent', 'student') THEN
+  IF p_school_role IS NULL OR p_school_role NOT IN ('manager', 'admin', 'teacher', 'finance', 'parent', 'student') THEN
     RAISE EXCEPTION 'Invalid school role';
+  END IF;
+  IF nullif(trim(p_school_username), '') IS NULL THEN
+    RAISE EXCEPTION 'A unique username is required for every school account';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id) THEN
     RAISE EXCEPTION 'New account profile was not created';
