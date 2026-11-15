@@ -360,6 +360,23 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.school_student_was_in_section_for_term(
+  p_student_membership_id uuid, p_section_id uuid, p_term_id uuid
+)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.school_student_section_history history
+    JOIN public.school_terms term
+      ON term.id = p_term_id
+     AND term.school_id = history.school_id
+    WHERE history.student_membership_id = p_student_membership_id
+      AND history.section_id = p_section_id
+      AND history.effective_from <= term.ends_on
+      AND (history.effective_to IS NULL OR history.effective_to >= term.starts_on)
+  );
+$;
+
 CREATE OR REPLACE FUNCTION public.school_can_view_assessment(p_assessment_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
@@ -375,9 +392,9 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
             SELECT 1 FROM public.school_memberships student
             WHERE student.user_id = auth.uid()
               AND student.school_id = assessment.school_id
-              AND student.section_id = assessment.section_id
               AND student.school_role = 'student'
               AND student.status IN ('active', 'suspended')
+              AND public.school_student_was_in_section_for_term(student.id, assessment.section_id, assessment.term_id)
           )
         )
         OR (
@@ -391,8 +408,8 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
               AND parent.status = 'active'
               AND link.status = 'active'
               AND student.school_id = assessment.school_id
-              AND student.section_id = assessment.section_id
               AND student.status IN ('active', 'suspended')
+              AND public.school_student_was_in_section_for_term(student.id, assessment.section_id, assessment.term_id)
           )
         )
       )
@@ -781,23 +798,28 @@ BEGIN
     SELECT DISTINCT
       student.id AS student_membership_id,
       section.id AS section_id,
-      section.grade_label,
+      history.grade_label,
       subject.subject_name,
       p_term_id AS term_id,
       section.school_id
-    FROM public.school_sections section
+    FROM public.school_student_section_history history
+    JOIN public.school_sections section
+      ON section.id = history.section_id
+     AND section.school_id = history.school_id
     JOIN public.school_memberships student
-      ON student.school_id = section.school_id
-     AND student.section_id = section.id
+      ON student.id = history.student_membership_id
+     AND student.school_id = history.school_id
      AND student.school_role = 'student'
-     AND student.status IN ('active', 'suspended')
     JOIN public.school_subjects subject
-      ON subject.school_id = section.school_id
-     AND subject.grade_label = section.grade_label
+      ON subject.school_id = history.school_id
+     AND subject.grade_label = history.grade_label
      AND subject.active = true
-    WHERE section.school_id = v_school_id
-      AND section.academic_year_id = (SELECT academic_year_id FROM public.school_terms WHERE id = p_term_id)
-  ),
+    JOIN public.school_terms term
+      ON term.id = p_term_id
+     AND term.school_id = history.school_id
+    WHERE history.effective_from <= term.ends_on
+      AND (history.effective_to IS NULL OR history.effective_to >= term.starts_on)
+      AND section.academic_year_id = term.academic_year_id
   category_scores AS (
     SELECT
       mark.student_membership_id,
@@ -813,6 +835,12 @@ BEGIN
     JOIN public.school_assessments assessment ON assessment.id = mark.assessment_id
     JOIN public.school_assessment_categories category ON category.id = assessment.category_id
     JOIN public.school_sections section ON section.id = assessment.section_id
+    JOIN public.school_student_section_history history
+      ON history.student_membership_id = mark.student_membership_id
+     AND history.school_id = assessment.school_id
+     AND history.section_id = assessment.section_id
+     AND history.effective_from <= (SELECT ends_on FROM public.school_terms WHERE id = p_term_id)
+     AND (history.effective_to IS NULL OR history.effective_to >= (SELECT starts_on FROM public.school_terms WHERE id = p_term_id))
     WHERE assessment.term_id = p_term_id
       AND assessment.school_id = v_school_id
       AND assessment.status = 'approved'
@@ -894,7 +922,7 @@ BEGIN
          CASE WHEN final_average IS NULL THEN 'incomplete' ELSE 'calculated' END,
          now(), now()
   FROM ranked
-  ON CONFLICT (term_id, student_membership_id, subject_name)
+  ON CONFLICT (term_id, student_membership_id, subject_name, section_id)
   DO UPDATE SET
     section_id = EXCLUDED.section_id,
     grade_label = EXCLUDED.grade_label,
@@ -1461,6 +1489,7 @@ GRANT SELECT, INSERT ON public.school_behavior_reports TO authenticated;
 GRANT SELECT, UPDATE ON public.school_parent_notifications TO authenticated;
 
 REVOKE ALL ON FUNCTION public.school_sync_student_section_history() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_student_was_in_section_for_term(uuid, uuid, uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_is_admin(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_can_teach_subject(uuid, uuid, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_is_homeroom_teacher(uuid, uuid) FROM PUBLIC, anon;
@@ -1486,6 +1515,7 @@ REVOKE ALL ON FUNCTION public.school_review_behavior_report(uuid, boolean, text)
 REVOKE ALL ON FUNCTION public.school_notify_parents_attendance_session() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_notify_parent_behavior_approval() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_notify_parent_results_published() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_student_was_in_section_for_term(uuid, uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_is_admin(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_can_teach_subject(uuid, uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_is_homeroom_teacher(uuid, uuid) TO authenticated;
