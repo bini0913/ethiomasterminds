@@ -301,12 +301,6 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         public._is_extreme_admin()
         OR public.is_school_manager_or_admin(assessment.school_id)
         OR public.school_can_teach_subject(assessment.school_id, assessment.section_id, assessment.subject_name)
-        OR EXISTS (
-          SELECT 1 FROM public.school_memberships creator
-          WHERE creator.id = assessment.created_by_membership_id
-            AND creator.user_id = auth.uid()
-            AND creator.status = 'active'
-        )
         OR (
           assessment.status IN ('approved', 'published')
           AND EXISTS (
@@ -315,7 +309,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
               AND student.school_id = assessment.school_id
               AND student.section_id = assessment.section_id
               AND student.school_role = 'student'
-              AND student.status = 'active'
+              AND student.status IN ('active', 'suspended')
           )
         )
         OR (
@@ -442,6 +436,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         OR (
           result.status = 'published'
           AND student.user_id = auth.uid()
+          AND student.status IN ('active', 'suspended')
         )
         OR (
           result.status = 'published'
@@ -478,7 +473,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         public._is_extreme_admin()
         OR public.is_school_manager_or_admin(record.school_id)
         OR public.school_is_homeroom_teacher(record.school_id, session.section_id)
-        OR student.user_id = auth.uid()
+        OR (student.user_id = auth.uid() AND student.status IN ('active', 'suspended'))
         OR EXISTS (
           SELECT 1 FROM public.school_parent_student_links link
           JOIN public.school_memberships parent ON parent.id = link.parent_membership_id
@@ -529,6 +524,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
         OR (
           report.status = 'approved'
           AND student.user_id = auth.uid()
+          AND student.status IN ('active', 'suspended')
         )
         OR (
           report.status = 'approved'
@@ -965,11 +961,10 @@ BEGIN
     END IF;
     SELECT school_role INTO v_creator_role FROM public.school_memberships
       WHERE id = NEW.created_by_membership_id AND school_id = NEW.school_id;
-    IF v_creator_role NOT IN ('teacher', 'admin') THEN
-      RAISE EXCEPTION 'Only an assigned teacher or School Admin can create an assessment';
+    IF v_creator_role <> 'teacher' THEN
+      RAISE EXCEPTION 'Only an assigned teacher can create an assessment';
     END IF;
-    IF v_creator_role = 'teacher'
-       AND NOT public.school_can_teach_subject(NEW.school_id, NEW.section_id, NEW.subject_name) THEN
+    IF NOT public.school_can_teach_subject(NEW.school_id, NEW.section_id, NEW.subject_name) THEN
       RAISE EXCEPTION 'Teacher is not assigned to this subject and section';
     END IF;
     RETURN NEW;
@@ -982,9 +977,12 @@ BEGIN
          OLD.subject_name, OLD.created_by_membership_id, OLD.created_at) THEN
     RAISE EXCEPTION 'Assessment identity fields are immutable';
   END IF;
-  IF NEW.status IS DISTINCT FROM OLD.status
+  IF (NEW.status IS DISTINCT FROM OLD.status
+      OR NEW.reviewed_by IS DISTINCT FROM OLD.reviewed_by
+      OR NEW.reviewed_at IS DISTINCT FROM OLD.reviewed_at
+      OR NEW.review_feedback IS DISTINCT FROM OLD.review_feedback)
      AND coalesce(current_setting('app.school_assessment_transition', true), '') NOT IN ('submit', 'review') THEN
-    RAISE EXCEPTION 'Assessment status changes must use the guarded workflow';
+    RAISE EXCEPTION 'Assessment submission and review fields must use the guarded workflow';
   END IF;
   RETURN NEW;
 END;
@@ -1032,10 +1030,14 @@ BEGIN
       IF v_transition = 'submit' AND v_enterer.user_id = auth.uid() THEN
         NULL;
       ELSIF v_transition = 'review' AND public.school_is_admin(NEW.school_id) THEN
-        NULL;
+        IF NEW.score IS DISTINCT FROM OLD.score OR NEW.teacher_note IS DISTINCT FROM OLD.teacher_note THEN
+          RAISE EXCEPTION 'School Admin review cannot alter teacher-entered scores';
+        END IF;
       ELSE
         RAISE EXCEPTION 'Mark status changes must use the guarded assessment workflow';
       END IF;
+    ELSIF v_enterer.user_id <> auth.uid() THEN
+      RAISE EXCEPTION 'Only the assigned teacher can edit a pending mark';
     END IF;
   END IF;
   RETURN NEW;
@@ -1090,9 +1092,12 @@ DECLARE
 BEGIN
   SELECT * INTO v_recorder FROM public.school_memberships WHERE id = NEW.recorded_by_membership_id;
   IF v_recorder.id IS NULL OR v_recorder.school_id <> NEW.school_id
-     OR v_recorder.user_id <> auth.uid() OR v_recorder.school_role <> 'teacher'
+     OR v_recorder.school_role <> 'teacher'
      OR NOT public.school_is_homeroom_teacher(NEW.school_id, NEW.section_id) THEN
     RAISE EXCEPTION 'Only the assigned homeroom teacher can create or update this attendance session';
+  END IF;
+  IF TG_OP = 'INSERT' AND v_recorder.user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'The signed-in homeroom teacher must create the attendance session';
   END IF;
   IF TG_OP = 'UPDATE' AND ROW(NEW.school_id, NEW.section_id, NEW.attendance_date, NEW.recorded_by_membership_id, NEW.created_at)
      IS DISTINCT FROM ROW(OLD.school_id, OLD.section_id, OLD.attendance_date, OLD.recorded_by_membership_id, OLD.created_at) THEN
@@ -1121,9 +1126,12 @@ BEGIN
      OR v_session.school_id <> NEW.school_id OR v_student.school_id <> NEW.school_id
      OR v_recorder.school_id <> NEW.school_id
      OR v_student.section_id <> v_session.section_id
-     OR v_recorder.user_id <> auth.uid() OR v_recorder.school_role <> 'teacher'
+     OR v_recorder.school_role <> 'teacher'
      OR NOT public.school_is_homeroom_teacher(NEW.school_id, v_session.section_id) THEN
     RAISE EXCEPTION 'Attendance must be recorded by the assigned homeroom teacher for that section';
+  END IF;
+  IF TG_OP = 'INSERT' AND v_recorder.user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'The signed-in homeroom teacher must record attendance';
   END IF;
   IF TG_OP = 'UPDATE' AND ROW(NEW.school_id, NEW.session_id, NEW.student_membership_id, NEW.recorded_by_membership_id, NEW.created_at)
      IS DISTINCT FROM ROW(OLD.school_id, OLD.session_id, OLD.student_membership_id, OLD.recorded_by_membership_id, OLD.created_at) THEN
