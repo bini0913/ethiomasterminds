@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS public.school_academic_years (
   is_current boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   CHECK (ends_on >= starts_on),
-  UNIQUE (school_id, name)
+  UNIQUE (school_id, name),
+  UNIQUE (id, school_id)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS school_single_current_academic_year
@@ -81,7 +82,9 @@ CREATE TABLE IF NOT EXISTS public.school_sections (
   homeroom_teacher_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (school_id, academic_year_id, grade_label, section_name),
-  UNIQUE (id, school_id)
+  UNIQUE (id, school_id),
+  FOREIGN KEY (academic_year_id, school_id)
+    REFERENCES public.school_academic_years(id, school_id) ON DELETE RESTRICT
 );
 
 ALTER TABLE public.school_memberships
@@ -110,14 +113,18 @@ CREATE TABLE IF NOT EXISTS public.school_teacher_assignments (
 CREATE TABLE IF NOT EXISTS public.school_parent_student_links (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
-  parent_membership_id uuid NOT NULL REFERENCES public.school_memberships(id) ON DELETE RESTRICT,
-  student_membership_id uuid NOT NULL REFERENCES public.school_memberships(id) ON DELETE RESTRICT,
+  parent_membership_id uuid NOT NULL,
+  student_membership_id uuid NOT NULL,
   status text NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'deactivated')),
   linked_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   linked_at timestamptz NOT NULL DEFAULT now(),
   ended_at timestamptz,
   UNIQUE (parent_membership_id, student_membership_id),
+  FOREIGN KEY (parent_membership_id, school_id)
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
+  FOREIGN KEY (student_membership_id, school_id)
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
   CHECK ((status = 'active' AND ended_at IS NULL) OR (status = 'deactivated' AND ended_at IS NOT NULL))
 );
 
@@ -137,11 +144,13 @@ CREATE TABLE IF NOT EXISTS public.school_student_id_sequences (
 CREATE TABLE IF NOT EXISTS public.school_record_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
-  membership_id uuid NOT NULL REFERENCES public.school_memberships(id) ON DELETE RESTRICT,
+  membership_id uuid NOT NULL,
   event_type text NOT NULL CHECK (event_type IN ('enrolled', 'grade_changed', 'transferred', 'graduated', 'deactivated', 'reactivated')),
   details jsonb NOT NULL DEFAULT '{}'::jsonb,
   actor_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (membership_id, school_id)
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT
 );
 
 CREATE INDEX IF NOT EXISTS school_record_events_membership_idx
@@ -166,6 +175,17 @@ AS $$
       AND (p_roles IS NULL OR sm.school_role = ANY(p_roles))
   );
 $$;
+
+CREATE OR REPLACE FUNCTION public.is_school_manager(p_school_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $
+  SELECT public._is_extreme_admin()
+    OR public.is_active_school_member(p_school_id, ARRAY['manager']::text[]);
+$;
 
 CREATE OR REPLACE FUNCTION public.is_school_manager_or_admin(p_school_id uuid)
 RETURNS boolean
@@ -256,6 +276,50 @@ BEGIN
   RETURN true;
 END;
 $$;
+
+CREATE OR REPLACE FUNCTION public.school_validate_teacher_assignment()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $
+DECLARE
+  v_teacher public.school_memberships%ROWTYPE;
+BEGIN
+  SELECT * INTO v_teacher
+  FROM public.school_memberships
+  WHERE id = NEW.teacher_membership_id AND school_id = NEW.school_id;
+  IF v_teacher.id IS NULL OR v_teacher.school_role <> 'teacher' OR v_teacher.status <> 'active' THEN
+    RAISE EXCEPTION 'Assignment must target an active teacher in the same school';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_teacher_assignment_validate ON public.school_teacher_assignments;
+CREATE TRIGGER school_teacher_assignment_validate
+BEFORE INSERT OR UPDATE ON public.school_teacher_assignments
+FOR EACH ROW EXECUTE FUNCTION public.school_validate_teacher_assignment();
+
+CREATE OR REPLACE FUNCTION public.school_protect_membership_identity()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $
+BEGIN
+  IF ROW(NEW.school_id, NEW.user_id, NEW.school_role, NEW.student_number, NEW.school_username, NEW.created_by)
+     IS DISTINCT FROM
+     ROW(OLD.school_id, OLD.user_id, OLD.school_role, OLD.student_number, OLD.school_username, OLD.created_by) THEN
+    RAISE EXCEPTION 'School membership identity and assigned student ID are immutable';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_membership_identity_immutable ON public.school_memberships;
+CREATE TRIGGER school_membership_identity_immutable
+BEFORE UPDATE ON public.school_memberships
+FOR EACH ROW EXECUTE FUNCTION public.school_protect_membership_identity();
 
 CREATE OR REPLACE FUNCTION public.school_validate_parent_student_link()
 RETURNS trigger
@@ -363,8 +427,8 @@ WITH CHECK (public._is_extreme_admin() AND created_by = auth.uid());
 DROP POLICY IF EXISTS schools_manager_update ON public.schools;
 CREATE POLICY schools_manager_update ON public.schools
 FOR UPDATE TO authenticated
-USING (public.is_school_manager_or_admin(id))
-WITH CHECK (public.is_school_manager_or_admin(id));
+USING (public.is_school_manager(id))
+WITH CHECK (public.is_school_manager(id));
 
 DROP POLICY IF EXISTS school_memberships_read ON public.school_memberships;
 CREATE POLICY school_memberships_read ON public.school_memberships
@@ -397,13 +461,9 @@ USING (
   )
 );
 
+-- Membership creation is reserved for trusted account-provisioning workflows
+-- using the service role; client-side inserts cannot assign arbitrary roles.
 DROP POLICY IF EXISTS school_memberships_manager_insert ON public.school_memberships;
-CREATE POLICY school_memberships_manager_insert ON public.school_memberships
-FOR INSERT TO authenticated
-WITH CHECK (
-  public._is_extreme_admin()
-  OR public.is_school_manager_or_admin(school_id)
-);
 
 DROP POLICY IF EXISTS school_memberships_manager_update ON public.school_memberships;
 CREATE POLICY school_memberships_manager_update ON public.school_memberships
@@ -417,9 +477,10 @@ FOR SELECT TO authenticated
 USING (public.is_active_school_member(school_id, NULL) OR public._is_extreme_admin());
 
 DROP POLICY IF EXISTS school_years_manager_write ON public.school_academic_years;
-CREATE POLICY school_years_manager_write ON public.school_academic_years
-FOR ALL TO authenticated
-USING (public.is_school_manager_or_admin(school_id))
+CREATE POLICY school_years_manager_insert ON public.school_academic_years
+FOR INSERT TO authenticated WITH CHECK (public.is_school_manager_or_admin(school_id));
+CREATE POLICY school_years_manager_update ON public.school_academic_years
+FOR UPDATE TO authenticated USING (public.is_school_manager_or_admin(school_id))
 WITH CHECK (public.is_school_manager_or_admin(school_id));
 
 DROP POLICY IF EXISTS school_sections_read ON public.school_sections;
@@ -437,9 +498,10 @@ USING (
 );
 
 DROP POLICY IF EXISTS school_sections_manager_write ON public.school_sections;
-CREATE POLICY school_sections_manager_write ON public.school_sections
-FOR ALL TO authenticated
-USING (public.is_school_manager_or_admin(school_id))
+CREATE POLICY school_sections_manager_insert ON public.school_sections
+FOR INSERT TO authenticated WITH CHECK (public.is_school_manager_or_admin(school_id));
+CREATE POLICY school_sections_manager_update ON public.school_sections
+FOR UPDATE TO authenticated USING (public.is_school_manager_or_admin(school_id))
 WITH CHECK (public.is_school_manager_or_admin(school_id));
 
 DROP POLICY IF EXISTS school_teacher_assignments_read ON public.school_teacher_assignments;
@@ -473,9 +535,10 @@ USING (
 );
 
 DROP POLICY IF EXISTS school_parent_links_manager_write ON public.school_parent_student_links;
-CREATE POLICY school_parent_links_manager_write ON public.school_parent_student_links
-FOR ALL TO authenticated
-USING (public.is_school_manager_or_admin(school_id))
+CREATE POLICY school_parent_links_manager_insert ON public.school_parent_student_links
+FOR INSERT TO authenticated WITH CHECK (public.is_school_manager_or_admin(school_id));
+CREATE POLICY school_parent_links_manager_update ON public.school_parent_student_links
+FOR UPDATE TO authenticated USING (public.is_school_manager_or_admin(school_id))
 WITH CHECK (public.is_school_manager_or_admin(school_id));
 
 DROP POLICY IF EXISTS school_record_events_read ON public.school_record_events;
@@ -497,4 +560,5 @@ GRANT EXECUTE ON FUNCTION public.school_next_student_number(uuid, text) TO authe
 GRANT EXECUTE ON FUNCTION public.school_deactivate_student_membership(uuid, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_active_school_member(uuid, text[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_school_manager_or_admin(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_school_manager(uuid) TO authenticated;
 
