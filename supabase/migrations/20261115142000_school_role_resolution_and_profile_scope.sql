@@ -61,13 +61,9 @@ GRANT EXECUTE ON FUNCTION public.get_user_role(uuid) TO authenticated;
 -- School managers/admins may see profiles only for people with a membership
 -- in their own school. Teachers see only students assigned to their sections.
 DROP POLICY IF EXISTS school_staff_view_same_school_profiles ON public.profiles;
-CREATE POLICY school_staff_view_same_school_profiles
-ON public.profiles
-FOR SELECT TO authenticated
-USING (public.school_can_view_profile(id));
-
 DROP POLICY IF EXISTS school_parents_view_linked_child_profiles ON public.profiles;
-CREATE POLICY school_parents_view_linked_child_profiles
+DROP POLICY IF EXISTS school_members_can_view_scoped_profiles ON public.profiles;
+CREATE POLICY school_members_can_view_scoped_profiles
 ON public.profiles
 FOR SELECT TO authenticated
 USING (public.school_can_view_profile(id));
