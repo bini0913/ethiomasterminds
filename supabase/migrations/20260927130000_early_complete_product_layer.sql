@@ -113,15 +113,15 @@ ON CONFLICT (key) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.descript
 DROP POLICY IF EXISTS "Admins manage Early content" ON public.early_content_items;
 CREATE POLICY "Admins manage Early content" ON public.early_content_items
 FOR ALL USING (
-  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('admin','manager','extreme_admin'))
+  (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'manager') OR public._is_extreme_admin())
 ) WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('admin','manager','extreme_admin'))
+  (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'manager') OR public._is_extreme_admin())
 );
 
 DROP POLICY IF EXISTS "Admins manage Early videos" ON public.early_video_resources;
 CREATE POLICY "Admins manage Early videos" ON public.early_video_resources
 FOR ALL USING (
-  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('admin','manager','extreme_admin'))
+  (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'manager') OR public._is_extreme_admin())
 ) WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('admin','manager','extreme_admin'))
+  (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'manager') OR public._is_extreme_admin())
 );
