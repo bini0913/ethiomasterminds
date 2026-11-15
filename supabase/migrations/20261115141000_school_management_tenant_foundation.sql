@@ -161,6 +161,17 @@ CREATE TABLE IF NOT EXISTS public.school_student_id_sequences (
   PRIMARY KEY (school_id, grade_label)
 );
 
+CREATE TABLE IF NOT EXISTS public.school_student_id_reservations (
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
+  student_number bigint NOT NULL CHECK (student_number > 0),
+  grade_label text NOT NULL,
+  reserved_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+  reserved_at timestamptz NOT NULL DEFAULT now(),
+  used_by_user_id uuid REFERENCES auth.users(id) ON DELETE RESTRICT,
+  used_at timestamptz,
+  PRIMARY KEY (school_id, student_number)
+);
+
 CREATE TABLE IF NOT EXISTS public.school_record_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
@@ -238,6 +249,9 @@ BEGIN
     RAISE EXCEPTION 'Grade is required for student ID allocation';
   END IF;
 
+  -- Serialize allocations for a school across all grade-specific counters.
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_school_id::text, 0));
+
   LOOP
     INSERT INTO public.school_student_id_sequences(school_id, grade_label, next_number)
     VALUES (p_school_id, v_grade, 2)
@@ -246,15 +260,26 @@ BEGIN
                   updated_at = now()
     RETURNING next_number - 1 INTO v_number;
 
-    EXIT WHEN NOT EXISTS (
+    IF EXISTS (
       SELECT 1 FROM public.school_memberships existing
       WHERE existing.school_id = p_school_id
         AND existing.school_role = 'student'
         AND existing.student_number = v_number
-    );
-  END LOOP;
+    ) OR EXISTS (
+      SELECT 1 FROM public.school_student_id_reservations reservation
+      WHERE reservation.school_id = p_school_id
+        AND reservation.student_number = v_number
+    ) THEN
+      CONTINUE;
+    END IF;
 
-  RETURN v_number;
+    INSERT INTO public.school_student_id_reservations(
+      school_id, student_number, grade_label, reserved_by
+    )
+    VALUES (p_school_id, v_number, v_grade, auth.uid());
+
+    RETURN v_number;
+  END LOOP;
 END;
 $$;
 
@@ -660,6 +685,7 @@ ALTER TABLE public.school_subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_teacher_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_parent_student_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_student_id_sequences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_student_id_reservations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_record_events ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS schools_member_read ON public.schools;
@@ -760,6 +786,7 @@ USING (public.school_can_view_record_event(id));
 
 -- ID sequences are accessed only through the guarded allocator function.
 REVOKE ALL ON public.school_student_id_sequences FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON public.school_student_id_reservations FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.school_next_student_number(uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.school_deactivate_student_membership(uuid, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.school_next_student_number(uuid, text) TO authenticated;
