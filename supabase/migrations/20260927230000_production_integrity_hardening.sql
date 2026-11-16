@@ -539,15 +539,23 @@ BEGIN
     RAISE EXCEPTION 'Authentication required';
   END IF;
 
-  SELECT um.*, dm.reward_xp, dm.reward_coins
-    INTO v_mission, v_reward_xp, v_reward_coins
+  SELECT um.*
+    INTO v_mission
   FROM public.user_missions um
-  JOIN public.daily_missions dm ON dm.id = um.mission_id
   WHERE um.id = p_mission_id AND um.user_id = uid
   FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Mission not found';
+  END IF;
+
+  SELECT dm.reward_xp, dm.reward_coins
+    INTO v_reward_xp, v_reward_coins
+  FROM public.daily_missions dm
+  WHERE dm.id = v_mission.mission_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Mission definition not found';
   END IF;
   IF NOT v_mission.completed THEN
     RAISE EXCEPTION 'Mission not completed yet';

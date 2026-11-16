@@ -161,7 +161,7 @@ export default function SchoolTeacherPortal() {
       db.from("book_uploads").select("book_id,moderation_note,status").eq("uploader_id", user?.id || ""),
       db.from("school_staff_evaluations").select("id,evaluation_type,rating,period_start,period_end,notes,created_at").eq("school_id", schoolId).eq("target_membership_id", activeMembership.id).order("created_at", { ascending: false }).limit(50),
     ]);
-    const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes].find((result) => result.error)?.error;
+    const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes, evaluationsRes].find((result) => result.error)?.error;
     if (error) {
       toast.error(error.message || "Teacher workspace could not be loaded.");
       setLoadError("Some school records could not be loaded. Try again.");
@@ -184,6 +184,7 @@ export default function SchoolTeacherPortal() {
     setQuizzes(quizzesRes.data ?? []);
     setBooks(booksRes.data ?? []);
     setBookUploads(bookUploadsRes.data ?? []);
+    setEvaluations(evaluationsRes.data ?? []);
     setTasks(tasksRes.data ?? []);
     setEvaluations(evaluationsRes.data ?? []);
     setConversations(conversationsRes.data ?? []);
