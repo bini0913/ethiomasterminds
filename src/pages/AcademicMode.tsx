@@ -68,7 +68,7 @@ const AcademicMode: React.FC = () => {
       const [todayRes, weekRes, resultsRes, topicsRes] = await Promise.all([
         db.from("study_plans").select("id,completed").eq("user_id", user.id).eq("scheduled_date", today),
         db.from("study_plans").select("id,completed").eq("user_id", user.id).gte("scheduled_date", start).lte("scheduled_date", today),
-        db.from("quiz_results").select("score,total_questions,created_at").eq("student_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        db.from("quiz_results").select("score,total_questions,completed_at").eq("student_id", user.id).order("completed_at", { ascending: false }).limit(1).maybeSingle(),
         topicsRequest,
       ]);
       if (cancelled) return;
