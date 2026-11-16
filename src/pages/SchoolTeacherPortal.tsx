@@ -55,6 +55,7 @@ export default function SchoolTeacherPortal() {
   const schoolId = activeSchool?.id;
   const [page, setPage] = useState("overview");
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -163,9 +164,12 @@ export default function SchoolTeacherPortal() {
     const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes, evaluationsRes].find((result) => result.error)?.error;
     if (error) {
       toast.error(error.message || "Teacher workspace could not be loaded.");
+      setLoadError("Some school records could not be loaded. Try again.");
       setLoading(false);
       return;
     }
+    setLoadError(evaluationsRes.error ? "Performance evaluations are temporarily unavailable. Other teacher records are available." : null);
+    if (evaluationsRes.error) toast.error(evaluationsRes.error.message || "Performance evaluations could not be loaded.");
     setAssignments(assignmentsRes.data ?? []);
     setSections(sectionsRes.data ?? []);
     setSubjects(subjectsRes.data ?? []);
@@ -182,6 +186,7 @@ export default function SchoolTeacherPortal() {
     setBookUploads(bookUploadsRes.data ?? []);
     setEvaluations(evaluationsRes.data ?? []);
     setTasks(tasksRes.data ?? []);
+    setEvaluations(evaluationsRes.data ?? []);
     setConversations(conversationsRes.data ?? []);
     if (!assessmentTermId && termsRes.data?.length) setAssessmentTermId(termsRes.data[0].id);
     const userIds = [...new Set((membersRes.data ?? []).map((member: any) => member.user_id))];
@@ -260,6 +265,19 @@ export default function SchoolTeacherPortal() {
   const pendingHomeworkCount = homework.filter((item) => ["draft", "rejected", "pending"].includes(item.status)).length;
   const pendingQuizCount = quizzes.filter((item) => ["draft", "rejected", "pending"].includes(item.school_review_status)).length;
   const behaviorReportsForReview = behaviorReports.filter((report) => report.status === "pending" && homeroomSectionIds.includes(report.section_id));
+  const progressRows = useMemo(() => assignedStudents.map((student) => {
+    const approvedMarks = marks.filter((mark) => mark.student_membership_id === student.id && mark.status === "approved");
+    const percentages = approvedMarks.map((mark) => {
+      const assessment = assessments.find((item) => item.id === mark.assessment_id);
+      return assessment?.max_score ? (Number(mark.score) / Number(assessment.max_score)) * 100 : null;
+    }).filter((value): value is number => value !== null && Number.isFinite(value));
+    return {
+      student,
+      approvedCount: approvedMarks.length,
+      average: percentages.length ? `${(percentages.reduce((sum, value) => sum + value, 0) / percentages.length).toFixed(1)}%` : "—",
+      homeworkCount: submissions.filter((submission) => submission.student_membership_id === student.id).length,
+    };
+  }), [assignedStudents, marks, assessments, submissions]);
 
   const createAssessment = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -739,12 +757,12 @@ export default function SchoolTeacherPortal() {
 
   const renderProgress = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Student progress" description="Review approved marks and homework activity for your assigned students. Averages use the assessments you entered." />
+      <SchoolPageHeading title="Student progress" description="Review approved marks and homework activity for your assigned students. Averages use assessments you entered." />
       <SchoolPanel title="Assigned student register">
-        {assignedStudents.length ? <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Class</th><th className="pb-2">Approved marks</th><th className="pb-2">Average score</th><th className="pb-2">Homework submitted</th></tr></thead><tbody className="divide-y divide-slate-100">{assignedStudents.map((student) => { const approved = marks.filter((mark) => mark.student_membership_id === student.id && mark.status === "approved"); const percentages = approved.map((mark) => { const assessment = assessments.find((item) => item.id === mark.assessment_id); return assessment?.max_score ? (Number(mark.score) / Number(assessment.max_score)) * 100 : null; }).filter((value): value is number => value !== null && Number.isFinite(value)); const average = percentages.length ? `${(percentages.reduce((sum, value) => sum + value, 0) / percentages.length).toFixed(1)}%` : "—"; return <tr key={student.id}><td className="py-3 font-medium text-slate-800">{memberName(student.id)}</td><td className="py-3 text-slate-600">{sectionLabel(student.section_id)}</td><td className="py-3 tabular-nums text-slate-600">{approved.length}</td><td className="py-3 tabular-nums text-slate-600">{average}</td><td className="py-3 tabular-nums text-slate-600">{submissions.filter((submission) => submission.student_membership_id === student.id).length}</td></tr>; })}</tbody></table></div> : <SchoolEmptyState title="No assigned students" description="Student progress appears after your class assignments are configured." />}
+        {progressRows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Class</th><th className="pb-2">Approved marks</th><th className="pb-2">Average score</th><th className="pb-2">Homework submitted</th></tr></thead><tbody className="divide-y divide-slate-100">{progressRows.map(({ student, approvedCount, average, homeworkCount }) => <tr key={student.id}><td className="py-3 font-medium text-slate-800">{memberName(student.id)}</td><td className="py-3 text-slate-600">{sectionLabel(student.section_id)}</td><td className="py-3 tabular-nums text-slate-600">{approvedCount}</td><td className="py-3 tabular-nums text-slate-600">{average}</td><td className="py-3 tabular-nums text-slate-600">{homeworkCount}</td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No assigned students" description="Student progress appears after your class assignments are configured." />}
       </SchoolPanel>
       <SchoolPanel title="My performance evaluations">
-        {evaluations.length ? <div className="space-y-3">{evaluations.map((evaluation) => <div key={evaluation.id} className="rounded-md border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold capitalize text-slate-800">{evaluation.evaluation_type.replace(/_/g, " ")}</p><p className="mt-1 text-xs text-slate-500">{evaluation.period_start || evaluation.period_end ? `${evaluation.period_start || "Start not set"} – ${evaluation.period_end || "End not set"}` : new Date(evaluation.created_at).toLocaleDateString()}</p></div><p className="text-sm font-semibold tabular-nums text-slate-700">{evaluation.rating}/5</p></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{evaluation.notes}</p></div>)}</div> : <SchoolEmptyState title="No evaluations yet" description="Your Manager's staff evaluations and the Admin's academic-work reviews will appear here." />}
+        {evaluations.length ? <div className="space-y-3">{evaluations.map((evaluation) => <div key={evaluation.id} className="rounded-md border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold capitalize text-slate-800">{String(evaluation.evaluation_type || "Evaluation").replace(/_/g, " ")}</p><p className="mt-1 text-xs text-slate-500">{evaluation.period_start || evaluation.period_end ? `${evaluation.period_start || "Start not set"} – ${evaluation.period_end || "End not set"}` : new Date(evaluation.created_at).toLocaleDateString()}</p></div><p className="text-sm font-semibold tabular-nums text-slate-700">{evaluation.rating}/5</p></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{evaluation.notes}</p></div>)}</div> : <SchoolEmptyState title="No evaluations yet" description="Your Manager's staff evaluations and the Admin's academic-work reviews will appear here." />}
       </SchoolPanel>
     </div>
   );
@@ -767,6 +785,7 @@ export default function SchoolTeacherPortal() {
   return (
     <SchoolPortalShell role="teacher" title="Teacher Portal" navItems={navItems} activeItem={page} onNavigate={setPage}>
       {loading && <div className="mb-4 text-xs text-slate-500">Refreshing assigned school records…</div>}
+      {loadError && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"><span>{loadError}</span><SchoolSecondaryButton onClick={() => void load()}>Try again</SchoolSecondaryButton></div>}
       {content}
     </SchoolPortalShell>
   );
