@@ -91,6 +91,7 @@ export interface CreateBookPayload {
   pdfFile: File;
   uploaderId: string;
   uploaderRole: LibraryBook['uploader_role'];
+  schoolSubmission?: { schoolId: string; sectionId: string };
   onProgress?: (state: 'validating' | 'uploading' | 'saving' | 'done') => void;
 }
 
@@ -275,9 +276,11 @@ export async function createBook(payload: CreateBookPayload) {
     }
   }
 
-  const status: UploadStatus = payload.uploaderRole === 'teacher' || payload.uploaderRole === 'admin' || payload.uploaderRole === 'manager'
-    ? 'approved'
-    : 'pending';
+  const status: UploadStatus = payload.schoolSubmission
+    ? 'pending'
+    : payload.uploaderRole === 'teacher' || payload.uploaderRole === 'admin' || payload.uploaderRole === 'manager'
+      ? 'approved'
+      : 'pending';
 
   payload.onProgress?.('saving');
   const { data, error } = await db
@@ -335,6 +338,24 @@ export async function createBook(payload: CreateBookPayload) {
     }
   } catch (uploadAuditError) {
     console.warn('book_uploads sync failed:', uploadAuditError);
+  }
+
+  if (payload.schoolSubmission) {
+    const { error: schoolSubmitError } = await (supabase as any).rpc('school_submit_library_book', {
+      p_book_id: createdBook.id,
+      p_section_id: payload.schoolSubmission.sectionId,
+    });
+    if (schoolSubmitError) {
+      throw new Error(`File uploaded but could not be submitted to the school review queue: ${schoolSubmitError.message}`);
+    }
+    const { data: schoolBook, error: schoolBookError } = await db
+      .from('library_books')
+      .select('*')
+      .eq('id', createdBook.id)
+      .single();
+    if (schoolBookError) throw schoolBookError;
+    payload.onProgress?.('done');
+    return await withUploaderProfile(schoolBook as LibraryBook);
   }
 
   payload.onProgress?.('done');

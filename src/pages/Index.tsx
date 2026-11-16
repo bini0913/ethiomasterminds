@@ -126,10 +126,7 @@ const Index: React.FC = () => {
           tier === "early" ? (
             <><EarlyTierHome /><EarlyEncouragement /><StudentBottomNav /></>
           ) : tier === "middle" ? (
-            <>
-              <MiddleTierHome />
-              <StudentBottomNav />
-            </>
+            <MiddleTierHome />
           ) : tier === "upper" ? (
             <UpperTierHome />
           ) : (

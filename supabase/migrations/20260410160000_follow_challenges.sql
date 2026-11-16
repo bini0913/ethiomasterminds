@@ -49,4 +49,9 @@ create trigger follow_challenges_touch_updated_at
 before update on public.follow_challenges
 for each row execute function public.touch_follow_challenges_updated_at();
 
-alter publication supabase_realtime add table if not exists public.follow_challenges;
+-- PostgreSQL does not support IF NOT EXISTS for publication membership.
+DO 'BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.follow_challenges;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END';

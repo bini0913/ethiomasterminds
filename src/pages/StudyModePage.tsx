@@ -95,6 +95,7 @@ const StudyModePage: React.FC = () => {
   const upperStudent = getUserTier(user?.grade) === "upper";
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [tasks, setTasks] = useState<StudyTask[]>([]);
   const [competitions, setCompetitions] = useState<StudyCompetition[]>([]);
   const [participants, setParticipants] = useState<StudyParticipant[]>([]);
@@ -159,6 +160,7 @@ const StudyModePage: React.FC = () => {
   const loadData = async () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
+    setLoadError(false);
     try {
       try {
         const { error: expiryError } = await db.rpc("expire_study_competitions");
@@ -177,12 +179,11 @@ const StudyModePage: React.FC = () => {
       db.rpc("get_study_mode_stats", { p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }),
     ]);
 
-    if (sessionsRes.error) toast.error(sessionsRes.error.message);
-    if (tasksRes.error) toast.error(tasksRes.error.message);
-    if (competitionsRes.error) toast.error(competitionsRes.error.message);
-    if (participantsRes.error) toast.error(participantsRes.error.message);
-    if (liveRes.error) toast.error(liveRes.error.message);
-    if (settingsRes.error) toast.error(settingsRes.error.message);
+    const queryErrors = [sessionsRes.error, tasksRes.error, competitionsRes.error, participantsRes.error, liveRes.error, settingsRes.error].filter(Boolean);
+    if (queryErrors.length) {
+      console.error("Some Study Mode data sources failed:", queryErrors);
+      setLoadError(true);
+    }
     if (statsRes.error) console.error("Study statistics load failed", statsRes.error);
     if (!statsRes.error && statsRes.data) {
       setStudyStats({
@@ -245,7 +246,7 @@ const StudyModePage: React.FC = () => {
 
     } catch (error) {
       console.error("Study Mode data load failed:", error);
-      toast.error("Your Study Mode data could not be refreshed. Please try again.");
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -636,13 +637,14 @@ const StudyModePage: React.FC = () => {
   const R = 54, C = 2 * Math.PI * R;
 
   return (
-    <div className={`${upperStudent ? "tier-upper " : ""}min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]`}>
+    <div className={`${upperStudent ? "tier-upper " : "tier-middle "}min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]`}>
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:py-8">
         <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            {!upperStudent && <Link to="/" className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Home</Link>}
-            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Study Mode</h1>
-            <p className="text-sm text-muted-foreground">One task. One timer. Earn XP for every focused minute.</p>
+            {upperStudent && <Link to="/" className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Home</Link>}
+            {!upperStudent && <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Focus studio</p>}
+            <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">Study Mode</h1>
+            <p className="mt-1 text-sm text-muted-foreground">One task. One timer. Earn XP for every focused minute.</p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-semibold">
             <span className="relative flex h-2.5 w-2.5"><span className={`absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 ${liveStatuses.length ? "animate-ping" : ""}`} /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" /></span>
@@ -650,9 +652,19 @@ const StudyModePage: React.FC = () => {
           </div>
         </header>
 
+        {loadError && (
+          <div role="alert" className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">Some Study Mode data could not be loaded.</p>
+              <p className="mt-1 text-muted-foreground">Your timer remains safe. Retry to reconnect before relying on tasks, competitions, or statistics.</p>
+            </div>
+            <Button variant="outline" className="min-h-10 shrink-0" onClick={() => void loadData()} disabled={loading}>Retry Study Mode</Button>
+          </div>
+        )}
+
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <main className="space-y-5">
-            <section className="rounded-3xl border-2 border-border bg-card p-5 shadow-[0_4px_0_hsl(var(--border))] sm:p-8">
+            <section className="rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-accent/10 p-5 shadow-sm sm:p-8">
               <div className="mx-auto mb-6 grid max-w-md grid-cols-3 gap-2" role="group" aria-label="Session length">
                 {presets.map(([m, min, label, sub]) => {
                   const on = mode === m && studyMinutes === min;
@@ -700,16 +712,16 @@ const StudyModePage: React.FC = () => {
                 )}
               </div>
 
-              <div className="mx-auto mt-5 max-w-md">
-                <label className="mb-1 block text-xs font-semibold text-muted-foreground" htmlFor="sm-task">Working on</label>
-                <select id="sm-task" value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)} className="h-11 w-full rounded-xl border-2 border-border bg-background px-3 text-sm font-medium">
+              <div className="mx-auto mt-5 max-w-md rounded-2xl border border-border/70 bg-card/70 p-3">
+                <label className="mb-1 block text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground" htmlFor="sm-task">Working on</label>
+                <select id="sm-task" value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)} className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-medium">
                   <option value="">No task selected</option>
                   {openTasks.map((t) => <option key={t.id} value={t.id}>{t.task_title}</option>)}
                 </select>
                 {selectedTaskId && <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={markTaskOnComplete} onChange={(e) => setMarkTaskOnComplete(e.target.checked)} /> Tick this task off when I finish</label>}
               </div>
 
-              <details className="mx-auto mt-4 max-w-md rounded-xl border border-border bg-background/60 px-3 py-2 text-sm">
+              <details className="mx-auto mt-4 max-w-md rounded-xl border border-border/70 bg-card/60 px-3 py-2 text-sm">
                 <summary className="cursor-pointer select-none font-semibold text-muted-foreground">Custom timer settings</summary>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   {([["Study (min)", studyMinutes, updateStudyMinutes, false], ["Break (min)", breakMinutes, updateBreakMinutes, mode === "deep"]] as const).map(([label, val, fn, off]) => (
@@ -732,7 +744,7 @@ const StudyModePage: React.FC = () => {
 
             <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {stats.map(({ label, value, icon: Icon }) => (
-                <div key={label} className="rounded-2xl border-2 border-border bg-card p-4 shadow-[0_3px_0_hsl(var(--border))]">
+                <div key={label} className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
                   <Icon className="mb-2 h-5 w-5 text-primary" />
                   <p className="text-2xl font-extrabold tabular-nums">{value}</p>
                   <p className="text-xs font-medium text-muted-foreground">{label}</p>
@@ -740,7 +752,7 @@ const StudyModePage: React.FC = () => {
               ))}
             </section>
 
-            <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-primary/30 bg-primary/5 p-4">
+            <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4">
               <div>
                 <p className="font-bold">Share your progress</p>
                 <p className="text-sm text-muted-foreground">Make a story card with today's study stats.</p>
@@ -752,7 +764,7 @@ const StudyModePage: React.FC = () => {
           </main>
 
           <aside className="space-y-5 lg:sticky lg:top-20 lg:self-start">
-            <section className="rounded-3xl border-2 border-border bg-card p-4 sm:p-5">
+            <section className="rounded-3xl border border-border/80 bg-card p-4 shadow-sm sm:p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-2 font-bold"><Check className="h-5 w-5 text-primary" /> Tasks</h2>
                 <span className="text-xs font-semibold text-muted-foreground">{doneTasks}/{tasks.length} done</span>
@@ -776,7 +788,7 @@ const StudyModePage: React.FC = () => {
               </ul>
             </section>
 
-            <section className="rounded-3xl border-2 border-border bg-card p-4 sm:p-5">
+            <section className="rounded-3xl border border-border/80 bg-card p-4 shadow-sm sm:p-5">
               <h2 className="mb-3 flex items-center gap-2 font-bold"><Users className="h-5 w-5 text-primary" /> Study room</h2>
               <StudyCallBar />
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -789,7 +801,7 @@ const StudyModePage: React.FC = () => {
               </div>
             </section>
 
-            <section className="rounded-3xl border-2 border-border bg-card p-4 sm:p-5">
+            <section className="rounded-3xl border border-border/80 bg-card p-4 shadow-sm sm:p-5">
               <h2 className="mb-3 flex items-center gap-2 font-bold"><Trophy className="h-5 w-5 text-primary" /> Study challenges</h2>
               <form className="mb-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); void createCompetition(); }}>
                 <Input value={competitionName} onChange={(e) => setCompetitionName(e.target.value)} placeholder="Challenge name" className="h-11 rounded-xl" />

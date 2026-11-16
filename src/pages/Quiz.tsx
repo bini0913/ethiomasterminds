@@ -21,7 +21,7 @@ import { normalizeSubject } from "@/lib/academicProfile";
 
 const Quiz: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { quizzes } = useQuiz();
+  const { quizzes, loading, loadError, fetchQuizzes } = useQuiz();
   const { user } = useUser();
   const tier = useTier();
   const upperStudent = tier === "upper";
@@ -419,21 +419,21 @@ const Quiz: React.FC = () => {
   }
   
   return (
-    <div className={upperStudent ? "tier-upper relative min-h-screen overflow-hidden bg-background text-foreground" : "relative min-h-screen overflow-hidden bg-background text-foreground"}>
+    <div className={upperStudent ? "tier-upper relative min-h-screen overflow-hidden bg-background text-foreground" : "tier-middle relative min-h-screen overflow-hidden bg-background text-foreground"}>
       
       <div className="relative z-10">
         {/* Header */}
         <header className="sticky top-0 z-20 border-b border-border bg-background/95">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <BackButton to="/" />
-                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                  <BookOpen className="h-5 w-5 text-primary-foreground" />
+              <div className="flex items-center gap-3">
+                {upperStudent && <BackButton to="/" />}
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <BookOpen className="h-5 w-5" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-display font-bold text-foreground">Quiz Center</h1>
-                  <p className="text-xs text-muted-foreground">Choose your challenge</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Practice studio</p>
+                  <h1 className="font-display text-lg font-bold text-foreground">Quiz Center</h1>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -452,14 +452,25 @@ const Quiz: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <section className="mb-6 rounded-3xl border-2 border-b-4 border-border bg-card p-5 sm:p-6">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary">Ready when you are</p>
-              <h2 className="mt-1 font-display text-2xl font-bold sm:text-3xl">Jump straight into practice</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{numQuestions} questions picked for your level. No setup needed.</p>
-              <button type="button" onClick={() => handleCreateRandomQuiz()} className="mm-btn mt-4 inline-flex h-14 w-full items-center justify-center gap-2 px-6 text-base font-bold uppercase tracking-wide sm:w-auto">
+            <section className="mb-6 overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-accent/10 p-5 shadow-sm sm:p-6">
+              <div className="max-w-2xl">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Ready when you are</p>
+                <h2 className="mt-2 font-display text-2xl font-bold sm:text-3xl">Jump straight into practice</h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{numQuestions} questions picked for your level. Build momentum, earn XP, and see what you know.</p>
+              </div>
+              <button type="button" onClick={() => handleCreateRandomQuiz()} disabled={loading || Boolean(loadError) || !selectedCategory} className="mm-btn mt-5 inline-flex h-12 w-full items-center justify-center gap-2 px-6 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
                 <Play className="h-5 w-5" /> Start practice
               </button>
             </section>
+            {loadError && (
+              <div role="alert" className="mb-6 flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold text-destructive">Approved quizzes are temporarily unavailable.</p>
+                  <p className="mt-1 text-muted-foreground">Your previous catalog remains visible while we reconnect.</p>
+                </div>
+                <Button variant="outline" className="min-h-10 shrink-0" onClick={() => void fetchQuizzes()}>Retry quiz bank</Button>
+              </div>
+            )}
             <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-6">
               <TabsList className="grid w-full grid-cols-2 bg-card border-border">
                 <TabsTrigger value="browse" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -594,12 +605,17 @@ const Quiz: React.FC = () => {
                     </motion.div>
                   ))}
                   
-                  {filteredQuizzes.length === 0 && (
+                  {loading && (
+                    <div className="col-span-full rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+                      Loading approved quizzes…
+                    </div>
+                  )}
+                  {!loading && !loadError && filteredQuizzes.length === 0 && (
                     <div className="col-span-full">
                       <Card className="bg-card border-border">
                         <CardContent className="py-12 text-center">
                           <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                          <p className="text-muted-foreground">No quizzes available for this grade/subject yet.</p>
+                          <p className="text-muted-foreground">No approved quizzes are available for this grade/subject yet.</p>
                           <Button
                             variant="outline"
                             className="mt-4"

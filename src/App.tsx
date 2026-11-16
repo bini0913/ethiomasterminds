@@ -23,6 +23,13 @@ const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const StudentDashboardRoute = lazy(() => import("./components/dashboard/StudentDashboardRoute"));
 const ManagerDashboard = lazy(() => import("./pages/ManagerDashboard"));
 const ManagerControlCenter = lazy(() => import("./pages/ManagerControlCenter"));
+const SchoolManagerPortal = lazy(() => import("./pages/SchoolManagerPortal"));
+const SchoolAdminPortal = lazy(() => import("./pages/SchoolAdminPortal"));
+const SchoolTeacherPortal = lazy(() => import("./pages/SchoolTeacherPortal"));
+const SchoolParentPortal = lazy(() => import("./pages/SchoolParentPortal"));
+const SchoolFinancePortal = lazy(() => import("./pages/SchoolFinancePortal"));
+const SchoolStudentPortal = lazy(() => import("./pages/SchoolStudentPortal"));
+const SchoolGlobalAdminPortal = lazy(() => import("./pages/SchoolGlobalAdminPortal"));
 const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
 const Chat = lazy(() => import("./pages/Chat"));
 const AITutor = lazy(() => import("./pages/AITutor"));
@@ -61,6 +68,8 @@ const SupabaseMigration = lazy(() => import("./pages/SupabaseMigration"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import EarlyTierRestrictedRoute from "./components/auth/EarlyTierRestrictedRoute";
 import { UserProvider } from "./context/UserContext";
+import { SchoolPortalProvider } from "./context/SchoolPortalContext";
+import SchoolPortalGate from "./components/school/SchoolPortalGate";
 import { TierProvider } from "./context/TierContext";
 import { QuizProvider } from "./context/QuizContext";
 import { AIHelperProvider } from "./context/AIHelperContext";
@@ -79,6 +88,7 @@ import NotificationBootstrap from "./components/notifications/NotificationBootst
 import NotificationRouteHandler from "./components/notifications/NotificationRouteHandler";
 import SocialRealtimeNotifications from "./components/notifications/SocialRealtimeNotifications";
 import StudentBottomNav from "./components/layout/StudentBottomNav";
+import MiddleTierShell from "./components/layout/MiddleTierShell";
 import UpperTierStudioShell from "./components/layout/UpperTierStudioShell";
 import { getUserTier } from "./lib/getUserTier";
 
@@ -124,6 +134,13 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/teacher", title: "Teacher Portal" },
   { prefix: "/admin/early-content", title: "Early Content" },
   { prefix: "/admin", title: "Admin Portal" },
+  { prefix: "/school/manager", title: "School Manager Portal" },
+  { prefix: "/school/admin", title: "School Admin Portal" },
+  { prefix: "/school/teacher", title: "School Teacher Portal" },
+  { prefix: "/school/parent", title: "School Parent Portal" },
+  { prefix: "/school/finance", title: "School Finance Portal" },
+  { prefix: "/school/student", title: "School Student Portal" },
+  { prefix: "/school/super-admin", title: "School Network Administration" },
   { prefix: "/manager", title: "Manager Control Center" },
   { prefix: "/manager-dashboard", title: "Manager Dashboard" },
   { prefix: "/finance", title: "Finance Portal" },
@@ -141,20 +158,22 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useUser();
 
-  // Finance is a standalone staff workspace with its own header and navigation.
-  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/")) return <>{children}</>;
+  // Standalone role workspaces provide their own navigation and layout.
+  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/") || location.pathname.startsWith("/school/")) return <>{children}</>;
 
   if (!isAuthenticated || !user) return <>{children}</>;
   if (user.role === "student" && getUserTier(user.grade) === "upper") return <UpperTierStudioShell>{children}</UpperTierStudioShell>;
 
   const isHome = location.pathname === "/";
   const isUpperStudent = getUserTier(user?.grade) === "upper";
+  const isStudent = user.role === "student";
+  const isMiddleStudent = isStudent && getUserTier(user?.grade) === "middle";
   // Grades 9–12 home renders its own screenshot-matched responsive shell.
   // Wrapping it here creates a second sidebar, header and desktop navigation.
   if (isHome && !isUpperStudent) {
+    if (isMiddleStudent) return <MiddleTierShell>{children}</MiddleTierShell>;
     return <>{children}</>;
   }
-  const isStudent = user.role === "student";
   const showBottomNav = isStudent && !isUpperStudent ? true : isUpperStudent;
 
   const handleBack = () => {
@@ -170,6 +189,8 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
     await logout();
     navigate("/", { replace: true });
   };
+
+  if (isMiddleStudent) return <MiddleTierShell>{children}</MiddleTierShell>;
 
   return (
     <div className={isUpperStudent ? "min-h-screen bg-background mm-studio-upper" : "min-h-screen bg-background"}>
@@ -266,6 +287,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <UserProvider>
+        <SchoolPortalProvider>
         <TierProvider>
           <LanguageProvider>
             <CurrencyProvider>
@@ -336,6 +358,13 @@ const App = () => (
                                 } 
                               />
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
+                              <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["admin"]}><SchoolPortalGate role="admin"><SchoolAdminPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolPortalGate role="teacher"><SchoolTeacherPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/parent" element={<ProtectedRoute allowedRoles={["parent"]}><SchoolPortalGate role="parent"><SchoolParentPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/finance" element={<ProtectedRoute allowedRoles={["finance"]}><SchoolPortalGate role="finance"><SchoolFinancePortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/student" element={<ProtectedRoute allowedRoles={["student"]}><SchoolPortalGate role="student"><SchoolStudentPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/super-admin" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><SchoolGlobalAdminPortal /></ProtectedRoute>} />
                               <Route
                                 path="/manager"
                                 element={
@@ -441,6 +470,7 @@ const App = () => (
             </CurrencyProvider>
           </LanguageProvider>
         </TierProvider>
+        </SchoolPortalProvider>
       </UserProvider>
     </ThemeProvider>
   </QueryClientProvider>

@@ -40,11 +40,13 @@ const InventoryPanel: React.FC = () => {
   const { user } = useUser();
   const [items, setItems] = React.useState<InventoryItem[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState(false);
   const [equippingId, setEquippingId] = React.useState<string | null>(null);
 
   const loadInventory = React.useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
+    setLoadError(false);
 
     const { data, error } = await (supabase as any)
       .from('user_items')
@@ -53,7 +55,8 @@ const InventoryPanel: React.FC = () => {
       .order('acquired_at', { ascending: false });
 
     if (error) {
-      toast.error('Failed to load inventory');
+      console.error('Failed to load inventory', error);
+      setLoadError(true);
       setLoading(false);
       return;
     }
@@ -130,6 +133,14 @@ const InventoryPanel: React.FC = () => {
         <CardContent>
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading inventory...</p>
+          ) : loadError ? (
+            <div role="alert" className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+              <div>
+                <p className="text-sm font-semibold">Inventory could not be loaded.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Your owned items were not changed. Retry to reconnect before treating this as an empty inventory.</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => void loadInventory()}>Retry inventory</Button>
+            </div>
           ) : items.length === 0 ? (
             <p className="text-sm text-muted-foreground">No owned items yet. Buy something from the shop first.</p>
           ) : (

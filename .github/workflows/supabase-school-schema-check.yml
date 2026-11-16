@@ -1,0 +1,56 @@
+name: Supabase school schema checks
+
+on:
+  push:
+    branches:
+      - main
+      - feat/school-management-portals-foundation
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "supabase/functions/**"
+      - "supabase/config.toml"
+      - "supabase/seed.sql"
+      - ".github/workflows/supabase-school-schema-check.yml"
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "supabase/functions/**"
+      - "supabase/config.toml"
+      - "supabase/seed.sql"
+      - ".github/workflows/supabase-school-schema-check.yml"
+
+concurrency:
+  group: school-schema-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start local Supabase services
+        run: supabase start -x studio,edge-runtime,logflare,vector,imgproxy
+      - name: Apply every migration from a clean database
+        run: supabase db reset --local
+      - name: Run pgTAP database tests
+        run: supabase test db
+      - name: Stop local Supabase services
+        if: always()
+        run: supabase stop --no-backup
+
+  edge-function-typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check school account provisioning function
+        run: deno check --node-modules-dir=auto supabase/functions/school-provision-account/index.ts

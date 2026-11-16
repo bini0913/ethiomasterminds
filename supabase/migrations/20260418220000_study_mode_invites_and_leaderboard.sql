@@ -23,17 +23,20 @@ create unique index if not exists uniq_study_room_pending_invite
 
 alter table public.study_room_invites enable row level security;
 
-create policy if not exists "invite_participants_view_study_room_invites"
+drop policy if exists "invite_participants_view_study_room_invites" on public.study_room_invites;
+create policy "invite_participants_view_study_room_invites"
 on public.study_room_invites
 for select
 using (auth.uid() = sender_id or auth.uid() = receiver_id);
 
-create policy if not exists "senders_create_study_room_invites"
+drop policy if exists "senders_create_study_room_invites" on public.study_room_invites;
+create policy "senders_create_study_room_invites"
 on public.study_room_invites
 for insert
 with check (auth.uid() = sender_id);
 
-create policy if not exists "receivers_or_senders_update_study_room_invites"
+drop policy if exists "receivers_or_senders_update_study_room_invites" on public.study_room_invites;
+create policy "receivers_or_senders_update_study_room_invites"
 on public.study_room_invites
 for update
 using (auth.uid() = sender_id or auth.uid() = receiver_id)

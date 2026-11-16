@@ -18,7 +18,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   BookOpen, Users, ClipboardList, Trophy, Bell, Settings, LogOut,
   Plus, Trash2, Edit, Send, Calendar, Clock, Target, Award, Search,
-  UserPlus, FileText, BarChart3, CheckCircle, XCircle, Loader2
+  UserPlus, FileText, BarChart3, CheckCircle, XCircle, Loader2, Download,
+  RefreshCw, Save, Copy, MoreHorizontal
 } from 'lucide-react';
 
 interface Quiz {
@@ -84,6 +85,8 @@ const TeacherPortal: React.FC = () => {
   const { user, logout } = useUser();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [portalError, setPortalError] = useState<string | null>(null);
   const [profile, setProfile] = useState<{ name: string; username: string } | null>(null);
   
   // Quiz state
@@ -117,6 +120,7 @@ const TeacherPortal: React.FC = () => {
   // Class state
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [showClassDialog, setShowClassDialog] = useState(false);
+  const [editingClass, setEditingClass] = useState<ClassData | null>(null);
   const [classForm, setClassForm] = useState({
     name: '',
     description: '',
@@ -130,6 +134,8 @@ const TeacherPortal: React.FC = () => {
   
   // Results state
   const [results, setResults] = useState<QuizResult[]>([]);
+  const [resultSearchQuery, setResultSearchQuery] = useState('');
+  const [resultQuizFilter, setResultQuizFilter] = useState('all');
   
   // Announcements state
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -165,6 +171,27 @@ const TeacherPortal: React.FC = () => {
     });
   }, [user]);
 
+  const refreshPortal = async () => {
+    setRefreshing(true);
+    setPortalError(null);
+    try {
+      await Promise.all([
+        fetchProfile(),
+        fetchQuizzes(),
+        fetchClasses(),
+        fetchResults(),
+        fetchAnnouncements(),
+        fetchAssignments(),
+      ]);
+      toast.success('Teacher workspace refreshed');
+    } catch (error) {
+      console.error('Teacher portal refresh failed:', error);
+      setPortalError('Some workspace data could not be refreshed. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const fetchProfile = async () => {
     const { data } = await supabase
       .from('profiles')
@@ -183,6 +210,7 @@ const TeacherPortal: React.FC = () => {
     
     if (error) {
       toast.error('Failed to fetch quizzes');
+      setPortalError('Quizzes could not be loaded. Use Refresh to try again.');
       return;
     }
     setQuizzes(data || []);
@@ -197,6 +225,7 @@ const TeacherPortal: React.FC = () => {
     
     if (error) {
       toast.error('Failed to fetch classes');
+      setPortalError('Classes could not be loaded. Use Refresh to try again.');
       return;
     }
     setClasses(data || []);
@@ -248,6 +277,7 @@ const TeacherPortal: React.FC = () => {
 
     if (quizError) {
       toast.error('Failed to fetch quiz results');
+      setPortalError('Results could not be loaded. Use Refresh to try again.');
       setResults([]);
       return;
     }
@@ -268,9 +298,13 @@ const TeacherPortal: React.FC = () => {
       .order('completed_at', { ascending: false })
       .limit(100);
 
-    if (!error && data) {
-      setResults(data);
+    if (error) {
+      toast.error('Failed to fetch quiz results');
+      setPortalError('Results could not be loaded. Use Refresh to try again.');
+      setResults([]);
+      return;
     }
+    setResults(data || []);
   };
 
   const fetchAssignments = async () => {
@@ -284,6 +318,7 @@ const TeacherPortal: React.FC = () => {
       .eq('assigned_by', user.id);
     if (error) {
       console.error('Failed to fetch quiz assignments:', error);
+      setPortalError('Assignments could not be loaded. Use Refresh to try again.');
       return;
     }
     setAssignments(data || []);
@@ -310,6 +345,7 @@ const TeacherPortal: React.FC = () => {
       
       if (error) {
         console.error('Failed to fetch students:', error);
+        setPortalError('Class students could not be loaded. Use Refresh to try again.');
         toast.error('Failed to fetch students');
         return;
       }
@@ -319,6 +355,62 @@ const TeacherPortal: React.FC = () => {
       console.error('Error fetching class students:', err);
       setClassStudents([]);
     }
+  };
+
+  const openClassEditor = (cls?: ClassData) => {
+    setEditingClass(cls || null);
+    setClassForm({
+      name: cls?.name || '',
+      description: cls?.description || '',
+      grade: cls?.grade || '9',
+      subject: cls?.subject || 'Math',
+    });
+    setShowClassDialog(true);
+  };
+
+  const handleSaveClass = async () => {
+    if (!classForm.name.trim()) {
+      toast.error('Please enter a class name');
+      return;
+    }
+
+    setLoading(true);
+    const classCode = editingClass?.class_code || `${classForm.subject.substring(0, 3).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+    const request = editingClass
+      ? supabase.from('classes').update({ ...classForm }).eq('id', editingClass.id)
+      : supabase.from('classes').insert({ ...classForm, class_code: classCode, teacher_id: user?.id });
+    const { error } = await request;
+    setLoading(false);
+
+    if (error) {
+      toast.error(editingClass ? 'Failed to update class' : 'Failed to create class');
+      return;
+    }
+
+    toast.success(editingClass ? 'Class updated' : `Class created! Code: ${classCode}`);
+    setShowClassDialog(false);
+    setEditingClass(null);
+    setClassForm({ name: '', description: '', grade: '9', subject: 'Math' });
+    await fetchClasses();
+  };
+
+  const handleDeleteClass = async (classId: string) => {
+    if (!window.confirm('Delete this class? Its memberships and class assignments will also be removed.')) return;
+    setLoading(true);
+    const { error } = await supabase.from('classes').delete().eq('id', classId);
+    setLoading(false);
+
+    if (error) {
+      toast.error('Failed to delete class');
+      return;
+    }
+
+    if (selectedClass?.id === classId) {
+      setSelectedClass(null);
+      setClassStudents([]);
+    }
+    toast.success('Class deleted');
+    await fetchClasses();
   };
 
   const searchStudents = async (query: string) => {
@@ -657,9 +749,19 @@ ${createdAnnouncement.content}`;
       return;
     }
     setAssigningQuiz(true);
-    const { error } = await supabase
-      .from('quiz_assignments')
-      .insert({ quiz_id: quizId, class_id: classId, assigned_by: user.id, due_date: dueDate?.toISOString() ?? null });
+    const selectedQuiz = quizzes.find(quiz => quiz.id === quizId);
+    const selectedClass = classes.find(cls => cls.id === classId);
+    if (selectedQuiz?.grade && selectedClass?.grade && selectedQuiz.grade !== selectedClass.grade) {
+      setAssigningQuiz(false);
+      toast.error(`This quiz is for Grade ${selectedQuiz.grade}, but the class is Grade ${selectedClass.grade}.`);
+      return;
+    }
+
+    const { error } = await (supabase.rpc as any)('create_teacher_assignment', {
+      p_quiz_id: quizId,
+      p_class_id: classId,
+      p_due_date: dueDate?.toISOString() ?? null,
+    });
 
     if (error) {
       setAssigningQuiz(false);
@@ -673,7 +775,6 @@ ${createdAnnouncement.content}`;
       .select('student_id')
       .eq('class_id', classId);
     const studentIds = Array.from(new Set((members || []).map((member: { student_id: string }) => member.student_id).filter(Boolean)));
-    const selectedQuiz = quizzes.find(quiz => quiz.id === quizId);
     const sentCount = membersError ? 0 : await sendRemoteNotifications(studentIds.map(studentId => ({
       userId: studentId,
       kind: 'quiz_assignment',
@@ -688,6 +789,46 @@ ${createdAnnouncement.content}`;
     toast.success(sentCount > 0
       ? `Quiz assigned. ${sentCount} student device(s) notified.`
       : 'Quiz assigned successfully. Students can see it in their assignments when they open Master Minds.');
+  };
+
+  const handleDeleteAssignment = async (assignmentId: string) => {
+    if (!window.confirm('Remove this assignment? Students will no longer see it as assigned work.')) return;
+    const { error } = await supabase.from('quiz_assignments').delete().eq('id', assignmentId);
+    if (error) {
+      toast.error('Could not remove assignment');
+      return;
+    }
+    toast.success('Assignment removed');
+    await fetchAssignments();
+  };
+
+  const exportResults = () => {
+    const visibleResults = results.filter(result => {
+      const quizTitle = (result as any).quizzes?.title || '';
+      const studentLabel = getStudentLabel(result.student_id);
+      return (resultQuizFilter === 'all' || (result as any).quiz_id === resultQuizFilter)
+        && `${quizTitle} ${studentLabel}`.toLowerCase().includes(resultSearchQuery.toLowerCase().trim());
+    });
+    const rows = [
+      ['Quiz', 'Student', 'Score', 'Correct', 'Total', 'Time (seconds)', 'Completed at'],
+      ...visibleResults.map(result => [
+        (result as any).quizzes?.title || 'Quiz',
+        getStudentLabel(result.student_id),
+        String(result.score),
+        String(result.correct_answers),
+        String(result.total_questions),
+        String(result.time_taken || 0),
+        new Date(result.completed_at).toISOString(),
+      ]),
+    ];
+    const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `master-minds-results-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${visibleResults.length} result(s) exported`);
   };
 
   const handleLogout = async () => {
@@ -727,10 +868,13 @@ ${createdAnnouncement.content}`;
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => setActiveTab('settings')}>
+              <Button variant="ghost" size="icon" aria-label="Open teacher settings" onClick={() => setActiveTab('settings')}>
                 <Settings className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={handleLogout}>
+              <Button variant="ghost" size="icon" aria-label="Refresh teacher workspace" onClick={refreshPortal} disabled={refreshing}>
+                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button variant="ghost" size="icon" aria-label="Sign out" onClick={handleLogout}>
                 <LogOut className="w-5 h-5" />
               </Button>
             </div>
@@ -738,6 +882,12 @@ ${createdAnnouncement.content}`;
         </header>
 
         <main className="mx-auto w-full max-w-7xl px-3 py-5 pb-24 sm:px-6 sm:py-7 lg:px-8">
+          {portalError && (
+            <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              <span>{portalError}</span>
+              <Button size="sm" variant="outline" onClick={refreshPortal} disabled={refreshing}>Try again</Button>
+            </div>
+          )}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <TabsTrigger value="dashboard" className="shrink-0 gap-2 rounded-xl px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
@@ -1189,14 +1339,14 @@ ${createdAnnouncement.content}`;
                 <h2 className="text-2xl font-bold">My Classes</h2>
                 <Dialog open={showClassDialog} onOpenChange={setShowClassDialog}>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button onClick={() => openClassEditor()}>
                       <Plus className="w-4 h-4 mr-2" />
                       Create Class
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Create New Class</DialogTitle>
+                      <DialogTitle>{editingClass ? 'Edit Class' : 'Create New Class'}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
                       <Input 
@@ -1228,9 +1378,9 @@ ${createdAnnouncement.content}`;
                           </SelectContent>
                         </Select>
                       </div>
-                      <Button className="w-full" onClick={handleCreateClass} disabled={loading}>
+                      <Button className="w-full" onClick={handleSaveClass} disabled={loading}>
                         {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Create Class
+                        {editingClass ? 'Save Class' : 'Create Class'}
                       </Button>
                     </div>
                   </DialogContent>
@@ -1249,11 +1399,15 @@ ${createdAnnouncement.content}`;
                     >
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between mb-4">
-                          <div>
+                          <div className="min-w-0">
                             <h3 className="text-lg font-semibold">{cls.name}</h3>
                             <p className="text-sm text-muted-foreground">{cls.description}</p>
                           </div>
-                          <Badge>{cls.subject}</Badge>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Badge>{cls.subject}</Badge>
+                            <Button type="button" variant="ghost" size="icon" aria-label={`Edit ${cls.name}`} onClick={(event) => { event.stopPropagation(); openClassEditor(cls); }}><Edit className="h-4 w-4" /></Button>
+                            <Button type="button" variant="ghost" size="icon" aria-label={`Delete ${cls.name}`} onClick={(event) => { event.stopPropagation(); void handleDeleteClass(cls.id); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          </div>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -1430,7 +1584,7 @@ ${createdAnnouncement.content}`;
                   const completedStudentIds = new Set(results.filter(result => (result as any).quiz_id === assignment.quiz_id && assignedStudentIds.includes(result.student_id)).map(result => result.student_id));
                   const completedCount = completedStudentIds.size;
                   const completionPercent = assignedStudentIds.length ? Math.round((completedCount / assignedStudentIds.length) * 100) : 0;
-                  return <Card key={assignment.id} className="border-slate-200 shadow-sm dark:border-slate-800"><CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{assignment.quizzes?.title || 'Quiz assignment'}</p><p className="mt-1 text-sm text-muted-foreground">{assignment.classes?.name || 'Class'}{assignment.classes?.grade ? ` · Grade ${assignment.classes.grade}` : ''}</p></div><Badge variant={overdue ? 'destructive' : 'secondary'}>{overdue ? 'Past due' : due ? 'Due date set' : 'No due date'}</Badge></div><div className="space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800"><div className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>{due ? `Due ${due.toLocaleDateString()}` : 'Flexible deadline'}</span><span>{assignment.quizzes?.subject || 'Quiz'}</span></div><div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Student progress</span><span className="font-semibold">{completedCount} / {assignedStudentIds.length} completed</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${completionPercent}%` }} /></div></div></CardContent></Card>;
+                  return <Card key={assignment.id} className="border-slate-200 shadow-sm dark:border-slate-800"><CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{assignment.quizzes?.title || 'Quiz assignment'}</p><p className="mt-1 text-sm text-muted-foreground">{assignment.classes?.name || 'Class'}{assignment.classes?.grade ? ` · Grade ${assignment.classes.grade}` : ''}</p></div><div className="flex items-center gap-2"><Badge variant={overdue ? 'destructive' : 'secondary'}>{overdue ? 'Past due' : due ? 'Due date set' : 'No due date'}</Badge><Button variant="ghost" size="icon" aria-label="Remove assignment" onClick={() => void handleDeleteAssignment(assignment.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div><div className="space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800"><div className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>{due ? `Due ${due.toLocaleDateString()}` : 'Flexible deadline'}</span><span>{assignment.quizzes?.subject || 'Quiz'}</span></div><div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Student progress</span><span className="font-semibold">{completedCount} / {assignedStudentIds.length} completed</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${completionPercent}%` }} /></div></div></CardContent></Card>;
                 })}
               </div>
               {assignments.length === 0 && <Card className="border-dashed border-slate-300 shadow-none dark:border-slate-700"><CardContent className="py-12 text-center"><ClipboardList className="mx-auto mb-3 h-9 w-9 text-muted-foreground" /><p className="font-semibold">No assignments yet</p><p className="mt-1 text-sm text-muted-foreground">Choose a quiz and class above to send the first assignment.</p></CardContent></Card>}
@@ -1438,13 +1592,28 @@ ${createdAnnouncement.content}`;
 
             <TabsContent value="results" className="space-y-6">
               <Card>
-                <CardHeader>
+                <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle>Student Quiz Results</CardTitle>
+                  <Button variant="outline" size="sm" onClick={exportResults} disabled={!results.length}><Download className="mr-2 h-4 w-4" />Export CSV</Button>
                 </CardHeader>
                 <CardContent>
+                  <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_220px]">
+                    <Input aria-label="Search results" placeholder="Search quiz or student" value={resultSearchQuery} onChange={(event) => setResultSearchQuery(event.target.value)} />
+                    <Select value={resultQuizFilter} onValueChange={setResultQuizFilter}>
+                      <SelectTrigger aria-label="Filter results by quiz"><SelectValue placeholder="All quizzes" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All quizzes</SelectItem>
+                        {quizzes.map((quiz) => <SelectItem key={quiz.id} value={quiz.id}>{quiz.title}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <ScrollArea className="h-96">
                     <div className="space-y-3">
-                      {results.map((result) => (
+                      {results.filter(result => {
+                        const quizTitle = (result as any).quizzes?.title || '';
+                        const studentLabel = getStudentLabel(result.student_id);
+                        return (resultQuizFilter === 'all' || (result as any).quiz_id === resultQuizFilter) && `${quizTitle} ${studentLabel}`.toLowerCase().includes(resultSearchQuery.toLowerCase().trim());
+                      }).map((result) => (
                         <Card key={result.id} className="p-4">
                           <div className="flex items-center justify-between">
                             <div>

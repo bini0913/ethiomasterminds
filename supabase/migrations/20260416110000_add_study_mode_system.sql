@@ -41,28 +41,57 @@ alter table public.tasks enable row level security;
 alter table public.study_rooms enable row level security;
 alter table public.room_members enable row level security;
 
-create policy if not exists "users_manage_own_study_sessions"
-on public.study_sessions
-for all
+DO $policy$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'study_sessions' AND policyname = 'users_manage_own_study_sessions'
+  ) THEN
+    CREATE POLICY "users_manage_own_study_sessions" ON public.study_sessions
+    for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+  END IF;
+END
+$policy$;
 
-create policy if not exists "users_manage_own_tasks"
-on public.tasks
-for all
+DO $policy$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'tasks' AND policyname = 'users_manage_own_tasks'
+  ) THEN
+    CREATE POLICY "users_manage_own_tasks" ON public.tasks
+    for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+  END IF;
+END
+$policy$;
 
-create policy if not exists "hosts_manage_rooms"
-on public.study_rooms
-for all
+DO $policy$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'study_rooms' AND policyname = 'hosts_manage_rooms'
+  ) THEN
+    CREATE POLICY "hosts_manage_rooms" ON public.study_rooms
+    for all
 using (auth.uid() = host_id)
 with check (auth.uid() = host_id);
+  END IF;
+END
+$policy$;
 
 
-create policy if not exists "members_or_open_rooms_can_view_rooms"
-on public.study_rooms
-for select
+DO $policy$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'study_rooms' AND policyname = 'members_or_open_rooms_can_view_rooms'
+  ) THEN
+    CREATE POLICY "members_or_open_rooms_can_view_rooms" ON public.study_rooms
+    for select
 using (
   status in ('open', 'live')
   or auth.uid() = host_id
@@ -73,10 +102,18 @@ using (
       and rm.user_id = auth.uid()
   )
 );
+  END IF;
+END
+$policy$;
 
-create policy if not exists "members_view_room_members"
-on public.room_members
-for select
+DO $policy$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'room_members' AND policyname = 'members_view_room_members'
+  ) THEN
+    CREATE POLICY "members_view_room_members" ON public.room_members
+    for select
 using (
   exists (
     select 1
@@ -85,12 +122,23 @@ using (
       and rm.user_id = auth.uid()
   )
 );
+  END IF;
+END
+$policy$;
 
-create policy if not exists "users_manage_membership_rows"
-on public.room_members
-for all
+DO $policy$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'room_members' AND policyname = 'users_manage_membership_rows'
+  ) THEN
+    CREATE POLICY "users_manage_membership_rows" ON public.room_members
+    for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+  END IF;
+END
+$policy$;
 
 -- Useful indexes
 create index if not exists idx_study_sessions_user_created_at on public.study_sessions(user_id, created_at desc);

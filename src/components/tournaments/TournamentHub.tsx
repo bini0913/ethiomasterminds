@@ -122,6 +122,8 @@ const TournamentHub: React.FC = () => {
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [joiningTournamentId, setJoiningTournamentId] = useState<string | null>(null);
   const [navigatedMatchRoomId, setNavigatedMatchRoomId] = useState<string | null>(null);
+  const [listLoadError, setListLoadError] = useState(false);
+  const [detailsLoadError, setDetailsLoadError] = useState(false);
   const isManager = user?.role === "manager" || user?.role === "admin" || user?.role === "extreme_admin";
 
   const selectedTournament = useMemo(
@@ -143,6 +145,7 @@ const TournamentHub: React.FC = () => {
   }, [matches]);
 
   const loadTournaments = async () => {
+    setListLoadError(false);
     try {
       // Auto-start is best-effort; a missing RPC must not block the tournament list.
       try {
@@ -194,12 +197,12 @@ const TournamentHub: React.FC = () => {
       if (!selectedTournamentId && mapped.length > 0) setSelectedTournamentId(mapped[0].id);
     } catch (error) {
       console.error("Tournament list load failed:", error);
-      toast.error("Tournaments could not be loaded. Please retry.");
-      setTournaments([]);
+      setListLoadError(true);
     }
   };
 
   const loadTournamentDetails = async (tournamentId: string) => {
+    setDetailsLoadError(false);
     try {
       const [playersRes, matchesRes, profilesRes, eventsRes] = await Promise.all([
         supabase
@@ -266,10 +269,7 @@ const TournamentHub: React.FC = () => {
       );
     } catch (error) {
       console.error("Tournament details load failed:", error);
-      toast.error("Tournament details could not be loaded. Please select the tournament again.");
-      setPlayers([]);
-      setMatches([]);
-      setEvents([]);
+      setDetailsLoadError(true);
     }
   };
 
@@ -546,6 +546,26 @@ const TournamentHub: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {listLoadError && (
+        <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold">Tournaments could not be loaded.</p>
+            <p className="mt-1 text-muted-foreground">The list may be temporarily unavailable. Retry before treating the empty sections as current.</p>
+          </div>
+          <Button variant="outline" className="min-h-10 shrink-0" onClick={() => void loadTournaments()}>Retry tournaments</Button>
+        </div>
+      )}
+
+      {detailsLoadError && selectedTournament && (
+        <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold">Tournament details could not be loaded.</p>
+            <p className="mt-1 text-muted-foreground">The tournament list is still available. Retry to reconnect the players and bracket.</p>
+          </div>
+          <Button variant="outline" className="min-h-10 shrink-0" onClick={() => void loadTournamentDetails(selectedTournament.id)}>Retry details</Button>
+        </div>
+      )}
 
       <section className="space-y-5">
         <h2 className="flex items-center gap-2 text-lg font-semibold"><Flame className="h-5 w-5 text-red-400" /> 🔥 Active Tournaments</h2>

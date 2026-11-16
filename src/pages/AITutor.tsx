@@ -1,22 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { useUser } from '@/context/UserContext';
 import { getUserTier } from '@/lib/getUserTier';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  Bot, Send, Loader2, BookOpen, Calculator, Globe, Beaker, History,
-  Sparkles, Mic, MicOff, Volume2, VolumeX, Lightbulb, ListChecks,
-  RefreshCw, Copy, Check, Brain
+  ArrowUp, Bot, Check, Copy, Loader2, Mic, MicOff, MoreHorizontal,
+  Plus, RefreshCw, RotateCcw, Sparkles, Volume2, VolumeX,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '@/components/ui/BackButton';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -25,30 +20,17 @@ interface Message {
   timestamp: string;
 }
 
-const subjects = [
-  { id: 'math', name: 'Mathematics', icon: Calculator, color: 'bg-primary/10 text-primary' },
-  { id: 'science', name: 'Science', icon: Beaker, color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
-  { id: 'english', name: 'English', icon: BookOpen, color: 'bg-accent/10 text-accent' },
-  { id: 'history', name: 'History', icon: History, color: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' },
-  { id: 'geography', name: 'Geography', icon: Globe, color: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' },
-  { id: 'general', name: 'General', icon: Sparkles, color: 'bg-muted text-muted-foreground' },
-];
-
-const quickActions = [
-  { label: 'Proof / derivation', prompt: 'Give a rigorous step-by-step mathematical proof or derivation. State assumptions, show each step, and explain why it follows.', icon: Calculator },
-  { label: 'Entrance exam analysis', prompt: 'Analyze this as an Ethiopian Grade 12 Entrance Exam question. Identify the tested concept, solve it methodically, explain distractors, and show an efficient exam approach.', icon: Brain },
-  { label: 'Formulas & mnemonics', prompt: 'Summarize the key formulas, define each symbol, explain when each formula applies, and suggest accurate mnemonic devices.', icon: BookOpen },
-  { label: '3 high-yield questions', prompt: 'Generate 3 high-yield practice questions for this topic, ordered from foundational to exam-level. Hide answers until I attempt them.', icon: ListChecks },
-];
-
-const starterPrompts: Record<string, string[]> = {
-  math: ['Explain Pythagoras theorem with a story', 'Help me solve quadratic equations', 'What is calculus used for?'],
-  science: ['Why is the sky blue?', 'How do vaccines work?', 'Explain Newton\'s laws'],
-  english: ['Improve this sentence: ...', 'What is a metaphor?', 'Help me write an essay intro'],
-  history: ['Tell me about Ethiopian history', 'Who was Menelik II?', 'Explain World War II briefly'],
-  geography: ['What causes monsoons?', 'Tallest mountains on Earth', 'How are deserts formed?'],
-  general: ['Teach me something new today', 'Give me a study tip', 'Help me focus better'],
+type Conversation = {
+  id: string;
+  updated_at?: string | null;
+  messages?: unknown;
 };
+
+const starterPrompts = [
+  'Explain a difficult topic step by step',
+  'Help me plan a focused study session',
+  'Quiz me on something I am learning',
+];
 
 const AITutor: React.FC = () => {
   const { user } = useUser();
@@ -57,271 +39,222 @@ const AITutor: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState('general');
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [voiceOut, setVoiceOut] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [historyError, setHistoryError] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [lastFailedPrompt, setLastFailedPrompt] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  useEffect(() => { if (user?.id) loadConversations(); }, [user?.id]);
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, isLoading]);
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  const firstName = user?.name?.split(' ')[0] || 'there';
+  const gradeLabel = user?.grade ? `Grade ${user.grade}` : 'your learning level';
 
   useEffect(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    const rec = new SR();
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onresult = (e: any) => { setInput(e.results[0][0].transcript); setIsListening(false); };
-    rec.onerror = () => setIsListening(false);
-    rec.onend = () => setIsListening(false);
-    recognitionRef.current = rec;
+    if (user?.id) void loadConversations();
+  }, [user?.id]);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event: any) => {
+      setInput(event.results[0][0].transcript);
+      setIsListening(false);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    return () => recognition.stop();
+  }, []);
+
+  const loadConversations = async () => {
+    if (!user?.id) return;
+    setHistoryError(false);
+    try {
+      const { data, error } = await supabase
+        .from('ai_tutor_conversations')
+        .select('id,updated_at,messages')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      setConversations((data || []).map((conversation) => ({
+        id: conversation.id,
+        updated_at: conversation.updated_at,
+        messages: conversation.messages,
+      })));
+    } catch (error) {
+      console.error('AI Tutor conversation history failed:', error);
+      setHistoryError(true);
+    }
+  };
+
+  const startNew = () => {
+    setConversationId(null);
+    setMessages([]);
+    setInput('');
+    setSendError(null);
+    setLastFailedPrompt(null);
+    setShowHistory(false);
+    textareaRef.current?.focus();
+  };
+
+  const openConversation = (conversation: Conversation) => {
+    setConversationId(conversation.id);
+    setMessages(Array.isArray(conversation.messages) ? conversation.messages as Message[] : []);
+    setInput('');
+    setSendError(null);
+    setLastFailedPrompt(null);
+    setShowHistory(false);
+    textareaRef.current?.focus();
+  };
 
   const speak = (text: string) => {
     if (!voiceOut || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, ''));
-    u.rate = 1; u.pitch = 1.05;
-    window.speechSynthesis.speak(u);
+    const utterance = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, ''));
+    utterance.rate = 1;
+    utterance.pitch = 1.05;
+    window.speechSynthesis.speak(utterance);
   };
 
   const toggleMic = () => {
-    if (!recognitionRef.current) { toast.error('Voice input not supported'); return; }
-    if (isListening) { recognitionRef.current.stop(); setIsListening(false); }
-    else { recognitionRef.current.start(); setIsListening(true); }
-  };
-
-  const loadConversations = async () => {
-    if (!user?.id) { setConversations([]); return; }
-    try {
-      const { data, error } = await supabase.from('ai_tutor_conversations')
-        .select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(15);
-      if (error) throw error;
-      setConversations(data || []);
-    } catch (error) {
-      console.error("AI Tutor conversation list load failed:", error);
-      toast.error("Your saved AI Tutor conversations could not be loaded.");
+    if (!recognitionRef.current) {
+      toast.error('Voice input is not supported in this browser.');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
     }
   };
-
-  const loadConversation = (conv: any) => {
-    setConversationId(conv.id);
-    setSelectedSubject(conv.subject || 'general');
-    setMessages((conv.messages as Message[]) || []);
-  };
-
-  const startNew = () => { setConversationId(null); setMessages([]); inputRef.current?.focus(); };
 
   const send = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content || isLoading) return;
-    const userMsg: Message = { role: 'user', content, timestamp: new Date().toISOString() };
-    setMessages(p => [...p, userMsg]);
+    const userMessage: Message = { role: 'user', content, timestamp: new Date().toISOString() };
+    setMessages((previous) => [...previous, userMessage]);
     setInput('');
     setIsLoading(true);
+    setSendError(null);
+    setLastFailedPrompt(null);
     try {
       const { data, error } = await supabase.functions.invoke('ai-tutor', {
-        body: { message: content, conversationId, subject: selectedSubject },
+        body: { message: content, conversationId, subject: 'general' },
       });
       if (error) throw error;
+      if (!data?.message) throw new Error('The tutor returned an empty response. Please try again.');
       if (data.conversationId && !conversationId) setConversationId(data.conversationId);
-      const aiMsg: Message = { role: 'assistant', content: data.message, timestamp: new Date().toISOString() };
-      setMessages(p => [...p, aiMsg]);
+      const assistantMessage: Message = { role: 'assistant', content: data.message, timestamp: new Date().toISOString() };
+      setMessages((previous) => [...previous, assistantMessage]);
       speak(data.message);
-      loadConversations();
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e.message || 'Failed to get response');
-    } finally { setIsLoading(false); inputRef.current?.focus(); }
+      void loadConversations();
+    } catch (error: any) {
+      console.error('AI Tutor response failed:', error);
+      setSendError(error?.message || 'The tutor could not respond right now.');
+      setLastFailedPrompt(content);
+    } finally {
+      setIsLoading(false);
+      textareaRef.current?.focus();
+    }
   };
 
-  const copyMsg = (text: string, idx: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(null), 1500);
+  const copyMessage = async (text: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIdx(index);
+      window.setTimeout(() => setCopiedIdx(null), 1500);
+    } catch {
+      toast.error('Could not copy this response.');
+    }
   };
-
-  const subj = subjects.find(s => s.id === selectedSubject)!;
-  const prompts = starterPrompts[selectedSubject] || starterPrompts.general;
 
   return (
-    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground relative overflow-hidden" : "min-h-screen bg-background text-foreground relative overflow-hidden"}>
-
-      <header className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border/50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {!upperStudent && <BackButton />}
-            <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center", subj.color)}>
-              <Bot className="h-5 w-5 text-current" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">AI Tutor</h1>
-              <p className="text-xs text-muted-foreground">Academic reasoning · Exam preparation · Concept mastery</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setVoiceOut(v => !v)} title="Toggle voice">
-              {voiceOut ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4" />}
-            </Button>
-            <Button variant="outline" size="sm" onClick={startNew}><RefreshCw className="h-4 w-4 mr-2" />New chat</Button>
-          </div>
+    <div className={cn('flex min-h-screen flex-col bg-white text-[#202123]', upperStudent && 'tier-upper')}>
+      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-[#ececf1] bg-white/90 px-3 backdrop-blur-md sm:px-5">
+        <div className="flex min-w-0 items-center gap-2">
+          {!upperStudent && <BackButton />}
+          <button type="button" onClick={startNew} className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#f7f7f8]">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#287c68] text-white"><Sparkles className="h-4 w-4" /></span>
+            <span className="truncate text-sm font-semibold">AI Tutor</span>
+            <span className="hidden text-xs text-[#8e8ea0] sm:inline">· {gradeLabel}</span>
+          </button>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={() => setVoiceOut((value) => !value)} className="h-9 w-9 rounded-lg text-[#6e6e80] hover:bg-[#f7f7f8]" aria-label={voiceOut ? 'Turn voice responses off' : 'Turn voice responses on'}>
+            {voiceOut ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setShowHistory((value) => !value)} className="h-9 w-9 rounded-lg text-[#6e6e80] hover:bg-[#f7f7f8]" aria-label="Show chat history"><MoreHorizontal className="h-4 w-4" /></Button>
+          <Button onClick={startNew} variant="outline" size="sm" className="ml-1 hidden h-9 gap-1.5 rounded-lg border-[#d9d9e3] text-[#4a4a57] sm:inline-flex"><Plus className="h-4 w-4" /> New chat</Button>
         </div>
       </header>
 
-      <div className="container max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-4 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1 space-y-4">
-            <Card className="glass border-border/50">
-              <CardHeader className="pb-3"><CardTitle className="text-sm">Subject focus</CardTitle></CardHeader>
-              <CardContent className="space-y-1.5">
-                {subjects.map(s => (
-                  <Button key={s.id} variant={selectedSubject === s.id ? 'default' : 'ghost'} size="sm"
-                    className="w-full justify-start" onClick={() => setSelectedSubject(s.id)}>
-                    <div className={cn("w-6 h-6 rounded-md flex items-center justify-center mr-2", s.color)}>
-                      <s.icon className="h-3 w-3 text-current" />
-                    </div>
-                    {s.name}
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="glass border-border/50">
-              <CardHeader className="pb-3"><CardTitle className="text-sm">Recent chats</CardTitle></CardHeader>
-              <CardContent className="space-y-1.5 max-h-72 overflow-y-auto">
-                {conversations.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No conversations yet</p>
-                ) : conversations.map(c => (
-                  <Button key={c.id} variant={conversationId === c.id ? 'secondary' : 'ghost'} size="sm"
-                    className="w-full justify-start text-left h-auto py-2" onClick={() => loadConversation(c)}>
-                    <div className="truncate">
-                      <div className="text-xs font-medium truncate capitalize">{c.subject || 'general'}</div>
-                      <div className="text-[10px] text-muted-foreground">{new Date(c.updated_at).toLocaleDateString()}</div>
-                    </div>
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
+      {showHistory && (
+        <div className="absolute right-3 top-[60px] z-30 w-[min(360px,calc(100vw-24px))] rounded-xl border border-[#e5e5eb] bg-white p-2 shadow-[0_12px_35px_rgba(0,0,0,0.12)] sm:right-5">
+          <div className="flex items-center justify-between px-2 py-2">
+            <p className="text-xs font-semibold text-[#565869]">Recent chats</p>
+            <button type="button" onClick={() => void loadConversations()} className="rounded-md p-1.5 text-[#8e8ea0] hover:bg-[#f7f7f8]" aria-label="Refresh chat history"><RefreshCw className="h-3.5 w-3.5" /></button>
           </div>
-
-          <div className="lg:col-span-3">
-            <Card className="glass border-border/50 h-[calc(100dvh-150px)] min-h-[520px] flex flex-col">
-              <CardHeader className="pb-3 border-b border-border/50">
-                <div className="flex items-center gap-3">
-                  <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", subj.color)}>
-                    <Bot className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <CardTitle className="text-base">AI Tutor · {subj.name}</CardTitle>
-                    <p className="text-xs text-muted-foreground">Encouraging, patient, step-by-step</p>
-                  </div>
-                  <Badge variant="secondary"><Sparkles className="h-3 w-3 mr-1" />Groq powered</Badge>
-                </div>
-              </CardHeader>
-
-              <ScrollArea className="flex-1 p-4" ref={scrollRef as any}>
-                <div className="space-y-4">
-                  {messages.length === 0 ? (
-                    <div className="text-center py-12">
-                      <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity }}
-                        className={cn("w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-4", subj.color)}>
-                        <Bot className="h-10 w-10 text-current" />
-                      </motion.div>
-                      <h3 className="text-xl font-bold mb-2">Welcome {user?.name?.split(' ')[0] || 'there'}</h3>
-                      <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                        I'll explain anything, quiz you, give examples, and adapt to how you learn best.
-                      </p>
-                      <div className="flex flex-wrap gap-2 justify-center max-w-lg mx-auto">
-                        {prompts.map(p => (
-                          <Button key={p} variant="outline" size="sm" onClick={() => send(p)}
-                            className="hover-scale">
-                            <Sparkles className="h-3 w-3 mr-1.5 text-primary" />{p}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <AnimatePresence initial={false}>
-                      {messages.map((msg, idx) => (
-                        <motion.div key={idx} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                          className={cn('flex group', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                          <div className={cn('max-w-[92%] sm:max-w-[85%] rounded-2xl px-4 py-3 relative min-w-0',
-                            msg.role === 'user'
-                              ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                              : 'bg-muted/70 backdrop-blur rounded-tl-sm border border-border/50')}>
-                            {msg.role === 'assistant' ? (
-                              <div className="prose prose-sm dark:prose-invert max-w-none text-[15px] leading-7 prose-p:my-2 prose-p:leading-7 prose-headings:text-base prose-headings:font-semibold prose-headings:leading-6 prose-headings:mt-4 prose-headings:mb-2 prose-h1:text-lg prose-h2:text-base prose-h3:text-sm prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-strong:font-semibold prose-code:text-primary prose-code:bg-background/50 prose-code:px-1 prose-code:rounded prose-pre:bg-background/70">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                              </div>
-                            ) : (
-                              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                            )}
-                            <div className="flex items-center justify-between gap-2 mt-1.5">
-                              <p className={cn('text-[10px]', msg.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
-                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                              {msg.role === 'assistant' && (
-                                <button onClick={() => copyMsg(msg.content, idx)}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
-                                  {copiedIdx === idx ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  )}
-
-                  {isLoading && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                      <div className="bg-muted/70 backdrop-blur rounded-2xl rounded-tl-sm px-4 py-3 border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          <span className="text-sm text-muted-foreground">Tutor is thinking…</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              </ScrollArea>
-
-              {messages.length > 0 && !isLoading && (
-                <div className="px-4 pb-2 flex flex-wrap gap-1.5 border-t border-border/30 pt-2">
-                  {quickActions.map(a => (
-                    <Button key={a.label} variant="outline" size="sm" className="h-7 text-xs"
-                      onClick={() => send(a.prompt)}>
-                      <a.icon className="h-3 w-3 mr-1" />{a.label}
-                    </Button>
-                  ))}
-                </div>
-              )}
-
-              <div className="p-3 border-t border-border/50 bg-card/30">
-                <div className="flex gap-2">
-                  <Button type="button" variant={isListening ? 'default' : 'outline'} size="icon"
-                    onClick={toggleMic}
-                    className={cn('shrink-0', isListening && 'bg-destructive hover:bg-destructive/90 animate-pulse')}>
-                    {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  </Button>
-                  <Input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    placeholder={isListening ? 'Listening…' : `Ask about ${subj.name.toLowerCase()}…`}
-                    disabled={isLoading} className="flex-1" />
-                  <Button onClick={() => send()} disabled={isLoading || !input.trim()} className="shrink-0">
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </div>
+          {historyError ? <div className="px-2 py-3 text-xs text-[#b45309]"><p>History could not be loaded.</p><button type="button" onClick={() => void loadConversations()} className="mt-1 font-semibold underline">Try again</button></div> : conversations.length === 0 ? <p className="px-2 py-3 text-xs text-[#8e8ea0]">No saved conversations yet.</p> : conversations.map((conversation) => <button key={conversation.id} type="button" onClick={() => openConversation(conversation)} className={cn('block w-full truncate rounded-lg px-2 py-2 text-left text-xs hover:bg-[#f7f7f8]', conversationId === conversation.id && 'bg-[#f1f7f5] text-[#287c68]')}>Study conversation<span className="ml-2 text-[10px] text-[#a0a0ad]">{conversation.updated_at ? new Date(conversation.updated_at).toLocaleDateString() : ''}</span></button>)}
         </div>
-      </div>
+      )}
+
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-[800px] px-4 pb-44 pt-8 sm:px-6 sm:pt-12">
+          {messages.length === 0 ? (
+            <div className="flex min-h-[58vh] flex-col items-center justify-center text-center">
+              <div className="mb-5 grid h-12 w-12 place-items-center rounded-full bg-[#287c68] text-white"><Sparkles className="h-6 w-6" /></div>
+              <h1 className="text-2xl font-semibold tracking-tight text-[#202123] sm:text-3xl">How can I help you learn?</h1>
+              <p className="mt-3 max-w-md text-sm leading-6 text-[#6e6e80]">Ask anything, paste a problem, or continue a conversation. I’ll explain ideas clearly and work through problems with you.</p>
+              <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-3">
+                {starterPrompts.map((prompt) => <button key={prompt} type="button" onClick={() => void send(prompt)} className="min-h-16 rounded-xl border border-[#e5e5eb] bg-white px-3 py-3 text-left text-xs text-[#565869] shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition hover:border-[#b8d8ce] hover:bg-[#f8fbfa] hover:text-[#287c68]">{prompt}</button>)}
+              </div>
+            </div>
+          ) : (
+              messages.map((message, index) => (
+                <div key={`${message.timestamp}-${index}`} className="group mb-8 flex gap-4">
+                  <div className={cn('mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full', message.role === 'assistant' ? 'bg-[#287c68] text-white' : 'bg-[#ececf1] text-[#565869]')}>
+                    {message.role === 'assistant' ? <Bot className="h-4 w-4" /> : <span className="text-[10px] font-bold">YOU</span>}
+                  </div>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    {message.role === 'assistant' ? <div className="prose prose-sm max-w-none text-[15px] leading-7 text-[#2d2d36] prose-p:my-2 prose-p:leading-7 prose-headings:mb-3 prose-headings:mt-5 prose-headings:text-base prose-strong:text-[#202123] prose-code:rounded prose-code:bg-[#f7f7f8] prose-code:px-1"><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown></div> : <p className="whitespace-pre-wrap text-[15px] leading-7 text-[#202123]">{message.content}</p>}
+                    <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                      <span className="text-[10px] text-[#a0a0ad]">{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      {message.role === 'assistant' && <button type="button" onClick={() => void copyMessage(message.content, index)} className="rounded p-1 text-[#8e8ea0] hover:bg-[#f7f7f8] hover:text-[#287c68]" aria-label="Copy response">{copiedIdx === index ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</button>}
+                    </div>
+                  </div>
+                </div>
+              ))
+          )}
+
+          {isLoading && <div className="mb-8 flex gap-4"><div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#287c68] text-white"><Bot className="h-4 w-4" /></div><div className="flex items-center gap-2 pt-1 text-sm text-[#8e8ea0]"><Loader2 className="h-4 w-4 animate-spin text-[#287c68]" /> Thinking…</div></div>}
+          {sendError && <div role="alert" className="mb-5 ml-11 flex items-center justify-between gap-3 rounded-lg bg-[#fff7ed] px-3 py-2 text-xs text-[#9a3412]"><span>{sendError}</span>{lastFailedPrompt && <button type="button" onClick={() => void send(lastFailedPrompt)} className="inline-flex shrink-0 items-center gap-1 font-semibold underline"><RotateCcw className="h-3 w-3" /> Retry</button>}</div>}
+        </div>
+      </main>
+
+      <footer className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-white via-white/95 to-transparent px-3 pb-3 pt-8 sm:px-6 sm:pb-5">
+        <div className="mx-auto max-w-[800px]">
+          <div className="flex items-end gap-2 rounded-2xl border border-[#d9d9e3] bg-white p-2 shadow-[0_4px_18px_rgba(0,0,0,0.08)] focus-within:border-[#287c68] focus-within:ring-2 focus-within:ring-[#287c68]/10">
+            <Button type="button" variant="ghost" size="icon" onClick={toggleMic} className={cn('mb-0.5 h-9 w-9 shrink-0 rounded-xl text-[#6e6e80] hover:bg-[#f7f7f8] hover:text-[#287c68]', isListening && 'bg-red-50 text-red-600 hover:bg-red-100')} aria-label={isListening ? 'Stop voice input' : 'Start voice input'}>{isListening ? <MicOff className="h-4 w-4 animate-pulse" /> : <Mic className="h-4 w-4" />}</Button>
+            <Textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Message AI Tutor…" disabled={isLoading} rows={1} className="max-h-32 min-h-[38px] resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0" />
+            <Button type="button" onClick={() => void send()} disabled={isLoading || !input.trim()} className="mb-0.5 h-9 w-9 shrink-0 rounded-xl bg-[#202123] p-0 text-white hover:bg-[#343541]" aria-label="Send message"><ArrowUp className="h-4 w-4" /></Button>
+          </div>
+          <p className="mt-2 text-center text-[10px] text-[#8e8ea0]">AI Tutor can make mistakes. Check important answers with your textbook.</p>
+        </div>
+      </footer>
     </div>
   );
 };

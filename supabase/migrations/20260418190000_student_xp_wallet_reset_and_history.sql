@@ -45,7 +45,10 @@ begin
   insert into public.wallets (user_id, coins, gems, xp)
   select p.id, 100, 10, coalesce(p.xp, 0)
   from public.profiles p
-  where p.role = 'student'
+  where exists (
+    select 1 from public.user_roles ur
+    where ur.user_id = p.id and ur.role = 'student'
+  )
   on conflict (user_id) do update
   set xp = coalesce(public.wallets.xp, excluded.xp);
 
@@ -65,7 +68,10 @@ begin
       'reset_at', now()
     )
   from public.profiles p
-  where p.role = 'student';
+  where exists (
+    select 1 from public.user_roles ur
+    where ur.user_id = p.id and ur.role = 'student'
+  );
 
   -- Add transactional record for transparency.
   insert into public.transactions (sender_id, receiver_id, amount, type, source)
@@ -76,7 +82,10 @@ begin
     'convert',
     'leaderboard_reset_xp_to_coins'
   from public.profiles p
-  where p.role = 'student'
+  where exists (
+    select 1 from public.user_roles ur
+    where ur.user_id = p.id and ur.role = 'student'
+  )
     and coalesce(p.xp, 0) > 0;
 
   -- Credit coins 1:1 from pre-reset XP and clear wallet XP.
@@ -85,15 +94,21 @@ begin
       xp = 0
   from public.profiles p
   where p.id = w.user_id
-    and p.role = 'student';
+    and exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = p.id and ur.role = 'student'
+    );
 
   -- Hard reset leaderboard-driving profile progression.
   v_reset_rank := coalesce(public.rank_from_level(1), 'BRONZE');
-  update public.profiles
+  update public.profiles p
   set xp = 0,
       level = 1,
       rank = v_reset_rank
-  where role = 'student';
+  where exists (
+    select 1 from public.user_roles ur
+    where ur.user_id = p.id and ur.role = 'student'
+  );
 
   select
     count(*),

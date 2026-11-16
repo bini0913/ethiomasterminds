@@ -40,6 +40,48 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 
+-- Earlier application migrations already created public.messages for direct
+-- sender/receiver messages. CREATE TABLE IF NOT EXISTS does not add columns to
+-- that existing table, so extend it compatibly instead of assuming a fresh table.
+-- conversation_id stays nullable so legacy direct messages remain readable.
+ALTER TABLE public.messages
+  ADD COLUMN IF NOT EXISTS conversation_id uuid,
+  ADD COLUMN IF NOT EXISTS message_type public.chat_message_type NOT NULL DEFAULT 'text',
+  ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS reply_to uuid,
+  ADD COLUMN IF NOT EXISTS is_edited boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS is_deleted boolean NOT NULL DEFAULT false;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.messages'::regclass
+      AND conname = 'messages_conversation_id_fkey'
+  ) THEN
+    ALTER TABLE public.messages
+      ADD CONSTRAINT messages_conversation_id_fkey
+      FOREIGN KEY (conversation_id)
+      REFERENCES public.conversations(id)
+      ON DELETE CASCADE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.messages'::regclass
+      AND conname = 'messages_reply_to_fkey'
+  ) THEN
+    ALTER TABLE public.messages
+      ADD CONSTRAINT messages_reply_to_fkey
+      FOREIGN KEY (reply_to)
+      REFERENCES public.messages(id)
+      ON DELETE SET NULL;
+  END IF;
+END;
+$$;
+
 create table if not exists public.message_reads (
   id uuid primary key default gen_random_uuid(),
   message_id uuid not null references public.messages(id) on delete cascade,

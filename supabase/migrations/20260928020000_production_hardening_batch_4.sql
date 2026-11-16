@@ -486,6 +486,10 @@ BEGIN
 END;
 $$;
 
+-- The legacy RPC was declared with a different return type. Drop its exact
+-- signature before recreating the hardened JSON response contract.
+DROP FUNCTION IF EXISTS public.respond_multiplayer_invite(uuid, text);
+
 CREATE OR REPLACE FUNCTION public.respond_multiplayer_invite(p_invite_id uuid,p_response text)
 RETURNS jsonb
 LANGUAGE plpgsql

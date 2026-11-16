@@ -4,6 +4,12 @@
 -- Canonical tournament column aliases required by product spec
 alter table public.tournaments add column if not exists question_count integer;
 alter table public.tournaments add column if not exists paused_at timestamptz;
+-- Earlier installations may already have a legacy tournaments table. Ensure
+-- the scheduling columns required by the realtime workflow exist on it.
+alter table public.tournaments add column if not exists starts_at timestamptz;
+alter table public.tournaments add column if not exists start_time timestamptz;
+alter table public.tournaments add column if not exists ends_at timestamptz;
+alter table public.tournaments add column if not exists end_time timestamptz;
 
 update public.tournaments
 set question_count = coalesce(question_count, questions_count)
@@ -36,6 +42,9 @@ execute function public.sync_tournament_question_count();
 
 -- Round number alias on tournament_matches for API/UI compatibility
 alter table public.tournament_matches add column if not exists round_number integer;
+-- Backfill scheduling columns when tournament_matches predates this schema.
+alter table public.tournament_matches add column if not exists starts_at timestamptz;
+alter table public.tournament_matches add column if not exists finished_at timestamptz;
 
 update public.tournament_matches
 set round_number = round
@@ -192,24 +201,30 @@ end;
 $$;
 
 -- Canonical matches compatibility view requested by product prompt
+-- Keep the original view's column names and order for CREATE OR REPLACE
+-- compatibility. New aliases are appended after the legacy columns.
 create or replace view public.matches as
 select
   tm.id,
   tm.tournament_id,
-  coalesce(tm.round_number, tm.round) as round_number,
   tm.player1_id,
   tm.player2_id,
-  tm.score_player1 as player1_score,
-  tm.score_player2 as player2_score,
-  tm.winner_id,
+  tm.round,
   case
     when tm.status in ('pending', 'ready') then 'waiting'
     when tm.status = 'live' then 'playing'
     else tm.status
   end as status,
+  tm.winner_id,
+  tm.score_player1,
+  tm.score_player2,
+  tm.created_at,
+  tm.updated_at,
+  coalesce(tm.round_number, tm.round) as round_number,
+  tm.score_player1 as player1_score,
+  tm.score_player2 as player2_score,
   tm.starts_at as started_at,
-  tm.finished_at as ended_at,
-  tm.created_at
+  tm.finished_at as ended_at
 from public.tournament_matches tm;
 
 -- manager can add users by username

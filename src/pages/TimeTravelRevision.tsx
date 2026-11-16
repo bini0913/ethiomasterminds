@@ -11,7 +11,6 @@ import {
   Brain, Flame, Trophy
 } from 'lucide-react';
 import { toast } from 'sonner';
-import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -239,18 +238,17 @@ const TimeTravelRevision: React.FC = () => {
   }
 
   return (
-    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground relative overflow-hidden" : "min-h-screen bg-background relative overflow-hidden"}>
-      {!upperStudent && <AnimatedBackground />}
-      
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground relative overflow-hidden" : "tier-middle min-h-screen bg-background text-foreground relative overflow-hidden"}>
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <BackButton />
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-              <Clock className="h-5 w-5 text-white" />
+            {upperStudent && <BackButton />}
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
+              <Clock className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Time-Travel Revision</h1>
+              {!upperStudent && <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Revision studio</p>}
+              <h1 className="font-display text-xl font-bold text-foreground">Time-Travel Revision</h1>
               <p className="text-sm text-muted-foreground">Master your past mistakes</p>
             </div>
           </div>
@@ -265,7 +263,7 @@ const TimeTravelRevision: React.FC = () => {
 
       <div className="container max-w-4xl mx-auto py-6 px-4 relative z-10">
         {isRevising && currentQuestion ? (
-          <Card className="glass border-border/50">
+          <Card className="border border-border/80 bg-card shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <Badge variant="secondary" className="capitalize">
@@ -281,7 +279,7 @@ const TimeTravelRevision: React.FC = () => {
               />
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-4 rounded-lg bg-muted/50">
+              <div className="rounded-2xl border border-border/70 bg-card/70 p-4">
                 <p className="text-lg font-medium">{currentQuestion.questionText}</p>
                 <p className="text-sm text-muted-foreground mt-2">
                   You previously answered: <span className="text-destructive">{currentQuestion.userAnswer}</span>
@@ -360,7 +358,7 @@ const TimeTravelRevision: React.FC = () => {
           <div className="space-y-6">
             {/* Stats Overview */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="glass border-border/50">
+              <Card className="border border-border/80 bg-card shadow-sm">
                 <CardContent className="pt-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Brain className="h-4 w-4 text-primary" />
@@ -369,7 +367,7 @@ const TimeTravelRevision: React.FC = () => {
                   <p className="text-2xl font-bold">{stats.totalMissed}</p>
                 </CardContent>
               </Card>
-              <Card className="glass border-border/50">
+              <Card className="border border-border/80 bg-card shadow-sm">
                 <CardContent className="pt-4">
                   <div className="flex items-center gap-2 mb-2">
                     <RotateCcw className="h-4 w-4 text-blue-500" />
@@ -378,7 +376,7 @@ const TimeTravelRevision: React.FC = () => {
                   <p className="text-2xl font-bold">{stats.reviewed}</p>
                 </CardContent>
               </Card>
-              <Card className="glass border-border/50">
+              <Card className="border border-border/80 bg-card shadow-sm">
                 <CardContent className="pt-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Trophy className="h-4 w-4 text-green-500" />
@@ -387,7 +385,7 @@ const TimeTravelRevision: React.FC = () => {
                   <p className="text-2xl font-bold">{stats.mastered}</p>
                 </CardContent>
               </Card>
-              <Card className="glass border-amber-500/30">
+              <Card className="border border-primary/20 bg-primary/5 shadow-sm">
                 <CardContent className="pt-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Flame className="h-4 w-4 text-amber-500" />
@@ -400,7 +398,7 @@ const TimeTravelRevision: React.FC = () => {
 
             {/* Empty State or Question List */}
             {missedQuestions.length === 0 ? (
-              <Card className="glass border-border/50">
+              <Card className="border border-border/80 bg-card shadow-sm">
                 <CardContent className="py-12 text-center">
                   <Sparkles className="h-16 w-16 mx-auto text-primary/50 mb-4" />
                   <h3 className="text-lg font-medium mb-2">No Mistakes Yet!</h3>
@@ -411,7 +409,7 @@ const TimeTravelRevision: React.FC = () => {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="glass border-border/50">
+              <Card className="border border-border/80 bg-card shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-primary" />
