@@ -74,6 +74,7 @@ export default function SchoolTeacherPortal() {
   const [books, setBooks] = useState<any[]>([]);
   const [bookUploads, setBookUploads] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [evaluations, setEvaluations] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
@@ -139,7 +140,7 @@ export default function SchoolTeacherPortal() {
     const [
       assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes,
       membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes,
-      behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes,
+      behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes, evaluationsRes,
     ] = await Promise.all([
       db.from("school_teacher_assignments").select("id,section_id,subject_name,assignment_kind").eq("school_id", schoolId).eq("teacher_membership_id", activeMembership.id),
       db.from("school_sections").select("id,academic_year_id,grade_label,section_name,homeroom_teacher_id").eq("school_id", schoolId),
@@ -157,8 +158,9 @@ export default function SchoolTeacherPortal() {
       db.from("school_staff_tasks").select("id,title,description,status,due_date,priority,task_type,response,assigned_by_membership_id").eq("school_id", schoolId).eq("assigned_to_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("school_conversations").select("id,conversation_type,section_id,student_membership_id,subject_name,last_message_at").eq("school_id", schoolId).order("last_message_at", { ascending: false }).limit(100),
       db.from("book_uploads").select("book_id,moderation_note,status").eq("uploader_id", user?.id || ""),
+      db.from("school_staff_evaluations").select("id,evaluation_type,rating,period_start,period_end,notes,created_at").eq("school_id", schoolId).eq("target_membership_id", activeMembership.id).order("created_at", { ascending: false }).limit(50),
     ]);
-    const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes].find((result) => result.error)?.error;
+    const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes, evaluationsRes].find((result) => result.error)?.error;
     if (error) {
       toast.error(error.message || "Teacher workspace could not be loaded.");
       setLoading(false);
@@ -178,6 +180,7 @@ export default function SchoolTeacherPortal() {
     setQuizzes(quizzesRes.data ?? []);
     setBooks(booksRes.data ?? []);
     setBookUploads(bookUploadsRes.data ?? []);
+    setEvaluations(evaluationsRes.data ?? []);
     setTasks(tasksRes.data ?? []);
     setConversations(conversationsRes.data ?? []);
     if (!assessmentTermId && termsRes.data?.length) setAssessmentTermId(termsRes.data[0].id);
@@ -736,9 +739,12 @@ export default function SchoolTeacherPortal() {
 
   const renderProgress = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Student progress" description="View progress records only for students in your assigned classes." />
+      <SchoolPageHeading title="Student progress" description="Review approved marks and homework activity for your assigned students. Averages use the assessments you entered." />
       <SchoolPanel title="Assigned student register">
-        {assignedStudents.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Class</th><th className="pb-2">Approved marks</th><th className="pb-2">Homework submitted</th></tr></thead><tbody className="divide-y divide-slate-100">{assignedStudents.map((student) => <tr key={student.id}><td className="py-3 font-medium text-slate-800">{memberName(student.id)}</td><td className="py-3 text-slate-600">{sectionLabel(student.section_id)}</td><td className="py-3 tabular-nums text-slate-600">{marks.filter((mark) => mark.student_membership_id === student.id && mark.status === "approved").length}</td><td className="py-3 tabular-nums text-slate-600">{submissions.filter((submission) => submission.student_membership_id === student.id).length}</td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No assigned students" description="Student progress appears after your class assignments are configured." />}
+        {assignedStudents.length ? <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Class</th><th className="pb-2">Approved marks</th><th className="pb-2">Average score</th><th className="pb-2">Homework submitted</th></tr></thead><tbody className="divide-y divide-slate-100">{assignedStudents.map((student) => { const approved = marks.filter((mark) => mark.student_membership_id === student.id && mark.status === "approved"); const percentages = approved.map((mark) => { const assessment = assessments.find((item) => item.id === mark.assessment_id); return assessment?.max_score ? (Number(mark.score) / Number(assessment.max_score)) * 100 : null; }).filter((value): value is number => value !== null && Number.isFinite(value)); const average = percentages.length ? `${(percentages.reduce((sum, value) => sum + value, 0) / percentages.length).toFixed(1)}%` : "—"; return <tr key={student.id}><td className="py-3 font-medium text-slate-800">{memberName(student.id)}</td><td className="py-3 text-slate-600">{sectionLabel(student.section_id)}</td><td className="py-3 tabular-nums text-slate-600">{approved.length}</td><td className="py-3 tabular-nums text-slate-600">{average}</td><td className="py-3 tabular-nums text-slate-600">{submissions.filter((submission) => submission.student_membership_id === student.id).length}</td></tr>; })}</tbody></table></div> : <SchoolEmptyState title="No assigned students" description="Student progress appears after your class assignments are configured." />}
+      </SchoolPanel>
+      <SchoolPanel title="My performance evaluations">
+        {evaluations.length ? <div className="space-y-3">{evaluations.map((evaluation) => <div key={evaluation.id} className="rounded-md border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold capitalize text-slate-800">{evaluation.evaluation_type.replace(/_/g, " ")}</p><p className="mt-1 text-xs text-slate-500">{evaluation.period_start || evaluation.period_end ? `${evaluation.period_start || "Start not set"} – ${evaluation.period_end || "End not set"}` : new Date(evaluation.created_at).toLocaleDateString()}</p></div><p className="text-sm font-semibold tabular-nums text-slate-700">{evaluation.rating}/5</p></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{evaluation.notes}</p></div>)}</div> : <SchoolEmptyState title="No evaluations yet" description="Your Manager's staff evaluations and the Admin's academic-work reviews will appear here." />}
       </SchoolPanel>
     </div>
   );
