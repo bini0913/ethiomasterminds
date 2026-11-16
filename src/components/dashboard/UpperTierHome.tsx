@@ -79,7 +79,7 @@ const UpperTierHome: React.FC = () => {
         weekEnd.setDate(weekEnd.getDate() + 6);
         const formatDate = calendarDate;
         const [topicResponse, resultResponse, planResponse] = await Promise.all([
-          db.from("topic_progress")
+          db.from("upper_student_topic_progress")
             .select("subject,topic,accuracy_percentage,questions_attempted")
             .eq("user_id", user.id)
             .gt("questions_attempted", 0)
