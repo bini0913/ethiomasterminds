@@ -77,7 +77,7 @@ const AcademicInsightsPage: React.FC = () => {
           ? (supabase as any).from("upper_student_topic_progress").select("subject,topic,accuracy_percentage,questions_attempted,correct_answers,last_practiced_at").eq("user_id", user.id)
           : supabase.from("topic_progress").select("*").eq("user_id", user.id);
         const [statsRes, topicsRes, streakRes] = await Promise.all([
-          supabase.rpc("get_user_stats", { p_user_id: user.id }),
+          supabase.rpc("get_user_stats", { _user_id: user.id }),
           topicQuery,
           // A student with no recorded streak yet is a valid empty state.
           supabase.from("user_streaks").select("*").eq("user_id", user.id).maybeSingle(),
@@ -93,7 +93,10 @@ const AcademicInsightsPage: React.FC = () => {
           });
           setLoadError(true);
         }
-        if (!statsRes.error) setStats(statsRes.data ?? null);
+        if (!statsRes.error) {
+          const statsRow = Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data;
+          setStats(statsRow ?? null);
+        }
         if (!topicsRes.error) {
           setTopicData(upperStudent
             ? (topicsRes.data || []).map((row: any) => ({ ...row, questions_correct: Number(row.correct_answers) || 0 }))
