@@ -26,7 +26,9 @@ BEGIN
   END LOOP;
 END $$;
 
-CREATE OR REPLACE FUNCTION public.get_email_by_username(_username text)
+-- Keep the existing input parameter name. PostgreSQL does not allow
+-- CREATE OR REPLACE FUNCTION to rename an input parameter.
+CREATE OR REPLACE FUNCTION public.get_email_by_username(p_username text)
 RETURNS text
 LANGUAGE sql
 STABLE
@@ -36,7 +38,7 @@ AS $$
   SELECT au.email::text
   FROM auth.users au
   JOIN public.profiles p ON p.id = au.id
-  WHERE lower(trim(p.username)) = lower(trim(_username))
+  WHERE lower(trim(p.username)) = lower(trim(p_username))
   LIMIT 1;
 $$;
 
