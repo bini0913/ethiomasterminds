@@ -107,11 +107,11 @@ const MiddleTierShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </span>
         </Link>
 
-        <nav aria-label="Grades 5–8 navigation" className="min-h-0 flex-1 space-y-5 overflow-y-auto px-1">
+        <nav aria-label="Grades 5–8 navigation" className="min-h-0 flex-1 space-y-4 overflow-y-auto px-1">
           <div>
             <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Your workspace</p>
             <div className="space-y-1">
-              {primaryNav.slice(0, 3).map((item) => {
+              {primaryNav.map((item) => {
                 const Icon = item.icon;
                 const active = isActivePath(location.pathname, item.match);
                 return <Link key={item.label} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold transition-colors ${active ? "bg-primary text-primary-foreground shadow-md shadow-primary/15" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-5 w-5" />{item.label}<ChevronRight className={`ml-auto h-4 w-4 transition-opacity ${active ? "opacity-70" : "opacity-0"}`} /></Link>;
@@ -119,42 +119,9 @@ const MiddleTierShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             </div>
           </div>
 
-          <div>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Learn</p>
-            <div className="space-y-1">
-              {learnLinks.filter((item) => item.path !== "/study-mode").map((item) => {
-                const Icon = item.icon;
-                const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-                return <Link key={item.path} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-4 w-4" />{item.label}</Link>;
-              })}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Play</p>
-            <div className="space-y-1">
-              {playLinks.map((item) => {
-                const Icon = item.icon;
-                const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-                return <Link key={item.path} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-4 w-4" />{item.label}</Link>;
-              })}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Connect</p>
-            <div className="space-y-1">
-              {connectLinks.map((item) => {
-                const Icon = item.icon;
-                const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-                return <Link key={item.path} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-4 w-4" />{item.label}</Link>;
-              })}
-            </div>
-          </div>
-
-          <div>
-            <button type="button" onClick={() => setAdvancedOpen((open) => !open)} aria-expanded={advancedOpen} className="flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"><Sparkles className="h-4 w-4" />More tools<ChevronRight className={`ml-auto h-4 w-4 transition-transform ${advancedOpen ? "rotate-90" : ""}`} /></button>
-            {advancedOpen && <div className="mt-1 space-y-1 border-l border-border/70 pl-3">{moreLinks.map((item) => { const Icon = item.icon; const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`); return <Link key={item.path} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-9 items-center gap-3 rounded-lg px-3 text-xs font-semibold transition-colors ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-4 w-4" />{item.label}</Link>; })}</div>}
+          <div className="border-t border-border/70 pt-3">
+            <button type="button" onClick={() => setAdvancedOpen((open) => !open)} aria-expanded={advancedOpen} className="flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"><Sparkles className="h-4 w-4" /><span>More tools</span><span className="text-xs font-medium text-muted-foreground/70">{moreLinks.length}</span><ChevronRight className={`ml-auto h-4 w-4 transition-transform ${advancedOpen ? "rotate-90" : ""}`} /></button>
+            {advancedOpen && <div className="mt-1 space-y-1 border-l border-border/70 pl-3">{[...learnLinks, ...playLinks, ...connectLinks, ...moreLinks].filter((item, index, list) => list.findIndex((candidate) => candidate.path === item.path) === index && !primaryNav.some((primary) => primary.path === item.path)).map((item) => { const Icon = item.icon; const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`); return <Link key={item.path} to={item.path} aria-current={active ? "page" : undefined} className={`flex min-h-9 items-center gap-3 rounded-lg px-3 text-xs font-semibold transition-colors ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-4 w-4" />{item.label}</Link>; })}</div>}
           </div>
         </nav>
 
