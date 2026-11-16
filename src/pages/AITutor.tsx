@@ -52,6 +52,8 @@ const AITutor: React.FC = () => {
 
   const firstName = user?.name?.split(' ')[0] || 'there';
   const gradeLabel = user?.grade ? `Grade ${user.grade}` : 'your learning level';
+  const tutorAccent = upperStudent ? 'bg-[#287c68]' : 'bg-primary';
+  const tutorAccentHover = upperStudent ? 'hover:text-[#287c68]' : 'hover:text-primary';
 
   useEffect(() => {
     if (user?.id) void loadConversations();
@@ -183,14 +185,14 @@ const AITutor: React.FC = () => {
   };
 
   return (
-    <div className={cn('flex min-h-screen flex-col bg-white text-[#202123]', upperStudent && 'tier-upper')}>
-      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-[#ececf1] bg-white/90 px-3 backdrop-blur-md sm:px-5">
+    <div className={cn('ai-tutor-shell flex min-h-screen flex-col', upperStudent ? 'tier-upper bg-white text-[#202123]' : 'tier-middle bg-background text-foreground')}>
+      <header className={cn('sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between px-3 backdrop-blur-md sm:px-5', upperStudent ? 'border-b border-[#ececf1] bg-white/90' : 'border-b border-border/70 bg-background/90')}>
         <div className="flex min-w-0 items-center gap-2">
-          {!upperStudent && <BackButton />}
-          <button type="button" onClick={startNew} className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#f7f7f8]">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#287c68] text-white"><Sparkles className="h-4 w-4" /></span>
+          {upperStudent && <BackButton />}
+          <button type="button" onClick={startNew} className="flex min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-muted">
+            <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-xl text-primary-foreground', upperStudent ? 'bg-[#287c68]' : 'bg-primary')}><Sparkles className="h-4 w-4" /></span>
             <span className="truncate text-sm font-semibold">AI Tutor</span>
-            <span className="hidden text-xs text-[#8e8ea0] sm:inline">· {gradeLabel}</span>
+            <span className="hidden text-xs text-muted-foreground sm:inline">· {gradeLabel}</span>
           </button>
         </div>
         <div className="flex items-center gap-1">
@@ -216,17 +218,17 @@ const AITutor: React.FC = () => {
         <div className="mx-auto w-full max-w-[800px] px-4 pb-44 pt-8 sm:px-6 sm:pt-12">
           {messages.length === 0 ? (
             <div className="flex min-h-[58vh] flex-col items-center justify-center text-center">
-              <div className="mb-5 grid h-12 w-12 place-items-center rounded-full bg-[#287c68] text-white"><Sparkles className="h-6 w-6" /></div>
-              <h1 className="text-2xl font-semibold tracking-tight text-[#202123] sm:text-3xl">How can I help you learn?</h1>
-              <p className="mt-3 max-w-md text-sm leading-6 text-[#6e6e80]">Ask anything, paste a problem, or continue a conversation. I’ll explain ideas clearly and work through problems with you.</p>
+              <div className={cn('mb-5 grid h-12 w-12 place-items-center rounded-full text-primary-foreground', tutorAccent)}><Sparkles className="h-6 w-6" /></div>
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">How can I help you learn?</h1>
+              <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">Ask anything, paste a problem, or continue a conversation. I’ll explain ideas clearly and work through problems with you.</p>
               <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-3">
-                {starterPrompts.map((prompt) => <button key={prompt} type="button" onClick={() => void send(prompt)} className="min-h-16 rounded-xl border border-[#e5e5eb] bg-white px-3 py-3 text-left text-xs text-[#565869] shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition hover:border-[#b8d8ce] hover:bg-[#f8fbfa] hover:text-[#287c68]">{prompt}</button>)}
+                {starterPrompts.map((prompt) => <button key={prompt} type="button" onClick={() => void send(prompt)} className={cn('min-h-16 rounded-2xl border bg-card px-3 py-3 text-left text-xs shadow-sm transition', upperStudent ? 'border-[#e5e5eb] text-[#565869] hover:border-[#b8d8ce] hover:bg-[#f8fbfa] hover:text-[#287c68]' : 'border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary')}>{prompt}</button>)}
               </div>
             </div>
           ) : (
               messages.map((message, index) => (
                 <div key={`${message.timestamp}-${index}`} className="group mb-8 flex gap-4">
-                  <div className={cn('mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full', message.role === 'assistant' ? 'bg-[#287c68] text-white' : 'bg-[#ececf1] text-[#565869]')}>
+                  <div className={cn('mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full', message.role === 'assistant' ? `${tutorAccent} text-primary-foreground` : 'bg-muted text-muted-foreground')}>
                     {message.role === 'assistant' ? <Bot className="h-4 w-4" /> : <span className="text-[10px] font-bold">YOU</span>}
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">
@@ -240,19 +242,19 @@ const AITutor: React.FC = () => {
               ))
           )}
 
-          {isLoading && <div className="mb-8 flex gap-4"><div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#287c68] text-white"><Bot className="h-4 w-4" /></div><div className="flex items-center gap-2 pt-1 text-sm text-[#8e8ea0]"><Loader2 className="h-4 w-4 animate-spin text-[#287c68]" /> Thinking…</div></div>}
-          {sendError && <div role="alert" className="mb-5 ml-11 flex items-center justify-between gap-3 rounded-lg bg-[#fff7ed] px-3 py-2 text-xs text-[#9a3412]"><span>{sendError}</span>{lastFailedPrompt && <button type="button" onClick={() => void send(lastFailedPrompt)} className="inline-flex shrink-0 items-center gap-1 font-semibold underline"><RotateCcw className="h-3 w-3" /> Retry</button>}</div>}
+          {isLoading && <div className="mb-8 flex gap-4"><div className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-full text-primary-foreground', tutorAccent)}><Bot className="h-4 w-4" /></div><div className="flex items-center gap-2 pt-1 text-sm text-[#8e8ea0]"><Loader2 className="h-4 w-4 animate-spin text-[#287c68]" /> Thinking…</div></div>}
+          {sendError && <div role="alert" className="mb-5 ml-11 flex items-center justify-between gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive"><span>{sendError}</span>{lastFailedPrompt && <button type="button" onClick={() => void send(lastFailedPrompt)} className="inline-flex shrink-0 items-center gap-1 font-semibold underline"><RotateCcw className="h-3 w-3" /> Retry</button>}</div>}
         </div>
       </main>
 
-      <footer className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-white via-white/95 to-transparent px-3 pb-3 pt-8 sm:px-6 sm:pb-5">
+      <footer className={cn('fixed inset-x-0 bottom-0 z-20 px-3 pb-3 pt-8 sm:px-6 sm:pb-5', upperStudent ? 'bg-gradient-to-t from-white via-white/95 to-transparent' : 'bg-gradient-to-t from-background via-background/95 to-transparent')}>
         <div className="mx-auto max-w-[800px]">
-          <div className="flex items-end gap-2 rounded-2xl border border-[#d9d9e3] bg-white p-2 shadow-[0_4px_18px_rgba(0,0,0,0.08)] focus-within:border-[#287c68] focus-within:ring-2 focus-within:ring-[#287c68]/10">
+          <div className={cn('flex items-end gap-2 rounded-2xl border bg-card p-2 shadow-lg focus-within:ring-2', upperStudent ? 'border-[#d9d9e3] focus-within:border-[#287c68] focus-within:ring-[#287c68]/10' : 'border-border focus-within:border-primary focus-within:ring-primary/10')}>
             <Button type="button" variant="ghost" size="icon" onClick={toggleMic} className={cn('mb-0.5 h-9 w-9 shrink-0 rounded-xl text-[#6e6e80] hover:bg-[#f7f7f8] hover:text-[#287c68]', isListening && 'bg-red-50 text-red-600 hover:bg-red-100')} aria-label={isListening ? 'Stop voice input' : 'Start voice input'}>{isListening ? <MicOff className="h-4 w-4 animate-pulse" /> : <Mic className="h-4 w-4" />}</Button>
             <Textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Message AI Tutor…" disabled={isLoading} rows={1} className="max-h-32 min-h-[38px] resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0" />
-            <Button type="button" onClick={() => void send()} disabled={isLoading || !input.trim()} className="mb-0.5 h-9 w-9 shrink-0 rounded-xl bg-[#202123] p-0 text-white hover:bg-[#343541]" aria-label="Send message"><ArrowUp className="h-4 w-4" /></Button>
+            <Button type="button" onClick={() => void send()} disabled={isLoading || !input.trim()} className={cn('mb-0.5 h-9 w-9 shrink-0 rounded-xl p-0 text-primary-foreground', tutorAccent)} aria-label="Send message"><ArrowUp className="h-4 w-4" /></Button>
           </div>
-          <p className="mt-2 text-center text-[10px] text-[#8e8ea0]">AI Tutor can make mistakes. Check important answers with your textbook.</p>
+          <p className="mt-2 text-center text-[10px] text-muted-foreground">AI Tutor can make mistakes. Check important answers with your textbook.</p>
         </div>
       </footer>
     </div>
