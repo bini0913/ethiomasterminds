@@ -26,7 +26,7 @@ BEGIN
   END LOOP;
 END $$;
 
-CREATE OR REPLACE FUNCTION public.get_email_by_username(_username text)
+CREATE OR REPLACE FUNCTION public.get_email_by_username(p_username text)
 RETURNS text
 LANGUAGE sql
 STABLE
@@ -36,7 +36,7 @@ AS $$
   SELECT au.email::text
   FROM auth.users au
   JOIN public.profiles p ON p.id = au.id
-  WHERE lower(trim(p.username)) = lower(trim(_username))
+  WHERE lower(trim(p.username)) = lower(trim(p_username))
   LIMIT 1;
 $$;
 
@@ -86,7 +86,7 @@ $$;
 REVOKE ALL ON FUNCTION public.get_user_role(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_user_role(uuid) TO authenticated;
 
-CREATE OR REPLACE FUNCTION public.get_dashboard_data(_user_id uuid)
+CREATE OR REPLACE FUNCTION public.get_dashboard_data(p_user_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
@@ -96,7 +96,7 @@ AS $$
 DECLARE result jsonb;
 BEGIN
   IF auth.uid() IS NULL OR (
-    auth.uid() <> _user_id
+    auth.uid() <> p_user_id
     AND NOT public.has_role(auth.uid(), 'admin')
     AND NOT public.has_role(auth.uid(), 'manager')
   ) THEN
@@ -112,7 +112,7 @@ BEGIN
   FROM public.profiles p
   LEFT JOIN public.user_currency uc ON uc.user_id = p.id
   LEFT JOIN public.user_streaks us ON us.user_id = p.id
-  WHERE p.id = _user_id;
+  WHERE p.id = p_user_id;
 
   RETURN result;
 END;
@@ -121,7 +121,7 @@ $$;
 REVOKE ALL ON FUNCTION public.get_dashboard_data(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_dashboard_data(uuid) TO authenticated;
 
-CREATE OR REPLACE FUNCTION public.get_user_stats(_user_id uuid)
+CREATE OR REPLACE FUNCTION public.get_user_stats(p_user_id uuid)
 RETURNS TABLE(xp integer, level integer, coins integer, gems integer, current_streak integer)
 LANGUAGE sql
 STABLE
@@ -132,9 +132,9 @@ AS $$
   FROM public.profiles p
   LEFT JOIN public.user_currency uc ON uc.user_id = p.id
   LEFT JOIN public.user_streaks us ON us.user_id = p.id
-  WHERE p.id = _user_id
+  WHERE p.id = p_user_id
     AND (
-      auth.uid() = _user_id
+      auth.uid() = p_user_id
       OR public.has_role(auth.uid(), 'admin')
       OR public.has_role(auth.uid(), 'manager')
     );
@@ -143,7 +143,7 @@ $$;
 REVOKE ALL ON FUNCTION public.get_user_stats(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_user_stats(uuid) TO authenticated;
 
-CREATE OR REPLACE FUNCTION public.update_user_streak(_user_id uuid)
+CREATE OR REPLACE FUNCTION public.update_user_streak(p_user_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -151,13 +151,13 @@ SET search_path = public
 AS $$
 DECLARE last_date date;
 BEGIN
-  IF auth.uid() IS NULL OR auth.uid() <> _user_id THEN
+  IF auth.uid() IS NULL OR auth.uid() <> p_user_id THEN
     RAISE EXCEPTION 'Permission denied';
   END IF;
-  SELECT last_activity_date INTO last_date FROM public.user_streaks WHERE user_id = _user_id;
+  SELECT last_activity_date INTO last_date FROM public.user_streaks WHERE user_id = p_user_id;
   IF last_date IS NULL THEN
     INSERT INTO public.user_streaks (user_id, current_streak, longest_streak, last_activity_date)
-    VALUES (_user_id, 1, 1, current_date)
+    VALUES (p_user_id, 1, 1, current_date)
     ON CONFLICT (user_id) DO UPDATE SET current_streak = 1, last_activity_date = current_date;
   ELSIF last_date = current_date THEN
     NULL;
@@ -166,11 +166,11 @@ BEGIN
     SET current_streak = current_streak + 1,
         longest_streak = greatest(longest_streak, current_streak + 1),
         last_activity_date = current_date
-    WHERE user_id = _user_id;
+    WHERE user_id = p_user_id;
   ELSE
     UPDATE public.user_streaks
     SET current_streak = 1, last_activity_date = current_date
-    WHERE user_id = _user_id;
+    WHERE user_id = p_user_id;
   END IF;
 END;
 $$;
