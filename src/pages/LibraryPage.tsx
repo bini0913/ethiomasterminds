@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '@/context/UserContext';
 import { getUserTier } from '@/lib/getUserTier';
 import { toast } from 'sonner';
-import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -491,13 +490,16 @@ const LibraryPage: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className={getUserTier(user?.grade) === "upper" ? "tier-upper min-h-screen relative overflow-hidden bg-background text-foreground" : "min-h-screen relative overflow-hidden"}>
-      {getUserTier(user?.grade) !== "upper" && <AnimatedBackground />}
+    <div className={getUserTier(user?.grade) === "upper" ? "tier-upper min-h-screen relative overflow-hidden bg-background text-foreground" : "tier-middle min-h-screen relative overflow-hidden bg-background text-foreground"}>
 
       <div className="relative z-10 p-4 md:p-6 max-w-7xl mx-auto space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <BackButton />
-          <h1 className="text-2xl md:text-3xl font-bold">Master Minds AI Library</h1>
+        <div className="flex items-center justify-between gap-3">
+          {userTier === 'upper' ? <BackButton /> : <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15"><BookOpen className="h-5 w-5" /></div>}
+          <div className="min-w-0 flex-1">
+            {userTier !== 'upper' && <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Learn studio</p>}
+            <h1 className="truncate font-display text-2xl font-bold md:text-3xl">Master Minds AI Library</h1>
+            <p className="mt-1 hidden text-sm text-muted-foreground sm:block">Read, save, and turn every book into a study advantage.</p>
+          </div>
           {canUpload && (
             <Dialog open={openUpload} onOpenChange={setOpenUpload}>
               <DialogTrigger asChild>
@@ -580,7 +582,7 @@ const LibraryPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4">
-          <Card>
+          <Card className="rounded-3xl border-border/80 bg-card shadow-sm">
             <CardHeader><CardTitle className="text-base">Library</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {([
