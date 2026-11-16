@@ -568,16 +568,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     if (!session?.user) return;
 
     try {
-      // Note: Full account deletion requires admin privileges
-      // For now, we sign out the user
+      const { error } = await (supabase as any).rpc("delete_my_account");
+      if (error) throw error;
+
+      // Delete the local session only after the destructive server operation
+      // has completed successfully.
       await supabase.auth.signOut();
       safeStorage.removeItem("masterminds_login_mode");
       setUser(null);
       setSession(null);
-      toast.success("You have been logged out. Contact support to fully delete your account.");
+      toast.success("Your account and associated data were permanently deleted.");
     } catch (error) {
       console.error('Delete account error:', error);
-      toast.error("Failed to delete account");
+      toast.error("We couldn't delete your account. No data was removed; please try again.");
     }
   };
 

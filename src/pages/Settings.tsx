@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
@@ -26,7 +26,7 @@ import { getUserTier } from "@/lib/getUserTier";
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 
 const Settings: React.FC = () => {
-  const { user, logout } = useUser();
+  const { user, logout, deleteAccount } = useUser();
   const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
@@ -37,6 +37,51 @@ const Settings: React.FC = () => {
   const [vibration, setVibration] = useState(true);
   
   const [showPassword, setShowPassword] = useState(false);
+  const [privacy, setPrivacy] = useState({
+    is_public: true,
+    show_online_status: false,
+    activity_history_enabled: true,
+    notifications_enabled: true,
+  });
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPrivacy = async () => {
+      if (!user?.id) return;
+      const { data, error } = await (supabase as any)
+        .from("profile_privacy_settings")
+        .select("is_public,show_online_status,activity_history_enabled,notifications_enabled")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (mounted && !error && data) setPrivacy((current) => ({ ...current, ...data }));
+    };
+    void loadPrivacy();
+    return () => { mounted = false; };
+  }, [user?.id]);
+
+  const updatePrivacy = async (field: keyof typeof privacy, value: boolean) => {
+    if (!user?.id) return;
+    const previous = privacy;
+    setPrivacy((current) => ({ ...current, [field]: value }));
+    setSavingPrivacy(true);
+    const { error } = await (supabase as any)
+      .from("profile_privacy_settings")
+      .upsert({ user_id: user.id, ...privacy, [field]: value, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    setSavingPrivacy(false);
+    if (error) {
+      setPrivacy(previous);
+      toast.error("Privacy settings could not be saved. Please try again.");
+      return;
+    }
+    toast.success("Privacy settings saved.");
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm("Delete your account and all associated data permanently? This cannot be undone.")) {
+      await deleteAccount();
+    }
+  };
   
   const handleLanguageChange = (value: string) => {
     setLanguage(value as "english" | "amharic" | "afaan-oromoo");
@@ -277,8 +322,12 @@ const Settings: React.FC = () => {
                     </div>
                     <Switch
                       id="notifications"
-                      checked={notifications}
-                      onCheckedChange={setNotifications}
+                      checked={privacy.notifications_enabled}
+                      disabled={savingPrivacy}
+                      onCheckedChange={(value) => {
+                        setNotifications(value);
+                        void updatePrivacy("notifications_enabled", value);
+                      }}
                     />
                   </div>
                   
@@ -288,7 +337,7 @@ const Settings: React.FC = () => {
                   </Button>
 
                   {/* Individual Toggles */}
-                  <div className="space-y-3 opacity-80" style={{ opacity: notifications ? 1 : 0.5 }}>
+                  <div className="space-y-3 opacity-80" style={{ opacity: privacy.notifications_enabled ? 1 : 0.5 }}>
                     {[
                       { id: 'friend-requests', label: 'Friend Requests', desc: 'When someone adds you', default: true },
                       { id: 'messages', label: 'Messages', desc: 'New chat messages', default: true },
@@ -301,7 +350,7 @@ const Settings: React.FC = () => {
                           <Label htmlFor={item.id} className="text-foreground">{item.label}</Label>
                           <p className="text-sm text-muted-foreground">{item.desc}</p>
                         </div>
-                        <Switch id={item.id} defaultChecked={item.default} disabled={!notifications} />
+                        <Switch id={item.id} defaultChecked={item.default} disabled={!privacy.notifications_enabled} />
                       </div>
                     ))}
                   </div>
@@ -331,16 +380,16 @@ const Settings: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {[
-                    { id: 'profile-public', label: 'Public Profile', desc: 'Others can see your stats', default: true },
-                    { id: 'online-status', label: 'Show Online Status', desc: 'Let friends see when you\'re online', default: true },
-                    { id: 'activity-history', label: 'Activity History', desc: 'Track your learning progress', default: true },
+                    { id: 'profile-public', field: 'is_public' as const, label: 'Public Profile', desc: 'Others can see your profile when enabled', value: privacy.is_public },
+                    { id: 'online-status', field: 'show_online_status' as const, label: 'Show Online Status', desc: 'Let friends see when you\'re online', value: privacy.show_online_status },
+                    { id: 'activity-history', field: 'activity_history_enabled' as const, label: 'Activity History', desc: 'Track your learning progress', value: privacy.activity_history_enabled },
                   ].map((item) => (
                     <div key={item.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50">
                       <div>
                         <Label htmlFor={item.id} className="text-foreground">{item.label}</Label>
                         <p className="text-sm text-muted-foreground">{item.desc}</p>
                       </div>
-                      <Switch id={item.id} defaultChecked={item.default} />
+                      <Switch id={item.id} checked={item.value} disabled={savingPrivacy} onCheckedChange={(value) => void updatePrivacy(item.field, value)} />
                     </div>
                   ))}
                 </CardContent>
@@ -366,6 +415,7 @@ const Settings: React.FC = () => {
                   <Button 
                     variant="outline" 
                     className="w-full justify-start border-destructive/30 text-destructive hover:bg-destructive/10"
+                    onClick={handleDeleteAccount}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete Account
