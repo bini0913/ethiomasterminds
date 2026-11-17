@@ -10,6 +10,23 @@ alter table public.quizzes
     check (source_verification_status in ('unverified','needs_review','verified','permission_confirmed'));
 create index if not exists quizzes_source_kind_idx on public.quizzes (source_kind);
 
+-- The original-practice seed uses this exam type; preserve all established
+-- values while explicitly allowing the new non-official practice category.
+alter table public.quizzes
+  drop constraint if exists quizzes_exam_type_check;
+alter table public.quizzes
+  add constraint quizzes_exam_type_check
+  check (exam_type in (
+    'general',
+    'school_exam',
+    'coursework',
+    'grade12_exit',
+    'entrance_exam',
+    'past_paper',
+    'mock_exam',
+    'entrance_practice'
+  ));
+
 -- Exam Mode reads topic labels for topic coverage/progress tracking.
 alter table public.questions add column if not exists topic text;
 
