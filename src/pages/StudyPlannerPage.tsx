@@ -468,6 +468,10 @@ const StudyPlannerPage: React.FC = () => {
     (acc[p.scheduled_date] = acc[p.scheduled_date] || []).push(p);
     return acc;
   }, {});
+  const weekDays = Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(new Date()), index));
+  const weekPlans = weekDays.flatMap((day) => grouped[format(day, "yyyy-MM-dd")] || []);
+  const weekCompleted = weekPlans.filter((plan) => plan.completed).length;
+  const weekProgress = weekPlans.length ? Math.round((weekCompleted / weekPlans.length) * 100) : 0;
 
   if (isLoading) {
     return (
@@ -573,6 +577,48 @@ const StudyPlannerPage: React.FC = () => {
           </Card>
         </div>
       )}
+
+      <div className="mx-auto max-w-4xl px-4 pb-4">
+        <Card className="overflow-hidden border-border/70 bg-card/80">
+          <CardContent className="p-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-4">
+              <div>
+                <p className="text-[11px] font-bold tracking-[0.16em] text-primary">THIS WEEK</p>
+                <h2 className="mt-1 text-lg font-bold">A plan you can actually follow</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{weekPlans.length ? `${weekCompleted} of ${weekPlans.length} sessions complete` : "Add or generate sessions to build your week."}</p>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl bg-muted/50 px-3 py-2 text-sm">
+                <Clock3 className="h-4 w-4 text-primary" />
+                <span className="font-semibold">{weekProgress}% on track</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-y divide-border/70 sm:grid-cols-4 lg:grid-cols-7 lg:divide-y-0">
+              {weekDays.map((day) => {
+                const dayPlans = grouped[format(day, "yyyy-MM-dd")] || [];
+                const today = isSameDay(day, new Date());
+                return (
+                  <div key={format(day, "yyyy-MM-dd")} className={`min-h-36 p-3 ${today ? "bg-primary/[0.045]" : "bg-card"}`}>
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <span className={`text-xs font-semibold ${today ? "text-primary" : "text-muted-foreground"}`}>{format(day, "EEE")}</span>
+                      <span className={`grid h-7 w-7 place-items-center rounded-full text-sm font-bold ${today ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{format(day, "d")}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {dayPlans.slice(0, 3).map((plan) => (
+                        <button key={plan.id} type="button" onClick={() => void toggleComplete(plan)} className="w-full rounded-lg border border-border/70 bg-background p-2 text-left transition hover:border-primary/50">
+                          <span className={`block truncate text-xs font-semibold ${plan.completed ? "text-muted-foreground line-through" : "text-foreground"}`}>{plan.topic}</span>
+                          <span className="mt-1 block truncate text-[10px] capitalize text-muted-foreground">{plan.subject}</span>
+                        </button>
+                      ))}
+                      {dayPlans.length > 3 && <p className="text-[10px] font-semibold text-muted-foreground">+{dayPlans.length - 3} more</p>}
+                      {!dayPlans.length && <p className="pt-2 text-center text-[10px] text-muted-foreground">—</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Add Plan Form */}
       <AnimatePresence>
