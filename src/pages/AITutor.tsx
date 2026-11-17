@@ -13,6 +13,7 @@ import BackButton from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { getAcademicProfile, resolveAcademicGrade } from '@/lib/academicProfile';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -24,6 +25,13 @@ type Conversation = {
   id: string;
   updated_at?: string | null;
   messages?: unknown;
+};
+
+type AcademicContext = {
+  grade: number;
+  curriculum: string;
+  goal: string;
+  subjects: string[];
 };
 
 const starterPrompts = [
@@ -47,6 +55,7 @@ const AITutor: React.FC = () => {
   const [historyError, setHistoryError] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [lastFailedPrompt, setLastFailedPrompt] = useState<string | null>(null);
+  const [academicContext, setAcademicContext] = useState<AcademicContext | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -58,6 +67,24 @@ const AITutor: React.FC = () => {
   useEffect(() => {
     if (user?.id) void loadConversations();
   }, [user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      setAcademicContext(null);
+      return;
+    }
+    void getAcademicProfile(user.id).then((profile) => {
+      if (cancelled || !profile) return;
+      setAcademicContext({
+        grade: resolveAcademicGrade(user.grade, profile.grade, 9),
+        curriculum: profile.curriculum || 'Ethiopian curriculum',
+        goal: [profile.study_goal, profile.study_goal_detail].filter(Boolean).join(' — ') || 'Independent study',
+        subjects: Array.isArray(profile.subjects) ? profile.subjects.filter((subject): subject is string => typeof subject === 'string' && subject.trim().length > 0) : [],
+      });
+    }).catch((error) => console.error('AI Tutor academic context load failed:', error));
+    return () => { cancelled = true; };
+  }, [user?.id, user?.grade]);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -155,7 +182,15 @@ const AITutor: React.FC = () => {
     setLastFailedPrompt(null);
     try {
       const { data, error } = await supabase.functions.invoke('ai-tutor', {
-        body: { message: content, conversationId, subject: 'general' },
+        body: {
+          message: content,
+          conversationId,
+          subject: 'general',
+          grade: academicContext?.grade,
+          curriculum: academicContext?.curriculum,
+          studyGoal: academicContext?.goal,
+          subjects: academicContext?.subjects || [],
+        },
       });
       if (error) throw error;
       if (!data?.message) throw new Error('The tutor returned an empty response. Please try again.');
@@ -216,6 +251,18 @@ const AITutor: React.FC = () => {
 
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[800px] px-4 pb-44 pt-8 sm:px-6 sm:pt-12">
+          {upperStudent && academicContext && (
+            <div className="mb-6 rounded-2xl border border-[#b8d8ce] bg-[#f4faf7] p-4 text-left">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#287c68]">Personalised study context</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-semibold text-[#202123]">Grade {academicContext.grade}</span>
+                <span className="text-[#8e8ea0]">·</span>
+                <span className="text-[#565869]">{academicContext.curriculum}</span>
+                {academicContext.goal && <><span className="text-[#8e8ea0]">·</span><span className="text-[#565869]">{academicContext.goal}</span></>}
+              </div>
+              {academicContext.subjects.length > 0 && <p className="mt-2 text-xs text-[#6e6e80]">Subjects: {academicContext.subjects.slice(0, 5).join(' · ')}</p>}
+            </div>
+          )}
           {messages.length === 0 ? (
             <div className="flex min-h-[58vh] flex-col items-center justify-center text-center">
               <div className={cn('mb-5 grid h-12 w-12 place-items-center rounded-full text-primary-foreground', tutorAccent)}><Sparkles className="h-6 w-6" /></div>
