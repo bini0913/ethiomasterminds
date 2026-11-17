@@ -357,7 +357,10 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.extreme_admin_get_audit_logs(p_limit integer DEFAULT 100)
+-- Reconcile the legacy audit-log row shape before replacing the RPC result type.
+DROP FUNCTION IF EXISTS public.extreme_admin_get_audit_logs(integer);
+
+CREATE FUNCTION public.extreme_admin_get_audit_logs(p_limit integer DEFAULT 100)
 RETURNS TABLE(
   id uuid,
   actor_id uuid,
