@@ -27,7 +27,12 @@ using (user_id = (select auth.uid()));
 -- A quiz submission is the only supported writer of question_attempts.
 -- Score only the question IDs actually present in the submission. This matters
 -- for generated practice sets, which contain a subset of a source quiz.
-create or replace function public.submit_quiz_result_secure(
+-- The prior implementation supplied a default submission UUID. This migration
+-- intentionally requires a caller-stable idempotency key, so drop the old
+-- signature before removing that default; CREATE OR REPLACE cannot remove it.
+drop function if exists public.submit_quiz_result_secure(uuid, jsonb, integer, uuid);
+
+create function public.submit_quiz_result_secure(
   p_quiz_id uuid,
   p_answers jsonb,
   p_time_taken integer,
@@ -222,3 +227,4 @@ $function$;
 
 revoke all on function public.submit_quiz_result_secure(uuid, jsonb, integer, uuid) from public, anon;
 grant execute on function public.submit_quiz_result_secure(uuid, jsonb, integer, uuid) to authenticated;
+grant execute on function public.submit_quiz_result_secure(uuid, jsonb, integer, uuid) to service_role;
