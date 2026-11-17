@@ -441,7 +441,10 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.extreme_admin_adjust_economy(
+-- The reconciled control-center RPC returns boolean; remove the legacy jsonb signature first.
+DROP FUNCTION IF EXISTS public.extreme_admin_adjust_economy(uuid, integer, integer, boolean);
+
+CREATE FUNCTION public.extreme_admin_adjust_economy(
   p_user_id uuid,
   p_xp_delta integer DEFAULT 0,
   p_coin_delta integer DEFAULT 0,
