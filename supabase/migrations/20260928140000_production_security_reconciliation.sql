@@ -26,6 +26,8 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Keep the existing input parameter name. PostgreSQL does not allow
+-- CREATE OR REPLACE FUNCTION to rename an input parameter.
 CREATE OR REPLACE FUNCTION public.get_email_by_username(p_username text)
 RETURNS text
 LANGUAGE sql
