@@ -171,7 +171,11 @@ $$;
 REVOKE ALL ON FUNCTION public.get_user_stats(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_user_stats(uuid) TO authenticated;
 
-CREATE OR REPLACE FUNCTION public.update_user_streak(p_user_id uuid)
+-- The earlier streak RPC returned jsonb; the reconciled production contract is void.
+-- Drop the prior signature before changing its return type, which CREATE OR REPLACE cannot do.
+DROP FUNCTION IF EXISTS public.update_user_streak(uuid);
+
+CREATE FUNCTION public.update_user_streak(p_user_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
