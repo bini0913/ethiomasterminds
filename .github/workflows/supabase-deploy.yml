@@ -40,32 +40,82 @@ jobs:
             exit 1
           }
 
-      - name: Push database migrations
+      - name: Push new database migrations
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            changed_files=""
-          else
-            test -n "${GITHUB_EVENT_BEFORE:-}" || {
-              echo "::error::Push event is missing its base SHA; refusing to skip migration detection."
-              exit 1
-            }
-            git cat-file -e "${GITHUB_EVENT_BEFORE}^{commit}" || {
-              echo "::error::Push base commit is unavailable; refusing to skip migration detection."
-              exit 1
-            }
-            changed_files="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA")"
+
+          # Manual dispatch is for Edge Function redeployment only. Database
+          # changes are deployed from a main push containing new migration files.
+          if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
+            echo "Manual dispatch does not push database migrations."
+            exit 0
           fi
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || grep -q '^supabase/migrations/' <<< "$changed_files"; then
-            test -n "${SUPABASE_DB_PASSWORD:-}" || {
-              echo "::error::A database migration is pending, but SUPABASE_DB_PASSWORD is not configured. Add this repository secret before deploying."
+
+          test -n "${GITHUB_EVENT_BEFORE:-}" || {
+            echo "::error::Push event is missing its base SHA."
+            exit 1
+          }
+          git cat-file -e "${GITHUB_EVENT_BEFORE}^{commit}" || {
+            echo "::error::Push base commit is unavailable."
+            exit 1
+          }
+
+          added_migrations="$(git diff --name-only --diff-filter=A --no-renames "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA" -- supabase/migrations)"
+          if [[ -z "$added_migrations" ]]; then
+            echo "No new migration files were added; historical migration edits are not replayed."
+            exit 0
+          fi
+
+          test -n "${SUPABASE_DB_PASSWORD:-}" || {
+            echo "::error::SUPABASE_DB_PASSWORD is required to deploy database migrations."
+            exit 1
+          }
+
+          # Production history was originally recorded through Supabase's
+          # migration API, so its version IDs differ from the repository's
+          # original filenames. Fetch the exact applied history first. This
+          # keeps db push from replaying old migrations or repairing history
+          # by deleting valid production records.
+          source_dir="$(mktemp -d)"
+          cp supabase/migrations/*.sql "$source_dir/"
+          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -delete
+
+          supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+          supabase migration fetch --linked
+
+          remote_max="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sed -E 's/^([0-9]+)_.*/\1/' | sort -n | tail -n 1)"
+          test -n "$remote_max" || {
+            echo "::error::Could not fetch the production migration history."
+            exit 1
+          }
+
+          while IFS= read -r path; do
+            [[ -n "$path" ]] || continue
+            file="$source_dir/$(basename "$path")"
+            test -f "$file" || {
+              echo "::error::New migration file was not found in the checked-out source: $path"
               exit 1
             }
-            supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
-          else
-            echo "No database migration changed; skipping database push."
-          fi
+            version="$(basename "$file" | cut -d_ -f1)"
+            if [[ "$version" -le "$remote_max" ]]; then
+              echo "::error::New migration $path has version $version, which is not later than production's latest version $remote_max. Create a fresh migration with a later timestamp."
+              exit 1
+            fi
+            cp "$file" supabase/migrations/
+          done <<< "$added_migrations"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          from collections import Counter
+          files = list(Path("supabase/migrations").glob("*.sql"))
+          versions = [p.name.split("_", 1)[0] for p in files]
+          duplicates = sorted(v for v, count in Counter(versions).items() if count > 1)
+          if duplicates:
+              raise SystemExit(f"Duplicate migration versions after history sync: {', '.join(duplicates)}")
+          PY
+
+          supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --yes
 
       - name: Deploy Edge Functions
         shell: bash
