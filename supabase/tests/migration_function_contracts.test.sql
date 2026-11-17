@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(9);
+SELECT plan(10);
 
 SELECT is(
   pg_get_function_result('public.purchase_store_item(uuid,boolean)'::regprocedure),
@@ -41,6 +41,17 @@ SELECT ok(
 SELECT ok(
   NOT has_function_privilege('anon','public.update_user_streak(uuid)','EXECUTE'),
   'anonymous users cannot update student streaks'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.quizzes'::regclass
+      AND conname = 'quizzes_exam_type_check'
+      AND pg_get_constraintdef(oid) LIKE '%entrance_practice%'
+  ),
+  'quizzes support the original entrance-practice category'
 );
 
 SELECT * FROM finish();
