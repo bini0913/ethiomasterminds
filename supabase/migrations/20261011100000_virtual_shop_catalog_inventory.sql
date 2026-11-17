@@ -12,6 +12,13 @@ CREATE TABLE IF NOT EXISTS public.store_items (
   unlock_level integer NOT NULL DEFAULT 1 CHECK (unlock_level >= 1),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+-- Earlier economy migrations created store_items without unlock_level.
+-- IF NOT EXISTS above preserves that table, so reconcile the column before
+-- the catalog seed and purchase RPC use it.
+ALTER TABLE public.store_items
+  ADD COLUMN IF NOT EXISTS unlock_level integer NOT NULL DEFAULT 1
+  CHECK (unlock_level >= 1);
+
 CREATE TABLE IF NOT EXISTS public.user_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
