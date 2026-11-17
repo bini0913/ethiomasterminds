@@ -233,8 +233,8 @@ const AcademicInsightsPage: React.FC = () => {
   ];
 
   return (
-    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5"}>
-      <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 bg-gradient-to-r from-sky-700 to-cyan-700 px-4 py-3 shadow-xl"}>
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "tier-middle min-h-screen bg-slate-50/80 text-slate-950 pb-[calc(6rem+env(safe-area-inset-bottom))]"}>
+      <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 border-b border-sky-700/20 bg-gradient-to-r from-sky-700 to-cyan-700 px-4 py-3 shadow-lg shadow-sky-900/10"}>
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className={upperStudent ? "text-muted-foreground hover:bg-muted hover:text-foreground" : "text-white hover:bg-white/10"}>
             <ArrowLeft className="h-5 w-5" />
@@ -245,7 +245,7 @@ const AcademicInsightsPage: React.FC = () => {
         </div>
       </header>
 
-      <div className="px-4 py-4 max-w-4xl mx-auto space-y-4">
+      <div className="mx-auto max-w-4xl space-y-5 px-4 py-5 sm:py-7">
         {loadError && (
           <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -256,17 +256,19 @@ const AcademicInsightsPage: React.FC = () => {
           </div>
         )}
         {/* Academic Rank */}
-        <Card className="bg-card/80 border-border/50">
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl mb-1">{academicRank.emoji}</p>
-            <h3 className="font-bold text-lg">{academicRank.title}</h3>
-            <p className="text-xs text-muted-foreground">{user?.xp || 0} XP</p>
+        <Card className={upperStudent ? "border-border/50 bg-card/80" : "overflow-hidden border-sky-200 bg-gradient-to-r from-sky-600 to-cyan-600 text-white shadow-lg shadow-sky-900/10"}>
+          <CardContent className="flex items-center gap-4 p-5 text-left sm:p-6">
+            <div className={upperStudent ? "text-3xl" : "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-3xl ring-1 ring-white/20"}>{academicRank.emoji}</div>
+            <div>
+              <h3 className="text-lg font-bold">{academicRank.title}</h3>
+              <p className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-sky-100"}>{user?.xp || 0} XP earned · keep building your streak</p>
+            </div>
           </CardContent>
         </Card>
 
         {/* AI Insights Button */}
         <Button
-          className={upperStudent ? "h-12 w-full" : "w-full h-12 bg-gradient-to-r from-primary to-accent text-white hover:from-primary hover:to-accent"}
+          className={upperStudent ? "h-12 w-full" : "h-12 w-full border-0 bg-slate-950 text-white shadow-lg shadow-slate-950/10 hover:bg-slate-800"}
           onClick={generateAIInsights}
           disabled={isLoadingAI}
         >
@@ -280,7 +282,7 @@ const AcademicInsightsPage: React.FC = () => {
         {/* AI Insights Display */}
         {aiInsights && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
+            <Card className={upperStudent ? "border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5" : "border-sky-200 bg-white shadow-sm"}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Brain className="h-5 w-5 text-primary" />
@@ -298,7 +300,7 @@ const AcademicInsightsPage: React.FC = () => {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {insights.map((ins, i) => (
             <motion.div key={ins.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-              <Card className="bg-card/80 border-border/50">
+              <Card className={upperStudent ? "border-border/50 bg-card/80" : "border-slate-200/80 bg-white shadow-sm"}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-1 text-muted-foreground">{ins.icon}<span className="text-xs">{ins.label}</span></div>
                   <p className={`text-xl font-bold ${ins.color}`}>{ins.value}</p>
@@ -308,7 +310,7 @@ const AcademicInsightsPage: React.FC = () => {
           ))}
         </div>
 
-        <Card className="bg-card/80 border-border/50">
+        <Card className={upperStudent ? "border-border/50 bg-card/80" : "border-slate-200/80 bg-white shadow-sm"}>
           <CardContent className="p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -342,7 +344,7 @@ const AcademicInsightsPage: React.FC = () => {
 
         {/* Subject Performance */}
         {subjectAccuracies.length > 0 && (
-          <Card className="bg-card/80 border-border/50">
+          <Card className={upperStudent ? "border-border/50 bg-card/80" : "border-slate-200/80 bg-white shadow-sm"}>
             <CardContent className="p-4">
               <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><BookOpen className="h-4 w-4" /> Subject Performance</h3>
               <div className="space-y-3">
@@ -362,7 +364,7 @@ const AcademicInsightsPage: React.FC = () => {
         )}
 
         {subjectAccuracies.length === 0 && (
-          <Card className="border-dashed bg-card/80">
+          <Card className={upperStudent ? "border-dashed bg-card/80" : "border-dashed border-slate-300 bg-white"}>
             <CardContent className="p-6 text-center">
               <BookOpen className="mx-auto h-8 w-8 text-muted-foreground" />
               <h3 className="mt-3 font-semibold">No subject performance yet</h3>
@@ -401,7 +403,7 @@ const AcademicInsightsPage: React.FC = () => {
         </div>
 
         {/* Study Consistency */}
-        <Card className="bg-card/80 border-border/50">
+        <Card className={upperStudent ? "border-border/50 bg-card/80" : "border-slate-200/80 bg-white shadow-sm"}>
           <CardContent className="p-4">
             <h3 className="font-semibold text-sm mb-2">Study Consistency Score</h3>
             <div className="flex items-center gap-3">
