@@ -52,6 +52,10 @@ FROM (VALUES
 ) AS v(name,section,price,currency,rarity,preview,description,unlock_level)
 WHERE NOT EXISTS (SELECT 1 FROM public.store_items s WHERE s.name=v.name);
 
+-- The original economy migration returned public.wallets. This migration
+-- changes the RPC contract to jsonb, so drop the old return type first.
+DROP FUNCTION IF EXISTS public.purchase_store_item(uuid, boolean);
+
 CREATE OR REPLACE FUNCTION public.purchase_store_item(p_item_id uuid, p_auto_equip boolean DEFAULT true)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE v_user uuid := auth.uid(); v_item public.store_items%ROWTYPE; v_coins integer; v_gems integer; v_level integer; v_owned boolean;
