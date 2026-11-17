@@ -52,7 +52,10 @@ FROM (VALUES
 ) AS v(name,section,price,currency,rarity,preview,description,unlock_level)
 WHERE NOT EXISTS (SELECT 1 FROM public.store_items s WHERE s.name=v.name);
 
-CREATE OR REPLACE FUNCTION public.purchase_store_item(p_item_id uuid, p_auto_equip boolean DEFAULT true)
+DROP FUNCTION IF EXISTS public.purchase_store_item(uuid, boolean);
+DROP FUNCTION IF EXISTS public.equip_store_item(uuid);
+
+CREATE FUNCTION public.purchase_store_item(p_item_id uuid, p_auto_equip boolean DEFAULT true)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE v_user uuid := auth.uid(); v_item public.store_items%ROWTYPE; v_coins integer; v_gems integer; v_level integer; v_owned boolean;
 BEGIN
@@ -75,7 +78,7 @@ BEGIN
  RETURN jsonb_build_object('success',true,'item_id',p_item_id,'coins_spent',CASE WHEN v_item.currency='coins' THEN v_item.price ELSE 0 END,'gems_spent',CASE WHEN v_item.currency='gems' THEN v_item.price ELSE 0 END);
 END; $$;
 
-CREATE OR REPLACE FUNCTION public.equip_store_item(p_item_id uuid)
+CREATE FUNCTION public.equip_store_item(p_item_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE v_user uuid := auth.uid(); v_item public.store_items%ROWTYPE; v_level integer;
 BEGIN
