@@ -32,7 +32,7 @@ insert into public.quizzes
   (created_by,title,description,subject,grade,difficulty,time_limit,exam_type,is_approved,is_public,
    source_kind,source_name,source_year,source_url,source_verification_status)
 select owner.user_id, s.title, s.description, s.subject, '12', 'medium', 15,
-       'entrance_practice', true, true, 'generated_practice',
+       'entrance_exam', true, true, 'generated_practice',
        'Master Minds original practice set', null, null, 'unverified'
 from owner cross join quiz_seed s
 where not exists (

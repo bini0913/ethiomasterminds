@@ -24,7 +24,7 @@ with owner as (
   select owner.user_id,
     'Entrance Preparation: Mathematics Foundations (Original Practice)',
     'Original Master Minds practice questions for common Grade 12 entrance-exam skills. Not copied from or represented as any historical national exam.',
-    'Mathematics','12','medium',20,'entrance_practice',true,true,
+    'Mathematics','12','medium',20,'entrance_exam',true,true,
     'generated_practice','Master Minds original practice set',null,null,'unverified'
   from owner
   where not exists (select 1 from public.quizzes q where q.title='Entrance Preparation: Mathematics Foundations (Original Practice)' and q.grade='12')
