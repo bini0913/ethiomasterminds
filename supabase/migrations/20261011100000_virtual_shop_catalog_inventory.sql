@@ -79,6 +79,8 @@ BEGIN
  RETURN jsonb_build_object('success',true,'item_id',p_item_id,'coins_spent',CASE WHEN v_item.currency='coins' THEN v_item.price ELSE 0 END,'gems_spent',CASE WHEN v_item.currency='gems' THEN v_item.price ELSE 0 END);
 END; $$;
 
+DROP FUNCTION IF EXISTS public.equip_store_item(uuid);
+
 CREATE OR REPLACE FUNCTION public.equip_store_item(p_item_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE v_user uuid := auth.uid(); v_item public.store_items%ROWTYPE; v_level integer;
