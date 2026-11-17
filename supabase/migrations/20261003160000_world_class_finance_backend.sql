@@ -2,12 +2,6 @@
 -- explicit payment accounts, atomic ledger operations, reversals, transfers,
 -- overdue synchronization and audited finance actions.
 
-DO $$
-BEGIN
-  ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'finance';
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
 ALTER TABLE public.finance_payments
   ADD COLUMN IF NOT EXISTS account_id uuid REFERENCES public.finance_accounts(id) ON DELETE RESTRICT;
 
