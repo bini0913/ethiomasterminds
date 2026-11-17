@@ -4,7 +4,7 @@ create or replace function public.submit_quiz_result_secure(
   p_quiz_id uuid,
   p_answers jsonb,
   p_time_taken integer,
-  p_submission_id uuid
+  p_submission_id uuid default gen_random_uuid()
 )
 returns jsonb
 language plpgsql
