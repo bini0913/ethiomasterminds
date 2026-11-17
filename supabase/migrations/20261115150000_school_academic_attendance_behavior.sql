@@ -305,6 +305,32 @@ CREATE TRIGGER school_sync_student_section_history
 AFTER INSERT OR UPDATE OF grade_label, section_id, status ON public.school_memberships
 FOR EACH ROW EXECUTE FUNCTION public.school_sync_student_section_history();
 
+-- Resolve the student's section membership against the term's actual dates.
+-- This preserves historical access to published assessments after a transfer.
+CREATE OR REPLACE FUNCTION public.school_student_was_in_section_for_term(
+  p_student_membership_id uuid,
+  p_section_id uuid,
+  p_term_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.school_student_section_history history
+    JOIN public.school_terms term
+      ON term.id = p_term_id
+     AND term.school_id = history.school_id
+    WHERE history.student_membership_id = p_student_membership_id
+      AND history.section_id = p_section_id
+      AND history.effective_from <= term.ends_on
+      AND (history.effective_to IS NULL OR history.effective_to >= term.starts_on)
+  );
+$function$;
+
 CREATE OR REPLACE FUNCTION public.school_is_admin(p_school_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT public._is_extreme_admin()

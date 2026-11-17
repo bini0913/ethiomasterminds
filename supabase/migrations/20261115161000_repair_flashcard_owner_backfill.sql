@@ -1,10 +1,14 @@
--- Keep flashcard ownership migration safe on databases where the original
--- realtime hardening migration has already been applied.
+-- Reconcile older production flashcard schemas before tightening visibility.
+ALTER TABLE public.flashcards
+  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS is_public boolean NOT NULL DEFAULT false;
+
 UPDATE public.flashcards
 SET user_id = btrim(created_by)::uuid
 WHERE user_id IS NULL
   AND pg_input_is_valid(btrim(created_by), 'uuid');
 
+DROP POLICY IF EXISTS "authenticated can view flashcards" ON public.flashcards;
 DROP POLICY IF EXISTS "Users can view public or own flashcards" ON public.flashcards;
 CREATE POLICY "Users can view public or own flashcards"
 ON public.flashcards
@@ -19,4 +23,5 @@ USING (
     WHERE ur.user_id = auth.uid()
       AND ur.role IN ('admin', 'teacher')
   )
+  OR public._is_extreme_admin()
 );
