@@ -527,7 +527,10 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.extreme_admin_get_settings()
+-- Reconcile the legacy settings row shape before replacing the RPC result type.
+DROP FUNCTION IF EXISTS public.extreme_admin_get_settings();
+
+CREATE FUNCTION public.extreme_admin_get_settings()
 RETURNS TABLE(setting_key text, setting_value jsonb)
 LANGUAGE sql
 STABLE
