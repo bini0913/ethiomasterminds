@@ -31,6 +31,20 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Validate unique migration versions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from collections import Counter
+
+          files = list(Path("supabase/migrations").glob("*.sql"))
+          versions = [path.name.split("_", 1)[0] for path in files]
+          duplicates = sorted(version for version, count in Counter(versions).items() if count > 1)
+          if duplicates:
+              raise SystemExit(
+                  "Duplicate Supabase migration version(s): " + ", ".join(duplicates)
+              )
+          PY
       - uses: supabase/setup-cli@v1
         with:
           version: latest
