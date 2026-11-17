@@ -146,13 +146,14 @@ const Quiz: React.FC = () => {
       // submission RPC grades by quiz_id, so mixing questions from several
       // source quizzes would make client and server grade different sets.
       const sourceQuiz = subjectQuizzes[index % Math.max(subjectQuizzes.length, 1)];
-      if (!sourceQuiz || sourceQuiz.questions.length < questionCount) return null;
+      if (!sourceQuiz) return null;
 
       const matchingQuestions = sourceQuiz.questions.filter((question) => {
         const topicMatches = !topicFilter || question.topic === topicFilter || question.topic === "General";
         const typeMatches = !questionTypeFilter || question.type.toLowerCase() === questionTypeFilter.toLowerCase().replace("fill in the blank", "fill in the blank");
         return topicMatches && typeMatches;
       });
+      if (matchingQuestions.length < questionCount) return null;
       const selectedQuestions = matchingQuestions
         .slice(0, questionCount)
         .map((question, pickIndex) => rotateOptionsForBalance(question, index, pickIndex));
@@ -184,7 +185,7 @@ const Quiz: React.FC = () => {
     categoriesToBuild.forEach((category) => {
       const subjectQuizzes = quizzesByCategory.get(category) || [];
       for (let i = 0; i < 10; i++) {
-        const questionCount = 10;
+        const questionCount = numQuestions;
         const practiceSet = buildSet(subjectQuizzes, category, questionCount, i);
         if (practiceSet) practiceSets.push(practiceSet);
       }

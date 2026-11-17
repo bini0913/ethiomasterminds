@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
-import { ArrowLeft, TrendingUp, Target, Zap, Brain, Calendar, Award, Loader2, Sparkles, BookOpen, AlertTriangle } from "lucide-react";
+import { ArrowLeft, TrendingUp, Target, Zap, Brain, Calendar, Award, Loader2, Sparkles, BookOpen, AlertTriangle, Clock } from "lucide-react";
+import { toast } from "sonner";
 import { getAcademicProfile, normalizeGrade, resolveAcademicGrade } from "@/lib/academicProfile";
 
 const AcademicInsightsPage: React.FC = () => {
@@ -19,6 +20,7 @@ const AcademicInsightsPage: React.FC = () => {
   const [topicData, setTopicData] = useState<any[]>([]);
   const [streak, setStreak] = useState<any>(null);
   const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [studyActivity, setStudyActivity] = useState<Array<{ date: string; minutes: number }>>([]);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -76,33 +78,36 @@ const AcademicInsightsPage: React.FC = () => {
         const topicQuery = upperStudent
           ? (supabase as any).from("upper_student_topic_progress").select("subject,topic,accuracy_percentage,questions_attempted,correct_answers,last_practiced_at").eq("user_id", user.id)
           : supabase.from("topic_progress").select("*").eq("user_id", user.id);
-        const [statsRes, topicsRes, streakRes] = await Promise.all([
+        const activityStart = new Date();
+        activityStart.setDate(activityStart.getDate() - 29);
+        const [statsRes, topicsRes, streakRes, activityRes] = await Promise.all([
           supabase.rpc("get_user_stats", { p_user_id: user.id }),
           topicQuery,
           // A student with no recorded streak yet is a valid empty state.
           supabase.from("user_streaks").select("*").eq("user_id", user.id).maybeSingle(),
+          supabase.from("study_sessions").select("start_time,duration,status").eq("user_id", user.id).eq("status", "completed").gte("start_time", activityStart.toISOString()).order("start_time", { ascending: true }),
         ]);
 
         if (cancelled) return;
 
-        if (statsRes.error || topicsRes.error || streakRes.error) {
-          console.error("Academic insights partial data load failed:", {
-            stats: statsRes.error,
-            topics: topicsRes.error,
-            streak: streakRes.error,
-          });
-          setLoadError(true);
-        }
-        if (!statsRes.error) {
-          const statsRow = Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data;
-          setStats(statsRow ?? null);
-        }
-        if (!topicsRes.error) {
-          setTopicData(upperStudent
-            ? (topicsRes.data || []).map((row: any) => ({ ...row, questions_correct: Number(row.correct_answers) || 0 }))
-            : (topicsRes.data ?? []));
-        }
-        if (!streakRes.error) setStreak(streakRes.data ?? null);
+        setStats(statsRes.data ?? null);
+        setTopicData(upperStudent
+          ? (topicsRes.data || []).map((row: any) => ({ ...row, questions_correct: Number(row.correct_answers) || 0 }))
+          : (topicsRes.data ?? []));
+        setStreak(streakRes.data ?? null);
+        const minutesByDay = new Map<string, number>();
+        (activityRes.data || []).forEach((session: any) => {
+          const day = String(session.start_time || "").slice(0, 10);
+          if (!day) return;
+          const minutes = Number(session.duration) || 0;
+          minutesByDay.set(day, (minutesByDay.get(day) || 0) + Math.round(minutes));
+        });
+        setStudyActivity(Array.from({ length: 30 }, (_, index) => {
+          const day = new Date(activityStart);
+          day.setDate(activityStart.getDate() + index);
+          const key = day.toISOString().slice(0, 10);
+          return { date: key, minutes: minutesByDay.get(key) || 0 };
+        }));
       } catch (error) {
         console.error("Academic insights data load failed:", error);
         if (!cancelled) {
@@ -200,6 +205,8 @@ const AcademicInsightsPage: React.FC = () => {
   const totalQuizzes = stats?.total_quizzes || 0;
   const currentStreak = streak?.current_streak || 0;
   const longestStreak = streak?.longest_streak || 0;
+  const studyMinutesTotal = studyActivity.reduce((total, day) => total + day.minutes, 0);
+  const maxStudyMinutes = Math.max(...studyActivity.map((day) => day.minutes), 1);
 
   const subjectStats: Record<string, { total: number; correct: number }> = {};
   topicData.forEach(t => {
@@ -219,10 +226,10 @@ const AcademicInsightsPage: React.FC = () => {
   const academicRank = getAcademicRank(user?.xp || 0);
 
   const insights = [
+    { icon: <Clock className="h-5 w-5" />, label: "Study time", value: studyMinutesTotal >= 60 ? `${Math.floor(studyMinutesTotal / 60)}h ${studyMinutesTotal % 60}m` : `${studyMinutesTotal}m`, color: "text-primary" },
     { icon: <Target className="h-5 w-5" />, label: "Accuracy", value: `${Math.round(accuracy)}%`, color: accuracy >= 80 ? "text-green-600" : accuracy >= 50 ? "text-yellow-600" : "text-red-600" },
     { icon: <Zap className="h-5 w-5" />, label: "Quizzes Done", value: String(totalQuizzes), color: "text-primary" },
     { icon: <Calendar className="h-5 w-5" />, label: "Current Streak", value: `${currentStreak} days`, color: "text-orange-600" },
-    { icon: <Award className="h-5 w-5" />, label: "Best Streak", value: `${longestStreak} days`, color: "text-primary" },
   ];
 
   return (
@@ -288,7 +295,7 @@ const AcademicInsightsPage: React.FC = () => {
         )}
 
         {/* Key Stats */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {insights.map((ins, i) => (
             <motion.div key={ins.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
               <Card className="bg-card/80 border-border/50">
@@ -300,6 +307,38 @@ const AcademicInsightsPage: React.FC = () => {
             </motion.div>
           ))}
         </div>
+
+        <Card className="bg-card/80 border-border/50">
+          <CardContent className="p-4">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold tracking-[0.16em] text-primary">STUDY ACTIVITY</p>
+                <h3 className="mt-1 font-semibold">Consistency over the last 30 days</h3>
+              </div>
+              <Badge variant="outline">{studyActivity.filter((day) => day.minutes > 0).length} active days</Badge>
+            </div>
+            {studyActivity.some((day) => day.minutes > 0) ? (
+              <>
+                <div className="flex h-36 items-end gap-1 rounded-xl bg-muted/30 px-2 py-3 sm:gap-1.5">
+                  {studyActivity.map((day) => (
+                    <div key={day.date} className="group relative flex h-full flex-1 items-end" title={`${day.minutes} minutes`}>
+                      <div className={`w-full rounded-t-sm transition-colors ${day.minutes > 0 ? "bg-primary/75 group-hover:bg-primary" : "bg-border/40"}`} style={{ height: `${day.minutes > 0 ? Math.max(8, (day.minutes / maxStudyMinutes) * 100) : 4}%` }} />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
+                  <span>{studyActivity[0]?.date}</span>
+                  <span>Today</span>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-xl border border-dashed p-6 text-center">
+                <p className="text-sm font-medium">Your activity chart will appear after your first Study Mode session.</p>
+                <Button className="mt-3" variant="outline" onClick={() => navigate("/study-mode")}>Start a study session</Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Subject Performance */}
         {subjectAccuracies.length > 0 && (
@@ -318,6 +357,17 @@ const AcademicInsightsPage: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {subjectAccuracies.length === 0 && (
+          <Card className="border-dashed bg-card/80">
+            <CardContent className="p-6 text-center">
+              <BookOpen className="mx-auto h-8 w-8 text-muted-foreground" />
+              <h3 className="mt-3 font-semibold">No subject performance yet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Complete a practice quiz to start seeing strengths and focus areas here.</p>
+              <Button className="mt-4" onClick={() => navigate("/quiz/filter")}>Start practice</Button>
             </CardContent>
           </Card>
         )}
