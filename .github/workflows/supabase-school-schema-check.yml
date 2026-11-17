@@ -68,3 +68,40 @@ jobs:
           deno-version: v2.x
       - name: Type-check school account provisioning function
         run: deno check --node-modules-dir=auto supabase/functions/school-provision-account/index.ts
+
+  migration-deploy-dry-run:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: mytbjkchvfybhyqcynnl
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+      - name: Dry-run pending migrations against production history
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_ACCESS_TOKEN:-}" || {
+            echo "::error::Missing SUPABASE_ACCESS_TOKEN repository secret."
+            exit 1
+          }
+          test -n "${SUPABASE_DB_PASSWORD:-}" || {
+            echo "::error::Missing SUPABASE_DB_PASSWORD repository secret."
+            exit 1
+          }
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          added_migrations="$(git diff --name-only --diff-filter=A --no-renames "$base_sha" "$head_sha" -- supabase/migrations)"
+          if [[ -z "$added_migrations" ]]; then
+            echo "No new migration files; skipping production history dry-run."
+            exit 0
+          fi
+          bash scripts/ci/sync-supabase-migration-history.sh "$base_sha" "$head_sha"
+          supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --dry-run
