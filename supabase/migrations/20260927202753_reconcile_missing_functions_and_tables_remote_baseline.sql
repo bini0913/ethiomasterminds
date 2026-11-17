@@ -1,0 +1,2 @@
+-- Remote production baseline marker.
+-- This version is already applied in Supabase; intentionally no-op locally.
