@@ -245,7 +245,10 @@ $$;
 REVOKE ALL ON FUNCTION public.update_analytics(uuid,text,integer,integer,numeric) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.update_analytics(uuid,text,integer,integer,numeric) TO authenticated;
 
-CREATE OR REPLACE FUNCTION public.check_achievements(_user_id uuid)
+-- The earlier achievement RPC returned jsonb; the reconciled production contract is void.
+DROP FUNCTION IF EXISTS public.check_achievements(uuid);
+
+CREATE FUNCTION public.check_achievements(_user_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
