@@ -25,7 +25,10 @@ revoke execute on function public.assign_user_role(uuid, public.app_role) from p
 revoke execute on function public.assign_user_role(uuid, public.app_role) from anon;
 grant execute on function public.assign_user_role(uuid, public.app_role) to authenticated;
 
-create or replace function public.assign_user_role(_user_id uuid, _role public.app_role)
+-- The hardened RPC changes the legacy return contract; drop the old signature first.
+drop function if exists public.assign_user_role(uuid, public.app_role);
+
+create function public.assign_user_role(_user_id uuid, _role public.app_role)
 returns void
 language plpgsql
 security definer
@@ -59,6 +62,11 @@ begin
   on conflict (user_id, role) do nothing;
 end;
 $function$;
+
+-- Reapply the client grants after DROP/CREATE so PUBLIC does not regain access.
+revoke all on function public.assign_user_role(uuid, public.app_role) from public, anon;
+grant execute on function public.assign_user_role(uuid, public.app_role) to authenticated;
+
 
 drop policy if exists "Admins can manage roles" on public.user_roles;
 

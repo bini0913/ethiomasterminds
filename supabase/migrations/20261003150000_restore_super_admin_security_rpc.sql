@@ -1,5 +1,8 @@
 -- Restore the Super Admin security summary RPC used by deployed clients.
-create or replace function public.extreme_admin_get_security()
+-- Replace the legacy table-returning security RPC with the deployed jsonb contract.
+drop function if exists public.extreme_admin_get_security();
+
+create function public.extreme_admin_get_security()
 returns jsonb
 language plpgsql
 stable

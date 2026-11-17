@@ -357,7 +357,10 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.extreme_admin_get_audit_logs(p_limit integer DEFAULT 100)
+-- Reconcile the legacy audit-log row shape before replacing the RPC result type.
+DROP FUNCTION IF EXISTS public.extreme_admin_get_audit_logs(integer);
+
+CREATE FUNCTION public.extreme_admin_get_audit_logs(p_limit integer DEFAULT 100)
 RETURNS TABLE(
   id uuid,
   actor_id uuid,
@@ -438,7 +441,10 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.extreme_admin_adjust_economy(
+-- The reconciled control-center RPC returns boolean; remove the legacy jsonb signature first.
+DROP FUNCTION IF EXISTS public.extreme_admin_adjust_economy(uuid, integer, integer, boolean);
+
+CREATE FUNCTION public.extreme_admin_adjust_economy(
   p_user_id uuid,
   p_xp_delta integer DEFAULT 0,
   p_coin_delta integer DEFAULT 0,
@@ -521,7 +527,10 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.extreme_admin_get_settings()
+-- Reconcile the legacy settings row shape before replacing the RPC result type.
+DROP FUNCTION IF EXISTS public.extreme_admin_get_settings();
+
+CREATE FUNCTION public.extreme_admin_get_settings()
 RETURNS TABLE(setting_key text, setting_value jsonb)
 LANGUAGE sql
 STABLE
