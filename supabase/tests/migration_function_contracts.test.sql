@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(10);
+SELECT plan(11);
 
 SELECT is(
   pg_get_function_result('public.purchase_store_item(uuid,boolean)'::regprocedure),
@@ -52,6 +52,13 @@ SELECT ok(
       AND pg_get_constraintdef(oid) LIKE '%entrance_practice%'
   ),
   'quizzes support the original entrance-practice category'
+);
+
+SELECT is(
+  (SELECT pronargdefaults FROM pg_proc
+   WHERE oid = 'public.submit_quiz_result_secure(uuid,jsonb,integer,uuid)'::regprocedure),
+  0,
+  'quiz submission requires an explicit stable idempotency key'
 );
 
 SELECT * FROM finish();
