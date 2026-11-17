@@ -46,8 +46,9 @@ jobs:
               )
           PY
       - uses: supabase/setup-cli@v1
+        id: setup-supabase-cli
         with:
-          version: latest
+          version: 3.0.0
       - name: Start local Supabase services
         run: supabase start -x studio,edge-runtime,logflare,vector,imgproxy
       - name: Apply every migration from a clean database
@@ -55,7 +56,7 @@ jobs:
       - name: Run pgTAP database tests
         run: supabase test db
       - name: Stop local Supabase services
-        if: always()
+        if: always() && steps.setup-supabase-cli.outcome == 'success'
         run: supabase stop --no-backup
 
   edge-function-typecheck:
