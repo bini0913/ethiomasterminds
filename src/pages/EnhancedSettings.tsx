@@ -33,17 +33,23 @@ import SimpleAvatarEditor, { SimpleAvatarConfig } from '@/components/avatar/Simp
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import BackButton from '@/components/ui/BackButton';
 import { getMindForgeSettings, saveMindForgeSettings } from '@/lib/mindforge';
+import { safeStorage } from '@/lib/safeStorage';
+import { useTheme, type Theme } from '@/context/ThemeContext';
 
 import { AvatarConfig } from '@/context/UserContext';
 
+const SETTINGS_STORAGE_KEY = 'masterminds-enhanced-settings-v1';
+
 const EnhancedSettings: React.FC = () => {
-  const { user, logout, updateProfile } = useUser();
+  const { user, logout, updateProfile, deleteAccount } = useUser();
   const { language, setLanguage } = useLanguage();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   const mindForge = getMindForgeSettings();
 
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState(() => {
+    const defaults = {
     notifications: true,
     soundEffects: mindForge.soundEnabled,
     autoSave: true,
@@ -53,15 +59,25 @@ const EnhancedSettings: React.FC = () => {
     showOnlineStatus: true,
     difficulty: 'medium',
     language: language,
-    theme: 'default',
+    theme,
     reactionAnimations: mindForge.reactionsEnabled,
     reducedMotion: mindForge.reducedMotion
+    };
+    try {
+      const saved = safeStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (!saved) return defaults;
+      const restored = { ...defaults, ...JSON.parse(saved) };
+      if (!(['light', 'dark', 'pink', 'blue'] as string[]).includes(restored.theme)) restored.theme = theme;
+      return restored;
+    } catch {
+      return defaults;
+    }
   });
 
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    bio: ''
+    bio: safeStorage.getItem(`masterminds-profile-bio-${user?.id || 'anonymous'}`) || ''
   });
 
   const [avatarConfig, setAvatarConfig] = useState<Partial<SimpleAvatarConfig>>({});
@@ -70,12 +86,17 @@ const EnhancedSettings: React.FC = () => {
 
 
   useEffect(() => {
+    safeStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     saveMindForgeSettings({
       reactionsEnabled: settings.reactionAnimations,
       soundEnabled: settings.soundEffects,
       reducedMotion: settings.reducedMotion
     });
-  }, [settings.reactionAnimations, settings.soundEffects, settings.reducedMotion]);
+  }, [settings]);
+
+  useEffect(() => {
+    if (settings.theme !== theme) setTheme(settings.theme as Theme);
+  }, [settings.theme, setTheme, theme]);
 
   // Load user's avatar config from database
   useEffect(() => {
@@ -89,6 +110,7 @@ const EnhancedSettings: React.FC = () => {
       ...prev,
       [key]: value
     }));
+    if (key === 'theme') setTheme(value as Theme);
   };
 
   const handleSaveProfile = async () => {
@@ -98,6 +120,8 @@ const EnhancedSettings: React.FC = () => {
     try {
       const saved = await updateProfile({ name: profileData.name.trim() });
       if (!saved) return;
+      safeStorage.setItem(`masterminds-profile-bio-${user.id}`, profileData.bio.trim());
+      toast.success('Profile preferences saved.');
     } catch (err) {
       console.error('Error saving profile:', err);
       toast.error("Failed to save profile");
@@ -135,8 +159,9 @@ const EnhancedSettings: React.FC = () => {
     navigate('/', { replace: true });
   };
 
-  const handleDeleteAccount = () => {
-    toast.error("Account deletion requires confirmation. Contact support for assistance.");
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Delete your account and all associated data permanently? This cannot be undone.')) return;
+    await deleteAccount();
   };
 
   const handleExportData = async () => {
@@ -288,12 +313,12 @@ const EnhancedSettings: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="bio">Bio (Optional)</Label>
+                <Label htmlFor="bio">Personal bio (saved on this device)</Label>
                 <Input
                   id="bio"
                   value={profileData.bio}
                   onChange={(e) => setProfileData({...profileData, bio: e.target.value})}
-                  placeholder="Tell others about yourself..."
+                  placeholder="Keep a short personal study note..."
                 />
               </div>
             </CardContent>
@@ -525,10 +550,10 @@ const EnhancedSettings: React.FC = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="default">Default</SelectItem>
-                    <SelectItem value="colorful">Colorful</SelectItem>
-                    <SelectItem value="minimal">Minimal</SelectItem>
-                    <SelectItem value="professional">Professional</SelectItem>
+                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="dark">Dark</SelectItem>
+                    <SelectItem value="pink">Rose</SelectItem>
+                    <SelectItem value="blue">Blue</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
