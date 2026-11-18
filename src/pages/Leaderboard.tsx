@@ -168,6 +168,9 @@ const Leaderboard = () => {
   const mobilePodium = topThree.length === 3 ? [topThree[1], topThree[0], topThree[2]] : topThree;
   const rest = withRank.slice(3);
   const visibleRest = rest.slice(0, visibleRows);
+  const currentUserIndex = user?.id && activeTab !== "classes" ? leaderboardData.findIndex((entry) => entry.id === user.id) : -1;
+  const currentUserScore = user?.id ? leaderboardData.find((entry) => entry.id === user.id) : undefined;
+  const currentViewLabel = activeTab === "weekly" ? "weekly" : timeframe === "monthly" ? "monthly" : timeframe === "weekly" ? "weekly" : "season";
 
   useEffect(() => {
     setVisibleRows(16);
@@ -239,13 +242,13 @@ const Leaderboard = () => {
           <Card className="border-primary/20 bg-card/80">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="rounded-xl bg-amber-500/10 p-3"><Trophy className="h-5 w-5 text-amber-500" /></div>
-              <div><p className="text-xs text-muted-foreground">Your position</p><p className="text-2xl font-bold tabular-nums">{user?.id && rankedUsers.some((entry) => entry.id === user.id) ? `#${rankedUsers.findIndex((entry) => entry.id === user.id) + 1}` : "—"}</p></div>
+              <div><p className="text-xs text-muted-foreground">Your position in {activeTab === "classes" ? "classes" : currentViewLabel}</p><p className="text-2xl font-bold tabular-nums">{currentUserIndex >= 0 ? `#${currentUserIndex + 1}` : "—"}</p></div>
             </CardContent>
           </Card>
           <Card className="border-primary/20 bg-card/80">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="rounded-xl bg-emerald-500/10 p-3"><Zap className="h-5 w-5 text-emerald-500" /></div>
-              <div><p className="text-xs text-muted-foreground">Your weekly score</p><p className="text-2xl font-bold tabular-nums">{(users.find((entry) => entry.id === user?.id)?.weeklyScore ?? 0).toLocaleString()}</p></div>
+              <div><p className="text-xs text-muted-foreground">Your {currentViewLabel} score</p><p className="text-2xl font-bold tabular-nums">{currentUserScore ? Math.round(activeTab === "weekly" ? currentUserScore.weeklyScore : scoreFor(currentUserScore)).toLocaleString() : "—"}</p></div>
             </CardContent>
           </Card>
         </section>
