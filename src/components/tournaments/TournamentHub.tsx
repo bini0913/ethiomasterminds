@@ -161,7 +161,7 @@ const TournamentHub: React.FC = () => {
           .select("id,name,status,subject,start_time,max_participants,entry_fee_coins,prize_coins,winner_id")
           .order("created_at", { ascending: false })
           .limit(30),
-        supabase.from("tournament_players" as any).select("tournament_id,user_id"),
+        supabase.from("tournament_participants" as any).select("tournament_id,user_id"),
         supabase.from("profiles").select("id,name"),
       ]);
 
@@ -204,31 +204,17 @@ const TournamentHub: React.FC = () => {
   const loadTournamentDetails = async (tournamentId: string) => {
     setDetailsLoadError(false);
     try {
-      const [playersRes, matchesRes, profilesRes, eventsRes] = await Promise.all([
+      const [playersRes, profilesRes] = await Promise.all([
         supabase
-          .from("tournament_players" as any)
-          .select("id,user_id,status")
+          .from("tournament_participants" as any)
+          .select("id,user_id,rank,score")
           .eq("tournament_id", tournamentId)
-          .order("joined_at", { ascending: true }),
-        supabase
-          .from("tournament_matches" as any)
-          .select("id,round,bracket_position,status,player1_id,player2_id,winner_id,score_player1,score_player2,room_id,meta")
-          .eq("tournament_id", tournamentId)
-          .order("round", { ascending: true })
-          .order("bracket_position", { ascending: true }),
+          .order("registered_at", { ascending: true }),
         supabase.from("profiles").select("id,name,avatar"),
-        supabase
-          .from("tournament_events" as any)
-          .select("id,event_type,data,payload,created_at")
-          .eq("tournament_id", tournamentId)
-          .order("created_at", { ascending: false })
-          .limit(20),
       ]);
 
       if (playersRes.error) throw playersRes.error;
-      if (matchesRes.error) throw matchesRes.error;
       if (profilesRes.error) console.warn("Tournament participant profiles unavailable:", profilesRes.error);
-      if (eventsRes.error) console.warn("Tournament event history unavailable:", eventsRes.error);
 
       const profileMap = new Map(((profilesRes.data as any[]) || []).map((profile: any) => [profile.id, profile]));
 
@@ -237,36 +223,12 @@ const TournamentHub: React.FC = () => {
         userId: player.user_id,
         name: profileMap.get(player.user_id)?.name || "Unknown Player",
         avatarUrl: profileMap.get(player.user_id)?.avatar || null,
-        status: player.status,
-      }));
-
-      const mappedMatches = (matchesRes.data || []).map((match: any): HubMatch => ({
-        id: match.id,
-        round: match.round,
-        bracketPosition: match.bracket_position,
-        status: match.status,
-        player1Id: match.player1_id,
-        player2Id: match.player2_id,
-        player1: match.player1_id ? profileMap.get(match.player1_id)?.name || "Unknown Player" : "Open Slot",
-        player2: match.player2_id ? profileMap.get(match.player2_id)?.name || "Unknown Player" : "Open Slot",
-        winnerId: match.winner_id,
-        winnerName: match.winner_id ? profileMap.get(match.winner_id)?.name || "Unknown Player" : null,
-        score1: match.score_player1 ?? 0,
-        score2: match.score_player2 ?? 0,
-        roomId: match.room_id ?? null,
-        meta: (match.meta || {}) as Record<string, unknown>,
+        status: player.rank === 1 ? "champion" : "active",
       }));
 
       setPlayers(mappedPlayers);
-      setMatches(mappedMatches);
-      setEvents(
-        (eventsRes.data || []).map((event: any): TournamentEvent => ({
-          id: event.id,
-          eventType: event.event_type,
-          createdAt: event.created_at,
-          data: (event.data || event.payload || {}) as Record<string, unknown>,
-        })),
-      );
+      setMatches([]);
+      setEvents([]);
     } catch (error) {
       console.error("Tournament details load failed:", error);
       setDetailsLoadError(true);
@@ -309,11 +271,8 @@ const TournamentHub: React.FC = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, () => {
         loadTournaments();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "tournament_players" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "tournament_participants" }, () => {
         loadTournaments();
-        if (selectedTournamentId) loadTournamentDetails(selectedTournamentId);
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "tournament_matches" }, () => {
         if (selectedTournamentId) loadTournamentDetails(selectedTournamentId);
       })
       .subscribe();
