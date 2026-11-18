@@ -45,7 +45,7 @@ const PAGE_SIZE = 9;
 const MAX_UPLOAD_SIZE_MB = 50;
 const MAX_AI_TEXT_LENGTH = 3500;
 
-type SectionKey = 'my-books' | 'assigned' | 'community' | 'curriculum' | 'upload' | 'highlights' | 'notes';
+type SectionKey = 'my-books' | 'assigned' | 'community' | 'saved' | 'downloaded' | 'curriculum' | 'upload' | 'highlights' | 'notes';
 
 type AiAction = 'summary' | 'simple' | 'questions' | 'flashcards' | 'concepts';
 
@@ -66,6 +66,7 @@ const LibraryPage: React.FC = () => {
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'validating' | 'uploading' | 'saving' | 'done'>('idle');
   const [openUpload, setOpenUpload] = useState(false);
   const [bookmarkSet, setBookmarkSet] = useState<Set<string>>(new Set());
+  const [downloadedSet, setDownloadedSet] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const [activeSection, setActiveSection] = useState<SectionKey>('community');
@@ -147,6 +148,15 @@ const LibraryPage: React.FC = () => {
   useEffect(() => {
     load();
   }, [user?.id]);
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const saved = safeStorage.getItem(`masterminds-library-downloads-${user.id}`);
+      setDownloadedSet(new Set(saved ? JSON.parse(saved) : []));
+    } catch {
+      setDownloadedSet(new Set());
+    }
+  }, [user?.id]);
 
   const gradeValue = (user?.grade || '').trim();
   const gradeMatch = gradeValue.match(/(?:grade\s*)?(\d{1,2})/i);
@@ -179,6 +189,8 @@ const LibraryPage: React.FC = () => {
       const inGrade = gradeFilter === 'all' || String(book.grade_level || '') === gradeFilter;
 
       if (activeSection === 'my-books') return inQuery && inSubject && inGrade && book.uploader_id === user?.id;
+      if (activeSection === 'saved') return inQuery && inSubject && inGrade && bookmarkSet.has(book.id);
+      if (activeSection === 'downloaded') return inQuery && inSubject && inGrade && downloadedSet.has(book.id);
       if (activeSection === 'community') {
         if (user?.role === 'student') {
           const grade = Number(book.grade_level || 0);
@@ -188,9 +200,17 @@ const LibraryPage: React.FC = () => {
       }
       return inQuery && inSubject && inGrade;
     });
-  }, [books, search, subjectFilter, gradeFilter, activeSection, user?.id, user?.role, studentGradeMin, studentGradeMax]);
+  }, [books, search, subjectFilter, gradeFilter, activeSection, bookmarkSet, downloadedSet, user?.id, user?.role, studentGradeMin, studentGradeMax]);
 
   const visibleBooks = filteredBooks.slice(0, visibleCount);
+  const markDownloaded = (bookId: string) => {
+    setDownloadedSet((previous) => {
+      const next = new Set(previous);
+      next.add(bookId);
+      if (user?.id) safeStorage.setItem(`masterminds-library-downloads-${user.id}`, JSON.stringify([...next]));
+      return next;
+    });
+  };
 
   const subjects = useMemo(() => Array.from(new Set([...books.map((b) => b.subject), ...curriculumBooks.map((b) => b.subject)])).sort(), [books, curriculumBooks]);
 
@@ -589,6 +609,8 @@ const LibraryPage: React.FC = () => {
                 ['my-books', 'My Books'],
                 ['assigned', 'Assigned Books'],
                 ['community', 'Community Library'],
+                ['saved', 'Saved Resources'],
+                ['downloaded', 'Downloaded'],
                 ...(userTier === 'upper' || user?.role !== 'student' ? [['curriculum', 'Curriculum Textbooks'] as [SectionKey, string]] : []),
                 ['upload', 'Upload Book'],
                 ['highlights', 'Highlights'],
@@ -604,7 +626,7 @@ const LibraryPage: React.FC = () => {
           </Card>
 
           <div className="space-y-4">
-            {(activeSection === 'community' || activeSection === 'my-books') && (
+            {(activeSection === 'community' || activeSection === 'my-books' || activeSection === 'saved' || activeSection === 'downloaded') && (
               <Card>
                 <CardContent className="p-4 grid gap-3 md:grid-cols-4">
                   <div className="md:col-span-2 relative">
@@ -716,11 +738,14 @@ const LibraryPage: React.FC = () => {
               </Card>
             )}
 
-            {(activeSection === 'community' || activeSection === 'my-books') && (
+            {(activeSection === 'community' || activeSection === 'my-books' || activeSection === 'saved' || activeSection === 'downloaded') && (
               loading ? (
                 <div className="flex justify-center py-16"><Loader2 className="h-10 w-10 animate-spin" /></div>
               ) : (
                 <>
+                  {filteredBooks.length === 0 && (
+                    <Card className="mb-4 border-dashed"><CardContent className="p-8 text-center"><BookOpen className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="font-semibold">{activeSection === 'saved' ? 'No saved resources yet' : activeSection === 'downloaded' ? 'No downloaded resources yet' : 'No resources match these filters'}</p><p className="mt-1 text-sm text-muted-foreground">{activeSection === 'saved' ? 'Use Save on a library card to keep it here.' : activeSection === 'downloaded' ? 'Download a PDF from the Community Library to track it here.' : 'Try a different search, subject, or grade.'}</p></CardContent></Card>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <AnimatePresence>
                       {visibleBooks.map((book) => {
@@ -769,7 +794,7 @@ const LibraryPage: React.FC = () => {
                                     <BookOpen className="h-4 w-4" /> Read
                                   </Button>
                                   <Button asChild size="sm" variant="outline" className="gap-2" disabled={!hasValidPdfUrl}>
-                                    <a href={pdfUrl} target="_blank" rel="noreferrer">
+                                    <a href={pdfUrl} target="_blank" rel="noreferrer" onClick={() => markDownloaded(book.id)}>
                                       <Download className="h-4 w-4" /> Download
                                     </a>
                                   </Button>
