@@ -3,8 +3,18 @@
 -- by the authenticated user's role. Public discovery/login/leaderboard
 -- endpoints are intentionally left unchanged for compatibility.
 
-revoke all on function public.disable_notification_device(text) from public, anon;
-grant execute on function public.disable_notification_device(text) to authenticated;
+-- This RPC exists in some deployed schemas but is not created by the
+-- migration chain on a fresh reset. Keep its hardening when present without
+-- making clean installs depend on an out-of-band function.
+do $migration$
+begin
+  if to_regprocedure('public.disable_notification_device(text)') is not null then
+    execute 'revoke all on function public.disable_notification_device(text) from public, anon';
+    execute 'grant execute on function public.disable_notification_device(text) to authenticated';
+    execute 'alter function public.disable_notification_device(text) set search_path = pg_catalog';
+  end if;
+end
+$migration$;
 
 revoke all on function public.get_early_profile_summary(uuid) from public, anon;
 grant execute on function public.get_early_profile_summary(uuid) to authenticated;
@@ -50,7 +60,6 @@ grant execute on function public.upsert_notification_device(text, text, text, bo
 
 -- These functions reference all non-system objects with explicit schemas.
 -- A pg_catalog-only search path prevents public-schema object shadowing.
-alter function public.disable_notification_device(text) set search_path = pg_catalog;
 alter function public.get_early_profile_summary(uuid) set search_path = pg_catalog;
 alter function public.get_student_leaderboard() set search_path = pg_catalog;
 alter function public.is_student_in_class(uuid, uuid) set search_path = pg_catalog;
