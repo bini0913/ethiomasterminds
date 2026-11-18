@@ -24,6 +24,7 @@ import { safeStorage } from "@/lib/safeStorage";
 import { getUserTier } from "@/lib/getUserTier";
 
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
+const SETTINGS_PREFERENCES_STORAGE_KEY = "masterminds-settings-preferences-v1";
 
 const Settings: React.FC = () => {
   const { user, logout, deleteAccount } = useUser();
@@ -31,10 +32,18 @@ const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   
-  const [volume, setVolume] = useState(70);
-  const [notifications, setNotifications] = useState(true);
-  const [soundEffects, setSoundEffects] = useState(true);
-  const [vibration, setVibration] = useState(true);
+  const [volume, setVolume] = useState(() => {
+    try { return Number(JSON.parse(safeStorage.getItem(SETTINGS_PREFERENCES_STORAGE_KEY) || "{}").volume ?? 70); } catch { return 70; }
+  });
+  const [notifications, setNotifications] = useState(() => {
+    try { return JSON.parse(safeStorage.getItem(SETTINGS_PREFERENCES_STORAGE_KEY) || "{}").notifications ?? true; } catch { return true; }
+  });
+  const [soundEffects, setSoundEffects] = useState(() => {
+    try { return JSON.parse(safeStorage.getItem(SETTINGS_PREFERENCES_STORAGE_KEY) || "{}").soundEffects ?? true; } catch { return true; }
+  });
+  const [vibration, setVibration] = useState(() => {
+    try { return JSON.parse(safeStorage.getItem(SETTINGS_PREFERENCES_STORAGE_KEY) || "{}").vibration ?? true; } catch { return true; }
+  });
   
   const [showPassword, setShowPassword] = useState(false);
   const [privacy, setPrivacy] = useState({
@@ -44,6 +53,10 @@ const Settings: React.FC = () => {
     notifications_enabled: true,
   });
   const [savingPrivacy, setSavingPrivacy] = useState(false);
+
+  useEffect(() => {
+    safeStorage.setItem(SETTINGS_PREFERENCES_STORAGE_KEY, JSON.stringify({ volume, notifications, soundEffects, vibration }));
+  }, [volume, notifications, soundEffects, vibration]);
 
   useEffect(() => {
     let mounted = true;
