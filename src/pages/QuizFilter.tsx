@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
@@ -19,11 +19,11 @@ import { getUserTier } from "@/lib/getUserTier";
 
 const QuizFilter: React.FC = () => {
   const navigate = useNavigate();
-  const { setQuizFilters } = useQuiz();
+  const { quizzes, loading: quizzesLoading, setQuizFilters } = useQuiz();
   const { user } = useUser();
   const upperStudent = getUserTier(user?.grade) === "upper";
 
-  const [grade, setGrade] = useState<string>("");
+  const [grade, setGrade] = useState<string>(upperStudent ? String(Number((user?.grade || "").match(/\d+/)?.[0] || 9)) : "");
   const [subject, setSubject] = useState<string>("");
   const [topic, setTopic] = useState<string>("");
   const [difficulty, setDifficulty] = useState<string>("");
@@ -32,18 +32,18 @@ const QuizFilter: React.FC = () => {
 
   // Available options for filters
   const grades = upperStudent ? ["9", "10", "11", "12"] : ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
-  const subjects = ["Mathematics", "Science", "English", "Social Studies", "General Knowledge"];
-
-  const topics: {[key: string]: string[];} = {
-    "Mathematics": ["Numbers", "Algebra", "Geometry", "Fractions", "Decimals", "Percentages"],
-    "Science": ["Biology", "Chemistry", "Physics", "Earth Science", "Astronomy"],
-    "English": ["Grammar", "Vocabulary", "Reading", "Writing", "Literature"],
-    "Social Studies": ["History", "Geography", "Civics", "Economics"],
-    "General Knowledge": ["Current Affairs", "Sports", "Arts", "Technology"]
-  };
-
-  const difficulties = ["Easy", "Medium", "Hard", "Extreme"];
-  const questionTypes = ["Multiple Choice", "True/False", "Fill in the Blank", "Matching"];
+  const availableQuizzes = useMemo(() => quizzes.filter((quiz) => {
+    const quizGrade = Number(quiz.gradeLevel);
+    return Number.isFinite(quizGrade) && quizGrade >= Number(grades[0]) && quizGrade <= Number(grades[grades.length - 1]);
+  }), [quizzes, grades]);
+  const subjects = useMemo(() => [...new Set(availableQuizzes.map((quiz) => quiz.category).filter(Boolean))].sort(), [availableQuizzes]);
+  const topicOptions = useMemo(() => {
+    const values = new Set<string>();
+    availableQuizzes.filter((quiz) => !subject || quiz.category === subject).forEach((quiz) => quiz.questions.forEach((question) => { if (question.topic && question.topic !== "General") values.add(question.topic); }));
+    return [...values].sort();
+  }, [availableQuizzes, subject]);
+  const difficulties = useMemo(() => [...new Set(availableQuizzes.map((quiz) => quiz.difficulty).filter(Boolean))].map((value) => String(value).replace(/^./, (letter) => letter.toUpperCase())), [availableQuizzes]);
+  const questionTypes = useMemo(() => [...new Set(availableQuizzes.flatMap((quiz) => quiz.questions.map((question) => question.type)).filter(Boolean))].sort(), [availableQuizzes]);
 
   const applyFilters = () => {
     const filters = {
@@ -106,11 +106,14 @@ const QuizFilter: React.FC = () => {
             <CardHeader className={upperStudent ? "border-b border-border bg-card text-foreground" : "bg-gradient-to-r from-primary to-accent text-white"}>
               <div className="flex items-center">
                 <Filter className="mr-2 h-5 w-5" />
-                <CardTitle>Customize Your Quiz</CardTitle>
+              <CardTitle>Customize Your Quiz</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Choose from the approved question bank. Options below update from real available content.</p>
               </div>
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-6">
+                {quizzesLoading && <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">Loading approved question-bank options…</div>}
+                {!quizzesLoading && subjects.length === 0 && <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">No approved quizzes are available for this grade range yet. You can still return and try another practice route.</div>}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="grade">Grade Level</Label>
@@ -152,7 +155,7 @@ const QuizFilter: React.FC = () => {
                         <SelectValue placeholder={subject ? "Select topic" : "Select a subject first"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {subject && topics[subject]?.map((t) =>
+                        {topicOptions.map((t) =>
                         <SelectItem key={t} value={t}>{t}</SelectItem>
                         )}
                       </SelectContent>
