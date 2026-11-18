@@ -26,24 +26,61 @@ import { getUserTier } from "@/lib/getUserTier";
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 const SETTINGS_PREFERENCES_STORAGE_KEY = "masterminds-settings-preferences-v1";
 
+type SettingsPreferences = {
+  volume: number;
+  notifications: boolean;
+  soundEffects: boolean;
+  vibration: boolean;
+};
+
+const DEFAULT_SETTINGS_PREFERENCES: SettingsPreferences = {
+  volume: 70,
+  notifications: true,
+  soundEffects: true,
+  vibration: true,
+};
+
+const readSettingsPreferences = (): SettingsPreferences => {
+  try {
+    const raw = safeStorage.getItem(SETTINGS_PREFERENCES_STORAGE_KEY);
+    if (!raw) return DEFAULT_SETTINGS_PREFERENCES;
+
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return DEFAULT_SETTINGS_PREFERENCES;
+
+    const candidate = parsed as Record<string, unknown>;
+    const volume = typeof candidate.volume === "number" && Number.isFinite(candidate.volume)
+      ? Math.min(100, Math.max(0, candidate.volume))
+      : DEFAULT_SETTINGS_PREFERENCES.volume;
+
+    return {
+      volume,
+      notifications: typeof candidate.notifications === "boolean"
+        ? candidate.notifications
+        : DEFAULT_SETTINGS_PREFERENCES.notifications,
+      soundEffects: typeof candidate.soundEffects === "boolean"
+        ? candidate.soundEffects
+        : DEFAULT_SETTINGS_PREFERENCES.soundEffects,
+      vibration: typeof candidate.vibration === "boolean"
+        ? candidate.vibration
+        : DEFAULT_SETTINGS_PREFERENCES.vibration,
+    };
+  } catch {
+    return DEFAULT_SETTINGS_PREFERENCES;
+  }
+};
+
 const Settings: React.FC = () => {
   const { user, logout, deleteAccount } = useUser();
   const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
+  const [initialPreferences] = useState(readSettingsPreferences);
   
-  const [volume, setVolume] = useState(() => {
-    try { return Number(JSON.parse(safeStorage.getItem(SETTINGS_PREFERENCES_STORAGE_KEY) || "{}").volume ?? 70); } catch { return 70; }
-  });
-  const [notifications, setNotifications] = useState(() => {
-    try { return JSON.parse(safeStorage.getItem(SETTINGS_PREFERENCES_STORAGE_KEY) || "{}").notifications ?? true; } catch { return true; }
-  });
-  const [soundEffects, setSoundEffects] = useState(() => {
-    try { return JSON.parse(safeStorage.getItem(SETTINGS_PREFERENCES_STORAGE_KEY) || "{}").soundEffects ?? true; } catch { return true; }
-  });
-  const [vibration, setVibration] = useState(() => {
-    try { return JSON.parse(safeStorage.getItem(SETTINGS_PREFERENCES_STORAGE_KEY) || "{}").vibration ?? true; } catch { return true; }
-  });
+  const [volume, setVolume] = useState(initialPreferences.volume);
+  const [notifications, setNotifications] = useState(initialPreferences.notifications);
+  const [soundEffects, setSoundEffects] = useState(initialPreferences.soundEffects);
+  const [vibration, setVibration] = useState(initialPreferences.vibration);
   
   const [showPassword, setShowPassword] = useState(false);
   const [privacy, setPrivacy] = useState({
