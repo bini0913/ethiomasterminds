@@ -20,3 +20,30 @@
 - Run the available typecheck, lint, production build, and relevant existing tests after implementation; resolve confirmed regressions.
 - Verify representative route/layout behavior and mobile content clearance where available. Be explicit if authenticated student backend testing is not possible; do not claim full end-to-end verification without an authenticated account.
 - Work on a separate feature branch and keep history intact; do not force-push or rewrite `main`. Any database change must be justified by a demonstrated gap and must be non-destructive.
+
+
+# Active TODO — Grades 5–8 Product Redesign
+
+## Foundation and shell
+
+- [ ] **Canonical middle-tier route model and ownership** — Every Grades 5–8 destination has one canonical label, parent group, active matcher, title, mobile visibility, grade scope, and compatibility alias; MiddleTierShell is the only middle-tier global chrome owner; App.tsx wraps middle routes exactly once; existing route URLs and query/deep-link semantics remain valid.
+- [ ] **Responsive shell modes** — Phone uses a hamburger drawer plus a maximum of five bottom-nav items with Rank replacing More; tablet uses a compact/collapsible sidebar mode; desktop uses a full sidebar; all modes preserve profile at top right on phone, safe-area spacing, no horizontal overflow, and correct content insets.
+- [ ] **Accessible shell interactions** — Sidebar, header, drawer, profile menu, and bottom navigation use semantic links/buttons, visible focus, stable accessible names, one aria-current destination, Escape close, focus trap/return, background isolation, scroll lock, and reduced-motion behavior.
+- [ ] **Shared middle-tier visual foundation** — Shared page/frame/header/status/action/metric/session/account primitives use scoped `.tier-middle` semantic tokens, consistent spacing/radius/elevation, readable light/dark/theme contrast, and no changes to upper-tier styling.
+
+## Home, learning, academic, play, connect, and account
+
+- [ ] **Canonical Home parity** — `/` and the Grades 5–8 home provide the next best action plus truthful loading/error/empty/stale states; assignments, daily missions and claim behavior, performance, friends, badges, quick actions, XP, streak, coins, and existing data authorities remain available; `/student-dashboard` stays compatible until parity is verified.
+- [ ] **Learn and quiz experience** — `/quiz` and all existing query parameters preserve approved content, Grade 5–8 bounds, generated-set identity, attempts, retakes, secure submission, timeout, retry, rewards, and accessible setup/session states; invalid legacy grade values are handled visibly without dropping other parameters.
+- [ ] **Learn and Focus surfaces** — Revision, flashcards, library, AI Tutor, Learning DNA, and Study Mode share page/header/status primitives while preserving revision writes, flashcard progress, reader/library mutations, AI history/retry, evidence limitations, timers, tasks, calls, competitions, and server session RPCs.
+- [ ] **Academic workspace** — Academic Mode uses middle-appropriate terminology and one shared frame; setup, hub, planner, insights, and topic coverage preserve academic profiles, study plans, AI/PDF analysis, analytics, mastery thresholds, book-derived units, topic progress, and quiz practice links with clear partial/cache/error states.
+- [ ] **Play workspace** — Multiplayer/Arena, Lobby/Rooms, Tournaments, Leaderboard, and Store have coherent hierarchy and responsive behavior; room, invite, readiness, countdown, answer/result, tournament, ranking, purchase, equip, conversion, transfer, inventory, and transaction flows remain intact.
+- [ ] **Connect workspace** — Social/community, private Friends/messages, group Chat, and Notifications are clearly differentiated; phone uses list-to-conversation navigation; unread, request, presence, post, message, room, push, reminder, deep-link, optimistic rollback, and realtime behavior remain functional.
+- [ ] **Canonical account experience** — `/settings` is the single account hub; `/profile/:userId` remains the profile/social surface; compatibility routes do not create duplicate account experiences; profile, privacy, follows, challenges, coin transfer, achievements, photo upload, notifications, appearance, accessibility, and logout remain functional.
+- [ ] **Avatar consistency** — One normalized avatar configuration and adapter renders the saved avatar consistently in profile, shell, friends, rooms, leaderboard, and collection surfaces; legacy configurations have safe conversion/fallback behavior; save is confirmed before local state claims success.
+
+## Hardening and delivery
+
+- [ ] **Responsive and accessibility release baseline** — Keyboard and touch operation works at 320/360/390px, 768/820px, 1024px, and 1280px-plus; 200% zoom and landscape phone do not overflow; dialogs/sheets restore focus and close with Escape; progress has numeric semantics; async/realtime changes announce at state boundaries; reduced motion is honored.
+- [ ] **Upper-tier protection** — Grades 9–12 labels, routes, guards, queries, navigation, styling, and behavior remain unchanged after every shared-file change; no `.tier-upper` or `.mm-studio-upper` styling is modified.
+- [ ] **Validation and PR delivery** — Each phase is delivered through a pushed branch and PR for manual review/merge; `npm run build`, changed-file lint, `git diff --check`, and relevant type checks are run; no PR is merged automatically.
