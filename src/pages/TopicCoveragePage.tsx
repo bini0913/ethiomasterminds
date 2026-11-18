@@ -149,19 +149,19 @@ const TopicCoveragePage: React.FC = () => {
   const subjectBooks = activeSubject ? selectedBooks.filter((b) => normalizeSubject(b.subject) === normalizeSubject(activeSubject)) : [];
 
   return (
-    <div className={`${upperStudent ? "tier-upper " : ""}min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]`}>
-      <div className="sticky top-14 z-30 border-b border-border bg-background/95 backdrop-blur">
+    <div className={`${upperStudent ? "tier-upper " : "tier-middle "}min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]`}>
+      <div className={upperStudent ? "sticky top-14 z-30 border-b border-border bg-background/95 backdrop-blur" : "sticky top-14 z-30 border-b border-sky-100 bg-white/95 backdrop-blur"}>
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           {!upperStudent && <Button variant="ghost" size="icon" aria-label="Back" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button>}
           <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
             {subjects.map((s) => {
               const sp = subjectProgress(s); const on = s === activeSubject;
               return <button key={s} type="button" onClick={() => setSelectedSubject(s)} aria-pressed={on}
-                className={`flex shrink-0 items-center gap-2 rounded-2xl border-2 border-b-4 px-4 py-2 text-sm font-bold transition active:translate-y-0.5 active:border-b-2 ${on ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}>
-                {labelFor(s)}<span className="text-xs opacity-70">{sp.coveragePct}%</span></button>;
+                className={`flex shrink-0 items-center gap-2 rounded-2xl border-2 border-b-4 px-4 py-2 text-sm font-bold transition active:translate-y-0.5 active:border-b-2 ${on ? "border-primary bg-primary/10 text-primary" : upperStudent ? "border-border bg-card text-muted-foreground hover:text-foreground" : "border-slate-200 bg-white text-slate-500 hover:border-sky-300 hover:text-sky-700"}`}>
+                {labelFor(s)}<span className="text-xs opacity-70">{sp.pct}%</span></button>;
             })}
           </div>
-          <div className="hidden items-center gap-1.5 rounded-2xl border-2 border-border bg-card px-3 py-2 text-sm font-bold sm:flex"><Trophy className="h-4 w-4 text-accent" />{overallMastered}/{overallTotal}</div>
+          <div className={upperStudent ? "hidden items-center gap-1.5 rounded-2xl border-2 border-border bg-card px-3 py-2 text-sm font-bold sm:flex" : "hidden items-center gap-1.5 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-700 sm:flex"}><Trophy className="h-4 w-4 text-accent" />{overallMastered}/{overallTotal}</div>
         </div>
       </div>
 
@@ -171,7 +171,7 @@ const TopicCoveragePage: React.FC = () => {
             <Card><CardContent className="p-8 text-center"><BookOpen className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="font-semibold">Choose your subjects first</p><Button className="mt-4" onClick={() => navigate("/academic/setup")}>Edit Academic Prep</Button></CardContent></Card>
           ) : (
             <>
-              <div className="mb-6 rounded-3xl border-2 border-b-[6px] border-primary/40 bg-primary p-5 text-primary-foreground">
+              <div className={upperStudent ? "mb-6 rounded-3xl border-2 border-b-[6px] border-primary/40 bg-primary p-5 text-primary-foreground" : "mb-6 rounded-[2rem] border border-sky-200/70 bg-gradient-to-br from-sky-600 via-cyan-600 to-sky-700 p-5 text-white shadow-lg shadow-sky-900/10"}>
                 <p className="text-xs font-bold uppercase tracking-wider opacity-80">Your path</p>
                 <h1 className="text-2xl font-extrabold">{labelFor(activeSubject)}</h1>
                 <div className="mt-3 flex items-center gap-3">
@@ -188,13 +188,12 @@ const TopicCoveragePage: React.FC = () => {
           )}
         </div>
         <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
-          <Card><CardContent className="space-y-3 p-4">
+          <Card className={upperStudent ? undefined : "border-slate-200/80 bg-white shadow-sm"}><CardContent className="space-y-3 p-4">
             <p className="flex items-center gap-2 font-bold"><Star className="h-4 w-4 text-accent" /> Overall mastery</p>
             <Progress value={overallCoverage} className="h-3" />
             <p className="text-xs text-muted-foreground">{overallCoverage}% average coverage · {overallMastered} of {overallTotal} topics mastered across {subjects.length} subjects</p>
           </CardContent></Card>
-          {activeSubject && focusTopic && <Card className="border-primary/20 bg-primary/5"><CardContent className="space-y-2 p-4"><p className="flex items-center gap-2 font-bold"><GraduationCap className="h-4 w-4 text-primary" /> Recommended focus</p><p className="text-sm font-semibold">{focusTopic}</p><p className="text-xs text-muted-foreground">Your lowest-confidence available topic. A short focused practice session can move it forward.</p><Button size="sm" className="w-full" onClick={() => practice(focusTopic)}>Practice this topic</Button></CardContent></Card>}
-          {activeSubject && <Card><CardContent className="space-y-2 p-4">
+          {activeSubject && <Card className={upperStudent ? undefined : "border-slate-200/80 bg-white shadow-sm"}><CardContent className="space-y-2 p-4">
             <p className="flex items-center gap-2 font-bold"><LibraryBig className="h-4 w-4 text-primary" /> Books</p>
             {subjectBooks.length ? subjectBooks.map((b) => <button key={b.id} type="button" onClick={() => navigate("/library")} className="flex w-full items-center gap-2 rounded-xl border border-border p-2 text-left text-sm hover:bg-muted"><BookOpen className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{b.title}</span></button>)
               : <p className="text-xs text-muted-foreground">No book picked for this subject.</p>}
