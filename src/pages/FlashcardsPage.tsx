@@ -286,6 +286,26 @@ const FlashcardsPage: React.FC = () => {
           </div>
         </div>
 
+        <div className="px-4 pb-4 max-w-4xl mx-auto">
+          <Card className="border-border/70 bg-card/80">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold tracking-[0.16em] text-primary">TODAY'S SESSION</p>
+                  <h2 className="mt-1 font-semibold">Keep your recall loop moving</h2>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate("/revision")}>View revision schedule</Button>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center sm:grid-cols-4">
+                <div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-lg font-bold">{dueCards.length}</p><p className="text-[10px] text-muted-foreground">Due now</p></div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-lg font-bold">{statusCounts.learning}</p><p className="text-[10px] text-muted-foreground">Learning</p></div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-lg font-bold">{statusCounts.mastered}</p><p className="text-[10px] text-muted-foreground">Mastered</p></div>
+                <div className="hidden rounded-xl border border-border bg-muted/30 p-3 sm:block"><p className="text-lg font-bold">{Math.max(1, Math.ceil(dueCards.length * 2))}m</p><p className="text-[10px] text-muted-foreground">Estimated time</p></div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Due Review Button */}
         {dueCards.length > 0 && (
           <div className="px-4 max-w-4xl mx-auto mb-4">

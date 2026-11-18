@@ -18,6 +18,13 @@ const isSafeHttpUrl = (value: string | null | undefined) => {
   }
 };
 
+const sourceStatusLabel = (value: string | null | undefined) => {
+  const status = String(value || "").toLowerCase();
+  if (["verified", "source_verified", "verified_metadata"].includes(status)) return "Source verified";
+  if (status === "permission_confirmed") return "Permission confirmed";
+  return "Verification pending";
+};
+
 type Paper = {
   id: string;
   subject: string;
@@ -99,6 +106,10 @@ const EntranceExamPapersPage: React.FC = () => {
     () => [...new Set(papers.map((paper) => paper.gregorian_year).filter((value): value is number => value != null))].sort((a, b) => b - a),
     [papers]
   );
+  const ecYears = useMemo(
+    () => [...new Set(papers.map((paper) => paper.ethiopian_year).filter((value): value is number => value != null))].sort((a, b) => b - a),
+    [papers]
+  );
 
   const filtered = useMemo(() => papers.filter((paper) => {
     const query = search.trim().toLowerCase();
@@ -126,23 +137,23 @@ const EntranceExamPapersPage: React.FC = () => {
       <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search subject or year" className="pl-9"/></div>
       <select aria-label="Subject" value={subject} onChange={event => setSubject(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="all">All subjects</option>{subjects.map(item=><option key={item} value={item}>{item}</option>)}</select>
       <select aria-label="Stream" value={stream} onChange={event => setStream(event.target.value)} className="h-10 rounded-md border border-border bg-card px-3 text-sm"><option value="all">All streams</option><option value="natural">Natural Science</option><option value="social">Social Science</option></select>
-      <select aria-label="Ethiopian academic year" value={ecYear} onChange={event => setEcYear(event.target.value)} className="h-10 rounded-md border border-border bg-card px-3 text-sm"><option value="all">All E.C. years</option>{[2016,2015,2014,2013,2012].map(value=><option key={value} value={String(value)}>{value} E.C.</option>)}</select>
+      <select aria-label="Ethiopian academic year" value={ecYear} onChange={event => setEcYear(event.target.value)} className="h-10 rounded-md border border-border bg-card px-3 text-sm"><option value="all">All E.C. years</option>{ecYears.map(value=><option key={value} value={String(value)}>{value} E.C.</option>)}</select>
       <select aria-label="Gregorian year" value={year} onChange={event => setYear(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm"><option value="all">All years</option>{years.map(value=><option key={value} value={String(value)}>{value} G.C.</option>)}</select>
     </CardContent></Card>
     <div className="flex flex-wrap gap-2" aria-label="Quick Ethiopian year filters">
       <Button size="sm" variant={ecYear === "all" ? "default" : "outline"} onClick={() => setEcYear("all")}>All years</Button>
-      {[2016, 2015, 2014, 2013, 2012].map(value => <Button key={value} size="sm" variant={ecYear === String(value) ? "default" : "outline"} onClick={() => setEcYear(String(value))}>{value} E.C.</Button>)}
+      {ecYears.slice(0, 5).map(value => <Button key={value} size="sm" variant={ecYear === String(value) ? "default" : "outline"} onClick={() => setEcYear(String(value))}>{value} E.C.</Button>)}
     </div>
     <div className="flex items-start gap-3 rounded-lg border p-4 text-sm text-muted-foreground"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0"/><p>These entries are a source-linked catalog, not copied question text. Open the source to view or download papers and check the answer key. The catalog records source metadata; it does not certify every answer as official.</p></div>
     {loading ? <p className="py-10 text-center text-muted-foreground">Loading past papers…</p> : error ? <Card><CardContent className="p-6 text-sm">{error}</CardContent></Card> : filtered.length === 0 ? <Card><CardContent className="p-8 text-center text-muted-foreground">No catalog entries match those filters.</CardContent></Card> :
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filtered.map(paper => {
         const status = String(paper.source_status || "").toLowerCase();
-        const sourceVerified = ["verified", "source_verified"].includes(status);
+        const sourceVerified = ["verified", "source_verified", "verified_metadata"].includes(status);
         return <Card key={paper.id} className="h-full"><CardContent className="flex h-full flex-col gap-3 p-4">
           <div className="flex items-start justify-between gap-2"><div className="rounded-lg bg-primary/10 p-2 text-primary"><FileText className="h-5 w-5"/></div><Badge variant="secondary">{paper.gregorian_year ? `${paper.gregorian_year} G.C.` : "Year unavailable"}</Badge></div>
           <div><h2 className="font-semibold">{paper.subject}</h2><p className="text-sm text-muted-foreground">{paper.ethiopian_year ? `${paper.ethiopian_year} E.C.` : "E.C. year unavailable"} · Grade 12 entrance exam</p><p className="mt-1 text-xs text-muted-foreground">{paper.stream || "Stream not specified"}</p></div>
           <p className="flex-1 text-xs text-muted-foreground">{paper.notes || "No additional source notes."}</p>
-          <div className="flex flex-wrap items-center gap-2"><Badge variant={sourceVerified ? "default" : "outline"}>{sourceVerified ? "Source verified" : status === "permission_confirmed" ? "Permission confirmed" : "Verification pending"}</Badge><Badge variant="outline">{paper.stream || "Stream not specified"}</Badge></div>
+          <div className="flex flex-wrap items-center gap-2"><Badge variant={sourceVerified ? "default" : "outline"}>{sourceStatusLabel(paper.source_status)}</Badge><Badge variant="outline">{paper.stream || "Stream not specified"}</Badge></div>
           <p className="text-xs font-medium">{paper.source_name || "Source name unavailable"}</p>
           {practiceSubjects.includes(normalizeSubject(paper.subject)) && <Button variant="outline" className="w-full" onClick={() => navigate("/academic/exam", { state: { subject: paper.subject } })}>Practice in Exam Mode</Button>}
           <Button className="w-full" disabled={!isSafeHttpUrl(paper.source_url)} onClick={() => { if (isSafeHttpUrl(paper.source_url)) window.open(paper.source_url!, "_blank", "noopener,noreferrer"); }}>{isSafeHttpUrl(paper.source_url) ? "Open source archive" : "Source link unavailable"} <ExternalLink className="ml-2 h-4 w-4"/></Button>

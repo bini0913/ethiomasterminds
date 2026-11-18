@@ -202,34 +202,42 @@ const AcademicSetup: React.FC = () => {
   const selectedBook = books.find((book) => book.id === bookId);
 
   return (
-    <div className={grade >= 9 ? "tier-upper min-h-screen bg-background px-4 py-6 pb-24 text-foreground" : "min-h-screen bg-background px-4 py-6 pb-24"}>
+    <div className={grade >= 9 ? "tier-upper min-h-screen bg-background px-4 py-6 pb-24 text-foreground" : "tier-middle min-h-screen bg-slate-50/80 px-4 py-6 pb-24 text-slate-950"}>
       <div className="mx-auto w-full max-w-2xl">
-        <div className="mb-5 flex items-center gap-3">
+        <div className={grade >= 9 ? "mb-5 flex items-center gap-3" : "mb-6 flex items-start gap-3"}>
           <Button variant="ghost" size="icon" onClick={() => (step === 1 || (band === "high" && step === 2)) ? navigate("/academic") : setStep((current) => current - 1)} aria-label="Go back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-primary" />
+              <GraduationCap className={grade >= 9 ? "h-5 w-5 text-primary" : "h-5 w-5 text-sky-600"} />
               <h1 className="text-xl font-bold">Set up {academicLabel}</h1>
             </div>
-            <p className="text-sm text-muted-foreground">We use your saved grade and learning activity to tailor your study path, goals, subjects and Library resources.</p>
+            <p className="mt-1 text-sm text-muted-foreground">We use your saved grade and learning activity to tailor your study path, goals, subjects and Library resources.</p>
           </div>
         </div>
 
-        <div className="mb-6 h-2 overflow-hidden rounded-full bg-muted">
+        {band === "middle" && <div className="mb-5 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm shadow-sky-100/70">
+          <div className="flex items-center justify-between gap-3">
+            <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-sky-600">Your study profile</p><p className="mt-1 text-sm font-semibold">Step {step} of {totalSteps}</p></div>
+            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">{Math.round(progress)}% ready</span>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-sky-100"><div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-cyan-500 transition-all duration-300" style={{ width: `${progress}%` }} /></div>
+        </div>}
+
+        <div className={grade >= 9 ? "mb-6 h-2 overflow-hidden rounded-full bg-muted" : "hidden"}>
           <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
         </div>
 
         {band === "middle" && step === 1 && (
-          <Card>
+          <Card className="border-sky-200 bg-white shadow-sm shadow-sky-100/70">
             <CardHeader>
               <CardTitle>What grade are you in?</CardTitle>
               <p className="text-sm text-muted-foreground">This controls the level and curriculum content we prepare for you.</p>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {Array.from({ length: 8 }, (_, index) => index + 5).map((value) => (
-                <Button key={value} variant={grade === value ? "default" : "outline"} className="h-14" onClick={() => setGrade(value)}>
+                <Button key={value} variant={grade === value ? "default" : "outline"} className={grade === value ? "h-14 bg-sky-600 text-white hover:bg-sky-700" : "h-14 border-sky-200 bg-white hover:border-sky-400 hover:bg-sky-50"} onClick={() => setGrade(value)}>
                   Grade {value}
                 </Button>
               ))}
@@ -238,7 +246,7 @@ const AcademicSetup: React.FC = () => {
         )}
 
         {step === 2 && (
-          <Card>
+          <Card className={grade >= 9 ? undefined : "border-sky-200 bg-white shadow-sm shadow-sky-100/70"}>
             <CardHeader>
               <CardTitle>What are you studying for?</CardTitle>
               <p className="text-sm text-muted-foreground">This changes the balance between daily learning, revision and exam practice.</p>
@@ -246,7 +254,7 @@ const AcademicSetup: React.FC = () => {
             <CardContent className="space-y-3">
               {activeGoalOptions.map((option) => (
                 <button key={option.value} type="button" onClick={() => setGoal(option.value)}
-                  className={`w-full rounded-xl border p-4 text-left transition ${goal === option.value ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"}`}>
+                  className={`w-full rounded-2xl border p-4 text-left transition ${goal === option.value ? (grade >= 9 ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-sky-500 bg-sky-50 ring-1 ring-sky-500") : (grade >= 9 ? "border-border hover:bg-muted/50" : "border-slate-200 hover:border-sky-300 hover:bg-sky-50/60")}`}>
                   <div className="flex items-start gap-3">
                     <Target className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                     <div><p className="font-semibold">{option.title}</p><p className="mt-1 text-sm text-muted-foreground">{option.description}</p></div>
@@ -262,7 +270,7 @@ const AcademicSetup: React.FC = () => {
         )}
 
         {band === "middle" && step === 3 && (
-          <Card>
+          <Card className="border-sky-200 bg-white shadow-sm shadow-sky-100/70">
             <CardHeader>
               <CardTitle>Which curriculum do you study?</CardTitle>
               <p className="text-sm text-muted-foreground">Master Minds will use this to choose the right learning path.</p>
@@ -270,7 +278,7 @@ const AcademicSetup: React.FC = () => {
             <CardContent className="space-y-3">
               {curriculumOptions.map((option) => (
                 <button key={option.value} type="button" onClick={() => setCurriculum(option.value)}
-                  className={`w-full rounded-xl border p-4 text-left transition ${curriculum === option.value ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"}`}>
+                  className={`w-full rounded-2xl border p-4 text-left transition ${curriculum === option.value ? "border-sky-500 bg-sky-50 ring-1 ring-sky-500" : "border-slate-200 hover:border-sky-300 hover:bg-sky-50/60"}`}>
                   <div className="flex items-start gap-3">
                     <Library className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                     <div><p className="font-semibold">{option.title}</p><p className="mt-1 text-sm text-muted-foreground">{option.description}</p></div>
@@ -282,7 +290,7 @@ const AcademicSetup: React.FC = () => {
         )}
 
         {step === (band === "high" ? 3 : 4) && (
-          <Card>
+          <Card className={grade >= 9 ? undefined : "border-sky-200 bg-white shadow-sm shadow-sky-100/70"}>
             <CardHeader>
               <CardTitle>What subjects are you studying?</CardTitle>
               <p className="text-sm text-muted-foreground">Choose all subjects you want Academic Prep to support.</p>
@@ -296,7 +304,7 @@ const AcademicSetup: React.FC = () => {
               )}
               {subjectOptions.map((subject) => (
                 <button key={subject} type="button" onClick={() => toggleSubject(subject)}
-                  className={`flex min-h-12 items-center justify-between rounded-xl border px-3 py-3 text-left text-sm transition ${subjects.includes(subject) ? "border-primary bg-primary/5 text-primary ring-1 ring-primary" : "border-border hover:bg-muted/50"}`}>
+                  className={`flex min-h-12 items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition ${subjects.includes(subject) ? (grade >= 9 ? "border-primary bg-primary/5 text-primary ring-1 ring-primary" : "border-sky-500 bg-sky-50 text-sky-700 ring-1 ring-sky-500") : (grade >= 9 ? "border-border hover:bg-muted/50" : "border-slate-200 hover:border-sky-300 hover:bg-sky-50/60")}`}>
                   <span>{subject}</span>
                   {subjects.includes(subject) && <Check className="h-4 w-4" />}
                 </button>
@@ -306,7 +314,7 @@ const AcademicSetup: React.FC = () => {
         )}
 
         {step === totalSteps && (
-          <Card>
+          <Card className={grade >= 9 ? undefined : "border-sky-200 bg-white shadow-sm shadow-sky-100/70"}>
             <CardHeader>
               <CardTitle>Which Library books and resources do you use?</CardTitle>
               <p className="text-sm text-muted-foreground">Select as many approved Library books as you use. These resources guide revision and recommendations.</p>
@@ -346,9 +354,9 @@ const AcademicSetup: React.FC = () => {
 
         <div className="mt-5 flex justify-end">
           {step < totalSteps ? (
-            <Button onClick={next} size="lg">Continue <ArrowRight className="ml-2 h-4 w-4" /></Button>
+            <Button onClick={next} size="lg" className={grade >= 9 ? undefined : "bg-sky-600 text-white shadow-lg shadow-sky-500/20 hover:bg-sky-700"}>Continue <ArrowRight className="ml-2 h-4 w-4" /></Button>
           ) : (
-            <Button onClick={save} disabled={loading} size="lg">{loading ? "Saving…" : "Finish setup"} <Check className="ml-2 h-4 w-4" /></Button>
+            <Button onClick={save} disabled={loading} size="lg" className={grade >= 9 ? undefined : "bg-sky-600 text-white shadow-lg shadow-sky-500/20 hover:bg-sky-700"}>{loading ? "Saving…" : "Finish setup"} <Check className="ml-2 h-4 w-4" /></Button>
           )}
         </div>
       </div>
