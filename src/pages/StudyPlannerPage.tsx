@@ -482,8 +482,8 @@ const StudyPlannerPage: React.FC = () => {
   }
 
   return (
-    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "min-h-screen bg-gradient-to-br from-background via-background to-primary/5"}>
-      <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 bg-gradient-to-r from-amber-700 to-orange-700 px-4 py-3 shadow-xl"}>
+    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground pb-[calc(6rem+env(safe-area-inset-bottom))]" : "tier-middle min-h-screen bg-slate-50/80 text-slate-950 pb-[calc(6rem+env(safe-area-inset-bottom))]"}>
+      <header className={upperStudent ? "sticky top-0 z-50 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-xl" : "sticky top-0 z-50 border-b border-sky-700/20 bg-gradient-to-r from-sky-700 to-cyan-700 px-4 py-3 shadow-lg shadow-sky-900/10"}>
         <div className="flex items-center gap-3 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate("/academic")} className={upperStudent ? "text-muted-foreground hover:bg-muted hover:text-foreground" : "text-white hover:bg-white/10"}>
             <ArrowLeft className="h-5 w-5" />
@@ -492,10 +492,10 @@ const StudyPlannerPage: React.FC = () => {
             <h1 className={upperStudent ? "flex items-center gap-2 text-lg font-bold text-foreground" : "flex items-center gap-2 text-lg font-bold text-white"}>
               <Calendar className="h-5 w-5" /> AI Study Planner
             </h1>
-            <p className="text-xs text-muted-foreground">Today: {completedToday}/{todayPlans.length} completed</p>
+            <p className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-sky-100"}>Today: {completedToday}/{todayPlans.length} completed</p>
           </div>
           <div className="flex gap-1">
-            <Button size="sm" variant="secondary" disabled={!subjects.length} onClick={() => setShowAdd(true)}>
+            <Button size="sm" variant="secondary" className={upperStudent ? undefined : "border-white/20 bg-white/15 text-white hover:bg-white/25 hover:text-white"} disabled={!subjects.length} onClick={() => setShowAdd(true)}>
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -517,11 +517,11 @@ const StudyPlannerPage: React.FC = () => {
       )}
 
       {/* AI Generate Button */}
-      <div className="px-4 py-4 max-w-4xl mx-auto">
+      <div className="mx-auto max-w-4xl px-4 py-5 sm:py-6">
         <div className="grid gap-2 sm:grid-cols-2">
         <Button variant="outline" className="h-12" onClick={() => setShowPlanSettings((open) => !open)}><BookOpen className="h-4 w-4 mr-2" /> Plan all selected books</Button>
         <Button
-          className={upperStudent ? "h-12" : "h-12 bg-gradient-to-r from-primary to-accent text-white hover:from-primary hover:to-accent"}
+          className={upperStudent ? "h-12" : "h-12 border-0 bg-slate-950 text-white shadow-lg shadow-slate-950/10 hover:bg-slate-800"}
           onClick={generateAIPlan}
           disabled={isGenerating || !subjects.length}
         >
@@ -532,7 +532,7 @@ const StudyPlannerPage: React.FC = () => {
           )}
         </Button>
         </div>
-        {showPlanSettings && <Card className="mt-3"><CardContent className="p-4 space-y-4">
+        {showPlanSettings && <Card className={upperStudent ? "mt-3" : "mt-3 border-sky-200 bg-white shadow-sm"}><CardContent className="space-y-4 p-4">
           <div><h3 className="font-semibold">Finish your selected books</h3><p className="text-sm text-muted-foreground">Analyze selected PDFs first. The planner schedules only extracted headings or page ranges; it will not invent textbook units.</p></div>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">Choose which books to finish</p><div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { const next = availableBooks.filter((book) => !subjects.length || subjects.some((subject) => normalizeSubject(subject) === book.subject)); setSelectedBooks(next); if (user?.id) safeStorage.setItem("masterminds:study-plan-books:" + user.id, JSON.stringify(next.map((book) => book.id))); }}>Select all matching subjects</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setSelectedBooks([]); if (user?.id) safeStorage.setItem("masterminds:study-plan-books:" + user.id, "[]"); }}>Clear</Button></div></div>
@@ -546,7 +546,7 @@ const StudyPlannerPage: React.FC = () => {
             <label className="text-sm">Finish in (days)<Input type="number" min={1} max={365} value={planSettings.finishDays} onChange={e=>setPlanSettings(p=>({...p,finishDays:Math.max(1,Math.min(365,Number(e.target.value)||1))}))}/></label>
           </div>
           <label className="block text-sm">Target analysis sections per PDF <Input type="number" min={1} max={200} value={planSettings.unitsPerBook} onChange={e=>setPlanSettings(p=>({...p,unitsPerBook:Math.max(1,Math.min(200,Number(e.target.value)||1))}))}/><span className="text-xs text-muted-foreground">Controls how a selected PDF is divided during analysis. The generated schedule uses only units actually extracted from your selected books.</span></label>
-          <div className="rounded-lg bg-muted p-3 text-sm"><p className="font-medium">{selectedBooks.length} selected books · {bookPlanUnitCount} units · {bookPlanRequiredSessions} reading/practice/review sessions needed</p><p className="text-muted-foreground">{planSettings.sessionsPerDay} sessions/day × {planSettings.daysPerWeek} days/week × {planSettings.minutesPerSession} min. Planned finish target: {format(addDays(new Date(),planSettings.finishDays),"PPP")}.</p><p className="mt-1 text-muted-foreground">This deadline fits about {bookPlanCapacity} sessions across eligible days.</p>{selectedBooks.length > 0 && unanalyzedSelectedBookCount > 0 && <p role="status" className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 font-medium text-amber-900 dark:text-amber-200">{unanalyzedSelectedBookCount} selected book{unanalyzedSelectedBookCount === 1 ? " needs" : "s need"} analysis before a real study schedule can be generated.</p>}{selectedBooks.length > 0 && unanalyzedSelectedBookCount === 0 && !bookPlanFeasible && <p role="status" className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 font-medium text-amber-900 dark:text-amber-200">This schedule cannot fit all analyzed book units yet. Add more finish days or sessions per day. At the current pace, plan for roughly {bookPlanMinimumDays} calendar days; the exact minimum can vary with the starting weekday.</p>}{selectedBooks.length === 0 && <p className="mt-2 text-muted-foreground">Select at least one book to calculate a completion schedule.</p>}</div>
+          <div className={upperStudent ? "rounded-lg bg-muted p-3 text-sm" : "rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-sm"}><p className="font-medium">{selectedBooks.length} selected books · {bookPlanUnitCount} units · {bookPlanRequiredSessions} reading/practice/review sessions needed</p><p className="text-muted-foreground">{planSettings.sessionsPerDay} sessions/day × {planSettings.daysPerWeek} days/week × {planSettings.minutesPerSession} min. Planned finish target: {format(addDays(new Date(),planSettings.finishDays),"PPP")}.</p><p className="mt-1 text-muted-foreground">This deadline fits about {bookPlanCapacity} sessions across eligible days.</p>{selectedBooks.length > 0 && unanalyzedSelectedBookCount > 0 && <p role="status" className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 font-medium text-amber-900 dark:text-amber-200">{unanalyzedSelectedBookCount} selected book{unanalyzedSelectedBookCount === 1 ? " needs" : "s need"} analysis before a real study schedule can be generated.</p>}{selectedBooks.length > 0 && unanalyzedSelectedBookCount === 0 && !bookPlanFeasible && <p role="status" className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 font-medium text-amber-900 dark:text-amber-200">This schedule cannot fit all analyzed book units yet. Add more finish days or sessions per day. At the current pace, plan for roughly {bookPlanMinimumDays} calendar days; the exact minimum can vary with the starting weekday.</p>}{selectedBooks.length === 0 && <p className="mt-2 text-muted-foreground">Select at least one book to calculate a completion schedule.</p>}</div>
           <div className="flex gap-2"><Button className="flex-1" onClick={generateBookCompletionPlan} disabled={isGenerating || !bookPlanFeasible}>{isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Target className="mr-2 h-4 w-4"/>}Generate book schedule</Button><Button variant="outline" onClick={savePlanSettings}>Save preferences</Button></div>
         </CardContent></Card>}
         <p className="text-xs text-center text-muted-foreground mt-1">AI weak-topic recommendations and a separate book-completion schedule are available. Book schedules use only units extracted from the selected books.</p>
@@ -555,7 +555,7 @@ const StudyPlannerPage: React.FC = () => {
       {/* Today's Progress */}
       {todayPlans.length > 0 && (
         <div className="px-4 max-w-4xl mx-auto mb-4">
-          <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+          <Card className={upperStudent ? "border-primary/20 bg-gradient-to-r from-primary/10 to-primary/5" : "border-sky-200 bg-gradient-to-r from-sky-50 to-cyan-50 shadow-sm"}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -579,7 +579,7 @@ const StudyPlannerPage: React.FC = () => {
       )}
 
       <div className="mx-auto max-w-4xl px-4 pb-4">
-        <Card className="overflow-hidden border-border/70 bg-card/80">
+        <Card className={upperStudent ? "overflow-hidden border-border/70 bg-card/80" : "overflow-hidden border-slate-200/80 bg-white shadow-sm"}>
           <CardContent className="p-0">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-4">
               <div>
@@ -597,14 +597,14 @@ const StudyPlannerPage: React.FC = () => {
                 const dayPlans = grouped[format(day, "yyyy-MM-dd")] || [];
                 const today = isSameDay(day, new Date());
                 return (
-                  <div key={format(day, "yyyy-MM-dd")} className={`min-h-36 p-3 ${today ? "bg-primary/[0.045]" : "bg-card"}`}>
+                  <div key={format(day, "yyyy-MM-dd")} className={`min-h-36 p-3 ${today ? (upperStudent ? "bg-primary/[0.045]" : "bg-sky-50/80") : (upperStudent ? "bg-card" : "bg-white")}`}>
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <span className={`text-xs font-semibold ${today ? "text-primary" : "text-muted-foreground"}`}>{format(day, "EEE")}</span>
                       <span className={`grid h-7 w-7 place-items-center rounded-full text-sm font-bold ${today ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{format(day, "d")}</span>
                     </div>
                     <div className="space-y-2">
                       {dayPlans.slice(0, 3).map((plan) => (
-                        <button key={plan.id} type="button" onClick={() => void toggleComplete(plan)} className="w-full rounded-lg border border-border/70 bg-background p-2 text-left transition hover:border-primary/50">
+                        <button key={plan.id} type="button" onClick={() => void toggleComplete(plan)} className="w-full rounded-xl border border-border/70 bg-background p-2 text-left transition hover:border-primary/50">
                           <span className={`block truncate text-xs font-semibold ${plan.completed ? "text-muted-foreground line-through" : "text-foreground"}`}>{plan.topic}</span>
                           <span className="mt-1 block truncate text-[10px] capitalize text-muted-foreground">{plan.subject}</span>
                         </button>
@@ -624,7 +624,7 @@ const StudyPlannerPage: React.FC = () => {
       <AnimatePresence>
         {showAdd && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="px-4 max-w-4xl mx-auto mb-4">
-            <Card className="border-primary/30">
+            <Card className={upperStudent ? "border-primary/30" : "border-sky-200 bg-white shadow-sm"}>
               <CardContent className="p-4 space-y-3">
                 <div className="flex gap-2">
                   <Select value={newSubject} onValueChange={setNewSubject}>
@@ -659,13 +659,13 @@ const StudyPlannerPage: React.FC = () => {
       {/* Plans by Date */}
       <div className="px-4 pb-24 max-w-4xl mx-auto space-y-4">
         {Object.keys(grouped).length === 0 ? (
-          <Card className="bg-card/80">
+          <Card className={upperStudent ? "bg-card/80" : "border-slate-200/80 bg-white shadow-sm"}>
             <CardContent className="p-8 text-center">
               <Brain className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
               <h3 className="font-semibold mb-1">No study plans yet</h3>
               <p className="text-muted-foreground text-sm mb-4">Use AI to generate a personalized plan or add tasks manually</p>
               <div className="flex gap-2 justify-center">
-                <Button onClick={generateAIPlan} disabled={isGenerating} className="bg-gradient-to-r from-primary to-accent">
+                  <Button onClick={generateAIPlan} disabled={isGenerating} className={upperStudent ? "bg-gradient-to-r from-primary to-accent" : "bg-slate-950 text-white hover:bg-slate-800"}>
                   <Wand2 className="h-4 w-4 mr-1" /> AI Generate
                 </Button>
                 <Button variant="outline" onClick={() => setShowAdd(true)}>
@@ -684,7 +684,7 @@ const StudyPlannerPage: React.FC = () => {
               <div className="space-y-2">
                 {items.map(plan => (
                   <motion.div key={plan.id} layout>
-                    <Card className={`bg-card/80 border-border/50 transition-all ${plan.completed ? "opacity-60" : ""}`}>
+                    <Card className={`${upperStudent ? "bg-card/80 border-border/50" : "border-slate-200/80 bg-white shadow-sm"} transition-all ${plan.completed ? "opacity-60" : ""}`}>
                       <CardContent className="p-3 flex items-center gap-3">
                         <Button
                           variant="ghost"
