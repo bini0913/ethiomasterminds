@@ -117,8 +117,12 @@ const AcademicMode: React.FC = () => {
     });
     const attempted = rows.filter((row) => Number.isFinite(Number(row.questions_attempted)) && Number(row.questions_attempted) > 0);
     const completed = rows.filter((row) => Number(row.completion_percentage) >= 100 || (Number(row.accuracy_percentage) >= 80 && Number(row.questions_attempted) >= 5));
-    return { subject, total: rows.length, attempted: attempted.length, completed: completed.length, pct: rows.length ? Math.round((completed.length / rows.length) * 100) : 0 };
+    const coverageValues = rows.map((row) => Number(row.completion_percentage) || (Number(row.accuracy_percentage) || 0)).filter((value) => Number.isFinite(value));
+    const coverage = coverageValues.length ? Math.round(coverageValues.reduce((sum, value) => sum + Math.max(0, Math.min(100, value)), 0) / coverageValues.length) : 0;
+    return { subject, total: rows.length, attempted: attempted.length, completed: completed.length, pct: coverage };
   });
+  const focusSubject = [...syllabusRows].filter((row) => row.total > 0).sort((a, b) => a.pct - b.pct)[0];
+  const trackedQuestions = safeTopicProgress.reduce((sum, row) => sum + (Number(row.questions_attempted) || 0), 0);
 
   return (
     <div className={tier === "upper" ? "tier-upper mm-academic-upper min-h-screen bg-background text-foreground" : "tier-middle min-h-screen bg-slate-50/80 text-slate-950"}>
@@ -156,6 +160,14 @@ const AcademicMode: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {tier === "upper" && <section className="mm-academic-insight relative overflow-hidden rounded-3xl border border-primary/20 bg-primary/[0.06] p-5 sm:p-6" aria-labelledby="learning-profile-title">
+          <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-primary/10 blur-2xl" />
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4"><div className="hidden h-16 w-16 shrink-0 items-end justify-center gap-1 rounded-2xl border border-primary/20 bg-background p-3 sm:flex"><span className="h-5 w-1.5 rounded-full bg-primary/40" /><span className="h-8 w-1.5 rounded-full bg-primary/70" /><span className="h-11 w-1.5 rounded-full bg-primary" /></div><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your learning profile</p><h2 id="learning-profile-title" className="mt-1 text-xl font-bold">{focusSubject ? `Build confidence in ${formatSubject(focusSubject.subject)}` : "Start building your learning profile"}</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{focusSubject ? `${focusSubject.pct}% coverage so far across ${focusSubject.attempted} tracked topics. Use focused practice to turn your next gap into progress.` : trackedQuestions ? `${trackedQuestions} practice questions are recorded. Keep studying to unlock more useful recommendations.` : "Complete a practice set and your Academic Hub will begin tailoring recommendations from real activity."}</p></div></div>
+            <Button variant="outline" className="shrink-0 bg-background" onClick={() => navigate("/learning-dna")}>Explore my profile <ArrowUpRight className="ml-2 h-4 w-4" /></Button>
+          </div>
+        </section>}
 
         <section>
           <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your learning tools</p><h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">Choose your next step</h2><p className="mt-1 text-sm text-muted-foreground">Everything works with your saved study profile.</p></div><Badge variant="outline" className="hidden sm:flex">{subjects.length} subjects</Badge></div>
