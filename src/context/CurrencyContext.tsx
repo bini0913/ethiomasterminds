@@ -17,7 +17,6 @@ interface CurrencyContextType {
   convertCoinsToXp: (coinAmount: number) => Promise<boolean>;
   transferCoins: (receiverId: string, amount: number) => Promise<boolean>;
   claimDailyReward: () => Promise<boolean>;
-  luckySpin: () => Promise<{ success: boolean; message?: string }>;
   refreshCurrency: () => Promise<void>;
 }
 
@@ -30,8 +29,7 @@ type WalletAction =
   | 'convert_coins_to_gems'
   | 'convert_coins_to_xp'
   | 'transfer_coins'
-  | 'claim_daily_reward'
-  | 'lucky_spin';
+  | 'claim_daily_reward';
 
 export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
@@ -168,14 +166,6 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
     return result?.success === true;
   };
 
-  const luckySpin = async (): Promise<{ success: boolean; message?: string }> => {
-    const result = await runAction('lucky_spin');
-    return {
-      success: result?.success === true,
-      message: typeof result?.message === 'string' ? result.message : 'Spin unavailable right now.',
-    };
-  };
-
   const refreshCurrency = async () => {
     await fetchCurrency();
   };
@@ -185,7 +175,7 @@ export const CurrencyProvider = ({ children }: { children: ReactNode }) => {
       coins, xp, gems, dailyStreak, loading,
       addCoins, spendCoins, addGems, spendGems,
       convertXpToCoins, convertCoinsToGems, convertCoinsToXp,
-      transferCoins, claimDailyReward, luckySpin, refreshCurrency,
+      transferCoins, claimDailyReward, refreshCurrency,
     }}>
       {children}
     </CurrencyContext.Provider>
