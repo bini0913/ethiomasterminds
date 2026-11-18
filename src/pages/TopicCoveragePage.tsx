@@ -33,6 +33,7 @@ const TopicCoveragePage: React.FC = () => {
   const [profileSubjects, setProfileSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [selectedBooks, setSelectedBooks] = useState<Array<{id:string;title:string;author:string;subject:string;description:string}>>([]);
   const [bookUnits, setBookUnits] = useState<Record<string, { units: string[]; pageCount: number; method: string; message?: string }>>({});
 
@@ -83,7 +84,17 @@ const TopicCoveragePage: React.FC = () => {
       if (!cancelled) setIsLoading(false);
     });
     return () => { cancelled = true; };
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
+
+  useEffect(() => {
+    const refresh = () => setRefreshKey((value) => value + 1);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
 
   const subjects = useMemo(() => {
     const fromProfile = profileSubjects;
@@ -111,17 +122,18 @@ const TopicCoveragePage: React.FC = () => {
       normalizeSubject(t.subject) === normalizeSubject(subject) &&
       t.topic.trim().toLowerCase() === topicName.trim().toLowerCase()
     );
-    if (!match) return { status: "new" as const, accuracy: 0, attempted: 0 };
+    if (!match) return { status: "new" as const, accuracy: 0, completion: 0, attempted: 0 };
     if (Number(match.accuracy_percentage) >= 80 && match.questions_attempted >= 5)
-      return { status: "mastered" as const, accuracy: Number(match.accuracy_percentage), attempted: match.questions_attempted };
-    return { status: "progress" as const, accuracy: Number(match.accuracy_percentage), attempted: match.questions_attempted };
+      return { status: "mastered" as const, accuracy: Number(match.accuracy_percentage), completion: Number(match.completion_percentage) || Number(match.accuracy_percentage), attempted: match.questions_attempted };
+    return { status: "progress" as const, accuracy: Number(match.accuracy_percentage), completion: Number(match.completion_percentage) || Number(match.accuracy_percentage), attempted: match.questions_attempted };
   };
 
   const subjectProgress = (subject: string) => {
     const path = getPath(subject);
     const mastered = path.filter((topic) => getStatus(subject, topic).status === "mastered").length;
     const active = path.filter((topic) => getStatus(subject, topic).attempted > 0).length;
-    return { mastered, active, total: path.length, pct: path.length ? Math.round((mastered / path.length) * 100) : 0 };
+    const coveragePct = path.length ? Math.round(path.reduce((sum, topic) => sum + getStatus(subject, topic).completion, 0) / path.length) : 0;
+    return { mastered, active, total: path.length, pct: path.length ? Math.round((mastered / path.length) * 100) : 0, coveragePct };
   };
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading your learning paths…</div>;
@@ -130,8 +142,10 @@ const TopicCoveragePage: React.FC = () => {
   const overallTotal = subjects.reduce((sum, s) => sum + subjectProgress(s).total, 0);
   const overallMastered = subjects.reduce((sum, s) => sum + subjectProgress(s).mastered, 0);
   const path = activeSubject ? getPath(activeSubject) : [];
-  const progress = activeSubject ? subjectProgress(activeSubject) : { mastered: 0, active: 0, total: 0, pct: 0 };
-  const practice = (topic: string) => activeSubject && navigate(`/quiz?subject=${encodeURIComponent(activeSubject)}&topic=${encodeURIComponent(topic)}`);
+  const progress = activeSubject ? subjectProgress(activeSubject) : { mastered: 0, active: 0, total: 0, pct: 0, coveragePct: 0 };
+  const practice = (topic?: string) => activeSubject && navigate(`/quiz?subject=${encodeURIComponent(activeSubject)}${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`);
+  const focusTopic = path.map((topic) => ({ topic, status: getStatus(activeSubject || "", topic) })).filter(({ status }) => status.status !== "mastered").sort((a, b) => a.status.accuracy - b.status.accuracy)[0]?.topic;
+  const overallCoverage = subjects.length ? Math.round(subjects.reduce((sum, subject) => sum + subjectProgress(subject).coveragePct, 0) / subjects.length) : 0;
   const subjectBooks = activeSubject ? selectedBooks.filter((b) => normalizeSubject(b.subject) === normalizeSubject(activeSubject)) : [];
 
   return (
@@ -144,7 +158,7 @@ const TopicCoveragePage: React.FC = () => {
               const sp = subjectProgress(s); const on = s === activeSubject;
               return <button key={s} type="button" onClick={() => setSelectedSubject(s)} aria-pressed={on}
                 className={`flex shrink-0 items-center gap-2 rounded-2xl border-2 border-b-4 px-4 py-2 text-sm font-bold transition active:translate-y-0.5 active:border-b-2 ${on ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}>
-                {labelFor(s)}<span className="text-xs opacity-70">{sp.pct}%</span></button>;
+                {labelFor(s)}<span className="text-xs opacity-70">{sp.coveragePct}%</span></button>;
             })}
           </div>
           <div className="hidden items-center gap-1.5 rounded-2xl border-2 border-border bg-card px-3 py-2 text-sm font-bold sm:flex"><Trophy className="h-4 w-4 text-accent" />{overallMastered}/{overallTotal}</div>
@@ -161,12 +175,12 @@ const TopicCoveragePage: React.FC = () => {
                 <p className="text-xs font-bold uppercase tracking-wider opacity-80">Your path</p>
                 <h1 className="text-2xl font-extrabold">{labelFor(activeSubject)}</h1>
                 <div className="mt-3 flex items-center gap-3">
-                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-primary-foreground/20"><div className="h-full rounded-full bg-primary-foreground transition-all" style={{ width: `${progress.pct}%` }} /></div>
-                  <span className="text-sm font-bold">{progress.mastered}/{progress.total}</span>
+                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-primary-foreground/20"><div className="h-full rounded-full bg-primary-foreground transition-all" style={{ width: `${progress.coveragePct}%` }} /></div>
+                  <span className="text-sm font-bold">{progress.coveragePct}% coverage</span>
                 </div>
               </div>
               {path.length === 0 ? (
-                <Card><CardContent className="space-y-3 p-6 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground"/><h2 className="font-semibold">Your path is empty</h2><p className="text-sm text-muted-foreground">Pick a book for this subject or finish a practice quiz to build your path.</p><div className="flex flex-col justify-center gap-2 sm:flex-row"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Choose a book</Button><Button variant="outline" onClick={()=>practice("")}><GraduationCap className="mr-2 h-4 w-4"/>Practice now</Button></div></CardContent></Card>
+                <Card><CardContent className="space-y-3 p-6 text-center"><BookOpen className="mx-auto h-8 w-8 text-muted-foreground"/><h2 className="font-semibold">Your path is empty</h2><p className="text-sm text-muted-foreground">Pick a book for this subject or start a subject-level practice set to build your path.</p><div className="flex flex-col justify-center gap-2 sm:flex-row"><Button onClick={()=>navigate("/library")}><BookOpen className="mr-2 h-4 w-4"/>Choose a book</Button><Button variant="outline" onClick={()=>practice()}><GraduationCap className="mr-2 h-4 w-4"/>Practice subject</Button></div></CardContent></Card>
               ) : (
                 <SkillTree key={activeSubject} onPractice={practice} nodes={path.map((topic, index) => { const st = getStatus(activeSubject, topic); return { topic, status: st.status, accuracy: st.accuracy, attempted: st.attempted, unlocked: index === 0 || getStatus(activeSubject, path[index - 1]).status !== "new" }; })} />
               )}
@@ -176,9 +190,10 @@ const TopicCoveragePage: React.FC = () => {
         <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
           <Card><CardContent className="space-y-3 p-4">
             <p className="flex items-center gap-2 font-bold"><Star className="h-4 w-4 text-accent" /> Overall mastery</p>
-            <Progress value={overallTotal ? (overallMastered / overallTotal) * 100 : 0} className="h-3" />
-            <p className="text-xs text-muted-foreground">{overallMastered} of {overallTotal} topics mastered across {subjects.length} subjects</p>
+            <Progress value={overallCoverage} className="h-3" />
+            <p className="text-xs text-muted-foreground">{overallCoverage}% average coverage · {overallMastered} of {overallTotal} topics mastered across {subjects.length} subjects</p>
           </CardContent></Card>
+          {activeSubject && focusTopic && <Card className="border-primary/20 bg-primary/5"><CardContent className="space-y-2 p-4"><p className="flex items-center gap-2 font-bold"><GraduationCap className="h-4 w-4 text-primary" /> Recommended focus</p><p className="text-sm font-semibold">{focusTopic}</p><p className="text-xs text-muted-foreground">Your lowest-confidence available topic. A short focused practice session can move it forward.</p><Button size="sm" className="w-full" onClick={() => practice(focusTopic)}>Practice this topic</Button></CardContent></Card>}
           {activeSubject && <Card><CardContent className="space-y-2 p-4">
             <p className="flex items-center gap-2 font-bold"><LibraryBig className="h-4 w-4 text-primary" /> Books</p>
             {subjectBooks.length ? subjectBooks.map((b) => <button key={b.id} type="button" onClick={() => navigate("/library")} className="flex w-full items-center gap-2 rounded-xl border border-border p-2 text-left text-sm hover:bg-muted"><BookOpen className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{b.title}</span></button>)
