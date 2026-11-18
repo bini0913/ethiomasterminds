@@ -738,13 +738,13 @@ const Quiz: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {[
-                        { subject: "Math", reward: "+50 XP", icon: Calculator, color: "from-primary to-accent" },
-                        { subject: "Science", reward: "+50 XP", icon: Atom, color: "from-secondary to-glow-cyan" },
-                        { subject: "English", reward: "+50 XP", icon: BookOpen, color: "from-accent to-glow-pink" }
-                      ].map((challenge, i) => (
+                      {categories.slice(0, 3).map((category, i) => {
+                        const categoryQuestions = quizzes.filter((quiz) => quiz.gradeLevel === selectedGradeNumber && quiz.category === category).reduce((sum, quiz) => sum + quiz.questions.length, 0);
+                        const colors = ["from-primary to-accent", "from-secondary to-glow-cyan", "from-accent to-glow-pink"];
+                        const challenge = { subject: category, reward: `+${Math.max(20, Math.min(100, categoryQuestions * 5))} XP`, color: colors[i % colors.length] };
+                        return (
                         <motion.div
-                          key={i}
+                          key={category}
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ delay: i * 0.1 }}
@@ -752,11 +752,11 @@ const Quiz: React.FC = () => {
                         >
                           <div className="flex items-center gap-3 mb-3">
                             <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${challenge.color} flex items-center justify-center`}>
-                              <challenge.icon className="h-5 w-5 text-white" />
+                              {getCategoryIcon(category)}
                             </div>
                             <div>
                               <p className="font-medium text-foreground">{challenge.subject} Challenge</p>
-                              <p className="text-xs text-muted-foreground">10 Questions</p>
+                              <p className="text-xs text-muted-foreground">{categoryQuestions} approved questions</p>
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
@@ -776,7 +776,9 @@ const Quiz: React.FC = () => {
                             </Button>
                           </div>
                         </motion.div>
-                      ))}
+                        );
+                      })}
+                      {!categories.length && <p className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Daily challenges will appear when approved quizzes are available for your selected grade.</p>}
                     </div>
                   </CardContent>
                 </Card>
