@@ -376,10 +376,6 @@ $$;
 REVOKE ALL ON FUNCTION public.complete_study_session(uuid,integer,uuid,boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.complete_study_session(uuid,integer,uuid,boolean) TO authenticated;
 
--- Repair existing derived level/rank drift without changing XP balances.
-UPDATE public.profiles
-SET level = greatest(1, floor(coalesce(xp,0) / 100.0)::integer + 1),
-    rank = public.calculate_rank(coalesce(xp,0)),
-    updated_at = now()
-WHERE level IS DISTINCT FROM greatest(1, floor(coalesce(xp,0) / 100.0)::integer + 1)
-   OR rank IS DISTINCT FROM public.calculate_rank(coalesce(xp,0));
+-- Do not backfill profiles in a schema migration. The profile update trigger
+-- intentionally requires an authenticated request context, which migrations
+-- do not have. Progression is synchronized by the trusted reward RPCs above.
