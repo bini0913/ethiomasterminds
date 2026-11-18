@@ -158,7 +158,7 @@ const TournamentHub: React.FC = () => {
       const [tournamentsRes, playersRes, profilesRes] = await Promise.all([
         supabase
           .from("tournaments")
-          .select("id,name,status,mode,subject,settings,question_count,questions_count,start_time,starts_at,max_participants,current_players,entry_fee,entry_fee_coins,prize_coins,winner_id")
+          .select("id,name,status,subject,start_time,max_participants,entry_fee_coins,prize_coins,winner_id")
           .order("created_at", { ascending: false })
           .limit(30),
         supabase.from("tournament_players" as any).select("tournament_id,user_id"),
@@ -180,14 +180,14 @@ const TournamentHub: React.FC = () => {
         id: row.id,
         name: row.name,
         status: row.status,
-        mode: row.mode ?? "speed",
+        mode: "speed",
         subject: row.subject ?? "General",
-        questionsPerMatch: row.settings?.questions_per_match ?? row.question_count ?? row.questions_count ?? 10,
-        startTime: row.start_time ?? row.starts_at ?? null,
-        registrationDeadline: row.settings?.registration_deadline ?? null,
+        questionsPerMatch: 10,
+        startTime: row.start_time ?? null,
+        registrationDeadline: null,
         maxPlayers: row.max_participants || 16,
-        currentPlayers: row.current_players ?? participantCounts[row.id] ?? 0,
-        entryFee: row.entry_fee ?? row.entry_fee_coins ?? 0,
+        currentPlayers: participantCounts[row.id] ?? 0,
+        entryFee: row.entry_fee_coins ?? 0,
         prize: row.prize_coins ?? 0,
         winnerId: row.winner_id,
         winnerName: row.winner_id ? profileMap.get(row.winner_id) ?? null : null,
