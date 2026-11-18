@@ -1,7 +1,9 @@
 -- Preserve the established update_user_streak RPC contract.
 -- The prior reconciliation migration attempted to change this function from
 -- jsonb to void, which PostgreSQL rejects during a clean migration reset.
-CREATE OR REPLACE FUNCTION public.update_user_streak(p_user_id uuid)
+DROP FUNCTION IF EXISTS public.update_user_streak(uuid);
+
+CREATE FUNCTION public.update_user_streak(p_user_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER

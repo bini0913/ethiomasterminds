@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS public.store_items (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 -- Earlier economy migrations created store_items without unlock_level.
--- IF NOT EXISTS above preserves that table, so reconcile the column before
--- the catalog seed and purchase RPC use it.
+-- CREATE TABLE IF NOT EXISTS preserves that earlier table, so reconcile the
+-- missing column before the catalog seed and purchase RPC use it.
 ALTER TABLE public.store_items
   ADD COLUMN IF NOT EXISTS unlock_level integer NOT NULL DEFAULT 1
   CHECK (unlock_level >= 1);
@@ -59,14 +59,12 @@ FROM (VALUES
 ) AS v(name,section,price,currency,rarity,preview,description,unlock_level)
 WHERE NOT EXISTS (SELECT 1 FROM public.store_items s WHERE s.name=v.name);
 
-CREATE OR REPLACE FUNCTION public.purchase_store_item(p_item_id uuid, p_auto_equip boolean DEFAULT false)
-RETURNS public.wallets
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-DECLARE
-  v_uid uuid := auth.uid();
-  v_wallet public.wallets;
-  v_item record;
-  v_level integer;
+DROP FUNCTION IF EXISTS public.purchase_store_item(uuid, boolean);
+DROP FUNCTION IF EXISTS public.equip_store_item(uuid);
+
+CREATE FUNCTION public.purchase_store_item(p_item_id uuid, p_auto_equip boolean DEFAULT true)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_user uuid := auth.uid(); v_item public.store_items%ROWTYPE; v_coins integer; v_gems integer; v_level integer; v_owned boolean;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
   SELECT * INTO v_item FROM public.store_items WHERE id=p_item_id AND is_active=true;
@@ -91,10 +89,10 @@ BEGIN
   SELECT * INTO v_wallet FROM public.wallets WHERE user_id=v_uid;
   RETURN v_wallet;
 END; $$;
-CREATE OR REPLACE FUNCTION public.equip_store_item(p_item_id uuid)
-RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-DECLARE v_uid uuid := auth.uid(); v_section text; v_level integer; v_unlock_level integer;
+
+CREATE FUNCTION public.equip_store_item(p_item_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_user uuid := auth.uid(); v_item public.store_items%ROWTYPE; v_level integer;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
   IF NOT EXISTS(SELECT 1 FROM public.user_items WHERE user_id=v_uid AND item_id=p_item_id) THEN RAISE EXCEPTION 'Item not owned'; END IF;

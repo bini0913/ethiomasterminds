@@ -40,32 +40,35 @@ jobs:
             exit 1
           }
 
-      - name: Push database migrations
+      - name: Push new database migrations
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            changed_files=""
-          else
-            test -n "${GITHUB_EVENT_BEFORE:-}" || {
-              echo "::error::Push event is missing its base SHA; refusing to skip migration detection."
-              exit 1
-            }
-            git cat-file -e "${GITHUB_EVENT_BEFORE}^{commit}" || {
-              echo "::error::Push base commit is unavailable; refusing to skip migration detection."
-              exit 1
-            }
-            changed_files="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA")"
+
+          # Manual dispatch is for Edge Function redeployment only. Database
+          # migrations are deployed from a main push containing new files.
+          if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
+            echo "Manual dispatch does not push database migrations."
+            exit 0
           fi
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || grep -q '^supabase/migrations/' <<< "$changed_files"; then
-            test -n "${SUPABASE_DB_PASSWORD:-}" || {
-              echo "::error::A database migration is pending, but SUPABASE_DB_PASSWORD is not configured. Add this repository secret before deploying."
-              exit 1
-            }
-            supabase db push --remote="$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
-          else
-            echo "No database migration changed; skipping database push."
+
+          test -n "${GITHUB_EVENT_BEFORE:-}" || {
+            echo "::error::Push event is missing its base SHA."
+            exit 1
+          }
+          git cat-file -e "${GITHUB_EVENT_BEFORE}^{commit}" || {
+            echo "::error::Push base commit is unavailable."
+            exit 1
+          }
+
+          added_migrations="$(git diff --name-only --diff-filter=A --no-renames "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA" -- supabase/migrations)"
+          if [[ -z "$added_migrations" ]]; then
+            echo "No new migration files were added; historical migration edits are not replayed."
+            exit 0
           fi
+
+          bash scripts/ci/sync-supabase-migration-history.sh "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA"
+          supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --yes
 
       - name: Deploy Edge Functions
         shell: bash
