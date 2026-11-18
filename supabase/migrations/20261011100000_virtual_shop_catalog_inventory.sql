@@ -64,7 +64,11 @@ DROP FUNCTION IF EXISTS public.equip_store_item(uuid);
 
 CREATE FUNCTION public.purchase_store_item(p_item_id uuid, p_auto_equip boolean DEFAULT true)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-DECLARE v_user uuid := auth.uid(); v_item public.store_items%ROWTYPE; v_coins integer; v_gems integer; v_level integer; v_owned boolean;
+DECLARE
+  v_uid uuid := auth.uid();
+  v_item public.store_items%ROWTYPE;
+  v_wallet public.wallets%ROWTYPE;
+  v_level integer;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
   SELECT * INTO v_item FROM public.store_items WHERE id=p_item_id AND is_active=true;
@@ -87,12 +91,16 @@ BEGIN
   INSERT INTO public.transactions(sender_id,receiver_id,amount,type,source) VALUES(v_uid,null,v_item.price,'purchase',v_item.name);
   INSERT INTO public.economy_notifications(user_id,title,body,category) VALUES(v_uid,'Item Unlocked!',format('%s is now in your inventory.',v_item.name),'purchase');
   SELECT * INTO v_wallet FROM public.wallets WHERE user_id=v_uid;
-  RETURN v_wallet;
+  RETURN to_jsonb(v_wallet);
 END; $$;
 
 CREATE FUNCTION public.equip_store_item(p_item_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-DECLARE v_user uuid := auth.uid(); v_item public.store_items%ROWTYPE; v_level integer;
+DECLARE
+  v_uid uuid := auth.uid();
+  v_section text;
+  v_unlock_level integer;
+  v_level integer;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
   IF NOT EXISTS(SELECT 1 FROM public.user_items WHERE user_id=v_uid AND item_id=p_item_id) THEN RAISE EXCEPTION 'Item not owned'; END IF;
@@ -102,6 +110,7 @@ BEGIN
   UPDATE public.user_items ui SET equipped=false FROM public.store_items si
   WHERE ui.item_id=si.id AND ui.user_id=v_uid AND si.section=v_section;
   UPDATE public.user_items SET equipped=true WHERE user_id=v_uid AND item_id=p_item_id;
+  RETURN jsonb_build_object('success',true,'item_id',p_item_id,'equipped',true);
 END; $$;
 REVOKE ALL ON FUNCTION public.purchase_store_item(uuid,boolean) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.equip_store_item(uuid) FROM PUBLIC;
