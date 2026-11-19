@@ -1,7 +1,7 @@
--- Close direct table-write paths that bypass the school workflow RPCs.
--- These REVOKEs are explicit because Supabase default privileges may have
--- granted broader table privileges before the school-specific migrations.
--- SECURITY DEFINER workflow RPCs continue to perform the guarded mutations.
+-- Close direct table-write paths that bypass guarded school workflows.
+-- Explicit REVOKEs override any broader Supabase default privileges.
+-- Teacher edits to homework assignments remain available through the existing
+-- RLS policy and validation trigger; only destructive deletion is blocked.
 
 REVOKE INSERT ON TABLE
   public.school_conversations,
@@ -11,10 +11,9 @@ FROM PUBLIC, anon, authenticated;
 REVOKE INSERT ON TABLE public.school_content_review_events
 FROM PUBLIC, anon, authenticated;
 
-REVOKE UPDATE, DELETE ON TABLE public.school_homework_assignments
-FROM PUBLIC, anon, authenticated;
-
-REVOKE DELETE ON TABLE public.school_homework_submissions
+REVOKE DELETE ON TABLE
+  public.school_homework_assignments,
+  public.school_homework_submissions
 FROM PUBLIC, anon, authenticated;
 
 REVOKE DELETE ON TABLE public.school_staff_tasks
