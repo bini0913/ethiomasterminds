@@ -250,7 +250,7 @@ const AITutor: React.FC = () => {
       )}
 
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[800px] px-4 pb-44 pt-8 sm:px-6 sm:pt-12">
+        <div className="mx-auto w-full max-w-[800px] px-4 pb-56 pt-8 sm:px-6 sm:pb-44 sm:pt-12">
           {upperStudent && academicContext && (
             <div className="mb-6 rounded-2xl border border-[#b8d8ce] bg-[#f4faf7] p-4 text-left">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#287c68]">Personalised study context</p>
@@ -294,11 +294,11 @@ const AITutor: React.FC = () => {
         </div>
       </main>
 
-      <footer className={cn('fixed inset-x-0 bottom-0 z-20 px-3 pb-3 pt-8 sm:px-6 sm:pb-5', upperStudent ? 'bg-gradient-to-t from-white via-white/95 to-transparent' : 'bg-gradient-to-t from-background via-background/95 to-transparent')}>
+      <footer className={cn('fixed inset-x-0 z-20 px-3 pb-3 pt-8 sm:px-6 sm:pb-5', upperStudent ? 'bottom-20 bg-gradient-to-t from-white via-white/95 to-transparent sm:bottom-0' : 'bottom-0 bg-gradient-to-t from-background via-background/95 to-transparent')}>
         <div className="mx-auto max-w-[800px]">
           <div className={cn('flex items-end gap-2 rounded-2xl border bg-card p-2 shadow-lg focus-within:ring-2', upperStudent ? 'border-[#d9d9e3] focus-within:border-[#287c68] focus-within:ring-[#287c68]/10' : 'border-border focus-within:border-primary focus-within:ring-primary/10')}>
             <Button type="button" variant="ghost" size="icon" onClick={toggleMic} className={cn('mb-0.5 h-9 w-9 shrink-0 rounded-xl text-[#6e6e80] hover:bg-[#f7f7f8] hover:text-[#287c68]', isListening && 'bg-red-50 text-red-600 hover:bg-red-100')} aria-label={isListening ? 'Stop voice input' : 'Start voice input'}>{isListening ? <MicOff className="h-4 w-4 animate-pulse" /> : <Mic className="h-4 w-4" />}</Button>
-            <Textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Message AI Tutor…" disabled={isLoading} rows={1} className="max-h-32 min-h-[38px] resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0" />
+            <Textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)} onInput={(event) => { const target = event.currentTarget; target.style.height = '0px'; target.style.height = `${Math.min(target.scrollHeight, 128)}px`; }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Message AI Tutor…" aria-label="Message AI Tutor" enterKeyHint="send" disabled={isLoading} rows={1} className="max-h-32 min-h-[38px] resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0" />
             <Button type="button" onClick={() => void send()} disabled={isLoading || !input.trim()} className={cn('mb-0.5 h-9 w-9 shrink-0 rounded-xl p-0 text-primary-foreground', tutorAccent)} aria-label="Send message"><ArrowUp className="h-4 w-4" /></Button>
           </div>
           <p className="mt-2 text-center text-[10px] text-muted-foreground">AI Tutor can make mistakes. Check important answers with your textbook.</p>
