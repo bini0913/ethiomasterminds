@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -74,7 +75,7 @@ const Chat: React.FC = () => {
   const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -465,7 +466,7 @@ const Chat: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <BackButton />
-            <h1 className="text-lg font-bold text-foreground">💬🧠 Master Minds Chat</h1>
+            <div><h1 className="text-lg font-bold text-foreground">Messages</h1><p className="text-[11px] text-muted-foreground">Study together, privately or in groups</p></div>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSearch(true)}>
@@ -802,12 +803,14 @@ const Chat: React.FC = () => {
                   e.target.value = '';
                 }} />
 
-                <Input ref={inputRef}
+                <Textarea ref={inputRef}
                   value={draft}
                   onChange={e => handleDraftChange(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  placeholder="Message, emoji, quiz link, notes, or match invite..."
-                  className="flex-1 h-9 bg-muted/50 border-border/30 text-sm rounded-full"
+                  onInput={e => { const target = e.currentTarget; target.style.height = '0px'; target.style.height = `${Math.min(target.scrollHeight, 112)}px`; }}
+                  placeholder="Write a message…"
+                  aria-label="Write a message"
+                  className="max-h-28 min-h-9 flex-1 resize-none rounded-2xl border-border/30 bg-muted/50 px-3 py-2 text-sm"
                 />
 
                 <Button size="icon" className="h-9 w-9 rounded-full shrink-0"
