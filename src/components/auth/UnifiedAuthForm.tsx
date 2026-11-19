@@ -63,6 +63,8 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [age, setAge] = useState("");
+  const [guardianEmail, setGuardianEmail] = useState("");
+  const [guardianConsent, setGuardianConsent] = useState(false);
   const [gender, setGender] = useState<"male" | "female" | "">("");
   const [avatar, setAvatar] = useState("avatar-1");
   const [password, setPassword] = useState("");
@@ -154,6 +156,11 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
       toast.error("Enter a valid age.");
       return;
     }
+    if (parsedAge < 18 && (!guardianConsent || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim()))) {
+      toast.error("Learners under 18 need a valid guardian email and consent.");
+      setStep(4);
+      return;
+    }
     if (password.length < 8 || score < 3) {
       toast.error("Use at least 8 characters and a mix of letters, numbers or symbols.");
       return;
@@ -162,7 +169,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     try {
       const profile = await signupWithRole(
         email.trim(), password, name.trim(), username.trim().toLowerCase(), "student", grade,
-        { age: parsedAge, gender, avatar, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp }, academicStream: academicStream || undefined },
+        { age: parsedAge, gender, avatar, guardianConsent: parsedAge < 18 ? guardianConsent : false, guardianEmail: parsedAge < 18 ? guardianEmail.trim().toLowerCase() : undefined, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp }, academicStream: academicStream || undefined },
       );
       if (profile) {
         safeStorage.setItem("masterminds_learning_goal", JSON.stringify({ id: goal.id, minutes: goal.minutes, xp: goal.xp, academicStream: academicStream || null }));
@@ -197,6 +204,9 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     }
     if (!Number.isInteger(Number(age)) || Number(age) < 3 || Number(age) > 120) {
       toast.error("Enter a valid age."); return;
+    }
+    if (Number(age) < 18 && (!guardianConsent || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim()))) {
+      toast.error("Learners under 18 need a valid guardian email and consent."); return;
     }
     if (password.length < 8 || score < 3) {
       toast.error("Choose a stronger password (8+ characters)."); return;
@@ -394,6 +404,19 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                     <option value="">Gender</option><option value="male">Male</option><option value="female">Female</option>
                   </select>
                 </div>
+                {Number(age) > 0 && Number(age) < 18 && (
+                  <div className="space-y-3 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
+                    <div>
+                      <p className="text-sm font-extrabold text-foreground">Guardian consent required</p>
+                      <p className="mt-1 text-xs font-medium text-muted-foreground">Learners under 18 need a guardian email and permission before an account can be created.</p>
+                    </div>
+                    <input aria-label="Guardian email" type="email" autoComplete="email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} placeholder="Guardian email" className="mm-field" />
+                    <label className="flex items-start gap-3 text-xs font-semibold text-foreground">
+                      <input type="checkbox" checked={guardianConsent} onChange={(e) => setGuardianConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+                      <span>I confirm that my parent or legal guardian has given permission for this account.</span>
+                    </label>
+                  </div>
+                )}
                 <div>
                   <div className="relative">
                     <input aria-label="Password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="mm-field pr-12" />
