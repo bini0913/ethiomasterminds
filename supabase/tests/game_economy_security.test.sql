@@ -28,7 +28,10 @@ select ok(has_table_privilege('authenticated','public.early_user_collection','SE
 
 -- Existing trusted transaction paths remain callable by authenticated users.
 select ok(has_function_privilege('authenticated','public.purchase_early_item(uuid)','EXECUTE'), 'server-side collectible purchase RPC remains available');
-select ok(has_function_privilege('authenticated','public.complete_early_activity(uuid,text,text,boolean,boolean)','EXECUTE'), 'server-side early activity reward RPC remains available');
+-- The legacy client-reported activity RPC was revoked in favor of the verified
+-- submit_early_quiz_answer path; keep this assertion aligned with the security
+-- test and the final privilege migration.
+select ok(not has_function_privilege('authenticated','public.complete_early_activity(uuid,text,text,boolean,boolean)','EXECUTE'), 'legacy client-reported early activity RPC is revoked; rewards use submit_early_quiz_answer');
 select ok(has_function_privilege('authenticated','public.check_achievements(uuid)','EXECUTE'), 'achievement initialization RPC remains available');
 
 -- The legacy unrestricted multiplayer payout RPC is no longer callable.
