@@ -116,3 +116,47 @@ Use a compact blue learning-signal line for active navigation and progress, calm
 ## Preservation rules
 
 Do not widen middle content beyond Grades 5–8. Do not infer authoritative completion, streak history, mastery, XP, rewards, wallet balance, or saved state from client-only defaults. Do not remount stateful timers, quiz sessions, realtime rooms, LiveKit calls, library readers, or conversations during responsive/shell changes. Do not add subscriptions per visual component. Do not replace canonical data sources with demo/local-only data. Do not delete legacy routes until parity, deep-link refresh/back behavior, and representative Grades 5–8 coverage are verified.
+
+
+# Active Plan — Master Minds Administration System Rebuild
+
+## Scope and implementation approach
+
+Upgrade the existing administration product in controlled, reviewable slices. Treat the repository inventory and `docs/admin-rebuild-audit.md` as the Stage 1 baseline. Preserve the existing React/Vite/TypeScript/Tailwind/Supabase architecture, authentication/UserContext, routes, role lookups, admin and school RPC contracts, RLS, Firebase, LiveKit and Vercel. Reuse current portals and migrations; do not create a second backend or role system. Never invent data, expose secrets, weaken security, mutate production records for a demo, or merge a PR.
+
+Establish a single admin navigation/page hierarchy and an explicit permission map grounded in existing database-enforced roles. Build a deep-navy, royal-blue, white/light-gray shell with restrained state colors, Lucide icons, responsive persistent desktop sidebar, accessible mobile drawer and real system state. Keep presentation separate from data/action services. Use real server/database contracts for every action; add schema changes only for demonstrated gaps after reviewing full local and production migration/RLS/RPC dependencies. Preserve owner-only Super Admin and the school tenant boundary.
+
+## Delivery slices
+
+1. Audit current route/page capabilities, auth/role gates, all applicable RPC and table contracts, migrations/RLS/tests, and production migration evidence; document supported, incomplete, broken and preserved behavior.
+2. Correct high-confidence existing workflow defects with current authorized server contracts (initial slice: virtual-wallet adjustment must call `admin_adjust_coins`, never write `profiles.coins`, and report audit state honestly).
+3. Consolidate the information architecture in focused pieces without removing or masking an existing working role portal before parity; implement shared loading/empty/error/denied/responsive patterns.
+4. Incrementally connect user/school/academic/content/operations/AI/reward/communications/analytics/finance/security/settings modules to existing APIs and permission checks; add migrations only when required.
+5. Verify changed code with available typecheck/lint/build and relevant SQL/browser checks; distinguish source-only evidence from authenticated production validation. Deliver focused PRs with database/security impact, evidence and limitations. Never merge.
+
+## Project structure
+
+- `src/App.tsx`: canonical existing route tree and role gates; preserve URLs and redirects.
+- `src/pages/AdminPortal.tsx`, `SuperAdminPortal.tsx`, `ExtremeAdminPortal.tsx`, `SchoolGlobalAdminPortal.tsx`, and existing school/manager/finance portals: current feature owners to inventory and consolidate only with parity.
+- `src/components/portals/` and `src/components/admin/` (where a shared module is justified): shared admin navigation, states, data views and confirmations.
+- `src/lib/` or existing integration/service modules: typed business actions and access to current RPC contracts, kept out of page presentation.
+- `src/context/UserContext.tsx`: existing identity/role loading authority; do not create a duplicate.
+- `supabase/migrations/` and `supabase/tests/`: authoritative schema/security changes and tests; do not add migrations for cosmetic needs.
+- `docs/admin-rebuild-audit.md`: evidence-based baseline and unverified limits.
+
+## Design direction
+
+- **Movement:** enterprise education SaaS command center.
+- **Principles:** trustworthy real data; precise role-aware actions; clear operational hierarchy; responsive, accessible dense information.
+- **Color philosophy:** deep navy for authority and orientation, royal blue for action, light surfaces for legibility, muted green/amber/red only for state.
+- **Layout:** persistent desktop left rail and contextual top bar; collapsible groups; mobile top bar and accessible drawer with stacked data views.
+- **Signature details:** understated active navigation marker, compact operational state labels, crisp bordered panels.
+- **Interaction and motion:** direct confirmation for sensitive operations, clear pending/success/error states, keyboard/touch support, restrained transitions and reduced-motion compliance.
+- **Typography:** reuse current application typography tokens; maintain a clear title/section/body hierarchy.
+- **Brand:** Master Minds, “Learn. Compete. Level Up.”; professional, precise, protective. Example copy: “Review the source before approving.” “This change is recorded to the admin audit trail.”
+- **Logo and brand color:** retain the existing Master Minds identity; no competing mark or unapproved gradient treatment.
+
+## Preservation and constraints
+
+Keep all existing student/parent/teacher/school/admin routes available; do not redesign non-admin portals. School administrators remain school-scoped. Only Super Admin retains the authority provided by existing owner-only backend contracts. Role/account changes, wallet writes and other privileged actions require authoritative server authorization and trustworthy audit records. Do not fabricate service health, operational events, usage, school subscriptions or financial records. The initial audit demonstrates that some RPC operations and their client-side audit calls are separate transactions; do not describe such logging as atomic until a tested database contract provides atomicity.
+
