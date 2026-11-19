@@ -213,6 +213,23 @@ const LibraryPage: React.FC = () => {
   };
 
   const subjects = useMemo(() => Array.from(new Set([...books.map((b) => b.subject), ...curriculumBooks.map((b) => b.subject)])).sort(), [books, curriculumBooks]);
+  const sectionCounts: Partial<Record<SectionKey, number>> = {
+    'my-books': books.filter((book) => book.uploader_id === user?.id).length,
+    assigned: assignedBooks.length,
+    community: books.filter((book) => {
+      if (user?.role !== 'student') return true;
+      const grade = Number(book.grade_level || 0);
+      return grade >= studentGradeMin && grade <= studentGradeMax;
+    }).length,
+    saved: books.filter((book) => bookmarkSet.has(book.id)).length,
+    downloaded: books.filter((book) => downloadedSet.has(book.id)).length,
+    curriculum: curriculumBooks.length,
+    highlights: highlights.length,
+    notes: highlights.filter((item) => Boolean(item.note)).length,
+  };
+  const sectionLabels: Record<SectionKey, string> = {
+    'my-books': 'My Books', assigned: 'Assigned Books', community: 'Community Library', saved: 'Saved Resources', downloaded: 'Downloaded', curriculum: 'Curriculum Textbooks', upload: 'Upload Book', highlights: 'Highlights', notes: 'Saved Notes',
+  };
 
   const resetForm = () => {
     const defaultGrade = user?.role === 'student'
@@ -603,7 +620,7 @@ const LibraryPage: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4">
           <Card className="rounded-3xl border-border/80 bg-card shadow-sm">
-            <CardHeader><CardTitle className="text-base">Library</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Browse Library</CardTitle><p className="text-xs text-muted-foreground">Your resources, in one place</p></CardHeader>
             <CardContent className="space-y-2">
               {([
                 ['my-books', 'My Books'],
@@ -620,7 +637,7 @@ const LibraryPage: React.FC = () => {
                 <Button key={key} variant={activeSection === key ? 'default' : 'ghost'} className="w-full justify-start" onClick={() => {
                   setActiveSection(key);
                   if (key === 'upload') setOpenUpload(true);
-                }}>{label}</Button>
+                }}><span className="flex-1 text-left">{label}</span>{sectionCounts[key] !== undefined && <Badge variant={activeSection === key ? 'secondary' : 'outline'}>{sectionCounts[key]}</Badge>}</Button>
               ))}
             </CardContent>
           </Card>
@@ -629,6 +646,7 @@ const LibraryPage: React.FC = () => {
             {(activeSection === 'community' || activeSection === 'my-books' || activeSection === 'saved' || activeSection === 'downloaded') && (
               <Card>
                 <CardContent className="p-4 grid gap-3 md:grid-cols-4">
+                  <div className="md:col-span-4 flex flex-wrap items-end justify-between gap-3 border-b border-border/60 pb-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Resource library</p><h2 className="mt-1 text-xl font-bold">{activeSection === 'community' ? 'Recommended for you' : sectionLabels[activeSection]}</h2><p className="mt-1 text-sm text-muted-foreground">{filteredBooks.length} resource{filteredBooks.length === 1 ? '' : 's'} available in this view.</p></div>{activeSection === 'community' && <Badge variant="outline">Grades {studentGradeMin}–{studentGradeMax}</Badge>}</div>
                   <div className="md:col-span-2 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input className="pl-9" placeholder={"Search by title, author, subject, uploader"} value={search} onChange={(e) => setSearch(e.target.value)} />
