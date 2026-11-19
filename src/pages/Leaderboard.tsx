@@ -215,261 +215,47 @@ const Leaderboard = () => {
 
   return (
     <div className={upperStudent ? "tier-upper min-h-screen bg-background p-4 text-foreground md:p-8" : "min-h-screen bg-gradient-to-b from-background via-background to-primary/10 p-4 md:p-8"}>
-      <div className="mx-auto max-w-6xl space-y-6 pb-24">
-        <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="mx-auto max-w-5xl space-y-5 pb-24">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">Live rankings for your school tier • no demo accounts</p>
-            <h1 className="text-3xl font-bold tracking-tight">{leaderboardTier === "upper" ? "Grades 9–12 Leaderboard" : leaderboardTier === "middle" ? "Grades 5–8 Leaderboard" : "KG–Grade 4 Leaderboard"}</h1>
-            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs">
-              <Trophy className="h-3.5 w-3.5 text-yellow-400" />
-              <span className="font-semibold">{season.name}</span>
-              <span className="text-muted-foreground">#{season.number}</span>
-              {season.startedAt && (
-                <span className="text-muted-foreground">• started {new Date(season.startedAt).toLocaleDateString()}</span>
-              )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="gap-1 rounded-full bg-primary/10 text-primary hover:bg-primary/10"><Trophy className="h-3.5 w-3.5" /> {season.name} · #{season.number}</Badge>
+              <span className="text-xs text-muted-foreground">Live rankings</span>
             </div>
+            <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Rank Arena</h1>
+            <p className="mt-1 max-w-xl text-sm text-muted-foreground">Climb your grade, challenge your friends, and make every practice session count.</p>
           </div>
-          <Button variant="outline" onClick={() => navigate("/")}>Back to home</Button>
+          <div className="flex gap-2"><Button variant="outline" onClick={() => navigate("/")}>Home</Button><Button onClick={() => navigate("/social")} className="gap-2"><Swords className="h-4 w-4" /> Challenge a friend</Button></div>
         </header>
 
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-3" aria-label="Leaderboard overview">
-          <Card className="border-primary/20 bg-card/80">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="rounded-xl bg-primary/10 p-3"><Users className="h-5 w-5 text-primary" /></div>
-              <div><p className="text-xs text-muted-foreground">Tier learners ranked</p><p className="text-2xl font-bold tabular-nums">{tierUsers.length.toLocaleString()}</p></div>
-            </CardContent>
-          </Card>
-          <Card className="border-primary/20 bg-card/80">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="rounded-xl bg-amber-500/10 p-3"><Trophy className="h-5 w-5 text-amber-500" /></div>
-              <div><p className="text-xs text-muted-foreground">Your position in {activeTab === "classes" ? "classes" : currentViewLabel}</p><p className="text-2xl font-bold tabular-nums">{currentUserIndex >= 0 ? `#${currentUserIndex + 1}` : "—"}</p></div>
-            </CardContent>
-          </Card>
-          <Card className="border-primary/20 bg-card/80">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="rounded-xl bg-emerald-500/10 p-3"><Zap className="h-5 w-5 text-emerald-500" /></div>
-              <div><p className="text-xs text-muted-foreground">Your {currentViewLabel} score</p><p className="text-2xl font-bold tabular-nums">{currentUserScore ? Math.round(activeTab === "weekly" ? currentUserScore.weeklyScore : scoreFor(currentUserScore)).toLocaleString() : "—"}</p></div>
-            </CardContent>
-          </Card>
+        <section className="overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/15 via-card to-accent/10 p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Your position</p><div className="mt-2 flex items-end gap-3"><span className="text-5xl font-black tabular-nums">{currentUserIndex >= 0 ? `#${currentUserIndex + 1}` : "—"}</span><span className="mb-2 text-sm text-muted-foreground">in {activeTab === "classes" ? "your classes" : currentViewLabel} rankings</span></div><p className="mt-2 text-sm text-muted-foreground">{currentUserScore ? `${Math.round(activeTab === "weekly" ? currentUserScore.weeklyScore : scoreFor(currentUserScore)).toLocaleString()} points · ${currentUserScore.streak} day streak` : "Complete a quiz to enter the arena."}</p></div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-border/70 bg-background/70 p-4"><p className="text-xs text-muted-foreground">Learners</p><p className="mt-1 text-2xl font-bold">{tierUsers.length.toLocaleString()}</p></div><div className="rounded-2xl border border-border/70 bg-background/70 p-4"><p className="text-xs text-muted-foreground">Your score</p><p className="mt-1 text-2xl font-bold">{currentUserScore ? Math.round(activeTab === "weekly" ? currentUserScore.weeklyScore : scoreFor(currentUserScore)).toLocaleString() : "—"}</p></div><div className="col-span-2 rounded-2xl border border-border/70 bg-background/70 p-4 sm:col-span-1"><p className="text-xs text-muted-foreground">Streak</p><p className="mt-1 text-2xl font-bold text-orange-500">{currentUserScore ? `🔥 ${currentUserScore.streak}` : "—"}</p></div></div>
+          </div>
         </section>
 
-        <Card className="border-primary/30 bg-background/80 backdrop-blur-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-yellow-500" /> Dynamic Ranking Arena
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeaderboardTab)}>
-              <div className="overflow-x-auto pb-2">
-                <TabsList className="inline-flex min-w-max gap-2 bg-muted/70 p-1">
-                  {tabConfig.map(({ value, label, icon: Icon }) => (
-                    <TabsTrigger
-                      key={value}
-                      value={value}
-                      className="gap-2 rounded-full px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-                    >
-                      <Icon className="h-4 w-4" />
-                      {label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </div>
-            </Tabs>
+        <Card className="border-border/80 bg-card/90 shadow-sm">
+          <CardContent className="space-y-5 p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">The board</p><h2 className="mt-1 text-xl font-bold">Compete your way</h2></div><Select value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All time</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="weekly">Weekly</SelectItem></SelectContent></Select></div>
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeaderboardTab)}><TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-muted/70 p-1 sm:grid-cols-5">{tabConfig.map(({ value, label, icon: Icon }) => <TabsTrigger key={value} value={value} className="gap-1.5 rounded-xl px-2 py-2 text-xs sm:text-sm"><Icon className="h-3.5 w-3.5" />{value === "global" ? "Overall" : label}</TabsTrigger>)}</TabsList></Tabs>
+            {activeTab === "grade" && <Select value={selectedGrade} onValueChange={setSelectedGrade}><SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Choose grade" /></SelectTrigger><SelectContent><SelectItem value="all">All Grades {leaderboardGradeMin}–{leaderboardGradeMax}</SelectItem>{leaderboardGrades.map((grade) => <SelectItem key={grade} value={String(grade)}>Grade {grade}</SelectItem>)}</SelectContent></Select>}
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground">Timeframe</span>
-                <Select value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
-                  <SelectTrigger className="w-36"><SelectValue placeholder="Timeframe" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All time</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {activeTab === "grade" && (
-                <div className="w-40">
-                  <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-                    <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{leaderboardTier === "early" ? "KG–Grade 4" : leaderboardTier === "middle" ? "Grades 5–8" : "Grades 9–12"}</SelectItem>
-                      {leaderboardGrades.map((grade) => (
-                        <SelectItem key={grade} value={String(grade)}>
-                          Grade {grade}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-
-            {activeTab === "classes" ? (
-              <section className="space-y-3">
-                {classRows.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No class competition data yet.</p>
-                ) : classRows.map((row, index) => (
-                  <div key={row.classId} className="flex items-center justify-between rounded-xl border border-border/70 bg-card/70 p-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">#{index + 1} Class Rank</p>
-                      <h3 className="text-lg font-semibold">{row.className}</h3>
-                      <p className="text-sm text-muted-foreground">{row.studentCount} students • {row.totalClassXp.toLocaleString()} total season XP</p>
-                    </div>
-                    <Badge className="text-base px-3 py-1">{row.classScore.toLocaleString()} avg XP</Badge>
-                  </div>
-                ))}
-              </section>
-            ) : (
-              <>
-            {loading ? <div className="rounded-xl border bg-muted/30 p-6 text-sm text-muted-foreground animate-pulse">Loading live rankings…</div> : null}
-            {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4"><p className="text-sm text-destructive">{loadError}</p><Button variant="outline" size="sm" onClick={loadLeaderboard}>Try again</Button></div>}
-            {!loading && !loadError && users.length === 0 && <div className="rounded-xl border border-dashed p-8 text-center"><Trophy className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-semibold">Your leaderboard starts here</p><p className="mt-1 text-sm text-muted-foreground">Complete quizzes to earn points and appear in the rankings.</p></div>}
-
-            <section className="space-y-3">
-              <div className="hidden gap-4 md:grid md:grid-cols-3">
-                {topThree.map((entry, index) => {
-                  const podiumRank = (index + 1) as 1 | 2 | 3;
-                  return (
-                    <motion.button
-                      layout
-                      whileHover={{ y: -6 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => openProfile(entry)}
-                      onTouchStart={() => handleLongPressStart(entry)}
-                      onTouchMove={handleLongPressMove}
-                      onTouchEnd={() => handleLongPressEnd(entry)}
-                      onTouchCancel={() => handleLongPressEnd()}
-                      key={entry.id}
-                      className={`rounded-2xl border p-4 text-left transition ${podiumStyles[podiumRank]}`}
-                    >
-                      <p className="text-xs opacity-85">{podiumRank === 1 ? "🥇 Gold" : podiumRank === 2 ? "🥈 Silver" : "🥉 Bronze"}</p>
-                      <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="lg" className="my-3" />
-                      <h3 className="font-semibold">{getDisplayName(entry)}</h3>
-                      <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
-                      <div className="mt-3 flex items-center justify-between">
-                        <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
-                        <span className="font-bold">#{entry.rankPos}</span>
-                      </div>
-                      <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} Season XP</p>
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 md:hidden">
-                {mobilePodium.map((entry) => {
-                  const isChampion = entry.rankPos === 1;
-                  return (
-                    <motion.button
-                      key={entry.id}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => openProfile(entry)}
-                      onTouchStart={() => handleLongPressStart(entry)}
-                      onTouchMove={handleLongPressMove}
-                      onTouchEnd={() => handleLongPressEnd(entry)}
-                      onTouchCancel={() => handleLongPressEnd()}
-                      className={`w-[82%] shrink-0 snap-center rounded-2xl border p-4 text-left transition ${podiumStyles[entry.rankPos as 1 | 2 | 3]} ${isChampion ? "scale-[1.01]" : "scale-95"}`}
-                    >
-                      <p className="text-xs opacity-80">Position #{entry.rankPos}</p>
-                      <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size={isChampion ? "lg" : "md"} className="my-3" />
-                      <h3 className="text-base font-semibold">{getDisplayName(entry)}</h3>
-                      <p className="text-sm text-muted-foreground">Level {entry.level} • Grade {entry.grade ?? "-"}</p>
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{`${getRankTierByLevel(entry.level).icon} ${entry.tier}`}</Badge>
-                        <span className="text-lg font-bold">#{entry.rankPos}</span>
-                      </div>
-                      <p className="mt-2 text-sm font-semibold">{Math.round(entry.score).toLocaleString()} Season XP</p>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <div
-              className="h-[440px] space-y-2 overflow-y-auto rounded-xl border border-primary/20 bg-background/60 p-2 backdrop-blur"
-              onScroll={(event) => {
-                const target = event.currentTarget;
-                const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 100;
-                if (nearBottom && visibleRows < rest.length) {
-                  setVisibleRows((count) => Math.min(count + 12, rest.length));
-                }
-              }}
-            >
-              <AnimatePresence>
-                {visibleRest.map((entry) => (
-                  <motion.button
-                    layout
-                    key={`${activeTab}-${entry.id}`}
-                    onClick={() => openProfile(entry)}
-                    onTouchStart={() => handleLongPressStart(entry)}
-                    onTouchMove={handleLongPressMove}
-                    onTouchEnd={() => handleLongPressEnd(entry)}
-                    onTouchCancel={() => handleLongPressEnd()}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    className={`mb-2 flex w-full items-center gap-3 rounded-xl border p-3 text-left transition active:shadow-sm ${entry.rankPos <= 10 ? "shadow-sm" : "bg-card/80"}`}
-                  >
-                    <span className="w-8 text-center text-sm font-semibold text-muted-foreground">#{entry.rankPos}</span>
-                    <AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="md" />
-                    <div className="flex-1">
-                      <p className="font-medium">{getDisplayName(entry)}</p>
-                      <p className="text-xs text-muted-foreground">Level {entry.level} • Season XP {entry.seasonXp.toLocaleString()}</p>
-                      {entry.activeTitle ? <p className="text-[11px] text-amber-400">{entry.activeTitle}</p> : null}
-                    </div>
-                    <div className="text-right">
-                      <Badge className={`mb-1 bg-gradient-to-r ${tierStyle(entry.level)}`}>{entry.tier}</Badge>
-                      <p className="text-sm font-semibold">{Math.round(entry.score).toLocaleString()} pts</p>
-                      <p className="inline-flex items-center gap-1 text-xs text-orange-500"><Flame className="h-3 w-3" />{entry.streak}</p>
-                    </div>
-                  </motion.button>
-                ))}
-              </AnimatePresence>
-            </div>
-              </>
-            )}
+            {activeTab === "classes" ? <section className="space-y-3">{classRows.length === 0 ? <div className="rounded-2xl border border-dashed p-8 text-center"><Users className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-semibold">Class rankings are coming together</p><p className="mt-1 text-sm text-muted-foreground">Join a class to compete with your classmates.</p></div> : classRows.map((row, index) => <div key={row.classId} className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/60 p-4"><div><p className="text-xs font-bold text-primary">#{index + 1} CLASS RANK</p><h3 className="mt-1 font-semibold">{row.className}</h3><p className="text-xs text-muted-foreground">{row.studentCount} students · {row.totalClassXp.toLocaleString()} total XP</p></div><Badge className="px-3 py-1">{row.classScore.toLocaleString()} avg</Badge></div>)}</section> : <>
+              {loading && <div className="rounded-2xl border bg-muted/30 p-6 text-center text-sm text-muted-foreground">Loading live rankings…</div>}
+              {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4"><p className="text-sm text-destructive">{loadError}</p><Button variant="outline" size="sm" onClick={loadLeaderboard}>Try again</Button></div>}
+              {!loading && !loadError && withRank.length === 0 && <div className="rounded-2xl border border-dashed p-8 text-center"><Trophy className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-semibold">Your arena starts here</p><p className="mt-1 text-sm text-muted-foreground">Complete quizzes to earn points and appear on the board.</p></div>}
+              {withRank.length > 0 && <>
+                <div className="grid gap-3 md:grid-cols-3">{topThree.map((entry, index) => <motion.button key={entry.id} layout whileHover={{ y: -4 }} whileTap={{ scale: .98 }} onClick={() => openProfile(entry)} onTouchStart={() => handleLongPressStart(entry)} onTouchMove={handleLongPressMove} onTouchEnd={() => handleLongPressEnd(entry)} onTouchCancel={() => handleLongPressEnd()} className={`rounded-2xl border p-4 text-left ${podiumStyles[(index + 1) as 1 | 2 | 3]}`}><div className="flex items-center justify-between"><Badge variant="outline">{index === 0 ? "1st" : index === 1 ? "2nd" : "3rd"}</Badge><span className="text-xl">{index === 0 ? "🏆" : index === 1 ? "🥈" : "🥉"}</span></div><AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="lg" className="my-3" /><h3 className="font-bold">{getDisplayName(entry)}</h3><p className="text-xs text-muted-foreground">Level {entry.level} · Grade {entry.grade ?? "—"}</p><div className="mt-3 flex items-center justify-between"><Badge className={`bg-gradient-to-r ${tierStyle(entry.level)}`}>{entry.tier}</Badge><span className="font-black">{Math.round(entry.score).toLocaleString()}</span></div></motion.button>)}</div>
+                <div className="space-y-2">{visibleRest.map((entry) => <motion.button key={`${activeTab}-${entry.id}`} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} onClick={() => openProfile(entry)} onTouchStart={() => handleLongPressStart(entry)} onTouchMove={handleLongPressMove} onTouchEnd={() => handleLongPressEnd(entry)} onTouchCancel={() => handleLongPressEnd()} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition hover:border-primary/40 hover:bg-primary/[0.03] ${entry.id === user?.id ? "border-primary/50 bg-primary/[0.06]" : "border-border/70 bg-background/50"}`}><span className="w-8 text-center font-bold text-muted-foreground">#{entry.rankPos}</span><AvatarRenderer avatar={entry.avatar ?? undefined} avatarConfig={entry.avatarConfig as any} size="md" /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{getDisplayName(entry)}{entry.id === user?.id && <span className="ml-2 text-xs font-normal text-primary">You</span>}</p><p className="text-xs text-muted-foreground">Level {entry.level} · {entry.streak} day streak</p></div><div className="text-right"><p className="font-bold tabular-nums">{Math.round(entry.score).toLocaleString()}</p><p className="text-[10px] text-muted-foreground">points</p></div></motion.button>)}{visibleRows < rest.length && <Button variant="outline" className="w-full" onClick={() => setVisibleRows((count) => Math.min(count + 12, rest.length))}>Load more competitors</Button>}</div>
+                {currentUserIndex >= visibleRows + 3 && currentUserScore && <div className="rounded-2xl border border-primary/30 bg-primary/[0.06] p-3 text-sm"><span className="font-semibold">Your rank is #{currentUserIndex + 1}</span><span className="text-muted-foreground"> · Keep going to reach the next competitor.</span></div>}
+              </>}
+            </>}
           </CardContent>
         </Card>
       </div>
-
-      <Button
-        onClick={() => navigate("/social")}
-        className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-sm md:bottom-6 md:right-6"
-        aria-label="Quick challenge"
-      >
-        <Swords className="h-5 w-5" />
-      </Button>
-
-      <Dialog open={!!previewUser} onOpenChange={(isOpen) => !isOpen && setPreviewUser(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" /> Mini Profile Preview
-            </DialogTitle>
-          </DialogHeader>
-          {previewUser ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <AvatarRenderer avatar={previewUser.avatar ?? undefined} avatarConfig={previewUser.avatarConfig as any} size="md" />
-                <div>
-                  <p className="font-semibold">{getDisplayName(previewUser)}</p>
-                  <p className="text-xs text-muted-foreground">Rank #{previewUser.rankPos} • Level {previewUser.level}</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge className={`bg-gradient-to-r ${tierStyle(previewUser.level)}`}>{previewUser.tier}</Badge>
-                <Badge variant="secondary">{Math.round(previewUser.score).toLocaleString()} pts</Badge>
-                <Badge variant="outline">🔥 {previewUser.streak} day streak</Badge>
-              </div>
-              <Button className="w-full" onClick={() => navigate(`/profile/${previewUser.id}`)}>Open full profile</Button>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <Button onClick={() => navigate("/social")} className="fixed bottom-20 right-4 h-12 w-12 rounded-full shadow-lg md:bottom-6 md:right-6" aria-label="Quick challenge"><Swords className="h-5 w-5" /></Button>
+      <Dialog open={!!previewUser} onOpenChange={(isOpen) => !isOpen && setPreviewUser(null)}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle className="flex items-center gap-2"><Zap className="h-4 w-4 text-primary" /> Competitor preview</DialogTitle></DialogHeader>{previewUser ? <div className="space-y-3"><div className="flex items-center gap-3"><AvatarRenderer avatar={previewUser.avatar ?? undefined} avatarConfig={previewUser.avatarConfig as any} size="md" /><div><p className="font-semibold">{getDisplayName(previewUser)}</p><p className="text-xs text-muted-foreground">Rank #{previewUser.rankPos} · Level {previewUser.level}</p></div></div><div className="flex flex-wrap gap-2"><Badge className={`bg-gradient-to-r ${tierStyle(previewUser.level)}`}>{previewUser.tier}</Badge><Badge variant="secondary">{Math.round(previewUser.score).toLocaleString()} points</Badge><Badge variant="outline">🔥 {previewUser.streak} day streak</Badge></div><Button className="w-full" onClick={() => navigate(`/profile/${previewUser.id}`)}>Open profile</Button></div> : null}</DialogContent></Dialog>
     </div>
   );
 };
