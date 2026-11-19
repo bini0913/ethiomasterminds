@@ -342,6 +342,13 @@ const AcademicInsightsPage: React.FC = () => {
           </CardContent>
         </Card>
 
+        <Card className={upperStudent ? "border-primary/20 bg-primary/[0.06]" : "border-sky-200 bg-sky-50/70"}>
+          <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Sparkles className="h-5 w-5" /></div><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Your next best move</p><h3 className="mt-1 font-semibold">{weakest ? `Focus on ${weakest.subject}` : "Keep building your learning profile"}</h3><p className="mt-1 text-sm text-muted-foreground">{weakest ? `${weakest.subject} is currently at ${weakest.accuracy}% across ${weakest.total} attempted questions. A focused practice set can turn this gap into progress.` : "Complete a practice quiz to unlock subject-level guidance based on your real results."}</p></div></div>
+            <Button variant="outline" className="shrink-0 bg-background" onClick={() => weakest ? navigate(`/quiz?subject=${encodeURIComponent(weakest.subject)}`) : navigate("/quiz/filter")}>{weakest ? "Practice this subject" : "Start practice"}</Button>
+          </CardContent>
+        </Card>
+
         {/* Subject Performance */}
         {subjectAccuracies.length > 0 && (
           <Card className={upperStudent ? "border-border/50 bg-card/80" : "border-slate-200/80 bg-white shadow-sm"}>

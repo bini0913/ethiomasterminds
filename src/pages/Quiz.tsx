@@ -19,6 +19,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { adjustDifficulty, difficultyFromLevel, normalizeDifficulty, QuizDifficulty, xpPerCorrectByDifficulty } from "@/lib/quizDifficulty";
 import { normalizeSubject } from "@/lib/academicProfile";
 
+const parseProfileGrade = (value: string | undefined, fallback: number) => {
+  const match = String(value ?? "").match(/\d{1,2}/);
+  const parsed = match ? Number(match[0]) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const Quiz: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { quizzes, loading, loadError, fetchQuizzes } = useQuiz();
@@ -43,7 +49,7 @@ const Quiz: React.FC = () => {
   const [performanceOffset, setPerformanceOffset] = useState(0);
   
   useEffect(() => {
-    const preferredGrade = parseInt(user?.grade || String(defaultQuizGrade), 10);
+    const preferredGrade = parseProfileGrade(user?.grade, defaultQuizGrade);
     const boundedGrade = Number.isNaN(preferredGrade) ? defaultQuizGrade : Math.min(quizGradeMax, Math.max(quizGradeMin, preferredGrade));
     setSelectedGrade(boundedGrade.toString());
   }, [user?.grade, defaultQuizGrade, quizGradeMin, quizGradeMax]);
@@ -54,7 +60,7 @@ const Quiz: React.FC = () => {
   }, [user?.level]);
 
   const studentGrade = useMemo(() => {
-    const preferredGrade = parseInt(user?.grade || String(defaultQuizGrade), 10);
+    const preferredGrade = parseProfileGrade(user?.grade, defaultQuizGrade);
     return Number.isNaN(preferredGrade) ? defaultQuizGrade : Math.min(quizGradeMax, Math.max(quizGradeMin, preferredGrade));
   }, [user?.grade, defaultQuizGrade, quizGradeMin, quizGradeMax]);
 

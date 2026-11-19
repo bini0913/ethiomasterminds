@@ -437,6 +437,20 @@ const FlashcardsPage: React.FC = () => {
           </div>}
         </motion.div>
       )}
+      {upperStudent && <Card className="mx-4 mb-8 w-full max-w-md self-center border-border bg-card/80 lg:mx-auto">
+        <CardHeader className="pb-3"><CardTitle className="text-base">Today’s session</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Cards reviewed</span><strong>{sessionReviewed} / {reviewCards.length}</strong></div>
+          <Progress value={reviewCards.length ? (sessionReviewed / reviewCards.length) * 100 : 0} className="h-1.5" />
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-lg font-bold">{dueCards.length}</p><p className="text-[10px] text-muted-foreground">Due now</p></div>
+            <div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-lg font-bold">{statusCounts.learning}</p><p className="text-[10px] text-muted-foreground">Learning</p></div>
+            <div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-lg font-bold">{statusCounts.mastered}</p><p className="text-[10px] text-muted-foreground">Mastered</p></div>
+          </div>
+          <div className="flex items-center justify-between border-t border-border pt-3 text-sm"><span className="text-muted-foreground">Estimated time</span><strong>{Math.max(1, Math.ceil(reviewCards.length * 2))} min</strong></div>
+          <Button variant="link" className="h-auto px-0" onClick={() => navigate("/revision")}>View revision schedule <ChevronRight className="ml-1 h-4 w-4" /></Button>
+        </CardContent>
+      </Card>}
     </div>
   );
 };
