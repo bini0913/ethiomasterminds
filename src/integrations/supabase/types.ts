@@ -2778,7 +2778,7 @@ export type Database = {
       }
       finalize_match: { Args: { p_room_id: string }; Returns: Json }
       find_student_by_username: {
-        Args: { search_username: string }
+        Args: { _username: string }
         Returns: {
           avatar: string
           id: string
@@ -2789,7 +2789,7 @@ export type Database = {
         }[]
       }
       get_class_students: {
-        Args: { class_uuid: string }
+        Args: { _class_id: string }
         Returns: {
           avatar: string
           id: string
