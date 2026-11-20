@@ -12,8 +12,8 @@ import '@/types/speech.d.ts';
 interface VoiceAnswerInputProps {
   questionType: 'multiple_choice' | 'true_false' | 'fill_blank';
   options?: string[];
-  correctAnswer: string;
-  onAnswer: (answer: string, isCorrect: boolean) => void;
+  correctAnswer?: string;
+  onAnswer: (answer: string, isCorrect?: boolean) => void;
   disabled?: boolean;
 }
 
@@ -84,6 +84,11 @@ const VoiceAnswerInput: React.FC<VoiceAnswerInputProps> = ({
     setIsProcessing(true);
 
     try {
+      if (!correctAnswer) {
+        setResult({ isCorrect: false, matchedOption: spokenText });
+        onAnswer(spokenText);
+        return;
+      }
       const { data, error } = await supabase.functions.invoke('voice-evaluate', {
         body: {
           transcribedText: spokenText,

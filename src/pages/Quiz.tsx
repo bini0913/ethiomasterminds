@@ -86,7 +86,7 @@ const Quiz: React.FC = () => {
     if (question.type !== "Multiple Choice") return question;
 
     const options = question.options.slice(0, 4);
-    if (options.length < 2 || !options.includes(question.correctAnswer)) return question;
+    if (options.length < 2) return question;
 
     const shift = (quizIndexSeed + questionIndex) % options.length;
     if (shift === 0) return question;

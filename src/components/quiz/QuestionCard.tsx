@@ -3,13 +3,13 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Question } from "@/context/QuizContext";
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface QuestionCardProps {
   question: Question;
-  onAnswer: (answer: string, isCorrect: boolean) => void;
+  onAnswer: (answer: string, isCorrect?: boolean) => void;
   timeLeft: number;
 }
 
@@ -29,15 +29,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLef
   const handleSubmitAnswer = () => {
     if (!selectedOption || answered) return;
     
-    const isCorrect = selectedOption === question.correctAnswer;
     setAnswered(true);
-    onAnswer(selectedOption, isCorrect);
-    
-    if (isCorrect) {
-      toast.success("Correct answer!");
-    } else {
-      toast.error(`Incorrect! The correct answer was: ${question.correctAnswer}`);
-    }
+    onAnswer(selectedOption);
+    toast.success("Answer recorded. Your result will be graded securely when you submit the quiz.");
   };
   
   return (
@@ -72,10 +66,8 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLef
               aria-pressed={selectedOption === option}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOptionSelect(option); } }}
               className={`min-h-14 cursor-pointer rounded-2xl border-2 border-b-4 p-4 transition-all active:translate-y-[2px] active:border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                answered && option === question.correctAnswer
-                  ? "border-success bg-success/10"
-                  : answered && option === selectedOption
-                  ? "border-destructive bg-destructive/10"
+                answered && option === selectedOption
+                  ? "border-primary bg-primary/10"
                   : selectedOption === option
                   ? "border-primary bg-primary/10"
                   : "border-border bg-card hover:bg-muted/60"
@@ -84,10 +76,8 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLef
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                    answered && option === question.correctAnswer
-                      ? "bg-success text-success-foreground"
-                      : answered && option === selectedOption && option !== question.correctAnswer
-                      ? "bg-destructive text-destructive-foreground"
+                    answered && option === selectedOption
+                      ? "bg-primary text-primary-foreground"
                       : selectedOption === option
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground"
@@ -96,12 +86,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLef
                   </span>
                   <span className="text-foreground">{option}</span>
                 </div>
-                {answered && option === question.correctAnswer && (
-                  <Check className="text-success h-5 w-5" />
-                )}
-                {answered && option === selectedOption && option !== question.correctAnswer && (
-                  <X className="text-destructive h-5 w-5" />
-                )}
+                {answered && option === selectedOption && <Check className="text-primary h-5 w-5" />}
               </div>
             </div>
           );
@@ -119,7 +104,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, onAnswer, timeLef
       )}
       
       {answered && question.explanation && (
-        <div className={`mt-4 rounded-2xl border-2 p-4 animate-in slide-in-from-bottom-4 ${selectedOption === question.correctAnswer ? "border-success/40 bg-success/10" : "border-destructive/40 bg-destructive/10"}`}>
+        <div className="mt-4 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4 animate-in slide-in-from-bottom-4">
           <p className="font-medium mb-1">Explanation:</p>
           <p className="text-sm">{question.explanation}</p>
         </div>
