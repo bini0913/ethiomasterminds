@@ -460,3 +460,93 @@ AS $function$
   LIMIT GREATEST(1, LEAST(p_limit, 500))
   OFFSET GREATEST(0, p_offset);
 $function$;
+
+
+-- Global school inventory for the Extreme Admin. Counts are derived from
+-- active school memberships; no student or staff personal data is exposed.
+CREATE OR REPLACE FUNCTION public.extreme_admin_list_schools()
+RETURNS TABLE(
+  id uuid,
+  name text,
+  school_code text,
+  status text,
+  created_at timestamptz,
+  created_by uuid,
+  managers bigint,
+  admins bigint,
+  teachers bigint,
+  students bigint,
+  parents bigint,
+  finance_staff bigint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT
+    s.id,
+    s.name,
+    s.school_code,
+    s.status,
+    s.created_at,
+    s.created_by,
+    count(sm.id) FILTER (WHERE sm.school_role = 'manager') AS managers,
+    count(sm.id) FILTER (WHERE sm.school_role = 'admin') AS admins,
+    count(sm.id) FILTER (WHERE sm.school_role = 'teacher') AS teachers,
+    count(sm.id) FILTER (WHERE sm.school_role = 'student') AS students,
+    count(sm.id) FILTER (WHERE sm.school_role = 'parent') AS parents,
+    count(sm.id) FILTER (WHERE sm.school_role = 'finance') AS finance_staff
+  FROM public.schools s
+  LEFT JOIN public.school_memberships sm
+    ON sm.school_id = s.id AND sm.status = 'active'
+  WHERE public._is_extreme_admin()
+  GROUP BY s.id
+  ORDER BY s.created_at DESC;
+$function$;
+
+REVOKE ALL ON FUNCTION public.extreme_admin_list_schools() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_list_schools() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.extreme_admin_set_school_status(
+  p_school_id uuid,
+  p_status text,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO pg_catalog, public
+AS $function$
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+
+  IF p_school_id IS NULL OR p_status NOT IN ('active', 'suspended', 'closed') THEN
+    RAISE EXCEPTION 'A valid school and status are required';
+  END IF;
+
+  UPDATE public.schools
+  SET status = p_status, updated_at = now()
+  WHERE id = p_school_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'School not found';
+  END IF;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(),
+    'root_set_school_status',
+    'school',
+    p_school_id,
+    jsonb_build_object('status', p_status, 'reason', nullif(trim(coalesce(p_reason, '')), ''))
+  );
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.extreme_admin_set_school_status(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_set_school_status(uuid, text, text) TO authenticated;
