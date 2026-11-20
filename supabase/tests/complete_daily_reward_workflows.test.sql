@@ -56,12 +56,17 @@ SELECT ok(
 );
 
 SELECT ok(
-  has_column('public', 'user_streaks', 'last_daily_reward_date'),
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'user_streaks'
+      AND column_name = 'last_daily_reward_date'
+  ),
   'daily reward claims use a separate date from normal learning activity'
 );
-SELECT like(
-  pg_get_functiondef('public.wallet_action(text,integer,uuid)'::regprocedure),
-  '%INSERT INTO public.transactions%',
+SELECT ok(
+  pg_get_functiondef('public.wallet_action(text,integer,uuid)'::regprocedure) LIKE '%INSERT INTO public.transactions%',
   'wallet actions write to the existing transaction history'
 );
 

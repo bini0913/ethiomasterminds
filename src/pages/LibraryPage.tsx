@@ -77,6 +77,7 @@ const LibraryPage: React.FC = () => {
   const [readerRetry, setReaderRetry] = useState(0);
   const [readerLoading, setReaderLoading] = useState(false);
   const [readerError, setReaderError] = useState<string | null>(null);
+  const [assetUrls, setAssetUrls] = useState<Record<string, { pdf: string; thumbnail: string | null }>>({});
   const [readerProgress, setReaderProgress] = useState(0);
   const [readerPageText, setReaderPageText] = useState('');
   const [selectedText, setSelectedText] = useState('');
@@ -203,6 +204,25 @@ const LibraryPage: React.FC = () => {
   }, [books, search, subjectFilter, gradeFilter, activeSection, bookmarkSet, downloadedSet, user?.id, user?.role, studentGradeMin, studentGradeMax]);
 
   const visibleBooks = filteredBooks.slice(0, visibleCount);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(visibleBooks.map(async (book) => {
+        try {
+          const [pdf, thumbnail] = await Promise.all([
+            getPdfPublicUrl(book.pdf_path),
+            getThumbnailPublicUrl(book.thumbnail_path),
+          ]);
+          return [book.id, { pdf, thumbnail }] as const;
+        } catch {
+          return [book.id, { pdf: '', thumbnail: null }] as const;
+        }
+      }));
+      if (!cancelled) setAssetUrls((current) => ({ ...current, ...Object.fromEntries(entries) }));
+    })();
+    return () => { cancelled = true; };
+  }, [visibleBooks]);
   const markDownloaded = (bookId: string) => {
     setDownloadedSet((previous) => {
       const next = new Set(previous);
@@ -337,8 +357,14 @@ const LibraryPage: React.FC = () => {
     return book.uploader_id === user.id;
   };
 
-  const openReader = (book: LibraryBook) => {
-    const url = getPdfPublicUrl(book.pdf_path);
+  const openReader = async (book: LibraryBook) => {
+    let url = assetUrls[book.id]?.pdf;
+    try {
+      url = url || await getPdfPublicUrl(book.pdf_path);
+    } catch {
+      toast.error('Book file could not be opened. Please retry.');
+      return;
+    }
     if (!isValidPublicUrl(url)) {
       toast.error('Book file URL is invalid. Please retry.');
       return;
@@ -767,8 +793,8 @@ const LibraryPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <AnimatePresence>
                       {visibleBooks.map((book) => {
-                        const thumbnailUrl = getThumbnailPublicUrl(book.thumbnail_path);
-                        const pdfUrl = getPdfPublicUrl(book.pdf_path);
+                        const thumbnailUrl = assetUrls[book.id]?.thumbnail || null;
+                        const pdfUrl = assetUrls[book.id]?.pdf || '';
                         const hasValidPdfUrl = isValidPublicUrl(pdfUrl);
                         const isBookmarked = bookmarkSet.has(book.id);
 

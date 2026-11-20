@@ -538,7 +538,7 @@ export async function invokeLibraryAI(payload: {
   return data.response as string;
 }
 
-export function getPdfPublicUrl(path: string) {
+export async function getPdfPublicUrl(path: string) {
   if (!path) return '';
 
   // Backward compatibility for legacy rows that may already store
@@ -548,8 +548,9 @@ export function getPdfPublicUrl(path: string) {
   }
 
   const normalizedPath = path.replace(/^\/+/, '');
-  const { data } = supabase.storage.from('library-files').getPublicUrl(normalizedPath);
-  return data.publicUrl;
+  const { data, error } = await supabase.storage.from('library-files').createSignedUrl(normalizedPath, 3600);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 export function isValidPublicUrl(url: string | null | undefined) {
@@ -562,7 +563,7 @@ export function isValidPublicUrl(url: string | null | undefined) {
   }
 }
 
-export function getThumbnailPublicUrl(path: string | null) {
+export async function getThumbnailPublicUrl(path: string | null) {
   if (!path) return null;
 
   // Backward compatibility for legacy rows that may already store
@@ -572,8 +573,9 @@ export function getThumbnailPublicUrl(path: string | null) {
   }
 
   const normalizedPath = path.replace(/^\/+/, '');
-  const { data } = supabase.storage.from('library-thumbnails').getPublicUrl(normalizedPath);
-  return data.publicUrl;
+  const { data, error } = await supabase.storage.from('library-thumbnails').createSignedUrl(normalizedPath, 3600);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 

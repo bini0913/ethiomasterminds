@@ -42,7 +42,23 @@ export default function SchoolStudentPortal() {
   const [homework, setHomework] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [books, setBooks] = useState<any[]>([]);
+  const [bookUrls, setBookUrls] = useState<Record<string, string>>({});
   const [quizzes, setQuizzes] = useState<any[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all((books || []).map(async (book) => {
+        try {
+          return [String(book.id), await getPdfPublicUrl(String(book.pdf_path || ""))] as const;
+        } catch {
+          return [String(book.id), ""] as const;
+        }
+      }));
+      if (!cancelled) setBookUrls(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [books]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
@@ -238,7 +254,7 @@ export default function SchoolStudentPortal() {
   const renderLibrary = () => (
     <div className="space-y-5">
       <SchoolPageHeading title="Textbooks & digital library" description="School-approved textbooks, notes, and learning resources for your section." />
-      {books.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{books.map((book) => <SchoolPanel key={book.id} title={book.title} description={`${book.subject} · ${book.author || "School resource"}`}><p className="line-clamp-3 text-sm text-slate-600">{book.description}</p><a href={getPdfPublicUrl(book.pdf_path)} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center text-sm font-semibold text-blue-700 hover:underline"><FileText className="mr-2 h-4 w-4" />Open PDF</a></SchoolPanel>)}</div> : <SchoolEmptyState title="No approved resources yet" description="Your teacher's approved textbooks and notes will appear here." />}
+      {books.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{books.map((book) => <SchoolPanel key={book.id} title={book.title} description={`${book.subject} · ${book.author || "School resource"}`}><p className="line-clamp-3 text-sm text-slate-600">{book.description}</p>{bookUrls[String(book.id)] ? <a href={bookUrls[String(book.id)]} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center text-sm font-semibold text-blue-700 hover:underline"><FileText className="mr-2 h-4 w-4" />Open PDF</a> : <p className="mt-3 text-sm text-slate-500">PDF unavailable. Please retry later.</p>}</SchoolPanel>)}</div> : <SchoolEmptyState title="No approved resources yet" description="Your teacher's approved textbooks and notes will appear here." />}
     </div>
   );
 

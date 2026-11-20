@@ -186,7 +186,7 @@ const StudyPlannerPage: React.FC = () => {
           continue;
         }
         try {
-          const response = await fetch(getPdfPublicUrl(book.pdf_path));
+          const response = await fetch(await getPdfPublicUrl(book.pdf_path));
           if (!response.ok) throw new Error("PDF download failed (" + response.status + ").");
           const bytes = await response.arrayBuffer();
           const pdf = await (pdfjs as any).getDocument({ data: bytes }).promise;

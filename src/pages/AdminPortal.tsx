@@ -14,6 +14,16 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -173,6 +183,9 @@ const AdminPortal: React.FC = () => {
   const [xpAmount, setXpAmount] = useState('50');
   const [levelAmount, setLevelAmount] = useState('1');
   const [coinAmount, setCoinAmount] = useState('50');
+  const [coinReason, setCoinReason] = useState('');
+  const [coinAdjustmentDraft, setCoinAdjustmentDraft] = useState<{ id: string; name: string; amount: number; reason: string } | null>(null);
+  const [coinAdjustmentSubmitting, setCoinAdjustmentSubmitting] = useState(false);
   const [resetMode, setResetMode] = useState<'level' | 'full'>('full');
   const [seasonConversionRate, setSeasonConversionRate] = useState('1');
   const [seasonConfirmText, setSeasonConfirmText] = useState('');
@@ -812,35 +825,40 @@ const AdminPortal: React.FC = () => {
       toast.error('Select a user and provide a non-zero whole-number coin amount.');
       return;
     }
-
-    const { data, error } = await (supabase as any).rpc('admin_adjust_coins', {
-      p_user_identifier: target.id,
-      p_amount: amount,
-    });
-    if (error) {
-      toast.error(error.message || 'Failed to update the virtual wallet.');
+    const reason = coinReason.trim();
+    if (reason.length < 8 || reason.length > 500) {
+      toast.error('Enter an adjustment reason between 8 and 500 characters.');
       return;
     }
 
-    const { error: auditError } = await (supabase as any).rpc('admin_write_audit_log', {
-      p_action: 'admin_adjust_coins',
-      p_target_type: 'user',
-      p_target_id: target.id,
-      p_metadata: {
-        amount,
-        resulting_coins: data?.coins ?? null,
-        target_label: target.username || target.name,
-      },
-    });
+    setCoinAdjustmentDraft({ id: target.id, name: target.name, amount, reason });
+  };
 
-    pushNotification(`Coins updated for ${target.name}`);
-    await fetchAllData();
-    if (auditError) {
-      console.error('Virtual wallet adjustment succeeded, but audit confirmation failed:', auditError);
-      toast.error('Wallet updated, but its audit record could not be confirmed. Do not repeat the adjustment; contact a Super Admin.');
-      return;
+  const confirmCoinAdjustment = async () => {
+    if (!coinAdjustmentDraft || coinAdjustmentSubmitting) return;
+    setCoinAdjustmentSubmitting(true);
+    try {
+      const { data, error } = await (supabase as any).rpc('admin_adjust_coins_with_audit', {
+        p_user_identifier: coinAdjustmentDraft.id,
+        p_amount: coinAdjustmentDraft.amount,
+        p_reason: coinAdjustmentDraft.reason,
+      });
+      if (error) {
+        toast.error(error.message || 'Wallet adjustment was not completed.');
+        return;
+      }
+
+      pushNotification(`Coins updated for ${coinAdjustmentDraft.name}`);
+      await fetchAllData();
+      setCoinReason('');
+      setCoinAdjustmentDraft(null);
+      toast.success(`Virtual wallet updated${Number.isFinite(data?.coins) ? ` to ${data.coins} coins` : ''}; audit record saved.`);
+    } catch (error) {
+      console.error('Wallet adjustment request failed:', error);
+      toast.error('Wallet adjustment could not be confirmed. Check the wallet and audit history before retrying.');
+    } finally {
+      setCoinAdjustmentSubmitting(false);
     }
-    toast.success(`Virtual wallet updated${Number.isFinite(data?.coins) ? ` to ${data.coins} coins` : ''}.`);
   };
 
   const handleEndSeason = async () => {
@@ -1166,11 +1184,44 @@ const AdminPortal: React.FC = () => {
                     <div className="space-y-2 rounded-lg border p-3">
                       <Label>Add / Remove Coins</Label>
                       <Input value={coinAmount} onChange={(e) => setCoinAmount(e.target.value)} type="number" placeholder="Coins (+/-)" />
-                      <Button className="w-full" onClick={handleCoinAdjustment}><Coins className="w-4 h-4 mr-2" />Apply Coins</Button>
+                      <Label htmlFor="coin-adjustment-reason">Reason (required)</Label>
+                      <Textarea id="coin-adjustment-reason" value={coinReason} onChange={(e) => setCoinReason(e.target.value)} maxLength={500} placeholder="Explain why this wallet adjustment is needed" />
+                      <Button className="w-full" onClick={handleCoinAdjustment}><Coins className="w-4 h-4 mr-2" />Review Adjustment</Button>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
+              <AlertDialog
+                open={coinAdjustmentDraft !== null}
+                onOpenChange={(open) => {
+                  if (!open && !coinAdjustmentSubmitting) setCoinAdjustmentDraft(null);
+                }}
+              >
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm virtual wallet adjustment</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {coinAdjustmentDraft && (
+                        <span className="block space-y-2">
+                          <span className="block">{coinAdjustmentDraft.amount > 0 ? 'Add' : 'Remove'} {Math.abs(coinAdjustmentDraft.amount)} coins {coinAdjustmentDraft.amount > 0 ? 'for' : 'from'} {coinAdjustmentDraft.name}.</span>
+                          <span className="block">Reason: {coinAdjustmentDraft.reason}</span>
+                          <span className="block">The wallet change and audit record are saved together. This action cannot be undone automatically.</span>
+                        </span>
+                      )}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={coinAdjustmentSubmitting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction disabled={coinAdjustmentSubmitting} onClick={(event) => {
+                      event.preventDefault();
+                      void confirmCoinAdjustment();
+                    }}>
+                      {coinAdjustmentSubmitting ? 'Saving…' : 'Confirm adjustment'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               <Card><CardContent className="p-0"><ScrollArea className="h-[560px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Select</th><th className="p-3 text-left">User</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Status</th><th className="p-3 text-left">Joined</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{filteredUsers.map((u) => (<tr key={u.id} className="border-b border-border/50"><td className="p-3"><input type="checkbox" checked={selectedUsers.includes(u.id)} onChange={(e) => setSelectedUsers((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))} /></td><td className="p-3"><p className="font-medium">{u.name}</p><p className="text-xs text-muted-foreground">@{u.username}</p></td><td className="p-3"><Select value={u.role} onValueChange={(v) => handleUpdateUserRole(u.id, v as Role)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem>{isSuperAdmin && <><SelectItem value="finance">Finance</SelectItem><SelectItem value="extreme_admin">Super Admin</SelectItem></>}</SelectContent></Select></td><td className="p-3">{u.grade || '-'}</td><td className="p-3"><span className="inline-flex items-center gap-1"><Zap className="h-3 w-3 text-blue-600" />{u.xp}</span></td><td className="p-3"><Badge variant={u.account_status === 'active' ? 'secondary' : 'destructive'}>{u.account_status || 'active'}</Badge></td><td className="p-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)} title="Send password reset email"><Key className="h-4 w-4" /></Button>{isSuperAdmin && <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)} title="Permanently delete auth account"><Trash2 className="h-4 w-4 text-destructive" /></Button>}</td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
             </TabsContent>
