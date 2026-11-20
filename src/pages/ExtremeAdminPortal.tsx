@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldAlert, AlertTriangle, RefreshCw, UserCog, Coins, Shield, Lock, Building2, Crown } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, RefreshCw, UserCog, Coins, Shield, Lock, Building2, Crown, Users } from 'lucide-react';
 import { useUser, UserRole } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -213,6 +213,15 @@ const ExtremeAdminPortal: React.FC = () => {
     toast.success(`${key} updated`);
   };
 
+  const overviewMetrics = [
+    { label: 'Accounts', value: dashboard.total_users ?? 0, Icon: Users },
+    { label: 'Schools', value: dashboard.schools ?? 0, Icon: Building2 },
+    { label: 'Students', value: dashboard.students ?? 0, Icon: Users },
+    { label: 'Teachers', value: dashboard.teachers ?? 0, Icon: UserCog },
+    { label: 'Super Admin', value: dashboard.super_admins ?? 0, Icon: Crown },
+    { label: 'Online now', value: dashboard.active_users_10m ?? 0, Icon: Shield },
+  ];
+
   if (!isExtremeAdmin) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center px-6">
@@ -241,7 +250,7 @@ const ExtremeAdminPortal: React.FC = () => {
             <CardTitle className="flex items-center gap-2 text-slate-900">
               <ShieldAlert className="h-5 w-5" /> Extreme Admin · Global platform control
             </CardTitle>
-            <CardDescription className="text-zinc-400">
+            <CardDescription className="text-slate-600">
               Global oversight of the Super Admin, every school, individual accounts, platform settings, and audited operations.
             </CardDescription>
           </CardHeader>
@@ -249,9 +258,22 @@ const ExtremeAdminPortal: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <Button onClick={refreshAll} variant="outline" disabled={loading}>
-            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
-          {loading && <p className="text-sm text-zinc-400">Syncing secure data...</p>}
+          {loading && <p className="text-sm text-slate-500">Syncing live platform data...</p>}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          {overviewMetrics.map(({ label, value, Icon }) => (
+            <Card key={label} className="border-slate-200 bg-white">
+              <CardContent className="flex items-center justify-between gap-2 p-4">
+                <div>
+                  <p className="text-xs font-medium text-slate-500">{label}</p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{Number(value).toLocaleString()}</p>
+                </div>
+                <Icon className="h-5 w-5 text-blue-700" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         <Tabs defaultValue="users" className="space-y-4">
@@ -335,7 +357,7 @@ const ExtremeAdminPortal: React.FC = () => {
           <TabsContent value="users" className="space-y-4">
             <Card className="bg-white border-slate-200">
               <CardHeader>
-                <CardTitle className="text-zinc-100 flex items-center gap-2"><UserCog className="h-4 w-4" />User Control</CardTitle>
+                <CardTitle className="text-slate-900 flex items-center gap-2"><UserCog className="h-4 w-4" />User Control</CardTitle>
                 <CardDescription>Manage ordinary platform roles and account access. Extreme Admin and Super Admin are controlled separately.</CardDescription>
               </CardHeader>
               <CardContent className="grid md:grid-cols-2 gap-4">
@@ -345,7 +367,7 @@ const ExtremeAdminPortal: React.FC = () => {
 
                   <Label>Role</Label>
                   <Select value={targetRole} onValueChange={(value) => setTargetRole(value as UserRole)}>
-                    <SelectTrigger className="bg-zinc-900 border-zinc-700"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {availableRoles.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}
                     </SelectContent>
@@ -357,7 +379,7 @@ const ExtremeAdminPortal: React.FC = () => {
                 <div className="space-y-3">
                   <Label>Account status</Label>
                   <Select value={status} onValueChange={(value) => setStatus(value as AccountStatus)}>
-                    <SelectTrigger className="bg-zinc-900 border-zinc-700"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">active</SelectItem>
                       <SelectItem value="suspended">suspended</SelectItem>
@@ -365,14 +387,14 @@ const ExtremeAdminPortal: React.FC = () => {
                       
                     </SelectContent>
                   </Select>
-                  <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Reason" className="bg-zinc-900 border-zinc-700" />
+                  <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Reason" className="bg-slate-50 border-slate-200" />
                   <Button onClick={setUserStatus} variant="secondary" className="w-full">Apply Status</Button>
                   
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-zinc-950 border-zinc-800">
+            <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle>All Users ({users.length})</CardTitle>
               </CardHeader>
@@ -381,11 +403,11 @@ const ExtremeAdminPortal: React.FC = () => {
                   <div key={item.id} className="text-xs border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center justify-between gap-3">
                     <div>
                       <div className="font-medium">{item.name} ({item.username || 'no-username'})</div>
-                      <div className="text-zinc-400">{item.id}</div>
+                      <div className="text-slate-600">{item.id}</div>
                     </div>
                     <div className="text-right">
                       <div>{item.role} · {item.account_status}</div>
-                      <div className="text-zinc-400">XP {item.xp} · Coins {item.coins}</div>
+                      <div className="text-slate-600">XP {item.xp} · Coins {item.coins}</div>
                     </div>
                   </div>
                 ))}
@@ -394,13 +416,13 @@ const ExtremeAdminPortal: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="economy" className="space-y-4">
-            <Card className="bg-zinc-950 border-zinc-800">
+            <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Coins className="h-4 w-4" />XP & Currency Control</CardTitle>
               </CardHeader>
               <CardContent className="grid md:grid-cols-3 gap-3">
-                <Input value={xpDelta} onChange={(e) => setXpDelta(e.target.value)} placeholder="XP delta (e.g. 250 or -50)" className="bg-zinc-900 border-zinc-700" />
-                <Input value={coinDelta} onChange={(e) => setCoinDelta(e.target.value)} placeholder="Coin delta (e.g. 100 or -25)" className="bg-zinc-900 border-zinc-700" />
+                <Input value={xpDelta} onChange={(e) => setXpDelta(e.target.value)} placeholder="XP delta (e.g. 250 or -50)" className="bg-slate-50 border-slate-200" />
+                <Input value={coinDelta} onChange={(e) => setCoinDelta(e.target.value)} placeholder="Coin delta (e.g. 100 or -25)" className="bg-slate-50 border-slate-200" />
                 <div className="flex gap-2">
                   <Button onClick={() => adjustEconomy(false)} className="flex-1">Apply</Button>
                   <Button onClick={() => adjustEconomy(true)} variant="destructive" className="flex-1">Reset</Button>
@@ -410,18 +432,18 @@ const ExtremeAdminPortal: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="content" className="space-y-4">
-            <Card className="bg-zinc-950 border-zinc-800">
+            <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle>Content Control</CardTitle>
                 <CardDescription>Delete social posts and library books by ID.</CardDescription>
               </CardHeader>
               <CardContent className="grid md:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Input value={postId} onChange={(e) => setPostId(e.target.value)} placeholder="Social post ID" className="bg-zinc-900 border-zinc-700" />
+                  <Input value={postId} onChange={(e) => setPostId(e.target.value)} placeholder="Social post ID" className="bg-slate-50 border-slate-200" />
                   <Button variant="destructive" onClick={deletePost} className="w-full">Delete Post</Button>
                 </div>
                 <div className="space-y-2">
-                  <Input value={bookId} onChange={(e) => setBookId(e.target.value)} placeholder="Library book ID" className="bg-zinc-900 border-zinc-700" />
+                  <Input value={bookId} onChange={(e) => setBookId(e.target.value)} placeholder="Library book ID" className="bg-slate-50 border-slate-200" />
                   <Button variant="destructive" onClick={deleteBook} className="w-full">Delete Book</Button>
                 </div>
               </CardContent>
@@ -429,26 +451,26 @@ const ExtremeAdminPortal: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="chats" className="space-y-4">
-            <Card className="bg-zinc-950 border-zinc-800">
+            <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle>Chat Control</CardTitle>
                 <CardDescription>Delete messages and monitor high-level message volume from dashboard stats.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Input value={messageId} onChange={(e) => setMessageId(e.target.value)} placeholder="Message ID" className="bg-zinc-900 border-zinc-700" />
+                <Input value={messageId} onChange={(e) => setMessageId(e.target.value)} placeholder="Message ID" className="bg-slate-50 border-slate-200" />
                 <Button variant="destructive" onClick={deleteMessage} className="w-full">Delete Message</Button>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="system" className="space-y-4">
-            <Card className="bg-zinc-950 border-zinc-800">
+            <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" />Feature + Platform Controls</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {['feature_social_enabled', 'feature_ai_enabled', 'feature_xp_enabled', 'leaderboard_enabled', 'grades_enabled'].map((key) => (
-                  <div key={key} className="flex items-center justify-between border border-zinc-800 rounded p-3 bg-zinc-900/70">
+                  <div key={key} className="flex items-center justify-between border border-slate-200 rounded p-3 bg-slate-50">
                     <span className="text-sm">{key}</span>
                     <Switch checked={Boolean(settings[key])} onCheckedChange={(value) => updateSetting(key, value)} />
                   </div>
@@ -456,7 +478,7 @@ const ExtremeAdminPortal: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card className="bg-zinc-950 border-zinc-800">
+            <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" />Security and access snapshot</CardTitle>
                 <CardDescription>Live metrics from the protected database function. This page does not pretend that client-entered IP addresses or unverified 2FA settings enforce security.</CardDescription>
@@ -478,14 +500,14 @@ const ExtremeAdminPortal: React.FC = () => {
 
             </Card>
 
-            <Card className="bg-zinc-950 border-zinc-800">
+            <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle>System Snapshot</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Object.entries(dashboard).map(([key, value]) => (
                   <div key={key} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-xs text-zinc-400">{key}</div>
+                    <div className="text-xs text-slate-600">{key}</div>
                     <div className="text-xl font-semibold">{value}</div>
                   </div>
                 ))}
@@ -494,20 +516,20 @@ const ExtremeAdminPortal: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="logs">
-            <Card className="bg-zinc-950 border-zinc-800">
+            <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle>Action Logs</CardTitle>
-                <CardDescription className="text-zinc-400">Who, what, and when for every root action.</CardDescription>
+                <CardDescription className="text-slate-600">Who, what, and when for every root action.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 max-h-[32rem] overflow-auto">
                 {logs.map((log) => (
-                  <div key={log.id} className="border border-zinc-800 rounded p-3 bg-zinc-900/70 text-xs">
+                  <div key={log.id} className="border border-slate-200 rounded p-3 bg-slate-50 text-xs">
                     <div className="flex justify-between gap-3">
                       <span className="font-medium">{log.action}</span>
-                      <span className="text-zinc-500">{new Date(log.created_at).toLocaleString()}</span>
+                      <span className="text-slate-500">{new Date(log.created_at).toLocaleString()}</span>
                     </div>
-                    <div className="text-zinc-400">actor: {log.actor_name || log.actor_id}</div>
-                    <div className="text-zinc-400">target: {log.target_type} / {log.target_id || 'n/a'}</div>
+                    <div className="text-slate-600">actor: {log.actor_name || log.actor_id}</div>
+                    <div className="text-slate-600">target: {log.target_type} / {log.target_id || 'n/a'}</div>
                   </div>
                 ))}
               </CardContent>
@@ -515,7 +537,7 @@ const ExtremeAdminPortal: React.FC = () => {
           </TabsContent>
         </Tabs>
 
-        <div className="text-xs text-amber-300/90 flex items-center gap-2">
+        <div className="text-xs text-amber-700 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4" />
           This workspace is intentionally restricted to the single Extreme Admin account.
         </div>
