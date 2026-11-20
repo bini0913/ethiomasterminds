@@ -103,7 +103,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     }
   };
   
-  const handleAnswerSubmit = (answer: string, isCorrect: boolean) => {
+  const handleAnswerSubmit = (answer: string, isCorrect?: boolean) => {
     setIsAnswered(true);
     
     // Track time spent on this question
@@ -121,7 +121,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
     // Add to completed questions
     setCompletedQuestionIds(prev => [...prev, currentQuestion.id]);
     
-    if (isCorrect) {
+    if (isCorrect === true) {
       const pointsEarned = calculatePoints(timeLeft);
       setScore(score + pointsEarned);
       setAnsweredCorrectly(prev => prev + 1);
@@ -138,7 +138,7 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       }
 
       toast.success(`Correct! +${pointsEarned} points`);
-    } else {
+    } else if (isCorrect === false) {
       setAnsweredWrong(prev => prev + 1);
       setStreak(0);
       const nextWrongCount = (wrongByTopic[currentQuestion.topic] || 0) + 1;
@@ -229,6 +229,10 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
       });
       if (error) throw error;
       const xpEarned = Number((data as any)?.xp_earned ?? 0);
+      const authoritativeCorrect = Number((data as any)?.correct_answers ?? 0);
+      setAnsweredCorrectly(authoritativeCorrect);
+      setAnsweredWrong(Math.max(0, quiz.questions.length - authoritativeCorrect));
+      setScore(authoritativeCorrect * 10);
       const rewardEligible = (data as any)?.reward_eligible !== false;
       setEarnedXP(rewardEligible ? xpEarned : 0);
       setSubmissionReady(true);
@@ -416,7 +420,6 @@ const QuizView: React.FC<QuizViewProps> = ({ quiz, onComplete, onExit, allowXP =
                           currentQuestion.type === 'Fill in the blank' ? 'fill_blank' : 'multiple_choice'
                         }
                         options={currentQuestion.options}
-                        correctAnswer={currentQuestion.correctAnswer}
                         onAnswer={handleAnswerSubmit}
                         disabled={isAnswered}
                       />

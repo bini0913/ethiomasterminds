@@ -7,7 +7,8 @@ export interface Question {
   id: string;
   text: string;
   options: string[];
-  correctAnswer: string;
+  /** Only populated by authorized authoring workflows, never by student quiz reads. */
+  correctAnswer?: string;
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Extreme';
   subject: string;
   grade: number;
@@ -105,7 +106,7 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const quizIds = quizzesData.map(q => q.id);
       const { data: questionsData, error: questionsError } = await supabase
         .from('questions')
-        .select('*')
+        .select('id,quiz_id,question_text,options,difficulty,points,topic,question_type,explanation,order_index')
         .in('quiz_id', quizIds)
         .order('order_index');
 
@@ -125,7 +126,6 @@ export const QuizProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           id: q.id,
           text: q.question_text,
           options,
-          correctAnswer: q.correct_answer,
           difficulty: (
             q.difficulty
               ? (q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1).toLowerCase())
