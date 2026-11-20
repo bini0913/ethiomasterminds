@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { BookOpen, Brain, Target, CalendarDays, BarChart3, GraduationCap, TrendingUp, ArrowUpRight, Settings2, ClipboardCheck, Sparkles, Loader2 } from "lucide-react";
+import { BookOpen, Brain, Target, CalendarDays, BarChart3, GraduationCap, TrendingUp, ArrowUpRight, Settings2, ClipboardCheck, Sparkles, Loader2, CheckCircle2, Flame, Zap, Trophy } from "lucide-react";
 import { getAcademicProfile, resolveAcademicGrade } from "@/lib/academicProfile";
 
 const features = [
@@ -44,6 +44,7 @@ const AcademicMode: React.FC = () => {
   const [reloadKey, setReloadKey] = useState(0);
   const [topicProgress, setTopicProgress] = useState<Array<{subject:string;topic:string;completion_percentage:number;accuracy_percentage:number;questions_attempted:number;questions_correct:number}>>([]);
   const [learnMode, setLearnMode] = useState<"focus" | "review" | "plan">("focus");
+  const [selectedSubject, setSelectedSubject] = useState("all");
 
   useEffect(() => {
     if (!user?.id) return;
@@ -124,6 +125,16 @@ const AcademicMode: React.FC = () => {
   });
   const focusSubject = [...syllabusRows].filter((row) => row.total > 0).sort((a, b) => a.pct - b.pct)[0];
   const trackedQuestions = safeTopicProgress.reduce((sum, row) => sum + (Number(row.questions_attempted) || 0), 0);
+  const activeSubject = selectedSubject === "all" ? focusSubject?.subject || subjects[0] : selectedSubject;
+  const activeSubjectRow = syllabusRows.find((row) => row.subject === activeSubject);
+  const activeSubjectLabel = activeSubject ? formatSubject(activeSubject) : "your subjects";
+  const nextAction = learnMode === "review"
+    ? { label: "Review flashcards", path: "/academic/flashcards", icon: BookOpen }
+    : learnMode === "plan"
+      ? { label: "Plan a study session", path: "/academic/planner", icon: CalendarDays }
+      : { label: activeSubject ? `Practice ${activeSubjectLabel}` : "Start practice", path: "/academic/exam", icon: Target };
+  const NextActionIcon = nextAction.icon;
+  const progressDegrees = Math.max(0, Math.min(100, todayProgress)) * 3.6;
 
   return (
     <div className={tier === "upper" ? "tier-upper mm-academic-upper min-h-screen bg-background text-foreground" : "tier-middle min-h-screen bg-slate-50/80 text-slate-950"}>
@@ -152,13 +163,32 @@ const AcademicMode: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2"><Badge className={tier === "upper" ? "" : "border-white/20 bg-white/15 text-white hover:bg-white/20"}>Grade {grade}</Badge><Badge variant="outline" className={tier === "upper" ? "" : "border-white/25 bg-transparent text-white"}>{profile?.curriculum === "oromia" ? "Oromia curriculum" : "Addis Ababa curriculum"}</Badge></div>
               <h2 className="mt-4 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">Learn with direction, not guesswork.</h2>
               <p className={tier === "upper" ? "text-muted-foreground mt-3 max-w-xl text-sm leading-6 sm:text-base" : "mt-3 max-w-xl text-sm leading-6 text-sky-50 sm:text-base"}>Your study space is tailored to your grade, subjects and goal. Practice, review your mistakes and build steady progress—one session at a time.</p>
-              <div className="mt-5 flex flex-wrap gap-2">{subjects.length ? subjects.map((item: string) => <Badge key={item} variant="outline" className="bg-background font-medium">{formatSubject(item)}</Badge>) : <span className="text-sm text-muted-foreground">Add your subjects in your study profile.</span>}</div>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button className={tier === "upper" ? "btn-3d-primary bg-primary text-primary-foreground h-11 font-bold" : "h-11 border-0 bg-white text-sky-700 shadow-lg hover:bg-sky-50"} onClick={() => navigate("/academic/exam")}><Target className="mr-2 h-4 w-4" />Start exam practice</Button><Button variant="outline" className={tier === "upper" ? "h-11 border-border bg-card text-foreground hover:bg-muted" : "h-11 border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"} onClick={() => navigate("/academic/planner")}><CalendarDays className="mr-2 h-4 w-4" />Plan study time</Button></div>
+              <div className="mt-5 flex flex-wrap gap-2">{subjects.length ? subjects.map((item: string) => <button key={item} type="button" onClick={() => setSelectedSubject(item)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${activeSubject === item ? (tier === "upper" ? "border-primary bg-primary text-primary-foreground" : "border-white bg-white text-sky-700") : (tier === "upper" ? "border-border bg-background hover:border-primary/50" : "border-white/30 bg-white/10 text-white hover:bg-white/20")}`}>{formatSubject(item)}</button>) : <span className="text-sm text-muted-foreground">Add your subjects in your study profile.</span>}</div>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row"><Button className={tier === "upper" ? "btn-3d-primary bg-primary text-primary-foreground h-11 font-bold" : "h-11 border-0 bg-white text-sky-700 shadow-lg hover:bg-sky-50"} onClick={() => navigate("/academic/exam", activeSubject ? { state: { subject: activeSubject } } : undefined)}><Target className="mr-2 h-4 w-4" />{activeSubject ? `Practice ${activeSubjectLabel}` : "Start exam practice"}</Button><Button variant="outline" className={tier === "upper" ? "h-11 border-border bg-card text-foreground hover:bg-muted" : "h-11 border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"} onClick={() => navigate("/academic/planner")}><CalendarDays className="mr-2 h-4 w-4" />Plan study time</Button></div>
             </div>
             <div className="grid grid-cols-2 gap-3 md:w-56 md:grid-cols-1">
               <div className={tier === "upper" ? "mm-academic-metric border bg-background p-4 text-foreground" : "rounded-2xl border border-white/20 bg-white/10 p-4 text-white backdrop-blur-sm"}><div className="flex items-center gap-2 text-sky-100"><CalendarDays className="h-4 w-4" /><span className="text-xs font-medium">Today's plan</span></div><p className="mt-2 text-2xl font-bold tabular-nums">{todayCompleted}<span className="text-base font-medium text-sky-100">/{todayCount}</span></p>{todayCount > 0 && <Progress value={todayProgress} className="mt-3 h-1.5 bg-white/20" />}{todayCount === 0 && <p className="mt-1 text-xs text-sky-100">No tasks scheduled yet</p>}</div>
               <div className={tier === "upper" ? "mm-academic-metric border bg-background p-4 text-foreground" : "rounded-2xl border border-white/20 bg-white/10 p-4 text-white backdrop-blur-sm"}><div className="flex items-center gap-2 text-sky-100"><ClipboardCheck className="h-4 w-4" /><span className="text-xs font-medium">Last exam score</span></div><p className="mt-2 text-2xl font-bold tabular-nums">{recentScore == null ? "—" : `${Math.round(recentScore)}%`}</p><p className="mt-1 text-xs text-sky-100">{recentScore == null ? "Complete an exam to begin tracking" : `${recentResult?.total_questions || 0} questions in latest attempt`}</p></div>
             </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]" aria-labelledby="next-move-title">
+          <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-card p-5 shadow-sm sm:p-6">
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-primary"><Zap className="h-3.5 w-3.5" />Next best move</span>{activeSubject && <Badge variant="outline">{activeSubjectLabel}</Badge>}</div>
+                <h2 id="next-move-title" className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">{learnMode === "focus" && activeSubjectRow ? `Build momentum in ${activeSubjectLabel}` : learnMode === "review" ? "Make today’s learning stick" : "Turn your goal into a plan"}</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{learnMode === "focus" && activeSubjectRow ? `${activeSubjectRow.pct}% coverage across ${activeSubjectRow.total} tracked topics. A short focused session can move your weakest area forward.` : learnMode === "review" ? "Refresh concepts you have already studied with active recall and spaced practice." : "Choose a realistic session and keep your progress visible instead of guessing what to study next."}</p>
+                <Button className="mt-5" onClick={() => navigate(nextAction.path, activeSubject ? { state: { subject: activeSubject } } : undefined)}><NextActionIcon className="mr-2 h-4 w-4" />{nextAction.label}<ArrowUpRight className="ml-2 h-4 w-4" /></Button>
+              </div>
+              <div className="flex shrink-0 items-center gap-4 rounded-2xl border bg-background/70 p-4 sm:flex-col sm:gap-2 sm:p-3"><div className="relative h-20 w-20 rounded-full" style={{ background: `conic-gradient(hsl(var(--primary)) ${progressDegrees}deg, hsl(var(--muted)) ${progressDegrees}deg)` }}><div className="absolute inset-1.5 flex flex-col items-center justify-center rounded-full bg-card"><span className="text-lg font-bold tabular-nums">{todayProgress}%</span><span className="text-[10px] text-muted-foreground">today</span></div></div><p className="text-sm font-semibold sm:text-center">{todayCount ? `${todayCompleted}/${todayCount} tasks` : "No plan yet"}</p></div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
+            <button type="button" onClick={() => navigate("/academic/topics")} className="rounded-2xl border bg-card p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm"><BarChart3 className="h-5 w-5 text-primary" /><p className="mt-3 text-2xl font-bold tabular-nums">{activeSubjectRow?.pct ?? 0}%</p><p className="text-xs text-muted-foreground">subject coverage</p></button>
+            <button type="button" onClick={() => navigate("/academic/exam", activeSubject ? { state: { subject: activeSubject } } : undefined)} className="rounded-2xl border bg-card p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm"><Flame className="h-5 w-5 text-orange-500" /><p className="mt-3 text-2xl font-bold tabular-nums">{trackedQuestions}</p><p className="text-xs text-muted-foreground">questions practiced</p></button>
           </div>
         </section>
 
@@ -179,9 +209,10 @@ const AcademicMode: React.FC = () => {
 
         <section>
           <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your learning studio</p><h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">Choose how you want to learn</h2><p className="mt-1 text-sm text-muted-foreground">Switch modes depending on what you need right now.</p></div><Badge variant="outline" className="w-fit">{subjects.length} subjects</Badge></div>
-          <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-border bg-muted/30 p-1">
-            {([['focus', 'Focus', 'Build skill'], ['review', 'Review', 'Remember'], ['plan', 'Plan', 'Stay on track']] as const).map(([value, label, description]) => <button key={value} type="button" onClick={() => setLearnMode(value)} className={`rounded-xl px-3 py-3 text-left transition ${learnMode === value ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><span className="block text-sm font-bold">{label}</span><span className="mt-0.5 block text-[11px]">{description}</span></button>)}
+          <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-border bg-muted/30 p-1" role="tablist" aria-label="Learning mode">
+            {([['focus', 'Focus', 'Build skill', Target], ['review', 'Review', 'Remember', CheckCircle2], ['plan', 'Plan', 'Stay on track', CalendarDays]] as const).map(([value, label, description, Icon]) => <button key={value} type="button" role="tab" aria-selected={learnMode === value} onClick={() => setLearnMode(value)} className={`rounded-xl px-3 py-3 text-left transition ${learnMode === value ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><span className="flex items-center gap-2 text-sm font-bold"><Icon className="h-4 w-4" />{label}</span><span className="mt-0.5 block text-[11px]">{description}</span></button>)}
           </div>
+          <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-1" aria-label="Filter by subject"><span className="shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Show:</span><button type="button" onClick={() => setSelectedSubject("all")} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${selectedSubject === "all" ? "border-primary bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:border-primary/40"}`}>All subjects</button>{subjects.map((subject) => <button key={subject} type="button" onClick={() => setSelectedSubject(subject)} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${selectedSubject === subject ? "border-primary bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:border-primary/40"}`}>{formatSubject(subject)}</button>)}</div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {features.filter((feature) => learnMode === "focus" ? ["/academic/exam", "/academic/topics", "/academic/entrance-papers"].includes(feature.path) : learnMode === "review" ? ["/academic/flashcards", "/library", "/academic/insights"].includes(feature.path) : ["/academic/planner", "/learning-dna"].includes(feature.path)).map((feature) => { const Icon = feature.icon; return <button key={feature.path} type="button" onClick={() => navigate(feature.path)} className={`mm-academic-feature ${tier === "upper" ? "btn-3d-card" : "border-slate-200/80 bg-white hover:border-sky-300 hover:shadow-sky-100/80"} group rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}>
               <div className="flex items-start justify-between gap-3"><div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Icon className="h-5 w-5" /></div><ArrowUpRight className="h-4 w-4 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" /></div>
@@ -190,10 +221,11 @@ const AcademicMode: React.FC = () => {
           </div>
         </section>
 
-        <section className="grid gap-3 md:grid-cols-3">
+        <section className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <Card className="rounded-2xl"><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-primary/10 p-3 text-primary"><GraduationCap className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Study level</p><p className="font-semibold">Grade {grade}</p></div></CardContent></Card>
           <Card className="rounded-2xl"><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-primary/10 p-3 text-primary"><BookOpen className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Study subjects</p><p className="font-semibold">{subjects.length} selected</p></div></CardContent></Card>
           <Card className="rounded-2xl"><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-primary/10 p-3 text-primary"><Sparkles className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Weekly tasks completed</p><p className="font-semibold">{weekDone} completed</p></div></CardContent></Card>
+          <Card className="rounded-2xl"><CardContent className="flex items-center gap-4 p-5"><div className="rounded-xl bg-primary/10 p-3 text-primary"><Trophy className="h-5 w-5" /></div><div><p className="text-sm text-muted-foreground">Latest result</p><p className="font-semibold">{recentScore == null ? "Keep practicing" : `${Math.round(recentScore)}% score`}</p></div></CardContent></Card>
         </section>
         {loadError && <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-muted-foreground">Some dashboard totals couldn't load. Your study tools are still available; try loading the totals again.</p><Button variant="outline" size="sm" className="min-h-10 shrink-0" onClick={() => setReloadKey((key) => key + 1)}>Retry dashboard data</Button></div>}
         <div className="flex items-start gap-3 rounded-2xl border bg-card p-4 text-sm"><Brain className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><p className="leading-6 text-muted-foreground"><span className="font-semibold text-foreground">Personalized, connected practice.</span> Exam results feed your progress, topics show your mastery, and your planner helps you focus on the next useful task. AI Tutor is unchanged.</p></div>
