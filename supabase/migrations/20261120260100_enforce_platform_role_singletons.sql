@@ -145,6 +145,13 @@ BEGIN
       RAISE EXCEPTION 'Target account does not exist';
     END IF;
 
+    IF NOT EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = p_user_id AND coalesce(account_status, 'active') = 'active'
+    ) THEN
+      RAISE EXCEPTION 'The Super Admin account must have an active profile';
+    END IF;
+
     IF public.has_role(p_user_id, 'extreme_admin'::public.app_role) THEN
       RAISE EXCEPTION 'The Extreme Admin account cannot become Super Admin';
     END IF;
