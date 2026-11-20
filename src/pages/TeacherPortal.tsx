@@ -67,6 +67,12 @@ interface DirectoryStudent extends Student {
   classIds: string[];
 }
 
+interface ClassStudentRpcRow {
+  student_id: string;
+  name: string;
+  username: string;
+}
+
 interface QuizResult {
   id: string;
   student_id: string;
@@ -156,6 +162,15 @@ const TeacherPortal: React.FC = () => {
   const [studentSearchResults, setStudentSearchResults] = useState<Student[]>([]);
   const [searchingStudents, setSearchingStudents] = useState(false);
 
+  const normalizeClassStudent = (student: ClassStudentRpcRow): Student => ({
+    id: student.student_id,
+    name: student.name,
+    username: student.username,
+    xp: 0,
+    level: 0,
+    avatar: '',
+  });
+
   useEffect(() => {
     if (!user) return;
     void Promise.all([
@@ -243,7 +258,11 @@ const TeacherPortal: React.FC = () => {
         console.error(`Failed to load students for ${cls.name}:`, error);
         return [] as Array<{ student: Student; className: string; classId: string }>;
       }
-      return (data || []).map((student: Student) => ({ student, className: cls.name, classId: cls.id }));
+      return (data || []).map((student: ClassStudentRpcRow) => ({
+        student: normalizeClassStudent(student),
+        className: cls.name,
+        classId: cls.id,
+      }));
     }));
 
     const directory = new Map<string, DirectoryStudent>();
@@ -350,7 +369,7 @@ const TeacherPortal: React.FC = () => {
         return;
       }
 
-      setClassStudents(data || []);
+      setClassStudents((data || []).map((student: ClassStudentRpcRow) => normalizeClassStudent(student)));
     } catch (err) {
       console.error('Error fetching class students:', err);
       setClassStudents([]);

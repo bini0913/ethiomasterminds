@@ -2791,13 +2791,9 @@ export type Database = {
       get_class_students: {
         Args: { _class_id: string }
         Returns: {
-          avatar: string
-          id: string
-          joined_at: string
-          level: number
+          student_id: string
           name: string
           username: string
-          xp: number
         }[]
       }
       get_dashboard_data: { Args: { p_user_id: string }; Returns: Json }
