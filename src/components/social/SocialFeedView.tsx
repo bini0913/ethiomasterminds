@@ -145,7 +145,7 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
       const savedSet = new Set((savedRes.data || []).map((s: any) => s.post_id));
       const followingSet = new Set(followingIds);
 
-      let mapped: Post[] = (postsData || []).map((post: any) => {
+      let mapped: Post[] = await Promise.all((postsData || []).map(async (post: any) => {
         const profile = profileMap[post.author_id];
         const likes = likesMap[post.id];
         const reactions = reactionsMap[post.id];
@@ -154,8 +154,8 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
           if (post.image_url.startsWith('http')) {
             imageUrl = post.image_url;
           } else {
-            const { data: pubData } = supabase.storage.from('social-images').getPublicUrl(post.image_url);
-            imageUrl = pubData?.publicUrl || null;
+            const { data: signedData } = await supabase.storage.from('social-images').createSignedUrl(post.image_url, 3600);
+            imageUrl = signedData?.signedUrl || null;
           }
         }
 
@@ -179,7 +179,7 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
           reactions: Object.entries(reactions?.counts || {}).map(([type, count]) => ({ type, count })),
           userReaction: reactions?.userReaction || null,
         };
-      });
+      }));
 
       // Apply mode filters/sorting
       if (mode === 'trending') {
