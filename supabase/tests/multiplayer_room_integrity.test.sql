@@ -5,6 +5,19 @@ create extension if not exists pgtap with schema extensions;
 select plan(34);
 
 -- Isolated fixtures; the test transaction rolls back all inserted rows.
+-- Room and player foreign keys point at auth.users. Create deterministic users
+-- through the same signup trigger used by the application instead of relying
+-- on an empty clean-replay auth schema.
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values
+  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'multiplayer-fixture-1@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 1"}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'multiplayer-fixture-2@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 2"}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'multiplayer-fixture-3@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 3"}'::jsonb, now(), now())
+on conflict (id) do nothing;
+
 insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)
 values
   ('a1000000-0000-4000-8000-000000000001', 'RLS public room', 'a2000000-0000-4000-8000-000000000001', 4, 'waiting', false),

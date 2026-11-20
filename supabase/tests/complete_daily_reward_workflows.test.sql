@@ -56,7 +56,7 @@ SELECT ok(
 );
 
 SELECT ok(
-  has_column('public', 'user_streaks', 'last_daily_reward_date'),
+  has_column('public', 'user_streaks', 'last_daily_reward_date')::boolean,
   'daily reward claims use a separate date from normal learning activity'
 );
 SELECT like(
