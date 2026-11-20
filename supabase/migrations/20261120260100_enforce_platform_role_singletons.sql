@@ -10,6 +10,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_roles_single_super_admin_idx
   ON public.user_roles (role)
   WHERE role = 'super_admin'::public.app_role;
 
+-- The two top-level authorities must be different accounts.
+CREATE UNIQUE INDEX IF NOT EXISTS user_roles_one_platform_role_per_account_idx
+  ON public.user_roles (user_id)
+  WHERE role IN (
+    'extreme_admin'::public.app_role,
+    'super_admin'::public.app_role
+  );
+
 CREATE OR REPLACE FUNCTION public._is_super_admin()
 RETURNS boolean
 LANGUAGE sql
