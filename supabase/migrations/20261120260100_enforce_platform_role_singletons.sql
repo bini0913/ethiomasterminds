@@ -318,3 +318,145 @@ $function$;
 -- if the owner role was absent. Disable client execution; recovery is a
 -- controlled operator procedure, not an in-app self-promotion route.
 REVOKE ALL ON FUNCTION public.extreme_admin_bootstrap_self() FROM PUBLIC, anon, authenticated;
+
+
+-- Report the distinct global and school-network populations accurately. The
+-- old dashboard mislabeled the Extreme Admin count as "super_admins".
+CREATE OR REPLACE FUNCTION public.extreme_admin_get_dashboard()
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+
+  RETURN jsonb_build_object(
+    'total_users', (SELECT count(*) FROM public.profiles),
+    'students', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles WHERE role = 'student'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'student' AND status = 'active'
+      ) AS student_accounts
+    ),
+    'teachers', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles WHERE role = 'teacher'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'teacher' AND status = 'active'
+      ) AS teacher_accounts
+    ),
+    'managers', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles WHERE role = 'manager'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'manager' AND status = 'active'
+      ) AS manager_accounts
+    ),
+    'admins', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles WHERE role = 'admin'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'admin' AND status = 'active'
+      ) AS admin_accounts
+    ),
+    'finance', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles WHERE role = 'finance'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'finance' AND status = 'active'
+      ) AS finance_accounts
+    ),
+    'parents', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles WHERE role = 'parent'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'parent' AND status = 'active'
+      ) AS parent_accounts
+    ),
+    'super_admins', (SELECT count(*) FROM public.user_roles WHERE role = 'super_admin'::public.app_role),
+    'extreme_admins', (SELECT count(*) FROM public.user_roles WHERE role = 'extreme_admin'::public.app_role),
+    'schools', (SELECT count(*) FROM public.schools),
+    'active_schools', (SELECT count(*) FROM public.schools WHERE status = 'active'),
+    'suspended_schools', (SELECT count(*) FROM public.schools WHERE status = 'suspended'),
+    'active_school_memberships', (SELECT count(*) FROM public.school_memberships WHERE status = 'active'),
+    'individual_users', (
+      SELECT count(*) FROM public.profiles p
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.school_memberships sm
+        WHERE sm.user_id = p.id AND sm.status = 'active'
+      )
+    ),
+    'messages', (SELECT count(*) FROM public.messages),
+    'group_messages', (SELECT count(*) FROM public.group_messages),
+    'room_messages', (SELECT count(*) FROM public.room_chat_messages),
+    'lobby_messages', (SELECT count(*) FROM public.lobby_messages),
+    'ai_conversations', (SELECT count(*) FROM public.ai_tutor_conversations),
+    'reports', (SELECT count(*) FROM public.reports),
+    'pending_reports', (SELECT count(*) FROM public.reports WHERE status = 'pending'),
+    'posts', (SELECT count(*) FROM public.social_posts),
+    'books', (SELECT count(*) FROM public.library_books),
+    'active_users_10m', (
+      SELECT count(*) FROM public.user_presence
+      WHERE last_seen > now() - interval '10 minutes'
+    )
+  );
+END;
+$function$;
+
+-- Use the authoritative role resolver so school memberships and platform
+-- roles are not lost through an unordered first-role lookup.
+CREATE OR REPLACE FUNCTION public.extreme_admin_list_users(
+  p_search text DEFAULT NULL,
+  p_role public.app_role DEFAULT NULL,
+  p_limit integer DEFAULT 300,
+  p_offset integer DEFAULT 0
+)
+RETURNS TABLE(
+  id uuid,
+  name text,
+  username text,
+  grade text,
+  xp integer,
+  level integer,
+  role public.app_role,
+  account_status text,
+  coins integer,
+  created_at timestamptz
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT
+    p.id,
+    p.name,
+    p.username,
+    p.grade,
+    p.xp,
+    p.level,
+    COALESCE(public.get_user_role(p.id), 'student'::public.app_role),
+    p.account_status,
+    COALESCE(uc.coins, 0),
+    p.created_at
+  FROM public.profiles p
+  LEFT JOIN public.user_currency uc ON uc.user_id = p.id
+  WHERE public._is_extreme_admin()
+    AND (
+      p_search IS NULL
+      OR p.name ILIKE '%' || p_search || '%'
+      OR p.username ILIKE '%' || p_search || '%'
+    )
+    AND (
+      p_role IS NULL
+      OR COALESCE(public.get_user_role(p.id), 'student'::public.app_role) = p_role
+    )
+  ORDER BY p.created_at DESC
+  LIMIT GREATEST(1, LEAST(p_limit, 500))
+  OFFSET GREATEST(0, p_offset);
+$function$;
