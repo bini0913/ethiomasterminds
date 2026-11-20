@@ -642,3 +642,47 @@ BEGIN
   EXECUTE replace(v_definition, v_old, v_new);
 END;
 $$;
+
+
+CREATE OR REPLACE FUNCTION public.super_admin_set_school_status(
+  p_school_id uuid,
+  p_status text,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO pg_catalog, public
+AS $function$
+BEGIN
+  IF NOT public._is_super_admin() THEN
+    RAISE EXCEPTION 'Super Admin access required';
+  END IF;
+
+  IF p_school_id IS NULL OR p_status NOT IN ('active', 'suspended', 'closed') THEN
+    RAISE EXCEPTION 'A valid school and status are required';
+  END IF;
+
+  UPDATE public.schools
+  SET status = p_status, updated_at = now()
+  WHERE id = p_school_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'School not found';
+  END IF;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(),
+    'super_admin_set_school_status',
+    'school',
+    p_school_id,
+    jsonb_build_object('status', p_status, 'reason', nullif(trim(coalesce(p_reason, '')), ''))
+  );
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.super_admin_set_school_status(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.super_admin_set_school_status(uuid, text, text) TO authenticated;
