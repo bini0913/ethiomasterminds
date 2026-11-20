@@ -145,11 +145,9 @@ const ExamModePage: React.FC = () => {
           setSourceQuizId("");
           return;
         }
-        const { data: questionRows, error: questionError } = await supabase
-          .from("questions")
-          .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,explanation,order_index,topic")
-          .in("quiz_id", matching.map((quiz: any) => quiz.id))
-          .order("order_index", { ascending: true });
+        const { data: questionRows, error: questionError } = await (supabase as any).rpc("get_student_question_bank", {
+          p_quiz_ids: matching.map((quiz: any) => quiz.id),
+        });
         if (questionError) throw questionError;
         const countByQuiz = new Map<string, number>();
         (questionRows || []).forEach((row: any) => {
@@ -396,11 +394,9 @@ const ExamModePage: React.FC = () => {
     }
     setIsStarting(true);
     try {
-      const { data, error } = await supabase
-        .from("questions")
-        .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,explanation,order_index,topic")
-        .in("quiz_id", subjectQuizzes.map((quiz) => quiz.id))
-        .order("order_index", { ascending: true });
+      const { data, error } = await (supabase as any).rpc("get_student_question_bank", {
+        p_quiz_ids: subjectQuizzes.map((quiz) => quiz.id),
+      });
       if (error) throw error;
       const quizById = new Map(subjectQuizzes.map((quiz) => [quiz.id, quiz]));
       const parsed = (data || []).map((row: any) => {
