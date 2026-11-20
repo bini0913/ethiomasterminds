@@ -15,7 +15,6 @@ const DailyChallenge: React.FC = () => {
   const { user, refreshProfile } = useUser();
   const [question, setQuestion] = useState<DailyQuestion | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [alreadyCompleted, setAlreadyCompleted] = useState(false);
   const [wasCorrect, setWasCorrect] = useState(false);
@@ -102,7 +101,6 @@ const DailyChallenge: React.FC = () => {
 
     setAlreadyCompleted(false);
     setWasCorrect(data?.correct === true);
-    setCorrectAnswer(typeof data?.correct_answer === "string" ? data.correct_answer : null);
     setXpAwarded(Number(data?.xp_awarded ?? 0));
 
     if (data?.success && data?.correct) {
@@ -166,10 +164,8 @@ const DailyChallenge: React.FC = () => {
                   className={`w-full rounded-lg border-2 p-3 text-left transition-all disabled:cursor-default ${
                     isSubmitting && selectedOption === option
                       ? "border-blue-300 bg-blue-50 animate-pulse"
-                      : isAnswered && option === correctAnswer
-                      ? "border-green-500 bg-green-50"
                       : isAnswered && option === selectedOption
-                      ? "border-red-500 bg-red-50"
+                      ? "border-blue-500 bg-blue-50"
                       : selectedOption === option
                       ? "border-blue-500 bg-blue-50"
                       : "border-gray-200 hover:border-blue-300"
@@ -186,7 +182,7 @@ const DailyChallenge: React.FC = () => {
         <CardFooter className="border-t pt-3">
           <div className="w-full text-sm text-muted-foreground">
             {isAnswered
-              ? (wasCorrect ? `Correct! +${xpAwarded} XP earned.` : `The correct answer was: ${correctAnswer ?? "not available"}`)
+              ? (wasCorrect ? `Correct! +${xpAwarded} XP earned.` : "Answer submitted. Review the explanation and come back tomorrow.")
               : "Submit your answer to complete today's challenge."}
           </div>
         </CardFooter>
