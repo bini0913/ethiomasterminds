@@ -550,3 +550,78 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.extreme_admin_set_school_status(uuid, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.extreme_admin_set_school_status(uuid, text, text) TO authenticated;
+
+
+-- Give the single Super Admin network-wide visibility without treating it as
+-- the platform owner or silently granting every school Manager capability.
+DO $$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  v_definition := pg_get_functiondef('public.school_can_view_school(uuid)'::regprocedure);
+  v_old := 'SELECT public._is_extreme_admin() OR public.is_active_school_member(p_school_id, NULL);';
+  v_new := 'SELECT public._is_extreme_admin() OR public._is_super_admin() OR public.is_active_school_member(p_school_id, NULL);';
+  IF position(v_old IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not safely update school_can_view_school';
+  END IF;
+  EXECUTE replace(v_definition, v_old, v_new);
+
+  v_definition := pg_get_functiondef('public.school_can_view_membership(uuid)'::regprocedure);
+  v_old := 'OR public._is_extreme_admin()';
+  v_new := 'OR public._is_extreme_admin() OR public._is_super_admin()';
+  IF position(v_old IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not safely update school_can_view_membership';
+  END IF;
+  EXECUTE replace(v_definition, v_old, v_new);
+
+  v_definition := pg_get_functiondef('public.school_can_view_invoice(uuid)'::regprocedure);
+  v_old := 'public._is_extreme_admin()';
+  v_new := 'public._is_extreme_admin() OR public._is_super_admin()';
+  IF position(v_old IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not safely update school_can_view_invoice';
+  END IF;
+  EXECUTE replace(v_definition, v_old, v_new);
+
+  -- The trusted account-provisioning RPC must recognize the distinct
+  -- Super Admin only for its explicit platform-level Manager workflow.
+  v_definition := pg_get_functiondef(
+    'public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure
+  );
+  v_old := 'WHERE user_id = p_actor_id AND role = ''extreme_admin''::public.app_role';
+  v_new := 'WHERE user_id = p_actor_id AND role IN (''extreme_admin''::public.app_role, ''super_admin''::public.app_role)';
+  IF position(v_old IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not safely update school_attach_account';
+  END IF;
+  EXECUTE replace(v_definition, v_old, v_new);
+
+  v_definition := pg_get_functiondef(
+    'public.school_link_parent_students(uuid,uuid,uuid[])'::regprocedure
+  );
+  v_old := 'WHERE user_id = p_actor_id AND role = ''extreme_admin''::public.app_role';
+  v_new := 'WHERE user_id = p_actor_id AND role IN (''extreme_admin''::public.app_role, ''super_admin''::public.app_role)';
+  IF position(v_old IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not safely update school_link_parent_students';
+  END IF;
+  EXECUTE replace(v_definition, v_old, v_new);
+END;
+$$;
+
+DROP POLICY IF EXISTS schools_super_admin_insert ON public.schools;
+CREATE POLICY schools_super_admin_insert
+ON public.schools
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  (public._is_extreme_admin() OR public._is_super_admin())
+  AND created_by = auth.uid()
+);
+
+DROP POLICY IF EXISTS schools_super_admin_update ON public.schools;
+CREATE POLICY schools_super_admin_update
+ON public.schools
+FOR UPDATE
+TO authenticated
+USING (public._is_extreme_admin() OR public._is_super_admin())
+WITH CHECK (public._is_extreme_admin() OR public._is_super_admin());
