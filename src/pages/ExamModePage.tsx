@@ -25,7 +25,7 @@ const isSafeHttpUrl = (value: string | null | undefined) => {
 type ExamState = "setup" | "running" | "results";
 type SourceQuiz = { id: string; title: string; description?: string; subject: string; grade: number; difficulty?: string; time_limit?: number | null; exam_type?: string; source_kind?: "past_paper" | "topic_practice" | "generated_practice" | "teacher_authored"; source_name?: string | null; source_year?: number | null; source_url?: string | null; source_verification_status?: "unverified" | "needs_review" | "verified" | "permission_confirmed"; questionCount: number };
 type EntrancePaperReference = { id: string; subject: string; ethiopian_year: number; gregorian_year: number; source_name: string; source_url: string; source_status: string; notes?: string };
-type ExamQuestion = { id: string; quiz_id?: string; subject?: string; sourceKind: "past_paper" | "topic_practice" | "generated_practice" | "teacher_authored"; sourceTitle: string; sourceVerificationStatus?: SourceQuiz["source_verification_status"]; sourceName?: string | null; sourceYear?: number | null; question_text: string; options: string[]; correct_answer: string; correct_answer_raw?: string; explanation?: string; topic?: string };
+type ExamQuestion = { id: string; quiz_id?: string; subject?: string; sourceKind: "past_paper" | "topic_practice" | "generated_practice" | "teacher_authored"; sourceTitle: string; sourceVerificationStatus?: SourceQuiz["source_verification_status"]; sourceName?: string | null; sourceYear?: number | null; question_text: string; options: string[]; correct_answer?: string; explanation?: string; topic?: string };
 function goalRelevance(quiz: SourceQuiz, goal: string): number {
   const text = `${quiz.title} ${quiz.description || ""} ${quiz.difficulty || ""} ${(quiz.exam_type || "general").replace(/[_-]+/g, " ")}`.toLowerCase();
   const target = goal.toLowerCase().replace(/[_-]+/g, " ");
@@ -147,14 +147,14 @@ const ExamModePage: React.FC = () => {
         }
         const { data: questionRows, error: questionError } = await supabase
           .from("questions")
-          .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index,topic")
+          .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,explanation,order_index,topic")
           .in("quiz_id", matching.map((quiz: any) => quiz.id))
           .order("order_index", { ascending: true });
         if (questionError) throw questionError;
         const countByQuiz = new Map<string, number>();
         (questionRows || []).forEach((row: any) => {
           const options = parseOptions(row);
-          if (row.question_text && options.length >= 2 && row.correct_answer != null) {
+          if (row.question_text && options.length >= 2) {
             countByQuiz.set(row.quiz_id, (countByQuiz.get(row.quiz_id) || 0) + 1);
           }
         });
@@ -239,11 +239,10 @@ const ExamModePage: React.FC = () => {
     const details = questions.map((q, index) => ({
       q,
       answer: answers[index] || "",
-      correct: answerText(answers[index], q.options) === answerText(q.correct_answer, q.options),
+      correct: false,
     }));
-    const correct = details.filter((item) => item.correct).length;
     const elapsedSeconds = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
-    setResults({ correct, total: questions.length, elapsedSeconds, details, xpAwarded: null, persistenceStatus: "pending" });
+    setResults({ correct: 0, total: questions.length, elapsedSeconds, details, xpAwarded: null, persistenceStatus: "pending" });
     setExamState("results");
     if (user?.id && selectedQuiz?.id) {
       // Each source quiz is submitted separately, with the exact question subset
@@ -265,20 +264,11 @@ const ExamModePage: React.FC = () => {
         const submissionId = crypto.randomUUID();
         const secureAnswers: Record<string, string> = {};
         for (const item of quizDetails) {
-          const selectedIndex = item.q.options.indexOf(item.answer);
-          if (selectedIndex < 0) continue;
-          const rawKey = String(item.q.correct_answer_raw || "").trim();
-          const expectsLetter = /^(?:OPTION\s*)?[A-D](?:[.)])?$/i.test(rawKey);
-          const expectsIndex = /^\d+$/.test(rawKey);
-          secureAnswers[item.q.id] = expectsLetter
-            ? String.fromCharCode(65 + selectedIndex)
-            : expectsIndex
-              ? String(selectedIndex)
-              : item.answer;
+          if (item.answer) secureAnswers[item.q.id] = item.answer;
         }
 
         try {
-          const { error: submitError } = await (supabase as any).rpc("submit_exam_result_secure", {
+          const { data: submitData, error: submitError } = await (supabase as any).rpc("submit_exam_result_secure", {
             p_quiz_id: quizId,
             p_question_ids: quizDetails.map(({ q }) => q.id),
             p_answers: secureAnswers,
@@ -289,6 +279,25 @@ const ExamModePage: React.FC = () => {
           });
           if (submitError) throw submitError;
           savedGroups += 1;
+
+          const { data: reviewData, error: reviewError } = await (supabase as any).rpc("get_exam_submission_review", {
+            p_submission_id: submissionId,
+          });
+          if (reviewError) throw reviewError;
+          const reviewById = new Map<string, { answer: string; correct_answer: string; explanation?: string }>((reviewData?.review || []).map((entry: any) => [String(entry.question_id), entry]));
+          setResults((current) => {
+            if (!current) return current;
+            const nextDetails = current.details.map((detail) => {
+              const review = reviewById.get(detail.q.id);
+              return review ? {
+                ...detail,
+                correct: answerText(review.answer, detail.q.options) === answerText(review.correct_answer, detail.q.options),
+                q: { ...detail.q, explanation: review.explanation || detail.q.explanation, correct_answer: review.correct_answer },
+              } : detail;
+            });
+            const correct = Number(reviewData?.correct_answers ?? submitData?.correct_answers ?? nextDetails.filter((item) => item.correct).length);
+            return { ...current, details: nextDetails, correct };
+          });
 
           try {
             const { data: rewardData, error: rewardError } = await (supabase as any).rpc("claim_quiz_reward", {
@@ -389,7 +398,7 @@ const ExamModePage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from("questions")
-        .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,correct_answer,explanation,order_index,topic")
+        .select("id,quiz_id,question_text,options,option_a,option_b,option_c,option_d,explanation,order_index,topic")
         .in("quiz_id", subjectQuizzes.map((quiz) => quiz.id))
         .order("order_index", { ascending: true });
       if (error) throw error;
@@ -409,12 +418,10 @@ const ExamModePage: React.FC = () => {
           sourceYear: quiz?.source_year,
           question_text: String(row.question_text || ""),
           options,
-          correct_answer: answerText(row.correct_answer, options),
-          correct_answer_raw: String(row.correct_answer ?? ""),
           explanation: row.explanation || undefined,
           topic: row.topic || undefined,
         };
-      }).filter((question: ExamQuestion) => question.question_text && question.options.length >= 2 && question.options.includes(question.correct_answer));
+      }).filter((question: ExamQuestion) => question.question_text && question.options.length >= 2);
       if (!parsed.length) {
         toast.error("This approved quiz doesn't have usable questions yet.");
         return;
