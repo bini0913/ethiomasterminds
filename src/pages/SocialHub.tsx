@@ -19,7 +19,8 @@ const SocialHub: React.FC = () => {
   const unread = messages.filter((message) => message.receiver === user?.id && !message.read).length;
   const incomingRequests = friendRequests.filter((request) => request.receiver.id === user?.id && request.status === "pending").length;
   const destinations = [
-    { title: "Friends", description: "Connect with classmates, chat privately, send requests, and see who is online.", icon: Users, path: "/friends", stat: friends.length + " friend" + (friends.length === 1 ? "" : "s"), secondary: onlineFriends.length + " online now", accent: "from-primary/15 to-primary/5" },
+    { title: "Friends", description: "Connect with classmates, manage requests, and see who is ready to study.", icon: Users, path: "/friends", stat: friends.length + " friend" + (friends.length === 1 ? "" : "s"), secondary: onlineFriends.length + " online now", accent: "from-primary/15 to-primary/5" },
+    { title: "Messages", description: "Continue a private or group conversation, share a quiz, or invite someone to a room.", icon: MessageCircle, path: "/chat", stat: unread ? unread + " unread" : "All caught up", secondary: "Private • Groups • Rooms", accent: "from-violet-500/15 to-primary/5" },
     { title: "Community", description: "Explore student posts, study ideas, challenges, trends, and learning conversations.", icon: Compass, path: "/social/community", stat: "Explore the community", secondary: "Posts • Study • Challenges", accent: "from-cyan-500/15 to-primary/5" },
   ];
   return (
@@ -31,14 +32,14 @@ const SocialHub: React.FC = () => {
           <div className="min-w-0"><h1 className="text-lg font-bold">Social</h1><p className="text-xs text-muted-foreground">Connect, learn and grow together</p></div>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        <section className="overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-cyan-500/10 p-5 shadow-sm sm:p-7">
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:py-8">
+        <section className="overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/15 via-background to-cyan-500/10 p-5 shadow-sm sm:p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="max-w-xl"><Badge variant="secondary" className="mb-3">Your Social Space</Badge><h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Learn with people who are on the same journey.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Choose where you want to go. Keep private conversations and friendships in Friends, and discover the wider Master Minds community in Community.</p></div>
-            {user && <div className="hidden shrink-0 sm:block"><AvatarRenderer avatar={user.avatar} size="lg" /></div>}
+            <div className="max-w-2xl"><Badge variant="secondary" className="mb-3">Your learning network</Badge><h2 className="text-2xl font-bold tracking-tight sm:text-4xl">Study better together.</h2><p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">Find your people, ask for help, share progress, and turn practice into a shared habit.</p><div className="mt-5 flex flex-wrap gap-2"><Badge variant="outline">{friends.length} friends</Badge><Badge variant="outline">{onlineFriends.length} online now</Badge><Badge variant="outline">{unread ? `${unread} unread` : "No unread messages"}</Badge></div></div>
+            {user && <div className="hidden shrink-0 rounded-3xl border border-primary/20 bg-background/60 p-4 sm:block"><AvatarRenderer avatar={user.avatar} size="lg" /><p className="mt-2 text-center text-xs font-semibold">Ready to connect</p></div>}
           </div>
         </section>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           {destinations.map((item, index) => {
             const Icon = item.icon; const isFriends = item.path === "/friends";
             return <motion.div key={item.title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }}>
@@ -52,11 +53,11 @@ const SocialHub: React.FC = () => {
             </motion.div>;
           })}
         </div>
-        <section className="grid grid-cols-3 gap-2 sm:gap-3">
+        <section className="rounded-3xl border bg-card p-4 sm:p-5"><div className="mb-4"><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Quick actions</p><h2 className="mt-1 text-xl font-bold">Make your next move</h2></div><div className="grid grid-cols-3 gap-2 sm:gap-3">
           <button onClick={() => navigate("/friends")} className="rounded-2xl border bg-card p-4 text-left transition hover:border-primary/30 hover:bg-muted/40"><UserPlus className="h-5 w-5 text-primary" /><p className="mt-2 text-sm font-semibold">Find people</p><p className="text-xs text-muted-foreground">Add friends</p></button>
           <button onClick={() => navigate("/friends?tab=messages")} className="rounded-2xl border bg-card p-4 text-left transition hover:border-primary/30 hover:bg-muted/40"><MessageCircle className="h-5 w-5 text-primary" /><p className="mt-2 text-sm font-semibold">Messages</p><p className="text-xs text-muted-foreground">{unread ? unread + " unread" : "All caught up"}</p></button>
           <button onClick={() => navigate("/social/community")} className="rounded-2xl border bg-card p-4 text-left transition hover:border-primary/30 hover:bg-muted/40"><Circle className="h-5 w-5 text-primary" /><p className="mt-2 text-sm font-semibold">Discover</p><p className="text-xs text-muted-foreground">See what is new</p></button>
-        </section>
+        </div></section>
       </main>
     </div>
   );

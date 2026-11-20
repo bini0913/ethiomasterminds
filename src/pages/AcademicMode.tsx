@@ -43,6 +43,7 @@ const AcademicMode: React.FC = () => {
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [topicProgress, setTopicProgress] = useState<Array<{subject:string;topic:string;completion_percentage:number;accuracy_percentage:number;questions_attempted:number;questions_correct:number}>>([]);
+  const [learnMode, setLearnMode] = useState<"focus" | "review" | "plan">("focus");
 
   useEffect(() => {
     if (!user?.id) return;
@@ -177,9 +178,12 @@ const AcademicMode: React.FC = () => {
         </section>}
 
         <section>
-          <div className="mb-4 flex items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your learning tools</p><h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">Choose your next step</h2><p className="mt-1 text-sm text-muted-foreground">Everything works with your saved study profile.</p></div><Badge variant="outline" className="hidden sm:flex">{subjects.length} subjects</Badge></div>
+          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your learning studio</p><h2 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">Choose how you want to learn</h2><p className="mt-1 text-sm text-muted-foreground">Switch modes depending on what you need right now.</p></div><Badge variant="outline" className="w-fit">{subjects.length} subjects</Badge></div>
+          <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-border bg-muted/30 p-1">
+            {([['focus', 'Focus', 'Build skill'], ['review', 'Review', 'Remember'], ['plan', 'Plan', 'Stay on track']] as const).map(([value, label, description]) => <button key={value} type="button" onClick={() => setLearnMode(value)} className={`rounded-xl px-3 py-3 text-left transition ${learnMode === value ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><span className="block text-sm font-bold">{label}</span><span className="mt-0.5 block text-[11px]">{description}</span></button>)}
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => { const Icon = feature.icon; return <button key={feature.path} type="button" onClick={() => navigate(feature.path)} className={`mm-academic-feature ${tier === "upper" ? "btn-3d-card" : "border-slate-200/80 bg-white hover:border-sky-300 hover:shadow-sky-100/80"} group rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${feature.featured ? "border-primary/30 bg-primary/[0.035] sm:col-span-2 lg:col-span-1" : ""}`}>
+            {features.filter((feature) => learnMode === "focus" ? ["/academic/exam", "/academic/topics", "/academic/entrance-papers"].includes(feature.path) : learnMode === "review" ? ["/academic/flashcards", "/library", "/academic/insights"].includes(feature.path) : ["/academic/planner", "/learning-dna"].includes(feature.path)).map((feature) => { const Icon = feature.icon; return <button key={feature.path} type="button" onClick={() => navigate(feature.path)} className={`mm-academic-feature ${tier === "upper" ? "btn-3d-card" : "border-slate-200/80 bg-white hover:border-sky-300 hover:shadow-sky-100/80"} group rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}>
               <div className="flex items-start justify-between gap-3"><div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Icon className="h-5 w-5" /></div><ArrowUpRight className="h-4 w-4 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" /></div>
               <p className="mt-4 text-[11px] font-bold tracking-[0.16em] text-primary">{feature.eyebrow}</p><h3 className="mt-1 text-lg font-semibold">{feature.title}</h3><p className="mt-1 min-h-10 text-sm leading-5 text-muted-foreground">{feature.description}</p><span className="mt-4 inline-flex items-center text-sm font-semibold">{feature.action}<ArrowUpRight className="ml-1.5 h-3.5 w-3.5" /></span>
             </button>; })}
