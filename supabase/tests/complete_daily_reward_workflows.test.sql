@@ -55,9 +55,8 @@ SELECT ok(
   'students cannot forge early quiz attempt history'
 );
 
-SELECT like(
-  has_column('public', 'user_streaks', 'last_daily_reward_date'),
-  'ok%',
+SELECT ok(
+  has_column('public', 'user_streaks', 'last_daily_reward_date') LIKE 'ok%',
   'daily reward claims use a separate date from normal learning activity'
 );
 SELECT like(
