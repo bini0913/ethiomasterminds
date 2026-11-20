@@ -758,3 +758,85 @@ BEGIN
   );
 END;
 $function$;
+
+
+-- Tighten the trusted account-attachment RPC: Extreme Admin retains global
+-- provisioning authority; Super Admin may provision school Managers only;
+-- school Managers/Admins remain limited to their own school's staff/students.
+DO $$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  v_definition := pg_get_functiondef(
+    'public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure
+  );
+
+  v_old := $old$  v_actor_role text;
+  v_is_super_admin boolean;$old$;
+  v_new := $new$  v_actor_role text;
+  v_is_extreme_admin boolean;
+  v_is_super_admin boolean;$new$;
+  IF position(v_old IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not safely add Extreme Admin provisioning distinction';
+  END IF;
+  v_definition := replace(v_definition, v_old, v_new);
+
+  v_old := $old$  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = p_actor_id AND role IN ('extreme_admin'::public.app_role, 'super_admin'::public.app_role)
+  ) INTO v_is_super_admin;$old$;
+  v_new := $new$  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = p_actor_id AND role = 'extreme_admin'::public.app_role
+  ) INTO v_is_extreme_admin;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = p_actor_id AND role = 'super_admin'::public.app_role
+  ) INTO v_is_super_admin;$new$;
+  IF position(v_old IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not safely separate platform provisioning roles';
+  END IF;
+  v_definition := replace(v_definition, v_old, v_new);
+
+  v_old := $old$  IF NOT v_is_super_admin AND v_actor_role IS NULL THEN
+    RAISE EXCEPTION 'Only the school Manager or Admin can provision accounts';
+  END IF;
+  IF NOT v_is_super_admin AND v_actor_role = 'admin'
+     AND p_school_role NOT IN ('student', 'parent', 'teacher') THEN
+    RAISE EXCEPTION 'School Admin can create student, parent, and teacher accounts only';
+  END IF;
+  IF NOT v_is_super_admin AND v_actor_role = 'manager'
+     AND p_school_role NOT IN ('student', 'parent', 'teacher', 'finance', 'admin') THEN
+    RAISE EXCEPTION 'School Manager cannot create another Manager account';
+  END IF;
+  IF p_school_role = 'manager' AND NOT v_is_super_admin THEN
+    RAISE EXCEPTION 'Only the Super Admin can create a school Manager';
+  END IF;$old$;
+  v_new := $new$  IF v_is_extreme_admin THEN
+    NULL;
+  ELSIF v_is_super_admin THEN
+    IF p_school_role <> 'manager' THEN
+      RAISE EXCEPTION 'Super Admin can only provision school Managers';
+    END IF;
+  ELSIF v_actor_role IS NULL THEN
+    RAISE EXCEPTION 'Only the school Manager or Admin can provision accounts';
+  ELSIF v_actor_role = 'admin'
+     AND p_school_role NOT IN ('student', 'parent', 'teacher') THEN
+    RAISE EXCEPTION 'School Admin can create student, parent, and teacher accounts only';
+  ELSIF v_actor_role = 'manager'
+     AND p_school_role NOT IN ('student', 'parent', 'teacher', 'finance', 'admin') THEN
+    RAISE EXCEPTION 'School Manager cannot create another Manager account';
+  ELSIF p_school_role = 'manager' THEN
+    RAISE EXCEPTION 'Only the Super Admin can create a school Manager';
+  END IF;$new$;
+  IF position(v_old IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not safely replace school provisioning authorization';
+  END IF;
+  v_definition := replace(v_definition, v_old, v_new);
+
+  EXECUTE v_definition;
+END;
+$$;
