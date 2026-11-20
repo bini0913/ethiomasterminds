@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldAlert, AlertTriangle, RefreshCw, Trash2, UserCog, Coins, Shield, Lock } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, RefreshCw, Trash2, UserCog, Coins, Shield, Lock, Building2, Crown } from 'lucide-react';
 import { useUser, UserRole } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
-type AccountStatus = 'active' | 'suspended' | 'banned' | 'purged';
+type AccountStatus = 'active' | 'suspended' | 'banned';
 
 type PortalUser = {
   id: string;
@@ -27,9 +27,10 @@ type PortalUser = {
   created_at: string;
 };
 
-type SecurityConfig = {
-  allowed_ips: string[];
-  require_2fa: boolean;
+type PortalSchool = {
+  id: string; name: string; school_code: string;
+  status: 'active' | 'suspended' | 'closed'; created_at: string; created_by: string;
+  managers: number; admins: number; teachers: number; students: number; parents: number; finance_staff: number;
 };
 
 const SECRET_PATH = '/root-control-portal-9xA7';
@@ -41,6 +42,8 @@ const ExtremeAdminPortal: React.FC = () => {
   const [dashboard, setDashboard] = useState<Record<string, number>>({});
   const [logs, setLogs] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, boolean>>({});
+  const [securitySummary, setSecuritySummary] = useState<Record<string, number>>({});
+  const [schools, setSchools] = useState<PortalSchool[]>([]);
 
   const [targetUserId, setTargetUserId] = useState('');
   const [targetRole, setTargetRole] = useState<UserRole>('student');
@@ -52,16 +55,11 @@ const ExtremeAdminPortal: React.FC = () => {
   const [postId, setPostId] = useState('');
   const [bookId, setBookId] = useState('');
 
-  const [requestIp, setRequestIp] = useState('');
-  const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [allowIpsInput, setAllowIpsInput] = useState('');
-  const [require2FA, setRequire2FA] = useState(false);
-  const [securityCodeInput, setSecurityCodeInput] = useState('');
-
   const isExtremeAdmin = user?.role === 'extreme_admin';
+  const currentSuperAdmin = users.find((item) => item.role === 'super_admin') || null;
 
   const availableRoles = useMemo<UserRole[]>(
-    () => ['student', 'teacher', 'admin', 'manager', 'extreme_admin'],
+    () => ['student', 'teacher', 'admin', 'manager', 'finance', 'parent'],
     [],
   );
 
@@ -69,31 +67,30 @@ const ExtremeAdminPortal: React.FC = () => {
     if (!isExtremeAdmin) return;
     setLoading(true);
     try {
-      const [{ data: dashboardData, error: dashboardError }, { data: userData, error: usersError }, { data: logData, error: logsError }, { data: settingsData, error: settingsError }, { data: securityData, error: securityError }] = await Promise.all([
+      const [{ data: dashboardData, error: dashboardError }, { data: userData, error: usersError }, { data: logData, error: logsError }, { data: settingsData, error: settingsError }, { data: securityData, error: securityError }, { data: schoolData, error: schoolsError }] = await Promise.all([
         supabase.rpc('extreme_admin_get_dashboard' as any),
         supabase.rpc('extreme_admin_list_users' as any, { p_limit: 300 }),
         supabase.rpc('extreme_admin_get_audit_logs' as any, { p_limit: 100 }),
         supabase.rpc('extreme_admin_get_settings' as any),
         supabase.rpc('extreme_admin_get_security' as any),
+        supabase.rpc('extreme_admin_list_schools' as any),
       ]);
 
-      if (dashboardError || usersError || logsError || settingsError || securityError) {
-        throw dashboardError || usersError || logsError || settingsError || securityError;
+      if (dashboardError || usersError || logsError || settingsError || securityError || schoolsError) {
+        throw dashboardError || usersError || logsError || settingsError || securityError || schoolsError;
       }
 
       setDashboard((dashboardData as Record<string, number>) || {});
       setUsers(((userData as unknown) as PortalUser[]) || []);
       setLogs((logData as any) || []);
+      setSchools((schoolData as PortalSchool[]) || []);
+      setSecuritySummary((securityData as Record<string, number>) || {});
 
       const mappedSettings = (settingsData || []).reduce((acc: Record<string, boolean>, row: any) => {
         acc[row.setting_key] = row.setting_value === true;
         return acc;
       }, {});
       setSettings(mappedSettings);
-
-      const security = (securityData as SecurityConfig[] | null)?.[0] || null;
-      setAllowIpsInput((security?.allowed_ips || []).join(', '));
-      setRequire2FA(Boolean(security?.require_2fa));
     } catch (error: any) {
       toast.error(error.message || 'Failed to refresh root control data');
     } finally {
@@ -106,40 +103,29 @@ const ExtremeAdminPortal: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isExtremeAdmin]);
 
-  const verifyAccess = async () => {
-    const { error } = await supabase.rpc('extreme_admin_check_access' as any, {
-      p_request_ip: requestIp || null,
-      p_two_factor_code: twoFactorCode || null,
+  const setSuperAdminAccount = async (enabled: boolean, userId = targetUserId) => {
+    if (!userId) return toast.error('Choose an account first');
+    const selected = users.find((item) => item.id === userId);
+    if (enabled && selected?.role === 'extreme_admin') return toast.error('The Extreme Admin account cannot also be the Super Admin');
+    const action = enabled ? 'assign or replace the single Super Admin' : 'revoke Super Admin access';
+    if (!window.confirm(`Are you sure you want to ${action}?`)) return;
+    const { error } = await supabase.rpc('extreme_admin_set_super_admin' as any, {
+      p_user_id: userId, p_enabled: enabled, p_reason: statusReason.trim() || null,
     });
-
-    if (error) {
-      toast.error(error.message || 'Verification failed');
-      return;
-    }
-
-    toast.success('Access verified. All control actions are enabled.');
+    if (error) return toast.error(error.message || 'Super Admin access could not be updated');
+    toast.success(enabled ? 'Super Admin account updated' : 'Super Admin access revoked');
+    await refreshAll();
   };
 
-  const saveSecurity = async () => {
-    const allowIps = allowIpsInput
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-
-    const { error } = await supabase.rpc('extreme_admin_configure_security' as any, {
-      p_allowed_ips: allowIps,
-      p_require_2fa: require2FA,
-      p_two_factor_code: securityCodeInput || null,
+  const changeSchoolStatus = async (school: PortalSchool) => {
+    const nextStatus = school.status === 'active' ? 'suspended' : 'active';
+    if (!window.confirm(`${nextStatus === 'suspended' ? 'Suspend' : 'Reactivate'} ${school.name}? School data will be preserved.`)) return;
+    const { error } = await supabase.rpc('extreme_admin_set_school_status' as any, {
+      p_school_id: school.id, p_status: nextStatus, p_reason: statusReason.trim() || null,
     });
-
-    if (error) {
-      toast.error(error.message || 'Could not save security settings');
-      return;
-    }
-
-    toast.success('Security settings updated');
-    setSecurityCodeInput('');
-    refreshAll();
+    if (error) return toast.error(error.message || 'School status could not be updated');
+    toast.success(`${school.name} is now ${nextStatus}`);
+    await refreshAll();
   };
 
   const setRole = async () => {
@@ -211,13 +197,6 @@ const ExtremeAdminPortal: React.FC = () => {
     if (error) return toast.error(error.message || 'Failed to delete book');
     toast.success('Book deleted');
     setBookId('');
-    refreshAll();
-  };
-
-  const purgeUserData = async () => {
-    const { error } = await supabase.rpc('extreme_admin_purge_user_data' as any, { p_user_id: targetUserId });
-    if (error) return toast.error(error.message || 'Failed to purge user data');
-    toast.success('User platform data purged');
     refreshAll();
   };
 
