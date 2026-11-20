@@ -43,6 +43,7 @@ import {
   Cell,
   Line,
   LineChart,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -79,7 +80,7 @@ interface SystemStats {
   totalFlashcards: number;
   totalBooks: number;
   totalPosts: number;
-  activeUsersNow: number;
+  usersSeenLast10m: number | null;
   approvedQuizzes: number;
   pendingQuizzes: number;
   totalReports: number;
@@ -158,7 +159,8 @@ const AdminPortal: React.FC = () => {
   const [activityLog, setActivityLog] = useState<Array<{ id: string; actor: string; action: string; target: string; at: string }>>([]);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsStatus, setSettingsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [dailyActivity, setDailyActivity] = useState<Array<{ day: string; users: number; quizzes: number; posts: number }>>([]);
+  const [dailyActivity, setDailyActivity] = useState<Array<{ day: string; quizzes: number; posts: number }>>([]);
+  const [dailyActivityStatus, setDailyActivityStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   const [stats, setStats] = useState<SystemStats>({
     totalUsers: 0,
@@ -170,7 +172,7 @@ const AdminPortal: React.FC = () => {
     totalFlashcards: 0,
     totalBooks: 0,
     totalPosts: 0,
-    activeUsersNow: 0,
+    usersSeenLast10m: null,
     approvedQuizzes: 0,
     pendingQuizzes: 0,
     totalReports: 0,
@@ -413,17 +415,18 @@ const AdminPortal: React.FC = () => {
   };
 
   const fetchStatsAndCharts = async () => {
-    const [profilesRes, quizzesRes, questionsRes, flashcardsRes, rolesRes, reportsRes, postsRes, presenceRes, booksRes, resultsRes] = await Promise.all([
+    setDailyActivityStatus('loading');
+    const presenceCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const [profilesRes, quizzesRes, questionsRes, flashcardsRes, rolesRes, reportsRes, postsRes, presenceRes, booksRes] = await Promise.all([
       db.from('profiles').select('id', { count: 'exact' }),
       db.from('quizzes').select('id,is_approved', { count: 'exact' }),
       db.from('questions').select('id', { count: 'exact' }),
       db.from('flashcards').select('id', { count: 'exact' }),
       db.from('user_roles').select('user_id,role'),
       db.from('reports').select('id,status', { count: 'exact' }),
-      db.from('social_posts').select('id,created_at', { count: 'exact' }),
-      db.from('user_presence').select('id,last_seen', { count: 'exact' }),
+      db.from('social_posts').select('id', { count: 'exact', head: true }),
+      db.from('user_presence').select('id', { count: 'exact', head: true }).gt('last_seen', presenceCutoff),
       db.from('study_plans').select('id', { count: 'exact' }),
-      db.from('quiz_results').select('completed_at').limit(1000),
     ]);
 
     const roles = rolesRes.data || [];
@@ -442,25 +445,47 @@ const AdminPortal: React.FC = () => {
       totalFlashcards: flashcardsRes.count || 0,
       totalBooks: booksRes.count || 0,
       totalPosts: postsRes.count || 0,
-      activeUsersNow: (presenceRes.data || []).filter((p: any) => new Date(p.last_seen).getTime() > Date.now() - 10 * 60 * 1000).length,
+      usersSeenLast10m: presenceRes.error ? null : presenceRes.count ?? 0,
       approvedQuizzes: quizRows.filter((q: any) => q.is_approved).length,
       pendingQuizzes: quizRows.filter((q: any) => !q.is_approved).length,
       totalReports: reportsRes.count || 0,
       pendingReports: reportRows.filter((r: any) => r.status === 'pending').length,
     });
 
-    const days = [...Array(7)].map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().slice(0, 10);
-    });
+    if (presenceRes.error) {
+      console.error('Could not load the recent user-presence count:', presenceRes.error.message);
+    }
 
-    setDailyActivity(days.map((day) => ({
-      day: day.slice(5),
-      users: (presenceRes.data || []).filter((p: any) => p.last_seen?.slice(0, 10) === day).length,
-      quizzes: (resultsRes.data || []).filter((r: any) => r.completed_at?.slice(0, 10) === day).length,
-      posts: (postsRes.data || []).filter((p: any) => p.created_at?.slice(0, 10) === day).length,
-    })));
+    const today = new Date();
+    const utcToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const dayStarts = Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(utcToday);
+      day.setUTCDate(day.getUTCDate() - (6 - index));
+      return day;
+    });
+    const dailyResults = await Promise.all(dayStarts.map(async (start) => {
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 1);
+      const startIso = start.toISOString();
+      const endIso = end.toISOString();
+      const [quizCount, postCount] = await Promise.all([
+        db.from('quiz_results').select('id', { count: 'exact', head: true }).gte('completed_at', startIso).lt('completed_at', endIso),
+        db.from('social_posts').select('id', { count: 'exact', head: true }).gte('created_at', startIso).lt('created_at', endIso),
+      ]);
+
+      return {
+        day: start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }),
+        quizzes: quizCount.count ?? 0,
+        posts: postCount.count ?? 0,
+        error: quizCount.error || postCount.error,
+      };
+    }));
+    const hasDailyActivityError = dailyResults.some((result) => result.error);
+    if (hasDailyActivityError) {
+      console.error('Could not load complete daily quiz/post counts:', dailyResults.filter((result) => result.error).map((result) => result.error?.message));
+    }
+    setDailyActivityStatus(hasDailyActivityError ? 'error' : 'ready');
+    setDailyActivity(hasDailyActivityError ? [] : dailyResults.map(({ day, quizzes, posts }) => ({ day, quizzes, posts })));
   };
 
   const handleCreateAnnouncement = async () => {
@@ -1088,7 +1113,7 @@ const AdminPortal: React.FC = () => {
                   ['Total users', stats.totalUsers, Users, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
                   ['Students', stats.totalStudents, Users, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
                   ['Teachers', stats.totalTeachers, UserCheck, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
-                  ['Active (10m)', stats.activeUsersNow, Activity, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
+                  ['Users seen (10m)', stats.usersSeenLast10m, Activity, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
                   ['Quizzes', stats.totalQuizzes, BookOpen, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
                   ['Questions', stats.totalQuestions, FileText, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
                   ['Pending reports', stats.pendingReports, Flag, 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'],
@@ -1097,7 +1122,7 @@ const AdminPortal: React.FC = () => {
                   const LucideIcon = IconComp as React.ComponentType<{ className?: string }>;
                   return (
                   <motion.div key={String(label)} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                    <Card className={String(colorClass) + ' shadow-sm'}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{value as number}</p><LucideIcon className="w-5 h-5 text-primary" /></div></CardContent></Card>
+                    <Card className={String(colorClass) + ' shadow-sm'}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{String(label)}</p><div className="flex items-center justify-between"><p className="text-2xl font-bold">{String(value ?? '—')}</p><LucideIcon className="w-5 h-5 text-primary" /></div></CardContent></Card>
                   </motion.div>
                   );
                 })}
@@ -1108,11 +1133,17 @@ const AdminPortal: React.FC = () => {
                 <h3 className="text-sm font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">Trends & composition</h3>
                 <div className="grid lg:grid-cols-3 gap-4">
                 <Card className="lg:col-span-2 border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <CardHeader><CardTitle>Daily Activity</CardTitle></CardHeader>
+                  <CardHeader>
+                    <CardTitle>Quiz completions &amp; social posts</CardTitle>
+                    <CardDescription>Exact event-row counts by UTC day for the last 7 days. This is not a daily-active-user history; user presence stores one mutable row per user.</CardDescription>
+                  </CardHeader>
                   <CardContent className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={dailyActivity}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Line type="monotone" dataKey="users" stroke="#3b82f6" /><Line type="monotone" dataKey="quizzes" stroke="#f97316" /><Line type="monotone" dataKey="posts" stroke="#22c55e" /></LineChart>
-                    </ResponsiveContainer>
+                    {dailyActivityStatus === 'loading' ? <p role="status" className="py-8 text-center text-sm text-muted-foreground">Loading 7-day activity counts…</p>
+                      : dailyActivityStatus === 'error' ? <div className="py-8 text-center text-sm text-muted-foreground"><p>Could not load the complete 7-day activity counts.</p><Button className="mt-3" size="sm" variant="outline" onClick={() => void fetchStatsAndCharts()}>Retry</Button></div>
+                        : !dailyActivity.some((day) => day.quizzes > 0 || day.posts > 0) ? <p className="py-8 text-center text-sm text-muted-foreground">No quiz completions or social posts were recorded in the last 7 UTC days.</p>
+                          : <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={dailyActivity}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis allowDecimals={false} /><Tooltip /><Legend /><Line name="Quiz completions" type="monotone" dataKey="quizzes" stroke="#f97316" /><Line name="Social posts" type="monotone" dataKey="posts" stroke="#22c55e" /></LineChart>
+                        </ResponsiveContainer>}
                   </CardContent>
                 </Card>
                 <Card className="border-secondary/50 bg-secondary/20">
@@ -1362,7 +1393,18 @@ const AdminPortal: React.FC = () => {
 
             <TabsContent value="analytics" className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
-                <Card><CardHeader><CardTitle>User Growth & Activity Trends</CardTitle></CardHeader><CardContent className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={dailyActivity}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Bar dataKey="users" fill="#3b82f6" /><Bar dataKey="quizzes" fill="#f97316" /></BarChart></ResponsiveContainer></CardContent></Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Quiz completions &amp; social posts</CardTitle>
+                    <CardDescription>Exact event-row counts by UTC day for the last 7 days. No historical daily-active-user series is available from mutable presence records.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="h-72">
+                    {dailyActivityStatus === 'loading' ? <p role="status" className="py-8 text-center text-sm text-muted-foreground">Loading 7-day activity counts…</p>
+                      : dailyActivityStatus === 'error' ? <div className="py-8 text-center text-sm text-muted-foreground"><p>Could not load the complete 7-day activity counts.</p><Button className="mt-3" size="sm" variant="outline" onClick={() => void fetchStatsAndCharts()}>Retry</Button></div>
+                        : !dailyActivity.some((day) => day.quizzes > 0 || day.posts > 0) ? <p className="py-8 text-center text-sm text-muted-foreground">No quiz completions or social posts were recorded in the last 7 UTC days.</p>
+                          : <ResponsiveContainer width="100%" height="100%"><BarChart data={dailyActivity}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="day" /><YAxis allowDecimals={false} /><Tooltip /><Legend /><Bar name="Quiz completions" dataKey="quizzes" fill="#f97316" /><Bar name="Social posts" dataKey="posts" fill="#22c55e" /></BarChart></ResponsiveContainer>}
+                  </CardContent>
+                </Card>
                 <Card><CardHeader><CardTitle>Most Active Students (Top XP)</CardTitle></CardHeader><CardContent className="space-y-3">{[...users].sort((a, b) => b.xp - a.xp).slice(0, 7).map((u, i) => (<div key={u.id} className="flex items-center justify-between p-2 rounded bg-muted/40"><span>#{i + 1} {u.name}</span><Badge>{u.xp} XP</Badge></div>))}</CardContent></Card>
               </div>
               <Card><CardHeader><CardTitle>Weak Subject Trends</CardTitle><CardDescription>Based on low-volume quizzes by subject.</CardDescription></CardHeader><CardContent>{Object.entries(quizzes.reduce((acc: Record<string, number>, q: any) => { acc[q.subject || 'Unknown'] = (acc[q.subject || 'Unknown'] || 0) + 1; return acc; }, {})).sort((a, b) => Number(a[1]) - Number(b[1])).slice(0, 6).map(([subject, count]) => (<div key={subject} className="flex justify-between border-b py-2"><span>{subject}</span><span className="text-muted-foreground">{String(count)} quizzes</span></div>))}</CardContent></Card>
