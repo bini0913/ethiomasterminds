@@ -8,14 +8,26 @@ select plan(34);
 -- Room and player foreign keys point at auth.users. Create deterministic users
 -- through the same signup trigger used by the application instead of relying
 -- on an empty clean-replay auth schema.
+select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000001', true);
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
 )
-values
-  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'multiplayer-fixture-1@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 1"}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'multiplayer-fixture-2@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 2"}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'multiplayer-fixture-3@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 3"}'::jsonb, now(), now())
+values ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'multiplayer-fixture-1@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 1"}'::jsonb, now(), now())
+on conflict (id) do nothing;
+select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000002', true);
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'multiplayer-fixture-2@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 2"}'::jsonb, now(), now())
+on conflict (id) do nothing;
+select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000003', true);
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'multiplayer-fixture-3@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 3"}'::jsonb, now(), now())
 on conflict (id) do nothing;
 
 insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)

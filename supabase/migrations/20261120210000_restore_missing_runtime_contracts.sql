@@ -116,6 +116,9 @@ CREATE POLICY "students read own early collection"
   ON public.early_user_collection FOR SELECT TO authenticated
   USING ((SELECT auth.uid()) = user_id);
 REVOKE ALL ON TABLE public.early_collectibles, public.early_user_collection FROM PUBLIC, anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
+  ON TABLE public.early_collectibles, public.early_user_collection
+  FROM authenticated;
 GRANT SELECT ON TABLE public.early_collectibles, public.early_user_collection TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.purchase_early_item(p_item_id uuid)
@@ -195,3 +198,11 @@ REVOKE ALL ON FUNCTION public.purchase_early_item(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.purchase_early_item(uuid) TO authenticated;
 REVOKE ALL ON FUNCTION public.get_early_profile_summary(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_early_profile_summary(uuid) TO authenticated;
+
+-- These shop RPCs are authenticated-only server workflows. Explicitly revoke
+-- the default PUBLIC execute grant so anonymous execution cannot be inherited.
+REVOKE EXECUTE ON FUNCTION public.purchase_store_item(uuid, boolean) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.equip_store_item(uuid) FROM PUBLIC, anon;
+
+-- Homework status transitions must go through the guarded review RPC.
+REVOKE UPDATE ON TABLE public.school_homework_assignments FROM PUBLIC, anon, authenticated;
