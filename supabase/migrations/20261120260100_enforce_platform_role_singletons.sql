@@ -1,0 +1,320 @@
+-- Separate platform ownership from school-network administration.
+-- The Extreme Admin remains the sole global authority. A separate, singleton
+-- Super Admin role is assigned only through the guarded Extreme Admin RPC.
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_roles_single_extreme_admin_idx
+  ON public.user_roles (role)
+  WHERE role = 'extreme_admin'::public.app_role;
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_roles_single_super_admin_idx
+  ON public.user_roles (role)
+  WHERE role = 'super_admin'::public.app_role;
+
+CREATE OR REPLACE FUNCTION public._is_super_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+  SELECT public.has_role(auth.uid(), 'super_admin'::public.app_role);
+$function$;
+
+REVOKE ALL ON FUNCTION public._is_super_admin() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public._is_super_admin() TO authenticated;
+
+-- Keep the platform roles above all school memberships and ordinary user roles.
+CREATE OR REPLACE FUNCTION public.get_user_role(_user_id uuid)
+RETURNS public.app_role
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_role public.app_role;
+BEGIN
+  IF _user_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  IF _user_id IS DISTINCT FROM auth.uid()
+     AND coalesce(auth.role(), '') <> 'service_role'
+     AND NOT public._is_extreme_admin() THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT candidate.role
+  INTO v_role
+  FROM (
+    SELECT ur.role, 0 AS source_priority,
+      CASE ur.role
+        WHEN 'extreme_admin'::public.app_role THEN 0
+        WHEN 'super_admin'::public.app_role THEN 1
+        ELSE 10
+      END AS role_priority
+    FROM public.user_roles ur
+    WHERE ur.user_id = _user_id
+      AND ur.role IN (
+        'extreme_admin'::public.app_role,
+        'super_admin'::public.app_role
+      )
+
+    UNION ALL
+
+    SELECT sm.school_role::public.app_role, 1 AS source_priority,
+      CASE sm.school_role
+        WHEN 'manager' THEN 1
+        WHEN 'admin' THEN 2
+        WHEN 'finance' THEN 3
+        WHEN 'teacher' THEN 4
+        WHEN 'parent' THEN 5
+        WHEN 'student' THEN 6
+        ELSE 99
+      END AS role_priority
+    FROM public.school_memberships sm
+    WHERE sm.user_id = _user_id
+      AND sm.status = 'active'
+
+    UNION ALL
+
+    SELECT ur.role, 2 AS source_priority,
+      CASE ur.role
+        WHEN 'manager'::public.app_role THEN 1
+        WHEN 'admin'::public.app_role THEN 2
+        WHEN 'finance'::public.app_role THEN 3
+        WHEN 'teacher'::public.app_role THEN 4
+        WHEN 'parent'::public.app_role THEN 5
+        WHEN 'student'::public.app_role THEN 6
+        ELSE 99
+      END AS role_priority
+    FROM public.user_roles ur
+    WHERE ur.user_id = _user_id
+      AND ur.role NOT IN (
+        'extreme_admin'::public.app_role,
+        'super_admin'::public.app_role
+      )
+  ) AS candidate
+  ORDER BY candidate.source_priority, candidate.role_priority
+  LIMIT 1;
+
+  RETURN v_role;
+END;
+$function$;
+
+-- Only the Extreme Admin may provision, replace, or revoke the single
+-- Super Admin. The transaction lock and unique partial index protect against
+-- concurrent attempts to create two Super Admin accounts.
+CREATE OR REPLACE FUNCTION public.extreme_admin_set_super_admin(
+  p_user_id uuid,
+  p_enabled boolean,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+DECLARE
+  v_previous_user_id uuid;
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'A target account is required';
+  END IF;
+
+  IF p_user_id = auth.uid() THEN
+    RAISE EXCEPTION 'The Extreme Admin cannot also be the Super Admin';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtext('master_minds.super_admin.singleton')::bigint);
+
+  IF p_enabled THEN
+    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = p_user_id) THEN
+      RAISE EXCEPTION 'Target account does not exist';
+    END IF;
+
+    IF public.has_role(p_user_id, 'extreme_admin'::public.app_role) THEN
+      RAISE EXCEPTION 'The Extreme Admin account cannot become Super Admin';
+    END IF;
+
+    SELECT user_id
+    INTO v_previous_user_id
+    FROM public.user_roles
+    WHERE role = 'super_admin'::public.app_role
+    FOR UPDATE;
+
+    IF v_previous_user_id IS NOT NULL AND v_previous_user_id <> p_user_id THEN
+      DELETE FROM public.user_roles
+      WHERE user_id = v_previous_user_id
+        AND role = 'super_admin'::public.app_role;
+    END IF;
+
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (p_user_id, 'super_admin'::public.app_role)
+    ON CONFLICT (user_id, role) DO NOTHING;
+  ELSE
+    DELETE FROM public.user_roles
+    WHERE user_id = p_user_id
+      AND role = 'super_admin'::public.app_role;
+  END IF;
+
+  INSERT INTO public.admin_audit_logs (
+    actor_id, action, target_type, target_id, metadata
+  )
+  VALUES (
+    auth.uid(),
+    CASE WHEN p_enabled THEN 'set_super_admin' ELSE 'revoke_super_admin' END,
+    'user',
+    p_user_id,
+    jsonb_build_object(
+      'enabled', p_enabled,
+      'reason', nullif(trim(coalesce(p_reason, '')), ''),
+      'replaced_user_id', v_previous_user_id
+    )
+  );
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.extreme_admin_set_super_admin(uuid, boolean, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_set_super_admin(uuid, boolean, text) TO authenticated;
+
+-- Top-level roles must never be granted through ordinary role-assignment paths.
+CREATE OR REPLACE FUNCTION public.assign_user_role(_user_id uuid, _role public.app_role)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  IF _role IN (
+    'extreme_admin'::public.app_role,
+    'super_admin'::public.app_role
+  ) THEN
+    RAISE EXCEPTION 'Top-level roles require the dedicated platform provisioning workflow';
+  END IF;
+
+  IF _user_id = auth.uid() THEN
+    IF _role <> 'student'::public.app_role THEN
+      RAISE EXCEPTION 'Users may only self-assign the student role';
+    END IF;
+  ELSIF public._is_extreme_admin() THEN
+    NULL;
+  ELSIF public.has_role(auth.uid(), 'admin'::public.app_role) THEN
+    IF _role NOT IN (
+      'student'::public.app_role,
+      'teacher'::public.app_role,
+      'admin'::public.app_role,
+      'manager'::public.app_role
+    ) THEN
+      RAISE EXCEPTION 'Admins cannot grant this role';
+    END IF;
+  ELSIF public.has_role(auth.uid(), 'manager'::public.app_role) THEN
+    IF _role NOT IN ('student'::public.app_role, 'teacher'::public.app_role) THEN
+      RAISE EXCEPTION 'Managers can only grant student or teacher roles';
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'Not authorized';
+  END IF;
+
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (_user_id, _role)
+  ON CONFLICT (user_id, role) DO NOTHING;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.extreme_admin_update_user_role(
+  p_user_id uuid,
+  p_role public.app_role
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+
+  IF p_role IN (
+    'extreme_admin'::public.app_role,
+    'super_admin'::public.app_role
+  ) THEN
+    RAISE EXCEPTION 'Use the dedicated top-level account controls';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = p_user_id
+      AND role IN ('extreme_admin'::public.app_role, 'super_admin'::public.app_role)
+  ) THEN
+    RAISE EXCEPTION 'Top-level account roles cannot be changed here';
+  END IF;
+
+  DELETE FROM public.user_roles WHERE user_id = p_user_id;
+  INSERT INTO public.user_roles (user_id, role) VALUES (p_user_id, p_role);
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (auth.uid(), 'update_user_role', 'user', p_user_id, jsonb_build_object('role', p_role));
+
+  RETURN true;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.extreme_admin_set_role(
+  p_user_id uuid,
+  p_role public.app_role,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+
+  IF p_role IN (
+    'extreme_admin'::public.app_role,
+    'super_admin'::public.app_role
+  ) THEN
+    RAISE EXCEPTION 'Use the dedicated top-level account controls';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = p_user_id
+      AND role IN ('extreme_admin'::public.app_role, 'super_admin'::public.app_role)
+  ) THEN
+    RAISE EXCEPTION 'Top-level account roles cannot be changed here';
+  END IF;
+
+  DELETE FROM public.user_roles WHERE user_id = p_user_id;
+  INSERT INTO public.user_roles(user_id, role) VALUES (p_user_id, p_role);
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(), 'root_set_role', 'user', p_user_id,
+    jsonb_build_object('role', p_role, 'reason', p_reason)
+  );
+
+  RETURN true;
+END;
+$function$;
+
+-- The legacy bootstrap allowed an ordinary admin to claim platform ownership
+-- if the owner role was absent. Disable client execution; recovery is a
+-- controlled operator procedure, not an in-app self-promotion route.
+REVOKE ALL ON FUNCTION public.extreme_admin_bootstrap_self() FROM PUBLIC, anon, authenticated;
