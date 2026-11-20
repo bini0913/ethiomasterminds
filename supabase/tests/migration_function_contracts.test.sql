@@ -55,7 +55,7 @@ SELECT ok(
 );
 
 SELECT is(
-  (SELECT pronargdefaults FROM pg_proc
+  (SELECT pronargdefaults::integer FROM pg_proc
    WHERE oid = 'public.submit_quiz_result_secure(uuid,jsonb,integer,uuid)'::regprocedure),
   0,
   'quiz submission requires an explicit stable idempotency key'
