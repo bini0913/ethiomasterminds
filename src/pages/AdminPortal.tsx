@@ -247,13 +247,11 @@ const AdminPortal: React.FC = () => {
       .channel('admin-live-monitoring')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, () => {
         pushNotification('New user joined');
-        logAction('Realtime event: new user');
         fetchUsers();
         fetchStatsAndCharts();
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, () => {
         pushNotification('Profile / XP update synced');
-        logAction('Realtime event: profile update');
         fetchUsers();
         fetchStatsAndCharts();
         fetchSeasonControlData();
@@ -262,12 +260,10 @@ const AdminPortal: React.FC = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'season_history' }, () => fetchSeasonControlData())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_posts' }, () => {
         pushNotification('New social post published');
-        logAction('Realtime event: new post');
         fetchStatsAndCharts();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quiz_results' }, () => {
         pushNotification('New quiz activity');
-        logAction('Realtime event: quiz completed');
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
         pushNotification('New message activity');
@@ -1462,7 +1458,7 @@ const AdminPortal: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="monitoring" className="space-y-4">
-              <Card><CardHeader><CardTitle>Real-time Monitoring</CardTitle><CardDescription>Live stream from Supabase subscriptions (users, posts, quiz activity, messages).</CardDescription></CardHeader><CardContent className="space-y-3">{notifications.map((n) => (<div key={n.id} className="border rounded-lg p-3 flex items-center justify-between"><div className="flex items-center gap-2"><Bell className="w-4 h-4 text-primary" /><p>{n.text}</p></div><p className="text-xs text-muted-foreground">{new Date(n.createdAt).toLocaleTimeString()}</p></div>))}{notifications.length === 0 && <p className="text-muted-foreground">No live events yet.</p>}</CardContent></Card>
+              <Card><CardHeader><CardTitle>Realtime Notifications</CardTitle><CardDescription>Ephemeral notices observed by this browser through Supabase subscriptions. These are not durable platform events or administrator audit records.</CardDescription></CardHeader><CardContent className="space-y-3">{notifications.map((n) => (<div key={n.id} className="border rounded-lg p-3 flex items-center justify-between"><div className="flex items-center gap-2"><Bell className="w-4 h-4 text-primary" /><p>{n.text}</p></div><p className="text-xs text-muted-foreground">{new Date(n.createdAt).toLocaleTimeString()}</p></div>))}{notifications.length === 0 && <p className="text-muted-foreground">No realtime notices have been observed in this session.</p>}</CardContent></Card>
             </TabsContent>
           </Tabs>
         </main>
