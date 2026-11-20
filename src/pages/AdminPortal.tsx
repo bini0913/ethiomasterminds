@@ -806,26 +806,41 @@ const AdminPortal: React.FC = () => {
 
   const handleCoinAdjustment = async () => {
     if (!ensureAdminPower()) return;
-    const target = resolveTargetUser() as (SystemUser & { coins?: number }) | null;
+    const target = resolveTargetUser();
     const amount = Number(coinAmount);
-    if (!target || !Number.isFinite(amount)) {
-      toast.error('Provide a valid username/user ID and coin amount.');
+    if (!target || !Number.isSafeInteger(amount) || amount === 0) {
+      toast.error('Select a user and provide a non-zero whole-number coin amount.');
       return;
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ coins: Math.max(0, (target.coins || 0) + amount) } as never)
-      .eq('id', target.id);
+    const { data, error } = await (supabase as any).rpc('admin_adjust_coins', {
+      p_user_identifier: target.id,
+      p_amount: amount,
+    });
     if (error) {
-      toast.error('Failed to update coins.');
+      toast.error(error.message || 'Failed to update the virtual wallet.');
       return;
     }
 
-    toast.success('Coins updated successfully');
+    const { error: auditError } = await (supabase as any).rpc('admin_write_audit_log', {
+      p_action: 'admin_adjust_coins',
+      p_target_type: 'user',
+      p_target_id: target.id,
+      p_metadata: {
+        amount,
+        resulting_coins: data?.coins ?? null,
+        target_label: target.username || target.name,
+      },
+    });
+
     pushNotification(`Coins updated for ${target.name}`);
-    logAction(`Adjusted coins by ${amount}`, target.id);
-    fetchAllData();
+    await fetchAllData();
+    if (auditError) {
+      console.error('Virtual wallet adjustment succeeded, but audit confirmation failed:', auditError);
+      toast.error('Wallet updated, but its audit record could not be confirmed. Do not repeat the adjustment; contact a Super Admin.');
+      return;
+    }
+    toast.success(`Virtual wallet updated${Number.isFinite(data?.coins) ? ` to ${data.coins} coins` : ''}.`);
   };
 
   const handleEndSeason = async () => {
