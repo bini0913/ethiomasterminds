@@ -131,7 +131,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   });
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [answerResult, setAnswerResult] = useState<{ correct: boolean; points: number; correctAnswer?: string; correctAnswerIndex?: number } | null>(null);
+  const [answerResult, setAnswerResult] = useState<{ correct: boolean; points: number } | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(30);
   const [matchStartedAt, setMatchStartedAt] = useState<string | null>(null);
   const [questionStartedAt, setQuestionStartedAt] = useState<number | null>(null);
@@ -732,8 +732,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       const result = data as {
         is_correct: boolean;
         points: number;
-        correct_answer?: string;
-        correct_index?: number;
         score?: number;
         finished?: boolean;
         timed_out?: boolean;
@@ -742,8 +740,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       setAnswerResult({
         correct: result.is_correct,
         points: result.points,
-        correctAnswer: result.correct_answer,
-        correctAnswerIndex: result.correct_index,
       });
 
       if (result.timed_out) {
@@ -1164,7 +1160,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                       let buttonClass = 'border-white/15 hover:border-cyan-300/70 bg-white/5';
 
                       if (selectedAnswer !== null) {
-                        if (answerResult?.correctAnswerIndex === index) {
+                        if (selectedAnswer === index && answerResult?.correct) {
                           buttonClass = 'border-green-500 bg-green-500/20 shadow-sm';
                         } else if (selectedAnswer === index && !answerResult?.correct) {
                           buttonClass = 'border-red-400 bg-red-500/20';
@@ -1202,11 +1198,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                         {answerResult.correct ? 'Correct! 🎉' : 'Not quite'}
                         {answerResult.points > 0 ? ` +${answerResult.points} points` : ' +0 points'}
                       </p>
-                      {!answerResult.correct && answerResult.correctAnswer && (
-                        <p className="text-sm mt-1 text-blue-100/85">
-                          Correct answer: <span className="font-semibold text-white">{answerResult.correctAnswer}</span>
-                        </p>
-                      )}
                     </div>
                   )}
 
