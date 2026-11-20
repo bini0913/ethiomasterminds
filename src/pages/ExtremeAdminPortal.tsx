@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldAlert, AlertTriangle, RefreshCw, Trash2, UserCog, Coins, Shield, Lock, Building2, Crown } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, RefreshCw, UserCog, Coins, Shield, Lock, Building2, Crown } from 'lucide-react';
 import { useUser, UserRole } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,8 +32,6 @@ type PortalSchool = {
   status: 'active' | 'suspended' | 'closed'; created_at: string; created_by: string;
   managers: number; admins: number; teachers: number; students: number; parents: number; finance_staff: number;
 };
-
-const SECRET_PATH = '/root-control-portal-9xA7';
 
 const ExtremeAdminPortal: React.FC = () => {
   const { user } = useUser();
@@ -217,18 +215,18 @@ const ExtremeAdminPortal: React.FC = () => {
 
   if (!isExtremeAdmin) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center px-6">
-        <Card className="w-full max-w-xl bg-zinc-950 border-zinc-800 text-zinc-100">
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center px-6">
+        <Card className="w-full max-w-xl bg-white border-slate-200 text-slate-900">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-400">
+            <CardTitle className="flex items-center gap-2 text-red-700">
               <Lock className="h-5 w-5" /> Access Denied
             </CardTitle>
-            <CardDescription className="text-zinc-400">
+            <CardDescription className="text-slate-600">
               This route is hidden and only available to the Extreme Admin owner.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-zinc-500">Secret path: {SECRET_PATH}</p>
+            <p className="text-sm text-slate-500">This workspace is restricted to the single Extreme Admin account.</p>
           </CardContent>
         </Card>
       </div>
@@ -236,29 +234,31 @@ const ExtremeAdminPortal: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="bg-zinc-950 border-red-900/70 text-zinc-100">
+        <Card className="bg-white border-slate-200 text-slate-900">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-400">
-              <ShieldAlert className="h-5 w-5" /> Extreme Admin Access — All actions are permanent
+            <CardTitle className="flex items-center gap-2 text-slate-900">
+              <ShieldAlert className="h-5 w-5" /> Extreme Admin · Global platform control
             </CardTitle>
             <CardDescription className="text-zinc-400">
-              Hidden root portal with full control across users, economy, chats, content, and system controls.
+              Global oversight of the Super Admin, every school, individual accounts, platform settings, and audited operations.
             </CardDescription>
           </CardHeader>
         </Card>
 
         <div className="flex items-center gap-3">
-          <Button onClick={refreshAll} variant="secondary" className="bg-zinc-800 text-zinc-100">
+          <Button onClick={refreshAll} variant="outline" disabled={loading}>
             <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>
           {loading && <p className="text-sm text-zinc-400">Syncing secure data...</p>}
         </div>
 
         <Tabs defaultValue="users" className="space-y-4">
-          <TabsList className="bg-zinc-900 border border-zinc-800">
+          <TabsList className="bg-white border border-slate-200 flex h-auto flex-wrap">
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="super-admin">Super Admin</TabsTrigger>
+            <TabsTrigger value="schools">Schools</TabsTrigger>
             <TabsTrigger value="economy">Economy</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
             <TabsTrigger value="chats">Chats</TabsTrigger>
@@ -266,16 +266,82 @@ const ExtremeAdminPortal: React.FC = () => {
             <TabsTrigger value="logs">Audit Logs</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="super-admin" className="space-y-4">
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Crown className="h-5 w-5 text-amber-600" />Single Super Admin account</CardTitle>
+                <CardDescription>There can be only one Super Admin. This account manages the one school network and does not receive global platform authority.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {currentSuperAdmin ? (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">{currentSuperAdmin.name}</p>
+                    <p className="mt-1 text-xs text-slate-600">@{currentSuperAdmin.username || 'no-username'} · {currentSuperAdmin.account_status}</p>
+                    <p className="mt-1 break-all text-xs text-slate-500">{currentSuperAdmin.id}</p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">No Super Admin account is currently assigned.</div>
+                )}
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Choose account to assign or replace Super Admin</Label>
+                    <Select value={targetUserId} onValueChange={setTargetUserId}>
+                      <SelectTrigger><SelectValue placeholder="Select an existing account" /></SelectTrigger>
+                      <SelectContent>
+                        {users.filter((item) => item.role !== 'extreme_admin').map((item) => (
+                          <SelectItem key={item.id} value={item.id}>{item.name} · @{item.username || 'no-username'}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Reason for audit history</Label>
+                    <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Why is this account being assigned or changed?" />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => void setSuperAdminAccount(true)} disabled={!targetUserId}>Assign / replace Super Admin</Button>
+                  {currentSuperAdmin && <Button variant="destructive" onClick={() => void setSuperAdminAccount(false, currentSuperAdmin.id)}>Revoke current Super Admin</Button>}
+                </div>
+                <p className="text-xs text-slate-500">Replacing the account revokes the previous Super Admin role and records the change. It does not delete either user's account or school records.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="schools" className="space-y-4">
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" />Global school oversight</CardTitle>
+                <CardDescription>Every school in the single network. Suspension preserves school data and membership history.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {schools.length ? schools.map((school) => (
+                  <div key={school.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900">{school.name} <span className="ml-2 font-mono text-xs text-slate-500">{school.school_code}</span></p>
+                      <p className="mt-1 text-xs text-slate-600">{school.students} students · {school.teachers} teachers · {school.managers} Managers · {school.admins} Admins · {school.parents} parents · {school.finance_staff} finance</p>
+                      <p className="mt-1 text-xs text-slate-500">Created {new Date(school.created_at).toLocaleDateString()} · {school.id}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={school.status === 'active' ? 'rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800' : 'rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800'}>{school.status}</span>
+                      <Button size="sm" variant={school.status === 'active' ? 'destructive' : 'outline'} onClick={() => void changeSchoolStatus(school)}>{school.status === 'active' ? 'Suspend' : 'Reactivate'}</Button>
+                    </div>
+                  </div>
+                )) : <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No schools are registered yet.</p>}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="users" className="space-y-4">
-            <Card className="bg-zinc-950 border-zinc-800">
+            <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle className="text-zinc-100 flex items-center gap-2"><UserCog className="h-4 w-4" />User Control</CardTitle>
-                <CardDescription>Role changes, suspension, bans, and account data purge.</CardDescription>
+                <CardDescription>Manage ordinary platform roles and account access. Extreme Admin and Super Admin are controlled separately.</CardDescription>
               </CardHeader>
               <CardContent className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-3">
                   <Label>Target user ID</Label>
-                  <Input value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} placeholder="UUID" className="bg-zinc-900 border-zinc-700" />
+                  <Input value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} placeholder="UUID" className="bg-white border-slate-200" />
 
                   <Label>Role</Label>
                   <Select value={targetRole} onValueChange={(value) => setTargetRole(value as UserRole)}>
@@ -296,12 +362,12 @@ const ExtremeAdminPortal: React.FC = () => {
                       <SelectItem value="active">active</SelectItem>
                       <SelectItem value="suspended">suspended</SelectItem>
                       <SelectItem value="banned">banned</SelectItem>
-                      <SelectItem value="purged">purged</SelectItem>
+                      
                     </SelectContent>
                   </Select>
                   <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Reason" className="bg-zinc-900 border-zinc-700" />
                   <Button onClick={setUserStatus} variant="secondary" className="w-full">Apply Status</Button>
-                  <Button onClick={purgeUserData} variant="destructive" className="w-full"><Trash2 className="h-4 w-4 mr-2" />Purge User Data</Button>
+                  
                 </div>
               </CardContent>
             </Card>
@@ -312,7 +378,7 @@ const ExtremeAdminPortal: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-2 max-h-96 overflow-auto">
                 {users.map((item) => (
-                  <div key={item.id} className="text-xs border border-zinc-800 rounded p-2 bg-zinc-900/70 flex items-center justify-between gap-3">
+                  <div key={item.id} className="text-xs border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center justify-between gap-3">
                     <div>
                       <div className="font-medium">{item.name} ({item.username || 'no-username'})</div>
                       <div className="text-zinc-400">{item.id}</div>
@@ -392,24 +458,24 @@ const ExtremeAdminPortal: React.FC = () => {
 
             <Card className="bg-zinc-950 border-zinc-800">
               <CardHeader>
-                <CardTitle>Security Layer (IP + 2FA)</CardTitle>
-                <CardDescription>Backend-enforced verification for root access actions.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" />Security and access snapshot</CardTitle>
+                <CardDescription>Live metrics from the protected database function. This page does not pretend that client-entered IP addresses or unverified 2FA settings enforce security.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid md:grid-cols-2 gap-3">
-                  <Input value={requestIp} onChange={(e) => setRequestIp(e.target.value)} placeholder="Current request IP (for verification)" className="bg-zinc-900 border-zinc-700" />
-                  <Input value={twoFactorCode} onChange={(e) => setTwoFactorCode(e.target.value)} placeholder="2FA code" className="bg-zinc-900 border-zinc-700" />
-                </div>
-                <Button onClick={verifyAccess}>Verify Access</Button>
-                <hr className="border-zinc-800" />
-                <Input value={allowIpsInput} onChange={(e) => setAllowIpsInput(e.target.value)} placeholder="Allowed IPs (comma separated)" className="bg-zinc-900 border-zinc-700" />
-                <div className="flex items-center gap-2">
-                  <Switch checked={require2FA} onCheckedChange={setRequire2FA} />
-                  <Label>Require 2FA code</Label>
-                </div>
-                <Input value={securityCodeInput} onChange={(e) => setSecurityCodeInput(e.target.value)} placeholder="New 2FA code (leave empty to keep existing)" className="bg-zinc-900 border-zinc-700" />
-                <Button onClick={saveSecurity}>Save Security Settings</Button>
+              <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[
+                  ['Audit events', securitySummary.audit_events ?? 0],
+                  ['Active platform admins', securitySummary.active_admins ?? 0],
+                  ['Active Managers', securitySummary.active_managers ?? 0],
+                  ['Suspended accounts', securitySummary.suspended_users ?? 0],
+                  ['Banned accounts', securitySummary.banned_users ?? 0],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-medium text-slate-500">{label}</p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{Number(value).toLocaleString()}</p>
+                  </div>
+                ))}
               </CardContent>
+
             </Card>
 
             <Card className="bg-zinc-950 border-zinc-800">
@@ -418,7 +484,7 @@ const ExtremeAdminPortal: React.FC = () => {
               </CardHeader>
               <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Object.entries(dashboard).map(([key, value]) => (
-                  <div key={key} className="rounded border border-zinc-800 bg-zinc-900/70 p-3">
+                  <div key={key} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <div className="text-xs text-zinc-400">{key}</div>
                     <div className="text-xl font-semibold">{value}</div>
                   </div>
@@ -451,7 +517,7 @@ const ExtremeAdminPortal: React.FC = () => {
 
         <div className="text-xs text-amber-300/90 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4" />
-          Keep this route secret. It is intentionally not linked in the app UI.
+          This workspace is intentionally restricted to the single Extreme Admin account.
         </div>
       </div>
     </div>
