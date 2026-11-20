@@ -30,7 +30,7 @@ const SchoolParentPortal = lazy(() => import("./pages/SchoolParentPortal"));
 const SchoolFinancePortal = lazy(() => import("./pages/SchoolFinancePortal"));
 const SchoolStudentPortal = lazy(() => import("./pages/SchoolStudentPortal"));
 const SchoolGlobalAdminPortal = lazy(() => import("./pages/SchoolGlobalAdminPortal"));
-const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
+const NetworkSuperAdminPortal = lazy(() => import("./pages/NetworkSuperAdminPortal"));
 const Chat = lazy(() => import("./pages/Chat"));
 const AITutor = lazy(() => import("./pages/AITutor"));
 const LearningDNA = lazy(() => import("./pages/LearningDNA"));
@@ -435,8 +435,8 @@ const App = () => (
                               <Route
                                 path="/super-admin"
                                 element={
-                                  <ProtectedRoute allowedRoles={['extreme_admin']}>
-                                    <SuperAdminPortal />
+                                  <ProtectedRoute allowedRoles={['super_admin']}>
+                                    <NetworkSuperAdminPortal />
                                   </ProtectedRoute>
                                 }
                               />
