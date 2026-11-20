@@ -59,9 +59,8 @@ SELECT ok(
   has_column('public', 'user_streaks', 'last_daily_reward_date') LIKE 'ok%',
   'daily reward claims use a separate date from normal learning activity'
 );
-SELECT like(
-  pg_get_functiondef('public.wallet_action(text,integer,uuid)'::regprocedure),
-  '%INSERT INTO public.transactions%',
+SELECT ok(
+  pg_get_functiondef('public.wallet_action(text,integer,uuid)'::regprocedure) LIKE '%INSERT INTO public.transactions%',
   'wallet actions write to the existing transaction history'
 );
 

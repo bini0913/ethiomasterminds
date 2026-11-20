@@ -9,7 +9,7 @@ select plan(34);
 -- inside this rollback-scoped test transaction. The application signup trigger
 -- is intentionally disabled here because it requires a real JWT context and
 -- profile creation is outside the room-integrity fixture’s responsibility.
-alter table auth.users disable trigger on_auth_user_created;
+alter table public.profiles disable trigger guard_student_profile_updates;
 insert into auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -20,6 +20,7 @@ values
   ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'multiplayer-fixture-3@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 3"}'::jsonb, now(), now())
 on conflict (id) do nothing;
 alter table auth.users enable trigger on_auth_user_created;
+alter table public.profiles enable trigger guard_student_profile_updates;
 
 insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)
 values
