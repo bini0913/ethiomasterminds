@@ -30,7 +30,7 @@ const SchoolParentPortal = lazy(() => import("./pages/SchoolParentPortal"));
 const SchoolFinancePortal = lazy(() => import("./pages/SchoolFinancePortal"));
 const SchoolStudentPortal = lazy(() => import("./pages/SchoolStudentPortal"));
 const SchoolGlobalAdminPortal = lazy(() => import("./pages/SchoolGlobalAdminPortal"));
-const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
+
 const Chat = lazy(() => import("./pages/Chat"));
 const AITutor = lazy(() => import("./pages/AITutor"));
 const LearningDNA = lazy(() => import("./pages/LearningDNA"));
@@ -159,7 +159,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   const { user, isAuthenticated, logout } = useUser();
 
   // Standalone role workspaces provide their own navigation and layout.
-  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/") || location.pathname.startsWith("/school/")) return <>{children}</>;
+  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/") || location.pathname === "/super-admin" || location.pathname.startsWith("/school/")) return <>{children}</>;
 
   if (!isAuthenticated || !user) return <>{children}</>;
   if (user.role === "student" && getUserTier(user.grade) === "upper") return <UpperTierStudioShell>{children}</UpperTierStudioShell>;
@@ -364,7 +364,7 @@ const App = () => (
                               <Route path="/school/parent" element={<ProtectedRoute allowedRoles={["parent"]}><SchoolPortalGate role="parent"><SchoolParentPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/finance" element={<ProtectedRoute allowedRoles={["finance"]}><SchoolPortalGate role="finance"><SchoolFinancePortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/student" element={<ProtectedRoute allowedRoles={["student"]}><SchoolPortalGate role="student"><SchoolStudentPortal /></SchoolPortalGate></ProtectedRoute>} />
-                              <Route path="/school/super-admin" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><SchoolGlobalAdminPortal /></ProtectedRoute>} />
+                              <Route path="/school/super-admin" element={<ProtectedRoute allowedRoles={["super_admin"]}><SchoolGlobalAdminPortal /></ProtectedRoute>} />
                               <Route
                                 path="/manager"
                                 element={
@@ -435,8 +435,8 @@ const App = () => (
                               <Route
                                 path="/super-admin"
                                 element={
-                                  <ProtectedRoute allowedRoles={['extreme_admin']}>
-                                    <SuperAdminPortal />
+                                  <ProtectedRoute allowedRoles={['super_admin']}>
+                                    <SchoolGlobalAdminPortal />
                                   </ProtectedRoute>
                                 }
                               />
