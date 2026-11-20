@@ -67,7 +67,9 @@ Deno.serve(async (req) => {
       .select("role")
       .eq("user_id", actorId);
     if (rolesError) return json({ error: "Unable to verify account permissions" }, 503);
-    const canProvisionNetwork = (globalRoles ?? []).some((row: { role: string }) => row.role === "extreme_admin" || row.role === "super_admin");
+    const isExtremeAdmin = (globalRoles ?? []).some((row: { role: string }) => row.role === "extreme_admin");
+    const isSuperAdmin = (globalRoles ?? []).some((row: { role: string }) => row.role === "super_admin");
+    const canProvisionNetwork = isExtremeAdmin || isSuperAdmin;
 
     const createAuthAccount = async (name: string, username: string, grade?: string, age?: number) => {
       const password = randomString(18);
@@ -175,7 +177,7 @@ Deno.serve(async (req) => {
       if (role === "manager" && !canProvisionNetwork) {
         return json({ error: "Only the Super Admin can create a school Manager" }, 403);
       }
-      if (role !== "manager") {
+      if (role !== "manager" && !isExtremeAdmin) {
         const { data: membership, error } = await admin
           .from("school_memberships")
           .select("school_role")
