@@ -641,7 +641,7 @@ DO $$
 DECLARE
   v_definition text;
   v_old text := 'public._is_extreme_admin()';
-  v_new text := 'public._is_extreme_admin() OR (public._is_super_admin() AND EXISTS (SELECT 1 FROM public.school_memberships target_profile_membership WHERE target_profile_membership.user_id = p_profile_id AND target_profile_membership.status = ''active''))';
+  v_new text := 'public._is_extreme_admin() OR (public._is_super_admin() AND EXISTS (SELECT 1 FROM public.school_memberships target_profile_membership WHERE target_profile_membership.user_id = p_profile_id AND target_profile_membership.status IN (''active'', ''suspended'')))';
 BEGIN
   v_definition := pg_get_functiondef('public.school_can_view_profile(uuid)'::regprocedure);
   IF position(v_old IN v_definition) = 0 THEN
