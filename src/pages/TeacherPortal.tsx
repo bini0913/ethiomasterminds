@@ -238,7 +238,7 @@ const TeacherPortal: React.FC = () => {
     }
 
     const results = await Promise.all(classes.map(async (cls) => {
-      const { data, error } = await supabase.rpc('get_class_students', { class_uuid: cls.id });
+      const { data, error } = await supabase.rpc('get_class_students', { _class_id: cls.id });
       if (error) {
         console.error(`Failed to load students for ${cls.name}:`, error);
         return [] as Array<{ student: Student; className: string; classId: string }>;
@@ -340,7 +340,7 @@ const TeacherPortal: React.FC = () => {
     try {
       // Use the secure RPC function to get class students
       const { data, error } = await supabase.rpc('get_class_students', {
-        class_uuid: classId
+        _class_id: classId
       });
       
       if (error) {
@@ -419,10 +419,10 @@ const TeacherPortal: React.FC = () => {
       return;
     }
 
-    setSearchingStudents(true);
+      setSearchingStudents(true);
     try {
       const { data, error } = await supabase.rpc('find_student_by_username', {
-        search_username: query.trim()
+        _username: query.trim()
       });
 
       if (error) {
