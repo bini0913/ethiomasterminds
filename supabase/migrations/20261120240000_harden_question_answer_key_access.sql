@@ -16,7 +16,7 @@ using (
         or public.has_role(auth.uid(), 'manager'::public.app_role)
         or public.has_role(auth.uid(), 'extreme_admin'::public.app_role)
         or (
-          quiz.grade < 9
+          coalesce(nullif(regexp_replace(quiz.grade, '[^0-9]', '', 'g'), '')::integer, 0) < 9
           and (
             (quiz.school_id is null and quiz.is_approved is true)
             or (quiz.school_id is not null and public.school_can_view_school_quiz(quiz.id))
