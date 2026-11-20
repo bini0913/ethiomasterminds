@@ -445,7 +445,7 @@ AS $function$
     COALESCE(uc.coins, 0),
     p.created_at
   FROM public.profiles p
-  LEFT JOIN public.user_currency uc ON uc.user_id = p.id
+  LEFT JOIN LATERAL (SELECT coins FROM public.user_currency WHERE user_id = p.id LIMIT 1) uc ON true
   WHERE public._is_extreme_admin()
     AND (
       p_search IS NULL
@@ -625,3 +625,20 @@ FOR UPDATE
 TO authenticated
 USING (public._is_extreme_admin() OR public._is_super_admin())
 WITH CHECK (public._is_extreme_admin() OR public._is_super_admin());
+
+
+-- Super Admin may inspect profiles only when they belong to an active school
+-- membership. Individual-only accounts remain outside the school network.
+DO $$
+DECLARE
+  v_definition text;
+  v_old text := 'public._is_extreme_admin()';
+  v_new text := 'public._is_extreme_admin() OR (public._is_super_admin() AND EXISTS (SELECT 1 FROM public.school_memberships target_profile_membership WHERE target_profile_membership.user_id = p_profile_id AND target_profile_membership.status = ''active''))';
+BEGIN
+  v_definition := pg_get_functiondef('public.school_can_view_profile(uuid)'::regprocedure);
+  IF position(v_old IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'Could not safely update school_can_view_profile';
+  END IF;
+  EXECUTE replace(v_definition, v_old, v_new);
+END;
+$$;
