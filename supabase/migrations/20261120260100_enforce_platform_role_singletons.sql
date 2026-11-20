@@ -686,3 +686,67 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.super_admin_set_school_status(uuid, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.super_admin_set_school_status(uuid, text, text) TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.extreme_admin_get_security()
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_audit_events bigint;
+  v_active_admins bigint;
+  v_active_managers bigint;
+  v_suspended_users bigint;
+  v_banned_users bigint;
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+
+  SELECT count(*) INTO v_audit_events FROM public.admin_audit_logs;
+
+  SELECT count(DISTINCT ur.user_id) INTO v_active_admins
+  FROM public.user_roles ur
+  JOIN public.profiles p ON p.id = ur.user_id
+  WHERE ur.role IN (
+    'admin'::public.app_role,
+    'super_admin'::public.app_role,
+    'extreme_admin'::public.app_role
+  )
+    AND coalesce(p.account_status, 'active') = 'active';
+
+  SELECT count(*) INTO v_active_managers
+  FROM (
+    SELECT ur.user_id
+    FROM public.user_roles ur
+    JOIN public.profiles p ON p.id = ur.user_id
+    WHERE ur.role = 'manager'::public.app_role
+      AND coalesce(p.account_status, 'active') = 'active'
+    UNION
+    SELECT sm.user_id
+    FROM public.school_memberships sm
+    JOIN public.profiles p ON p.id = sm.user_id
+    WHERE sm.school_role = 'manager'
+      AND sm.status = 'active'
+      AND coalesce(p.account_status, 'active') = 'active'
+  ) AS manager_accounts;
+
+  SELECT count(*) INTO v_suspended_users
+  FROM public.profiles WHERE account_status = 'suspended';
+
+  SELECT count(*) INTO v_banned_users
+  FROM public.profiles WHERE account_status = 'banned';
+
+  RETURN jsonb_build_object(
+    'audit_events', v_audit_events,
+    'active_admins', v_active_admins,
+    'active_managers', v_active_managers,
+    'suspended_users', v_suspended_users,
+    'banned_users', v_banned_users,
+    'security_audit_events', v_audit_events
+  );
+END;
+$function$;
