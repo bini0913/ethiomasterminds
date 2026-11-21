@@ -475,9 +475,19 @@ CREATE POLICY school_leadership_view_scoped_memberships
     )
     OR (
       school_memberships.school_role IN ('admin', 'teacher', 'finance')
-      AND public.school_leadership_has_permission(
-        school_memberships.school_id, 'view_staff', school_memberships.grade_label,
-        school_memberships.id, school_memberships.section_id
+      AND (
+        public.school_leadership_has_permission(
+          school_memberships.school_id, 'view_staff', school_memberships.grade_label,
+          school_memberships.id, school_memberships.section_id
+        )
+        OR public.school_leadership_has_permission(
+          school_memberships.school_id, 'manage_team_tasks', school_memberships.grade_label,
+          school_memberships.id, school_memberships.section_id
+        )
+        OR public.school_leadership_has_permission(
+          school_memberships.school_id, 'assign_team_tasks', school_memberships.grade_label,
+          school_memberships.id, school_memberships.section_id
+        )
       )
     )
   );
