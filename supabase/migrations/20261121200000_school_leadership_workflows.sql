@@ -687,6 +687,7 @@ BEGIN
        OR v_session.school_id <> NEW.school_id
        OR v_student.school_id <> NEW.school_id
        OR v_student.section_id <> v_session.section_id
+       OR NEW.attendance_status IS NULL
        OR NEW.attendance_status NOT IN ('present', 'absent', 'late', 'excused')
        OR NOT public.school_leadership_has_permission(
          NEW.school_id, 'review_attendance', v_grade_label,
@@ -739,7 +740,7 @@ DECLARE
   v_appointment_id uuid;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
-  IF p_attendance_status NOT IN ('present', 'absent', 'late', 'excused') THEN
+  IF p_attendance_status IS NULL OR p_attendance_status NOT IN ('present', 'absent', 'late', 'excused') THEN
     RAISE EXCEPTION 'Invalid attendance status';
   END IF;
   IF nullif(trim(p_reason), '') IS NULL THEN
