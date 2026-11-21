@@ -895,7 +895,7 @@ export default function SchoolManagerPortal() {
       ["middle_school_director", "Middle School Director", "middle_school"],
       ["high_school_director", "High School Director", "high_school"],
     ] as const;
-    const positionLabel = (position: string) => ({
+    const positionLabels: Record<string, string> = {
       main_director: "Main Director",
       vice_director: "Vice Director",
       kg_director: "KG Director",
@@ -903,13 +903,15 @@ export default function SchoolManagerPortal() {
       middle_school_director: "Middle School Director",
       high_school_director: "High School Director",
       team_leader: "Team Leader",
-    }[position] || position.replace(/_/g, " "));
-    const divisionLabel = (division: string | null) => ({
+    };
+    const divisionLabels: Record<string, string> = {
       kg: "KG",
       elementary: "Elementary",
       middle_school: "Middle School",
       high_school: "High School",
-    }[division || ""] || "School-wide");
+    };
+    const positionLabel = (position: string) => positionLabels[position] || position.replace(/_/g, " ");
+    const divisionLabel = (division: string | null) => divisionLabels[division || ""] || "School-wide";
     const permissionOptions = [
       ["view_students", "View assigned students"],
       ["view_staff", "View assigned staff"],
