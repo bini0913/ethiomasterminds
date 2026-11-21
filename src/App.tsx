@@ -136,7 +136,7 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/admin/early-content", title: "Early Content" },
   { prefix: "/admin", title: "Admin Portal" },
   { prefix: "/school/manager", title: "School Manager Portal" },
-  { prefix: "/school/admin", title: "School Admin Portal" },
+  { prefix: "/school/admin", title: "School Leadership Portal" },
   { prefix: "/school/teacher", title: "School Teacher Portal" },
   { prefix: "/school/parent", title: "School Parent Portal" },
   { prefix: "/school/finance", title: "School Finance Portal" },
