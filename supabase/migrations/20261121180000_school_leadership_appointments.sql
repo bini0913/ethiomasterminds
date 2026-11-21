@@ -663,7 +663,26 @@ AS $$
             WHERE team_member.appointment_id = appointment.id
               AND team_member.school_id = appointment.school_id
               AND (
-                team_member.membership_id = p_target_membership_id
+                (
+                  team_member.membership_id = p_target_membership_id
+                  AND (
+                    p_section_id IS NULL
+                    OR EXISTS (
+                      SELECT 1
+                      FROM public.school_teacher_assignments assignment
+                      JOIN public.school_sections team_section
+                        ON team_section.id = assignment.section_id
+                       AND team_section.school_id = assignment.school_id
+                      JOIN public.school_division_grade_mappings team_mapping
+                        ON team_mapping.school_id = team_section.school_id
+                       AND team_mapping.grade_label = team_section.grade_label
+                       AND team_mapping.division_scope = appointment.division_scope
+                      WHERE assignment.school_id = appointment.school_id
+                        AND assignment.teacher_membership_id = team_member.membership_id
+                        AND assignment.section_id = p_section_id
+                    )
+                  )
+                )
                 OR (
                   target.school_role = 'student'
                   AND target.section_id IS NOT NULL
