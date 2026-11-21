@@ -82,6 +82,9 @@ export default function SchoolManagerPortal() {
   const [mappingDivision, setMappingDivision] = useState("kg");
   const [teamAppointmentId, setTeamAppointmentId] = useState("");
   const [teamMemberId, setTeamMemberId] = useState("");
+  const [leadershipAuditEvents, setLeadershipAuditEvents] = useState<any[]>([]);
+  const [permissionDrafts, setPermissionDrafts] = useState<Record<string, string[]>>({});
+  const [leadershipPermissionReason, setLeadershipPermissionReason] = useState("");
 
   const [accountRole, setAccountRole] = useState<AccountRole>("admin");
   const [accountName, setAccountName] = useState("");
@@ -223,7 +226,7 @@ export default function SchoolManagerPortal() {
 
   const loadLeadership = useCallback(async () => {
     if (!schoolId) return;
-    const [appointmentsRes, mappingsRes, teamMembersRes] = await Promise.all([
+    const [appointmentsRes, mappingsRes, teamMembersRes, auditRes] = await Promise.all([
       db.from("school_leadership_appointments")
         .select("id,membership_id,position,division_scope,team_name,permissions,status,start_date,end_date,created_at")
         .eq("school_id", schoolId)
@@ -236,19 +239,26 @@ export default function SchoolManagerPortal() {
         .select("id,appointment_id,membership_id,created_at")
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
+      db.from("school_leadership_audit_events")
+        .select("id,appointment_id,actor_user_id,event_type,reason,created_at,after_state")
+        .eq("school_id", schoolId)
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
-    const loadError = appointmentsRes.error || mappingsRes.error || teamMembersRes.error;
+    const loadError = appointmentsRes.error || mappingsRes.error || teamMembersRes.error || auditRes.error;
     if (loadError) {
       setLeadershipError("Leadership management is waiting for its database migration. Existing school operations remain available.");
       setLeadershipAppointments([]);
       setDivisionMappings([]);
       setTeamAssignments([]);
+      setLeadershipAuditEvents([]);
       return;
     }
     setLeadershipError(null);
     setLeadershipAppointments(appointmentsRes.data ?? []);
     setDivisionMappings(mappingsRes.data ?? []);
     setTeamAssignments(teamMembersRes.data ?? []);
+    setLeadershipAuditEvents(auditRes.data ?? []);
   }, [schoolId, db]);
 
   useEffect(() => { void loadLeadership(); }, [loadLeadership]);
@@ -325,6 +335,26 @@ export default function SchoolManagerPortal() {
     });
     if (error) return toast.error(error.message || "The team member could not be removed.");
     toast.success("Team assignment removed.");
+    await loadLeadership();
+  };
+
+  const updateLeaderPermissions = async (appointmentId: string, permissions: string[]) => {
+    if (!leadershipPermissionReason.trim()) {
+      return toast.error("Enter a reason for changing leadership permissions.");
+    }
+    const { error } = await db.rpc("school_update_leadership_permissions", {
+      p_appointment_id: appointmentId,
+      p_permissions: permissions,
+      p_reason: leadershipPermissionReason.trim(),
+    });
+    if (error) return toast.error(error.message || "Leadership permissions could not be updated.");
+    toast.success("Leadership permissions updated and audited.");
+    setLeadershipPermissionReason("");
+    setPermissionDrafts((current) => {
+      const next = { ...current };
+      delete next[appointmentId];
+      return next;
+    });
     await loadLeadership();
   };
 
@@ -1191,6 +1221,39 @@ export default function SchoolManagerPortal() {
                     </div>
                     <SchoolStatus value={appointment.status} />
                   </div>
+                  <details className="mt-3 rounded-lg border border-slate-100 p-3">
+                    <summary className="cursor-pointer text-xs font-semibold text-blue-700">Manage permissions</summary>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                      {permissionOptions.map(([permission, label]) => {
+                        const currentPermissions = permissionDrafts[appointment.id] ?? appointment.permissions ?? [];
+                        return (
+                          <label key={permission} className="flex items-start gap-2 rounded-md border border-slate-100 p-2 text-xs text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={currentPermissions.includes(permission)}
+                              onChange={(event) => setPermissionDrafts((current) => ({
+                                ...current,
+                                [appointment.id]: event.target.checked
+                                  ? [...currentPermissions, permission]
+                                  : currentPermissions.filter((item) => item !== permission),
+                              }))}
+                              className="mt-0.5"
+                            />
+                            <span>{label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <input
+                        className={schoolInputClass}
+                        value={leadershipPermissionReason}
+                        onChange={(event) => setLeadershipPermissionReason(event.target.value)}
+                        placeholder="Reason for this permission change"
+                      />
+                      <SchoolSecondaryButton onClick={() => void updateLeaderPermissions(appointment.id, permissionDrafts[appointment.id] ?? appointment.permissions ?? [])}>Save permissions</SchoolSecondaryButton>
+                    </div>
+                  </details>
                   {appointment.status !== "ended" && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {appointment.status === "active"
@@ -1204,6 +1267,25 @@ export default function SchoolManagerPortal() {
             </div>
           ) : <SchoolEmptyState title="No leadership appointments yet" description="Appoint the Main Director, Vice Director, division directors, and team leaders above." />}
           {vacancies.length > 0 && <p className="mt-4 text-xs text-slate-500">Vacant positions: {vacancies.map(([, label]) => label).join(", ")}.</p>}
+        </SchoolPanel>
+        <SchoolPanel title="Leadership activity history" description="Appointment and permission changes are recorded by the database.">
+          {leadershipAuditEvents.length ? (
+            <div className="space-y-2">
+              {leadershipAuditEvents.slice(0, 30).map((event) => (
+                <div key={event.id} className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 py-2 last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">
+                      {event.event_type === "appointed" ? "Leadership appointment created" : "Leadership appointment updated"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {profiles[event.actor_user_id]?.name || "School Manager"} · {event.reason || "No additional reason"}
+                    </p>
+                  </div>
+                  <span className="text-xs tabular-nums text-slate-500">{new Date(event.created_at).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          ) : <SchoolEmptyState title="No leadership changes recorded" description="Appointments and permission changes will appear here." />}
         </SchoolPanel>
       </div>
     );
