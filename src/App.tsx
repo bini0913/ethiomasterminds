@@ -360,7 +360,7 @@ const App = () => (
                               />
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
                               <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
-                              <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["admin", "teacher", "finance"]}><SchoolPortalGate role="admin"><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["admin", "teacher", "finance"]}><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></ProtectedRoute>} />
                               <Route path="/school/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolPortalGate role="teacher"><SchoolTeacherPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/parent" element={<ProtectedRoute allowedRoles={["parent"]}><SchoolPortalGate role="parent"><SchoolParentPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/finance" element={<ProtectedRoute allowedRoles={["finance"]}><SchoolPortalGate role="finance"><SchoolFinancePortal /></SchoolPortalGate></ProtectedRoute>} />
