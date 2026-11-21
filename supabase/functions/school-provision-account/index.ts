@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
       if (role === "manager" && !canProvisionNetwork) {
         return json({ error: "Only the Super Admin or Extreme Admin can create a school Manager" }, 403);
       }
-      if (role !== "manager" && !isExtremeAdmin) {
+      if (role !== "manager" && !canProvisionNetwork) {
         const { data: membership, error } = await admin
           .from("school_memberships")
           .select("school_role")
