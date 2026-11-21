@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(22);
+select plan(34);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -27,6 +27,19 @@ select ok(has_function_privilege('authenticated','public.school_set_division_gra
 select ok(has_function_privilege('authenticated','public.school_assign_leadership_team_member(uuid,uuid,boolean)','EXECUTE'), 'manager team assignment RPC is available');
 select ok(not has_function_privilege('anon','public.school_set_division_grade_mapping(uuid,text,text)','EXECUTE'), 'anonymous users cannot configure school divisions');
 select ok(not has_function_privilege('anon','public.school_assign_leadership_team_member(uuid,uuid,boolean)','EXECUTE'), 'anonymous users cannot assign team members');
+
+select ok(has_function_privilege('authenticated','public.school_leadership_has_permission(uuid,text,text,uuid,uuid)','EXECUTE'), 'leadership permission resolver is available to authenticated users');
+select ok(not has_function_privilege('anon','public.school_leadership_has_permission(uuid,text,text,uuid,uuid)','EXECUTE'), 'anonymous users cannot query leadership permission resolver');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_memberships' and policyname='school_leadership_view_scoped_memberships'), 'membership reads support appointment-scoped leaders');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_sections' and policyname='school_leadership_view_scoped_sections'), 'section reads support division scope');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_teacher_assignments' and policyname='school_leadership_view_scoped_teacher_assignments'), 'teacher assignment reads support division and team scope');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_attendance_sessions' and policyname='school_leadership_view_scoped_attendance_sessions'), 'attendance session reads support leadership scope');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_attendance_records' and policyname='school_leadership_view_scoped_attendance_records'), 'attendance record reads support student and division scope');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_assessments' and policyname='school_leadership_view_scoped_assessments'), 'assessment reads support leadership scope');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_student_marks' and policyname='school_leadership_view_scoped_marks'), 'result reads support leadership scope');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_behavior_reports' and policyname='school_leadership_view_scoped_behavior_reports'), 'student support reads support leadership scope');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_homework_assignments' and policyname='school_leadership_view_scoped_homework'), 'homework reads support leadership scope');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_staff_tasks' and policyname='school_leadership_view_scoped_staff_tasks'), 'team task reads support assigned team scope');
 
 select * from finish();
 rollback;
