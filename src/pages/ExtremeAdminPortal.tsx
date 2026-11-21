@@ -428,19 +428,14 @@ const ExtremeAdminPortal: React.FC = () => {
               <CardContent className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-3">
                   <Label>Target user ID</Label>
-                  <Input value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} placeholder="UUID" className="bg-white border-slate-200" />
-
+                  <Input value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} placeholder="Select an account below or enter UUID" className="bg-white border-slate-200" />
                   <Label>Role</Label>
                   <Select value={targetRole} onValueChange={(value) => setTargetRole(value as UserRole)}>
                     <SelectTrigger className="bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {availableRoles.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}
-                    </SelectContent>
+                    <SelectContent>{availableRoles.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
                   </Select>
-
-                  <Button onClick={setRole} className="w-full">Update Role</Button>
+                  <Button onClick={setRole} className="w-full" disabled={!targetUserId.trim()}>Update Role</Button>
                 </div>
-
                 <div className="space-y-3">
                   <Label>Account status</Label>
                   <Select value={status} onValueChange={(value) => setStatus(value as AccountStatus)}>
@@ -451,29 +446,97 @@ const ExtremeAdminPortal: React.FC = () => {
                       <SelectItem value="banned">banned</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Reason" className="bg-slate-50 border-slate-200" />
-                  <Button onClick={setUserStatus} variant="secondary" className="w-full">Apply Status</Button>
+                  <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Reason for the account change" className="bg-slate-50 border-slate-200" />
+                  <Button onClick={setUserStatus} variant="secondary" className="w-full" disabled={!targetUserId.trim()}>Apply Status</Button>
                 </div>
               </CardContent>
             </Card>
-
             <Card className="bg-white border-slate-200">
               <CardHeader>
-                <CardTitle>All Users ({users.length})</CardTitle>
+                <CardTitle>Platform Accounts ({filteredUsers.length} shown · {users.length} loaded)</CardTitle>
+                <CardDescription>Select an account to populate the controls above. Top-level roles cannot be changed here.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2 max-h-96 overflow-auto">
-                {users.map((item) => (
-                  <div key={item.id} className="text-xs border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-medium">{item.name} ({item.username || 'no-username'})</div>
-                      <div className="text-slate-600">{item.id}</div>
+              <CardContent className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search name, username, or account ID" className="bg-white pl-9" />
+                </div>
+                <div className="max-h-[30rem] overflow-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+                  {filteredUsers.map((item) => (
+                    <button key={item.id} type="button" onClick={() => setTargetUserId(item.id)} className={`flex w-full flex-wrap items-center justify-between gap-2 px-3 py-3 text-left hover:bg-slate-50 ${targetUserId === item.id ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : ''}`}>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-slate-900">{item.name}</span>
+                        <span className="block truncate text-xs text-slate-500">@{item.username || 'no-username'} · {item.id}</span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2 text-xs text-slate-600">
+                        <span>{item.role}</span><span className="rounded-full bg-slate-100 px-2 py-1">{item.account_status || 'active'}</span>
+                      </span>
+                    </button>
+                  ))}
+                  {!filteredUsers.length && <p className="p-5 text-center text-sm text-slate-500">No matching accounts in the latest 300 loaded accounts.</p>}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reports" className="space-y-4">
+            <Card className="border-slate-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Platform reports</CardTitle>
+                <CardDescription>Review user-submitted reports. Every status change is recorded in the global audit log.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Optional moderation note for the audit trail" />
+                {reports.map((report) => (
+                  <div key={report.id} className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-900">{report.reason || 'User report'} <span className="ml-2 text-xs font-normal text-slate-500">{report.reported_type}</span></p>
+                        <p className="mt-1 text-xs text-slate-500">Reported by {report.reporter_name || report.reporter_id} · {report.reported_name || report.reported_id || 'No target'} · {new Date(report.created_at).toLocaleString()}</p>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{report.status}</span>
                     </div>
-                    <div className="text-right">
-                      <div>{item.role} · {item.account_status}</div>
-                      <div className="text-slate-600">XP {item.xp} · Coins {item.coins}</div>
-                    </div>
+                    {report.description && <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{report.description}</p>}
+                    {report.status !== 'resolved' && report.status !== 'dismissed' && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => void updateReport(report.id, 'reviewed')}>Mark reviewed</Button>
+                        <Button size="sm" onClick={() => void updateReport(report.id, 'resolved')}>Resolve</Button>
+                        <Button size="sm" variant="destructive" onClick={() => void updateReport(report.id, 'dismissed')}>Dismiss</Button>
+                      </div>
+                    )}
+                    <p className="mt-2 break-all text-[11px] text-slate-400">Report ID: {report.id}</p>
                   </div>
                 ))}
+                {!reports.length && <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No reports found in the latest 100 records.</p>}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="finance" className="space-y-4">
+            <Card className="border-slate-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" />Global finance overview</CardTitle>
+                <CardDescription>Read-only totals across the platform finance ledger. Transaction-level access remains in the Finance Portal.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {financeOverview.available === false ? (
+                  <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500">Global finance overview is not available.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                    {[
+                      ['Active accounts', financeOverview.accounts ?? 0],
+                      ['Invoices', financeOverview.invoices ?? 0],
+                      ['Payments', financeOverview.payments ?? 0],
+                      ['Transactions', financeOverview.transactions ?? 0],
+                      ['Current balance', Number(financeOverview.balance ?? 0).toLocaleString()],
+                    ].map(([label, value]) => (
+                      <div key={String(label)} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs text-slate-500">{label}</p>
+                        <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
