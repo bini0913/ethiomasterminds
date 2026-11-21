@@ -173,15 +173,18 @@ CREATE OR REPLACE FUNCTION public.super_admin_get_network_alerts()
 RETURNS TABLE(kind text, severity text, title text, detail text, school_id uuid, created_at timestamptz)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public
 AS $$
-  SELECT 'school_status', 'warning', 'School access is suspended', s.name || ' (' || s.school_code || ') requires review', s.id, s.updated_at
-  FROM public.schools s
-  WHERE public._is_super_admin() AND s.network_id = public.school_network_id() AND s.status = 'suspended'
-  UNION ALL
-  SELECT 'finance_followup', 'info', 'Pending finance follow-up', f.note, f.school_id, f.created_at
-  FROM public.school_finance_followups f
-  JOIN public.schools s ON s.id = f.school_id
-  WHERE public._is_super_admin() AND s.network_id = public.school_network_id() AND f.status = 'pending'
-  ORDER BY created_at DESC
+  SELECT alerts.*
+  FROM (
+    SELECT 'school_status', 'warning', 'School access is suspended', s.name || ' (' || s.school_code || ') requires review', s.id, s.updated_at AS created_at
+    FROM public.schools s
+    WHERE public._is_super_admin() AND s.network_id = public.school_network_id() AND s.status = 'suspended'
+    UNION ALL
+    SELECT 'finance_followup', 'info', 'Pending finance follow-up', f.note, f.school_id, f.created_at
+    FROM public.school_finance_followups f
+    JOIN public.schools s ON s.id = f.school_id
+    WHERE public._is_super_admin() AND s.network_id = public.school_network_id() AND f.status = 'pending'
+  ) AS alerts(kind, severity, title, detail, school_id, created_at)
+  ORDER BY alerts.created_at DESC
   LIMIT 100;
 $$;
 REVOKE ALL ON FUNCTION public.super_admin_get_network_alerts() FROM PUBLIC, anon;
