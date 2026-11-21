@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(34);
+select plan(37);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -40,6 +40,11 @@ select ok(exists (select 1 from pg_policies where schemaname='public' and tablen
 select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_behavior_reports' and policyname='school_leadership_view_scoped_behavior_reports'), 'student support reads support leadership scope');
 select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_homework_assignments' and policyname='school_leadership_view_scoped_homework'), 'homework reads support leadership scope');
 select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_staff_tasks' and policyname='school_leadership_view_scoped_staff_tasks'), 'team task reads support assigned team scope');
+
+select ok(has_function_privilege('authenticated','public.school_update_leadership_permissions(uuid,text[],text)','EXECUTE'), 'manager permission update RPC is available');
+select ok(not has_function_privilege('anon','public.school_update_leadership_permissions(uuid,text[],text)','EXECUTE'), 'anonymous users cannot change leadership permissions');
+
+select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_appointment_per_member'), 'one staff member cannot hold conflicting active leadership appointments');
 
 select * from finish();
 rollback;
