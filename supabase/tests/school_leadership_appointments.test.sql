@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(68);
+select plan(70);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -89,6 +89,10 @@ select ok(position('Main Director retains the full School Admin authority' in pg
 
 select ok(position('Only the appointed Main Director can provision school accounts' in pg_get_functiondef('public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure)) > 0, 'unappointed Admin memberships cannot provision school accounts');
 select ok(position('appointment.position = ''main_director''' in pg_get_functiondef('public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure)) > 0, 'staff provisioning verifies the Main Director appointment');
+
+
+select ok(position('Only the Main Director may use the School Admin membership' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'non-Main-Director appointments cannot reuse the School Admin membership');
+select ok(position('already has an active School Admin account' in pg_get_functiondef('public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure)) > 0, 'a school cannot provision a second active School Admin membership');
 
 select * from finish();
 rollback;
