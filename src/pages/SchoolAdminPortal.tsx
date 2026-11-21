@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
+import { useSchoolLeadership } from "@/components/school/SchoolLeadershipGate";
 import SchoolBulkStudentEnrollment from "@/components/school/SchoolBulkStudentEnrollment";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
@@ -33,6 +34,8 @@ const navItems: SchoolNavItem[] = [
 
 export default function SchoolAdminPortal() {
   const { activeSchool, activeMembership } = useSchoolPortal();
+  const { appointment } = useSchoolLeadership();
+  const canReviewAttendance = appointment.permissions.includes("review_attendance");
   const db = supabase as any;
   const schoolId = activeSchool?.id;
   const [page, setPage] = useState("overview");
@@ -68,6 +71,7 @@ export default function SchoolAdminPortal() {
   const [marks, setMarks] = useState<any[]>([]);
   const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [attendanceDrafts, setAttendanceDrafts] = useState<Record<string, { status: string; note: string; reason: string }>>({});
   const [behaviorReports, setBehaviorReports] = useState<any[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [books, setBooks] = useState<any[]>([]);
@@ -119,7 +123,7 @@ export default function SchoolAdminPortal() {
       db.from("school_homework_assignments").select("id,title,section_id,teacher_membership_id,subject_name,instructions,due_at,status,review_feedback,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(200),
       db.from("school_student_marks").select("id,assessment_id,student_membership_id,score,status,teacher_note").eq("school_id", schoolId).limit(500),
       db.from("school_attendance_sessions").select("id,section_id,attendance_date,status,recorded_by_membership_id").eq("school_id", schoolId).order("attendance_date", { ascending: false }).limit(100),
-      db.from("school_attendance_records").select("id,session_id,student_membership_id,attendance_status").eq("school_id", schoolId).limit(1000),
+      db.from("school_attendance_records").select("id,session_id,student_membership_id,attendance_status,note").eq("school_id", schoolId).limit(1000),
       db.from("school_behavior_reports").select("id,student_membership_id,section_id,reported_by_membership_id,report_type,severity,description,status,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("quizzes").select("id,title,subject,grade,school_section_id,school_review_status,created_by").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("library_books").select("id,title,subject,grade:school_grade_label,school_section_id,school_review_status,uploader_id").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
@@ -328,6 +332,25 @@ export default function SchoolAdminPortal() {
     toast.success(approve ? "Announcement published." : "Announcement rejected.");
     await load();
   };
+  const reviewAttendance = async (record: any) => {
+    const draft = attendanceDrafts[record.id] || { status: record.attendance_status, note: record.note || "", reason: "" };
+    if (!draft.reason.trim()) return toast.error("Enter a reason for this attendance correction.");
+    const { error } = await db.rpc("school_leadership_correct_attendance", {
+      p_record_id: record.id,
+      p_attendance_status: draft.status,
+      p_note: draft.note,
+      p_reason: draft.reason.trim(),
+    });
+    if (error) return toast.error(error.message || "Attendance correction was rejected.");
+    toast.success("Attendance corrected and recorded in the leadership audit history.");
+    setAttendanceDrafts((current) => {
+      const next = { ...current };
+      delete next[record.id];
+      return next;
+    });
+    await load();
+  };
+
   const reviewBehavior = async (id: string, approve: boolean) => {
     const { error } = await db.rpc("school_review_behavior_report", { p_report_id: id, p_approve: approve, p_note: reviewFeedback[id] || null });
     if (error) return toast.error(error.message);
@@ -550,6 +573,21 @@ export default function SchoolAdminPortal() {
       <SchoolPanel title="Recent attendance sessions">
         {attendanceSessions.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Date</th><th className="pb-2">Section</th><th className="pb-2">Homeroom teacher</th><th className="pb-2">Records</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{attendanceSessions.map((session) => <tr key={session.id}><td className="py-3 text-slate-700">{session.attendance_date}</td><td className="py-3 text-slate-600">{sectionLabel(session.section_id)}</td><td className="py-3 text-slate-600">{memberName(session.recorded_by_membership_id)}</td><td className="py-3 tabular-nums text-slate-600">{attendanceRecords.filter((record) => record.session_id === session.id).length}</td><td className="py-3"><SchoolStatus value={session.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No attendance sessions yet" description="Homeroom teachers' daily records will appear here." />}
       </SchoolPanel>
+      {canReviewAttendance && <SchoolPanel title="Attendance corrections" description="A reason is required. Every correction is retained in the leadership audit history.">
+        {attendanceRecords.length ? <div className="space-y-3">{attendanceRecords.slice(0, 50).map((record) => {
+          const session = attendanceSessions.find((item) => item.id === record.session_id);
+          const draft = attendanceDrafts[record.id] || { status: record.attendance_status, note: record.note || "", reason: "" };
+          return <div key={record.id} className="rounded-lg border border-slate-100 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-slate-800">{memberName(record.student_membership_id)}</p><p className="mt-1 text-xs text-slate-500">{session?.attendance_date || "—"} · {sectionLabel(session?.section_id)}</p></div><SchoolStatus value={record.attendance_status} /></div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <SchoolField label="Attendance status"><select value={draft.status} onChange={(event) => setAttendanceDrafts((current) => ({ ...current, [record.id]: { ...draft, status: event.target.value } }))} className={schoolSelectClass}><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></SchoolField>
+              <SchoolField label="Attendance note"><input value={draft.note} onChange={(event) => setAttendanceDrafts((current) => ({ ...current, [record.id]: { ...draft, note: event.target.value } }))} className={schoolInputClass} placeholder="Optional note" /></SchoolField>
+              <div className="sm:col-span-2"><SchoolField label="Reason for correction"><input value={draft.reason} onChange={(event) => setAttendanceDrafts((current) => ({ ...current, [record.id]: { ...draft, reason: event.target.value } }))} className={schoolInputClass} placeholder="Required — explain why this record is changing" /></SchoolField></div>
+            </div>
+            <div className="mt-3"><SchoolPrimaryButton onClick={() => void reviewAttendance(record)} disabled={draft.status === record.attendance_status && draft.note === (record.note || "")}>Save correction</SchoolPrimaryButton></div>
+          </div>;
+        })}</div> : <SchoolEmptyState title="No attendance records to correct" description="Records will appear after teachers submit attendance." />}
+      </SchoolPanel>}
     </div>
   );
 
