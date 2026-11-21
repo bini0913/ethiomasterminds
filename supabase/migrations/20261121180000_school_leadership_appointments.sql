@@ -116,11 +116,13 @@ AS $$
   SELECT auth.uid() IS NOT NULL AND public.is_school_manager(p_school_id);
 $$;
 
+DROP POLICY IF EXISTS school_leadership_appointments_read ON public.school_leadership_appointments;
 CREATE POLICY school_leadership_appointments_read
   ON public.school_leadership_appointments
   FOR SELECT TO authenticated
   USING (public.school_can_view_leadership_appointment(id));
 
+DROP POLICY IF EXISTS school_leadership_audit_read ON public.school_leadership_audit_events;
 CREATE POLICY school_leadership_audit_read
   ON public.school_leadership_audit_events
   FOR SELECT TO authenticated
@@ -164,6 +166,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS school_leadership_appointment_audit ON public.school_leadership_appointments;
 CREATE TRIGGER school_leadership_appointment_audit
   AFTER INSERT OR UPDATE ON public.school_leadership_appointments
   FOR EACH ROW EXECUTE FUNCTION public.school_audit_leadership_appointment();
@@ -410,22 +413,26 @@ AS $$
   );
 $$;
 
+DROP POLICY IF EXISTS school_division_grade_mappings_read ON public.school_division_grade_mappings;
 CREATE POLICY school_division_grade_mappings_read
   ON public.school_division_grade_mappings
   FOR SELECT TO authenticated
   USING (public.school_can_view_division_grade_mapping(school_id));
 
+DROP POLICY IF EXISTS school_leadership_team_members_read ON public.school_leadership_team_members;
 CREATE POLICY school_leadership_team_members_read
   ON public.school_leadership_team_members
   FOR SELECT TO authenticated
   USING (public.school_can_view_leadership_team_member(id));
 
+DROP POLICY IF EXISTS school_leadership_structure_events_read ON public.school_leadership_structure_events;
 CREATE POLICY school_leadership_structure_events_read
   ON public.school_leadership_structure_events
   FOR SELECT TO authenticated
   USING (public.is_school_manager(school_id));
 
 CREATE OR REPLACE FUNCTION public.school_set_division_grade_mapping(
+  p_school_id uuid,
   p_grade_label text,
   p_division_scope text
 )
@@ -443,10 +450,12 @@ BEGIN
 
   SELECT * INTO v_actor
   FROM public.school_memberships
-  WHERE user_id = auth.uid() AND school_role = 'manager' AND status = 'active'
-  ORDER BY created_at
+  WHERE school_id = p_school_id
+    AND user_id = auth.uid()
+    AND school_role = 'manager'
+    AND status = 'active'
   LIMIT 1;
-  IF v_actor.id IS NULL THEN RAISE EXCEPTION 'An active School Manager membership is required'; END IF;
+  IF v_actor.id IS NULL THEN RAISE EXCEPTION 'An active School Manager membership in this school is required'; END IF;
 
   IF p_division_scope IS NULL THEN
     DELETE FROM public.school_division_grade_mappings
@@ -560,7 +569,7 @@ REVOKE ALL ON FUNCTION public.school_can_view_division_grade_mapping(uuid) FROM 
 GRANT EXECUTE ON FUNCTION public.school_can_view_division_grade_mapping(uuid) TO authenticated;
 REVOKE ALL ON FUNCTION public.school_can_view_leadership_team_member(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_can_view_leadership_team_member(uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.school_set_division_grade_mapping(text, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.school_set_division_grade_mapping(text, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_set_division_grade_mapping(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_set_division_grade_mapping(uuid, text, text) TO authenticated;
 REVOKE ALL ON FUNCTION public.school_assign_leadership_team_member(uuid, uuid, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_assign_leadership_team_member(uuid, uuid, boolean) TO authenticated;
