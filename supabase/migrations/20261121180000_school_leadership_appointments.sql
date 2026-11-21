@@ -322,3 +322,245 @@ REVOKE ALL ON FUNCTION public.school_appoint_leader(uuid, text, text, text, text
 GRANT EXECUTE ON FUNCTION public.school_appoint_leader(uuid, text, text, text, text[], date, date) TO authenticated;
 REVOKE ALL ON FUNCTION public.school_update_leadership_appointment(uuid, text, date, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_update_leadership_appointment(uuid, text, date, text) TO authenticated;
+
+
+-- A school configures its own grade-to-division mapping; no grade assumptions are hardcoded.
+CREATE UNIQUE INDEX IF NOT EXISTS school_leadership_appointments_id_school_idx
+  ON public.school_leadership_appointments(id, school_id);
+
+CREATE TABLE IF NOT EXISTS public.school_division_grade_mappings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
+  division_scope text NOT NULL CHECK (division_scope IN ('kg', 'elementary', 'middle_school', 'high_school')),
+  grade_label text NOT NULL CHECK (char_length(trim(grade_label)) BETWEEN 1 AND 80),
+  created_by_membership_id uuid NOT NULL,
+  updated_by_membership_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (school_id, grade_label),
+  FOREIGN KEY (created_by_membership_id, school_id)
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
+  FOREIGN KEY (updated_by_membership_id, school_id)
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS public.school_leadership_team_members (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
+  appointment_id uuid NOT NULL,
+  membership_id uuid NOT NULL,
+  assigned_by_membership_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (appointment_id, membership_id),
+  FOREIGN KEY (appointment_id, school_id)
+    REFERENCES public.school_leadership_appointments(id, school_id) ON DELETE RESTRICT,
+  FOREIGN KEY (membership_id, school_id)
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT,
+  FOREIGN KEY (assigned_by_membership_id, school_id)
+    REFERENCES public.school_memberships(id, school_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS public.school_leadership_structure_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
+  actor_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  actor_membership_id uuid REFERENCES public.school_memberships(id) ON DELETE SET NULL,
+  event_type text NOT NULL CHECK (event_type IN (
+    'division_grade_mapped', 'division_grade_unmapped',
+    'team_member_assigned', 'team_member_removed'
+  )),
+  details jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS school_division_grade_mappings_school_idx
+  ON public.school_division_grade_mappings(school_id, division_scope, grade_label);
+CREATE INDEX IF NOT EXISTS school_leadership_team_members_appointment_idx
+  ON public.school_leadership_team_members(appointment_id, created_at);
+CREATE INDEX IF NOT EXISTS school_leadership_structure_events_school_idx
+  ON public.school_leadership_structure_events(school_id, created_at DESC);
+
+ALTER TABLE public.school_division_grade_mappings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_leadership_team_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_leadership_structure_events ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_division_grade_mapping(p_school_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT auth.uid() IS NOT NULL
+    AND (public.is_active_school_member(p_school_id, NULL::text[]) OR public._is_extreme_admin());
+$$;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_leadership_team_member(p_assignment_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM public.school_leadership_team_members assignment
+    WHERE assignment.id = p_assignment_id
+      AND public.school_can_view_leadership_appointment(assignment.appointment_id)
+  );
+$$;
+
+CREATE POLICY school_division_grade_mappings_read
+  ON public.school_division_grade_mappings
+  FOR SELECT TO authenticated
+  USING (public.school_can_view_division_grade_mapping(school_id));
+
+CREATE POLICY school_leadership_team_members_read
+  ON public.school_leadership_team_members
+  FOR SELECT TO authenticated
+  USING (public.school_can_view_leadership_team_member(id));
+
+CREATE POLICY school_leadership_structure_events_read
+  ON public.school_leadership_structure_events
+  FOR SELECT TO authenticated
+  USING (public.is_school_manager(school_id));
+
+CREATE OR REPLACE FUNCTION public.school_set_division_grade_mapping(
+  p_grade_label text,
+  p_division_scope text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_actor public.school_memberships%ROWTYPE;
+  v_grade text := nullif(trim(p_grade_label), '');
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF v_grade IS NULL THEN RAISE EXCEPTION 'Grade label is required'; END IF;
+
+  SELECT * INTO v_actor
+  FROM public.school_memberships
+  WHERE user_id = auth.uid() AND school_role = 'manager' AND status = 'active'
+  ORDER BY created_at
+  LIMIT 1;
+  IF v_actor.id IS NULL THEN RAISE EXCEPTION 'An active School Manager membership is required'; END IF;
+
+  IF p_division_scope IS NULL THEN
+    DELETE FROM public.school_division_grade_mappings
+    WHERE school_id = v_actor.school_id AND grade_label = v_grade;
+    INSERT INTO public.school_leadership_structure_events (
+      school_id, actor_user_id, actor_membership_id, event_type, details
+    ) VALUES (
+      v_actor.school_id, auth.uid(), v_actor.id, 'division_grade_unmapped',
+      jsonb_build_object('grade_label', v_grade)
+    );
+    RETURN true;
+  END IF;
+
+  IF p_division_scope NOT IN ('kg', 'elementary', 'middle_school', 'high_school') THEN
+    RAISE EXCEPTION 'Invalid school division';
+  END IF;
+
+  INSERT INTO public.school_division_grade_mappings (
+    school_id, division_scope, grade_label, created_by_membership_id, updated_by_membership_id
+  ) VALUES (
+    v_actor.school_id, p_division_scope, v_grade, v_actor.id, v_actor.id
+  )
+  ON CONFLICT (school_id, grade_label) DO UPDATE
+  SET division_scope = EXCLUDED.division_scope,
+      updated_by_membership_id = EXCLUDED.updated_by_membership_id,
+      updated_at = now();
+
+  INSERT INTO public.school_leadership_structure_events (
+    school_id, actor_user_id, actor_membership_id, event_type, details
+  ) VALUES (
+    v_actor.school_id, auth.uid(), v_actor.id, 'division_grade_mapped',
+    jsonb_build_object('grade_label', v_grade, 'division_scope', p_division_scope)
+  );
+  RETURN true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.school_assign_leadership_team_member(
+  p_appointment_id uuid,
+  p_target_membership_id uuid,
+  p_assign boolean
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_appointment public.school_leadership_appointments%ROWTYPE;
+  v_target public.school_memberships%ROWTYPE;
+  v_actor public.school_memberships%ROWTYPE;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+
+  SELECT * INTO v_appointment
+  FROM public.school_leadership_appointments
+  WHERE id = p_appointment_id AND position = 'team_leader' AND status = 'active';
+  IF v_appointment.id IS NULL THEN RAISE EXCEPTION 'An active Team Leader appointment is required'; END IF;
+
+  SELECT * INTO v_actor
+  FROM public.school_memberships
+  WHERE school_id = v_appointment.school_id
+    AND user_id = auth.uid()
+    AND school_role = 'manager'
+    AND status = 'active'
+  LIMIT 1;
+  IF v_actor.id IS NULL THEN RAISE EXCEPTION 'Only the School Manager can manage team membership'; END IF;
+
+  SELECT * INTO v_target
+  FROM public.school_memberships
+  WHERE id = p_target_membership_id
+    AND school_id = v_appointment.school_id
+    AND status = 'active'
+    AND school_role IN ('admin', 'teacher', 'finance');
+  IF v_target.id IS NULL THEN RAISE EXCEPTION 'Choose active staff from this school'; END IF;
+
+  IF p_assign THEN
+    INSERT INTO public.school_leadership_team_members (
+      school_id, appointment_id, membership_id, assigned_by_membership_id
+    ) VALUES (
+      v_appointment.school_id, v_appointment.id, v_target.id, v_actor.id
+    ) ON CONFLICT (appointment_id, membership_id) DO NOTHING;
+    INSERT INTO public.school_leadership_structure_events (
+      school_id, actor_user_id, actor_membership_id, event_type, details
+    ) VALUES (
+      v_appointment.school_id, auth.uid(), v_actor.id, 'team_member_assigned',
+      jsonb_build_object('appointment_id', v_appointment.id, 'membership_id', v_target.id)
+    );
+  ELSE
+    DELETE FROM public.school_leadership_team_members
+    WHERE appointment_id = v_appointment.id AND membership_id = v_target.id;
+    INSERT INTO public.school_leadership_structure_events (
+      school_id, actor_user_id, actor_membership_id, event_type, details
+    ) VALUES (
+      v_appointment.school_id, auth.uid(), v_actor.id, 'team_member_removed',
+      jsonb_build_object('appointment_id', v_appointment.id, 'membership_id', v_target.id)
+    );
+  END IF;
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON TABLE public.school_division_grade_mappings FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.school_division_grade_mappings TO authenticated;
+REVOKE ALL ON TABLE public.school_leadership_team_members FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.school_leadership_team_members TO authenticated;
+REVOKE ALL ON TABLE public.school_leadership_structure_events FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.school_leadership_structure_events TO authenticated;
+
+REVOKE ALL ON FUNCTION public.school_can_view_division_grade_mapping(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_division_grade_mapping(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_can_view_leadership_team_member(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_leadership_team_member(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_set_division_grade_mapping(text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_set_division_grade_mapping(text, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.school_assign_leadership_team_member(uuid, uuid, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_assign_leadership_team_member(uuid, uuid, boolean) TO authenticated;
