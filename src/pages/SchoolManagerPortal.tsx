@@ -1305,7 +1305,8 @@ export default function SchoolManagerPortal() {
                     <span className="text-xs tabular-nums text-slate-500">{new Date(event.created_at).toLocaleString()}</span>
                   </div>
                   <p className="mt-1 text-xs text-slate-600">{profiles[event.actor_user_id]?.name || "School leader"} · {event.reason}</p>
-                  {event.before_state && event.after_state && <p className="mt-1 text-xs text-slate-500">Record changed · {event.target_table}</p>}
+                  {event.target_table === "school_attendance_records" && <p className="mt-1 text-xs text-slate-500">Attendance: {event.before_state?.attendance_status || "—"} → {event.after_state?.attendance_status || "—"}</p>}
+                  {event.target_table === "school_staff_tasks" && <p className="mt-1 text-xs text-slate-500">Task: {event.after_state?.title || "Staff task"} · Status: {event.after_state?.status || "created"}</p>}
                 </div>
               ))}
             </div>
