@@ -277,7 +277,7 @@ BEGIN
      OR NOT (
        public.school_is_admin(v_book.school_id)
        OR public.school_leadership_has_permission(
-         v_book.school_id, 'review_assessments', v_book.grade,
+         v_book.school_id, 'review_assessments', v_book.school_grade_label,
          NULL, v_book.school_section_id
        )
      ) THEN
