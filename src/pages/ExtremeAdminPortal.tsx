@@ -57,7 +57,7 @@ const ExtremeAdminPortal: React.FC = () => {
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [dashboard, setDashboard] = useState<Record<string, number>>({});
   const [logs, setLogs] = useState<any[]>([]);
-  const [settings, setSettings] = useState<Record<string, boolean>>({});
+  const [settings, setSettings] = useState<Record<string, boolean | number>>({});
   const [securitySummary, setSecuritySummary] = useState<Record<string, number>>({});
   const [schools, setSchools] = useState<PortalSchool[]>([]);
   const [reports, setReports] = useState<PortalReport[]>([]);
@@ -65,6 +65,7 @@ const ExtremeAdminPortal: React.FC = () => {
   const [posts, setPosts] = useState<PortalPost[]>([]);
   const [financeOverview, setFinanceOverview] = useState<FinanceOverview>({});
   const [userSearch, setUserSearch] = useState('');
+  const [aiDailyLimit, setAiDailyLimit] = useState('50');
   const [superAdminUsers, setSuperAdminUsers] = useState<PortalUser[]>([]);
 
   const [targetUserId, setTargetUserId] = useState('');
@@ -129,11 +130,13 @@ const ExtremeAdminPortal: React.FC = () => {
       setPosts((postData as PortalPost[]) || []);
       setFinanceOverview((financeData as FinanceOverview) || {});
 
-      const mappedSettings = (settingsData || []).reduce((acc: Record<string, boolean>, row: any) => {
-        acc[row.setting_key] = row.setting_value === true;
+      const mappedSettings = (settingsData || []).reduce((acc: Record<string, boolean | number>, row: any) => {
+        acc[row.setting_key] = typeof row.setting_value === 'number' ? row.setting_value : row.setting_value === true;
         return acc;
       }, {});
       setSettings(mappedSettings);
+      const configuredLimit = mappedSettings.max_ai_requests_per_day;
+      setAiDailyLimit(String(typeof configuredLimit === 'number' ? configuredLimit : 50));
     } catch (error: any) {
       toast.error(error.message || 'Failed to refresh root control data');
     } finally {
@@ -274,7 +277,7 @@ const ExtremeAdminPortal: React.FC = () => {
   });
 
   const updateSetting = async (key: string, value: boolean) => {
-    const { error } = await supabase.rpc('extreme_admin_set_setting' as any, {
+    const { error } = await supabase.rpc('admin_set_setting' as any, {
       p_key: key,
       p_value: value,
     });
@@ -286,6 +289,21 @@ const ExtremeAdminPortal: React.FC = () => {
 
     setSettings((prev) => ({ ...prev, [key]: value }));
     toast.success(`${key} updated`);
+  };
+
+  const updateAiDailyLimit = async () => {
+    const value = Number(aiDailyLimit);
+    if (!Number.isInteger(value) || value < 0 || value > 300) {
+      return toast.error('AI daily limit must be a whole number from 0 to 300');
+    }
+    const { error } = await supabase.rpc('admin_set_setting' as any, {
+      p_key: 'max_ai_requests_per_day',
+      p_value: value,
+    });
+    if (error) return toast.error(error.message || 'AI daily limit could not be updated');
+    setSettings((prev) => ({ ...prev, max_ai_requests_per_day: value }));
+    toast.success('AI daily limit updated');
+    await refreshAll();
   };
 
   const overviewMetrics = [
@@ -645,12 +663,27 @@ const ExtremeAdminPortal: React.FC = () => {
                 <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" />Feature + Platform Controls</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {['feature_social_enabled', 'feature_ai_enabled', 'feature_xp_enabled', 'leaderboard_enabled', 'grades_enabled'].map((key) => (
+                {['feature_social_enabled', 'feature_ai_enabled', 'feature_xp_enabled', 'leaderboard_enabled', 'grades_enabled', 'strict_moderation'].map((key) => (
                   <div key={key} className="flex items-center justify-between border border-slate-200 rounded p-3 bg-slate-50">
                     <span className="text-sm">{key}</span>
                     <Switch checked={Boolean(settings[key])} onCheckedChange={(value) => updateSetting(key, value)} />
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" />AI usage limit</CardTitle>
+                <CardDescription>This is enforced by the database AI request limiter per account over a rolling 24-hour window. Set 0 to disable AI requests globally; maximum 300 per account per 24 hours.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex-1 space-y-2">
+                  <Label>Maximum AI requests per account / 24 hours</Label>
+                  <Input type="number" min={0} max={300} step={1} value={aiDailyLimit} onChange={(e) => setAiDailyLimit(e.target.value)} className="bg-white" />
+                </div>
+                <Button onClick={() => void updateAiDailyLimit()}>Save AI limit</Button>
+                <p className="text-xs text-slate-500">Current saved value: {typeof settings.max_ai_requests_per_day === 'number' ? settings.max_ai_requests_per_day : 50}</p>
               </CardContent>
             </Card>
 
