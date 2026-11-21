@@ -223,6 +223,10 @@ export default function SchoolManagerPortal() {
     setLoading(false);
   }, [schoolId, db, sectionYearId, subjectYearId, feeYearId, gradingYearId, gradingGradeLabel]);
 
+  useEffect(() => {
+    const hasActiveAdmin = members.some((member) => member.school_role === "admin" && member.status === "active");
+    if (hasActiveAdmin && accountRole === "admin") setAccountRole("teacher");
+  }, [members, accountRole]);
   useEffect(() => { void load(); }, [load]);
 
   const loadLeadership = useCallback(async () => {
@@ -754,9 +758,10 @@ export default function SchoolManagerPortal() {
           <form onSubmit={createAccount} className="space-y-3">
             <SchoolField label="Account role">
               <select className={schoolSelectClass} value={accountRole} onChange={(event) => setAccountRole(event.target.value as AccountRole)}>
-                <option value="admin">School Admin</option><option value="teacher">Teacher</option><option value="finance">Finance</option><option value="parent">Parent</option><option value="student">Student</option>
+                <option value="admin" disabled={members.some((member) => member.school_role === "admin" && member.status === "active")}>Main Director account (one per school)</option><option value="teacher">Teacher</option><option value="finance">Finance</option><option value="parent">Parent</option><option value="student">Student</option>
               </select>
             </SchoolField>
+            {members.some((member) => member.school_role === "admin" && member.status === "active") && <p className="text-xs leading-5 text-slate-500">An active School Admin account already exists. Appoint that account as Main Director instead of creating another.</p>}
             <SchoolField label="Full name"><input className={schoolInputClass} value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder="Full name" /></SchoolField>
             {accountRole === "student" && <>
               <SchoolField label="Class section"><select className={schoolSelectClass} value={accountSectionId} onChange={(event) => setAccountSectionId(event.target.value)}><option value="">Choose section</option>{sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}</select></SchoolField>
