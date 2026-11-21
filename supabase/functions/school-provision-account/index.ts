@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
         const adminMembership = (memberships ?? []).find((membership: { id: string; school_role: string }) => membership.school_role === "admin");
         let isMainDirector = false;
         if (adminMembership) {
-          const today = new Date().toISOString().slice(0, 10);
+          const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
           const { data: appointment, error: appointmentError } = await admin
             .from("school_leadership_appointments")
             .select("id")
