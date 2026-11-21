@@ -98,7 +98,7 @@ function ScopedLeadershipWorkspace() {
         .eq("school_id", schoolId)
         .order("grade_label");
     }
-    if (can("view_attendance")) {
+    if (can("view_attendance") || can("review_attendance")) {
       requests.sessions = db.from("school_attendance_sessions")
         .select("id,section_id,attendance_date,status")
         .eq("school_id", schoolId)
@@ -117,6 +117,13 @@ function ScopedLeadershipWorkspace() {
         .limit(100);
       requests.homework = db.from("school_homework_assignments")
         .select("id,title,section_id,subject_name,due_at,status,created_at")
+        .eq("school_id", schoolId)
+        .order("created_at", { ascending: false })
+        .limit(100);
+    }
+    if (can("view_discipline") || can("review_discipline")) {
+      requests.behavior = db.from("school_behavior_reports")
+        .select("id,student_membership_id,section_id,report_type,severity,description,status,created_at")
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false })
         .limit(100);
