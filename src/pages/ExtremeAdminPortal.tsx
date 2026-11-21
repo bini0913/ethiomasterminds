@@ -258,7 +258,7 @@ const ExtremeAdminPortal: React.FC = () => {
   const updateReport = async (reportId: string, nextStatus: 'reviewed' | 'resolved' | 'dismissed') => {
     const actionLabel = nextStatus === 'dismissed' ? 'dismiss this report' : nextStatus === 'resolved' ? 'resolve this report' : 'mark this report reviewed';
     if (!window.confirm(`Are you sure you want to ${actionLabel}?`)) return;
-    const { error } = await supabase.rpc('extreme_admin_resolve_report' as any, {
+    const { error } = await supabase.rpc('extreme_admin_set_report_status' as any, {
       p_report_id: reportId,
       p_status: nextStatus,
       p_reason: statusReason.trim() || null,
