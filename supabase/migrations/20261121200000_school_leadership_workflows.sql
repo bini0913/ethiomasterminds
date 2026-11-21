@@ -990,7 +990,7 @@ BEGIN
 
   RETURN v_appointment_id;
 END;
-$function$
+$function$;
 
 
 -- Serialize Main Director account creation and reject a second active School Admin.
@@ -1279,6 +1279,6 @@ BEGIN
 
   RETURN v_membership_id;
 END;
-$function$
+$function$;
 
 
