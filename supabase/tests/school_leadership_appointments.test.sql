@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(63);
+select plan(66);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
