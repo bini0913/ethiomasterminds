@@ -51,6 +51,10 @@ const Index: React.FC = () => {
         navigate('/root-control-portal-9xA7');
         return;
       }
+      if (user.role === 'super_admin') {
+        navigate('/super-admin');
+        return;
+      }
       if (user.role === 'teacher') {
         navigate('/teacher');
         return;

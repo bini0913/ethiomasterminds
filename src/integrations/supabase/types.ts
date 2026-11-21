@@ -2866,7 +2866,7 @@ export type Database = {
       update_user_streak: { Args: { p_user_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "student" | "teacher" | "admin" | "manager" | "extreme_admin" | "finance" | "parent" | "super_admin"
+      app_role: "student" | "teacher" | "admin" | "manager" | "finance" | "parent" | "super_admin" | "extreme_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2994,7 +2994,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["student", "teacher", "admin", "manager", "extreme_admin", "finance", "parent", "super_admin"],
+      app_role: ["student", "teacher", "admin", "manager", "finance", "parent", "super_admin", "extreme_admin"],
     },
   },
 } as const

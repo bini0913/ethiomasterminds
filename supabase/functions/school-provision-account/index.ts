@@ -136,13 +136,26 @@ Deno.serve(async (req) => {
       if (name.length < 2 || name.length > 160 || !/^[A-Z0-9]{2,8}$/.test(schoolCode) || managerName.length < 2) {
         return json({ error: "School name, school code, and Manager name are required" }, 400);
       }
+      const { data: network, error: networkError } = await admin
+        .from("school_networks")
+        .select("id")
+        .eq("network_key", true)
+        .single();
+      if (networkError || !network) return json({ error: "School network is unavailable" }, 503);
 
       const { data: school, error: schoolError } = await admin
         .from("schools")
-        .insert({ name, school_code: schoolCode, created_by: actorId })
+        .insert({ name, school_code: schoolCode, network_id: network.id, created_by: actorId })
         .select("id,name,school_code")
         .single();
       if (schoolError || !school) return json({ error: "Could not create the school" }, 409);
+      await admin.from("admin_audit_logs").insert({
+        actor_id: actorId,
+        action: "school_registered",
+        target_type: "school",
+        target_id: school.id,
+        metadata: { school_code: schoolCode, network_id: network.id, manager_provisioned: true },
+      });
 
       try {
         const username = await uniqueStaffUsername();
@@ -175,7 +188,7 @@ Deno.serve(async (req) => {
         return json({ error: "Provide a school, valid role, and between 1 and 100 accounts" }, 400);
       }
       if (role === "manager" && !canProvisionNetwork) {
-        return json({ error: "Only the Super Admin can create a school Manager" }, 403);
+        return json({ error: "Only the Super Admin or Extreme Admin can create a school Manager" }, 403);
       }
       if (role !== "manager" && !isExtremeAdmin) {
         const { data: membership, error } = await admin

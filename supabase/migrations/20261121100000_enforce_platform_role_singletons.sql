@@ -599,27 +599,6 @@ BEGIN
   END IF;
   EXECUTE replace(v_definition, v_old, v_new);
 
-  -- The trusted account-provisioning RPC must recognize the distinct
-  -- Super Admin only for its explicit platform-level Manager workflow.
-  v_definition := pg_get_functiondef(
-    'public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure
-  );
-  v_old := 'WHERE user_id = p_actor_id AND role = ''extreme_admin''::public.app_role';
-  v_new := 'WHERE user_id = p_actor_id AND role IN (''extreme_admin''::public.app_role, ''super_admin''::public.app_role)';
-  IF position(v_old IN v_definition) = 0 THEN
-    RAISE EXCEPTION 'Could not safely update school_attach_account';
-  END IF;
-  EXECUTE replace(v_definition, v_old, v_new);
-
-  v_definition := pg_get_functiondef(
-    'public.school_link_parent_students(uuid,uuid,uuid[])'::regprocedure
-  );
-  v_old := 'WHERE user_id = p_actor_id AND role = ''extreme_admin''::public.app_role';
-  v_new := 'WHERE user_id = p_actor_id AND role IN (''extreme_admin''::public.app_role, ''super_admin''::public.app_role)';
-  IF position(v_old IN v_definition) = 0 THEN
-    RAISE EXCEPTION 'Could not safely update school_link_parent_students';
-  END IF;
-  EXECUTE replace(v_definition, v_old, v_new);
 END;
 $$;
 
@@ -680,7 +659,8 @@ BEGIN
 
   UPDATE public.schools
   SET status = p_status, updated_at = now()
-  WHERE id = p_school_id;
+  WHERE id = p_school_id
+    AND network_id = public.school_network_id();
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'School not found';
