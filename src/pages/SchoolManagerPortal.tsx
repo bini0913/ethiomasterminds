@@ -69,7 +69,12 @@ export default function SchoolManagerPortal() {
   const [leaderTeamName, setLeaderTeamName] = useState("");
   const [leaderStartDate, setLeaderStartDate] = useState("");
   const [leaderEndDate, setLeaderEndDate] = useState("");
-  const [leaderPermissions, setLeaderPermissions] = useState<string[]>(["view_reports"]);
+  const [leaderPermissions, setLeaderPermissions] = useState<string[]>([
+    "view_students", "view_staff", "view_attendance", "review_attendance",
+    "view_academics", "review_assessments", "review_results", "view_curriculum",
+    "manage_team_tasks", "assign_team_tasks", "view_reports", "publish_announcements",
+    "view_discipline", "review_discipline", "view_finance_summary", "manage_meetings",
+  ]);
   const [leadershipActionReason, setLeadershipActionReason] = useState("");
   const [divisionMappings, setDivisionMappings] = useState<any[]>([]);
   const [teamAssignments, setTeamAssignments] = useState<any[]>([]);
@@ -1035,7 +1040,28 @@ export default function SchoolManagerPortal() {
                 </select>
               </SchoolField>
               <SchoolField label="Leadership position">
-                <select className={schoolSelectClass} value={leaderPosition} onChange={(event) => setLeaderPosition(event.target.value)}>
+                <select
+                  className={schoolSelectClass}
+                  value={leaderPosition}
+                  onChange={(event) => {
+                    const nextPosition = event.target.value;
+                    setLeaderPosition(nextPosition);
+                    if (nextPosition === "main_director") {
+                      setLeaderPermissions([
+                        "view_students", "view_staff", "view_attendance", "review_attendance",
+                        "view_academics", "review_assessments", "review_results", "view_curriculum",
+                        "manage_team_tasks", "assign_team_tasks", "view_reports", "publish_announcements",
+                        "view_discipline", "review_discipline", "view_finance_summary", "manage_meetings",
+                      ]);
+                    } else if (nextPosition === "vice_director") {
+                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "view_curriculum", "view_reports", "manage_team_tasks", "manage_meetings"]);
+                    } else if (nextPosition === "team_leader") {
+                      setLeaderPermissions(["view_staff", "view_attendance", "view_academics", "view_curriculum", "manage_team_tasks", "assign_team_tasks", "view_reports"]);
+                    } else {
+                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_discipline", "view_reports", "manage_team_tasks"]);
+                    }
+                  }}
+                >
                   <option value="main_director">Main Director</option>
                   <option value="vice_director">Vice Director</option>
                   <option value="kg_director">KG Director</option>
