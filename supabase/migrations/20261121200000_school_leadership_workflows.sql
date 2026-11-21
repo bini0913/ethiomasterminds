@@ -347,7 +347,7 @@ BEGIN
       IF v_target_role NOT IN ('admin', 'teacher', 'finance') THEN
         RAISE EXCEPTION 'Manager tasks may be assigned to Admin, Teacher, or Finance staff';
       END IF;
-    ELSIF v_actor_role = 'admin' THEN
+    ELSIF v_actor_role = 'admin' AND public.school_is_admin(NEW.school_id) THEN
       IF v_target_role <> 'teacher' OR NEW.task_type <> 'academic' THEN
         RAISE EXCEPTION 'Main Director can assign academic tasks to teachers only';
       END IF;
@@ -411,7 +411,8 @@ BEGIN
     IF NEW.status = 'submitted' THEN NEW.submitted_at := now(); END IF;
   ELSIF v_actor = OLD.assigned_by_membership_id
         AND (
-          v_actor_role IN ('manager', 'admin')
+          v_actor_role = 'manager'
+          OR public.school_is_admin(OLD.school_id)
           OR public.school_leadership_has_permission(
             OLD.school_id, 'assign_team_tasks', NULL, OLD.assigned_to_membership_id, NULL
           )
