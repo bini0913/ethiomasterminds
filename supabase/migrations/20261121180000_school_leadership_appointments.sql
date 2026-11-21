@@ -195,22 +195,23 @@ DECLARE
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
 
-  SELECT * INTO v_actor
-  FROM public.school_memberships
-  WHERE user_id = auth.uid() AND school_role = 'manager' AND status = 'active'
-  ORDER BY created_at
-  LIMIT 1;
-  IF v_actor.id IS NULL THEN RAISE EXCEPTION 'An active School Manager membership is required'; END IF;
-
   SELECT * INTO v_target
   FROM public.school_memberships
   WHERE id = p_target_membership_id
-    AND school_id = v_actor.school_id
     AND status = 'active'
     AND school_role IN ('admin', 'teacher', 'finance');
   IF v_target.id IS NULL THEN
-    RAISE EXCEPTION 'Choose an active Admin, Teacher, or Finance membership in this school';
+    RAISE EXCEPTION 'Choose an active Admin, Teacher, or Finance membership in a school you manage';
   END IF;
+
+  SELECT * INTO v_actor
+  FROM public.school_memberships
+  WHERE school_id = v_target.school_id
+    AND user_id = auth.uid()
+    AND school_role = 'manager'
+    AND status = 'active'
+  LIMIT 1;
+  IF v_actor.id IS NULL THEN RAISE EXCEPTION 'An active School Manager membership in the target school is required'; END IF;
   IF v_target.user_id = auth.uid() THEN RAISE EXCEPTION 'The School Manager cannot appoint themselves'; END IF;
 
   IF p_position NOT IN (
@@ -235,7 +236,7 @@ BEGIN
   IF p_end_date IS NOT NULL AND p_end_date < COALESCE(p_start_date, CURRENT_DATE) THEN
     RAISE EXCEPTION 'Appointment end date cannot precede its start date';
   END IF;
-  IF COALESCE(p_permissions, ARRAY[]::text[]) - v_allowed_permissions <> ARRAY[]::text[] THEN
+  IF NOT (COALESCE(p_permissions, ARRAY[]::text[]) <@ v_allowed_permissions) THEN
     RAISE EXCEPTION 'One or more permissions are not supported';
   END IF;
 
