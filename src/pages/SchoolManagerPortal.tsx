@@ -62,6 +62,7 @@ export default function SchoolManagerPortal() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [leadershipAppointments, setLeadershipAppointments] = useState<any[]>([]);
+  const [leadershipActionEvents, setLeadershipActionEvents] = useState<any[]>([]);
   const [leadershipError, setLeadershipError] = useState<string | null>(null);
   const [leaderTargetId, setLeaderTargetId] = useState("");
   const [leaderPosition, setLeaderPosition] = useState("main_director");
@@ -226,7 +227,7 @@ export default function SchoolManagerPortal() {
 
   const loadLeadership = useCallback(async () => {
     if (!schoolId) return;
-    const [appointmentsRes, mappingsRes, teamMembersRes, auditRes] = await Promise.all([
+    const [appointmentsRes, mappingsRes, teamMembersRes, auditRes, actionEventsRes] = await Promise.all([
       db.from("school_leadership_appointments")
         .select("id,membership_id,position,division_scope,team_name,permissions,status,start_date,end_date,created_at")
         .eq("school_id", schoolId)
@@ -244,6 +245,11 @@ export default function SchoolManagerPortal() {
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false })
         .limit(100),
+      db.from("school_leadership_action_events")
+        .select("id,appointment_id,actor_user_id,action_type,target_table,target_id,reason,created_at,before_state,after_state")
+        .eq("school_id", schoolId)
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
     const loadError = appointmentsRes.error || mappingsRes.error || teamMembersRes.error || auditRes.error;
     if (loadError) {
@@ -252,6 +258,7 @@ export default function SchoolManagerPortal() {
       setDivisionMappings([]);
       setTeamAssignments([]);
       setLeadershipAuditEvents([]);
+      setLeadershipActionEvents([]);
       return;
     }
     setLeadershipError(null);
@@ -259,6 +266,7 @@ export default function SchoolManagerPortal() {
     setDivisionMappings(mappingsRes.data ?? []);
     setTeamAssignments(teamMembersRes.data ?? []);
     setLeadershipAuditEvents(auditRes.data ?? []);
+    setLeadershipActionEvents(actionEventsRes.error ? [] : (actionEventsRes.data ?? []));
   }, [schoolId, db]);
 
   useEffect(() => { void loadLeadership(); }, [loadLeadership]);
@@ -1286,6 +1294,22 @@ export default function SchoolManagerPortal() {
               ))}
             </div>
           ) : <SchoolEmptyState title="No leadership changes recorded" description="Appointments and permission changes will appear here." />}
+        </SchoolPanel>
+        <SchoolPanel title="Leadership operational audit" description="Attendance corrections and other leadership actions are recorded with their reason and before/after values.">
+          {leadershipActionEvents.length ? (
+            <div className="space-y-2">
+              {leadershipActionEvents.slice(0, 30).map((event) => (
+                <div key={event.id} className="border-b border-slate-100 py-2 last:border-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium capitalize text-slate-800">{event.action_type.replace(/_/g, " ")}</p>
+                    <span className="text-xs tabular-nums text-slate-500">{new Date(event.created_at).toLocaleString()}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600">{profiles[event.actor_user_id]?.name || "School leader"} · {event.reason}</p>
+                  {event.before_state && event.after_state && <p className="mt-1 text-xs text-slate-500">Record changed · {event.target_table}</p>}
+                </div>
+              ))}
+            </div>
+          ) : <SchoolEmptyState title="No operational leadership actions" description="Attendance corrections and leadership task actions will appear here." />}
         </SchoolPanel>
       </div>
     );
