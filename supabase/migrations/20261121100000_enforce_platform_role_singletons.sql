@@ -610,6 +610,7 @@ TO authenticated
 WITH CHECK (
   (public._is_extreme_admin() OR public._is_super_admin())
   AND created_by = auth.uid()
+  AND network_id = public.school_network_id()
 );
 
 DROP POLICY IF EXISTS schools_super_admin_update ON public.schools;
@@ -617,8 +618,8 @@ CREATE POLICY schools_super_admin_update
 ON public.schools
 FOR UPDATE
 TO authenticated
-USING (public._is_extreme_admin() OR public._is_super_admin())
-WITH CHECK (public._is_extreme_admin() OR public._is_super_admin());
+USING ((public._is_extreme_admin() OR public._is_super_admin()) AND network_id = public.school_network_id())
+WITH CHECK ((public._is_extreme_admin() OR public._is_super_admin()) AND network_id = public.school_network_id());
 
 
 -- Super Admin may inspect profiles only when they belong to an active school
