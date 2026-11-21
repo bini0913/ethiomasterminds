@@ -2822,6 +2822,26 @@ export type Database = {
         }
         Returns: boolean
       }
+      create_chat_group: {
+        Args: { p_description?: string; p_group_type?: string; p_name: string }
+        Returns: Database["public"]["Tables"]["chat_groups"]["Row"]
+      }
+      join_chat_group: { Args: { p_group_id: string }; Returns: boolean }
+      leave_chat_group: { Args: { p_group_id: string }; Returns: boolean }
+      add_chat_group_member: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      send_group_message: {
+        Args: {
+          p_attachment_url?: string
+          p_content: string
+          p_group_id: string
+          p_message_type?: string
+          p_reply_to_id?: string
+        }
+        Returns: Database["public"]["Tables"]["group_messages"]["Row"]
+      }
       is_room_member: {
         Args: { p_room_id: string; p_user_id: string }
         Returns: boolean

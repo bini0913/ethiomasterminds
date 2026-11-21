@@ -282,14 +282,11 @@ const EnhancedChatSystem: React.FC<EnhancedChatSystemProps> = ({
     }
 
     try {
-      const { error } = await supabase
-        .from('group_messages')
-        .insert({
-          group_id: activeChat,
-          sender_id: currentUserId,
-          content: filtered,
-          message_type: type
-        });
+      const { error } = await supabase.rpc('send_group_message', {
+        p_group_id: activeChat,
+        p_content: filtered,
+        p_message_type: type,
+      });
 
       if (error) throw error;
 
@@ -306,27 +303,12 @@ const EnhancedChatSystem: React.FC<EnhancedChatSystemProps> = ({
     if (!newGroupName.trim() || currentUserId === 'guest') return;
 
     try {
-      // Create the group
-      const { data: group, error: groupError } = await supabase
-        .from('chat_groups')
-        .insert({
-          name: newGroupName.trim(),
-          created_by: currentUserId,
-          group_type: 'group'
-        })
-        .select()
-        .single();
+      const { error } = await supabase.rpc('create_chat_group', {
+        p_name: newGroupName.trim(),
+        p_group_type: 'group',
+      });
 
-      if (groupError) throw groupError;
-
-      // Add creator as member
-      await supabase
-        .from('chat_group_members')
-        .insert({
-          group_id: group.id,
-          user_id: currentUserId,
-          role: 'admin'
-        });
+      if (error) throw error;
 
       toast.success('Group created!');
       setNewGroupName('');
