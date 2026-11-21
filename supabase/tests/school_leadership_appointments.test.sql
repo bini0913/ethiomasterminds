@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(37);
+select plan(39);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -45,6 +45,9 @@ select ok(has_function_privilege('authenticated','public.school_update_leadershi
 select ok(not has_function_privilege('anon','public.school_update_leadership_permissions(uuid,text[],text)','EXECUTE'), 'anonymous users cannot change leadership permissions');
 
 select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_appointment_per_member'), 'one staff member cannot hold conflicting active leadership appointments');
+
+select ok(position('main_director' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'generic school Admin authority is restricted by leadership appointment');
+select ok(position('school_is_admin' in pg_get_functiondef('public.is_school_manager_or_admin(uuid)'::regprocedure)) > 0, 'manager-or-admin checks use the leadership-aware Admin guard');
 
 select * from finish();
 rollback;
