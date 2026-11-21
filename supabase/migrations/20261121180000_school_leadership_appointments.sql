@@ -235,6 +235,9 @@ BEGIN
   LIMIT 1;
   IF v_actor.id IS NULL THEN RAISE EXCEPTION 'An active School Manager membership in the target school is required'; END IF;
   IF v_target.user_id = auth.uid() THEN RAISE EXCEPTION 'The School Manager cannot appoint themselves'; END IF;
+  IF p_position = 'main_director' AND v_target.school_role <> 'admin' THEN
+    RAISE EXCEPTION 'The Main Director must use the existing School Admin membership';
+  END IF;
 
   IF p_position NOT IN (
     'main_director', 'vice_director', 'kg_director', 'elementary_director',
@@ -600,6 +603,55 @@ GRANT EXECUTE ON FUNCTION public.school_set_division_grade_mapping(uuid, text, t
 REVOKE ALL ON FUNCTION public.school_assign_leadership_team_member(uuid, uuid, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_assign_leadership_team_member(uuid, uuid, boolean) TO authenticated;
 
+
+-- Retain the existing school Admin membership as the Main Director's account-level
+-- access path. Once an Admin membership is appointed to another leadership position,
+-- its generic Admin privileges are removed and the scoped permission resolver applies.
+-- Unappointed legacy Admin memberships retain access during the migration transition.
+CREATE OR REPLACE FUNCTION public.school_is_admin(p_school_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $
+  SELECT public._is_extreme_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public.school_memberships membership
+      WHERE membership.school_id = p_school_id
+        AND membership.user_id = auth.uid()
+        AND membership.school_role = 'admin'
+        AND membership.status = 'active'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.school_leadership_appointments appointment
+          WHERE appointment.school_id = membership.school_id
+            AND appointment.membership_id = membership.id
+            AND appointment.status = 'active'
+            AND appointment.position <> 'main_director'
+            AND appointment.start_date <= CURRENT_DATE
+            AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE)
+        )
+    );
+$;
+
+CREATE OR REPLACE FUNCTION public.is_school_manager_or_admin(p_school_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $
+  SELECT public._is_extreme_admin()
+    OR public.is_active_school_member(p_school_id, ARRAY['manager']::text[])
+    OR public.school_is_admin(p_school_id);
+$;
+
+REVOKE ALL ON FUNCTION public.school_is_admin(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_is_admin(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.is_school_manager_or_admin(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_school_manager_or_admin(uuid) TO authenticated;
 
 -- Shared server-side permission resolver for role-specific leadership read scopes.
 -- It never trusts a client-supplied school alone: the active appointment and
