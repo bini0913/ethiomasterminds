@@ -161,9 +161,9 @@ const Multiplayer: React.FC = () => {
   };
 
   const handleLeaveRoom = useCallback(() => {
-    if (roomId && user) void leaveRoom(roomId, user.name || "Player");
+    if (roomId && user?.id) void leaveRoom(roomId, user.name || "Player");
     navigate("/multiplayer");
-  }, [leaveRoom, navigate, roomId, user]);
+  }, [leaveRoom, navigate, roomId, user?.id, user?.name]);
 
   const shareResult = async () => {
     const text = `I finished a Master Minds multiplayer match with a score of ${matchSummary?.score ?? 0}!`;

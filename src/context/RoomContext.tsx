@@ -230,7 +230,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const leaveRoom = async (roomId: string, playerName: string) => {
+  const leaveRoom = useCallback(async (roomId: string, _playerName: string) => {
     if (!user?.id) return;
     try {
       const { error } = await db.rpc('multiplayer_leave_room', { p_room_id: roomId });
@@ -242,7 +242,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       console.error('Error leaving room:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to leave room');
     }
-  };
+  }, [fetchRooms, user?.id]);
 
   return (
     <RoomContext.Provider value={{

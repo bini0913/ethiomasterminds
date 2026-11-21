@@ -148,7 +148,6 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const [countdownValue, setCountdownValue] = useState(5);
   const [countdownEndsAt, setCountdownEndsAt] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [offlineSeconds, setOfflineSeconds] = useState(30);
   const [isOffline, setIsOffline] = useState(false);
   const [consecutiveCorrect, setConsecutiveCorrect] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
@@ -170,6 +169,8 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   const autoStartTriggeredRef = useRef(false);
   const finishRequestedRef = useRef(false);
   const resultsHandledRef = useRef(false);
+  const roomLoadInFlightRef = useRef(false);
+  const resultsLoadInFlightRef = useRef(false);
   const { onlineFriends } = useFriends();
 
   useEffect(() => {
@@ -248,35 +249,28 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   useEffect(() => {
     const handleOffline = () => {
       setIsOffline(true);
-      setOfflineSeconds(30);
       toast.error('Connection lost… reconnecting');
     };
     const handleOnline = () => {
       setIsOffline(false);
-      setOfflineSeconds(30);
       toast.success('Reconnected to room');
       void loadRoomData();
+    };
+    const handleResume = () => {
+      if (document.visibilityState === 'visible') void loadRoomData();
     };
 
     window.addEventListener('offline', handleOffline);
     window.addEventListener('online', handleOnline);
+    window.addEventListener('pageshow', handleResume);
+    document.addEventListener('visibilitychange', handleResume);
     return () => {
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
+      window.removeEventListener('pageshow', handleResume);
+      document.removeEventListener('visibilitychange', handleResume);
     };
   }, []);
-
-  useEffect(() => {
-    if (!isOffline) return;
-    if (offlineSeconds <= 0) {
-      toast.error('Reconnect window expired. Match forfeited.');
-      onLeave();
-      return;
-    }
-
-    const timer = setTimeout(() => setOfflineSeconds((prev) => prev - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [isOffline, offlineSeconds, onLeave]);
 
   const playTone = (frequency: number, duration: number) => {
     if (!soundEnabled || typeof window === 'undefined') return;
@@ -295,22 +289,21 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   };
 
   const loadRoomData = async () => {
+    if (roomLoadInFlightRef.current) return;
+    roomLoadInFlightRef.current = true;
     setLoadError(null);
     try {
       const { error: membershipError } = await db.rpc('multiplayer_assert_room_member', { p_room_id: roomId });
       if (membershipError) throw membershipError;
 
-      const { data: room } = await supabase
+      const { data: room, error: roomError } = await supabase
         .from('multiplayer_rooms')
         .select('host_id, question_count, subject, difficulty, max_players, game_mode, status, started_at')
         .eq('id', roomId)
         .single();
 
-      if (!room) {
-        toast.error('Room not found');
-        onLeave();
-        return;
-      }
+      if (roomError) throw roomError;
+      if (!room) throw new Error('Room not found');
 
       setIsHost(room.host_id === currentUserId);
       setRoomMaxPlayers(room.max_players || initialMaxPlayers);
@@ -333,6 +326,11 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
         if (state.status === 'countdown' || state.status === 'starting') {
           setCountdownEndsAt(state.question_ends_at);
         }
+      } else {
+        setRoomState((previous) => ({
+          ...previous,
+          status: room.status === 'playing' || room.status === 'finished' ? room.status : 'waiting',
+        }));
       }
       if (room.status === 'playing') {
         finishRequestedRef.current = false;
@@ -350,6 +348,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       setLoadError(message);
       toast.error('Could not load this multiplayer room');
     } finally {
+      roomLoadInFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -454,70 +453,75 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }, [playerFinished, roomState.status, roomId]);
 
   const loadMatchResults = async () => {
+    if (resultsLoadInFlightRef.current || resultsHandledRef.current) return;
+    resultsLoadInFlightRef.current = true;
     setResultsLoadError(null);
-    let results: any[] | null = null;
-    let error: any = null;
-    for (let attempt = 0; attempt < 6; attempt += 1) {
-      const response = await (supabase as any)
-        .from('multiplayer_match_results')
-      .select('user_id, placement, player_count, score, correct_answers, answered_questions, total_questions, accuracy, xp_earned, coins_earned')
-        .eq('room_id', roomId)
-        .order('placement', { ascending: true });
-      results = response.data;
-      error = response.error;
-      if (error || (results && results.length > 0)) break;
-      await new Promise((resolve) => window.setTimeout(resolve, 400));
+    try {
+      let results: any[] | null = null;
+      let error: any = null;
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const response = await (supabase as any)
+          .from('multiplayer_match_results')
+          .select('user_id, placement, player_count, score, correct_answers, answered_questions, total_questions, accuracy, xp_earned, coins_earned')
+          .eq('room_id', roomId)
+          .order('placement', { ascending: true });
+        results = response.data;
+        error = response.error;
+        if (error || (results && results.length > 0)) break;
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      }
+
+      if (error) {
+        console.error('Error loading multiplayer results:', error);
+        setResultsLoadError('We could not retrieve the final match results. Check your connection and try again.');
+        toast.error('Could not load the final match results');
+        return;
+      }
+
+      if (!results?.length) {
+        setResultsLoadError('Final results are still processing. You can safely retry in a moment.');
+        return;
+      }
+
+      const finalPlayers = await fetchPlayers();
+      const names = new Map(finalPlayers.map((p) => [p.id, p.name]));
+      const mapped = results.map((result: any): MatchPlayerResult => ({
+        id: result.user_id,
+        name: names.get(result.user_id) || 'Player ' + result.user_id.slice(0, 6),
+        placement: result.placement,
+        score: result.score || 0,
+        correctAnswers: result.correct_answers || 0,
+        answeredQuestions: result.answered_questions || 0,
+        totalQuestions: result.total_questions || 0,
+        accuracy: Number(result.accuracy || 0),
+        xpEarned: result.xp_earned || 0,
+        coinsEarned: result.coins_earned || 0,
+      }));
+
+      const me = mapped.find((player) => player.id === currentUserId);
+      if (!me) return;
+
+      resultsHandledRef.current = true;
+      onGameEnd({
+        playerRank: me.placement,
+        playerCount: results.length,
+        score: me.score,
+        correctAnswers: me.correctAnswers,
+        answeredQuestions: me.answeredQuestions,
+        totalQuestions: me.totalQuestions,
+        xpGained: me.xpEarned,
+        coinsGained: me.coinsEarned,
+        rankChange: me.placement === 1 ? 18 : me.placement <= 3 ? 6 : -4,
+        accuracy: me.accuracy,
+        avgResponseTime: Number((me.answeredQuestions > 0 ? 60 / me.answeredQuestions : 0).toFixed(2)),
+        streak: Math.max(bestStreak, consecutiveCorrect),
+        strongTopics: [],
+        weakTopics: [],
+        players: mapped,
+      });
+    } finally {
+      resultsLoadInFlightRef.current = false;
     }
-
-    if (error) {
-      console.error('Error loading multiplayer results:', error);
-      setResultsLoadError('We could not retrieve the final match results. Check your connection and try again.');
-      toast.error('Could not load the final match results');
-      return;
-    }
-
-    if (!results?.length) {
-      setResultsLoadError('Final results are still processing. You can safely retry in a moment.');
-      toast.error('Final results are still processing');
-      return;
-    }
-
-    const finalPlayers = await fetchPlayers();
-    const names = new Map(finalPlayers.map((p) => [p.id, p.name]));
-    const mapped = results.map((result: any): MatchPlayerResult => ({
-      id: result.user_id,
-      name: names.get(result.user_id) || 'Player ' + result.user_id.slice(0, 6),
-      placement: result.placement,
-      score: result.score || 0,
-      correctAnswers: result.correct_answers || 0,
-      answeredQuestions: result.answered_questions || 0,
-      totalQuestions: result.total_questions || 0,
-      accuracy: Number(result.accuracy || 0),
-      xpEarned: result.xp_earned || 0,
-      coinsEarned: result.coins_earned || 0,
-    }));
-
-    const me = mapped.find((player) => player.id === currentUserId);
-    if (!me || resultsHandledRef.current) return;
-
-    resultsHandledRef.current = true;
-    onGameEnd({
-      playerRank: me.placement,
-      playerCount: results.length,
-      score: me.score,
-      correctAnswers: me.correctAnswers,
-      answeredQuestions: me.answeredQuestions,
-      totalQuestions: me.totalQuestions,
-      xpGained: me.xpEarned,
-      coinsGained: me.coinsEarned,
-      rankChange: me.placement === 1 ? 18 : me.placement <= 3 ? 6 : -4,
-      accuracy: me.accuracy,
-      avgResponseTime: Number((me.answeredQuestions > 0 ? 60 / me.answeredQuestions : 0).toFixed(2)),
-      streak: Math.max(bestStreak, consecutiveCorrect),
-      strongTopics: [],
-      weakTopics: [],
-      players: mapped,
-    });
   };
   const loadPlayerQuestion = async () => {
     setQuestionLoadError(null);
@@ -686,10 +690,14 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     const currentPlayer = players.find((p) => p.id === currentUserId);
     if (!currentPlayer) return;
 
-    const { error } = await db.rpc('multiplayer_toggle_ready', { p_room_id: roomId });
-    if (error) throw error;
-
-    playTone(520, 0.08);
+    try {
+      const { error } = await db.rpc('multiplayer_toggle_ready', { p_room_id: roomId });
+      if (error) throw error;
+      playTone(520, 0.08);
+    } catch (error) {
+      console.error('Could not update ready state:', error);
+      toast.error(error instanceof Error ? error.message : 'Could not update ready state');
+    }
   };
 
   const startGame = async () => {
@@ -819,30 +827,42 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
     const content = (message || chatInput.trim()).slice(0, 80);
     if (!content) return;
 
-    const { error } = await db.rpc('multiplayer_send_room_message', {
-      p_room_id: roomId,
-      p_content: content,
-    });
-    if (error) throw error;
-
-    if (!message) setChatInput('');
+    try {
+      const { error } = await db.rpc('multiplayer_send_room_message', {
+        p_room_id: roomId,
+        p_content: content,
+      });
+      if (error) throw error;
+      if (!message) setChatInput('');
+    } catch (error) {
+      console.error('Could not send room message:', error);
+      toast.error(error instanceof Error ? error.message : 'Could not send message');
+    }
   };
 
   const updateRoomConfig = async (nextConfig: Partial<typeof roomConfig>) => {
     if (!isHost) return;
-    const merged = { ...roomConfig, ...nextConfig };
+    const previous = roomConfig;
+    const merged = { ...previous, ...nextConfig };
     setRoomConfig(merged);
     setRoomMaxPlayers(merged.maxPlayers);
-    const { error } = await db.rpc('multiplayer_update_room', {
-      p_room_id: roomId,
-      p_subject: merged.subject,
-      p_difficulty: merged.difficulty,
-      p_game_mode: merged.gameMode,
-      p_question_count: merged.questionCount,
-      p_max_players: merged.maxPlayers,
-    });
-    if (error) throw error;
-    toast.success('Room settings updated');
+    try {
+      const { error } = await db.rpc('multiplayer_update_room', {
+        p_room_id: roomId,
+        p_subject: merged.subject,
+        p_difficulty: merged.difficulty,
+        p_game_mode: merged.gameMode,
+        p_question_count: merged.questionCount,
+        p_max_players: merged.maxPlayers,
+      });
+      if (error) throw error;
+      toast.success('Room settings updated');
+    } catch (error) {
+      setRoomConfig(previous);
+      setRoomMaxPlayers(previous.maxPlayers);
+      console.error('Could not update room settings:', error);
+      toast.error(error instanceof Error ? error.message : 'Could not update room settings');
+    }
   };
 
   const triggerCountdown = async () => {
@@ -961,7 +981,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       <div className="relative z-10 mx-auto w-full min-w-0 max-w-6xl">
         {isOffline && (
           <Card className="mb-4 p-3 border-amber-300/30 bg-amber-500/10 text-amber-100">
-            Connection lost… reconnecting ({offlineSeconds}s return window)
+            Connection lost… your room membership is preserved while we reconnect.
           </Card>
         )}
 
