@@ -36,7 +36,7 @@ type SchoolPortalShellProps = {
 };
 
 export default function SchoolPortalShell({
-  role, title, navItems, activeItem, onNavigate, children, headerActions,
+  role, title, navItems, activeItem, onNavigate, children, headerActions, roleLabelOverride,
 }: SchoolPortalShellProps) {
   const { user, logout } = useUser();
   const { memberships, activeMembership, activeSchool, switchSchool } = useSchoolPortal();
@@ -95,7 +95,7 @@ export default function SchoolPortalShell({
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">{initials}</div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-white">{user?.name || "Account"}</p>
-            <p className="truncate text-xs text-slate-400">{user?.username ? `@${user.username}` : roleLabels[role]}</p>
+            <p className="truncate text-xs text-slate-400">{user?.username ? `@${user.username}` : (roleLabelOverride || roleLabels[role])}</p>
           </div>
         </div>
         <button
