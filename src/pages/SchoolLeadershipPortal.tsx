@@ -49,11 +49,11 @@ function ScopedLeadershipWorkspace() {
     const items: SchoolNavItem[] = [{ id: "overview", label: "Overview", icon: LayoutDashboard }];
     if (can("view_students")) items.push({ id: "students", label: "Students", icon: Users });
     if (can("view_staff")) items.push({ id: "staff", label: "Staff & Teachers", icon: UserCog });
-    if (can("view_attendance")) items.push({ id: "attendance", label: "Attendance", icon: CalendarCheck });
+    if (can("view_attendance") || can("review_attendance")) items.push({ id: "attendance", label: "Attendance", icon: CalendarCheck });
     if (can("view_academics") || can("review_assessments") || can("review_results") || can("view_curriculum")) {
       items.push({ id: "academics", label: "Academic Oversight", icon: ClipboardCheck });
     }
-    if (can("view_discipline")) items.push({ id: "discipline", label: "Student Support", icon: ShieldCheck });
+    if (can("view_discipline") || can("review_discipline")) items.push({ id: "discipline", label: "Student Support", icon: ShieldCheck });
     if (can("manage_team_tasks") || can("assign_team_tasks")) {
       items.push({ id: "tasks", label: "Team Tasks", icon: ClipboardList });
     }
@@ -91,7 +91,7 @@ function ScopedLeadershipWorkspace() {
         .eq("status", "active")
         .order("created_at", { ascending: false });
     }
-    if (can("view_students") || can("view_curriculum") || can("view_academics") || can("review_assessments")) {
+    if (can("view_students") || can("view_curriculum") || can("view_academics") || can("review_assessments") || can("view_attendance") || can("review_attendance") || can("view_discipline") || can("review_discipline")) {
       requests.sections = db.from("school_sections")
         .select("id,grade_label,section_name")
         .eq("school_id", schoolId)
@@ -230,7 +230,7 @@ function ScopedLeadershipWorkspace() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {can("view_students") && <SchoolMetric label="Students in scope" value={activeStudents.length} detail="Active student memberships visible to your appointment" icon={Users} />}
         {can("view_staff") && <SchoolMetric label="Staff in scope" value={activeStaff.length} detail="Active staff memberships visible to your appointment" icon={UserCog} />}
-        {can("view_attendance") && <SchoolMetric label="Today's attendance sessions" value={todaySessions.length} detail="Sessions in your authorized scope" icon={CalendarCheck} />}
+        {(can("view_attendance") || can("review_attendance")) && <SchoolMetric label="Today's attendance sessions" value={todaySessions.length} detail="Sessions in your authorized scope" icon={CalendarCheck} />}
         {(can("view_academics") || can("review_assessments")) && <SchoolMetric label="Pending assessments" value={pendingAssessments.length} detail="Submissions awaiting academic review" icon={ClipboardCheck} />}
         {(can("manage_team_tasks") || can("assign_team_tasks")) && <SchoolMetric label="Team tasks" value={tasks.length} detail="Tasks visible to your assigned team or division" icon={ClipboardList} />}
       </div>
@@ -346,9 +346,9 @@ function ScopedLeadershipWorkspace() {
   switch (page) {
     case "students": content = can("view_students") ? renderStudents() : renderOverview(); break;
     case "staff": content = can("view_staff") ? renderStaff() : renderOverview(); break;
-    case "attendance": content = can("view_attendance") ? renderAttendance() : renderOverview(); break;
+    case "attendance": content = can("view_attendance") || can("review_attendance") ? renderAttendance() : renderOverview(); break;
     case "academics": content = can("view_academics") || can("review_assessments") || can("review_results") || can("view_curriculum") ? renderAcademics() : renderOverview(); break;
-    case "discipline": content = can("view_discipline") ? renderDiscipline() : renderOverview(); break;
+    case "discipline": content = can("view_discipline") || can("review_discipline") ? renderDiscipline() : renderOverview(); break;
     case "tasks": content = can("manage_team_tasks") || can("assign_team_tasks") ? renderTasks() : renderOverview(); break;
     case "reports": content = can("view_reports") ? renderReports() : renderOverview(); break;
     default: content = renderOverview();
