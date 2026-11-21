@@ -138,9 +138,24 @@ DECLARE
   v_school_id uuid;
   v_appointment_id uuid;
   v_actor_membership_id uuid;
+  v_reason text;
+  v_before_state jsonb;
+  v_after_state jsonb;
 BEGIN
-  v_school_id := COALESCE(NEW.school_id, OLD.school_id);
-  v_appointment_id := COALESCE(NEW.id, OLD.id);
+  IF TG_OP = 'INSERT' THEN
+    v_school_id := NEW.school_id;
+    v_appointment_id := NEW.id;
+    v_reason := NEW.change_reason;
+    v_before_state := NULL;
+    v_after_state := to_jsonb(NEW);
+  ELSE
+    v_school_id := NEW.school_id;
+    v_appointment_id := NEW.id;
+    v_reason := NEW.change_reason;
+    v_before_state := to_jsonb(OLD);
+    v_after_state := to_jsonb(NEW);
+  END IF;
+
   SELECT membership.id INTO v_actor_membership_id
   FROM public.school_memberships membership
   WHERE membership.school_id = v_school_id
@@ -158,9 +173,9 @@ BEGIN
     auth.uid(),
     v_actor_membership_id,
     CASE WHEN TG_OP = 'INSERT' THEN 'appointed' ELSE 'updated' END,
-    COALESCE(NEW.change_reason, OLD.change_reason),
-    CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE to_jsonb(OLD) END,
-    to_jsonb(NEW)
+    v_reason,
+    v_before_state,
+    v_after_state
   );
   RETURN NEW;
 END;
