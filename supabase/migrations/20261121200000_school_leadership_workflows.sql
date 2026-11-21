@@ -904,3 +904,284 @@ $$;
 
 REVOKE ALL ON FUNCTION public.school_leadership_correct_attendance(uuid, text, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_leadership_correct_attendance(uuid, text, text, text) TO authenticated;
+
+
+-- The provisioning service must not treat every legacy school_role='admin'
+-- membership as an administrator. Only the active Main Director may use the
+-- existing School Admin account-provisioning authority.
+CREATE OR REPLACE FUNCTION public.school_attach_account(p_actor_id uuid, p_school_id uuid, p_user_id uuid, p_school_role text, p_school_username text, p_grade_label text DEFAULT NULL::text, p_age_at_enrollment integer DEFAULT NULL::integer, p_section_id uuid DEFAULT NULL::uuid, p_student_number bigint DEFAULT NULL::bigint, p_parent_membership_ids uuid[] DEFAULT '{}'::uuid[], p_student_membership_ids uuid[] DEFAULT '{}'::uuid[], p_teacher_assignments jsonb DEFAULT '[]'::jsonb)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_actor_role text;
+  v_is_main_director boolean := false;
+  v_is_extreme_admin boolean;
+  v_is_super_admin boolean;
+  v_school_code text;
+  v_membership_id uuid;
+  v_section_grade text;
+  v_assignment jsonb;
+  v_assignment_section uuid;
+  v_assignment_subject text;
+  v_assignment_kind text;
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'Trusted account provisioning service required';
+  END IF;
+  IF p_actor_id IS NULL OR p_user_id IS NULL OR p_school_id IS NULL THEN
+    RAISE EXCEPTION 'Actor, school, and new user are required';
+  END IF;
+  IF p_school_role IS NULL OR p_school_role NOT IN ('manager', 'admin', 'teacher', 'finance', 'parent', 'student') THEN
+    RAISE EXCEPTION 'Invalid school role';
+  END IF;
+  IF nullif(trim(p_school_username), '') IS NULL THEN
+    RAISE EXCEPTION 'A unique username is required for every school account';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id) THEN
+    RAISE EXCEPTION 'New account profile was not created';
+  END IF;
+  IF lower((SELECT username FROM public.profiles WHERE id = p_user_id)) <> lower(trim(p_school_username)) THEN
+    RAISE EXCEPTION 'Account username does not match the new profile';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = p_actor_id AND role = 'extreme_admin'::public.app_role
+  ) INTO v_is_extreme_admin;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = p_actor_id AND role = 'super_admin'::public.app_role
+  ) INTO v_is_super_admin;
+
+  SELECT school_role INTO v_actor_role
+  FROM public.school_memberships
+  WHERE school_id = p_school_id
+    AND user_id = p_actor_id
+    AND status = 'active'
+    AND school_role IN ('manager', 'admin')
+  ORDER BY CASE school_role WHEN 'manager' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END
+  LIMIT 1;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.school_memberships membership
+    JOIN public.school_leadership_appointments appointment
+      ON appointment.school_id = membership.school_id
+     AND appointment.membership_id = membership.id
+    WHERE membership.school_id = p_school_id
+      AND membership.user_id = p_actor_id
+      AND membership.school_role = 'admin'
+      AND membership.status = 'active'
+      AND appointment.position = 'main_director'
+      AND appointment.status = 'active'
+      AND appointment.start_date <= CURRENT_DATE
+      AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE)
+  ) INTO v_is_main_director;
+
+  IF v_is_extreme_admin THEN
+    NULL;
+  ELSIF v_is_super_admin THEN
+    IF p_school_role <> 'manager' THEN
+      RAISE EXCEPTION 'Super Admin can only provision school Managers';
+    END IF;
+  ELSIF v_actor_role IS NULL THEN
+    RAISE EXCEPTION 'Only the school Manager or Admin can provision accounts';
+  ELSIF v_actor_role = 'admin' AND NOT v_is_main_director THEN
+    RAISE EXCEPTION 'Only the appointed Main Director can provision school accounts';
+  ELSIF v_actor_role = 'admin'
+     AND p_school_role NOT IN ('student', 'parent', 'teacher') THEN
+    RAISE EXCEPTION 'Main Director can create student, parent, and teacher accounts only';
+  ELSIF v_actor_role = 'manager'
+     AND p_school_role NOT IN ('student', 'parent', 'teacher', 'finance', 'admin') THEN
+    RAISE EXCEPTION 'School Manager cannot create another Manager account';
+  ELSIF p_school_role = 'manager' THEN
+    RAISE EXCEPTION 'Only the Super Admin can create a school Manager';
+  END IF;
+
+  SELECT school_code INTO v_school_code
+  FROM public.schools
+  WHERE id = p_school_id AND status = 'active';
+  IF v_school_code IS NULL THEN
+    RAISE EXCEPTION 'School not found or not active';
+  END IF;
+
+  IF p_school_role = 'student' THEN
+    IF nullif(trim(p_grade_label), '') IS NULL
+       OR p_age_at_enrollment IS NULL
+       OR p_age_at_enrollment NOT BETWEEN 3 AND 120
+       OR p_section_id IS NULL
+       OR p_student_number IS NULL THEN
+      RAISE EXCEPTION 'Student grade, age, section, and student ID are required';
+    END IF;
+
+    SELECT grade_label INTO v_section_grade
+    FROM public.school_sections
+    WHERE id = p_section_id AND school_id = p_school_id;
+    IF v_section_grade IS NULL OR v_section_grade <> trim(p_grade_label) THEN
+      RAISE EXCEPTION 'Student section must belong to the selected grade and school';
+    END IF;
+    IF (SELECT age FROM public.profiles WHERE id = p_user_id) IS DISTINCT FROM p_age_at_enrollment THEN
+      RAISE EXCEPTION 'Student profile age must match age at enrollment';
+    END IF;
+    IF lower(trim(p_school_username)) !~ (
+      '^' || lower(v_school_code) || '/' || p_student_number::text || '/' || p_age_at_enrollment::text || '$'
+    ) THEN
+      RAISE EXCEPTION 'Student username must match SCHOOL_CODE/STUDENT_ID/AGE';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM public.school_memberships
+      WHERE school_id = p_school_id
+        AND school_role = 'student'
+        AND student_number = p_student_number
+    ) THEN
+      RAISE EXCEPTION 'Student ID is already assigned in this school';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.school_student_id_reservations reservation
+      WHERE reservation.school_id = p_school_id
+        AND reservation.student_number = p_student_number
+        AND reservation.grade_label = lower(trim(p_grade_label))
+        AND reservation.reserved_by = p_actor_id
+        AND reservation.used_by_user_id IS NULL
+    ) THEN
+      RAISE EXCEPTION 'Student ID must be reserved by the trusted grade-based allocator';
+    END IF;
+    IF coalesce(cardinality(p_parent_membership_ids), 0) > 0 AND EXISTS (
+      SELECT 1
+      FROM unnest(p_parent_membership_ids) AS parent_ids(parent_id)
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.school_memberships parent
+        WHERE parent.id = parent_ids.parent_id
+          AND parent.school_id = p_school_id
+          AND parent.school_role = 'parent'
+          AND parent.status = 'active'
+      )
+    ) THEN
+      RAISE EXCEPTION 'Every linked parent must be an active parent account in this school';
+    END IF;
+  ELSIF p_school_role = 'parent' THEN
+    IF lower(trim(p_school_username)) NOT LIKE 'pa%' THEN
+      RAISE EXCEPTION 'School parent usernames must begin with pa';
+    END IF;
+    IF coalesce(cardinality(p_student_membership_ids), 0) > 0 AND EXISTS (
+      SELECT 1
+      FROM unnest(p_student_membership_ids) AS student_ids(student_id)
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.school_memberships student
+        WHERE student.id = student_ids.student_id
+          AND student.school_id = p_school_id
+          AND student.school_role = 'student'
+          AND student.status IN ('active', 'suspended')
+      )
+    ) THEN
+      RAISE EXCEPTION 'Every linked child must be an enrolled student in this school';
+    END IF;
+  ELSIF p_school_role = 'teacher' THEN
+    IF jsonb_typeof(coalesce(p_teacher_assignments, '[]'::jsonb)) <> 'array'
+       OR jsonb_array_length(coalesce(p_teacher_assignments, '[]'::jsonb)) = 0 THEN
+      RAISE EXCEPTION 'Teacher accounts require at least one subject, section, or homeroom assignment';
+    END IF;
+  END IF;
+
+  INSERT INTO public.school_memberships(
+    school_id, user_id, school_role, status, grade_label, age_at_enrollment,
+    section_id, student_number, school_username, created_by
+  )
+  VALUES (
+    p_school_id, p_user_id, p_school_role, 'active',
+    CASE WHEN p_school_role = 'student' THEN trim(p_grade_label) ELSE NULL END,
+    CASE WHEN p_school_role = 'student' THEN p_age_at_enrollment ELSE NULL END,
+    CASE WHEN p_school_role = 'student' THEN p_section_id ELSE NULL END,
+    CASE WHEN p_school_role = 'student' THEN p_student_number ELSE NULL END,
+    lower(trim(p_school_username)),
+    p_actor_id
+  )
+  RETURNING id INTO v_membership_id;
+
+  IF p_school_role = 'student' THEN
+    UPDATE public.school_student_id_reservations
+    SET used_by_user_id = p_user_id, used_at = now()
+    WHERE school_id = p_school_id
+      AND student_number = p_student_number
+      AND grade_label = lower(trim(p_grade_label))
+      AND reserved_by = p_actor_id
+      AND used_by_user_id IS NULL;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Student ID reservation is missing or already used';
+    END IF;
+  END IF;
+
+  IF p_school_role = 'student' AND coalesce(cardinality(p_parent_membership_ids), 0) > 0 THEN
+    INSERT INTO public.school_parent_student_links(
+      school_id, parent_membership_id, student_membership_id, linked_by
+    )
+    SELECT p_school_id, parent_ids.parent_id, v_membership_id, p_actor_id
+    FROM unnest(p_parent_membership_ids) AS parent_ids(parent_id);
+  ELSIF p_school_role = 'parent' AND coalesce(cardinality(p_student_membership_ids), 0) > 0 THEN
+    INSERT INTO public.school_parent_student_links(
+      school_id, parent_membership_id, student_membership_id, linked_by
+    )
+    SELECT p_school_id, v_membership_id, student_ids.student_id, p_actor_id
+    FROM unnest(p_student_membership_ids) AS student_ids(student_id);
+  ELSIF p_school_role = 'teacher' THEN
+    FOR v_assignment IN SELECT value FROM jsonb_array_elements(p_teacher_assignments)
+    LOOP
+      v_assignment_section := nullif(v_assignment ->> 'section_id', '')::uuid;
+      v_assignment_subject := nullif(trim(v_assignment ->> 'subject_name'), '');
+      v_assignment_kind := coalesce(nullif(v_assignment ->> 'assignment_kind', ''), 'subject');
+
+      IF v_assignment_section IS NULL OR v_assignment_subject IS NULL
+         OR v_assignment_kind NOT IN ('subject', 'homeroom') THEN
+        RAISE EXCEPTION 'Teacher assignment is incomplete or invalid';
+      END IF;
+
+      SELECT grade_label INTO v_section_grade
+      FROM public.school_sections
+      WHERE id = v_assignment_section AND school_id = p_school_id;
+      IF v_section_grade IS NULL THEN
+        RAISE EXCEPTION 'Teacher assignment section does not belong to this school';
+      END IF;
+
+      IF v_assignment_kind = 'subject' AND NOT EXISTS (
+        SELECT 1
+        FROM public.school_subjects subject
+        JOIN public.school_sections section
+          ON section.school_id = subject.school_id
+         AND section.academic_year_id = subject.academic_year_id
+        WHERE section.id = v_assignment_section
+          AND subject.school_id = p_school_id
+          AND subject.grade_label = v_section_grade
+          AND subject.subject_name = v_assignment_subject
+          AND subject.active = true
+      ) THEN
+        RAISE EXCEPTION 'Teacher subject must be an active subject for the assigned grade';
+      END IF;
+
+      IF v_assignment_kind = 'homeroom' AND EXISTS (
+        SELECT 1 FROM public.school_teacher_assignments
+        WHERE section_id = v_assignment_section
+          AND assignment_kind = 'homeroom'
+      ) THEN
+        RAISE EXCEPTION 'This section already has a homeroom teacher';
+      END IF;
+
+      INSERT INTO public.school_teacher_assignments(
+        school_id, teacher_membership_id, section_id, subject_name,
+        assignment_kind, created_by
+      )
+      VALUES (
+        p_school_id, v_membership_id, v_assignment_section, v_assignment_subject,
+        v_assignment_kind, p_actor_id
+      );
+    END LOOP;
+  END IF;
+
+  RETURN v_membership_id;
+END;
+$function$
+
+
