@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(14);
+select plan(22);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -18,6 +18,15 @@ select ok(not has_function_privilege('anon','public.school_appoint_leader(uuid,t
 select ok(not has_function_privilege('anon','public.school_update_leadership_appointment(uuid,text,date,text)','EXECUTE'), 'anonymous users cannot change appointments');
 select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_singleton_position'), 'singleton leadership positions cannot be double-booked');
 select ok(exists (select 1 from pg_trigger where tgname='school_leadership_appointment_audit' and tgrelid='public.school_leadership_appointments'::regclass and not tgisinternal), 'leadership changes are audited');
+
+select ok(to_regclass('public.school_division_grade_mappings') is not null, 'school-specific grade division mappings exist');
+select ok(to_regclass('public.school_leadership_team_members') is not null, 'team membership assignments exist');
+select ok((select relrowsecurity from pg_class where oid='public.school_division_grade_mappings'::regclass), 'division mappings have RLS');
+select ok((select relrowsecurity from pg_class where oid='public.school_leadership_team_members'::regclass), 'team membership assignments have RLS');
+select ok(has_function_privilege('authenticated','public.school_set_division_grade_mapping(uuid,text,text)','EXECUTE'), 'manager division mapping RPC is available');
+select ok(has_function_privilege('authenticated','public.school_assign_leadership_team_member(uuid,uuid,boolean)','EXECUTE'), 'manager team assignment RPC is available');
+select ok(not has_function_privilege('anon','public.school_set_division_grade_mapping(uuid,text,text)','EXECUTE'), 'anonymous users cannot configure school divisions');
+select ok(not has_function_privilege('anon','public.school_assign_leadership_team_member(uuid,uuid,boolean)','EXECUTE'), 'anonymous users cannot assign team members');
 
 select * from finish();
 rollback;
