@@ -33,7 +33,7 @@ export default function SchoolLeadershipPortal() {
 
 function ScopedLeadershipWorkspace() {
   const { activeSchool } = useSchoolPortal();
-  const { appointment } = useSchoolLeadership();
+  const { appointment, membership } = useSchoolLeadership();
   const db = supabase as any;
   const schoolId = activeSchool?.id;
   const permissions = useMemo(() => new Set(appointment.permissions || []), [appointment.permissions]);
@@ -264,7 +264,7 @@ function ScopedLeadershipWorkspace() {
 
   return (
     <SchoolPortalShell
-      role="admin"
+      role={membership.school_role}
       roleLabelOverride={title}
       title={title}
       navItems={navItems}
