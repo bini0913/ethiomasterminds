@@ -32,6 +32,7 @@ type SchoolPortalShellProps = {
   onNavigate: (id: string) => void;
   children: React.ReactNode;
   headerActions?: React.ReactNode;
+  roleLabelOverride?: string;
 };
 
 export default function SchoolPortalShell({
