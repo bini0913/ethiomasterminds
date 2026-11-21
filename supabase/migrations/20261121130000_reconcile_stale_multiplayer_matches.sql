@@ -129,5 +129,7 @@ begin
 end;
 $function$;
 
-revoke all on function public.cleanup_expired_multiplayer_rooms() from public, anon;
-grant execute on function public.cleanup_expired_multiplayer_rooms() to authenticated;
+-- Cleanup is maintenance-only. Never expose it to browser-authenticated users;
+-- the service role invokes it from a trusted scheduler.
+revoke all on function public.cleanup_expired_multiplayer_rooms() from public, anon, authenticated;
+grant execute on function public.cleanup_expired_multiplayer_rooms() to service_role;
