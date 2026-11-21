@@ -37,7 +37,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $$
 DECLARE
   v_appointment public.school_leadership_appointments%ROWTYPE;
   v_actor public.school_memberships%ROWTYPE;
@@ -83,14 +83,14 @@ BEGIN
   WHERE id = p_appointment_id;
   RETURN true;
 END;
-$;
+$$;
 
 
 CREATE OR REPLACE FUNCTION public.school_require_full_main_director_permissions()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = public
-AS $
+AS $$
 DECLARE
   v_required_permissions text[] := ARRAY[
     'view_students', 'view_staff', 'view_attendance', 'review_attendance',
@@ -105,7 +105,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS school_require_full_main_director_permissions
   ON public.school_leadership_appointments;
