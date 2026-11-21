@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
-import { useSchoolLeadership } from "@/components/school/SchoolLeadershipGate";
 import SchoolBulkStudentEnrollment from "@/components/school/SchoolBulkStudentEnrollment";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
@@ -34,7 +33,6 @@ const navItems: SchoolNavItem[] = [
 
 export default function SchoolAdminPortal() {
   const { activeSchool, activeMembership } = useSchoolPortal();
-  const { appointment } = useSchoolLeadership();
   const db = supabase as any;
   const schoolId = activeSchool?.id;
   const [page, setPage] = useState("overview");
