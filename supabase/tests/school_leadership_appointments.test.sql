@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(49);
+select plan(55);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -62,6 +62,14 @@ select ok(position('review_assessments' in pg_get_functiondef('public.school_rev
   'quiz and library approvals check scoped academic review permission');
 select ok(has_function_privilege('authenticated','public.school_review_assessment(uuid,boolean,text)','EXECUTE'), 'authenticated school leaders can call the guarded assessment review RPC');
 select ok(not has_function_privilege('anon','public.school_review_assessment(uuid,boolean,text)','EXECUTE'), 'anonymous users cannot call the guarded assessment review RPC');
+
+
+select ok((select qual like '%review_discipline%' from pg_policies where schemaname='public' and tablename='school_memberships' and policyname='school_leadership_view_scoped_memberships'), 'student identity reads are available to scoped student-support reviewers');
+select ok((select qual like '%review_assessments%' from pg_policies where schemaname='public' and tablename='school_sections' and policyname='school_leadership_view_scoped_sections'), 'section labels are readable to scoped academic reviewers');
+select ok((select qual like '%review_attendance%' from pg_policies where schemaname='public' and tablename='school_attendance_sessions' and policyname='school_leadership_view_scoped_attendance_sessions'), 'attendance sessions are readable to scoped attendance reviewers');
+select ok((select qual like '%review_attendance%' from pg_policies where schemaname='public' and tablename='school_attendance_records' and policyname='school_leadership_view_scoped_attendance_records'), 'attendance records are readable to scoped attendance reviewers');
+select ok((select qual like '%review_discipline%' from pg_policies where schemaname='public' and tablename='school_behavior_reports' and policyname='school_leadership_view_scoped_behavior_reports'), 'behavior reports are readable to scoped discipline reviewers');
+select ok((select qual like '%review_assessments%' from pg_policies where schemaname='public' and tablename='school_homework_assignments' and policyname='school_leadership_view_scoped_homework'), 'homework is readable to scoped academic reviewers');
 
 select * from finish();
 rollback;
