@@ -648,7 +648,7 @@ AS $manager_admin$
   SELECT public._is_extreme_admin()
     OR public.is_active_school_member(p_school_id, ARRAY['manager']::text[])
     OR public.school_is_admin(p_school_id);
-$school_admin$;
+$manager_admin$;
 
 REVOKE ALL ON FUNCTION public.school_is_admin(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_is_admin(uuid) TO authenticated;
