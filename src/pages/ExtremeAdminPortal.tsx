@@ -227,20 +227,32 @@ const ExtremeAdminPortal: React.FC = () => {
     refreshAll();
   };
 
-  const deletePost = async () => {
-    const { error } = await supabase.rpc('extreme_admin_delete_social_post' as any, { p_post_id: postId });
+  const deletePostById = async (id: string) => {
+    if (!id || !window.confirm('Remove this social post? This action cannot be undone.')) return;
+    const { error } = await supabase.rpc('extreme_admin_delete_social_post' as any, { p_post_id: id });
     if (error) return toast.error(error.message || 'Failed to delete post');
-    toast.success('Post deleted');
+    toast.success('Post removed');
     setPostId('');
-    refreshAll();
+    await refreshAll();
+  };
+
+  const deleteBookById = async (id: string) => {
+    if (!id || !window.confirm('Remove this library book? This action cannot be undone.')) return;
+    const { error } = await supabase.rpc('extreme_admin_delete_library_book' as any, { p_book_id: id });
+    if (error) return toast.error(error.message || 'Failed to delete book');
+    toast.success('Book removed');
+    setBookId('');
+    await refreshAll();
+  };
+
+  const deletePost = async () => {
+    if (!postId.trim()) return toast.error('Enter a social post ID');
+    await deletePostById(postId.trim());
   };
 
   const deleteBook = async () => {
-    const { error } = await supabase.rpc('extreme_admin_delete_library_book' as any, { p_book_id: bookId });
-    if (error) return toast.error(error.message || 'Failed to delete book');
-    toast.success('Book deleted');
-    setBookId('');
-    refreshAll();
+    if (!bookId.trim()) return toast.error('Enter a library book ID');
+    await deleteBookById(bookId.trim());
   };
 
   const updateReport = async (reportId: string, nextStatus: 'reviewed' | 'resolved' | 'dismissed') => {
@@ -560,17 +572,55 @@ const ExtremeAdminPortal: React.FC = () => {
           <TabsContent value="content" className="space-y-4">
             <Card className="bg-white border-slate-200">
               <CardHeader>
-                <CardTitle>Content Control</CardTitle>
-                <CardDescription>Delete social posts and library books by ID.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5" />Library content review</CardTitle>
+                <CardDescription>Inspect recent library records before taking a moderation action. The list shows up to 100 records.</CardDescription>
               </CardHeader>
-              <CardContent className="grid md:grid-cols-2 gap-3">
+              <CardContent className="space-y-3">
+                {books.map((book) => (
+                  <div key={book.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{book.title}</p>
+                      <p className="text-xs text-slate-500">{book.author || 'Unknown author'} · {book.subject || 'Unspecified subject'} · Grade {book.grade_level ?? '—'} · {book.status}</p>
+                      <p className="break-all text-[11px] text-slate-400">{book.id} · Uploaded by {book.uploader_name || book.uploader_id}</p>
+                    </div>
+                    <Button size="sm" variant="destructive" onClick={() => void deleteBookById(book.id)}>Remove book</Button>
+                  </div>
+                ))}
+                {!books.length && <p className="text-sm text-slate-500">No library books found in the latest result.</p>}
+              </CardContent>
+            </Card>
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5" />Social content review</CardTitle>
+                <CardDescription>Inspect recent public posts and remove content that violates platform rules.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {posts.map((post) => (
+                  <div key={post.id} className="rounded-lg border border-slate-200 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{post.author_name || post.author_id} · {post.post_type}</p>
+                      <Button size="sm" variant="destructive" onClick={() => void deletePostById(post.id)}>Remove post</Button>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{post.content}</p>
+                    <p className="mt-2 break-all text-[11px] text-slate-400">{post.id} · {new Date(post.created_at).toLocaleString()}</p>
+                  </div>
+                ))}
+                {!posts.length && <p className="text-sm text-slate-500">No social posts found in the latest result.</p>}
+              </CardContent>
+            </Card>
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <CardTitle>Direct moderation by record ID</CardTitle>
+                <CardDescription>Use these fields for a record outside the latest 100 results.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
                   <Input value={postId} onChange={(e) => setPostId(e.target.value)} placeholder="Social post ID" className="bg-slate-50 border-slate-200" />
-                  <Button variant="destructive" onClick={deletePost} className="w-full">Delete Post</Button>
+                  <Button variant="destructive" onClick={deletePost} className="w-full">Remove post by ID</Button>
                 </div>
                 <div className="space-y-2">
                   <Input value={bookId} onChange={(e) => setBookId(e.target.value)} placeholder="Library book ID" className="bg-slate-50 border-slate-200" />
-                  <Button variant="destructive" onClick={deleteBook} className="w-full">Delete Book</Button>
+                  <Button variant="destructive" onClick={deleteBook} className="w-full">Remove book by ID</Button>
                 </div>
               </CardContent>
             </Card>
