@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
+import { useSchoolLeadership } from "@/components/school/SchoolLeadershipGate";
 import SchoolBulkStudentEnrollment from "@/components/school/SchoolBulkStudentEnrollment";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
@@ -33,6 +34,7 @@ const navItems: SchoolNavItem[] = [
 
 export default function SchoolAdminPortal() {
   const { activeSchool, activeMembership } = useSchoolPortal();
+  const { appointment } = useSchoolLeadership();
   const db = supabase as any;
   const schoolId = activeSchool?.id;
   const [page, setPage] = useState("overview");
@@ -735,7 +737,7 @@ export default function SchoolAdminPortal() {
   }
 
   return (
-    <SchoolPortalShell role="admin" title="School Admin" navItems={navItems} activeItem={page} onNavigate={setPage}>
+    <SchoolPortalShell role="admin" roleLabelOverride="Main Director" title="Main Director" navItems={navItems} activeItem={page} onNavigate={setPage}>
       {loading && <div className="mb-4 text-xs text-slate-500">Refreshing school records…</div>}
       {content}
     </SchoolPortalShell>
