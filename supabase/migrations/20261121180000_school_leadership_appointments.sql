@@ -628,10 +628,12 @@ AS $
           FROM public.school_leadership_appointments appointment
           WHERE appointment.school_id = membership.school_id
             AND appointment.membership_id = membership.id
-            AND appointment.status = 'active'
-            AND appointment.position <> 'main_director'
-            AND appointment.start_date <= CURRENT_DATE
-            AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE)
+            AND (
+              appointment.position <> 'main_director'
+              OR appointment.status <> 'active'
+              OR appointment.start_date > CURRENT_DATE
+              OR (appointment.end_date IS NOT NULL AND appointment.end_date < CURRENT_DATE)
+            )
         )
     );
 $;
