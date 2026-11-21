@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldAlert, AlertTriangle, RefreshCw, UserCog, Coins, Shield, Lock, Building2, Crown, Users } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, RefreshCw, UserCog, Coins, Shield, Lock, Building2, Crown, Users, FileText, Wallet, Search, BookOpen, MessageSquare } from 'lucide-react';
 import { useUser, UserRole } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,6 +32,24 @@ type PortalSchool = {
   status: 'active' | 'suspended' | 'closed'; created_at: string; created_by: string;
   managers: number; admins: number; teachers: number; students: number; parents: number; finance_staff: number;
 };
+type PortalReport = {
+  id: string; reporter_id: string; reporter_name: string | null; reported_id: string | null;
+  reported_name: string | null; reported_type: string; reason: string; description: string;
+  status: string; created_at: string; reviewed_at: string | null; reviewed_by: string | null;
+};
+type PortalBook = {
+  id: string; title: string; author: string | null; subject: string | null;
+  grade_level: number | null; type: string; status: string; uploader_id: string;
+  uploader_name: string | null; created_at: string; updated_at: string;
+};
+type PortalPost = {
+  id: string; author_id: string; author_name: string | null; content: string;
+  post_type: string; image_url: string | null; created_at: string;
+};
+type FinanceOverview = {
+  available?: boolean; accounts?: number; invoices?: number; payments?: number;
+  transactions?: number; balance?: number;
+};
 
 const ExtremeAdminPortal: React.FC = () => {
   const { user } = useUser();
@@ -39,9 +57,16 @@ const ExtremeAdminPortal: React.FC = () => {
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [dashboard, setDashboard] = useState<Record<string, number>>({});
   const [logs, setLogs] = useState<any[]>([]);
-  const [settings, setSettings] = useState<Record<string, boolean>>({});
+  const [settings, setSettings] = useState<Record<string, boolean | number>>({});
   const [securitySummary, setSecuritySummary] = useState<Record<string, number>>({});
   const [schools, setSchools] = useState<PortalSchool[]>([]);
+  const [reports, setReports] = useState<PortalReport[]>([]);
+  const [books, setBooks] = useState<PortalBook[]>([]);
+  const [posts, setPosts] = useState<PortalPost[]>([]);
+  const [financeOverview, setFinanceOverview] = useState<FinanceOverview>({});
+  const [userSearch, setUserSearch] = useState('');
+  const [aiDailyLimit, setAiDailyLimit] = useState('50');
+  const [superAdminUsers, setSuperAdminUsers] = useState<PortalUser[]>([]);
 
   const [targetUserId, setTargetUserId] = useState('');
   const [targetRole, setTargetRole] = useState<UserRole>('student');
@@ -54,7 +79,7 @@ const ExtremeAdminPortal: React.FC = () => {
   const [bookId, setBookId] = useState('');
 
   const isExtremeAdmin = user?.role === 'extreme_admin';
-  const currentSuperAdmin = users.find((item) => item.role === 'super_admin') || null;
+  const currentSuperAdmin = superAdminUsers[0] || null;
 
   const availableRoles = useMemo<UserRole[]>(
     () => ['student', 'teacher', 'admin', 'manager', 'finance', 'parent'],
@@ -65,30 +90,53 @@ const ExtremeAdminPortal: React.FC = () => {
     if (!isExtremeAdmin) return;
     setLoading(true);
     try {
-      const [{ data: dashboardData, error: dashboardError }, { data: userData, error: usersError }, { data: logData, error: logsError }, { data: settingsData, error: settingsError }, { data: securityData, error: securityError }, { data: schoolData, error: schoolsError }] = await Promise.all([
+      const [
+        { data: dashboardData, error: dashboardError },
+        { data: userData, error: usersError },
+        { data: logData, error: logsError },
+        { data: settingsData, error: settingsError },
+        { data: securityData, error: securityError },
+        { data: schoolData, error: schoolsError },
+        { data: superAdminData, error: superAdminError },
+        { data: reportData, error: reportsError },
+        { data: bookData, error: booksError },
+        { data: postData, error: postsError },
+        { data: financeData, error: financeError },
+      ] = await Promise.all([
         supabase.rpc('extreme_admin_get_dashboard' as any),
         supabase.rpc('extreme_admin_list_users' as any, { p_limit: 300 }),
         supabase.rpc('extreme_admin_get_audit_logs' as any, { p_limit: 100 }),
         supabase.rpc('extreme_admin_get_settings' as any),
         supabase.rpc('extreme_admin_get_security' as any),
         supabase.rpc('extreme_admin_list_schools' as any),
+        supabase.rpc('extreme_admin_list_users' as any, { p_role: 'super_admin', p_limit: 1, p_offset: 0 }),
+        supabase.rpc('extreme_admin_list_reports' as any, { p_status: null, p_limit: 100, p_offset: 0 }),
+        supabase.rpc('extreme_admin_list_books' as any, { p_search: null, p_limit: 100, p_offset: 0 }),
+        supabase.rpc('extreme_admin_list_posts' as any, { p_search: null, p_limit: 100, p_offset: 0 }),
+        supabase.rpc('extreme_admin_finance_overview' as any),
       ]);
 
-      if (dashboardError || usersError || logsError || settingsError || securityError || schoolsError) {
-        throw dashboardError || usersError || logsError || settingsError || securityError || schoolsError;
-      }
+      const firstError = dashboardError || usersError || logsError || settingsError || securityError || schoolsError || superAdminError || reportsError || booksError || postsError || financeError;
+      if (firstError) throw firstError;
 
       setDashboard((dashboardData as Record<string, number>) || {});
       setUsers(((userData as unknown) as PortalUser[]) || []);
       setLogs((logData as any) || []);
       setSchools((schoolData as PortalSchool[]) || []);
       setSecuritySummary((securityData as Record<string, number>) || {});
+      setSuperAdminUsers((superAdminData as PortalUser[]) || []);
+      setReports((reportData as PortalReport[]) || []);
+      setBooks((bookData as PortalBook[]) || []);
+      setPosts((postData as PortalPost[]) || []);
+      setFinanceOverview((financeData as FinanceOverview) || {});
 
-      const mappedSettings = (settingsData || []).reduce((acc: Record<string, boolean>, row: any) => {
-        acc[row.setting_key] = row.setting_value === true;
+      const mappedSettings = (settingsData || []).reduce((acc: Record<string, boolean | number>, row: any) => {
+        acc[row.setting_key] = typeof row.setting_value === 'number' ? row.setting_value : row.setting_value === true;
         return acc;
       }, {});
       setSettings(mappedSettings);
+      const configuredLimit = mappedSettings.max_ai_requests_per_day;
+      setAiDailyLimit(String(typeof configuredLimit === 'number' ? configuredLimit : 50));
     } catch (error: any) {
       toast.error(error.message || 'Failed to refresh root control data');
     } finally {
@@ -182,24 +230,54 @@ const ExtremeAdminPortal: React.FC = () => {
     refreshAll();
   };
 
-  const deletePost = async () => {
-    const { error } = await supabase.rpc('extreme_admin_delete_social_post' as any, { p_post_id: postId });
+  const deletePostById = async (id: string) => {
+    if (!id || !window.confirm('Remove this social post? This action cannot be undone.')) return;
+    const { error } = await supabase.rpc('extreme_admin_delete_social_post' as any, { p_post_id: id });
     if (error) return toast.error(error.message || 'Failed to delete post');
-    toast.success('Post deleted');
+    toast.success('Post removed');
     setPostId('');
-    refreshAll();
+    await refreshAll();
+  };
+
+  const deleteBookById = async (id: string) => {
+    if (!id || !window.confirm('Remove this library book? This action cannot be undone.')) return;
+    const { error } = await supabase.rpc('extreme_admin_delete_library_book' as any, { p_book_id: id });
+    if (error) return toast.error(error.message || 'Failed to delete book');
+    toast.success('Book removed');
+    setBookId('');
+    await refreshAll();
+  };
+
+  const deletePost = async () => {
+    if (!postId.trim()) return toast.error('Enter a social post ID');
+    await deletePostById(postId.trim());
   };
 
   const deleteBook = async () => {
-    const { error } = await supabase.rpc('extreme_admin_delete_library_book' as any, { p_book_id: bookId });
-    if (error) return toast.error(error.message || 'Failed to delete book');
-    toast.success('Book deleted');
-    setBookId('');
-    refreshAll();
+    if (!bookId.trim()) return toast.error('Enter a library book ID');
+    await deleteBookById(bookId.trim());
   };
 
+  const updateReport = async (reportId: string, nextStatus: 'reviewed' | 'resolved' | 'dismissed') => {
+    const actionLabel = nextStatus === 'dismissed' ? 'dismiss this report' : nextStatus === 'resolved' ? 'resolve this report' : 'mark this report reviewed';
+    if (!window.confirm(`Are you sure you want to ${actionLabel}?`)) return;
+    const { error } = await supabase.rpc('extreme_admin_set_report_status' as any, {
+      p_report_id: reportId,
+      p_status: nextStatus,
+      p_reason: statusReason.trim() || null,
+    });
+    if (error) return toast.error(error.message || 'Report could not be updated');
+    toast.success(`Report marked ${nextStatus}`);
+    await refreshAll();
+  };
+
+  const filteredUsers = users.filter((item) => {
+    const needle = userSearch.trim().toLowerCase();
+    return !needle || item.name.toLowerCase().includes(needle) || (item.username || '').toLowerCase().includes(needle) || item.id.toLowerCase().includes(needle);
+  });
+
   const updateSetting = async (key: string, value: boolean) => {
-    const { error } = await supabase.rpc('extreme_admin_set_setting' as any, {
+    const { error } = await supabase.rpc('admin_set_setting' as any, {
       p_key: key,
       p_value: value,
     });
@@ -211,6 +289,22 @@ const ExtremeAdminPortal: React.FC = () => {
 
     setSettings((prev) => ({ ...prev, [key]: value }));
     toast.success(`${key} updated`);
+  };
+
+  const updateAiDailyLimit = async () => {
+    if (!aiDailyLimit.trim()) return toast.error('Enter an AI daily limit from 0 to 300');
+    const value = Number(aiDailyLimit);
+    if (!Number.isInteger(value) || value < 0 || value > 300) {
+      return toast.error('AI daily limit must be a whole number from 0 to 300');
+    }
+    const { error } = await supabase.rpc('admin_set_setting' as any, {
+      p_key: 'max_ai_requests_per_day',
+      p_value: value,
+    });
+    if (error) return toast.error(error.message || 'AI daily limit could not be updated');
+    setSettings((prev) => ({ ...prev, max_ai_requests_per_day: value }));
+    toast.success('AI daily limit updated');
+    await refreshAll();
   };
 
   const overviewMetrics = [
@@ -281,6 +375,8 @@ const ExtremeAdminPortal: React.FC = () => {
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="super-admin">Super Admin</TabsTrigger>
             <TabsTrigger value="schools">Schools</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="finance">Finance</TabsTrigger>
             <TabsTrigger value="economy">Economy</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
             <TabsTrigger value="chats">Chats</TabsTrigger>
@@ -363,19 +459,14 @@ const ExtremeAdminPortal: React.FC = () => {
               <CardContent className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-3">
                   <Label>Target user ID</Label>
-                  <Input value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} placeholder="UUID" className="bg-white border-slate-200" />
-
+                  <Input value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} placeholder="Select an account below or enter UUID" className="bg-white border-slate-200" />
                   <Label>Role</Label>
                   <Select value={targetRole} onValueChange={(value) => setTargetRole(value as UserRole)}>
                     <SelectTrigger className="bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {availableRoles.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}
-                    </SelectContent>
+                    <SelectContent>{availableRoles.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
                   </Select>
-
-                  <Button onClick={setRole} className="w-full">Update Role</Button>
+                  <Button onClick={setRole} className="w-full" disabled={!targetUserId.trim()}>Update Role</Button>
                 </div>
-
                 <div className="space-y-3">
                   <Label>Account status</Label>
                   <Select value={status} onValueChange={(value) => setStatus(value as AccountStatus)}>
@@ -386,29 +477,97 @@ const ExtremeAdminPortal: React.FC = () => {
                       <SelectItem value="banned">banned</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Reason" className="bg-slate-50 border-slate-200" />
-                  <Button onClick={setUserStatus} variant="secondary" className="w-full">Apply Status</Button>
+                  <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Reason for the account change" className="bg-slate-50 border-slate-200" />
+                  <Button onClick={setUserStatus} variant="secondary" className="w-full" disabled={!targetUserId.trim()}>Apply Status</Button>
                 </div>
               </CardContent>
             </Card>
-
             <Card className="bg-white border-slate-200">
               <CardHeader>
-                <CardTitle>All Users ({users.length})</CardTitle>
+                <CardTitle>Platform Accounts ({filteredUsers.length} shown · {users.length} loaded)</CardTitle>
+                <CardDescription>Select an account to populate the controls above. Top-level roles cannot be changed here.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2 max-h-96 overflow-auto">
-                {users.map((item) => (
-                  <div key={item.id} className="text-xs border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-medium">{item.name} ({item.username || 'no-username'})</div>
-                      <div className="text-slate-600">{item.id}</div>
+              <CardContent className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search name, username, or account ID" className="bg-white pl-9" />
+                </div>
+                <div className="max-h-[30rem] overflow-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+                  {filteredUsers.map((item) => (
+                    <button key={item.id} type="button" onClick={() => setTargetUserId(item.id)} className={`flex w-full flex-wrap items-center justify-between gap-2 px-3 py-3 text-left hover:bg-slate-50 ${targetUserId === item.id ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : ''}`}>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-slate-900">{item.name}</span>
+                        <span className="block truncate text-xs text-slate-500">@{item.username || 'no-username'} · {item.id}</span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2 text-xs text-slate-600">
+                        <span>{item.role}</span><span className="rounded-full bg-slate-100 px-2 py-1">{item.account_status || 'active'}</span>
+                      </span>
+                    </button>
+                  ))}
+                  {!filteredUsers.length && <p className="p-5 text-center text-sm text-slate-500">No matching accounts in the latest 300 loaded accounts.</p>}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reports" className="space-y-4">
+            <Card className="border-slate-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Platform reports</CardTitle>
+                <CardDescription>Review user-submitted reports. Every status change is recorded in the global audit log.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Optional moderation note for the audit trail" />
+                {reports.map((report) => (
+                  <div key={report.id} className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-900">{report.reason || 'User report'} <span className="ml-2 text-xs font-normal text-slate-500">{report.reported_type}</span></p>
+                        <p className="mt-1 text-xs text-slate-500">Reported by {report.reporter_name || report.reporter_id} · {report.reported_name || report.reported_id || 'No target'} · {new Date(report.created_at).toLocaleString()}</p>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{report.status}</span>
                     </div>
-                    <div className="text-right">
-                      <div>{item.role} · {item.account_status}</div>
-                      <div className="text-slate-600">XP {item.xp} · Coins {item.coins}</div>
-                    </div>
+                    {report.description && <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{report.description}</p>}
+                    {report.status !== 'resolved' && report.status !== 'dismissed' && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => void updateReport(report.id, 'reviewed')}>Mark reviewed</Button>
+                        <Button size="sm" onClick={() => void updateReport(report.id, 'resolved')}>Resolve</Button>
+                        <Button size="sm" variant="destructive" onClick={() => void updateReport(report.id, 'dismissed')}>Dismiss</Button>
+                      </div>
+                    )}
+                    <p className="mt-2 break-all text-[11px] text-slate-400">Report ID: {report.id}</p>
                   </div>
                 ))}
+                {!reports.length && <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No reports found in the latest 100 records.</p>}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="finance" className="space-y-4">
+            <Card className="border-slate-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" />Global finance overview</CardTitle>
+                <CardDescription>Read-only totals across the platform finance ledger. Transaction-level access remains in the Finance Portal.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {financeOverview.available === false ? (
+                  <p className="rounded-lg border border-dashed border-slate-300 p-5 text-sm text-slate-500">Global finance overview is not available.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                    {[
+                      ['Active accounts', financeOverview.accounts ?? 0],
+                      ['Invoices', financeOverview.invoices ?? 0],
+                      ['Payments', financeOverview.payments ?? 0],
+                      ['Transactions', financeOverview.transactions ?? 0],
+                      ['Current balance', Number(financeOverview.balance ?? 0).toLocaleString()],
+                    ].map(([label, value]) => (
+                      <div key={String(label)} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs text-slate-500">{label}</p>
+                        <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -432,17 +591,55 @@ const ExtremeAdminPortal: React.FC = () => {
           <TabsContent value="content" className="space-y-4">
             <Card className="bg-white border-slate-200">
               <CardHeader>
-                <CardTitle>Content Control</CardTitle>
-                <CardDescription>Delete social posts and library books by ID.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5" />Library content review</CardTitle>
+                <CardDescription>Inspect recent library records before taking a moderation action. The list shows up to 100 records.</CardDescription>
               </CardHeader>
-              <CardContent className="grid md:grid-cols-2 gap-3">
+              <CardContent className="space-y-3">
+                {books.map((book) => (
+                  <div key={book.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{book.title}</p>
+                      <p className="text-xs text-slate-500">{book.author || 'Unknown author'} · {book.subject || 'Unspecified subject'} · Grade {book.grade_level ?? '—'} · {book.status}</p>
+                      <p className="break-all text-[11px] text-slate-400">{book.id} · Uploaded by {book.uploader_name || book.uploader_id}</p>
+                    </div>
+                    <Button size="sm" variant="destructive" onClick={() => void deleteBookById(book.id)}>Remove book</Button>
+                  </div>
+                ))}
+                {!books.length && <p className="text-sm text-slate-500">No library books found in the latest result.</p>}
+              </CardContent>
+            </Card>
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5" />Social content review</CardTitle>
+                <CardDescription>Inspect recent public posts and remove content that violates platform rules.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {posts.map((post) => (
+                  <div key={post.id} className="rounded-lg border border-slate-200 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{post.author_name || post.author_id} · {post.post_type}</p>
+                      <Button size="sm" variant="destructive" onClick={() => void deletePostById(post.id)}>Remove post</Button>
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{post.content}</p>
+                    <p className="mt-2 break-all text-[11px] text-slate-400">{post.id} · {new Date(post.created_at).toLocaleString()}</p>
+                  </div>
+                ))}
+                {!posts.length && <p className="text-sm text-slate-500">No social posts found in the latest result.</p>}
+              </CardContent>
+            </Card>
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <CardTitle>Direct moderation by record ID</CardTitle>
+                <CardDescription>Use these fields for a record outside the latest 100 results.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
                   <Input value={postId} onChange={(e) => setPostId(e.target.value)} placeholder="Social post ID" className="bg-slate-50 border-slate-200" />
-                  <Button variant="destructive" onClick={deletePost} className="w-full">Delete Post</Button>
+                  <Button variant="destructive" onClick={deletePost} className="w-full">Remove post by ID</Button>
                 </div>
                 <div className="space-y-2">
                   <Input value={bookId} onChange={(e) => setBookId(e.target.value)} placeholder="Library book ID" className="bg-slate-50 border-slate-200" />
-                  <Button variant="destructive" onClick={deleteBook} className="w-full">Delete Book</Button>
+                  <Button variant="destructive" onClick={deleteBook} className="w-full">Remove book by ID</Button>
                 </div>
               </CardContent>
             </Card>
@@ -473,6 +670,21 @@ const ExtremeAdminPortal: React.FC = () => {
                     <Switch checked={Boolean(settings[key])} onCheckedChange={(value) => updateSetting(key, value)} />
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" />AI usage limit</CardTitle>
+                <CardDescription>This is enforced by the database AI request limiter per account over a rolling 24-hour window. Set 0 to disable AI requests globally; maximum 300 per account per 24 hours.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex-1 space-y-2">
+                  <Label>Maximum AI requests per account / 24 hours</Label>
+                  <Input type="number" min={0} max={300} step={1} value={aiDailyLimit} onChange={(e) => setAiDailyLimit(e.target.value)} className="bg-white" />
+                </div>
+                <Button onClick={() => void updateAiDailyLimit()}>Save AI limit</Button>
+                <p className="text-xs text-slate-500">Current saved value: {typeof settings.max_ai_requests_per_day === 'number' ? settings.max_ai_requests_per_day : 50}</p>
               </CardContent>
             </Card>
 
