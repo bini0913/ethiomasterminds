@@ -375,7 +375,9 @@ BEGIN
 
   IF v_actor = OLD.assigned_to_membership_id THEN
     IF NEW.status NOT IN ('in_progress', 'submitted')
-       OR OLD.status NOT IN ('open', 'in_progress', 'returned') THEN
+       OR OLD.status NOT IN ('open', 'in_progress', 'returned')
+       OR NEW.verified_by_membership_id IS DISTINCT FROM OLD.verified_by_membership_id
+       OR NEW.verified_at IS DISTINCT FROM OLD.verified_at THEN
       RAISE EXCEPTION 'Assigned staff can only start or submit their task';
     END IF;
     IF NEW.status = 'submitted' THEN NEW.submitted_at := now(); END IF;
