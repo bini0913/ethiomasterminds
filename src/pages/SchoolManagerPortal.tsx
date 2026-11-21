@@ -71,6 +71,12 @@ export default function SchoolManagerPortal() {
   const [leaderEndDate, setLeaderEndDate] = useState("");
   const [leaderPermissions, setLeaderPermissions] = useState<string[]>(["view_reports"]);
   const [leadershipActionReason, setLeadershipActionReason] = useState("");
+  const [divisionMappings, setDivisionMappings] = useState<any[]>([]);
+  const [teamAssignments, setTeamAssignments] = useState<any[]>([]);
+  const [mappingGrade, setMappingGrade] = useState("");
+  const [mappingDivision, setMappingDivision] = useState("kg");
+  const [teamAppointmentId, setTeamAppointmentId] = useState("");
+  const [teamMemberId, setTeamMemberId] = useState("");
 
   const [accountRole, setAccountRole] = useState<AccountRole>("admin");
   const [accountName, setAccountName] = useState("");
@@ -212,18 +218,32 @@ export default function SchoolManagerPortal() {
 
   const loadLeadership = useCallback(async () => {
     if (!schoolId) return;
-    const { data, error } = await db
-      .from("school_leadership_appointments")
-      .select("id,membership_id,position,division_scope,team_name,permissions,status,start_date,end_date,created_at")
-      .eq("school_id", schoolId)
-      .order("created_at", { ascending: false });
-    if (error) {
+    const [appointmentsRes, mappingsRes, teamMembersRes] = await Promise.all([
+      db.from("school_leadership_appointments")
+        .select("id,membership_id,position,division_scope,team_name,permissions,status,start_date,end_date,created_at")
+        .eq("school_id", schoolId)
+        .order("created_at", { ascending: false }),
+      db.from("school_division_grade_mappings")
+        .select("id,division_scope,grade_label")
+        .eq("school_id", schoolId)
+        .order("grade_label"),
+      db.from("school_leadership_team_members")
+        .select("id,appointment_id,membership_id,created_at")
+        .eq("school_id", schoolId)
+        .order("created_at", { ascending: false }),
+    ]);
+    const loadError = appointmentsRes.error || mappingsRes.error || teamMembersRes.error;
+    if (loadError) {
       setLeadershipError("Leadership management is waiting for its database migration. Existing school operations remain available.");
       setLeadershipAppointments([]);
+      setDivisionMappings([]);
+      setTeamAssignments([]);
       return;
     }
     setLeadershipError(null);
-    setLeadershipAppointments(data ?? []);
+    setLeadershipAppointments(appointmentsRes.data ?? []);
+    setDivisionMappings(mappingsRes.data ?? []);
+    setTeamAssignments(teamMembersRes.data ?? []);
   }, [schoolId, db]);
 
   useEffect(() => { void loadLeadership(); }, [loadLeadership]);
@@ -250,6 +270,56 @@ export default function SchoolManagerPortal() {
     setLeaderTeamName("");
     setLeaderStartDate("");
     setLeaderEndDate("");
+    await loadLeadership();
+  };
+
+  const saveDivisionMapping = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!schoolId || !mappingGrade) return toast.error("Choose a grade to map.");
+    const { error } = await db.rpc("school_set_division_grade_mapping", {
+      p_school_id: schoolId,
+      p_grade_label: mappingGrade,
+      p_division_scope: mappingDivision,
+    });
+    if (error) return toast.error(error.message || "The division mapping could not be saved.");
+    toast.success("Grade mapped to its school division.");
+    await loadLeadership();
+  };
+
+  const removeDivisionMapping = async (gradeLabel: string) => {
+    if (!schoolId) return;
+    const { error } = await db.rpc("school_set_division_grade_mapping", {
+      p_school_id: schoolId,
+      p_grade_label: gradeLabel,
+      p_division_scope: null,
+    });
+    if (error) return toast.error(error.message || "The division mapping could not be removed.");
+    toast.success("Grade division mapping removed.");
+    await loadLeadership();
+  };
+
+  const saveTeamMember = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!teamAppointmentId || !teamMemberId) return toast.error("Choose a Team Leader and a staff member.");
+    const { error } = await db.rpc("school_assign_leadership_team_member", {
+      p_appointment_id: teamAppointmentId,
+      p_target_membership_id: teamMemberId,
+      p_assign: true,
+    });
+    if (error) return toast.error(error.message || "The team member could not be assigned.");
+    toast.success("Staff member added to the Team Leader's assigned team.");
+    setTeamMemberId("");
+    await loadLeadership();
+  };
+
+  const removeTeamMember = async (appointmentId: string, membershipId: string) => {
+    const { error } = await db.rpc("school_assign_leadership_team_member", {
+      p_appointment_id: appointmentId,
+      p_target_membership_id: membershipId,
+      p_assign: false,
+    });
+    if (error) return toast.error(error.message || "The team member could not be removed.");
+    toast.success("Team assignment removed.");
     await loadLeadership();
   };
 
@@ -1007,6 +1077,75 @@ export default function SchoolManagerPortal() {
             </div>
             <SchoolPrimaryButton type="submit" disabled={!staff.length}>Create appointment</SchoolPrimaryButton>
           </form>
+        </SchoolPanel>
+        <SchoolPanel title="Grade-to-division mapping" description="Configure how this school groups its actual grade labels. These mappings are school-specific and are not hardcoded by Master Minds.">
+          <form onSubmit={saveDivisionMapping} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+            <SchoolField label="School grade">
+              <select className={schoolSelectClass} value={mappingGrade} onChange={(event) => setMappingGrade(event.target.value)} required>
+                <option value="">Choose a configured grade</option>
+                {[...new Set(sections.map((section) => section.grade_label))].sort((a, b) => a.localeCompare(b)).map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+              </select>
+            </SchoolField>
+            <SchoolField label="Division">
+              <select className={schoolSelectClass} value={mappingDivision} onChange={(event) => setMappingDivision(event.target.value)}>
+                <option value="kg">KG</option>
+                <option value="elementary">Elementary</option>
+                <option value="middle_school">Middle School</option>
+                <option value="high_school">High School</option>
+              </select>
+            </SchoolField>
+            <SchoolPrimaryButton type="submit">Save mapping</SchoolPrimaryButton>
+          </form>
+          <div className="mt-4 space-y-2">
+            {divisionMappings.length ? divisionMappings.map((mapping) => (
+              <div key={mapping.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-100 px-3 py-2">
+                <span className="text-sm font-medium text-slate-800">{mapping.grade_label}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs capitalize text-slate-500">{mapping.division_scope.replace(/_/g, " ")}</span>
+                  <SchoolSecondaryButton onClick={() => void removeDivisionMapping(mapping.grade_label)}>Remove</SchoolSecondaryButton>
+                </div>
+              </div>
+            )) : <SchoolEmptyState title="No division mappings configured" description="Map each grade used by this school to KG, Elementary, Middle School, or High School." />}
+          </div>
+        </SchoolPanel>
+        <SchoolPanel title="Team membership assignments" description="Assign existing school staff to each Team Leader. Team membership does not create accounts or change school roles.">
+          <form onSubmit={saveTeamMember} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+            <SchoolField label="Team Leader">
+              <select className={schoolSelectClass} value={teamAppointmentId} onChange={(event) => setTeamAppointmentId(event.target.value)} required>
+                <option value="">Choose Team Leader</option>
+                {leadershipAppointments.filter((item) => item.position === "team_leader" && item.status === "active").map((item) => <option key={item.id} value={item.id}>{memberName(item.membership_id)} · {item.team_name}</option>)}
+              </select>
+            </SchoolField>
+            <SchoolField label="Staff member">
+              <select className={schoolSelectClass} value={teamMemberId} onChange={(event) => setTeamMemberId(event.target.value)} required>
+                <option value="">Choose active staff</option>
+                {staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
+              </select>
+            </SchoolField>
+            <SchoolPrimaryButton type="submit">Assign to team</SchoolPrimaryButton>
+          </form>
+          <div className="mt-4 space-y-3">
+            {leadershipAppointments.filter((item) => item.position === "team_leader").map((leader) => {
+              const assigned = teamAssignments.filter((item) => item.appointment_id === leader.id);
+              return (
+                <div key={leader.id} className="rounded-lg border border-slate-200 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900">{memberName(leader.membership_id)} · {leader.team_name}</p>
+                    <SchoolStatus value={leader.status} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {assigned.length ? assigned.map((item) => (
+                      <span key={item.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700">
+                        {memberName(item.membership_id)}
+                        <button type="button" onClick={() => void removeTeamMember(leader.id, item.membership_id)} className="font-semibold text-rose-600" aria-label={"Remove " + memberName(item.membership_id)}>×</button>
+                      </span>
+                    )) : <span className="text-xs text-slate-500">No staff assigned to this team yet.</span>}
+                  </div>
+                </div>
+              );
+            })}
+            {!leadershipAppointments.some((item) => item.position === "team_leader") && <SchoolEmptyState title="No Team Leaders appointed" description="Appoint a Team Leader above before assigning staff to a team." />}
+          </div>
         </SchoolPanel>
         <SchoolPanel title="Leadership appointments" description="Suspending or ending an appointment preserves its history. A replacement is appointed as a new record.">
           <div className="mb-3">
