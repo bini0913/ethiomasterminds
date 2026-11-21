@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(55);
+select plan(62);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -70,6 +70,15 @@ select ok((select qual like '%review_attendance%' from pg_policies where scheman
 select ok((select qual like '%review_attendance%' from pg_policies where schemaname='public' and tablename='school_attendance_records' and policyname='school_leadership_view_scoped_attendance_records'), 'attendance records are readable to scoped attendance reviewers');
 select ok((select qual like '%review_discipline%' from pg_policies where schemaname='public' and tablename='school_behavior_reports' and policyname='school_leadership_view_scoped_behavior_reports'), 'behavior reports are readable to scoped discipline reviewers');
 select ok((select qual like '%review_assessments%' from pg_policies where schemaname='public' and tablename='school_homework_assignments' and policyname='school_leadership_view_scoped_homework'), 'homework is readable to scoped academic reviewers');
+
+
+select ok(to_regclass('public.school_leadership_action_events') is not null, 'operational leadership audit table exists');
+select ok((select relrowsecurity from pg_class where oid='public.school_leadership_action_events'::regclass), 'operational leadership audit table has RLS');
+select ok(not has_table_privilege('authenticated','public.school_leadership_action_events','INSERT'), 'clients cannot write operational leadership audit events directly');
+select ok(has_function_privilege('authenticated','public.school_leadership_correct_attendance(uuid,text,text,text)','EXECUTE'), 'appointed leaders can call the guarded attendance correction RPC');
+select ok(not has_function_privilege('anon','public.school_leadership_correct_attendance(uuid,text,text,text)','EXECUTE'), 'anonymous users cannot correct school attendance');
+select ok(position('review_attendance' in pg_get_functiondef('public.school_validate_attendance_record()'::regprocedure)) > 0, 'attendance trigger independently validates leadership correction scope');
+select ok(position('school_leadership_action_events' in pg_get_functiondef('public.school_validate_staff_task()'::regprocedure)) > 0, 'leadership task assignments and reviews are audited');
 
 select * from finish();
 rollback;
