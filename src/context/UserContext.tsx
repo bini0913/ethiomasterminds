@@ -5,7 +5,7 @@ import { safeStorage } from "@/lib/safeStorage";
 import { User, Session } from "@supabase/supabase-js";
 
 // Types
-export type UserRole = "student" | "teacher" | "admin" | "manager" | "finance" | "parent" | "extreme_admin";
+export type UserRole = "student" | "teacher" | "admin" | "manager" | "finance" | "parent" | "super_admin" | "extreme_admin";
 
 export interface AvatarConfig {
   bodyType?: string;
@@ -143,7 +143,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const role = roleData as UserRole | null;
-      if (!role || !['student', 'teacher', 'admin', 'manager', 'finance', 'parent', 'extreme_admin'].includes(role)) {
+      if (!role || !['student', 'teacher', 'admin', 'manager', 'finance', 'parent', 'super_admin', 'extreme_admin'].includes(role)) {
         console.error('Role lookup returned no valid role:', roleData);
         return null;
       }

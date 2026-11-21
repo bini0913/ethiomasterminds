@@ -67,7 +67,9 @@ Deno.serve(async (req) => {
       .select("role")
       .eq("user_id", actorId);
     if (rolesError) return json({ error: "Unable to verify account permissions" }, 503);
-    const isSuperAdmin = (globalRoles ?? []).some((row: { role: string }) => row.role === "extreme_admin");
+    const isSuperAdmin = (globalRoles ?? []).some((row: { role: string }) =>
+      row.role === "extreme_admin" || row.role === "super_admin"
+    );
 
     const createAuthAccount = async (name: string, username: string, grade?: string, age?: number) => {
       const password = randomString(18);
@@ -134,13 +136,26 @@ Deno.serve(async (req) => {
       if (name.length < 2 || name.length > 160 || !/^[A-Z0-9]{2,8}$/.test(schoolCode) || managerName.length < 2) {
         return json({ error: "School name, school code, and Manager name are required" }, 400);
       }
+      const { data: network, error: networkError } = await admin
+        .from("school_networks")
+        .select("id")
+        .eq("network_key", true)
+        .single();
+      if (networkError || !network) return json({ error: "School network is unavailable" }, 503);
 
       const { data: school, error: schoolError } = await admin
         .from("schools")
-        .insert({ name, school_code: schoolCode, created_by: actorId })
+        .insert({ name, school_code: schoolCode, network_id: network.id, created_by: actorId })
         .select("id,name,school_code")
         .single();
       if (schoolError || !school) return json({ error: "Could not create the school" }, 409);
+      await admin.from("admin_audit_logs").insert({
+        actor_id: actorId,
+        action: "school_registered",
+        target_type: "school",
+        target_id: school.id,
+        metadata: { school_code: schoolCode, network_id: network.id, manager_provisioned: true },
+      });
 
       try {
         const username = await uniqueStaffUsername();
