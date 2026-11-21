@@ -85,7 +85,7 @@ function ScopedLeadershipWorkspace() {
     setLoading(true);
     setLoadError(null);
     const requests: Record<string, Promise<any>> = {};
-    if (can("view_students") || can("view_staff")) {
+    if (can("view_students") || can("view_staff") || can("manage_team_tasks") || can("assign_team_tasks")) {
       requests.members = db.from("school_memberships")
         .select("id,user_id,school_role,status,grade_label,section_id,school_username")
         .eq("school_id", schoolId)
