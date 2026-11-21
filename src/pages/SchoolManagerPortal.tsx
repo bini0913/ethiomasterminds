@@ -402,6 +402,23 @@ export default function SchoolManagerPortal() {
     const section = sections.find((item) => item.id === sectionId);
     return section ? `${section.grade_label} ${section.section_name}` : "—";
   };
+  const membershipRoleLabel = (member: any) => {
+    const appointment = leadershipAppointments.find((item) => item.membership_id === member.id && item.status === "active");
+    if (appointment) {
+      const labels: Record<string, string> = {
+        main_director: "Main Director",
+        vice_director: "Vice Director",
+        kg_director: "KG Director",
+        elementary_director: "Elementary Director",
+        middle_school_director: "Middle School Director",
+        high_school_director: "High School Director",
+        team_leader: "Team Leader",
+      };
+      return labels[appointment.position] || appointment.position;
+    }
+    return member.school_role === "admin" ? "Unassigned School Admin" : member.school_role;
+  };
+
 
   const createAccount = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -787,7 +804,7 @@ export default function SchoolManagerPortal() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[620px] text-left text-sm">
               <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="pb-2 font-semibold">Person</th><th className="pb-2 font-semibold">Role</th><th className="pb-2 font-semibold">Grade / section</th><th className="pb-2 font-semibold">Status</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 capitalize text-slate-600">{member.school_role}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td></tr>)}</tbody>
+              <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 text-slate-600">{membershipRoleLabel(member)}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td></tr>)}</tbody>
             </table>
           </div>
         </SchoolPanel>
