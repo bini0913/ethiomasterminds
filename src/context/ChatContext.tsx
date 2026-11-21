@@ -245,27 +245,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return null;
 
     try {
-      const { data, error } = await supabase
-        .from('chat_groups')
-        .insert({
-          name,
-          description,
-          group_type: type,
-          created_by: user.id
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('create_chat_group', {
+        p_name: name,
+        p_description: description,
+        p_group_type: type,
+      });
 
       if (error) throw error;
-
-      // Add creator as owner
-      await supabase
-        .from('chat_group_members')
-        .insert({
-          group_id: data.id,
-          user_id: user.id,
-          role: 'owner'
-        });
 
       const newGroup: ChatGroup = {
         ...data,
@@ -287,13 +273,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return;
 
     try {
-      const { error } = await supabase
-        .from('chat_group_members')
-        .insert({
-          group_id: groupId,
-          user_id: user.id,
-          role: 'member'
-        });
+      const { error } = await supabase.rpc('join_chat_group', {
+        p_group_id: groupId,
+      });
 
       if (error) throw error;
 
@@ -313,11 +295,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return;
 
     try {
-      const { error } = await supabase
-        .from('chat_group_members')
-        .delete()
-        .eq('group_id', groupId)
-        .eq('user_id', user.id);
+      const { error } = await supabase.rpc('leave_chat_group', {
+        p_group_id: groupId,
+      });
 
       if (error) throw error;
 
@@ -337,23 +317,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id || !currentGroup || !content.trim()) return;
 
     try {
-      const { error } = await supabase
-        .from('group_messages')
-        .insert({
-          group_id: currentGroup.id,
-          sender_id: user.id,
-          content: content.trim(),
-          message_type: 'text',
-          reply_to_id: replyToId
-        });
+      const { error } = await supabase.rpc('send_group_message', {
+        p_group_id: currentGroup.id,
+        p_content: content.trim(),
+        p_message_type: 'text',
+        p_reply_to_id: replyToId || null,
+      });
 
       if (error) throw error;
-
-      // Update group's updated_at
-      await supabase
-        .from('chat_groups')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', currentGroup.id);
     } catch (err) {
       console.error('Error sending message:', err);
       toast.error('Failed to send message');
@@ -364,13 +335,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return;
 
     try {
-      const { error } = await supabase
-        .from('chat_group_members')
-        .insert({
-          group_id: groupId,
-          user_id: userId,
-          role: 'member'
-        });
+      const { error } = await supabase.rpc('add_chat_group_member', {
+        p_group_id: groupId,
+        p_user_id: userId,
+      });
 
       if (error) throw error;
 

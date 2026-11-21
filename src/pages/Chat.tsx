@@ -322,14 +322,14 @@ const Chat: React.FC = () => {
       return;
     }
     setSending(true);
-    const { error } = await supabase.from('group_messages').insert({
-      group_id: activeRoom.id, sender_id: user.id,
-      content: text, message_type: 'text',
-      reply_to_id: replyTo?.id || null,
+    const { error } = await supabase.rpc('send_group_message', {
+      p_group_id: activeRoom.id,
+      p_content: text,
+      p_message_type: 'text',
+      p_reply_to_id: replyTo?.id || null,
     });
     if (error) { toast.error('Failed to send'); setSending(false); return; }
     setDraft(''); setReplyTo(null); setSending(false);
-    await supabase.from('chat_groups').update({ updated_at: new Date().toISOString() }).eq('id', activeRoom.id);
   }, [user?.id, activeRoom, draft, sending, replyTo]);
 
   // Broadcast typing
@@ -347,12 +347,11 @@ const Chat: React.FC = () => {
   const createGroup = async () => {
     if (!user?.id || !newGroupName.trim()) return;
     try {
-      const { data, error } = await supabase.from('chat_groups')
-        .insert({ name: newGroupName.trim(), group_type: newGroupType, created_by: user.id })
-        .select().single();
+      const { error } = await supabase.rpc('create_chat_group', {
+        p_name: newGroupName.trim(),
+        p_group_type: newGroupType,
+      });
       if (error) throw error;
-      await supabase.from('chat_group_members')
-        .insert({ group_id: data.id, user_id: user.id, role: 'owner' });
       toast.success('Chat created!');
       setNewGroupName(''); setShowCreateDialog(false);
       loadRooms();
@@ -375,9 +374,7 @@ const Chat: React.FC = () => {
   // Join group
   const joinGroup = async (groupId: string) => {
     if (!user?.id) return;
-    const { error } = await supabase.from('chat_group_members')
-      .insert({ group_id: groupId, user_id: user.id, role: 'member' });
-    if (error?.code === '23505') { toast.info('Already a member'); return; }
+    const { error } = await supabase.rpc('join_chat_group', { p_group_id: groupId });
     if (error) { toast.error('Failed to join'); return; }
     toast.success('Joined!');
     loadRooms();
@@ -796,9 +793,10 @@ const Chat: React.FC = () => {
                   if (!file || !activeRoom || !user?.id) return;
                   await sendMessage();
                   const msg = `📎 ${file.name}`;
-                  await supabase.from('group_messages').insert({
-                    group_id: activeRoom.id, sender_id: user.id,
-                    content: msg, message_type: 'text',
+                  await supabase.rpc('send_group_message', {
+                    p_group_id: activeRoom.id,
+                    p_content: msg,
+                    p_message_type: 'text',
                   });
                   e.target.value = '';
                 }} />
