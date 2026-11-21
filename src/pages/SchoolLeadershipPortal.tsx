@@ -186,6 +186,16 @@ function ScopedLeadershipWorkspace() {
     await load();
   };
 
+  const reviewTeamTask = async (taskId: string, status: "verified" | "returned") => {
+    const { error } = await db.from("school_staff_tasks")
+      .update({ status })
+      .eq("id", taskId)
+      .eq("school_id", schoolId);
+    if (error) return toast.error(error.message || "Task review failed.");
+    toast.success(status === "verified" ? "Task verified." : "Task returned to the assigned teacher.");
+    await load();
+  };
+
   const createTeamTask = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!taskTargetId || !taskTitle.trim()) return toast.error("Choose a teacher and enter a task title.");
@@ -315,7 +325,7 @@ function ScopedLeadershipWorkspace() {
         </form>
       </SchoolPanel>}
       <SchoolPanel title="Task register">
-        {tasks.length ? <div className="space-y-2">{tasks.map((task) => <div key={task.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 p-3"><div><p className="text-sm font-semibold text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{memberName(task.assigned_to_membership_id)} · Due {task.due_date || "Not set"}</p></div><SchoolStatus value={task.status} /></div>)}</div> : <SchoolEmptyState title="No team tasks" description="Tasks assigned within your scope will appear here." />}
+        {tasks.length ? <div className="space-y-2">{tasks.map((task) => <div key={task.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 p-3"><div><p className="text-sm font-semibold text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{memberName(task.assigned_to_membership_id)} · Due {task.due_date || "Not set"}</p></div><div className="flex flex-wrap items-center gap-2"><SchoolStatus value={task.status} />{can("assign_team_tasks") && task.status === "submitted" && <><button onClick={() => void reviewTeamTask(task.id, "verified")} className="rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white">Verify</button><button onClick={() => void reviewTeamTask(task.id, "returned")} className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700">Return</button></>}</div></div>)}</div> : <SchoolEmptyState title="No team tasks" description="Tasks assigned within your scope will appear here." />}
       </SchoolPanel>
     </div>
   );
