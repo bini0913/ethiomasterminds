@@ -600,11 +600,10 @@ const Lobby: React.FC = () => {
       );
       setInviteSecondsLeft(remaining);
       if (remaining <= 0) {
-        void supabase
-          .from("multiplayer_invites" as any)
-          .update({ status: "expired", responded_at: new Date().toISOString() })
-          .eq("id", incomingInvite.id)
-          .eq("receiver_id", user?.id || "");
+        void (supabase as any).rpc("respond_multiplayer_invite", {
+          _invite_id: incomingInvite.id,
+          _accept: false,
+        });
         setIncomingInvite(null);
       }
     }, 500);
