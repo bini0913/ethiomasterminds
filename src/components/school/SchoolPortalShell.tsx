@@ -153,13 +153,14 @@ export default function SchoolPortalShell({
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {headerActions}
             {roleMemberships.length > 1 && (
-              <label className="hidden items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 md:flex">
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-600 sm:px-2.5">
                 <span className="sr-only">Switch school</span>
                 <Building2 className="h-4 w-4" />
                 <select
                   value={activeMembership?.id || ""}
                   onChange={(event) => switchSchool(event.target.value)}
-                  className="max-w-[180px] bg-transparent text-sm font-medium text-slate-700 outline-none"
+                  aria-label="Switch school"
+                  className="max-w-[120px] bg-transparent text-xs font-medium text-slate-700 outline-none sm:max-w-[180px] sm:text-sm"
                 >
                   {roleMemberships.map((membership) => (
                     <option key={membership.id} value={membership.id}>{membership.school.name}</option>
