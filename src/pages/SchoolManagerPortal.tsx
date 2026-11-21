@@ -1066,7 +1066,7 @@ export default function SchoolManagerPortal() {
               <SchoolField label="Staff member">
                 <select className={schoolSelectClass} value={leaderTargetId} onChange={(event) => setLeaderTargetId(event.target.value)} required>
                   <option value="">Choose active staff</option>
-                  {staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
+                  {staff.filter((member) => leaderPosition !== "main_director" || member.school_role === "admin").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
                 </select>
               </SchoolField>
               <SchoolField label="Leadership position">
