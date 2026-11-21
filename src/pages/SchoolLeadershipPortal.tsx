@@ -33,7 +33,7 @@ export default function SchoolLeadershipPortal() {
 
 function ScopedLeadershipWorkspace() {
   const { activeSchool } = useSchoolPortal();
-  const { appointment, membership } = useSchoolLeadership();
+  const { appointment } = useSchoolLeadership();
   const db = supabase as any;
   const schoolId = activeSchool?.id;
   const permissions = useMemo(() => new Set(appointment.permissions || []), [appointment.permissions]);
