@@ -547,3 +547,218 @@ CREATE POLICY school_leadership_view_scoped_homework
       NULL, school_homework_assignments.section_id
     )
   );
+
+
+-- Operational leadership audit events are separate from appointment-history events.
+CREATE TABLE IF NOT EXISTS public.school_leadership_action_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE RESTRICT,
+  appointment_id uuid NOT NULL REFERENCES public.school_leadership_appointments(id) ON DELETE RESTRICT,
+  actor_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  actor_membership_id uuid NOT NULL REFERENCES public.school_memberships(id) ON DELETE RESTRICT,
+  action_type text NOT NULL CHECK (action_type IN (
+    'attendance_corrected', 'task_assigned', 'task_reviewed',
+    'assessment_reviewed', 'homework_reviewed', 'behavior_reviewed',
+    'announcement_reviewed', 'quiz_reviewed', 'library_reviewed'
+  )),
+  target_table text NOT NULL,
+  target_id uuid NOT NULL,
+  reason text,
+  before_state jsonb,
+  after_state jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS school_leadership_action_events_school_created_idx
+  ON public.school_leadership_action_events(school_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS school_leadership_action_events_appointment_created_idx
+  ON public.school_leadership_action_events(appointment_id, created_at DESC);
+
+ALTER TABLE public.school_leadership_action_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.school_leadership_action_events FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.school_leadership_action_events TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.school_can_view_leadership_action_event(p_event_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM public.school_leadership_action_events event
+    JOIN public.school_leadership_appointments appointment
+      ON appointment.id = event.appointment_id
+     AND appointment.school_id = event.school_id
+    JOIN public.school_memberships leader
+      ON leader.id = appointment.membership_id
+     AND leader.school_id = appointment.school_id
+    WHERE event.id = p_event_id
+      AND (
+        public.is_school_manager(event.school_id)
+        OR public.school_is_admin(event.school_id)
+        OR leader.user_id = auth.uid()
+      )
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.school_can_view_leadership_action_event(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_leadership_action_event(uuid) TO authenticated;
+
+DROP POLICY IF EXISTS school_leadership_action_events_read ON public.school_leadership_action_events;
+CREATE POLICY school_leadership_action_events_read
+  ON public.school_leadership_action_events
+  FOR SELECT TO authenticated
+  USING (public.school_can_view_leadership_action_event(id));
+
+-- Leadership attendance corrections use a guarded RPC. The trigger only bypasses
+-- homeroom-teacher recording checks when this transaction-local flag is set and
+-- independently revalidates the leader's appointment scope.
+CREATE OR REPLACE FUNCTION public.school_validate_attendance_record()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_session public.school_attendance_sessions%ROWTYPE;
+  v_student public.school_memberships%ROWTYPE;
+  v_recorder public.school_memberships%ROWTYPE;
+  v_grade_label text;
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND current_setting('app.school_attendance_leadership_review', true) = 'true' THEN
+    SELECT * INTO v_session
+    FROM public.school_attendance_sessions
+    WHERE id = NEW.session_id;
+    SELECT * INTO v_student
+    FROM public.school_memberships
+    WHERE id = NEW.student_membership_id;
+    SELECT section.grade_label INTO v_grade_label
+    FROM public.school_sections section
+    WHERE section.id = v_session.section_id
+      AND section.school_id = v_session.school_id;
+
+    IF ROW(NEW.school_id, NEW.session_id, NEW.student_membership_id, NEW.recorded_by_membership_id, NEW.created_at)
+       IS DISTINCT FROM
+       ROW(OLD.school_id, OLD.session_id, OLD.student_membership_id, OLD.recorded_by_membership_id, OLD.created_at) THEN
+      RAISE EXCEPTION 'Attendance record identity fields are immutable';
+    END IF;
+    IF v_session.id IS NULL OR v_student.id IS NULL
+       OR v_session.school_id <> NEW.school_id
+       OR v_student.school_id <> NEW.school_id
+       OR v_student.section_id <> v_session.section_id
+       OR NEW.attendance_status NOT IN ('present', 'absent', 'late', 'excused')
+       OR NOT public.school_leadership_has_permission(
+         NEW.school_id, 'review_attendance', v_grade_label,
+         NEW.student_membership_id, v_session.section_id
+       ) THEN
+      RAISE EXCEPTION 'An appointed school leader with attendance review permission is required';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  SELECT * INTO v_session FROM public.school_attendance_sessions WHERE id = NEW.session_id;
+  SELECT * INTO v_student FROM public.school_memberships WHERE id = NEW.student_membership_id;
+  SELECT * INTO v_recorder FROM public.school_memberships WHERE id = NEW.recorded_by_membership_id;
+  IF v_session.id IS NULL OR v_student.id IS NULL OR v_recorder.id IS NULL
+     OR v_session.school_id <> NEW.school_id OR v_student.school_id <> NEW.school_id
+     OR v_recorder.school_id <> NEW.school_id
+     OR v_student.section_id <> v_session.section_id
+     OR v_recorder.school_role <> 'teacher'
+     OR NOT public.school_is_homeroom_teacher(NEW.school_id, v_session.section_id) THEN
+    RAISE EXCEPTION 'Attendance must be recorded by the assigned homeroom teacher for that section';
+  END IF;
+  IF TG_OP = 'INSERT' AND v_recorder.user_id <> auth.uid() THEN
+    RAISE EXCEPTION 'The signed-in homeroom teacher must record attendance';
+  END IF;
+  IF TG_OP = 'UPDATE' AND ROW(NEW.school_id, NEW.session_id, NEW.student_membership_id, NEW.recorded_by_membership_id, NEW.created_at)
+     IS DISTINCT FROM ROW(OLD.school_id, OLD.session_id, OLD.student_membership_id, OLD.recorded_by_membership_id, OLD.created_at) THEN
+    RAISE EXCEPTION 'Attendance record identity fields are immutable';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.school_leadership_correct_attendance(
+  p_record_id uuid,
+  p_attendance_status text,
+  p_note text,
+  p_reason text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_record public.school_attendance_records%ROWTYPE;
+  v_updated public.school_attendance_records%ROWTYPE;
+  v_session public.school_attendance_sessions%ROWTYPE;
+  v_grade_label text;
+  v_actor_membership_id uuid;
+  v_appointment_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF p_attendance_status NOT IN ('present', 'absent', 'late', 'excused') THEN
+    RAISE EXCEPTION 'Invalid attendance status';
+  END IF;
+  IF nullif(trim(p_reason), '') IS NULL THEN
+    RAISE EXCEPTION 'A reason is required for attendance corrections';
+  END IF;
+
+  SELECT * INTO v_record
+  FROM public.school_attendance_records
+  WHERE id = p_record_id
+  FOR UPDATE;
+  IF v_record.id IS NULL THEN RAISE EXCEPTION 'Attendance record not found'; END IF;
+
+  SELECT * INTO v_session
+  FROM public.school_attendance_sessions
+  WHERE id = v_record.session_id
+    AND school_id = v_record.school_id;
+  SELECT section.grade_label INTO v_grade_label
+  FROM public.school_sections section
+  WHERE section.id = v_session.section_id
+    AND section.school_id = v_session.school_id;
+
+  v_actor_membership_id := public.school_my_membership_id(v_record.school_id);
+  SELECT appointment.id INTO v_appointment_id
+  FROM public.school_leadership_appointments appointment
+  WHERE appointment.school_id = v_record.school_id
+    AND appointment.membership_id = v_actor_membership_id
+    AND appointment.status = 'active'
+    AND appointment.start_date <= CURRENT_DATE
+    AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE)
+  LIMIT 1;
+
+  IF v_appointment_id IS NULL OR NOT public.school_leadership_has_permission(
+    v_record.school_id, 'review_attendance', v_grade_label,
+    v_record.student_membership_id, v_session.section_id
+  ) THEN
+    RAISE EXCEPTION 'An active school leadership appointment with attendance review permission is required';
+  END IF;
+
+  PERFORM set_config('app.school_attendance_leadership_review', 'true', true);
+  UPDATE public.school_attendance_records
+  SET attendance_status = p_attendance_status,
+      note = nullif(trim(p_note), ''),
+      updated_at = now()
+  WHERE id = p_record_id
+  RETURNING * INTO v_updated;
+  PERFORM set_config('app.school_attendance_leadership_review', '', true);
+
+  INSERT INTO public.school_leadership_action_events (
+    school_id, appointment_id, actor_user_id, actor_membership_id,
+    action_type, target_table, target_id, reason, before_state, after_state
+  ) VALUES (
+    v_record.school_id, v_appointment_id, auth.uid(), v_actor_membership_id,
+    'attendance_corrected', 'school_attendance_records', v_record.id,
+    trim(p_reason), to_jsonb(v_record), to_jsonb(v_updated)
+  );
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.school_leadership_correct_attendance(uuid, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_leadership_correct_attendance(uuid, text, text, text) TO authenticated;
