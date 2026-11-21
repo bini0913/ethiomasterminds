@@ -191,17 +191,36 @@ Deno.serve(async (req) => {
         return json({ error: "Only the Super Admin or Extreme Admin can create a school Manager" }, 403);
       }
       if (role !== "manager" && !canProvisionNetwork) {
-        const { data: membership, error } = await admin
+        const { data: memberships, error: membershipError } = await admin
           .from("school_memberships")
-          .select("school_role")
+          .select("id,school_role")
           .eq("school_id", schoolId)
           .eq("user_id", actorId)
           .eq("status", "active")
-          .in("school_role", ["manager", "admin"])
-          .order("school_role", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (error || !membership) return json({ error: "Only this school's Manager or Admin can create its staff, parent, and student accounts" }, 403);
+          .in("school_role", ["manager", "admin"]);
+        if (membershipError) return json({ error: "Unable to verify this school's provisioning authority" }, 503);
+
+        const isManager = (memberships ?? []).some((membership: { school_role: string }) => membership.school_role === "manager");
+        const adminMembership = (memberships ?? []).find((membership: { id: string; school_role: string }) => membership.school_role === "admin");
+        let isMainDirector = false;
+        if (adminMembership) {
+          const today = new Date().toISOString().slice(0, 10);
+          const { data: appointment, error: appointmentError } = await admin
+            .from("school_leadership_appointments")
+            .select("id")
+            .eq("school_id", schoolId)
+            .eq("membership_id", adminMembership.id)
+            .eq("position", "main_director")
+            .eq("status", "active")
+            .lte("start_date", today)
+            .or(`end_date.is.null,end_date.gte.${today}`)
+            .maybeSingle();
+          if (appointmentError) return json({ error: "Unable to verify Main Director appointment" }, 503);
+          isMainDirector = Boolean(appointment?.id);
+        }
+        if (!isManager && !isMainDirector) {
+          return json({ error: "Only this school's Manager or appointed Main Director can create staff, parent, and student accounts" }, 403);
+        }
       }
 
       const { data: school, error: schoolError } = await admin
