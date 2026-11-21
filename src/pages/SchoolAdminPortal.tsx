@@ -122,7 +122,7 @@ export default function SchoolAdminPortal() {
       db.from("school_attendance_records").select("id,session_id,student_membership_id,attendance_status").eq("school_id", schoolId).limit(1000),
       db.from("school_behavior_reports").select("id,student_membership_id,section_id,reported_by_membership_id,report_type,severity,description,status,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("quizzes").select("id,title,subject,grade,school_section_id,school_review_status,created_by").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
-      db.from("library_books").select("id,title,subject,grade,school_section_id,school_review_status,uploader_id").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+      db.from("library_books").select("id,title,subject,grade:school_grade_label,school_section_id,school_review_status,uploader_id").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_announcements").select("id,title,body,audience_type,grade_label,section_id,status,created_by_membership_id,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_staff_tasks").select("id,title,assigned_to_membership_id,status,due_date,priority,task_type,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_conversations").select("id,conversation_type,section_id,student_membership_id,subject_name,last_message_at,created_at").eq("school_id", schoolId).order("last_message_at", { ascending: false }).limit(100),
