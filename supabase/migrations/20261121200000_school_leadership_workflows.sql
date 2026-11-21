@@ -85,6 +85,36 @@ BEGIN
 END;
 $;
 
+
+CREATE OR REPLACE FUNCTION public.school_require_full_main_director_permissions()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $
+DECLARE
+  v_required_permissions text[] := ARRAY[
+    'view_students', 'view_staff', 'view_attendance', 'review_attendance',
+    'view_academics', 'review_assessments', 'review_results', 'view_curriculum',
+    'manage_team_tasks', 'assign_team_tasks', 'view_reports', 'publish_announcements',
+    'view_discipline', 'review_discipline', 'view_finance_summary', 'manage_meetings'
+  ]::text[];
+BEGIN
+  IF NEW.position = 'main_director'
+     AND NOT (v_required_permissions <@ COALESCE(NEW.permissions, ARRAY[]::text[])) THEN
+    RAISE EXCEPTION 'The Main Director must retain the complete School Admin permission set';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS school_require_full_main_director_permissions
+  ON public.school_leadership_appointments;
+CREATE TRIGGER school_require_full_main_director_permissions
+  BEFORE INSERT OR UPDATE OF position, permissions
+  ON public.school_leadership_appointments
+  FOR EACH ROW
+  EXECUTE FUNCTION public.school_require_full_main_director_permissions();
+
 REVOKE ALL ON FUNCTION public.school_update_leadership_permissions(uuid, text[], text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_update_leadership_permissions(uuid, text[], text) TO authenticated;
 
