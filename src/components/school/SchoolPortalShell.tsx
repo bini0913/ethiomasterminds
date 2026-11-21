@@ -85,7 +85,7 @@ export default function SchoolPortalShell({
           <p className="mt-2 truncate text-sm font-semibold text-white">{role === "super_admin" ? "All schools" : activeSchool?.name || "Loading school"}</p>
           <p className="mt-1 text-xs text-slate-400">{role === "super_admin" ? "Platform-wide oversight" : activeSchool?.school_code || " "}</p>
           <span className="mt-3 inline-flex rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200">
-            {roleLabels[role]}
+            {roleLabelOverride || roleLabels[role]}
           </span>
         </div>
       </div>
