@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolPortal, SchoolMembership } from "@/context/SchoolPortalContext";
@@ -78,6 +78,5 @@ export default function SchoolLeadershipGate({ children }: { children: React.Rea
     return <div className="mx-auto mt-10 max-w-xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm"><h1 className="text-lg font-semibold text-slate-900">No active leadership appointment</h1><p className="mt-2 text-sm leading-6 text-slate-600">This school account has not been appointed to a leadership position, or its appointment has ended. Contact your School Manager to assign or renew your school leadership appointment.</p><p className="mt-3 text-xs text-slate-500">Your existing school membership and personal account have not been changed.</p></div>;
   }
 
-  const value = useMemo(() => ({ appointment, membership: activeMembership }), [appointment, activeMembership]);
-  return <LeadershipContext.Provider value={value}>{children}</LeadershipContext.Provider>;
+  return <LeadershipContext.Provider value={{ appointment, membership: activeMembership }}>{children}</LeadershipContext.Provider>;
 }
