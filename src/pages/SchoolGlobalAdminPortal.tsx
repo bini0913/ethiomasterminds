@@ -126,8 +126,12 @@ export default function SchoolGlobalAdminPortal() {
   const changeSchoolStatus = async (school: any) => {
     const nextStatus = school.status === "active" ? "suspended" : "active";
     if (!window.confirm(`${nextStatus === "suspended" ? "Suspend" : "Reactivate"} ${school.name}? This changes school access for all its members.`)) return;
-    const { error } = await db.from("schools").update({ status: nextStatus }).eq("id", school.id);
-    if (error) return toast.error(error.message);
+    const { error } = await db.rpc("super_admin_set_school_status", {
+      p_school_id: school.id,
+      p_status: nextStatus,
+      p_reason: "Super Admin school directory",
+    });
+    if (error) return toast.error(error.message || "School status could not be updated.");
     toast.success(`${school.name} is now ${nextStatus}.`);
     await load();
   };

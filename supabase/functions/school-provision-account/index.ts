@@ -67,9 +67,9 @@ Deno.serve(async (req) => {
       .select("role")
       .eq("user_id", actorId);
     if (rolesError) return json({ error: "Unable to verify account permissions" }, 503);
-    const isSuperAdmin = (globalRoles ?? []).some((row: { role: string }) =>
-      row.role === "extreme_admin" || row.role === "super_admin"
-    );
+    const isExtremeAdmin = (globalRoles ?? []).some((row: { role: string }) => row.role === "extreme_admin");
+    const isSuperAdmin = (globalRoles ?? []).some((row: { role: string }) => row.role === "super_admin");
+    const canProvisionNetwork = isExtremeAdmin || isSuperAdmin;
 
     const createAuthAccount = async (name: string, username: string, grade?: string, age?: number) => {
       const password = randomString(18);
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
     };
 
     if (action === "create_school") {
-      if (!isSuperAdmin) return json({ error: "Only the Super Admin can create schools and Managers" }, 403);
+      if (!canProvisionNetwork) return json({ error: "Only the Super Admin or Extreme Admin can create schools and Managers" }, 403);
       const name = normalize(payload?.school?.name);
       const schoolCode = normalize(payload?.school?.school_code).toUpperCase();
       const managerName = normalize(payload?.manager?.name);
@@ -187,10 +187,10 @@ Deno.serve(async (req) => {
       if (!schoolId || !validRoles.includes(role) || !Array.isArray(accounts) || accounts.length < 1 || accounts.length > 100) {
         return json({ error: "Provide a school, valid role, and between 1 and 100 accounts" }, 400);
       }
-      if (role === "manager" && !isSuperAdmin) {
-        return json({ error: "Only the Super Admin can create a school Manager" }, 403);
+      if (role === "manager" && !canProvisionNetwork) {
+        return json({ error: "Only the Super Admin or Extreme Admin can create a school Manager" }, 403);
       }
-      if (role !== "manager" && !isSuperAdmin) {
+      if (role !== "manager" && !isExtremeAdmin) {
         const { data: membership, error } = await admin
           .from("school_memberships")
           .select("school_role")
@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
           .order("school_role", { ascending: false })
           .limit(1)
           .maybeSingle();
-        if (error || !membership) return json({ error: "Only this school's Manager or Admin can create accounts" }, 403);
+        if (error || !membership) return json({ error: "Only this school's Manager or Admin can create its staff, parent, and student accounts" }, 403);
       }
 
       const { data: school, error: schoolError } = await admin

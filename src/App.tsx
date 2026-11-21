@@ -159,7 +159,7 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   const { user, isAuthenticated, logout } = useUser();
 
   // Standalone role workspaces provide their own navigation and layout.
-  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/") || location.pathname.startsWith("/school/")) return <>{children}</>;
+  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/") || location.pathname === "/super-admin" || location.pathname.startsWith("/school/")) return <>{children}</>;
 
   if (!isAuthenticated || !user) return <>{children}</>;
   if (user.role === "student" && getUserTier(user.grade) === "upper") return <UpperTierStudioShell>{children}</UpperTierStudioShell>;
