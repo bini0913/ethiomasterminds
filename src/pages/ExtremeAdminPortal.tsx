@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldAlert, AlertTriangle, RefreshCw, UserCog, Coins, Shield, Lock, Building2, Crown, Users } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, RefreshCw, UserCog, Coins, Shield, Lock, Building2, Crown, Users, FileText, Wallet, Search, BookOpen, MessageSquare } from 'lucide-react';
 import { useUser, UserRole } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,6 +32,24 @@ type PortalSchool = {
   status: 'active' | 'suspended' | 'closed'; created_at: string; created_by: string;
   managers: number; admins: number; teachers: number; students: number; parents: number; finance_staff: number;
 };
+type PortalReport = {
+  id: string; reporter_id: string; reporter_name: string | null; reported_id: string | null;
+  reported_name: string | null; reported_type: string; reason: string; description: string;
+  status: string; created_at: string; reviewed_at: string | null; reviewed_by: string | null;
+};
+type PortalBook = {
+  id: string; title: string; author: string | null; subject: string | null;
+  grade_level: number | null; type: string; status: string; uploader_id: string;
+  uploader_name: string | null; created_at: string; updated_at: string;
+};
+type PortalPost = {
+  id: string; author_id: string; author_name: string | null; content: string;
+  post_type: string; image_url: string | null; created_at: string;
+};
+type FinanceOverview = {
+  available?: boolean; accounts?: number; invoices?: number; payments?: number;
+  transactions?: number; balance?: number;
+};
 
 const ExtremeAdminPortal: React.FC = () => {
   const { user } = useUser();
@@ -42,6 +60,12 @@ const ExtremeAdminPortal: React.FC = () => {
   const [settings, setSettings] = useState<Record<string, boolean>>({});
   const [securitySummary, setSecuritySummary] = useState<Record<string, number>>({});
   const [schools, setSchools] = useState<PortalSchool[]>([]);
+  const [reports, setReports] = useState<PortalReport[]>([]);
+  const [books, setBooks] = useState<PortalBook[]>([]);
+  const [posts, setPosts] = useState<PortalPost[]>([]);
+  const [financeOverview, setFinanceOverview] = useState<FinanceOverview>({});
+  const [userSearch, setUserSearch] = useState('');
+  const [superAdminUsers, setSuperAdminUsers] = useState<PortalUser[]>([]);
 
   const [targetUserId, setTargetUserId] = useState('');
   const [targetRole, setTargetRole] = useState<UserRole>('student');
@@ -54,7 +78,7 @@ const ExtremeAdminPortal: React.FC = () => {
   const [bookId, setBookId] = useState('');
 
   const isExtremeAdmin = user?.role === 'extreme_admin';
-  const currentSuperAdmin = users.find((item) => item.role === 'super_admin') || null;
+  const currentSuperAdmin = superAdminUsers[0] || null;
 
   const availableRoles = useMemo<UserRole[]>(
     () => ['student', 'teacher', 'admin', 'manager', 'finance', 'parent'],
@@ -65,24 +89,45 @@ const ExtremeAdminPortal: React.FC = () => {
     if (!isExtremeAdmin) return;
     setLoading(true);
     try {
-      const [{ data: dashboardData, error: dashboardError }, { data: userData, error: usersError }, { data: logData, error: logsError }, { data: settingsData, error: settingsError }, { data: securityData, error: securityError }, { data: schoolData, error: schoolsError }] = await Promise.all([
+      const [
+        { data: dashboardData, error: dashboardError },
+        { data: userData, error: usersError },
+        { data: logData, error: logsError },
+        { data: settingsData, error: settingsError },
+        { data: securityData, error: securityError },
+        { data: schoolData, error: schoolsError },
+        { data: superAdminData, error: superAdminError },
+        { data: reportData, error: reportsError },
+        { data: bookData, error: booksError },
+        { data: postData, error: postsError },
+        { data: financeData, error: financeError },
+      ] = await Promise.all([
         supabase.rpc('extreme_admin_get_dashboard' as any),
         supabase.rpc('extreme_admin_list_users' as any, { p_limit: 300 }),
         supabase.rpc('extreme_admin_get_audit_logs' as any, { p_limit: 100 }),
         supabase.rpc('extreme_admin_get_settings' as any),
         supabase.rpc('extreme_admin_get_security' as any),
         supabase.rpc('extreme_admin_list_schools' as any),
+        supabase.rpc('extreme_admin_list_users' as any, { p_role: 'super_admin', p_limit: 1, p_offset: 0 }),
+        supabase.rpc('extreme_admin_list_reports' as any, { p_status: null, p_limit: 100, p_offset: 0 }),
+        supabase.rpc('extreme_admin_list_books' as any, { p_search: null, p_limit: 100, p_offset: 0 }),
+        supabase.rpc('extreme_admin_list_posts' as any, { p_search: null, p_limit: 100, p_offset: 0 }),
+        supabase.rpc('extreme_admin_finance_overview' as any),
       ]);
 
-      if (dashboardError || usersError || logsError || settingsError || securityError || schoolsError) {
-        throw dashboardError || usersError || logsError || settingsError || securityError || schoolsError;
-      }
+      const firstError = dashboardError || usersError || logsError || settingsError || securityError || schoolsError || superAdminError || reportsError || booksError || postsError || financeError;
+      if (firstError) throw firstError;
 
       setDashboard((dashboardData as Record<string, number>) || {});
       setUsers(((userData as unknown) as PortalUser[]) || []);
       setLogs((logData as any) || []);
       setSchools((schoolData as PortalSchool[]) || []);
       setSecuritySummary((securityData as Record<string, number>) || {});
+      setSuperAdminUsers((superAdminData as PortalUser[]) || []);
+      setReports((reportData as PortalReport[]) || []);
+      setBooks((bookData as PortalBook[]) || []);
+      setPosts((postData as PortalPost[]) || []);
+      setFinanceOverview((financeData as FinanceOverview) || {});
 
       const mappedSettings = (settingsData || []).reduce((acc: Record<string, boolean>, row: any) => {
         acc[row.setting_key] = row.setting_value === true;
@@ -198,6 +243,24 @@ const ExtremeAdminPortal: React.FC = () => {
     refreshAll();
   };
 
+  const updateReport = async (reportId: string, nextStatus: 'reviewed' | 'resolved' | 'dismissed') => {
+    const actionLabel = nextStatus === 'dismissed' ? 'dismiss this report' : nextStatus === 'resolved' ? 'resolve this report' : 'mark this report reviewed';
+    if (!window.confirm(`Are you sure you want to ${actionLabel}?`)) return;
+    const { error } = await supabase.rpc('extreme_admin_resolve_report' as any, {
+      p_report_id: reportId,
+      p_status: nextStatus,
+      p_reason: statusReason.trim() || null,
+    });
+    if (error) return toast.error(error.message || 'Report could not be updated');
+    toast.success(`Report marked ${nextStatus}`);
+    await refreshAll();
+  };
+
+  const filteredUsers = users.filter((item) => {
+    const needle = userSearch.trim().toLowerCase();
+    return !needle || item.name.toLowerCase().includes(needle) || (item.username || '').toLowerCase().includes(needle) || item.id.toLowerCase().includes(needle);
+  });
+
   const updateSetting = async (key: string, value: boolean) => {
     const { error } = await supabase.rpc('extreme_admin_set_setting' as any, {
       p_key: key,
@@ -281,6 +344,8 @@ const ExtremeAdminPortal: React.FC = () => {
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="super-admin">Super Admin</TabsTrigger>
             <TabsTrigger value="schools">Schools</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="finance">Finance</TabsTrigger>
             <TabsTrigger value="economy">Economy</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
             <TabsTrigger value="chats">Chats</TabsTrigger>
