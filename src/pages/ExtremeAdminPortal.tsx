@@ -663,7 +663,7 @@ const ExtremeAdminPortal: React.FC = () => {
                 <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" />Feature + Platform Controls</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {['feature_social_enabled', 'feature_ai_enabled', 'feature_xp_enabled', 'leaderboard_enabled', 'grades_enabled', 'strict_moderation'].map((key) => (
+                {['feature_social_enabled', 'feature_ai_enabled', 'feature_xp_enabled', 'leaderboard_enabled', 'grades_enabled'].map((key) => (
                   <div key={key} className="flex items-center justify-between border border-slate-200 rounded p-3 bg-slate-50">
                     <span className="text-sm">{key}</span>
                     <Switch checked={Boolean(settings[key])} onCheckedChange={(value) => updateSetting(key, value)} />
