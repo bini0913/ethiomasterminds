@@ -491,6 +491,13 @@ BEGIN
   IF p_division_scope NOT IN ('kg', 'elementary', 'middle_school', 'high_school') THEN
     RAISE EXCEPTION 'Invalid school division';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.school_sections section
+    WHERE section.school_id = v_actor.school_id
+      AND section.grade_label = v_grade
+  ) THEN
+    RAISE EXCEPTION 'Choose a grade label already used by this school';
+  END IF;
 
   INSERT INTO public.school_division_grade_mappings (
     school_id, division_scope, grade_label, created_by_membership_id, updated_by_membership_id
@@ -949,6 +956,9 @@ BEGIN
   LIMIT 1;
   IF v_actor.id IS NULL THEN RAISE EXCEPTION 'Only the School Manager can change leadership permissions'; END IF;
 
+  IF v_appointment.status = 'ended' THEN
+    RAISE EXCEPTION 'Ended appointments are historical; create a new appointment to change permissions';
+  END IF;
   IF NOT (COALESCE(p_permissions, ARRAY[]::text[]) <@ v_allowed_permissions) THEN
     RAISE EXCEPTION 'One or more permissions are not supported';
   END IF;
