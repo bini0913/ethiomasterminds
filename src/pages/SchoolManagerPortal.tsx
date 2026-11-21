@@ -25,6 +25,7 @@ const navItems: SchoolNavItem[] = [
   { id: "requests", label: "Change Requests", icon: Settings },
   { id: "reports", label: "Reports", icon: FileBarChart },
   { id: "discipline", label: "Disciplinary Reviews", icon: Scale },
+  { id: "leadership", label: "Leadership Team", icon: UserCog },
 ];
 
 type AccountRole = "admin" | "teacher" | "finance" | "parent" | "student";
@@ -59,6 +60,17 @@ export default function SchoolManagerPortal() {
   const [policySettings, setPolicySettings] = useState<any>(null);
   const [createdCredentials, setCreatedCredentials] = useState<any[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [leadershipAppointments, setLeadershipAppointments] = useState<any[]>([]);
+  const [leadershipError, setLeadershipError] = useState<string | null>(null);
+  const [leaderTargetId, setLeaderTargetId] = useState("");
+  const [leaderPosition, setLeaderPosition] = useState("main_director");
+  const [leaderDivision, setLeaderDivision] = useState("kg");
+  const [leaderTeamName, setLeaderTeamName] = useState("");
+  const [leaderStartDate, setLeaderStartDate] = useState("");
+  const [leaderEndDate, setLeaderEndDate] = useState("");
+  const [leaderPermissions, setLeaderPermissions] = useState<string[]>(["view_reports"]);
+  const [leadershipActionReason, setLeadershipActionReason] = useState("");
 
   const [accountRole, setAccountRole] = useState<AccountRole>("admin");
   const [accountName, setAccountName] = useState("");
@@ -197,6 +209,65 @@ export default function SchoolManagerPortal() {
   }, [schoolId, db, sectionYearId, subjectYearId, feeYearId, gradingYearId, gradingGradeLabel]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const loadLeadership = useCallback(async () => {
+    if (!schoolId) return;
+    const { data, error } = await db
+      .from("school_leadership_appointments")
+      .select("id,membership_id,position,division_scope,team_name,permissions,status,start_date,end_date,created_at")
+      .eq("school_id", schoolId)
+      .order("created_at", { ascending: false });
+    if (error) {
+      setLeadershipError("Leadership management is waiting for its database migration. Existing school operations remain available.");
+      setLeadershipAppointments([]);
+      return;
+    }
+    setLeadershipError(null);
+    setLeadershipAppointments(data ?? []);
+  }, [schoolId, db]);
+
+  useEffect(() => { void loadLeadership(); }, [loadLeadership]);
+
+  const appointLeader = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!leaderTargetId) return toast.error("Choose an active school staff member.");
+    if (leaderPosition === "team_leader" && !leaderTeamName.trim()) return toast.error("Enter the team or department name.");
+    const division = ["kg_director", "elementary_director", "middle_school_director", "high_school_director", "team_leader"].includes(leaderPosition)
+      ? leaderDivision
+      : null;
+    const { error } = await db.rpc("school_appoint_leader", {
+      p_target_membership_id: leaderTargetId,
+      p_position: leaderPosition,
+      p_division_scope: division,
+      p_team_name: leaderPosition === "team_leader" ? leaderTeamName.trim() : null,
+      p_permissions: leaderPermissions,
+      p_start_date: leaderStartDate || new Date().toISOString().slice(0, 10),
+      p_end_date: leaderEndDate || null,
+    });
+    if (error) return toast.error(error.message || "The leadership appointment could not be saved.");
+    toast.success("Leadership appointment created and recorded.");
+    setLeaderTargetId("");
+    setLeaderTeamName("");
+    setLeaderStartDate("");
+    setLeaderEndDate("");
+    await loadLeadership();
+  };
+
+  const updateLeaderAppointment = async (appointmentId: string, status: "active" | "suspended" | "ended") => {
+    if (status !== "active" && !leadershipActionReason.trim()) {
+      return toast.error("Enter a reason before suspending or ending an appointment.");
+    }
+    const { error } = await db.rpc("school_update_leadership_appointment", {
+      p_appointment_id: appointmentId,
+      p_status: status,
+      p_end_date: status === "ended" ? new Date().toISOString().slice(0, 10) : null,
+      p_reason: leadershipActionReason.trim() || null,
+    });
+    if (error) return toast.error(error.message || "The appointment could not be updated.");
+    toast.success(status === "ended" ? "Appointment ended; its history was retained." : status === "suspended" ? "Appointment suspended." : "Appointment reactivated.");
+    setLeadershipActionReason("");
+    await loadLeadership();
+  };
 
   const activeMembers = members.filter((member) => member.status === "active");
   const students = activeMembers.filter((member) => member.school_role === "student");
@@ -815,6 +886,162 @@ export default function SchoolManagerPortal() {
     </div>
   );
 
+  const renderLeadership = () => {
+    const fixedPositions = [
+      ["main_director", "Main Director", null],
+      ["vice_director", "Vice Director", null],
+      ["kg_director", "KG Director", "kg"],
+      ["elementary_director", "Elementary Director", "elementary"],
+      ["middle_school_director", "Middle School Director", "middle_school"],
+      ["high_school_director", "High School Director", "high_school"],
+    ] as const;
+    const positionLabel = (position: string) => ({
+      main_director: "Main Director",
+      vice_director: "Vice Director",
+      kg_director: "KG Director",
+      elementary_director: "Elementary Director",
+      middle_school_director: "Middle School Director",
+      high_school_director: "High School Director",
+      team_leader: "Team Leader",
+    }[position] || position.replace(/_/g, " "));
+    const divisionLabel = (division: string | null) => ({
+      kg: "KG",
+      elementary: "Elementary",
+      middle_school: "Middle School",
+      high_school: "High School",
+    }[division || ""] || "School-wide");
+    const permissionOptions = [
+      ["view_students", "View assigned students"],
+      ["view_staff", "View assigned staff"],
+      ["view_attendance", "View attendance"],
+      ["review_attendance", "Review attendance"],
+      ["view_academics", "View academic progress"],
+      ["review_assessments", "Review assessments"],
+      ["review_results", "Review examination results"],
+      ["view_curriculum", "View curriculum coverage"],
+      ["manage_team_tasks", "Manage assigned team tasks"],
+      ["assign_team_tasks", "Assign team tasks"],
+      ["view_reports", "View assigned reports"],
+      ["publish_announcements", "Publish scoped announcements"],
+      ["view_discipline", "View student-support records"],
+      ["review_discipline", "Review student-support reports"],
+      ["view_finance_summary", "View finance summaries"],
+      ["manage_meetings", "Manage assigned meetings"],
+    ] as const;
+    const activeAppointment = (position: string, division: string | null) =>
+      leadershipAppointments.find((item) => item.status === "active" && item.position === position && (division === null || item.division_scope === division));
+    const vacancies = fixedPositions.filter(([position, , division]) => !activeAppointment(position, division));
+    return (
+      <div className="space-y-5">
+        <SchoolPageHeading
+          title="School leadership team"
+          description="Appoint the school's directors and team leaders. Leadership positions are school appointments, not new global account roles."
+        />
+        {leadershipError && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{leadershipError}</div>}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {fixedPositions.map(([position, label, division]) => {
+            const appointment = activeAppointment(position, division);
+            return (
+              <div key={position} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">{label}</p>
+                  <SchoolStatus value={appointment ? "appointed" : "vacant"} />
+                </div>
+                <p className="mt-2 text-sm text-slate-600">{appointment ? memberName(appointment.membership_id) : "No active appointment"}</p>
+                <p className="mt-1 text-xs text-slate-500">{division ? divisionLabel(division) : "School-wide responsibility"}</p>
+              </div>
+            );
+          })}
+        </div>
+        <SchoolPanel title="Appoint a school leader" description="Choose an existing active staff membership. This never creates a duplicate account or changes the person's global role.">
+          <form onSubmit={appointLeader} className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <SchoolField label="Staff member">
+                <select className={schoolSelectClass} value={leaderTargetId} onChange={(event) => setLeaderTargetId(event.target.value)} required>
+                  <option value="">Choose active staff</option>
+                  {staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
+                </select>
+              </SchoolField>
+              <SchoolField label="Leadership position">
+                <select className={schoolSelectClass} value={leaderPosition} onChange={(event) => setLeaderPosition(event.target.value)}>
+                  <option value="main_director">Main Director</option>
+                  <option value="vice_director">Vice Director</option>
+                  <option value="kg_director">KG Director</option>
+                  <option value="elementary_director">Elementary Director</option>
+                  <option value="middle_school_director">Middle School Director</option>
+                  <option value="high_school_director">High School Director</option>
+                  <option value="team_leader">Team Leader</option>
+                </select>
+              </SchoolField>
+              {["kg_director", "elementary_director", "middle_school_director", "high_school_director", "team_leader"].includes(leaderPosition) && (
+                <SchoolField label="Division">
+                  <select className={schoolSelectClass} value={leaderDivision} onChange={(event) => setLeaderDivision(event.target.value)}>
+                    <option value="kg">KG</option>
+                    <option value="elementary">Elementary</option>
+                    <option value="middle_school">Middle School</option>
+                    <option value="high_school">High School</option>
+                  </select>
+                </SchoolField>
+              )}
+              {leaderPosition === "team_leader" && <SchoolField label="Team or department"><input className={schoolInputClass} value={leaderTeamName} onChange={(event) => setLeaderTeamName(event.target.value)} placeholder="e.g. Mathematics team" required /></SchoolField>}
+              <SchoolField label="Appointment starts"><input type="date" className={schoolInputClass} value={leaderStartDate} onChange={(event) => setLeaderStartDate(event.target.value)} /></SchoolField>
+              <SchoolField label="Appointment ends (optional)"><input type="date" className={schoolInputClass} value={leaderEndDate} onChange={(event) => setLeaderEndDate(event.target.value)} /></SchoolField>
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-semibold text-slate-800">Granted responsibilities</p>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {permissionOptions.map(([permission, label]) => (
+                  <label key={permission} className="flex items-start gap-2 rounded-lg border border-slate-100 p-2.5 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={leaderPermissions.includes(permission)}
+                      onChange={(event) => setLeaderPermissions((current) => event.target.checked ? [...current, permission] : current.filter((item) => item !== permission))}
+                      className="mt-0.5"
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <SchoolPrimaryButton type="submit" disabled={!staff.length}>Create appointment</SchoolPrimaryButton>
+          </form>
+        </SchoolPanel>
+        <SchoolPanel title="Leadership appointments" description="Suspending or ending an appointment preserves its history. A replacement is appointed as a new record.">
+          <div className="mb-3">
+            <SchoolField label="Reason for suspension or ending">
+              <input className={schoolInputClass} value={leadershipActionReason} onChange={(event) => setLeadershipActionReason(event.target.value)} placeholder="Required when suspending or ending an appointment" />
+            </SchoolField>
+          </div>
+          {leadershipAppointments.length ? (
+            <div className="space-y-3">
+              {leadershipAppointments.map((appointment) => (
+                <div key={appointment.id} className="rounded-lg border border-slate-200 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{memberName(appointment.membership_id)} · {positionLabel(appointment.position)}</p>
+                      <p className="mt-1 text-xs text-slate-500">{divisionLabel(appointment.division_scope)}{appointment.team_name ? " · " + appointment.team_name : ""} · {appointment.start_date}{appointment.end_date ? " – " + appointment.end_date : ""}</p>
+                      <p className="mt-2 text-xs text-slate-600">Permissions: {appointment.permissions?.length ? appointment.permissions.join(", ").replace(/_/g, " ") : "No additional permissions assigned"}</p>
+                    </div>
+                    <SchoolStatus value={appointment.status} />
+                  </div>
+                  {appointment.status !== "ended" && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {appointment.status === "active"
+                        ? <SchoolSecondaryButton onClick={() => void updateLeaderAppointment(appointment.id, "suspended")}>Suspend appointment</SchoolSecondaryButton>
+                        : <SchoolSecondaryButton onClick={() => void updateLeaderAppointment(appointment.id, "active")}>Reactivate appointment</SchoolSecondaryButton>}
+                      <SchoolPrimaryButton onClick={() => void updateLeaderAppointment(appointment.id, "ended")}>End appointment</SchoolPrimaryButton>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : <SchoolEmptyState title="No leadership appointments yet" description="Appoint the Main Director, Vice Director, division directors, and team leaders above." />}
+          {vacancies.length > 0 && <p className="mt-4 text-xs text-slate-500">Vacant positions: {vacancies.map(([, label]) => label).join(", ")}.</p>}
+        </SchoolPanel>
+      </div>
+    );
+  };
+
   const renderReports = () => (
     <div className="space-y-5">
       <SchoolPageHeading title="School reports" description="Live operational records available to the School Manager." />
@@ -842,6 +1069,7 @@ export default function SchoolManagerPortal() {
     case "requests": content = renderRequests(); break;
     case "reports": content = renderReports(); break;
     case "discipline": content = renderDiscipline(); break;
+    case "leadership": content = renderLeadership(); break;
     default: content = renderOverview();
   }
 
