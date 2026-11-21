@@ -588,3 +588,256 @@ REVOKE ALL ON FUNCTION public.school_set_division_grade_mapping(uuid, text, text
 GRANT EXECUTE ON FUNCTION public.school_set_division_grade_mapping(uuid, text, text) TO authenticated;
 REVOKE ALL ON FUNCTION public.school_assign_leadership_team_member(uuid, uuid, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_assign_leadership_team_member(uuid, uuid, boolean) TO authenticated;
+
+
+-- Shared server-side permission resolver for role-specific leadership read scopes.
+-- It never trusts a client-supplied school alone: the active appointment and
+-- school membership must belong to auth.uid(), and division/team scope is resolved
+-- against school-owned mapping and assignment records.
+CREATE OR REPLACE FUNCTION public.school_leadership_has_permission(
+  p_school_id uuid,
+  p_permission text,
+  p_grade_label text DEFAULT NULL,
+  p_target_membership_id uuid DEFAULT NULL,
+  p_section_id uuid DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM public.school_leadership_appointments appointment
+    JOIN public.school_memberships leader
+      ON leader.id = appointment.membership_id
+     AND leader.school_id = appointment.school_id
+    LEFT JOIN public.school_memberships target
+      ON target.id = p_target_membership_id
+     AND target.school_id = p_school_id
+    LEFT JOIN public.school_sections requested_section
+      ON requested_section.id = p_section_id
+     AND requested_section.school_id = p_school_id
+    WHERE appointment.school_id = p_school_id
+      AND leader.user_id = auth.uid()
+      AND leader.status = 'active'
+      AND appointment.status = 'active'
+      AND appointment.start_date <= CURRENT_DATE
+      AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE)
+      AND p_permission = ANY(appointment.permissions)
+      AND (
+        appointment.position IN ('main_director', 'vice_director')
+        OR (
+          appointment.position IN ('kg_director', 'elementary_director', 'middle_school_director', 'high_school_director')
+          AND EXISTS (
+            SELECT 1
+            FROM public.school_division_grade_mappings mapping
+            WHERE mapping.school_id = appointment.school_id
+              AND mapping.division_scope = appointment.division_scope
+              AND mapping.grade_label = COALESCE(
+                p_grade_label,
+                target.grade_label,
+                requested_section.grade_label
+              )
+          )
+          OR (
+            appointment.position IN ('kg_director', 'elementary_director', 'middle_school_director', 'high_school_director')
+            AND p_target_membership_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1
+              FROM public.school_teacher_assignments assignment
+              JOIN public.school_sections section
+                ON section.id = assignment.section_id
+               AND section.school_id = assignment.school_id
+              JOIN public.school_division_grade_mappings mapping
+                ON mapping.school_id = section.school_id
+               AND mapping.grade_label = section.grade_label
+               AND mapping.division_scope = appointment.division_scope
+              WHERE assignment.school_id = appointment.school_id
+                AND assignment.teacher_membership_id = p_target_membership_id
+            )
+          )
+        )
+        OR (
+          appointment.position = 'team_leader'
+          AND EXISTS (
+            SELECT 1
+            FROM public.school_leadership_team_members team_member
+            WHERE team_member.appointment_id = appointment.id
+              AND team_member.school_id = appointment.school_id
+              AND (
+                team_member.membership_id = p_target_membership_id
+                OR EXISTS (
+                  SELECT 1
+                  FROM public.school_teacher_assignments assignment
+                  JOIN public.school_memberships student
+                    ON student.id = p_target_membership_id
+                   AND student.school_id = assignment.school_id
+                   AND student.school_role = 'student'
+                  WHERE assignment.school_id = appointment.school_id
+                    AND assignment.teacher_membership_id = team_member.membership_id
+                    AND (
+                      (p_section_id IS NOT NULL AND assignment.section_id = p_section_id)
+                      OR (p_section_id IS NULL AND student.section_id = assignment.section_id)
+                    )
+                )
+                OR (
+                  p_section_id IS NOT NULL
+                  AND EXISTS (
+                    SELECT 1
+                    FROM public.school_teacher_assignments assignment
+                    WHERE assignment.school_id = appointment.school_id
+                      AND assignment.teacher_membership_id = team_member.membership_id
+                      AND assignment.section_id = p_section_id
+                  )
+                )
+              )
+          )
+        )
+      )
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.school_leadership_has_permission(uuid, text, text, uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_leadership_has_permission(uuid, text, text, uuid, uuid) TO authenticated;
+
+DROP POLICY IF EXISTS school_leadership_view_scoped_memberships ON public.school_memberships;
+CREATE POLICY school_leadership_view_scoped_memberships
+  ON public.school_memberships
+  FOR SELECT TO authenticated
+  USING (
+    (school_role = 'student' AND public.school_leadership_has_permission(
+      school_id, 'view_students', grade_label, id, section_id
+    ))
+    OR (school_role IN ('admin', 'teacher', 'finance') AND public.school_leadership_has_permission(
+      school_id, 'view_staff', grade_label, id, section_id
+    ))
+  );
+
+DROP POLICY IF EXISTS school_leadership_view_scoped_sections ON public.school_sections;
+CREATE POLICY school_leadership_view_scoped_sections
+  ON public.school_sections
+  FOR SELECT TO authenticated
+  USING (
+    public.school_leadership_has_permission(school_id, 'view_students', grade_label, NULL, id)
+    OR public.school_leadership_has_permission(school_id, 'view_curriculum', grade_label, NULL, id)
+  );
+
+DROP POLICY IF EXISTS school_leadership_view_scoped_teacher_assignments ON public.school_teacher_assignments;
+CREATE POLICY school_leadership_view_scoped_teacher_assignments
+  ON public.school_teacher_assignments
+  FOR SELECT TO authenticated
+  USING (
+    public.school_leadership_has_permission(
+      school_id,
+      'view_staff',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
+      teacher_membership_id,
+      section_id
+    )
+    OR public.school_leadership_has_permission(
+      school_id,
+      'view_curriculum',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
+      teacher_membership_id,
+      section_id
+    )
+  );
+
+DROP POLICY IF EXISTS school_leadership_view_scoped_attendance_sessions ON public.school_attendance_sessions;
+CREATE POLICY school_leadership_view_scoped_attendance_sessions
+  ON public.school_attendance_sessions
+  FOR SELECT TO authenticated
+  USING (
+    public.school_leadership_has_permission(
+      school_id, 'view_attendance',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
+      NULL, section_id
+    )
+  );
+
+DROP POLICY IF EXISTS school_leadership_view_scoped_attendance_records ON public.school_attendance_records;
+CREATE POLICY school_leadership_view_scoped_attendance_records
+  ON public.school_attendance_records
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.school_attendance_sessions session
+      JOIN public.school_sections section
+        ON section.id = session.section_id
+       AND section.school_id = session.school_id
+      WHERE session.id = session_id
+        AND session.school_id = school_id
+        AND public.school_leadership_has_permission(
+          school_id, 'view_attendance', section.grade_label,
+          student_membership_id, session.section_id
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS school_leadership_view_scoped_assessments ON public.school_assessments;
+CREATE POLICY school_leadership_view_scoped_assessments
+  ON public.school_assessments
+  FOR SELECT TO authenticated
+  USING (
+    public.school_leadership_has_permission(
+      school_id, 'view_academics',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
+      NULL, section_id
+    )
+    OR public.school_leadership_has_permission(
+      school_id, 'review_assessments',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
+      NULL, section_id
+    )
+  );
+
+DROP POLICY IF EXISTS school_leadership_view_scoped_marks ON public.school_student_marks;
+CREATE POLICY school_leadership_view_scoped_marks
+  ON public.school_student_marks
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.school_assessments assessment
+      JOIN public.school_sections section
+        ON section.id = assessment.section_id
+       AND section.school_id = assessment.school_id
+      WHERE assessment.id = assessment_id
+        AND assessment.school_id = school_id
+        AND (
+          public.school_leadership_has_permission(
+            school_id, 'view_academics', section.grade_label, student_membership_id, section.id
+          )
+          OR public.school_leadership_has_permission(
+            school_id, 'review_results', section.grade_label, student_membership_id, section.id
+          )
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS school_leadership_view_scoped_behavior_reports ON public.school_behavior_reports;
+CREATE POLICY school_leadership_view_scoped_behavior_reports
+  ON public.school_behavior_reports
+  FOR SELECT TO authenticated
+  USING (
+    public.school_leadership_has_permission(
+      school_id, 'view_discipline',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
+      student_membership_id, section_id
+    )
+  );
+
+DROP POLICY IF EXISTS school_leadership_view_scoped_homework ON public.school_homework_assignments;
+CREATE POLICY school_leadership_view_scoped_homework
+  ON public.school_homework_assignments
+  FOR SELECT TO authenticated
+  USING (
+    public.school_leadership_has_permission(
+      school_id, 'view_academics',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
+      NULL, section_id
+    )
+  );
