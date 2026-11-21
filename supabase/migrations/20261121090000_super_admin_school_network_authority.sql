@@ -164,10 +164,10 @@ WITH CHECK (public._is_network_authority() AND network_id = public.school_networ
 
 GRANT EXECUTE ON FUNCTION public._is_super_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_network_id() TO authenticated;
-REVOKE EXECUTE ON FUNCTION public.super_admin_get_network_dashboard() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.super_admin_list_network_schools(text, integer, integer) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.super_admin_register_school(text, text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.super_admin_set_school_status(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.super_admin_get_network_dashboard() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.super_admin_list_network_schools(text, integer, integer) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.super_admin_register_school(text, text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.super_admin_set_school_status(uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.super_admin_get_network_dashboard() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.super_admin_list_network_schools(text, integer, integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.super_admin_register_school(text, text) TO authenticated;
