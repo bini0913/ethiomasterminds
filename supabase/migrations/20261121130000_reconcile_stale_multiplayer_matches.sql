@@ -133,3 +133,20 @@ $function$;
 -- the service role invokes it from a trusted scheduler.
 revoke all on function public.cleanup_expired_multiplayer_rooms() from public, anon, authenticated;
 grant execute on function public.cleanup_expired_multiplayer_rooms() to service_role;
+
+-- The room trigger invokes cleanup, and cleanup updates room status. Ignore
+-- nested trigger invocations from those internal updates to prevent recursion.
+create or replace function public.cleanup_expired_multiplayer_rooms_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $function$
+begin
+  if pg_trigger_depth() > 1 then
+    return new;
+  end if;
+  perform public.cleanup_expired_multiplayer_rooms();
+  return new;
+end;
+$function$;
