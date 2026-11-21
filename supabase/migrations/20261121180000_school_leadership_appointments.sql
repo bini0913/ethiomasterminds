@@ -708,10 +708,10 @@ CREATE POLICY school_leadership_view_scoped_memberships
   FOR SELECT TO authenticated
   USING (
     (school_role = 'student' AND public.school_leadership_has_permission(
-      school_id, 'view_students', grade_label, id, section_id
+      school_memberships.school_id, 'view_students', school_memberships.grade_label, school_memberships.id, school_memberships.section_id
     ))
     OR (school_role IN ('admin', 'teacher', 'finance') AND public.school_leadership_has_permission(
-      school_id, 'view_staff', grade_label, id, section_id
+      school_memberships.school_id, 'view_staff', school_memberships.grade_label, school_memberships.id, school_memberships.section_id
     ))
   );
 
@@ -720,8 +720,8 @@ CREATE POLICY school_leadership_view_scoped_sections
   ON public.school_sections
   FOR SELECT TO authenticated
   USING (
-    public.school_leadership_has_permission(school_id, 'view_students', grade_label, NULL, id)
-    OR public.school_leadership_has_permission(school_id, 'view_curriculum', grade_label, NULL, id)
+    public.school_leadership_has_permission(school_sections.school_id, 'view_students', school_sections.grade_label, NULL, school_sections.id)
+    OR public.school_leadership_has_permission(school_sections.school_id, 'view_curriculum', school_sections.grade_label, NULL, school_sections.id)
   );
 
 DROP POLICY IF EXISTS school_leadership_view_scoped_teacher_assignments ON public.school_teacher_assignments;
@@ -730,16 +730,16 @@ CREATE POLICY school_leadership_view_scoped_teacher_assignments
   FOR SELECT TO authenticated
   USING (
     public.school_leadership_has_permission(
-      school_id,
+      school_teacher_assignments.school_id,
       'view_staff',
-      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = school_teacher_assignments.section_id AND section.school_id = school_teacher_assignments.school_id),
       teacher_membership_id,
       section_id
     )
     OR public.school_leadership_has_permission(
       school_id,
       'view_curriculum',
-      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = school_teacher_assignments.section_id AND section.school_id = school_teacher_assignments.school_id),
       teacher_membership_id,
       section_id
     )
@@ -751,9 +751,9 @@ CREATE POLICY school_leadership_view_scoped_attendance_sessions
   FOR SELECT TO authenticated
   USING (
     public.school_leadership_has_permission(
-      school_id, 'view_attendance',
-      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
-      NULL, section_id
+      school_attendance_sessions.school_id, 'view_attendance',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = school_teacher_assignments.section_id AND section.school_id = school_teacher_assignments.school_id),
+      NULL, school_attendance_sessions.section_id
     )
   );
 
@@ -768,10 +768,10 @@ CREATE POLICY school_leadership_view_scoped_attendance_records
       JOIN public.school_sections section
         ON section.id = session.section_id
        AND section.school_id = session.school_id
-      WHERE session.id = session_id
-        AND session.school_id = school_id
+      WHERE session.id = school_attendance_records.session_id
+        AND session.school_id = school_attendance_records.school_id
         AND public.school_leadership_has_permission(
-          school_id, 'view_attendance', section.grade_label,
+          school_attendance_sessions.school_id, 'view_attendance', section.grade_label,
           student_membership_id, session.section_id
         )
     )
@@ -783,14 +783,14 @@ CREATE POLICY school_leadership_view_scoped_assessments
   FOR SELECT TO authenticated
   USING (
     public.school_leadership_has_permission(
-      school_id, 'view_academics',
-      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
-      NULL, section_id
+      school_homework_assignments.school_id, 'view_academics',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = school_teacher_assignments.section_id AND section.school_id = school_teacher_assignments.school_id),
+      NULL, school_attendance_sessions.section_id
     )
     OR public.school_leadership_has_permission(
       school_id, 'review_assessments',
-      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
-      NULL, section_id
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = school_teacher_assignments.section_id AND section.school_id = school_teacher_assignments.school_id),
+      NULL, school_attendance_sessions.section_id
     )
   );
 
@@ -805,14 +805,14 @@ CREATE POLICY school_leadership_view_scoped_marks
       JOIN public.school_sections section
         ON section.id = assessment.section_id
        AND section.school_id = assessment.school_id
-      WHERE assessment.id = assessment_id
-        AND assessment.school_id = school_id
+      WHERE assessment.id = school_student_marks.assessment_id
+        AND assessment.school_id = school_student_marks.school_id
         AND (
           public.school_leadership_has_permission(
-            school_id, 'view_academics', section.grade_label, student_membership_id, section.id
+            school_student_marks.school_homework_assignments.school_id, 'view_academics', section.grade_label, school_student_marks.student_membership_id, section.id
           )
           OR public.school_leadership_has_permission(
-            school_id, 'review_results', section.grade_label, student_membership_id, section.id
+            school_student_marks.school_id, 'review_results', section.grade_label, school_student_marks.student_membership_id, section.id
           )
         )
     )
@@ -824,9 +824,9 @@ CREATE POLICY school_leadership_view_scoped_behavior_reports
   FOR SELECT TO authenticated
   USING (
     public.school_leadership_has_permission(
-      school_id, 'view_discipline',
-      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
-      student_membership_id, section_id
+      school_behavior_reports.school_id, 'view_discipline',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = school_teacher_assignments.section_id AND section.school_id = school_teacher_assignments.school_id),
+      school_behavior_reports.student_membership_id, school_behavior_reports.section_id
     )
   );
 
@@ -836,8 +836,8 @@ CREATE POLICY school_leadership_view_scoped_homework
   FOR SELECT TO authenticated
   USING (
     public.school_leadership_has_permission(
-      school_id, 'view_academics',
-      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = section_id AND section.school_id = school_id),
-      NULL, section_id
+      school_homework_assignments.school_id, 'view_academics',
+      (SELECT section.grade_label FROM public.school_sections section WHERE section.id = school_teacher_assignments.section_id AND section.school_id = school_teacher_assignments.school_id),
+      NULL, school_attendance_sessions.section_id
     )
   );
