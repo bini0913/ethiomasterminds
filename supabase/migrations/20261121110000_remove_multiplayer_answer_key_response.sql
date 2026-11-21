@@ -9,7 +9,7 @@ create or replace function public.multiplayer_submit_answer(
 returns jsonb
 language plpgsql
 security definer
-set search_path = pg_catalog, public
+set search_path = pg_catalog, auth
 as $$
 declare
   r public.multiplayer_rooms%rowtype;
