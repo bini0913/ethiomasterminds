@@ -614,7 +614,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $school_admin$
   SELECT public._is_extreme_admin()
     OR EXISTS (
       SELECT 1
@@ -636,7 +636,7 @@ AS $
             )
         )
     );
-$;
+$school_admin$;
 
 CREATE OR REPLACE FUNCTION public.is_school_manager_or_admin(p_school_id uuid)
 RETURNS boolean
@@ -644,11 +644,11 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $manager_admin$
   SELECT public._is_extreme_admin()
     OR public.is_active_school_member(p_school_id, ARRAY['manager']::text[])
     OR public.school_is_admin(p_school_id);
-$;
+$school_admin$;
 
 REVOKE ALL ON FUNCTION public.school_is_admin(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_is_admin(uuid) TO authenticated;
