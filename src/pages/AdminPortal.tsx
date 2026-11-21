@@ -280,7 +280,10 @@ const AdminPortal: React.FC = () => {
 
   const fetchUsers = async () => {
     const [profilesRes, rolesRes] = await Promise.all([
-      db.from('profiles').select('*').order('created_at', { ascending: false }).limit(500),
+      db.from('profiles')
+        .select('id,name,username,grade,xp,season_xp,level,created_at,account_status')
+        .order('created_at', { ascending: false })
+        .limit(500),
       db.from('user_roles').select('user_id, role'),
     ]);
     if (profilesRes.error) {
