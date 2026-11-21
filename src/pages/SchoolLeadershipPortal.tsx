@@ -142,7 +142,8 @@ function ScopedLeadershipWorkspace() {
     if (results.attendance) setAttendanceRecords(results.attendance.data ?? []);
     if (results.assessments) setAssessments(results.assessments.data ?? []);
     if (results.homework) setHomework(results.homework.data ?? []);
-    if (results.tasks) setTasks(results.tasks.data ?? []);\n    if (results.behavior) setBehaviorReports(results.behavior.data ?? []);
+    if (results.tasks) setTasks(results.tasks.data ?? []);
+    if (results.behavior) setBehaviorReports(results.behavior.data ?? []);
 
     const userIds = [...new Set((results.members?.data ?? []).map((member: any) => member.user_id))];
     if (userIds.length) {
@@ -347,7 +348,8 @@ function ScopedLeadershipWorkspace() {
     case "staff": content = can("view_staff") ? renderStaff() : renderOverview(); break;
     case "attendance": content = can("view_attendance") ? renderAttendance() : renderOverview(); break;
     case "academics": content = can("view_academics") || can("review_assessments") || can("review_results") || can("view_curriculum") ? renderAcademics() : renderOverview(); break;
-    case "discipline": content = can("view_discipline") ? renderDiscipline() : renderOverview(); break;\n    case "tasks": content = can("manage_team_tasks") || can("assign_team_tasks") ? renderTasks() : renderOverview(); break;
+    case "discipline": content = can("view_discipline") ? renderDiscipline() : renderOverview(); break;
+    case "tasks": content = can("manage_team_tasks") || can("assign_team_tasks") ? renderTasks() : renderOverview(); break;
     case "reports": content = can("view_reports") ? renderReports() : renderOverview(); break;
     default: content = renderOverview();
   }
