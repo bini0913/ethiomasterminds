@@ -23,7 +23,7 @@ const positionLabels: Record<string, string> = {
   team_leader: "Team Leader",
 };
 
-type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academics" | "tasks" | "reports";
+type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academics" | "discipline" | "tasks" | "reports";
 
 export default function SchoolLeadershipPortal() {
   const { appointment } = useSchoolLeadership();
@@ -53,6 +53,7 @@ function ScopedLeadershipWorkspace() {
     if (can("view_academics") || can("review_assessments") || can("review_results") || can("view_curriculum")) {
       items.push({ id: "academics", label: "Academic Oversight", icon: ClipboardCheck });
     }
+    if (can("view_discipline")) items.push({ id: "discipline", label: "Student Support", icon: ShieldCheck });
     if (can("manage_team_tasks") || can("assign_team_tasks")) {
       items.push({ id: "tasks", label: "Team Tasks", icon: ClipboardList });
     }
@@ -70,6 +71,12 @@ function ScopedLeadershipWorkspace() {
   const [assessments, setAssessments] = useState<any[]>([]);
   const [homework, setHomework] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [behaviorReports, setBehaviorReports] = useState<any[]>([]);
+  const [reviewFeedback, setReviewFeedback] = useState<Record<string, string>>({});
+  const [taskTargetId, setTaskTargetId] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskDueDate, setTaskDueDate] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async () => {
@@ -135,7 +142,7 @@ function ScopedLeadershipWorkspace() {
     if (results.attendance) setAttendanceRecords(results.attendance.data ?? []);
     if (results.assessments) setAssessments(results.assessments.data ?? []);
     if (results.homework) setHomework(results.homework.data ?? []);
-    if (results.tasks) setTasks(results.tasks.data ?? []);
+    if (results.tasks) setTasks(results.tasks.data ?? []);\n    if (results.behavior) setBehaviorReports(results.behavior.data ?? []);
 
     const userIds = [...new Set((results.members?.data ?? []).map((member: any) => member.user_id))];
     if (userIds.length) {
@@ -143,6 +150,61 @@ function ScopedLeadershipWorkspace() {
       if (!error) setProfiles(Object.fromEntries((data ?? []).map((profile: any) => [profile.id, profile])));
     }
     setLoading(false);
+  };
+
+  const reviewAssessment = async (assessmentId: string, approve: boolean) => {
+    const { error } = await db.rpc("school_review_assessment", {
+      p_assessment_id: assessmentId,
+      p_approve: approve,
+      p_feedback: reviewFeedback[assessmentId] || null,
+    });
+    if (error) return toast.error(error.message || "Assessment review failed.");
+    toast.success(approve ? "Assessment and submitted marks approved." : "Assessment returned to the teacher.");
+    await load();
+  };
+
+  const reviewHomework = async (homeworkId: string, approve: boolean) => {
+    const { error } = await db.rpc("school_review_homework", {
+      p_homework_id: homeworkId,
+      p_approved: approve,
+      p_feedback: reviewFeedback[homeworkId] || null,
+    });
+    if (error) return toast.error(error.message || "Homework review failed.");
+    toast.success(approve ? "Homework approved." : "Homework returned to the teacher.");
+    await load();
+  };
+
+  const reviewBehavior = async (reportId: string, approve: boolean) => {
+    const { error } = await db.rpc("school_review_behavior_report", {
+      p_report_id: reportId,
+      p_approve: approve,
+      p_review_note: reviewFeedback[reportId] || null,
+    });
+    if (error) return toast.error(error.message || "Student support review failed.");
+    toast.success(approve ? "Behavior report approved." : "Behavior report rejected.");
+    await load();
+  };
+
+  const createTeamTask = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!taskTargetId || !taskTitle.trim()) return toast.error("Choose a teacher and enter a task title.");
+    const { error } = await db.from("school_staff_tasks").insert({
+      school_id: schoolId,
+      assigned_to_membership_id: taskTargetId,
+      assigned_by_membership_id: membership.id,
+      task_type: "academic",
+      title: taskTitle.trim(),
+      description: taskDescription.trim() || null,
+      due_date: taskDueDate || null,
+      priority: "normal",
+    });
+    if (error) return toast.error(error.message || "Task could not be assigned. Check that the teacher is in your assigned scope.");
+    setTaskTargetId("");
+    setTaskTitle("");
+    setTaskDescription("");
+    setTaskDueDate("");
+    toast.success("Task assigned within your authorized leadership scope.");
+    await load();
   };
 
   useEffect(() => { void load(); }, [schoolId, appointment.id]);
@@ -221,10 +283,10 @@ function ScopedLeadershipWorkspace() {
     <div className="space-y-5">
       <SchoolPageHeading title="Academic oversight" description="Assessment and homework progress within your authorized school scope." />
       <SchoolPanel title="Assessment submissions">
-        {assessments.length ? <div className="space-y-2">{assessments.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 p-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.subject_name} · {sectionName(item.section_id)}</p></div><SchoolStatus value={item.status} /></div>)}</div> : <SchoolEmptyState title="No assessments in scope" description="Teacher assessment submissions will appear here." />}
+        {assessments.length ? <div className="space-y-2">{assessments.map((item) => <div key={item.id} className="rounded-lg border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.subject_name} · {sectionName(item.section_id)}</p></div><SchoolStatus value={item.status} /></div>{can("review_assessments") && item.status === "submitted" && <div className="mt-3 flex flex-col gap-2"><input value={reviewFeedback[item.id] || ""} onChange={(event) => setReviewFeedback((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Optional review feedback" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /><div className="flex flex-wrap gap-2"><button onClick={() => void reviewAssessment(item.id, true)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Approve assessment</button><button onClick={() => void reviewAssessment(item.id, false)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Return to teacher</button></div></div>}</div>)}</div> : <SchoolEmptyState title="No assessments in scope" description="Teacher assessment submissions will appear here." />}
       </SchoolPanel>
       <SchoolPanel title="Homework oversight">
-        {homework.length ? <div className="space-y-2">{homework.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 p-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.subject_name} · {sectionName(item.section_id)} · Due {item.due_at ? new Date(item.due_at).toLocaleDateString() : "—"}</p></div><SchoolStatus value={item.status} /></div>)}</div> : <SchoolEmptyState title="No homework records in scope" description="Homework assignments will appear here." />}
+        {homework.length ? <div className="space-y-2">{homework.map((item) => <div key={item.id} className="rounded-lg border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.subject_name} · {sectionName(item.section_id)} · Due {item.due_at ? new Date(item.due_at).toLocaleDateString() : "—"}</p></div><SchoolStatus value={item.status} /></div>{can("review_assessments") && item.status === "pending" && <div className="mt-3 flex flex-col gap-2"><input value={reviewFeedback[item.id] || ""} onChange={(event) => setReviewFeedback((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Optional review feedback" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /><div className="flex flex-wrap gap-2"><button onClick={() => void reviewHomework(item.id, true)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Approve homework</button><button onClick={() => void reviewHomework(item.id, false)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Return to teacher</button></div></div>}</div>)}</div> : <SchoolEmptyState title="No homework records in scope" description="Homework assignments will appear here." />}
       </SchoolPanel>
     </div>
   );
@@ -232,8 +294,36 @@ function ScopedLeadershipWorkspace() {
   const renderTasks = () => (
     <div className="space-y-5">
       <SchoolPageHeading title="Team tasks" description="Work assigned to staff members within your leadership team or division." />
+      {can("assign_team_tasks") && <SchoolPanel title="Assign a team task">
+        <form onSubmit={createTeamTask} className="grid gap-3 sm:grid-cols-2">
+          <label className="text-xs font-medium text-slate-600">Teacher in your scope
+            <select required value={taskTargetId} onChange={(event) => setTaskTargetId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+              <option value="">Choose teacher</option>{members.filter((member) => member.school_role === "teacher").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-slate-600">Due date
+            <input type="date" value={taskDueDate} onChange={(event) => setTaskDueDate(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+          </label>
+          <label className="text-xs font-medium text-slate-600 sm:col-span-2">Task title
+            <input required value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="e.g. Submit the weekly lesson coverage report" />
+          </label>
+          <label className="text-xs font-medium text-slate-600 sm:col-span-2">Instructions
+            <textarea value={taskDescription} onChange={(event) => setTaskDescription(event.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+          </label>
+          <div className="sm:col-span-2"><button type="submit" className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white">Assign task</button></div>
+        </form>
+      </SchoolPanel>}
       <SchoolPanel title="Task register">
         {tasks.length ? <div className="space-y-2">{tasks.map((task) => <div key={task.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 p-3"><div><p className="text-sm font-semibold text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{memberName(task.assigned_to_membership_id)} · Due {task.due_date || "Not set"}</p></div><SchoolStatus value={task.status} /></div>)}</div> : <SchoolEmptyState title="No team tasks" description="Tasks assigned within your scope will appear here." />}
+      </SchoolPanel>
+    </div>
+  );
+
+  const renderDiscipline = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Student support" description="Behavior and student-support reports within your appointed scope." />
+      <SchoolPanel title="Behavior reports">
+        {behaviorReports.length ? <div className="space-y-3">{behaviorReports.map((report) => <div key={report.id} className="rounded-lg border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(report.student_membership_id)} · {report.report_type}</p><SchoolStatus value={report.status} /></div><p className="mt-1 text-xs text-slate-500">{sectionName(report.section_id)} · {report.severity} severity · {new Date(report.created_at).toLocaleDateString()}</p><p className="mt-2 text-sm text-slate-700">{report.description}</p>{can("review_discipline") && report.status === "pending" && <div className="mt-3 space-y-2"><input value={reviewFeedback[report.id] || ""} onChange={(event) => setReviewFeedback((current) => ({ ...current, [report.id]: event.target.value }))} placeholder="Optional review note" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /><div className="flex flex-wrap gap-2"><button onClick={() => void reviewBehavior(report.id, true)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Approve report</button><button onClick={() => void reviewBehavior(report.id, false)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Reject report</button></div></div>}</div>)}</div> : <SchoolEmptyState title="No student support reports" description="Teacher-submitted behavior reports will appear here." />}
       </SchoolPanel>
     </div>
   );
@@ -257,7 +347,7 @@ function ScopedLeadershipWorkspace() {
     case "staff": content = can("view_staff") ? renderStaff() : renderOverview(); break;
     case "attendance": content = can("view_attendance") ? renderAttendance() : renderOverview(); break;
     case "academics": content = can("view_academics") || can("review_assessments") || can("review_results") || can("view_curriculum") ? renderAcademics() : renderOverview(); break;
-    case "tasks": content = can("manage_team_tasks") || can("assign_team_tasks") ? renderTasks() : renderOverview(); break;
+    case "discipline": content = can("view_discipline") ? renderDiscipline() : renderOverview(); break;\n    case "tasks": content = can("manage_team_tasks") || can("assign_team_tasks") ? renderTasks() : renderOverview(); break;
     case "reports": content = can("view_reports") ? renderReports() : renderOverview(); break;
     default: content = renderOverview();
   }
