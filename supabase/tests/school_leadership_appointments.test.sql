@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(39);
+select plan(49);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -48,6 +48,20 @@ select ok(exists (select 1 from pg_indexes where schemaname='public' and indexna
 
 select ok(position('main_director' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'generic school Admin authority is restricted by leadership appointment');
 select ok(position('school_is_admin' in pg_get_functiondef('public.is_school_manager_or_admin(uuid)'::regprocedure)) > 0, 'manager-or-admin checks use the leadership-aware Admin guard');
+
+
+select ok(position('appointment.position = ''main_director''' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'only an active Main Director appointment grants school Admin authority');
+select ok(position('appointment.start_date' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'Main Director authority respects appointment start date');
+select ok(position('review_assessments' in pg_get_functiondef('public.school_review_assessment(uuid,boolean,text)'::regprocedure)) > 0, 'assessment review checks the leadership permission and section scope');
+select ok(position('review_assessments' in pg_get_functiondef('public.school_review_homework(uuid,boolean,text)'::regprocedure)) > 0, 'homework review checks the leadership permission and section scope');
+select ok(position('review_discipline' in pg_get_functiondef('public.school_can_review_behavior_report(uuid)'::regprocedure)) > 0, 'student support review checks the leadership permission and section scope');
+select ok(position('publish_announcements' in pg_get_functiondef('public.school_review_announcement(uuid,boolean,text)'::regprocedure)) > 0, 'announcement review checks the leadership permission and audience scope');
+select ok(position('assign_team_tasks' in pg_get_functiondef('public.school_validate_staff_task()'::regprocedure)) > 0, 'task trigger enforces leadership assignment scope');
+select ok(position('review_assessments' in pg_get_functiondef('public.school_review_quiz(uuid,boolean,text)'::regprocedure)) > 0
+  and position('review_assessments' in pg_get_functiondef('public.school_review_library_book(uuid,boolean,text)'::regprocedure)) > 0,
+  'quiz and library approvals check scoped academic review permission');
+select ok(has_function_privilege('authenticated','public.school_review_assessment(uuid,boolean,text)','EXECUTE'), 'authenticated school leaders can call the guarded assessment review RPC');
+select ok(not has_function_privilege('anon','public.school_review_assessment(uuid,boolean,text)','EXECUTE'), 'anonymous users cannot call the guarded assessment review RPC');
 
 select * from finish();
 rollback;
