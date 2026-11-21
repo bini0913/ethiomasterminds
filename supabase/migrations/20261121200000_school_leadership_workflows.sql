@@ -330,6 +330,7 @@ DECLARE
   v_actor uuid;
   v_actor_role text;
   v_target_role text;
+  v_appointment_id uuid;
 BEGIN
   IF TG_OP = 'INSERT' THEN
     v_actor := public.school_my_membership_id(NEW.school_id);
@@ -359,6 +360,25 @@ BEGIN
     ELSE
       RAISE EXCEPTION 'Only the School Manager, Main Director, or an appointed leader with task permission can assign staff tasks';
     END IF;
+
+    SELECT appointment.id INTO v_appointment_id
+    FROM public.school_leadership_appointments appointment
+    WHERE appointment.school_id = NEW.school_id
+      AND appointment.membership_id = v_actor
+      AND appointment.status = 'active'
+      AND appointment.start_date <= CURRENT_DATE
+      AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE)
+    LIMIT 1;
+    IF v_appointment_id IS NOT NULL THEN
+      INSERT INTO public.school_leadership_action_events (
+        school_id, appointment_id, actor_user_id, actor_membership_id,
+        action_type, target_table, target_id, reason, after_state
+      ) VALUES (
+        NEW.school_id, v_appointment_id, auth.uid(), v_actor,
+        'task_assigned', 'school_staff_tasks', NEW.id,
+        'Assigned academic task: ' || NEW.title, to_jsonb(NEW)
+      );
+    END IF;
     RETURN NEW;
   END IF;
 
@@ -372,6 +392,14 @@ BEGIN
 
   v_actor := public.school_my_membership_id(OLD.school_id);
   SELECT school_role INTO v_actor_role FROM public.school_memberships WHERE id = v_actor;
+  SELECT appointment.id INTO v_appointment_id
+  FROM public.school_leadership_appointments appointment
+  WHERE appointment.school_id = OLD.school_id
+    AND appointment.membership_id = v_actor
+    AND appointment.status = 'active'
+    AND appointment.start_date <= CURRENT_DATE
+    AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE)
+  LIMIT 1;
 
   IF v_actor = OLD.assigned_to_membership_id THEN
     IF NEW.status NOT IN ('in_progress', 'submitted')
@@ -399,9 +427,19 @@ BEGIN
   ELSE
     RAISE EXCEPTION 'Only the assigned staff member or authorized task assigner can update this task';
   END IF;
+  IF v_appointment_id IS NOT NULL AND v_actor = OLD.assigned_by_membership_id THEN
+    INSERT INTO public.school_leadership_action_events (
+      school_id, appointment_id, actor_user_id, actor_membership_id,
+      action_type, target_table, target_id, reason, before_state, after_state
+    ) VALUES (
+      OLD.school_id, v_appointment_id, auth.uid(), v_actor,
+      'task_reviewed', 'school_staff_tasks', OLD.id,
+      'Task status changed to ' || NEW.status, to_jsonb(OLD), to_jsonb(NEW)
+    );
+  END IF;
   RETURN NEW;
 END;
-$$;
+$;
 
 REVOKE ALL ON FUNCTION public.school_review_assessment(uuid, boolean, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_review_assessment(uuid, boolean, text) TO authenticated;
