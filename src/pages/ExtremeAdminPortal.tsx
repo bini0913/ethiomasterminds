@@ -292,6 +292,7 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const updateAiDailyLimit = async () => {
+    if (!aiDailyLimit.trim()) return toast.error('Enter an AI daily limit from 0 to 300');
     const value = Number(aiDailyLimit);
     if (!Number.isInteger(value) || value < 0 || value > 300) {
       return toast.error('AI daily limit must be a whole number from 0 to 300');
