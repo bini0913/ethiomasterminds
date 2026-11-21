@@ -53,6 +53,8 @@ import {
 } from 'recharts';
 
 type Role = 'student' | 'teacher' | 'admin' | 'manager' | 'finance' | 'extreme_admin';
+const ADMIN_USER_PAGE_SIZE = 500;
+const ADMIN_ROLE_LOOKUP_BATCH_SIZE = 100;
 
 interface SystemUser {
   id: string;
@@ -69,6 +71,17 @@ interface SystemUser {
   created_at: string;
   account_status?: 'active' | 'suspended' | 'banned' | 'purged';
 }
+
+const fetchDirectoryRoles = async (userIds: string[]) => {
+  const rows: any[] = [];
+  for (let index = 0; index < userIds.length; index += ADMIN_ROLE_LOOKUP_BATCH_SIZE) {
+    const batch = userIds.slice(index, index + ADMIN_ROLE_LOOKUP_BATCH_SIZE);
+    const { data, error } = await db.from('user_roles').select('user_id,role').in('user_id', batch);
+    if (error) return { data: null, error };
+    rows.push(...(data || []));
+  }
+  return { data: rows, error: null };
+};
 
 interface SystemStats {
   totalUsers: number;
@@ -145,6 +158,8 @@ const AdminPortal: React.FC = () => {
   const [logSearch, setLogSearch] = useState('');
 
   const [users, setUsers] = useState<SystemUser[]>([]);
+  const [usersTotalCount, setUsersTotalCount] = useState(0);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
   const [flashcards, setFlashcards] = useState<any[]>([]);
@@ -279,19 +294,26 @@ const AdminPortal: React.FC = () => {
   }, []);
 
   const fetchUsers = async () => {
-    const [profilesRes, rolesRes] = await Promise.all([
-      db.from('profiles')
-        .select('id,name,username,grade,xp,season_xp,level,created_at,account_status')
-        .order('created_at', { ascending: false })
-        .limit(500),
-      db.from('user_roles').select('user_id, role'),
-    ]);
+    setUsersLoading(true);
+    const profilesRes = await db.from('profiles')
+      .select('id,name,username,grade,xp,season_xp,level,created_at,account_status', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(0, ADMIN_USER_PAGE_SIZE - 1);
     if (profilesRes.error) {
       console.error('Admin user list failed:', profilesRes.error);
       toast.error('Could not load users. Check your admin permissions and connection.');
+      setUsersLoading(false);
       return;
     }
-    if (rolesRes.error) console.error('Admin role list failed:', rolesRes.error);
+    const profileIds = (profilesRes.data || []).map((profile: any) => profile.id);
+    const rolesRes = await fetchDirectoryRoles(profileIds);
+    if (rolesRes.error) {
+      console.error('Admin role list failed:', rolesRes.error);
+      toast.error('Could not load user roles. The directory was not updated to avoid showing incorrect role labels.');
+      setUsersLoading(false);
+      return;
+    }
     const rolePriority: Role[] = ['extreme_admin', 'admin', 'manager', 'finance', 'teacher', 'student'];
     const roleByUser = new Map<string, Role>();
     (rolesRes.data || []).forEach((entry: any) => {
@@ -304,6 +326,50 @@ const AdminPortal: React.FC = () => {
       role: roleByUser.get(profile.id) || 'student',
       account_status: profile.account_status || (profile.is_banned ? 'banned' : profile.is_suspended ? 'suspended' : 'active'),
     })) as SystemUser[]);
+    setUsersTotalCount(profilesRes.count ?? 0);
+    setUsersLoading(false);
+  };
+
+  const fetchMoreUsers = async () => {
+    if (usersLoading || users.length >= usersTotalCount) return;
+    setUsersLoading(true);
+    const start = users.length;
+    const end = start + ADMIN_USER_PAGE_SIZE - 1;
+    const profilesRes = await db.from('profiles')
+      .select('id,name,username,grade,xp,season_xp,level,created_at,account_status')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(start, end);
+    if (profilesRes.error) {
+      console.error('Admin user directory next page failed:', profilesRes.error);
+      toast.error('Could not load more users. Please retry.');
+      setUsersLoading(false);
+      return;
+    }
+
+    const pageIds = (profilesRes.data || []).map((profile: any) => profile.id);
+    const rolesRes = await fetchDirectoryRoles(pageIds);
+    if (rolesRes.error) {
+      console.error('Admin next-page role list failed:', rolesRes.error);
+      toast.error('Could not load roles for more users. No additional rows were added.');
+      setUsersLoading(false);
+      return;
+    }
+
+    const rolePriority: Role[] = ['extreme_admin', 'admin', 'manager', 'finance', 'teacher', 'student'];
+    const roleByUser = new Map<string, Role>();
+    (rolesRes.data || []).forEach((entry: any) => {
+      const role = entry.role as Role;
+      const current = roleByUser.get(entry.user_id);
+      if (!current || rolePriority.indexOf(role) < rolePriority.indexOf(current)) roleByUser.set(entry.user_id, role);
+    });
+    const nextUsers = (profilesRes.data || []).map((profile: any) => ({
+      ...profile,
+      role: roleByUser.get(profile.id) || 'student',
+      account_status: profile.account_status || 'active',
+    })) as SystemUser[];
+    setUsers((current) => [...current, ...nextUsers]);
+    setUsersLoading(false);
   };
 
   const fetchContent = async () => {
@@ -979,7 +1045,7 @@ const AdminPortal: React.FC = () => {
   };
 
   const filteredUsers = useMemo(() => users
-    .filter((u) => (searchQuery ? `${u.name} ${u.username}`.toLowerCase().includes(searchQuery.toLowerCase()) : true))
+    .filter((u) => (searchQuery ? `${u.name} ${u.username} ${u.id}`.toLowerCase().includes(searchQuery.toLowerCase()) : true))
     .filter((u) => (gradeFilter === 'all' ? true : String(u.grade || '').includes(gradeFilter)))
     .filter((u) => (roleFilter === 'all' ? true : u.role === roleFilter)), [users, searchQuery, gradeFilter, roleFilter]);
 
@@ -1160,11 +1226,12 @@ const AdminPortal: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="users" className="space-y-4">
+              <p className="text-sm text-muted-foreground">Search and filters apply to the profiles currently loaded below. Email is not part of the selected profile data. Load more to include older profiles.</p>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 w-64" placeholder="Search users" /></div>
+                <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 w-64" placeholder="Search loaded name, username, ID" /></div>
                 <Select value={gradeFilter} onValueChange={setGradeFilter}><SelectTrigger className="w-40"><SelectValue placeholder="Grade" /></SelectTrigger><SelectContent><SelectItem value="all">All Grades</SelectItem><SelectItem value="1">Grade 1</SelectItem><SelectItem value="5">Grade 5</SelectItem><SelectItem value="8">Grade 8</SelectItem><SelectItem value="12">Grade 12</SelectItem></SelectContent></Select>
                 <Select value={roleFilter} onValueChange={setRoleFilter}><SelectTrigger className="w-40"><SelectValue placeholder="Role" /></SelectTrigger><SelectContent><SelectItem value="all">All Roles</SelectItem><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="finance">Finance</SelectItem><SelectItem value="extreme_admin">Super Admin</SelectItem></SelectContent></Select>
-                <Badge variant="outline">{filteredUsers.length} users</Badge>
+                <Badge variant="outline">{filteredUsers.length} matches · {users.length.toLocaleString()} of {usersTotalCount.toLocaleString()} loaded</Badge>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1254,6 +1321,7 @@ const AdminPortal: React.FC = () => {
               </AlertDialog>
 
               <Card><CardContent className="p-0"><ScrollArea className="h-[560px]"><table className="w-full"><thead className="sticky top-0 bg-muted/90"><tr><th className="p-3 text-left">Select</th><th className="p-3 text-left">User</th><th className="p-3 text-left">Role</th><th className="p-3 text-left">Grade</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Status</th><th className="p-3 text-left">Joined</th><th className="p-3 text-right">Actions</th></tr></thead><tbody>{filteredUsers.map((u) => (<tr key={u.id} className="border-b border-border/50"><td className="p-3"><input type="checkbox" checked={selectedUsers.includes(u.id)} onChange={(e) => setSelectedUsers((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))} /></td><td className="p-3"><p className="font-medium">{u.name}</p><p className="text-xs text-muted-foreground">@{u.username}</p></td><td className="p-3"><Select value={u.role} onValueChange={(v) => handleUpdateUserRole(u.id, v as Role)}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="teacher">Teacher</SelectItem><SelectItem value="manager">Manager</SelectItem><SelectItem value="admin">Admin</SelectItem>{isSuperAdmin && <><SelectItem value="finance">Finance</SelectItem><SelectItem value="extreme_admin">Super Admin</SelectItem></>}</SelectContent></Select></td><td className="p-3">{u.grade || '-'}</td><td className="p-3"><span className="inline-flex items-center gap-1"><Zap className="h-3 w-3 text-blue-600" />{u.xp}</span></td><td className="p-3"><Badge variant={u.account_status === 'active' ? 'secondary' : 'destructive'}>{u.account_status || 'active'}</Badge></td><td className="p-3 text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td><td className="p-3 text-right"><Button variant="ghost" size="sm" onClick={() => handleResetPassword(u)} title="Send password reset email"><Key className="h-4 w-4" /></Button>{isSuperAdmin && <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)} title="Permanently delete auth account"><Trash2 className="h-4 w-4 text-destructive" /></Button>}</td></tr>))}</tbody></table></ScrollArea></CardContent></Card>
+              {users.length < usersTotalCount && <div className="flex justify-center"><Button variant="outline" onClick={() => void fetchMoreUsers()} disabled={usersLoading}>{usersLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading users…</> : `Load more users (${(usersTotalCount - users.length).toLocaleString()} remaining)`}</Button></div>}
             </TabsContent>
 
             <TabsContent value="control" className="space-y-4">
