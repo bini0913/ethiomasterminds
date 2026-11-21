@@ -384,12 +384,10 @@ const ExtremeAdminPortal: React.FC = () => {
                       <SelectItem value="active">active</SelectItem>
                       <SelectItem value="suspended">suspended</SelectItem>
                       <SelectItem value="banned">banned</SelectItem>
-                      
                     </SelectContent>
                   </Select>
                   <Textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Reason" className="bg-slate-50 border-slate-200" />
                   <Button onClick={setUserStatus} variant="secondary" className="w-full">Apply Status</Button>
-                  
                 </div>
               </CardContent>
             </Card>
