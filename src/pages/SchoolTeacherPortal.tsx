@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LayoutDashboard, School, ClipboardCheck, BookOpen, Library, CalendarCheck,
   ShieldCheck, MessageSquare, ClipboardList, BarChart3, Plus, Send, Check,
@@ -67,8 +67,10 @@ export default function SchoolTeacherPortal() {
   const [marks, setMarks] = useState<any[]>([]);
   const [homework, setHomework] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [submissionsError, setSubmissionsError] = useState<string | null>(null);
   const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [attendanceRecordsError, setAttendanceRecordsError] = useState<string | null>(null);
   const [behaviorReports, setBehaviorReports] = useState<any[]>([]);
   const [behaviorReviewNotes, setBehaviorReviewNotes] = useState<Record<string, string>>({});
   const [quizzes, setQuizzes] = useState<any[]>([]);
@@ -134,15 +136,18 @@ export default function SchoolTeacherPortal() {
   const [messageSectionId, setMessageSectionId] = useState("");
   const [messageDraft, setMessageDraft] = useState("");
   const [taskResponseById, setTaskResponseById] = useState<Record<string, string>>({});
+  const loadRequestRef = useRef(0);
 
   const load = useCallback(async () => {
     if (!schoolId || !activeMembership?.id) return;
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
-    const [
-      assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes,
-      membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes,
-      behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes, evaluationsRes,
-    ] = await Promise.all([
+    try {
+      const [
+        assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes,
+        membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes,
+        behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes, evaluationsRes,
+      ] = await Promise.all([
       db.from("school_teacher_assignments").select("id,section_id,subject_name,assignment_kind").eq("school_id", schoolId).eq("teacher_membership_id", activeMembership.id),
       db.from("school_sections").select("id,academic_year_id,grade_label,section_name,homeroom_teacher_id").eq("school_id", schoolId),
       db.from("school_subjects").select("id,academic_year_id,grade_label,subject_name,active").eq("school_id", schoolId).eq("active", true),
@@ -159,17 +164,17 @@ export default function SchoolTeacherPortal() {
       db.from("school_staff_tasks").select("id,title,description,status,due_date,priority,task_type,response,assigned_by_membership_id").eq("school_id", schoolId).eq("assigned_to_membership_id", activeMembership.id).order("created_at", { ascending: false }),
       db.from("school_conversations").select("id,conversation_type,section_id,student_membership_id,subject_name,last_message_at").eq("school_id", schoolId).order("last_message_at", { ascending: false }).limit(100),
       db.from("book_uploads").select("book_id,moderation_note,status").eq("uploader_id", user?.id || ""),
-      db.from("school_staff_evaluations").select("id,evaluation_type,rating,period_start,period_end,notes,created_at").eq("school_id", schoolId).eq("target_membership_id", activeMembership.id).order("created_at", { ascending: false }).limit(50),
-    ]);
-    const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes, evaluationsRes].find((result) => result.error)?.error;
-    if (error) {
-      toast.error(error.message || "Teacher workspace could not be loaded.");
-      setLoadError("Some school records could not be loaded. Try again.");
-      setLoading(false);
-      return;
-    }
-    setLoadError(evaluationsRes.error ? "Performance evaluations are temporarily unavailable. Other teacher records are available." : null);
-    if (evaluationsRes.error) toast.error(evaluationsRes.error.message || "Performance evaluations could not be loaded.");
+        db.from("school_staff_evaluations").select("id,evaluation_type,rating,period_start,period_end,notes,created_at").eq("school_id", schoolId).eq("target_membership_id", activeMembership.id).order("created_at", { ascending: false }).limit(50),
+      ]);
+      const error = [assignmentsRes, sectionsRes, subjectsRes, termsRes, categoriesRes, membersRes, assessmentsRes, marksRes, homeworkRes, sessionsRes, behaviorRes, quizzesRes, booksRes, tasksRes, conversationsRes, bookUploadsRes].find((result) => result.error)?.error;
+      if (error) {
+        toast.error(error.message || "Teacher workspace could not be loaded.");
+        setLoadError("Some school records could not be loaded. Try again.");
+        return;
+      }
+      if (requestId !== loadRequestRef.current) return;
+      setLoadError(evaluationsRes.error ? "Performance evaluations are temporarily unavailable. Other teacher records are available." : null);
+      if (evaluationsRes.error) toast.error(evaluationsRes.error.message || "Performance evaluations could not be loaded.");
     setAssignments(assignmentsRes.data ?? []);
     setSections(sectionsRes.data ?? []);
     setSubjects(subjectsRes.data ?? []);
@@ -186,13 +191,13 @@ export default function SchoolTeacherPortal() {
     setBookUploads(bookUploadsRes.data ?? []);
     setEvaluations(evaluationsRes.data ?? []);
     setTasks(tasksRes.data ?? []);
-    setEvaluations(evaluationsRes.data ?? []);
     setConversations(conversationsRes.data ?? []);
     if (!assessmentTermId && termsRes.data?.length) setAssessmentTermId(termsRes.data[0].id);
     const userIds = [...new Set((membersRes.data ?? []).map((member: any) => member.user_id))];
     if (user?.id) userIds.push(user.id);
     if (userIds.length) {
-      const { data: profileRows } = await db.from("profiles").select("id,name,username").in("id", [...new Set(userIds)]);
+      const { data: profileRows, error: profileError } = await db.from("profiles").select("id,name,username").in("id", [...new Set(userIds)]);
+      if (profileError) toast.error(profileError.message || "Some profile names could not be loaded.");
       setProfiles(Object.fromEntries((profileRows ?? []).map((profile: any) => [profile.id, profile])));
     }
     const sectionIds = [...new Set((assignmentsRes.data ?? []).map((assignment: any) => assignment.section_id))];
@@ -200,20 +205,39 @@ export default function SchoolTeacherPortal() {
       const homeworkIds = (homeworkRes.data ?? []).map((item: any) => item.id);
       if (homeworkIds.length) {
         const { data: submissionRows, error: submissionError } = await db.from("school_homework_submissions").select("id,homework_id,student_membership_id,response_text,attachment_path,status,grade,feedback,submitted_at").in("homework_id", homeworkIds);
-        if (submissionError) toast.error(submissionError.message);
-        setSubmissions(submissionRows ?? []);
-      } else setSubmissions([]);
+        if (submissionError) {
+          setSubmissionsError(submissionError.message || "Homework submissions could not be loaded.");
+          toast.error(submissionError.message);
+        } else {
+          setSubmissionsError(null);
+          setSubmissions(submissionRows ?? []);
+        }
+      } else { setSubmissionsError(null); setSubmissions([]); }
       const sessionIds = (sessionsRes.data ?? []).map((session: any) => session.id);
       if (sessionIds.length) {
         const { data: recordRows, error: recordError } = await db.from("school_attendance_records").select("id,session_id,student_membership_id,attendance_status,note").in("session_id", sessionIds);
-        if (recordError) toast.error(recordError.message);
-        setAttendanceRecords(recordRows ?? []);
-      } else setAttendanceRecords([]);
+        if (recordError) {
+          setAttendanceRecordsError(recordError.message || "Attendance records could not be loaded.");
+          toast.error(recordError.message);
+        } else {
+          setAttendanceRecordsError(null);
+          setAttendanceRecords(recordRows ?? []);
+        }
+      } else { setAttendanceRecordsError(null); setAttendanceRecords([]); }
     } else {
+      setSubmissionsError(null);
+      setAttendanceRecordsError(null);
       setSubmissions([]);
       setAttendanceRecords([]);
     }
-    setLoading(false);
+    } catch (error: any) {
+      if (requestId === loadRequestRef.current) {
+        toast.error(error?.message || "Teacher workspace could not be loaded.");
+        setLoadError("Some school records could not be loaded. Try again.");
+      }
+    } finally {
+      if (requestId === loadRequestRef.current) setLoading(false);
+    }
   }, [schoolId, activeMembership?.id, user?.id, db, assessmentTermId]);
 
   useEffect(() => { void load(); }, [load]);
@@ -247,6 +271,8 @@ export default function SchoolTeacherPortal() {
   const homeroomSectionIds = useMemo(() => [...new Set(assignments.filter((assignment) => assignment.assignment_kind === "homeroom").map((assignment) => assignment.section_id))], [assignments]);
   const homeroomSections = sections.filter((section) => homeroomSectionIds.includes(section.id));
   const assignedStudents = members.filter((member) => member.status === "active" && assignedSectionIds.includes(member.section_id));
+  const selectedAttendanceSession = attendanceSessions.find((session) => session.section_id === attendanceSectionId && session.attendance_date === attendanceDate);
+  const attendanceReadOnly = Boolean(selectedAttendanceSession && (selectedAttendanceSession.status !== "open" || selectedAttendanceSession.recorded_by_membership_id !== activeMembership?.id));
   const memberName = (membershipId: string) => {
     const member = members.find((item) => item.id === membershipId);
     if (member) return profiles[member.user_id]?.name || member.school_username || "Student";
@@ -663,7 +689,7 @@ export default function SchoolTeacherPortal() {
         {homework.length ? <div className="space-y-3">{homework.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{sectionLabel(item.section_id)} · {item.subject_name} · Due {item.due_at ? new Date(item.due_at).toLocaleString() : "No due date"}</p></div><SchoolStatus value={item.status} /></div>{item.review_feedback && <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-800">Admin feedback: {item.review_feedback}</p>}<button type="button" onClick={() => setSelectedHomeworkId(item.id)} className="mt-3 text-xs font-semibold text-blue-700 hover:underline">View student submissions ({submissions.filter((submission) => submission.homework_id === item.id).length})</button></div>)}</div> : <SchoolEmptyState title="No homework assignments" description="Create homework above." />}
       </SchoolPanel>
       {selectedHomeworkId && <SchoolPanel title="Student submissions" action={<button type="button" onClick={() => setSelectedHomeworkId("")} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Close</button>}>
-        {submissions.filter((submission) => submission.homework_id === selectedHomeworkId).length ? <div className="space-y-3">{submissions.filter((submission) => submission.homework_id === selectedHomeworkId).map((submission) => <div key={submission.id} className="rounded-md border border-slate-100 p-3"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-800">{memberName(submission.student_membership_id)}</p><SchoolStatus value={submission.status} /></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{submission.response_text || "No written response"}</p>{submission.attachment_path && <p className="mt-1 text-xs text-slate-500">Attachment: {submission.attachment_path}</p>}<div className="mt-3 grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]"><input type="number" min="0" className={schoolInputClass} placeholder="Grade" value={gradeValues[submission.id] ?? submission.grade ?? ""} onChange={(event) => setGradeValues((current) => ({ ...current, [submission.id]: event.target.value }))} /><input className={schoolInputClass} placeholder="Feedback" value={gradeFeedback[submission.id] ?? submission.feedback ?? ""} onChange={(event) => setGradeFeedback((current) => ({ ...current, [submission.id]: event.target.value }))} /><SchoolSecondaryButton onClick={() => void gradeSubmission(submission)}>Save feedback</SchoolSecondaryButton></div></div>)}</div> : <SchoolEmptyState title="No submissions yet" description="Student submissions appear after homework is approved." />}
+        {submissionsError ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{submissionsError} <button type="button" onClick={() => void load()} className="ml-2 font-semibold underline">Retry</button></div> : submissions.filter((submission) => submission.homework_id === selectedHomeworkId).length ? <div className="space-y-3">{submissions.filter((submission) => submission.homework_id === selectedHomeworkId).map((submission) => <div key={submission.id} className="rounded-md border border-slate-100 p-3"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-800">{memberName(submission.student_membership_id)}</p><SchoolStatus value={submission.status} /></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{submission.response_text || "No written response"}</p>{submission.attachment_path && <p className="mt-1 text-xs text-slate-500">Attachment: {submission.attachment_path}</p>}<div className="mt-3 grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]"><input type="number" min="0" className={schoolInputClass} placeholder="Grade" value={gradeValues[submission.id] ?? submission.grade ?? ""} onChange={(event) => setGradeValues((current) => ({ ...current, [submission.id]: event.target.value }))} /><input className={schoolInputClass} placeholder="Feedback" value={gradeFeedback[submission.id] ?? submission.feedback ?? ""} onChange={(event) => setGradeFeedback((current) => ({ ...current, [submission.id]: event.target.value }))} /><SchoolSecondaryButton onClick={() => void gradeSubmission(submission)}>Save feedback</SchoolSecondaryButton></div></div>)}</div> : <SchoolEmptyState title="No submissions yet" description="Student submissions appear after homework is approved." />}
       </SchoolPanel>}
     </div>
   );
@@ -694,13 +720,14 @@ export default function SchoolTeacherPortal() {
       <SchoolPageHeading title="Homeroom attendance" description="Daily attendance can only be recorded for sections where you are the assigned homeroom teacher." />
       <SchoolPanel title="Record daily attendance">
         {!homeroomSections.length ? <SchoolEmptyState title="No homeroom section assigned" description="You can record attendance after the School Manager assigns you as a homeroom teacher." /> : <form onSubmit={recordAttendance} className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2"><SchoolField label="Homeroom section"><select className={schoolSelectClass} value={attendanceSectionId} onChange={(event) => setAttendanceSectionId(event.target.value)}><option value="">Choose homeroom section</option>{homeroomSections.map((section) => <option key={section.id} value={section.id}>{sectionLabel(section.id)}</option>)}</select></SchoolField><SchoolField label="Attendance date"><input type="date" className={schoolInputClass} value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} /></SchoolField></div>
-          {assignedStudents.filter((student) => student.section_id === attendanceSectionId).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_160px_minmax(0,1fr)] sm:items-center"><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><select className={schoolSelectClass} value={attendanceValues[student.id] || "present"} onChange={(event) => setAttendanceValues((current) => ({ ...current, [student.id]: event.target.value }))}><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select><input className={schoolInputClass} placeholder="Optional note" value={attendanceNotes[student.id] || ""} onChange={(event) => setAttendanceNotes((current) => ({ ...current, [student.id]: event.target.value }))} /></div>)}
-          <SchoolPrimaryButton type="submit" disabled={!attendanceSectionId}>Submit attendance</SchoolPrimaryButton>
+          <div className="grid gap-3 sm:grid-cols-2"><SchoolField label="Homeroom section"><select className={schoolSelectClass} value={attendanceSectionId} onChange={(event) => setAttendanceSectionId(event.target.value)} disabled={attendanceReadOnly}><option value="">Choose homeroom section</option>{homeroomSections.map((section) => <option key={section.id} value={section.id}>{sectionLabel(section.id)}</option>)}</select></SchoolField><SchoolField label="Attendance date"><input type="date" className={schoolInputClass} value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} disabled={attendanceReadOnly} /></SchoolField></div>
+          {attendanceReadOnly && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">This attendance session is {selectedAttendanceSession?.status === "open" ? "owned by another teacher" : selectedAttendanceSession?.status}. It is read-only.</div>}
+          {assignedStudents.filter((student) => student.section_id === attendanceSectionId).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_160px_minmax(0,1fr)] sm:items-center"><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><select className={schoolSelectClass} value={attendanceValues[student.id] || "present"} onChange={(event) => setAttendanceValues((current) => ({ ...current, [student.id]: event.target.value }))} disabled={attendanceReadOnly}><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select><input className={schoolInputClass} placeholder="Optional note" value={attendanceNotes[student.id] || ""} onChange={(event) => setAttendanceNotes((current) => ({ ...current, [student.id]: event.target.value }))} disabled={attendanceReadOnly} /></div>)}
+          <SchoolPrimaryButton type="submit" disabled={!attendanceSectionId || attendanceReadOnly}>Submit attendance</SchoolPrimaryButton>
         </form>}
       </SchoolPanel>
       <SchoolPanel title="Attendance history">
-        {attendanceSessions.length ? <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Date</th><th className="pb-2">Section</th><th className="pb-2">Records</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{attendanceSessions.map((session) => <tr key={session.id}><td className="py-3 text-slate-700">{session.attendance_date}</td><td className="py-3 text-slate-600">{sectionLabel(session.section_id)}</td><td className="py-3 tabular-nums text-slate-600">{attendanceRecords.filter((record) => record.session_id === session.id).length}</td><td className="py-3"><SchoolStatus value={session.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No attendance records" description="Submitted homeroom attendance sessions will appear here." />}
+        {attendanceRecordsError ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{attendanceRecordsError} <button type="button" onClick={() => void load()} className="ml-2 font-semibold underline">Retry</button></div> : attendanceSessions.length ? <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Date</th><th className="pb-2">Section</th><th className="pb-2">Records</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{attendanceSessions.map((session) => <tr key={session.id}><td className="py-3 text-slate-700">{session.attendance_date}</td><td className="py-3 text-slate-600">{sectionLabel(session.section_id)}</td><td className="py-3 tabular-nums text-slate-600">{attendanceRecords.filter((record) => record.session_id === session.id).length}</td><td className="py-3"><SchoolStatus value={session.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No attendance records" description="Submitted homeroom attendance sessions will appear here." />}
       </SchoolPanel>
     </div>
   );
