@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useSchoolPortal, SchoolMembership } from "@/context/SchoolPortalContext";
+import { useSchoolPortal, type SchoolMembership } from "@/context/SchoolPortalContext";
 
 export type SchoolLeadershipAppointment = {
   id: string;
