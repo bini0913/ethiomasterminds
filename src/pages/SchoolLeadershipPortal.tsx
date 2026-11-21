@@ -68,6 +68,7 @@ function ScopedLeadershipWorkspace() {
   const [sections, setSections] = useState<any[]>([]);
   const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [attendanceDrafts, setAttendanceDrafts] = useState<Record<string, { status: string; note: string; reason: string }>>({});
   const [assessments, setAssessments] = useState<any[]>([]);
   const [homework, setHomework] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -104,7 +105,7 @@ function ScopedLeadershipWorkspace() {
         .order("attendance_date", { ascending: false })
         .limit(100);
       requests.attendance = db.from("school_attendance_records")
-        .select("id,session_id,student_membership_id,attendance_status")
+        .select("id,session_id,student_membership_id,attendance_status,note")
         .eq("school_id", schoolId)
         .limit(1000);
     }
@@ -151,6 +152,25 @@ function ScopedLeadershipWorkspace() {
       if (!error) setProfiles(Object.fromEntries((data ?? []).map((profile: any) => [profile.id, profile])));
     }
     setLoading(false);
+  };
+
+  const reviewAttendance = async (recordId: string, currentStatus: string, currentNote: string | null) => {
+    const draft = attendanceDrafts[recordId] || { status: currentStatus, note: currentNote || "", reason: "" };
+    if (!draft.reason.trim()) return toast.error("Enter a reason for this attendance correction.");
+    const { error } = await db.rpc("school_leadership_correct_attendance", {
+      p_record_id: recordId,
+      p_attendance_status: draft.status,
+      p_note: draft.note,
+      p_reason: draft.reason.trim(),
+    });
+    if (error) return toast.error(error.message || "Attendance correction was rejected.");
+    toast.success("Attendance corrected and added to the leadership audit history.");
+    setAttendanceDrafts((current) => {
+      const next = { ...current };
+      delete next[recordId];
+      return next;
+    });
+    await load();
   };
 
   const reviewAssessment = async (assessmentId: string, approve: boolean) => {
@@ -287,6 +307,21 @@ function ScopedLeadershipWorkspace() {
       <SchoolPanel title="Recent attendance sessions">
         {attendanceSessions.length ? <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Date</th><th className="pb-2">Section</th><th className="pb-2">Records</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{attendanceSessions.map((session) => <tr key={session.id}><td className="py-3 text-slate-700">{session.attendance_date}</td><td className="py-3 text-slate-600">{sectionName(session.section_id)}</td><td className="py-3 text-slate-600">{attendanceRecords.filter((record) => record.session_id === session.id).length}</td><td className="py-3"><SchoolStatus value={session.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No attendance sessions" description="Attendance records will appear here when teachers submit them." />}
       </SchoolPanel>
+      {can("review_attendance") && <SchoolPanel title="Attendance corrections" description="Corrections require a reason and are written to the leadership audit history.">
+        {attendanceRecords.length ? <div className="space-y-3">{attendanceRecords.slice(0, 50).map((record) => {
+          const session = attendanceSessions.find((item) => item.id === record.session_id);
+          const draft = attendanceDrafts[record.id] || { status: record.attendance_status, note: record.note || "", reason: "" };
+          return <div key={record.id} className="rounded-lg border border-slate-100 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-slate-800">{memberName(record.student_membership_id)}</p><p className="mt-1 text-xs text-slate-500">{session?.attendance_date || "—"} · {sectionName(session?.section_id || null)}</p></div><SchoolStatus value={record.attendance_status} /></div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className="text-xs font-medium text-slate-600">Attendance status<select value={draft.status} onChange={(event) => setAttendanceDrafts((current) => ({ ...current, [record.id]: { ...draft, status: event.target.value } }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></label>
+              <label className="text-xs font-medium text-slate-600">Attendance note<input value={draft.note} onChange={(event) => setAttendanceDrafts((current) => ({ ...current, [record.id]: { ...draft, note: event.target.value } }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Optional note" /></label>
+              <label className="text-xs font-medium text-slate-600 sm:col-span-2">Reason for correction<input value={draft.reason} onChange={(event) => setAttendanceDrafts((current) => ({ ...current, [record.id]: { ...draft, reason: event.target.value } }))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Required — explain why the original record is being corrected" /></label>
+            </div>
+            <div className="mt-3"><button onClick={() => void reviewAttendance(record.id, record.attendance_status, record.note)} disabled={draft.status === record.attendance_status && draft.note === (record.note || "")} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Save correction</button></div>
+          </div>;
+        })}</div> : <SchoolEmptyState title="No attendance records to correct" description="Records will appear here after teachers submit attendance." />}
+      </SchoolPanel>}
     </div>
   );
 
