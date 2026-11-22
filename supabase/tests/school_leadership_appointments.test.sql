@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(86);
+select plan(87);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -114,6 +114,8 @@ select ok(position('WHEN appointment.position = ''academic_director''' in pg_get
 select ok(position('academic_appointment.position = ''academic_director''' in pg_get_functiondef('public.school_can_view_leadership_appointment(uuid)'::regprocedure)) > 0, 'Academic Director can read the four division leadership appointments');
 select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_singleton_position'), 'only one active Academic Director can be appointed per school');
 select ok(has_function_privilege('authenticated','public.school_appoint_leader(uuid,text,text,text,text[],date,date)','EXECUTE') and not has_function_privilege('anon','public.school_appoint_leader(uuid,text,text,text,text[],date,date)','EXECUTE'), 'Academic Director appointment remains manager-only and authenticated');
+
+select ok(position('Academic Director permissions are limited to school-wide academic oversight' in pg_get_functiondef('public.school_update_leadership_permissions(uuid,text[],text)'::regprocedure)) > 0, 'School Manager cannot grant finance or operational permissions to the Academic Director');
 
 select * from finish();
 rollback;
