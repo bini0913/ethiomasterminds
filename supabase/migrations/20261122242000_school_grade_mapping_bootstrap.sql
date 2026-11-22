@@ -16,6 +16,7 @@ AS $function$
 DECLARE
   v_actor public.school_memberships%ROWTYPE;
   v_grade text := nullif(trim(p_grade_label), '');
+  v_existing_grade text;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -35,6 +36,26 @@ BEGIN
 
   IF v_actor.id IS NULL THEN
     RAISE EXCEPTION 'An active School Manager membership in this school is required';
+  END IF;
+
+  SELECT existing_mapping.grade_label
+  INTO v_existing_grade
+  FROM public.school_division_grade_mappings existing_mapping
+  WHERE existing_mapping.school_id = v_actor.school_id
+    AND lower(existing_mapping.grade_label) = lower(v_grade)
+  LIMIT 1;
+
+  IF v_existing_grade IS NULL THEN
+    SELECT section.grade_label
+    INTO v_existing_grade
+    FROM public.school_sections section
+    WHERE section.school_id = v_actor.school_id
+      AND lower(section.grade_label) = lower(v_grade)
+    LIMIT 1;
+  END IF;
+
+  IF v_existing_grade IS NOT NULL THEN
+    v_grade := v_existing_grade;
   END IF;
 
   IF p_division_scope IS NULL THEN
@@ -125,6 +146,33 @@ BEGIN
 
   IF v_actor.id IS NULL THEN
     RAISE EXCEPTION 'An active School Manager membership in this school is required';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM (VALUES
+      ('Nursery', 'kg'),
+      ('KG 1', 'kg'),
+      ('KG 2', 'kg'),
+      ('Grade 1', 'elementary'),
+      ('Grade 2', 'elementary'),
+      ('Grade 3', 'elementary'),
+      ('Grade 4', 'elementary'),
+      ('Grade 5', 'elementary'),
+      ('Grade 6', 'elementary'),
+      ('Grade 7', 'middle_school'),
+      ('Grade 8', 'middle_school'),
+      ('Grade 9', 'high_school'),
+      ('Grade 10', 'high_school'),
+      ('Grade 11', 'high_school'),
+      ('Grade 12', 'high_school')
+    ) AS default_mapping(grade_label, division_scope)
+    JOIN public.school_division_grade_mappings existing_mapping
+      ON existing_mapping.school_id = v_actor.school_id
+     AND lower(existing_mapping.grade_label) = lower(default_mapping.grade_label)
+    WHERE existing_mapping.grade_label <> default_mapping.grade_label
+  ) THEN
+    RAISE EXCEPTION 'An existing grade label differs only by letter casing; resolve it before applying the standard structure';
   END IF;
 
   IF EXISTS (
