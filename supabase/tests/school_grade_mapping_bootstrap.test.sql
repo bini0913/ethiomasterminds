@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(16);
+SELECT plan(18);
 
 SELECT ok(
   position('Choose a grade label already used by this school' in pg_get_functiondef('public.school_set_division_grade_mapping(uuid,text,text)'::regprocedure)) = 0,
@@ -10,6 +10,11 @@ SELECT ok(
 SELECT ok(
   position('An active School Manager membership in this school is required' in pg_get_functiondef('public.school_set_division_grade_mapping(uuid,text,text)'::regprocedure)) > 0,
   'grade mapping remains restricted to an active School Manager'
+);
+
+SELECT ok(
+  position('lower(existing_mapping.grade_label) = lower(v_grade)' in pg_get_functiondef('public.school_set_division_grade_mapping(uuid,text,text)'::regprocedure)) > 0,
+  'manual grade mapping reuses existing grade-label casing instead of creating case variants'
 );
 
 SELECT ok(
@@ -55,6 +60,16 @@ SELECT ok(
   position('Grade 9' in pg_get_functiondef('public.school_initialize_default_ethiopian_grade_mappings(uuid)'::regprocedure)) > 0
   AND position('Grade 12' in pg_get_functiondef('public.school_initialize_default_ethiopian_grade_mappings(uuid)'::regprocedure)) > 0,
   'High School defaults include Grades 9 through 12'
+);
+
+SELECT ok(
+  position('lower(existing_mapping.grade_label) = lower(default_mapping.grade_label)' in pg_get_functiondef('public.school_initialize_default_ethiopian_grade_mappings(uuid)'::regprocedure)) > 0,
+  'default initializer rejects case-variant existing mappings'
+);
+
+SELECT ok(
+  position('lower(existing_section.grade_label) = lower(default_mapping.grade_label)' in pg_get_functiondef('public.school_initialize_default_ethiopian_grade_mappings(uuid)'::regprocedure)) > 0,
+  'default initializer rejects case-variant existing section labels'
 );
 
 SELECT ok(
