@@ -418,6 +418,8 @@ export default function SchoolManagerPortal() {
         elementary_director: "Elementary Director",
         middle_school_director: "Middle School Director",
         high_school_director: "High School Director",
+        academic_director: "Academic Director",
+        hr_director: "HR Director / Business Manager",
         team_leader: "Team Leader",
       };
       return labels[appointment.position] || appointment.position;
@@ -882,7 +884,7 @@ export default function SchoolManagerPortal() {
           </form>
           {createdCredentials.length > 0 && <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-emerald-900">Initial login credentials</p><button onClick={() => void copyCredentials()} className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800"><Copy className="h-3.5 w-3.5" />Copy</button></div>
-            <p className="mt-1 text-xs text-emerald-800">Copy these now and deliver them privately. They are not stored here for later retrieval.</p>
+            <p className="mt-1 text-xs text-emerald-800">Copy these now and deliver them privately. The user must change the temporary password after signing in. Credentials are shown only once.</p>
             <div className="mt-3 space-y-2">{createdCredentials.map((item, index) => <div key={index} className="rounded-md border border-emerald-200 bg-white p-2 text-xs"><p><span className="font-semibold">Username:</span> {item.username}</p><p className="mt-1 break-all"><span className="font-semibold">Initial password:</span> {item.initial_password}</p></div>)}</div>
           </div>}
         </SchoolPanel>
