@@ -141,7 +141,7 @@ function ScopedLeadershipWorkspace() {
     }
     if (can("view_students") || can("view_curriculum") || can("view_academics") || can("review_assessments") || can("review_results") || can("view_attendance") || can("review_attendance") || can("view_discipline") || can("review_discipline")) {
       requests.sections = db.from("school_sections")
-        .select("id,grade_label,section_name")
+        .select("id,academic_year_id,grade_label,section_name")
         .eq("school_id", schoolId)
         .order("grade_label");
     }
@@ -228,7 +228,7 @@ function ScopedLeadershipWorkspace() {
     if (results.academicYears) {
       const currentYears = results.academicYears.data ?? [];
       setAcademicYears(currentYears);
-      if (!sectionAcademicYearId && currentYears[0]) setSectionAcademicYearId(currentYears[0].id);
+      if (currentYears[0] && !currentYears.some((year: any) => year.id === sectionAcademicYearId)) setSectionAcademicYearId(currentYears[0].id);
     }
     if (results.sessions) setAttendanceSessions(results.sessions.data ?? []);
     if (results.attendance) setAttendanceRecords(results.attendance.data ?? []);
