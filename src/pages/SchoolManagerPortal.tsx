@@ -28,7 +28,7 @@ const navItems: SchoolNavItem[] = [
   { id: "leadership", label: "Leadership Team", icon: UserCog },
 ];
 
-type AccountRole = "admin" | "teacher" | "finance" | "parent" | "student";
+type AccountRole = "teacher" | "finance" | "parent" | "student";
 type LeadershipPosition = "" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "academic_director" | "hr_director";
 
 export default function SchoolManagerPortal() {
@@ -225,10 +225,6 @@ export default function SchoolManagerPortal() {
     setLoading(false);
   }, [schoolId, db, subjectYearId, feeYearId, gradingYearId, gradingGradeLabel]);
 
-  useEffect(() => {
-    const hasActiveAdmin = members.some((member) => member.school_role === "admin" && member.status === "active");
-    if (hasActiveAdmin && accountRole === "admin") setAccountRole("teacher");
-  }, [members, accountRole]);
   useEffect(() => { void load(); }, [load]);
 
   const loadLeadership = useCallback(async () => {
@@ -483,7 +479,7 @@ export default function SchoolManagerPortal() {
         p_target_membership_id: data.created[0].membership_id,
         p_position: position,
         p_division_scope: division,
-        p_team_name: position === "team_leader" ? accountLeadershipTeam.trim() : null,
+        p_team_name: null,
         p_permissions: position === "hr_director" ? hrPermissions : position === "academic_director" ? academicPermissions : standardPermissions,
         p_start_date: new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" }),
         p_end_date: null,
@@ -859,27 +855,7 @@ export default function SchoolManagerPortal() {
           </div>
         </SchoolPanel>
       </div>
-      <SchoolPanel title="Link an existing account as a teacher" description="Use this when a person already has a Master Minds login. It creates a school teacher membership only; it does not create another login or change the person's global role.">
-        <form onSubmit={attachExistingTeacher} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="min-w-0 flex-1">
-            <SchoolField label="Existing Master Minds username">
-              <input
-                className={schoolInputClass}
-                value={existingTeacherUsername}
-                onChange={(event) => setExistingTeacherUsername(event.target.value)}
-                placeholder="e.g. jote"
-                minLength={3}
-                maxLength={64}
-                required
-              />
-            </SchoolField>
-          </div>
-          <SchoolPrimaryButton type="submit" disabled={linkingExistingTeacher || !existingTeacherUsername.trim()}>
-            {linkingExistingTeacher ? "Linking account…" : "Link teacher account"}
-          </SchoolPrimaryButton>
-        </form>
-        <p className="mt-2 text-xs text-slate-500">The teacher will appear in the school staff directory. Assign at least one section and subject later under Teacher Assignments before expecting class work to appear in their workspace.</p>
-      </SchoolPanel>
+
     </div>
   );
 
@@ -1334,7 +1310,7 @@ export default function SchoolManagerPortal() {
                     </div>
                     <SchoolStatus value={appointment.status} />
                   </div>
-                  {appointment.position === "main_director" ? <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">This historical appointment is no longer used by the current school structure.</p> : <details className="mt-3 rounded-lg border border-slate-100 p-3">
+                  {appointment.position === "main_director" ? <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">This legacy appointment is retained for historical records only.</p> : <details className="mt-3 rounded-lg border border-slate-100 p-3">
                     <summary className="cursor-pointer text-xs font-semibold text-blue-700">Manage permissions</summary>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       {permissionOptions.map(([permission, label]) => {
