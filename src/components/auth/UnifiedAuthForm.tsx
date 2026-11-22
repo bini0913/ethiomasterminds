@@ -234,7 +234,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
       switch (profile.role) {
         case "extreme_admin": navigate("/root-control-portal-9xA7", { replace: true }); break;
         case "admin": navigate("/admin", { replace: true }); break;
-        case "manager": navigate("/manager-dashboard", { replace: true }); break;
+        case "manager": navigate("/school/manager", { replace: true }); break;
         case "teacher": navigate("/teacher", { replace: true }); break;
         case "finance": navigate("/finance", { replace: true }); break;
         default: navigate("/", { replace: true }); onSuccess();
