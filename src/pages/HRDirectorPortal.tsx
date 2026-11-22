@@ -4,7 +4,6 @@ import {
   LayoutDashboard, Users, ClipboardList, Award, Wallet, RefreshCw, Search,
   TrendingUp, UserCheck, Clock3,
 } from "lucide-react";
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import { useSchoolLeadership } from "@/components/school/SchoolLeadershipGate";
@@ -123,7 +122,12 @@ export default function HRDirectorPortal() {
     return totals;
   }, {});
   const outstanding = byCurrency(invoices.filter((invoice) => Number(invoice.balance) > 0), "balance");
-  const received = byCurrency(payments, "amount");
+  const invoiceCurrency = new Map(invoices.map((invoice) => [invoice.id, invoice.currency || "ETB"]));
+  const received = payments.reduce((totals: Record<string, number>, payment) => {
+    const currency = invoiceCurrency.get(payment.invoice_id) || "ETB";
+    totals[currency] = (totals[currency] || 0) + Number(payment.amount || 0);
+    return totals;
+  }, {});
   const moneySummary = (values: Record<string, number>) => Object.entries(values).map(([currency, amount]) => `${currency} ${amount.toLocaleString()}`).join(" · ") || "0";
   const filteredStaff = staff.filter((member) => {
     const name = staffName(member.id).toLowerCase();
@@ -171,7 +175,7 @@ export default function HRDirectorPortal() {
 
   const renderStaff = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Staff directory" description="School staff memberships, employment status and profile details." action={<SchoolSecondaryButton onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</SchoolSecondaryButton>} />
+      <SchoolPageHeading title="Staff directory" description="School staff memberships, account status and profile details." action={<SchoolSecondaryButton onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</SchoolSecondaryButton>} />
       <SchoolField label="Search staff">
         <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input className={`${schoolInputClass} pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, username, role or grade" /></div>
       </SchoolField>
@@ -179,7 +183,7 @@ export default function HRDirectorPortal() {
         {filteredStaff.length ? <div className="divide-y divide-slate-100">
           {filteredStaff.map((member) => <div key={member.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
             <div><p className="text-sm font-semibold text-slate-900">{staffName(member.id)}</p><p className="mt-1 text-xs text-slate-500">{member.school_username ? `@${member.school_username}` : "No school username"} · {member.school_role}{member.grade_label ? ` · ${member.grade_label}` : ""}</p></div>
-            <div className="flex items-center gap-2"><SchoolStatus value={member.status} /><span className="text-xs text-slate-400">Joined {new Date(member.created_at).toLocaleDateString()}</span></div>
+            <div className="flex items-center gap-2"><SchoolStatus value={member.status} /><span className="text-xs text-slate-400">Membership added {new Date(member.created_at).toLocaleDateString()}</span></div>
           </div>)}
         </div> : <SchoolEmptyState title="No matching staff" description="Try another search or check that staff memberships have been created for this school." />}
       </SchoolPanel>
