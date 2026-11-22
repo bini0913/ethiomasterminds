@@ -264,7 +264,7 @@ export default function SchoolManagerPortal() {
       return;
     }
     setLeadershipError(null);
-    setLeadershipAppointments(appointmentsRes.data ?? []);
+    setLeadershipAppointments((appointmentsRes.data ?? []).filter((item: any) => item.position !== "main_director"));
     setDivisionMappings(mappingsRes.data ?? []);
     setTeamAssignments(teamMembersRes.data ?? []);
     setLeadershipAuditEvents(auditRes.data ?? []);
@@ -1135,7 +1135,7 @@ export default function SchoolManagerPortal() {
       <div className="space-y-5">
         <SchoolPageHeading
           title="School leadership team"
-          description="Appoint the school's directors and team leaders. Leadership positions are school appointments, not new global account roles."
+          description="Review the Director and Vice Director appointments for your school. Create new accounts in People & Accounts."
         />
         {leadershipError && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{leadershipError}</div>}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1153,81 +1153,6 @@ export default function SchoolManagerPortal() {
             );
           })}
         </div>
-        <SchoolPanel title="Appoint an existing leader" description="Use only when replacing an existing appointment. New Director and Vice Director accounts are created in People & Accounts.">
-          <form onSubmit={appointLeader} className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <SchoolField label="Staff member">
-                <select className={schoolSelectClass} value={leaderTargetId} onChange={(event) => setLeaderTargetId(event.target.value)} required>
-                  <option value="">Choose active staff</option>
-                  {staff.filter((member) => leaderPosition === "hr_director" ? member.school_role === "finance" : member.school_role === "teacher").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
-                </select>
-              </SchoolField>
-              <SchoolField label="Leadership position">
-                <select
-                  className={schoolSelectClass}
-                  value={leaderPosition}
-                  onChange={(event) => {
-                    const nextPosition = event.target.value;
-                    setLeaderPosition(nextPosition);
-                    if (nextPosition === "hr_director") {
-                      setLeaderPermissions(["view_staff", "view_staff_evaluations", "manage_team_tasks", "view_reports", "view_finance_summary"]);
-                    } else if (nextPosition === "academic_director") {
-                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_reports"]);
-                    } else if (nextPosition === "vice_director") {
-                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "view_curriculum", "view_reports", "manage_team_tasks"]);
-                    } else if (nextPosition === "team_leader") {
-                      setLeaderPermissions(["view_staff", "view_attendance", "view_academics", "view_curriculum", "manage_team_tasks", "assign_team_tasks", "view_reports"]);
-                    } else {
-                      setLeaderPermissions([
-                        "view_students", "view_staff", "view_attendance", "review_attendance",
-                        "view_academics", "review_assessments", "review_results", "view_curriculum",
-                        "view_discipline", "review_discipline", "view_reports",
-                        "manage_team_tasks", "assign_team_tasks",
-                      ]);
-                    }
-                  }}
-                >
-                  <option value="academic_director">Academic Director</option>
-                  <option value="hr_director">HR Director / Business Manager</option>
-                  <option value="vice_director">Vice Director</option>
-                  <option value="kg_director">KG Director</option>
-                  <option value="elementary_director">Elementary Director</option>
-                  <option value="middle_school_director">Middle School Director</option>
-                  <option value="high_school_director">High School Director</option>
-                </select>
-              </SchoolField>
-              {leaderPosition === "vice_director" && (
-                <SchoolField label="Division">
-                  <select className={schoolSelectClass} value={leaderDivision} onChange={(event) => setLeaderDivision(event.target.value)}>
-                    <option value="kg">KG</option>
-                    <option value="elementary">Elementary</option>
-                    <option value="middle_school">Middle School</option>
-                    <option value="high_school">High School</option>
-                  </select>
-                </SchoolField>
-              )}
-                            <SchoolField label="Appointment starts"><input type="date" className={schoolInputClass} value={leaderStartDate} onChange={(event) => setLeaderStartDate(event.target.value)} /></SchoolField>
-              <SchoolField label="Appointment ends (optional)"><input type="date" className={schoolInputClass} value={leaderEndDate} onChange={(event) => setLeaderEndDate(event.target.value)} /></SchoolField>
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-semibold text-slate-800">Granted responsibilities</p>
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                {visiblePermissionOptions.map(([permission, label]) => (
-                  <label key={permission} className="flex items-start gap-2 rounded-lg border border-slate-100 p-2.5 text-xs text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={leaderPermissions.includes(permission)}
-                      onChange={(event) => setLeaderPermissions((current) => event.target.checked ? [...current, permission] : current.filter((item) => item !== permission))}
-                      className="mt-0.5"
-                    />
-                    <span>{label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <SchoolPrimaryButton type="submit" disabled={!staff.length}>Create appointment</SchoolPrimaryButton>
-          </form>
-        </SchoolPanel>
         <SchoolPanel title="Grade-to-division mapping" description="Configure how this school groups its actual grade labels. These mappings are school-specific and are not hardcoded by Master Minds.">
           <form onSubmit={saveDivisionMapping} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
             <SchoolField label="School grade">
