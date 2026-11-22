@@ -109,23 +109,6 @@ AS $function$
 DECLARE
   v_actor public.school_memberships%ROWTYPE;
   v_inserted integer := 0;
-  v_grade_defaults text[][] := ARRAY[
-    ARRAY['Nursery', 'kg'],
-    ARRAY['KG 1', 'kg'],
-    ARRAY['KG 2', 'kg'],
-    ARRAY['Grade 1', 'elementary'],
-    ARRAY['Grade 2', 'elementary'],
-    ARRAY['Grade 3', 'elementary'],
-    ARRAY['Grade 4', 'elementary'],
-    ARRAY['Grade 5', 'elementary'],
-    ARRAY['Grade 6', 'elementary'],
-    ARRAY['Grade 7', 'middle_school'],
-    ARRAY['Grade 8', 'middle_school'],
-    ARRAY['Grade 9', 'high_school'],
-    ARRAY['Grade 10', 'high_school'],
-    ARRAY['Grade 11', 'high_school'],
-    ARRAY['Grade 12', 'high_school']
-  ];
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -146,11 +129,27 @@ BEGIN
 
   IF EXISTS (
     SELECT 1
-    FROM unnest(v_grade_defaults) AS default_mapping
+    FROM (VALUES
+      ('Nursery', 'kg'),
+      ('KG 1', 'kg'),
+      ('KG 2', 'kg'),
+      ('Grade 1', 'elementary'),
+      ('Grade 2', 'elementary'),
+      ('Grade 3', 'elementary'),
+      ('Grade 4', 'elementary'),
+      ('Grade 5', 'elementary'),
+      ('Grade 6', 'elementary'),
+      ('Grade 7', 'middle_school'),
+      ('Grade 8', 'middle_school'),
+      ('Grade 9', 'high_school'),
+      ('Grade 10', 'high_school'),
+      ('Grade 11', 'high_school'),
+      ('Grade 12', 'high_school')
+    ) AS default_mapping(grade_label, division_scope)
     JOIN public.school_division_grade_mappings existing_mapping
       ON existing_mapping.school_id = v_actor.school_id
-     AND existing_mapping.grade_label = default_mapping[1]
-    WHERE existing_mapping.division_scope <> default_mapping[2]
+     AND existing_mapping.grade_label = default_mapping.grade_label
+    WHERE existing_mapping.division_scope <> default_mapping.division_scope
   ) THEN
     RAISE EXCEPTION 'Existing grade mappings conflict with the standard Ethiopian grade structure; review those mappings first';
   END IF;
@@ -164,7 +163,23 @@ BEGIN
     default_mapping[1],
     v_actor.id,
     v_actor.id
-  FROM unnest(v_grade_defaults) AS default_mapping
+  FROM (VALUES
+    ('Nursery', 'kg'),
+    ('KG 1', 'kg'),
+    ('KG 2', 'kg'),
+    ('Grade 1', 'elementary'),
+    ('Grade 2', 'elementary'),
+    ('Grade 3', 'elementary'),
+    ('Grade 4', 'elementary'),
+    ('Grade 5', 'elementary'),
+    ('Grade 6', 'elementary'),
+    ('Grade 7', 'middle_school'),
+    ('Grade 8', 'middle_school'),
+    ('Grade 9', 'high_school'),
+    ('Grade 10', 'high_school'),
+    ('Grade 11', 'high_school'),
+    ('Grade 12', 'high_school')
+  ) AS default_mapping(grade_label, division_scope)
   ON CONFLICT (school_id, grade_label) DO NOTHING;
 
   GET DIAGNOSTICS v_inserted = ROW_COUNT;
@@ -175,8 +190,9 @@ BEGIN
     v_actor.school_id,
     auth.uid(),
     v_actor.id,
-    'ethiopian_grade_mappings_initialized',
+    'division_grade_mapped',
     jsonb_build_object(
+      'action', 'default_ethiopian_grade_structure_initialized',
       'added_count', v_inserted,
       'grade_labels', ARRAY[
         'Nursery', 'KG 1', 'KG 2',
