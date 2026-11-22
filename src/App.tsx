@@ -21,8 +21,6 @@ const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
 const AdminPortal = lazy(() => import("./pages/AdminPortal"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const StudentDashboardRoute = lazy(() => import("./components/dashboard/StudentDashboardRoute"));
-const ManagerDashboard = lazy(() => import("./pages/ManagerDashboard"));
-const ManagerControlCenter = lazy(() => import("./pages/ManagerControlCenter"));
 const SchoolManagerPortal = lazy(() => import("./pages/SchoolManagerPortal"));
 const SchoolLeadershipPortal = lazy(() => import("./pages/SchoolLeadershipPortal"));
 const SchoolLeadershipGate = lazy(() => import("./components/school/SchoolLeadershipGate"));
@@ -142,8 +140,8 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/school/finance", title: "School Finance Portal" },
   { prefix: "/school/student", title: "School Student Portal" },
   { prefix: "/school/super-admin", title: "School Network Administration" },
-  { prefix: "/manager", title: "Manager Control Center" },
-  { prefix: "/manager-dashboard", title: "Manager Dashboard" },
+  { prefix: "/manager", title: "School Manager Portal" },
+  { prefix: "/manager-dashboard", title: "School Manager Portal" },
   { prefix: "/finance", title: "Finance Portal" },
   { prefix: "/super-admin", title: "Super Admin Control Center" },
   { prefix: "/root-control-portal-9xA7", title: "Control Portal" },
@@ -366,22 +364,9 @@ const App = () => (
                               <Route path="/school/finance" element={<ProtectedRoute allowedRoles={["finance"]}><SchoolPortalGate role="finance"><SchoolFinancePortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/student" element={<ProtectedRoute allowedRoles={["student"]}><SchoolPortalGate role="student"><SchoolStudentPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/super-admin" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><SchoolGlobalAdminPortal /></ProtectedRoute>} />
-                              <Route
-                                path="/manager"
-                                element={
-                                  <ProtectedRoute allowedRoles={['manager', 'admin', 'extreme_admin']}>
-                                    <ManagerControlCenter />
-                                  </ProtectedRoute>
-                                }
-                              />
-                              <Route 
-                                path="/manager-dashboard" 
-                                element={
-                                  <ProtectedRoute allowedRoles={['manager', 'admin', 'extreme_admin']}>
-                                    <ManagerDashboard />
-                                  </ProtectedRoute>
-                                } 
-                              />
+                              {/* Compatibility aliases: the school-scoped portal is the sole Manager experience. */}
+                              <Route path="/manager" element={<ProtectedRoute allowedRoles={["manager"]}><Navigate to="/school/manager" replace /></ProtectedRoute>} />
+                              <Route path="/manager-dashboard" element={<ProtectedRoute allowedRoles={["manager"]}><Navigate to="/school/manager" replace /></ProtectedRoute>} />
                               <Route path="/store" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><StorePage /></ProtectedRoute>} />
                               <Route path="/tournaments" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Tournaments /></ProtectedRoute>} />
                               <Route path="/enhanced-settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><EnhancedSettings /></ProtectedRoute>} />
