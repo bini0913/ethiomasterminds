@@ -164,6 +164,87 @@ BEGIN
 END;
 $function$;
 
+-- Keep the Manager permission editor, but make retired appointments immutable history.
+CREATE OR REPLACE FUNCTION public.school_update_leadership_permissions(
+  p_appointment_id uuid,
+  p_permissions text[],
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $
+DECLARE
+  v_appointment public.school_leadership_appointments%ROWTYPE;
+  v_actor public.school_memberships%ROWTYPE;
+  v_allowed_permissions text[] := ARRAY[
+    'view_students', 'view_staff', 'view_attendance', 'review_attendance',
+    'view_academics', 'review_assessments', 'review_results', 'view_curriculum',
+    'manage_team_tasks', 'assign_team_tasks', 'view_reports', 'publish_announcements',
+    'view_discipline', 'review_discipline', 'view_finance_summary', 'view_staff_evaluations', 'manage_meetings'
+  ]::text[];
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  SELECT * INTO v_appointment
+  FROM public.school_leadership_appointments
+  WHERE id = p_appointment_id
+  FOR UPDATE;
+  IF v_appointment.id IS NULL THEN RAISE EXCEPTION 'Leadership appointment not found'; END IF;
+
+  SELECT * INTO v_actor
+  FROM public.school_memberships
+  WHERE school_id = v_appointment.school_id
+    AND user_id = auth.uid()
+    AND school_role = 'manager'
+    AND status = 'active'
+  LIMIT 1;
+  IF v_actor.id IS NULL THEN RAISE EXCEPTION 'Only the School Manager can change leadership permissions'; END IF;
+  IF v_appointment.position = 'main_director' THEN
+    RAISE EXCEPTION 'Legacy Main Director appointments are retired and cannot be changed; the historical record is preserved';
+  END IF;
+  IF v_appointment.status = 'ended' THEN
+    RAISE EXCEPTION 'Ended appointments are historical; create a new appointment to change permissions';
+  END IF;
+  IF NOT (COALESCE(p_permissions, ARRAY[]::text[]) <@ v_allowed_permissions) THEN
+    RAISE EXCEPTION 'One or more permissions are not supported';
+  END IF;
+
+  IF v_appointment.position = 'hr_director' AND NOT (
+    COALESCE(p_permissions, ARRAY[]::text[]) <@ ARRAY[
+      'view_staff', 'view_staff_evaluations', 'manage_team_tasks',
+      'view_reports', 'view_finance_summary', 'manage_meetings'
+    ]::text[]
+  ) THEN
+    RAISE EXCEPTION 'HR Director permissions are limited to school HR and finance operations';
+  END IF;
+
+  IF v_appointment.position <> 'hr_director' AND 'view_staff_evaluations' = ANY(COALESCE(p_permissions, ARRAY[]::text[])) THEN
+    RAISE EXCEPTION 'Staff evaluation access is reserved for the HR Director';
+  END IF;
+
+  IF v_appointment.position = 'academic_director' AND NOT (
+    COALESCE(p_permissions, ARRAY[]::text[]) <@ ARRAY[
+      'view_students', 'view_staff', 'view_attendance', 'view_academics',
+      'review_assessments', 'review_results', 'view_curriculum',
+      'view_reports', 'publish_announcements', 'manage_meetings'
+    ]::text[]
+  ) THEN
+    RAISE EXCEPTION 'Academic Director permissions are limited to school-wide academic oversight';
+  END IF;
+  IF nullif(trim(p_reason), '') IS NULL THEN
+    RAISE EXCEPTION 'A reason is required when changing leadership permissions';
+  END IF;
+
+  UPDATE public.school_leadership_appointments
+  SET permissions = COALESCE(p_permissions, ARRAY[]::text[]),
+      change_reason = trim(p_reason),
+      updated_at = now()
+  WHERE id = p_appointment_id;
+  RETURN true;
+END;
+$;
+
 -- A School Manager can safely convert one existing legacy membership into the
 -- Finance membership required by the HR Director / Business Manager workspace.
 CREATE OR REPLACE FUNCTION public.school_convert_legacy_admin_to_hr_director(
