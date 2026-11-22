@@ -174,7 +174,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $function$
 DECLARE
   v_appointment public.school_leadership_appointments%ROWTYPE;
   v_actor public.school_memberships%ROWTYPE;
@@ -243,7 +243,7 @@ BEGIN
   WHERE id = p_appointment_id;
   RETURN true;
 END;
-$;
+$function$;
 
 -- A School Manager can safely convert one existing legacy membership into the
 -- Finance membership required by the HR Director / Business Manager workspace.
