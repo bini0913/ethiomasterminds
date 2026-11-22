@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(11);
+SELECT plan(13);
 
 SELECT ok(
   EXISTS (
@@ -89,6 +89,35 @@ SELECT ok(
       AND policyname = 'school_leadership_view_scoped_memberships'
   ), '')) > 0,
   'leadership staff directory policy hides platform authority memberships'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::bigint
+    FROM public.school_memberships membership
+    JOIN public.user_roles platform_role
+      ON platform_role.user_id = membership.user_id
+     AND platform_role.role IN ('super_admin'::public.app_role, 'extreme_admin'::public.app_role)
+    WHERE membership.status = 'active'
+  ),
+  0::bigint,
+  'no platform authority account retains an active school membership'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::bigint
+    FROM public.school_leadership_appointments appointment
+    JOIN public.school_memberships membership
+      ON membership.id = appointment.membership_id
+     AND membership.school_id = appointment.school_id
+    JOIN public.user_roles platform_role
+      ON platform_role.user_id = membership.user_id
+     AND platform_role.role IN ('super_admin'::public.app_role, 'extreme_admin'::public.app_role)
+    WHERE appointment.status = 'active'
+  ),
+  0::bigint,
+  'no platform authority account retains an active school leadership appointment'
 );
 
 SELECT * FROM finish();
