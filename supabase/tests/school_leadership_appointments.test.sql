@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(100);
+select plan(104);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -133,6 +133,39 @@ select ok(position('Staff evaluation access is reserved for the HR Director' in 
 select ok(position('Staff evaluation access is reserved for the HR Director' in pg_get_functiondef('public.school_update_leadership_permissions(uuid,text[],text)'::regprocedure)) > 0, 'School Manager cannot grant HR-only evaluation access to another leadership position');
 
 select ok(position('target.school_role IN (''admin'', ''teacher'', ''finance'')' in pg_get_functiondef('public.school_can_view_profile(uuid)'::regprocedure)) > 0, 'HR staff profile visibility excludes student and parent profiles');
+
+
+select ok(
+  position('school_leadership_has_permission(target.school_id, ''view_students''' in pg_get_functiondef('public.school_can_view_profile(uuid)'::regprocedure)) > 0,
+  'appointed division leaders can view student profiles only when the mapped student scope is permitted'
+);
+select ok(
+  coalesce((
+    select position('view_academics' in pg_get_expr(polqual, polrelid)) > 0
+    from pg_policy
+    where polname = 'school_leadership_view_scoped_memberships'
+      and polrelid = 'public.school_memberships'::regclass
+  ), false),
+  'academic oversight permission grants scoped student membership visibility'
+);
+select ok(
+  coalesce((
+    select position('view_academics' in pg_get_expr(polqual, polrelid)) > 0
+    from pg_policy
+    where polname = 'school_leadership_view_scoped_sections'
+      and polrelid = 'public.school_sections'::regclass
+  ), false),
+  'academic oversight permission grants scoped section labels'
+);
+select ok(
+  coalesce((
+    select position('review_results' in pg_get_expr(polqual, polrelid)) > 0
+    from pg_policy
+    where polname = 'school_leadership_view_scoped_assessments'
+      and polrelid = 'public.school_assessments'::regclass
+  ), false),
+  'result reviewers can read scoped assessment metadata for marks and reports'
+);
 
 select * from finish();
 rollback;

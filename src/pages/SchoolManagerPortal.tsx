@@ -73,8 +73,8 @@ export default function SchoolManagerPortal() {
   const [leaderPermissions, setLeaderPermissions] = useState<string[]>([
     "view_students", "view_staff", "view_attendance", "review_attendance",
     "view_academics", "review_assessments", "review_results", "view_curriculum",
-    "manage_team_tasks", "assign_team_tasks", "view_reports", "publish_announcements",
-    "view_discipline", "review_discipline", "view_finance_summary", "manage_meetings",
+    "manage_team_tasks", "assign_team_tasks", "view_reports",
+    "view_discipline", "review_discipline", "view_finance_summary",
   ]);
   const [leadershipActionReason, setLeadershipActionReason] = useState("");
   const [divisionMappings, setDivisionMappings] = useState<any[]>([]);
@@ -1066,24 +1066,26 @@ export default function SchoolManagerPortal() {
       ["manage_team_tasks", "Manage assigned team tasks"],
       ["assign_team_tasks", "Assign team tasks"],
       ["view_reports", "View assigned reports"],
-      ["publish_announcements", "Publish scoped announcements"],
       ["view_discipline", "View student-support records"],
       ["review_discipline", "Review student-support reports"],
       ["view_finance_summary", "View finance summaries"],
       ["view_staff_evaluations", "View staff evaluations"],
-      ["manage_meetings", "Manage assigned meetings"],
     ] as const;
+    const divisionDirectorPositions = ["kg_director", "elementary_director", "middle_school_director", "high_school_director"];
     const visiblePermissionOptions = leaderPosition === "hr_director"
       ? permissionOptions.filter(([permission]) => [
           "view_staff", "view_staff_evaluations", "manage_team_tasks",
-          "view_reports", "view_finance_summary", "manage_meetings",
+          "view_reports", "view_finance_summary",
         ].includes(permission))
-      : permissionOptions.filter(([permission]) => permission !== "view_staff_evaluations" && (
-          leaderPosition !== "academic_director" || ![
+      : permissionOptions.filter(([permission]) => {
+          if (permission === "view_staff_evaluations") return false;
+          if (divisionDirectorPositions.includes(leaderPosition) && permission === "view_finance_summary") return false;
+          if (leaderPosition === "academic_director" && [
             "review_attendance", "manage_team_tasks", "assign_team_tasks",
             "view_discipline", "review_discipline", "view_finance_summary",
-          ].includes(permission)
-        ));
+          ].includes(permission)) return false;
+          return true;
+        });
     const activeAppointment = (position: string, division: string | null) =>
       leadershipAppointments.find((item) => item.status === "active" && item.position === position && (division === null || item.division_scope === division));
     const vacancies = fixedPositions.filter(([position, , division]) => !activeAppointment(position, division));
@@ -1129,19 +1131,24 @@ export default function SchoolManagerPortal() {
                       setLeaderPermissions([
                         "view_students", "view_staff", "view_attendance", "review_attendance",
                         "view_academics", "review_assessments", "review_results", "view_curriculum",
-                        "manage_team_tasks", "assign_team_tasks", "view_reports", "publish_announcements",
-                        "view_discipline", "review_discipline", "view_finance_summary", "manage_meetings",
+                        "manage_team_tasks", "assign_team_tasks", "view_reports",
+                        "view_discipline", "review_discipline", "view_finance_summary",
                       ]);
                     } else if (nextPosition === "hr_director") {
-                      setLeaderPermissions(["view_staff", "view_staff_evaluations", "manage_team_tasks", "view_reports", "view_finance_summary", "manage_meetings"]);
+                      setLeaderPermissions(["view_staff", "view_staff_evaluations", "manage_team_tasks", "view_reports", "view_finance_summary"]);
                     } else if (nextPosition === "academic_director") {
-                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_reports", "publish_announcements", "manage_meetings"]);
+                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_reports"]);
                     } else if (nextPosition === "vice_director") {
-                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "view_curriculum", "view_reports", "manage_team_tasks", "manage_meetings"]);
+                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "view_curriculum", "view_reports", "manage_team_tasks"]);
                     } else if (nextPosition === "team_leader") {
                       setLeaderPermissions(["view_staff", "view_attendance", "view_academics", "view_curriculum", "manage_team_tasks", "assign_team_tasks", "view_reports"]);
                     } else {
-                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "review_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_discipline", "review_discipline", "view_reports", "manage_team_tasks", "assign_team_tasks", "publish_announcements", "manage_meetings"]);
+                      setLeaderPermissions([
+                        "view_students", "view_staff", "view_attendance", "review_attendance",
+                        "view_academics", "review_assessments", "review_results", "view_curriculum",
+                        "view_discipline", "review_discipline", "view_reports",
+                        "manage_team_tasks", "assign_team_tasks",
+                      ]);
                     }
                   }}
                 >

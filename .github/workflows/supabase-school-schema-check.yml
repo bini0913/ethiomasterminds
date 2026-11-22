@@ -50,7 +50,10 @@ jobs:
         with:
           version: 3.0.0
       - name: Start local Supabase services
-        run: supabase start -x studio,edge-runtime,logflare,vector,imgproxy
+        # Inbucket is only a local email-capture service. Database migration
+        # replay and pgTAP do not require it, and its default host port can
+        # collide with ports reserved by hosted CI runners.
+        run: supabase start -x studio,edge-runtime,logflare,vector,imgproxy,inbucket
       - name: Apply every migration from a clean database
         run: supabase db reset --local
       - name: Run pgTAP database tests
