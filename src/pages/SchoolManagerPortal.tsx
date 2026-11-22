@@ -347,7 +347,8 @@ export default function SchoolManagerPortal() {
     });
     if (error) return toast.error(error.message || "The team member could not be removed.");
     toast.success("Team assignment removed.");
-    await loadLeadership();  };
+    await loadLeadership();
+  };
 
   const updateLeaderPermissions = async (appointmentId: string, permissions: string[]) => {
     if (!leadershipPermissionReason.trim()) {
@@ -717,7 +718,8 @@ export default function SchoolManagerPortal() {
     if (error) return toast.error(error.message);
     setTaskTitle(""); setTaskDescription(""); setTaskDueDate("");
     toast.success("Follow-up task assigned.");
-    await load();  };
+    await load();
+  };
 
   const createEvaluation = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -1069,7 +1071,8 @@ export default function SchoolManagerPortal() {
       team_leader: "Team Leader",
     };
     const divisionLabels: Record<string, string> = {
-      kg: "KG",      elementary: "Elementary",
+      kg: "KG",
+      elementary: "Elementary",
       middle_school: "Middle School",
       high_school: "High School",
     };
@@ -1418,7 +1421,8 @@ export default function SchoolManagerPortal() {
     case "requests": content = renderRequests(); break;
     case "reports": content = renderReports(); break;
     case "discipline": content = renderDiscipline(); break;
-    case "leadership": content = renderLeadership(); break;    default: content = renderOverview();
+    case "leadership": content = renderLeadership(); break;
+    default: content = renderOverview();
   }
 
   return (
