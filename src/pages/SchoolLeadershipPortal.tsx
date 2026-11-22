@@ -16,7 +16,6 @@ import {
 } from "@/components/school/SchoolPortalPrimitives";
 
 const positionLabels: Record<string, string> = {
-  main_director: "Main Director",
   academic_director: "Academic Director",
   hr_director: "HR Director / Business Manager",
   vice_director: "Vice Director",
@@ -27,7 +26,7 @@ const positionLabels: Record<string, string> = {
   team_leader: "Team Leader",
 };
 
-type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academics" | "discipline" | "tasks" | "reports" | "leadership" | "sections";
+type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academics" | "discipline" | "tasks" | "reports" | "leadership" | "sections" | "people";
 
 export default function SchoolLeadershipPortal() {
   const { appointment } = useSchoolLeadership();
@@ -95,6 +94,7 @@ function ScopedLeadershipWorkspace() {
     }
     if (can("view_reports")) items.push({ id: "reports", label: "Reports", icon: FileBarChart });
     if (isDivisionDirector && can("view_staff")) items.push({ id: "leadership", label: "Division Leadership", icon: Network });
+    if (isDivisionDirector && can("view_staff")) items.push({ id: "people", label: "Team & Teachers", icon: UserCog });
     if (isDivisionDirector) items.push({ id: "sections", label: "Class Sections", icon: PanelsTopLeft });
     return items;
   }, [appointment.permissions, isDivisionDirector]);
@@ -104,7 +104,17 @@ function ScopedLeadershipWorkspace() {
   const [members, setMembers] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [sections, setSections] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
+  const [divisionStaffName, setDivisionStaffName] = useState("");
+  const [divisionStaffKind, setDivisionStaffKind] = useState<"teacher" | "team_leader">("teacher");
+  const [divisionStaffSectionId, setDivisionStaffSectionId] = useState("");
+  const [divisionStaffAssignmentKind, setDivisionStaffAssignmentKind] = useState<"subject" | "homeroom">("subject");
+  const [divisionStaffSubject, setDivisionStaffSubject] = useState("");
+  const [divisionStaffTeamName, setDivisionStaffTeamName] = useState("");
+  const [divisionStaffCredentials, setDivisionStaffCredentials] = useState<any>(null);
+  const [divisionStaffCreating, setDivisionStaffCreating] = useState(false);
+  const [divisionStaffError, setDivisionStaffError] = useState<string | null>(null);
   const [sectionAcademicYearId, setSectionAcademicYearId] = useState("");
   const [sectionGradeLabel, setSectionGradeLabel] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
@@ -201,6 +211,11 @@ function ScopedLeadershipWorkspace() {
         .eq("school_id", schoolId)
         .eq("division_scope", appointment.division_scope)
         .order("grade_label");
+      requests.subjects = db.from("school_subjects")
+        .select("id,academic_year_id,grade_label,subject_name,active")
+        .eq("school_id", schoolId)
+        .eq("active", true)
+        .order("grade_label");
       if (can("view_staff")) {
         requests.divisionAppointments = db.from("school_leadership_appointments")
           .select("id,membership_id,position,division_scope,team_name,status,start_date,end_date")
@@ -239,6 +254,7 @@ function ScopedLeadershipWorkspace() {
     }
     if (results.members) setMembers(results.members.data ?? []);
     if (results.sections) setSections(results.sections.data ?? []);
+    if (results.subjects) setSubjects(results.subjects.data ?? []);
     if (results.academicYears) {
       const currentYears = results.academicYears.data ?? [];
       setAcademicYears(currentYears);
@@ -266,6 +282,46 @@ function ScopedLeadershipWorkspace() {
       if (!error) setProfiles(Object.fromEntries((data ?? []).map((profile: any) => [profile.id, profile])));
     }
     setLoading(false);
+  };
+
+  const createDivisionStaff = async (event: React.FormEvent) => {
+    event.preventDefault(); setDivisionStaffError(null); setDivisionStaffCredentials(null);
+    const section = sections.find((item) => item.id === divisionStaffSectionId);
+    if (!divisionStaffName.trim()) return setDivisionStaffError("Enter the person’s full name.");
+    if (!section || !divisionGradeMappings.some((mapping) => mapping.grade_label === section.grade_label)) return setDivisionStaffError("Choose a class section in your division.");
+    if (divisionStaffAssignmentKind === "subject" && !divisionStaffSubject) return setDivisionStaffError("Choose the subject this person will teach.");
+    if (divisionStaffKind === "team_leader" && !divisionStaffTeamName.trim()) return setDivisionStaffError("Enter the team name.");
+    setDivisionStaffCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("school-provision-account", { body: { action: "create_division_staff", school_id: schoolId, position: divisionStaffKind, name: divisionStaffName.trim(), section_id: section.id, assignment_kind: divisionStaffAssignmentKind, subject_name: divisionStaffAssignmentKind === "homeroom" ? "Homeroom" : divisionStaffSubject, team_name: divisionStaffKind === "team_leader" ? divisionStaffTeamName.trim() : null } });
+      if (error || data?.error || !data?.created?.membership_id) return setDivisionStaffError(data?.error || error?.message || "The account could not be created.");
+      setDivisionStaffCredentials(data.created); setDivisionStaffName(""); setDivisionStaffTeamName(""); setDivisionStaffSubject("");
+      toast.success(divisionStaffKind === "team_leader" ? "Team Leader account created." : "Teacher account created."); await load();
+    } catch (error: any) { setDivisionStaffError(error?.message || "The account could not be created."); }
+    finally { setDivisionStaffCreating(false); }
+  };
+
+  const renderDivisionPeople = () => {
+    const currentYearId = academicYears[0]?.id;
+    const divisionSections = sections.filter((section) => divisionGradeMappings.some((mapping) => mapping.grade_label === section.grade_label) && (!currentYearId || section.academic_year_id === currentYearId));
+    const divisionTeachers = members.filter((member) => member.school_role === "teacher");
+    return <div className="space-y-5">
+      <SchoolPageHeading title="Team & teachers" description={`Create the Team Leaders and Teachers who work in your ${divisionInfo?.coverage || scopeLabel} division.`} />
+      <SchoolPanel title="Create a team member" description="Create a real login and assign the person to one of your division’s classes. Login details appear once.">
+        {divisionSections.length ? <form onSubmit={createDivisionStaff} className="grid gap-3 md:grid-cols-2">
+          <label className="text-xs font-medium text-slate-600">Account type<select value={divisionStaffKind} onChange={(event) => setDivisionStaffKind(event.target.value as "teacher" | "team_leader")} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800"><option value="teacher">Teacher</option><option value="team_leader">Team Leader</option></select></label>
+          <label className="text-xs font-medium text-slate-600">Full name<input required value={divisionStaffName} onChange={(event) => setDivisionStaffName(event.target.value)} placeholder="Enter full name" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800" /></label>
+          <label className="text-xs font-medium text-slate-600">Class section<select required value={divisionStaffSectionId} onChange={(event) => { setDivisionStaffSectionId(event.target.value); setDivisionStaffSubject(""); }} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800"><option value="">Choose a class</option>{divisionSections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} · {section.section_name}</option>)}</select></label>
+          <label className="text-xs font-medium text-slate-600">Assignment<select value={divisionStaffAssignmentKind} onChange={(event) => setDivisionStaffAssignmentKind(event.target.value as "subject" | "homeroom")} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800"><option value="subject">Subject teacher</option><option value="homeroom">Homeroom teacher</option></select></label>
+          {divisionStaffAssignmentKind === "subject" && <label className="text-xs font-medium text-slate-600">Subject<select required value={divisionStaffSubject} onChange={(event) => setDivisionStaffSubject(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800"><option value="">Choose a subject</option>{subjects.filter((subject) => subject.grade_label === divisionSections.find((section) => section.id === divisionStaffSectionId)?.grade_label && subject.academic_year_id === currentYearId).map((subject) => <option key={subject.id} value={subject.subject_name}>{subject.subject_name}</option>)}</select></label>}
+          {divisionStaffKind === "team_leader" && <label className="text-xs font-medium text-slate-600">Team name<input required value={divisionStaffTeamName} onChange={(event) => setDivisionStaffTeamName(event.target.value)} placeholder="e.g. Grade 4 Team" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800" /></label>}
+          {divisionStaffError && <p role="alert" className="md:col-span-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{divisionStaffError}</p>}
+          <div className="md:col-span-2"><button disabled={divisionStaffCreating} type="submit" className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{divisionStaffCreating ? "Creating account…" : `Create ${divisionStaffKind === "team_leader" ? "Team Leader" : "Teacher"}`}</button></div>
+        </form> : <SchoolEmptyState title="Create your class sections first" description="Once the Manager maps your division’s grades and you create the class sections, you can add Team Leaders and Teachers here." />}
+        {divisionStaffCredentials && <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4"><p className="text-sm font-semibold text-emerald-900">Account created — save these login details</p><div className="mt-2 grid gap-2 text-sm sm:grid-cols-2"><p>Username: <strong>{divisionStaffCredentials.username}</strong></p><p>Temporary password: <strong>{divisionStaffCredentials.initial_password}</strong></p></div><p className="mt-2 text-xs text-emerald-800">Share these details privately. The person must change the temporary password after signing in. They are shown only once.</p></div>}
+      </SchoolPanel>
+      <SchoolPanel title="People in your division"><div className="divide-y divide-slate-100">{divisionTeamLeaders.map((leader) => <div key={leader.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold text-slate-800">{memberName(leader.membership_id)}</p><p className="text-xs text-slate-500">Team Leader · {leader.team_name || "Team"}</p></div><SchoolStatus value={leader.status} /></div>)}{divisionTeachers.map((teacher) => <div key={teacher.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold text-slate-800">{memberName(teacher.id)}</p><p className="text-xs text-slate-500">Teacher · {teacher.school_username}</p></div><SchoolStatus value={teacher.status} /></div>)}{!divisionTeamLeaders.length && !divisionTeachers.length && <SchoolEmptyState title="No team members yet" description="Create the first Teacher or Team Leader above." />}</div></SchoolPanel>
+    </div>;
   };
 
   const createDivisionSections = async (event: React.FormEvent) => {
@@ -686,6 +742,7 @@ function ScopedLeadershipWorkspace() {
     case "tasks": content = can("manage_team_tasks") || can("assign_team_tasks") ? renderTasks() : renderOverview(); break;
     case "reports": content = can("view_reports") ? renderReports() : renderOverview(); break;
     case "leadership": content = isDivisionDirector && can("view_staff") ? renderDivisionLeadership() : renderOverview(); break;
+    case "people": content = isDivisionDirector && can("view_staff") ? renderDivisionPeople() : renderOverview(); break;
     case "sections": content = isDivisionDirector ? renderClassSections() : renderOverview(); break;
     default: content = renderOverview();
   }
