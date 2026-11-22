@@ -140,24 +140,30 @@ select ok(
   'appointed division leaders can view student profiles only when the mapped student scope is permitted'
 );
 select ok(
-  position('view_academics' in pg_get_expr(polqual, polrelid)) > 0
-  from pg_policy
-  where polname = 'school_leadership_view_scoped_memberships'
-    and polrelid = 'public.school_memberships'::regclass,
+  coalesce((
+    select position('view_academics' in pg_get_expr(polqual, polrelid)) > 0
+    from pg_policy
+    where polname = 'school_leadership_view_scoped_memberships'
+      and polrelid = 'public.school_memberships'::regclass
+  ), false),
   'academic oversight permission grants scoped student membership visibility'
 );
 select ok(
-  position('view_academics' in pg_get_expr(polqual, polrelid)) > 0
-  from pg_policy
-  where polname = 'school_leadership_view_scoped_sections'
-    and polrelid = 'public.school_sections'::regclass,
+  coalesce((
+    select position('view_academics' in pg_get_expr(polqual, polrelid)) > 0
+    from pg_policy
+    where polname = 'school_leadership_view_scoped_sections'
+      and polrelid = 'public.school_sections'::regclass
+  ), false),
   'academic oversight permission grants scoped section labels'
 );
 select ok(
-  position('review_results' in pg_get_expr(polqual, polrelid)) > 0
-  from pg_policy
-  where polname = 'school_leadership_view_scoped_assessments'
-    and polrelid = 'public.school_assessments'::regclass,
+  coalesce((
+    select position('review_results' in pg_get_expr(polqual, polrelid)) > 0
+    from pg_policy
+    where polname = 'school_leadership_view_scoped_assessments'
+      and polrelid = 'public.school_assessments'::regclass
+  ), false),
   'result reviewers can read scoped assessment metadata for marks and reports'
 );
 
