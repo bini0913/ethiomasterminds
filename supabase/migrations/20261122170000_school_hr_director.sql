@@ -440,6 +440,7 @@ AS $function$
       SELECT 1
       FROM public.school_memberships target
       WHERE target.user_id = p_profile_id
+        AND target.school_role IN ('admin', 'teacher', 'finance')
         AND target.status IN ('active', 'suspended')
         AND public.school_leadership_has_permission(target.school_id, 'view_staff', target.grade_label, target.id, target.section_id)
     )
