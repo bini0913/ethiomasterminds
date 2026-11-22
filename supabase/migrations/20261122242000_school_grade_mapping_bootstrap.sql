@@ -171,8 +171,31 @@ BEGIN
       ON existing_mapping.school_id = v_actor.school_id
      AND lower(existing_mapping.grade_label) = lower(default_mapping.grade_label)
     WHERE existing_mapping.grade_label <> default_mapping.grade_label
+  ) OR EXISTS (
+    SELECT 1
+    FROM (VALUES
+      ('Nursery', 'kg'),
+      ('KG 1', 'kg'),
+      ('KG 2', 'kg'),
+      ('Grade 1', 'elementary'),
+      ('Grade 2', 'elementary'),
+      ('Grade 3', 'elementary'),
+      ('Grade 4', 'elementary'),
+      ('Grade 5', 'elementary'),
+      ('Grade 6', 'elementary'),
+      ('Grade 7', 'middle_school'),
+      ('Grade 8', 'middle_school'),
+      ('Grade 9', 'high_school'),
+      ('Grade 10', 'high_school'),
+      ('Grade 11', 'high_school'),
+      ('Grade 12', 'high_school')
+    ) AS default_mapping(grade_label, division_scope)
+    JOIN public.school_sections existing_section
+      ON existing_section.school_id = v_actor.school_id
+     AND lower(existing_section.grade_label) = lower(default_mapping.grade_label)
+    WHERE existing_section.grade_label <> default_mapping.grade_label
   ) THEN
-    RAISE EXCEPTION 'An existing grade label differs only by letter casing; resolve it before applying the standard structure';
+    RAISE EXCEPTION 'An existing grade or section label differs only by letter casing; resolve it before applying the standard structure';
   END IF;
 
   IF EXISTS (
