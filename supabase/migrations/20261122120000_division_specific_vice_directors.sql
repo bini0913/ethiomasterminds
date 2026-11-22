@@ -199,6 +199,25 @@ AS $$
                 AND assignment.teacher_membership_id = p_target_membership_id
             )
           )
+          OR (
+            appointment.position IN ('kg_director', 'elementary_director', 'middle_school_director', 'high_school_director')
+            AND p_target_membership_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1
+              FROM public.school_leadership_appointments subordinate_appointment
+              JOIN public.school_memberships subordinate_membership
+                ON subordinate_membership.id = subordinate_appointment.membership_id
+               AND subordinate_membership.school_id = subordinate_appointment.school_id
+              WHERE subordinate_appointment.school_id = appointment.school_id
+                AND subordinate_appointment.membership_id = p_target_membership_id
+                AND subordinate_appointment.position IN ('vice_director', 'team_leader')
+                AND subordinate_appointment.division_scope = appointment.division_scope
+                AND subordinate_appointment.status = 'active'
+                AND subordinate_appointment.start_date <= CURRENT_DATE
+                AND (subordinate_appointment.end_date IS NULL OR subordinate_appointment.end_date >= CURRENT_DATE)
+                AND subordinate_membership.status = 'active'
+            )
+          )
         WHEN appointment.position = 'team_leader' THEN
           EXISTS (
             SELECT 1
