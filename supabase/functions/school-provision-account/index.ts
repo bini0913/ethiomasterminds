@@ -179,6 +179,70 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (action === "attach_existing_teacher") {
+      const schoolId = normalize(payload?.school_id);
+      const targetUsername = normalize(payload?.username).toLowerCase();
+      if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64) {
+        return json({ error: "Provide a school and a valid existing username" }, 400);
+      }
+
+      const { data: actorMemberships, error: actorMembershipError } = await admin
+        .from("school_memberships")
+        .select("id,school_role")
+        .eq("school_id", schoolId)
+        .eq("user_id", actorId)
+        .eq("status", "active")
+        .in("school_role", ["manager", "admin"]);
+      if (actorMembershipError) return json({ error: "Unable to verify this school's authority" }, 503);
+
+      const isManager = (actorMemberships ?? []).some((membership: { school_role: string }) => membership.school_role === "manager");
+      const adminMembership = (actorMemberships ?? []).find((membership: { id: string; school_role: string }) => membership.school_role === "admin");
+      let isMainDirector = false;
+      if (adminMembership) {
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
+        const { data: appointment, error: appointmentError } = await admin
+          .from("school_leadership_appointments")
+          .select("id")
+          .eq("school_id", schoolId)
+          .eq("membership_id", adminMembership.id)
+          .eq("position", "main_director")
+          .eq("status", "active")
+          .lte("start_date", today)
+          .or(`end_date.is.null,end_date.gte.${today}`)
+          .maybeSingle();
+        if (appointmentError) return json({ error: "Unable to verify Main Director appointment" }, 503);
+        isMainDirector = Boolean(appointment?.id);
+      }
+      if (!isManager && !isMainDirector) {
+        return json({ error: "Only this school's Manager or appointed Main Director can attach an existing teacher account" }, 403);
+      }
+
+      const { data: targetProfile, error: profileError } = await admin
+        .from("profiles")
+        .select("id,username")
+        .eq("username", targetUsername)
+        .maybeSingle();
+      if (profileError) return json({ error: "Unable to look up the existing account" }, 503);
+      if (!targetProfile?.id || !targetProfile.username) return json({ error: "No existing account was found for that username" }, 404);
+
+      const { data: membershipId, error: attachError } = await admin.rpc("school_attach_existing_teacher_account", {
+        p_actor_id: actorId,
+        p_school_id: schoolId,
+        p_user_id: targetProfile.id,
+      });
+      if (attachError || !membershipId) {
+        return json({ error: attachError?.message || "The existing teacher account could not be attached" }, 400);
+      }
+
+      return json({
+        membership_id: membershipId,
+        username: targetProfile.username,
+        role: "teacher",
+        requires_assignment: true,
+        global_role_unchanged: true,
+      }, 201);
+    }
+
     if (action === "create_accounts") {
       const schoolId = normalize(payload?.school_id);
       const role = normalize(payload?.role) as SchoolRole;
