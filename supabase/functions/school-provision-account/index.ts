@@ -244,27 +244,66 @@ Deno.serve(async (req) => {
       const assignmentKind = normalize(payload?.assignment_kind);
       const subjectName = normalize(payload?.subject_name);
       const teamName = normalize(payload?.team_name);
-      if (!schoolId || !["teacher", "team_leader"].includes(position) || name.length < 2 || name.length > 160 || !sectionId || !["subject", "homeroom"].includes(assignmentKind)) return json({ error: "Provide a valid name, class, account type, and teaching assignment" }, 400);
-      if (position === "team_leader" && (teamName.length < 2 || teamName.length > 100)) return json({ error: "Enter a valid Team Leader team name" }, 400);
-      const { data: actorMembership, error: actorError } = await admin.from("school_memberships").select("id").eq("school_id", schoolId).eq("user_id", actorId).eq("school_role", "teacher").eq("status", "active").maybeSingle();
-      if (actorError || !actorMembership) return json({ error: "An active school staff account is required" }, 403);
-      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
-      const { data: directorAppointment, error: directorError } = await admin.from("school_leadership_appointments").select("id,division_scope").eq("school_id", schoolId).eq("membership_id", actorMembership.id).in("position", ["kg_director", "elementary_director", "middle_school_director", "high_school_director"]).eq("status", "active").lte("start_date", today).or("end_date.is.null,end_date.gte." + today).limit(1).maybeSingle();
-      if (directorError || !directorAppointment) return json({ error: "Only an active Division Director can create Team Leaders and Teachers" }, 403);
-      const { data: section, error: sectionError } = await admin.from("school_sections").select("id,grade_label,academic_year_id").eq("id", sectionId).eq("school_id", schoolId).maybeSingle();
-      if (sectionError || !section) return json({ error: "Choose a class section in your division" }, 400);
-      const { data: mapping, error: mappingError } = await admin.from("school_division_grade_mappings").select("id").eq("school_id", schoolId).eq("division_scope", directorAppointment.division_scope).eq("grade_label", section.grade_label).maybeSingle();
-      if (mappingError || !mapping) return json({ error: "That class is outside your assigned division" }, 403);
-      const { data: year, error: yearError } = await admin.from("school_academic_years").select("id").eq("id", section.academic_year_id).eq("school_id", schoolId).eq("is_current", true).maybeSingle();
-      if (yearError || !year) return json({ error: "Choose a class in the current academic year" }, 400);
-      if (assignmentKind === "subject") {
-        const { data: subject, error: subjectError } = await admin.from("school_subjects").select("id").eq("school_id", schoolId).eq("academic_year_id", section.academic_year_id).eq("grade_label", section.grade_label).eq("subject_name", subjectName).eq("active", true).maybeSingle();
-        if (subjectError || !subject) return json({ error: "Choose an active subject for this grade" }, 400);
+      if (!schoolId || !["teacher", "team_leader"].includes(position) || name.length < 2 || name.length > 160) {
+        return json({ error: "Provide a valid name and account type" }, 400);
       }
+      if (position === "team_leader" && (teamName.length < 2 || teamName.length > 100)) {
+        return json({ error: "Enter a valid Team Leader team name" }, 400);
+      }
+      if (position === "teacher" && (!sectionId || !["subject", "homeroom"].includes(assignmentKind) || (assignmentKind === "subject" && !subjectName))) {
+        return json({ error: "Choose the class, assignment type and subject for this teacher" }, 400);
+      }
+
+      const { data: actorMembership, error: actorError } = await admin
+        .from("school_memberships").select("id")
+        .eq("school_id", schoolId).eq("user_id", actorId)
+        .eq("school_role", "teacher").eq("status", "active").maybeSingle();
+      if (actorError || !actorMembership) return json({ error: "An active school staff account is required" }, 403);
+
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
+      const { data: directorAppointment, error: directorError } = await admin
+        .from("school_leadership_appointments").select("id,division_scope")
+        .eq("school_id", schoolId).eq("membership_id", actorMembership.id)
+        .in("position", ["kg_director", "elementary_director", "middle_school_director", "high_school_director"])
+        .eq("status", "active").lte("start_date", today)
+        .or("end_date.is.null,end_date.gte." + today).limit(1).maybeSingle();
+      if (directorError || !directorAppointment) return json({ error: "Only an active Division Director can create Team Leaders and Teachers" }, 403);
+
+      if (position === "teacher") {
+        const { data: section, error: sectionError } = await admin
+          .from("school_sections").select("id,grade_label,academic_year_id")
+          .eq("id", sectionId).eq("school_id", schoolId).maybeSingle();
+        if (sectionError || !section) return json({ error: "Choose a class section in your division" }, 400);
+        const { data: mapping, error: mappingError } = await admin
+          .from("school_division_grade_mappings").select("id")
+          .eq("school_id", schoolId).eq("division_scope", directorAppointment.division_scope)
+          .eq("grade_label", section.grade_label).maybeSingle();
+        if (mappingError || !mapping) return json({ error: "That class is outside your assigned division" }, 403);
+        const { data: year, error: yearError } = await admin
+          .from("school_academic_years").select("id")
+          .eq("id", section.academic_year_id).eq("school_id", schoolId)
+          .eq("is_current", true).maybeSingle();
+        if (yearError || !year) return json({ error: "Choose a class in the current academic year" }, 400);
+        if (assignmentKind === "subject") {
+          const { data: subject, error: subjectError } = await admin
+            .from("school_subjects").select("id")
+            .eq("school_id", schoolId).eq("academic_year_id", section.academic_year_id)
+            .eq("grade_label", section.grade_label).eq("subject_name", subjectName)
+            .eq("active", true).maybeSingle();
+          if (subjectError || !subject) return json({ error: "Choose an active subject for this grade" }, 400);
+        }
+      }
+
       try {
         const username = await uniqueStaffUsername();
         const account = await createAuthAccount(name, username);
-        const { data: membershipId, error: attachError } = await admin.rpc("school_attach_division_staff_account", { p_actor_id: actorId, p_school_id: schoolId, p_user_id: account.userId, p_school_username: username, p_section_id: sectionId, p_subject_name: assignmentKind === "homeroom" ? "Homeroom" : subjectName, p_assignment_kind: assignmentKind, p_position: position, p_team_name: position === "team_leader" ? teamName : null });
+        const { data: membershipId, error: attachError } = await admin.rpc("school_attach_division_staff_account", {
+          p_actor_id: actorId, p_school_id: schoolId, p_user_id: account.userId,
+          p_school_username: username, p_section_id: position === "teacher" ? sectionId : null,
+          p_subject_name: position === "teacher" ? (assignmentKind === "homeroom" ? "Homeroom" : subjectName) : null,
+          p_assignment_kind: position === "teacher" ? assignmentKind : null,
+          p_position: position, p_team_name: position === "team_leader" ? teamName : null,
+        });
         if (attachError || !membershipId) throw new Error(attachError?.message || "Could not attach the new account to your division");
         createdUserId = null;
         return json({ created: { membership_id: membershipId, username, initial_password: account.password, role: position } }, 201);
