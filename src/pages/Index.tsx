@@ -12,6 +12,7 @@ import EarlyEncouragement from "@/components/early/EarlyEncouragement";
 import StudentBottomNav from "@/components/layout/StudentBottomNav";
 import { useUser } from "@/context/UserContext";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
+import { supabase } from "@/integrations/supabase/client";
 import { useTier } from "@/context/TierContext";
 
 // App stages
@@ -29,21 +30,25 @@ const Index: React.FC = () => {
   const [appStage, setAppStage] = useState<AppStage>(AppStage.Welcome);
   const [userType, setUserType] = useState<"student" | "teacher" | "admin" | "manager">("student");
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [roleRouteResolving, setRoleRouteResolving] = useState(false);
   const navigate = useNavigate();
   
   // Resolve one landing portal from the authoritative global role and active school membership.
   useEffect(() => {
-    if (isLoading) return;
+    let cancelled = false;
+    if (isLoading) return () => { cancelled = true; };
 
     if (isAuthenticated && user) {
       // Platform authorities always win over school membership and remembered login mode.
       if (user.role === "extreme_admin") {
+        setRoleRouteResolving(false);
         navigate("/root-control-portal-9xA7", { replace: true });
-        return;
+        return () => { cancelled = true; };
       }
       if (user.role === "super_admin") {
+        setRoleRouteResolving(false);
         navigate("/super-admin", { replace: true });
-        return;
+        return () => { cancelled = true; };
       }
 
       const hasSchoolRole = (role: string) =>
@@ -52,38 +57,68 @@ const Index: React.FC = () => {
       const loginMode = safeStorage.getItem("masterminds_login_mode");
 
       if (["teacher", "finance", "parent", "student"].includes(user.role) && schoolMembershipsLoading) {
-        return;
+        return () => { cancelled = true; };
       }
 
       if (user.role === "manager") {
+        setRoleRouteResolving(false);
         navigate("/school/manager", { replace: true });
-        return;
+        return () => { cancelled = true; };
       }
       if (user.role === "finance") {
-        navigate(hasSchoolRole("finance") ? "/school/finance" : "/finance", { replace: true });
-        return;
+        if (!hasSchoolRole("finance")) {
+          setRoleRouteResolving(false);
+          navigate("/finance", { replace: true });
+          return () => { cancelled = true; };
+        }
+
+        const financeMembershipIds = memberships
+          .filter((membership) => membership.status === "active" && membership.school_role === "finance")
+          .map((membership) => membership.id);
+        setRoleRouteResolving(true);
+        void (async () => {
+          const today = new Date().toLocaleDateString("en-CA");
+          const { data, error } = await (supabase as any)
+            .from("school_leadership_appointments")
+            .select("id")
+            .in("membership_id", financeMembershipIds)
+            .eq("position", "hr_director")
+            .eq("status", "active")
+            .lte("start_date", today)
+            .or(`end_date.is.null,end_date.gte.${today}`)
+            .limit(1)
+            .maybeSingle();
+          if (cancelled) return;
+          setRoleRouteResolving(false);
+          navigate(!error && data ? "/school/admin" : "/school/finance", { replace: true });
+        })();
+        return () => { cancelled = true; };
       }
       if (user.role === "teacher") {
+        setRoleRouteResolving(false);
         navigate(hasSchoolRole("teacher") ? "/school/teacher" : "/teacher", { replace: true });
-        return;
+        return () => { cancelled = true; };
       }
       if (user.role === "parent") {
+        setRoleRouteResolving(false);
         navigate(hasSchoolRole("parent") ? "/school/parent" : "/parent-dashboard", { replace: true });
-        return;
+        return () => { cancelled = true; };
       }
       if (user.role === "admin") {
+        setRoleRouteResolving(false);
         navigate("/admin", { replace: true });
-        return;
+        return () => { cancelled = true; };
       }
 
       if (user.role === "student") {
+        setRoleRouteResolving(false);
         if (hasSchoolRole("student")) {
           navigate("/school/student", { replace: true });
-          return;
+          return () => { cancelled = true; };
         }
         if (loginMode === "parent") {
           navigate("/parent-dashboard", { replace: true });
-          return;
+          return () => { cancelled = true; };
         }
         if (!user.grade || !user.educationLevel) {
           setAppStage(AppStage.ProfileSetup);
@@ -91,9 +126,14 @@ const Index: React.FC = () => {
           setAppStage(AppStage.MainMenu);
         }
       }
-    } else if (!isAuthenticated && appStage !== AppStage.Welcome) {
-      setAppStage(AppStage.Auth);
+    } else {
+      setRoleRouteResolving(false);
+      if (!isAuthenticated && appStage !== AppStage.Welcome) {
+        setAppStage(AppStage.Auth);
+      }
     }
+
+    return () => { cancelled = true; };
   }, [isAuthenticated, user, isLoading, navigate, appStage, memberships, schoolMembershipsLoading]);
 
   // Handle welcome screen continue button
@@ -117,7 +157,7 @@ const Index: React.FC = () => {
   
   // Render content based on the current app stage
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading || roleRouteResolving) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-background to-secondary/20">
           <div className="text-center">
