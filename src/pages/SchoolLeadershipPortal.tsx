@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Users, UserCog, CalendarCheck, ClipboardCheck,
-  ClipboardList, FileBarChart, RefreshCw, ShieldCheck, Network, GraduationCap,
+  ClipboardList, FileBarChart, RefreshCw, ShieldCheck, Network,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
