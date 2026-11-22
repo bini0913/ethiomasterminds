@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(15);
+SELECT plan(16);
 
 SELECT ok(
   position('Choose a grade label already used by this school' in pg_get_functiondef('public.school_set_division_grade_mapping(uuid,text,text)'::regprocedure)) = 0,
@@ -55,6 +55,11 @@ SELECT ok(
   position('Grade 9' in pg_get_functiondef('public.school_initialize_default_ethiopian_grade_mappings(uuid)'::regprocedure)) > 0
   AND position('Grade 12' in pg_get_functiondef('public.school_initialize_default_ethiopian_grade_mappings(uuid)'::regprocedure)) > 0,
   'High School defaults include Grades 9 through 12'
+);
+
+SELECT ok(
+  position('division_grade_mapped' in pg_get_functiondef('public.school_initialize_default_ethiopian_grade_mappings(uuid)'::regprocedure)) > 0,
+  'default initializer writes a supported school leadership audit event'
 );
 
 SELECT ok(
