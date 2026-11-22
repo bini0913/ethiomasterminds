@@ -28,7 +28,7 @@ const navItems: SchoolNavItem[] = [
   { id: "leadership", label: "Leadership Team", icon: UserCog },
 ];
 
-type AccountRole = "teacher" | "finance" | "parent" | "student";
+type AccountRole = "admin" | "teacher" | "finance" | "parent" | "student";
 type LeadershipPosition = "" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "academic_director" | "hr_director";
 
 export default function SchoolManagerPortal() {
@@ -406,19 +406,18 @@ export default function SchoolManagerPortal() {
     const appointment = leadershipAppointments.find((item) => item.membership_id === member.id && item.status === "active");
     if (appointment) {
       const labels: Record<string, string> = {
-        
-        vice_director: "Vice Director",
+          vice_director: "Vice Director",
         kg_director: "KG Director",
         elementary_director: "Elementary Director",
         middle_school_director: "Middle School Director",
         high_school_director: "High School Director",
         academic_director: "Academic Director",
         hr_director: "HR Director / Business Manager",
-        
+        team_leader: "Team Leader",
       };
       return labels[appointment.position] || appointment.position;
     }
-    return member.school_role === "admin" ? "Legacy admin account" : member.school_role;
+    return member.school_role === "admin" ? "Unassigned School Admin" : member.school_role;
   };
 
 
@@ -822,9 +821,365 @@ export default function SchoolManagerPortal() {
         <SchoolPanel title="Create an account" description="Choose a Director role, parent, or student. Login details are shown once after creation.">
           <form onSubmit={createAccount} className="space-y-3">
             <SchoolField label="Account type">
-              <select className={schoolSelectClass} value={accountLeadershipPosition ? "leadership" : accountRole} onChange={(event) => { if (event.target.value === "leadership") { setAccountLeadershipPosition("kg_director"); } else { setAccountLeadershipPosition(""); setAccountRole(event.target.value as AccountRole); } }}>
-               <option value="leadership">Director / Vice Director</option><option value="finance">Finance staff</option><option value="parent">Parent</option><option value="student">Student</option>
-             </select>
+              <select className={schoolSelectClass} value={accountLeadershipPosition ? "leadership" : accountRole} onChange={(event) => { if (event.target.value === "leadership") setAccountLeadershipPosition("kg_director"); else { setAccountLeadershipPosition(""); setAccountRole(event.target.value as AccountRole); } }}>
+                  <option value="leadership">Director / Vice Director</option><option value="finance">Finance staff</option><option value="parent">Parent</option><option value="student">Student</option>
+                </select>
+            </SchoolField>
+            {accountLeadershipPosition && <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+              <SchoolField label="Leadership position">
+                <select className={schoolSelectClass} value={accountLeadershipPosition} onChange={(event) => setAccountLeadershipPosition(event.target.value as LeadershipPosition)}>
+                  <option value="">Choose position</option><option value="kg_director">KG Division Director</option><option value="elementary_director">Elementary Division Director</option><option value="middle_school_director">Middle School Division Director</option><option value="high_school_director">High School Division Director</option><option value="vice_director">Vice Director</option><option value="academic_director">Academic Director</option><option value="hr_director">HR Director / Business Manager</option>
+                </select>
+              </SchoolField>
+              {accountLeadershipPosition === "vice_director" && <SchoolField label="Division"><select className={schoolSelectClass} value={accountLeadershipDivision} onChange={(event) => setAccountLeadershipDivision(event.target.value)}><option value="kg">KG</option><option value="elementary">Elementary</option><option value="middle_school">Middle School</option><option value="high_school">High School</option></select></SchoolField>}
+                            <p className="text-xs leading-5 text-slate-600">Create a real login for this Director or Vice Director. The leadership appointment is recorded automatically.</p>
+            </div>}
+            <SchoolField label="Full name"><input className={schoolInputClass} value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder="Full name" /></SchoolField>
+            {accountRole === "student" && <>
+              <SchoolField label="Class section"><select className={schoolSelectClass} value={accountSectionId} onChange={(event) => setAccountSectionId(event.target.value)}><option value="">Choose section</option>{sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}</select></SchoolField>
+              <SchoolField label="Age at enrollment"><input type="number" min="3" max="120" className={schoolInputClass} value={accountAge} onChange={(event) => setAccountAge(event.target.value)} /></SchoolField>
+              <SchoolField label="Link parent accounts"><select multiple className="min-h-24 w-full rounded-md border border-slate-200 bg-white p-2 text-sm" value={parentMembershipIds} onChange={(event) => setParentMembershipIds(Array.from(event.target.selectedOptions).map((option) => option.value))}>{parents.map((parent) => <option key={parent.id} value={parent.id}>{memberName(parent.id)}</option>)}</select></SchoolField>
+            </>}
+            {accountRole === "parent" && <SchoolField label="Link children"><select multiple className="min-h-24 w-full rounded-md border border-slate-200 bg-white p-2 text-sm" value={studentMembershipIds} onChange={(event) => setStudentMembershipIds(Array.from(event.target.selectedOptions).map((option) => option.value))}>{students.map((student) => <option key={student.id} value={student.id}>{memberName(student.id)} · {student.grade_label || "Student"}</option>)}</select></SchoolField>}
+            {formError && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{formError}</p>}
+            <SchoolPrimaryButton type="submit">Create account</SchoolPrimaryButton>
+          </form>
+          {createdCredentials.length > 0 && <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-emerald-900">Initial login credentials</p><button onClick={() => void copyCredentials()} className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800"><Copy className="h-3.5 w-3.5" />Copy</button></div>
+            <p className="mt-1 text-xs text-emerald-800">Copy these now and deliver them privately. The user must change the temporary password after signing in. Credentials are shown only once.</p>
+            <div className="mt-3 space-y-2">{createdCredentials.map((item, index) => <div key={index} className="rounded-md border border-emerald-200 bg-white p-2 text-xs"><p><span className="font-semibold">Username:</span> {item.username}</p><p className="mt-1 break-all"><span className="font-semibold">Initial password:</span> {item.initial_password}</p></div>)}</div>
+          </div>}
+        </SchoolPanel>
+        <SchoolPanel title="School accounts" description={`${members.length} total school memberships`}>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left text-sm">
+              <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="pb-2 font-semibold">Person</th><th className="pb-2 font-semibold">Role</th><th className="pb-2 font-semibold">Grade / section</th><th className="pb-2 font-semibold">Status</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 text-slate-600">{membershipRoleLabel(member)}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td></tr>)}</tbody>
+            </table>
+          </div>
+        </SchoolPanel>
+      </div>
+      <SchoolPanel title="Link an existing account as a teacher" description="Use this when a person already has a Master Minds login. It creates a school teacher membership only; it does not create another login or change the person's global role.">
+        <form onSubmit={attachExistingTeacher} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <SchoolField label="Existing Master Minds username">
+              <input
+                className={schoolInputClass}
+                value={existingTeacherUsername}
+                onChange={(event) => setExistingTeacherUsername(event.target.value)}
+                placeholder="e.g. jote"
+                minLength={3}
+                maxLength={64}
+                required
+              />
+            </SchoolField>
+          </div>
+          <SchoolPrimaryButton type="submit" disabled={linkingExistingTeacher || !existingTeacherUsername.trim()}>
+            {linkingExistingTeacher ? "Linking account…" : "Link teacher account"}
+          </SchoolPrimaryButton>
+        </form>
+        <p className="mt-2 text-xs text-slate-500">The teacher will appear in the school staff directory. Assign at least one section and subject later under Teacher Assignments before expecting class work to appear in their workspace.</p>
+      </SchoolPanel>
+    </div>
+  );
+
+  const renderStructure = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="School structure" description="Manage academic years and the subject catalog. Division Directors create and organize class sections within their assigned grades." />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SchoolPanel title="Academic year">
+          <form onSubmit={addAcademicYear} className="space-y-3">
+            <SchoolField label="Academic year name"><input className={schoolInputClass} value={yearName} onChange={(event) => setYearName(event.target.value)} placeholder="2026/2027" /></SchoolField>
+            <SchoolField label="Start date"><input type="date" className={schoolInputClass} value={yearStart} onChange={(event) => setYearStart(event.target.value)} /></SchoolField>
+            <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} /></SchoolField>
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={yearIsCurrent} onChange={(event) => setYearIsCurrent(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" /> Set as current academic year</label>
+            <SchoolPrimaryButton type="submit">Add academic year</SchoolPrimaryButton>
+          </form>
+        </SchoolPanel>
+        <SchoolPanel title="Add subject">
+          <form onSubmit={addSubject} className="space-y-3">
+            <SchoolField label="Academic year"><select className={schoolSelectClass} value={subjectYearId} onChange={(event) => setSubjectYearId(event.target.value)}><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></SchoolField>
+            <SchoolField label="Grade"><input className={schoolInputClass} value={subjectGrade} onChange={(event) => setSubjectGrade(event.target.value)} placeholder="Grade 9" /></SchoolField>
+            <SchoolField label="Subject name"><input className={schoolInputClass} value={subjectName} onChange={(event) => setSubjectName(event.target.value)} placeholder="Mathematics" /></SchoolField>
+            <SchoolPrimaryButton type="submit">Add subject</SchoolPrimaryButton>
+          </form>
+        </SchoolPanel>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <SchoolPanel title="Academic years"><div className="space-y-2">{years.map((year) => <div key={year.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-100 p-3"><div><p className="text-sm font-medium text-slate-800">{year.name}</p><p className="text-xs text-slate-500">{year.starts_on} – {year.ends_on}</p></div>{year.is_current ? <SchoolStatus value="active" /> : <button type="button" onClick={() => void setCurrentYear(year.id)} className="text-xs font-semibold text-blue-700 hover:underline">Set current</button>}</div>)}{!years.length && <SchoolEmptyState title="No years yet" description="Add the first academic year." />}</div></SchoolPanel>
+        <SchoolPanel title="Sections"><div className="space-y-2">{sections.map((section) => <div key={section.id} className="flex items-center justify-between rounded-md border border-slate-100 p-3"><p className="text-sm font-medium text-slate-800">{section.grade_label} {section.section_name}</p><span className="text-xs text-slate-500">{years.find((year) => year.id === section.academic_year_id)?.name || "Academic year"}</span></div>)}{!sections.length && <SchoolEmptyState title="No sections yet" description="The relevant Division Director can create sections for grades in their division." />}</div></SchoolPanel>
+        <SchoolPanel title="Subjects"><div className="space-y-2">{subjects.map((subject) => <div key={subject.id} className="flex items-center justify-between rounded-md border border-slate-100 p-3"><div><p className="text-sm font-medium text-slate-800">{subject.subject_name}</p><p className="text-xs text-slate-500">{subject.grade_label}</p></div><SchoolStatus value={subject.active ? "active" : "deactivated"} /></div>)}{!subjects.length && <SchoolEmptyState title="No subjects yet" description="Add subjects by grade and academic year." />}</div></SchoolPanel>
+      </div>
+    </div>
+  );
+
+  const renderAssignments = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Teacher assignments" description="Assign teachers to subjects, grades, sections, and homeroom responsibilities." />
+      <SchoolPanel title="Create assignment">
+        <form onSubmit={addAssignment} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SchoolField label="Teacher"><select className={schoolSelectClass} value={assignTeacherId} onChange={(event) => setAssignTeacherId(event.target.value)}><option value="">Choose teacher</option>{teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{memberName(teacher.id)}</option>)}</select></SchoolField>
+          <SchoolField label="Section"><select className={schoolSelectClass} value={assignSectionId} onChange={(event) => setAssignSectionId(event.target.value)}><option value="">Choose section</option>{sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}</select></SchoolField>
+          <SchoolField label="Assignment type"><select className={schoolSelectClass} value={assignKind} onChange={(event) => setAssignKind(event.target.value as "subject" | "homeroom")}><option value="subject">Subject teacher</option><option value="homeroom">Homeroom teacher</option></select></SchoolField>
+          {assignKind === "subject" && <SchoolField label="Subject"><select className={schoolSelectClass} value={assignSubject} onChange={(event) => setAssignSubject(event.target.value)}><option value="">Choose subject</option>{subjects.filter((subject) => subject.active && subject.grade_label === sections.find((section) => section.id === assignSectionId)?.grade_label && subject.academic_year_id === sections.find((section) => section.id === assignSectionId)?.academic_year_id).map((subject) => <option key={subject.id} value={subject.subject_name}>{subject.subject_name}</option>)}</select></SchoolField>}
+          <div className="md:col-span-2 xl:col-span-4"><SchoolPrimaryButton type="submit">Save assignment</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <SchoolPanel title="Current assignments">
+        {assignments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Teacher</th><th className="pb-2">Section</th><th className="pb-2">Subject / responsibility</th><th className="pb-2">Type</th><th className="pb-2">Action</th></tr></thead><tbody className="divide-y divide-slate-100">{assignments.map((assignment) => <tr key={assignment.id}><td className="py-3 font-medium text-slate-800">{memberName(assignment.teacher_membership_id)}</td><td className="py-3 text-slate-600">{sectionLabel(assignment.section_id)}</td><td className="py-3 text-slate-600">{assignment.subject_name}</td><td className="py-3 capitalize text-slate-600">{assignment.assignment_kind}</td><td className="py-3"><button type="button" onClick={() => void deleteTeacherAssignment(assignment)} className="text-xs font-semibold text-red-700 hover:underline">Remove</button></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No teacher assignments" description="Create assignments after teachers, sections, and subjects have been added." />}
+      </SchoolPanel>
+    </div>
+  );
+
+  useEffect(() => {
+    const policy = gradingPolicies.find((item) => item.academic_year_id === gradingYearId && item.grade_label === gradingGradeLabel);
+    setPassMark(String(policy?.pass_mark ?? 50));
+    setRankScope(policy?.rank_scope ?? "section");
+    setMissingMarkRule(policy?.missing_mark_rule ?? "incomplete");
+  }, [gradingYearId, gradingGradeLabel, gradingPolicies]);
+
+  const renderGrading = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Grading & school policies" description="Configure each grade's assessment weights, pass mark, ranking scope, grade scale, and parent notification policies." />
+      <SchoolPanel title="Select academic year and grade">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SchoolField label="Academic year"><select className={schoolSelectClass} value={gradingYearId} onChange={(event) => setGradingYearId(event.target.value)}><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}{year.is_current ? " · Current" : ""}</option>)}</select></SchoolField>
+          <SchoolField label="Grade"><select className={schoolSelectClass} value={gradingGradeLabel} onChange={(event) => setGradingGradeLabel(event.target.value)}>{[...new Set(sections.map((section) => section.grade_label))].sort().map((grade) => <option key={grade} value={grade}>{grade}</option>)}</select></SchoolField>
+        </div>
+      </SchoolPanel>
+      <SchoolPanel title="Assessment categories and weights" description="The default grading model is Class Activities 10%, Tests 30%, and Final Examination 60%. The total must equal 100% before term results can be calculated.">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-700">Current total: <span className={categoryWeightTotal === 100 ? "text-emerald-700" : "text-amber-700"}>{categoryWeightTotal.toFixed(2)}%</span></p><SchoolSecondaryButton onClick={() => void seedGradingDefaults()} disabled={!gradingYearId || !gradingGradeLabel}>Seed default 10/30/60 categories</SchoolSecondaryButton></div>
+        {selectedGradingCategories.length ? <div className="space-y-2">{selectedGradingCategories.map((category) => <div key={category.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_120px_100px_auto] sm:items-end"><SchoolField label="Category name"><input className={schoolInputClass} value={category.category_name} onChange={(event) => setGradingCategories((current) => current.map((item) => item.id === category.id ? { ...item, category_name: event.target.value } : item))} /></SchoolField><SchoolField label="Weight (%)"><input type="number" min="0" max="100" step="0.01" className={schoolInputClass} value={category.weight_percent} onChange={(event) => setGradingCategories((current) => current.map((item) => item.id === category.id ? { ...item, weight_percent: event.target.value } : item))} /></SchoolField><label className="flex min-h-10 items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={Boolean(category.required)} onChange={(event) => setGradingCategories((current) => current.map((item) => item.id === category.id ? { ...item, required: event.target.checked } : item))} />Required</label><SchoolSecondaryButton onClick={() => void saveCategory(category)}>Save</SchoolSecondaryButton></div>)}</div> : <SchoolEmptyState title="No grading categories configured" description="Seed the default 10/30/60 categories or add your own." />}
+        <form onSubmit={addGradingCategory} className="mt-4 grid gap-2 border-t border-slate-100 pt-4 sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-end"><SchoolField label="New category"><input className={schoolInputClass} value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} placeholder="Project work" /></SchoolField><SchoolField label="Weight (%)"><input type="number" min="0" max="100" step="0.01" className={schoolInputClass} value={newCategoryWeight} onChange={(event) => setNewCategoryWeight(event.target.value)} /></SchoolField><SchoolPrimaryButton type="submit">Add category</SchoolPrimaryButton></form>
+      </SchoolPanel>
+      <SchoolPanel title="Grading and ranking policy">
+        <form onSubmit={saveGradingPolicy} className="grid gap-3 md:grid-cols-3">
+          <SchoolField label="Pass mark (%)"><input type="number" min="0" max="100" step="0.5" className={schoolInputClass} value={passMark} onChange={(event) => setPassMark(event.target.value)} /></SchoolField>
+          <SchoolField label="Ranking scope"><select className={schoolSelectClass} value={rankScope} onChange={(event) => setRankScope(event.target.value)}><option value="section">Within each section</option><option value="grade">Across the whole grade</option></select></SchoolField>
+          <SchoolField label="Missing mark rule"><select className={schoolSelectClass} value={missingMarkRule} onChange={(event) => setMissingMarkRule(event.target.value)}><option value="incomplete">Mark term incomplete</option><option value="zero">Treat missing mark as zero</option></select></SchoolField>
+          <div className="md:col-span-3"><SchoolPrimaryButton type="submit">Save grading policy</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <SchoolPanel title="Grade scale" description="Define non-overlapping percentage ranges for the selected grade.">
+        <div className="mb-3 overflow-x-auto"><table className="w-full min-w-[500px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Letter</th><th className="pb-2">Minimum</th><th className="pb-2">Maximum</th><th className="pb-2">Description</th></tr></thead><tbody className="divide-y divide-slate-100">{selectedGradeScales.map((scale) => <tr key={scale.id}><td className="py-2 font-semibold text-slate-800">{scale.letter_grade}</td><td className="py-2 text-slate-600">{scale.minimum_score}%</td><td className="py-2 text-slate-600">{scale.maximum_score}%</td><td className="py-2 text-slate-600">{scale.description || "—"}</td></tr>)}</tbody></table></div>
+        <form onSubmit={addGradeScale} className="grid gap-2 sm:grid-cols-5 sm:items-end"><SchoolField label="Letter"><input className={schoolInputClass} value={newScaleLetter} onChange={(event) => setNewScaleLetter(event.target.value)} placeholder="A" /></SchoolField><SchoolField label="Minimum %"><input type="number" min="0" max="100" className={schoolInputClass} value={newScaleMin} onChange={(event) => setNewScaleMin(event.target.value)} /></SchoolField><SchoolField label="Maximum %"><input type="number" min="0" max="100" className={schoolInputClass} value={newScaleMax} onChange={(event) => setNewScaleMax(event.target.value)} /></SchoolField><SchoolField label="Description"><input className={schoolInputClass} value={newScaleDescription} onChange={(event) => setNewScaleDescription(event.target.value)} /></SchoolField><SchoolPrimaryButton type="submit">Add scale</SchoolPrimaryButton></form>
+      </SchoolPanel>
+      <SchoolPanel title="Attendance and parent notification policies" description="Attendance and behavior remain separate from academic marks by default. These settings control notifications and the absence review threshold.">
+        {policySettings ? <form onSubmit={savePolicySettings} className="space-y-3">
+          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.attendance_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, attendance_notifications_enabled: event.target.checked }))} />Send automatic parent notifications when homeroom attendance is submitted</label>
+          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.behavior_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, behavior_notifications_enabled: event.target.checked }))} />Notify parents after a behavior report is approved</label>
+          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.report_card_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, report_card_notifications_enabled: event.target.checked }))} />Notify parents when official report cards are published</label>
+          <SchoolField label="Absences requiring Admin review"><input type="number" min="1" max="60" className={schoolInputClass} value={policySettings.absence_review_threshold} onChange={(event) => setPolicySettings((current: any) => ({ ...current, absence_review_threshold: event.target.value }))} /></SchoolField>
+          <SchoolPrimaryButton type="submit">Save school policies</SchoolPrimaryButton>
+        </form> : <SchoolEmptyState title="Policy settings unavailable" description="The school's policy settings row has not been created." />}
+      </SchoolPanel>
+    </div>
+  );
+
+  const renderFinance = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="School fees & finance" description="Configure fee structures and oversee invoices, payments, and outstanding balances. Daily payment processing belongs to the School Finance team." />
+      <div className="grid gap-3 sm:grid-cols-3"><SchoolMetric label="Fee structures" value={feeStructures.length} detail="Configured school fees" icon={Wallet} /><SchoolMetric label="Invoices" value={invoices.length} detail="Generated by Finance" icon={ClipboardList} /><SchoolMetric label="Outstanding balance" value={outstandingSummary} detail="Unpaid and partial invoices" icon={Wallet} /></div>
+      <SchoolPanel title="Create fee structure" description="Manager configures the fee; Finance generates invoices for enrolled students.">
+        <form onSubmit={addFeeStructure} className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <SchoolField label="Academic year"><select className={schoolSelectClass} value={feeYearId} onChange={(event) => setFeeYearId(event.target.value)}><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></SchoolField>
+          <SchoolField label="Grade"><input className={schoolInputClass} value={feeGrade} onChange={(event) => setFeeGrade(event.target.value)} /></SchoolField>
+          <SchoolField label="Fee name"><input className={schoolInputClass} value={feeName} onChange={(event) => setFeeName(event.target.value)} placeholder="Tuition fee" /></SchoolField>
+          <SchoolField label="Amount"><input type="number" min="0.01" step="0.01" className={schoolInputClass} value={feeAmount} onChange={(event) => setFeeAmount(event.target.value)} /></SchoolField>
+          <SchoolField label="Currency"><select className={schoolSelectClass} value={feeCurrency} onChange={(event) => setFeeCurrency(event.target.value)}><option value="ETB">ETB</option><option value="USD">USD</option></select></SchoolField>
+          <SchoolField label="Due date"><input type="date" className={schoolInputClass} value={feeDueDate} onChange={(event) => setFeeDueDate(event.target.value)} /></SchoolField>
+          <div className="md:col-span-2 xl:col-span-5"><SchoolPrimaryButton type="submit">Save fee structure</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <SchoolPanel title="Finance follow-ups from Finance staff" description="Review unpaid invoice reports and confirm that the school has addressed them.">
+        {financeFollowups.length ? <div className="space-y-3">{financeFollowups.map((item) => <div key={item.id} className="rounded-md border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.student_membership_id)} · Invoice {item.invoice_id}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-600">{item.note}</p>{item.status !== "resolved" && <div className="mt-2"><SchoolSecondaryButton onClick={() => void resolveFinanceFollowup(item.id)}>Mark resolved</SchoolSecondaryButton></div>}{item.resolution_note && <p className="mt-2 text-xs text-emerald-700">{item.resolution_note}</p>}</div>)}</div> : <SchoolEmptyState title="No finance follow-ups" description="Reports from the School Finance team will appear here." />}
+      </SchoolPanel>
+      <SchoolPanel title="Outstanding invoices" description="Read-only oversight for the Manager.">
+        {invoices.filter((invoice) => Number(invoice.balance) > 0).length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Invoice</th><th className="pb-2">Student</th><th className="pb-2">Amount</th><th className="pb-2">Balance</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{invoices.filter((invoice) => Number(invoice.balance) > 0).map((invoice) => <tr key={invoice.id}><td className="py-3 font-medium text-slate-800">{invoice.invoice_number}</td><td className="py-3 text-slate-600">{memberName(invoice.student_membership_id)}</td><td className="py-3 text-slate-600">{invoice.currency} {Number(invoice.amount).toLocaleString()}</td><td className="py-3 font-medium text-slate-800">{invoice.currency} {Number(invoice.balance).toLocaleString()}</td><td className="py-3"><SchoolStatus value={invoice.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No outstanding invoices" description="Finance-generated invoices with balances will appear here." />}
+      </SchoolPanel>
+    </div>
+  );
+
+  const renderTasks = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Staff tasks & follow-ups" description="Assign follow-up work to Admins, teachers, and Finance. Staff submit their work; you can verify it or request corrections." />
+      <SchoolPanel title="Assign a task">
+        <form onSubmit={createTask} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SchoolField label="Assign to"><select className={schoolSelectClass} value={taskTargetId} onChange={(event) => setTaskTargetId(event.target.value)}><option value="">Choose staff member</option>{staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
+          <SchoolField label="Task type"><select className={schoolSelectClass} value={taskType} onChange={(event) => setTaskType(event.target.value)}><option value="follow_up">Follow-up</option><option value="oversight">Oversight</option><option value="academic">Academic</option><option value="finance">Finance</option></select></SchoolField>
+          <SchoolField label="Priority"><select className={schoolSelectClass} value={taskPriority} onChange={(event) => setTaskPriority(event.target.value)}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></SchoolField>
+          <SchoolField label="Due date"><input type="date" className={schoolInputClass} value={taskDueDate} onChange={(event) => setTaskDueDate(event.target.value)} /></SchoolField>
+          <SchoolField label="Task title"><input className={schoolInputClass} value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} /></SchoolField>
+          <SchoolField label="Description"><input className={schoolInputClass} value={taskDescription} onChange={(event) => setTaskDescription(event.target.value)} /></SchoolField>
+          <div className="md:col-span-2 xl:col-span-4"><SchoolPrimaryButton type="submit">Assign task</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <SchoolPanel title="School task register">
+        {tasks.length ? <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Task</th><th className="pb-2">Assigned to</th><th className="pb-2">Type</th><th className="pb-2">Due</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{tasks.map((task) => <tr key={task.id}><td className="py-3 font-medium text-slate-800">{task.title}</td><td className="py-3 text-slate-600">{memberName(task.assigned_to_membership_id)}</td><td className="py-3 capitalize text-slate-600">{task.task_type}</td><td className="py-3 text-slate-600">{task.due_date || "—"}</td><td className="py-3"><SchoolStatus value={task.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No tasks assigned" description="Use the form above to assign the first follow-up." />}
+      </SchoolPanel>
+    </div>
+  );
+
+  const renderEvaluations = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Staff evaluations" description="Record staff performance evaluations. School Admins evaluate teachers' academic work separately." />
+      <SchoolPanel title="Record staff performance evaluation">
+        <form onSubmit={createEvaluation} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SchoolField label="Staff member"><select className={schoolSelectClass} value={evaluationTargetId} onChange={(event) => setEvaluationTargetId(event.target.value)}><option value="">Choose staff member</option>{staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
+          <SchoolField label="Rating (1–5)"><select className={schoolSelectClass} value={evaluationRating} onChange={(event) => setEvaluationRating(event.target.value)}><option value="1">1 — Needs improvement</option><option value="2">2 — Developing</option><option value="3">3 — Meets expectations</option><option value="4">4 — Strong</option><option value="5">5 — Excellent</option></select></SchoolField>
+          <SchoolField label="Period start"><input type="date" className={schoolInputClass} value={evaluationStart} onChange={(event) => setEvaluationStart(event.target.value)} /></SchoolField>
+          <SchoolField label="Period end"><input type="date" className={schoolInputClass} value={evaluationEnd} onChange={(event) => setEvaluationEnd(event.target.value)} /></SchoolField>
+          <SchoolField label="Evaluation notes"><input className={schoolInputClass} value={evaluationNotes} onChange={(event) => setEvaluationNotes(event.target.value)} /></SchoolField>
+          <div className="md:col-span-2 xl:col-span-4"><SchoolPrimaryButton type="submit">Save evaluation</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <SchoolPanel title="Evaluation history">
+        {evaluations.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Staff member</th><th className="pb-2">Type</th><th className="pb-2">Rating</th><th className="pb-2">Date</th></tr></thead><tbody className="divide-y divide-slate-100">{evaluations.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800">{memberName(item.target_membership_id)}</td><td className="py-3 capitalize text-slate-600">{item.evaluation_type.replace("_", " ")}</td><td className="py-3 tabular-nums text-slate-700">{item.rating}/5</td><td className="py-3 text-slate-500">{new Date(item.created_at).toLocaleDateString()}</td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No evaluations recorded" description="Completed staff evaluations will appear here." />}
+      </SchoolPanel>
+    </div>
+  );
+
+  const renderRequests = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Staff responsibility requests" description="Request role or assignment changes. The Super Admin reviews requests; this portal never changes staff permissions directly." />
+      <SchoolPanel title="Submit a change request">
+        <form onSubmit={createChangeRequest} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SchoolField label="Staff member"><select className={schoolSelectClass} value={requestTargetId} onChange={(event) => setRequestTargetId(event.target.value)}><option value="">Choose staff member</option>{staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
+          <SchoolField label="Request type"><select className={schoolSelectClass} value={requestType} onChange={(event) => setRequestType(event.target.value)}><option value="responsibility_change">Responsibility change</option><option value="assignment_change">Assignment change</option><option value="role_change">Role change</option></select></SchoolField>
+          {requestType === "role_change" && <SchoolField label="Requested role"><select className={schoolSelectClass} value={requestedRole} onChange={(event) => setRequestedRole(event.target.value)}><option value="admin">Admin</option><option value="teacher">Teacher</option><option value="finance">Finance</option></select></SchoolField>}
+          <SchoolField label="Requested details (JSON)"><input className={schoolInputClass} value={requestDetails} onChange={(event) => setRequestDetails(event.target.value)} placeholder='{"new_section":"Grade 8A"}' /></SchoolField>
+          <SchoolField label="Reason"><input className={schoolInputClass} value={requestReason} onChange={(event) => setRequestReason(event.target.value)} /></SchoolField>
+          <div className="md:col-span-2 xl:col-span-4"><SchoolPrimaryButton type="submit">Send to Super Admin</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <SchoolPanel title="Submitted requests">
+        {changeRequests.length ? <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Staff member</th><th className="pb-2">Request</th><th className="pb-2">Reason</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{changeRequests.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800">{memberName(item.target_membership_id)}</td><td className="py-3 capitalize text-slate-600">{item.request_type.replace("_", " ")}</td><td className="py-3 text-slate-600">{item.reason}</td><td className="py-3"><SchoolStatus value={item.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No change requests" description="Requests submitted to the Super Admin will appear here." />}
+      </SchoolPanel>
+    </div>
+  );
+
+  const renderDiscipline = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Disciplinary oversight" description="Submit staff recommendations to the Super Admin and review student recommendations from the School Admin." />
+      <SchoolPanel title="Recommend staff disciplinary action">
+        <form onSubmit={submitStaffDisciplineRecommendation} className="grid gap-3 md:grid-cols-2">
+          <SchoolField label="Staff member"><select className={schoolSelectClass} value={staffDisciplineTargetId} onChange={(event) => setStaffDisciplineTargetId(event.target.value)}><option value="">Choose staff member</option>{members.filter((member) => ["admin", "teacher", "finance"].includes(member.school_role) && member.status === "active").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
+          <SchoolField label="Reason"><input className={schoolInputClass} value={staffDisciplineReason} onChange={(event) => setStaffDisciplineReason(event.target.value)} /></SchoolField>
+          <div className="md:col-span-2"><SchoolField label="Recommendation"><textarea className={schoolTextareaClass} value={staffDisciplineRecommendation} onChange={(event) => setStaffDisciplineRecommendation(event.target.value)} /></SchoolField></div>
+          <div className="md:col-span-2"><SchoolPrimaryButton type="submit">Submit to Super Admin</SchoolPrimaryButton></div>
+        </form>
+      </SchoolPanel>
+      <SchoolPanel title="Teacher conduct reports from School Admin">
+        {staffConductReports.length ? <div className="space-y-3">{staffConductReports.map((report) => <div key={report.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(report.target_teacher_membership_id)} · {report.report_type.replace(/_/g, " ")}</p><SchoolStatus value={report.status} /></div><p className="mt-1 text-xs text-slate-500">Submitted by {memberName(report.submitted_by_membership_id)} · {report.severity}</p><p className="mt-2 text-sm text-slate-700">{report.description}</p>{report.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={managerReviewNotes[report.id] || ""} onChange={(event) => setManagerReviewNotes((current) => ({ ...current, [report.id]: event.target.value }))} placeholder="Manager review note" /><div className="mt-2 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewStaffConductReport(report, "reviewed")}>Mark reviewed</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewStaffConductReport(report, "resolved")}>Resolve</SchoolSecondaryButton><SchoolSecondaryButton onClick={() => void reviewStaffConductReport(report, "dismissed")}>Dismiss</SchoolSecondaryButton></div></>}{report.manager_note && <p className="mt-2 text-xs text-emerald-700">Manager note: {report.manager_note}</p>}</div>)}</div> : <SchoolEmptyState title="No staff conduct reports" description="Admin-submitted reports will appear here." />}
+      </SchoolPanel>
+      <SchoolPanel title="Teacher assignment recommendations">
+        {assignmentRecommendations.length ? <div className="space-y-3">{assignmentRecommendations.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.teacher_membership_id)} · {item.recommendation_type.replace(/_/g, " ")}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-500">Requested: {item.requested_section_id ? sectionLabel(item.requested_section_id) : "—"} · {item.requested_subject_name || "—"} · {item.requested_assignment_kind || "—"}</p><p className="mt-2 text-sm text-slate-700">{item.reason}</p>{item.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={managerReviewNotes[item.id] || ""} onChange={(event) => setManagerReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Manager decision note" /><div className="mt-2 flex gap-2"><SchoolPrimaryButton onClick={() => void reviewAssignmentRecommendation(item, true)}>Accept</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewAssignmentRecommendation(item, false)}>Decline</SchoolSecondaryButton></div></>}{item.manager_note && <p className="mt-2 text-xs text-emerald-700">Manager note: {item.manager_note}</p>}</div>)}</div> : <SchoolEmptyState title="No assignment recommendations" description="Admin recommendations will appear here." />}
+      </SchoolPanel>
+      <SchoolPanel title="Student disciplinary recommendations">
+        {disciplinaryRecommendations.filter((item) => item.target_kind === "student").length ? <div className="space-y-3">{disciplinaryRecommendations.filter((item) => item.target_kind === "student").map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.target_membership_id)}</p><SchoolStatus value={item.status} /></div><p className="mt-2 text-sm text-slate-700">Reason: {item.reason}</p><p className="mt-1 text-sm text-slate-700">Recommendation: {item.recommendation}</p>{item.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={disciplineReviewNotes[item.id] || ""} onChange={(event) => setDisciplineReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Decision note (optional)" /><div className="mt-2 flex gap-2"><SchoolPrimaryButton onClick={() => void reviewStudentDisciplineRecommendation(item, true)}>Accept</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewStudentDisciplineRecommendation(item, false)}>Reject</SchoolSecondaryButton></div></>}{item.decision_note && <p className="mt-2 text-xs text-slate-500">Decision: {item.decision_note}</p>}</div>)}</div> : <SchoolEmptyState title="No student recommendations" description="Admin-submitted student recommendations will appear here." />}
+      </SchoolPanel>
+      <SchoolPanel title="Staff disciplinary recommendations">
+        {disciplinaryRecommendations.filter((item) => item.target_kind === "staff").length ? <div className="space-y-2">{disciplinaryRecommendations.filter((item) => item.target_kind === "staff").map((item) => <div key={item.id} className="rounded-md border border-slate-100 p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.target_membership_id)}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-600">{item.reason}</p><p className="mt-1 text-xs text-slate-600">Recommendation: {item.recommendation}</p><p className="mt-2 text-xs text-slate-500">Staff recommendations are reviewed by the Super Admin.</p></div>)}</div> : <SchoolEmptyState title="No staff recommendations" description="Staff recommendations submitted by the Manager will appear here." />}
+      </SchoolPanel>
+    </div>
+  );
+
+  const renderLeadership = () => {
+    const fixedPositions = [
+      ["academic_director", "Academic Director", null],
+      ["hr_director", "HR Director / Business Manager", null],
+      ["vice_director", "KG Vice Director", "kg"],
+      ["vice_director", "Elementary Vice Director", "elementary"],
+      ["vice_director", "Middle School Vice Director", "middle_school"],
+      ["vice_director", "High School Vice Director", "high_school"],
+      ["kg_director", "KG Director", "kg"],
+      ["elementary_director", "Elementary Director", "elementary"],
+      ["middle_school_director", "Middle School Director", "middle_school"],
+      ["high_school_director", "High School Director", "high_school"],
+    ] as const;
+    const positionLabels: Record<string, string> = {
+      academic_director: "Academic Director",
+      hr_director: "HR Director / Business Manager",
+      vice_director: "Vice Director",
+      kg_director: "KG Director",
+      elementary_director: "Elementary Director",
+      middle_school_director: "Middle School Director",
+      high_school_director: "High School Director",
+      team_leader: "Team Leader",
+    };
+    const divisionLabels: Record<string, string> = {
+      kg: "KG",
+      elementary: "Elementary",
+      middle_school: "Middle School",
+      high_school: "High School",
+    };
+    const positionLabel = (position: string) => positionLabels[position] || position.replace(/_/g, " ");
+    const divisionLabel = (division: string | null) => divisionLabels[division || ""] || "School-wide";
+    const permissionOptions = [
+      ["view_students", "View assigned students"],
+      ["view_staff", "View assigned staff"],
+      ["view_attendance", "View attendance"],
+      ["review_attendance", "Review attendance"],
+      ["view_academics", "View academic progress"],
+      ["review_assessments", "Review assessments"],
+      ["review_results", "Review examination results"],
+      ["view_curriculum", "View curriculum coverage"],
+      ["manage_team_tasks", "Manage assigned team tasks"],
+      ["assign_team_tasks", "Assign team tasks"],
+      ["view_reports", "View assigned reports"],
+      ["view_discipline", "View student-support records"],
+      ["review_discipline", "Review student-support reports"],
+      ["view_finance_summary", "View finance summaries"],
+      ["view_staff_evaluations", "View staff evaluations"],
+    ] as const;
+    const divisionDirectorPositions = ["kg_director", "elementary_director", "middle_school_director", "high_school_director"];
+    const visiblePermissionOptions = leaderPosition === "hr_director"
+      ? permissionOptions.filter(([permission]) => [
+          "view_staff", "view_staff_evaluations", "manage_team_tasks",
+          "view_reports", "view_finance_summary",
+        ].includes(permission))
+      : permissionOptions.filter(([permission]) => {
+          if (permission === "view_staff_evaluations") return false;
+          if (divisionDirectorPositions.includes(leaderPosition) && permission === "view_finance_summary") return false;
+          if (leaderPosition === "academic_director" && [
+            "review_attendance", "manage_team_tasks", "assign_team_tasks",
+            "view_discipline", "review_discipline", "view_finance_summary",
+          ].includes(permission)) return false;
+          return true;
+        });
+    const activeAppointment = (position: string, division: string | null) =>
+      leadershipAppointments.find((item) => item.status === "active" && item.position === position && (division === null || item.division_scope === division));
+    const vacancies = fixedPositions.filter(([position, , division]) => !activeAppointment(position, division));
+    return (
+      <div className="space-y-5">
+        <SchoolPageHeading
+          title="School leadership team"
+          description="Appoint the school's directors and team leaders. Leadership positions are school appointments, not new global account roles."
+        />
+        {leadershipError && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{leadershipError}</div>}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {fixedPositions.map(([position, label, division]) => {
+            const appointment = activeAppointment(position, division);
+            return (
+              <div key={`${position}-${division || "school"}`} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">{label}</p>
+                  <SchoolStatus value={appointment ? "appointed" : "vacant"} />
+                </div>
+                <p className="mt-2 text-sm text-slate-600">{appointment ? memberName(appointment.membership_id) : "No active appointment"}</p>
+                <p className="mt-1 text-xs text-slate-500">{division ? divisionLabel(division) : "School-wide responsibility"}</p>
+              </div>
+            );
+          })}
+        </div>
+        <SchoolPanel title="Appoint an existing leader" description="Use only when replacing an existing appointment. New Director and Vice Director accounts are created in People & Accounts.">
+          <form onSubmit={appointLeader} className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <SchoolField label="Staff member">
+                <select className={schoolSelectClass} value={leaderTargetId} onChange={(event) => setLeaderTargetId(event.target.value)} required>
+                  <option value="">Choose active staff</option>
+                  {staff.filter((member) => leaderPosition === "hr_director" ? member.school_role === "finance" : member.school_role === "teacher").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
+                </select>
               </SchoolField>
               <SchoolField label="Leadership position">
                 <select
@@ -979,7 +1334,7 @@ export default function SchoolManagerPortal() {
                     </div>
                     <SchoolStatus value={appointment.status} />
                   </div>
-                  <details className="mt-3 rounded-lg border border-slate-100 p-3">
+                  {appointment.position === "main_director" ? <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">This historical appointment is no longer used by the current school structure.</p> : <details className="mt-3 rounded-lg border border-slate-100 p-3">
                     <summary className="cursor-pointer text-xs font-semibold text-blue-700">Manage permissions</summary>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       {permissionOptions.map(([permission, label]) => {
@@ -1011,7 +1366,7 @@ export default function SchoolManagerPortal() {
                       />
                       <SchoolSecondaryButton onClick={() => void updateLeaderPermissions(appointment.id, permissionDrafts[appointment.id] ?? appointment.permissions ?? [])}>Save permissions</SchoolSecondaryButton>
                     </div>
-                  </details>
+                  </details>}
                   {appointment.status !== "ended" && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {appointment.status === "active"
