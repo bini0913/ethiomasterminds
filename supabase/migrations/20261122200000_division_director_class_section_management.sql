@@ -13,7 +13,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1
     FROM public.school_leadership_appointments appointment
@@ -32,7 +32,7 @@ AS $
       AND leader.user_id = auth.uid()
       AND leader.status = 'active'
   );
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.school_is_active_division_director_for_grade(uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.school_is_active_division_director_for_grade(uuid, text) TO authenticated;
