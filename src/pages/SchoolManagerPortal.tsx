@@ -28,8 +28,8 @@ const navItems: SchoolNavItem[] = [
   { id: "leadership", label: "Leadership Team", icon: UserCog },
 ];
 
-type AccountRole = "admin" | "teacher" | "finance" | "parent" | "student";
-type LeadershipPosition = "" | "main_director" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "academic_director" | "hr_director" | "team_leader";
+type AccountRole = "teacher" | "finance" | "parent" | "student";
+type LeadershipPosition = "" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "academic_director" | "hr_director";
 
 export default function SchoolManagerPortal() {
   const { activeSchool, activeMembership } = useSchoolPortal();
@@ -979,7 +979,7 @@ export default function SchoolManagerPortal() {
                     </div>
                     <SchoolStatus value={appointment.status} />
                   </div>
-                  {appointment.position === "main_director" ? <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">The Main Director uses the existing full School Admin authority. Suspend or end this appointment to revoke access; individual permission editing is not available for this position.</p> : <details className="mt-3 rounded-lg border border-slate-100 p-3">
+                  <details className="mt-3 rounded-lg border border-slate-100 p-3">
                     <summary className="cursor-pointer text-xs font-semibold text-blue-700">Manage permissions</summary>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       {permissionOptions.map(([permission, label]) => {
@@ -1011,7 +1011,7 @@ export default function SchoolManagerPortal() {
                       />
                       <SchoolSecondaryButton onClick={() => void updateLeaderPermissions(appointment.id, permissionDrafts[appointment.id] ?? appointment.permissions ?? [])}>Save permissions</SchoolSecondaryButton>
                     </div>
-                  </details>}
+                  </details>
                   {appointment.status !== "ended" && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {appointment.status === "active"
@@ -1023,7 +1023,7 @@ export default function SchoolManagerPortal() {
                 </div>
               ))}
             </div>
-          ) : <SchoolEmptyState title="No leadership appointments yet" description="Appoint the Main Director, Vice Director, division directors, and team leaders above." />}
+          ) : <SchoolEmptyState title="No leadership appointments yet" description="Create Director and Vice Director accounts in People & Accounts above." />}
           {vacancies.length > 0 && <p className="mt-4 text-xs text-slate-500">Vacant positions: {vacancies.map(([, label]) => label).join(", ")}.</p>}
         </SchoolPanel>
         <SchoolPanel title="Leadership activity history" description="Appointment and permission changes are recorded by the database.">
