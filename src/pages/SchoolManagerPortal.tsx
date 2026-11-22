@@ -64,18 +64,7 @@ export default function SchoolManagerPortal() {
   const [leadershipAppointments, setLeadershipAppointments] = useState<any[]>([]);
   const [leadershipActionEvents, setLeadershipActionEvents] = useState<any[]>([]);
   const [leadershipError, setLeadershipError] = useState<string | null>(null);
-  const [leaderTargetId, setLeaderTargetId] = useState("");
-  const [leaderPosition, setLeaderPosition] = useState("kg_director");
-  const [leaderDivision, setLeaderDivision] = useState("kg");
-  const [leaderTeamName, setLeaderTeamName] = useState("");
-  const [leaderStartDate, setLeaderStartDate] = useState("");
-  const [leaderEndDate, setLeaderEndDate] = useState("");
-  const [leaderPermissions, setLeaderPermissions] = useState<string[]>([
-    "view_students", "view_staff", "view_attendance", "review_attendance",
-    "view_academics", "review_assessments", "review_results", "view_curriculum",
-    "manage_team_tasks", "assign_team_tasks", "view_reports",
-    "view_discipline", "review_discipline", "view_finance_summary",
-  ]);
+  const [convertingLegacyMembershipId, setConvertingLegacyMembershipId] = useState<string | null>(null);
   const [leadershipActionReason, setLeadershipActionReason] = useState("");
   const [divisionMappings, setDivisionMappings] = useState<any[]>([]);
   const [teamAssignments, setTeamAssignments] = useState<any[]>([]);
@@ -272,29 +261,6 @@ export default function SchoolManagerPortal() {
 
   useEffect(() => { void loadLeadership(); }, [loadLeadership]);
 
-  const appointLeader = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!leaderTargetId) return toast.error("Choose an active school staff member.");
-    const divisionByPosition: Record<string, string> = { kg_director: "kg", elementary_director: "elementary", middle_school_director: "middle_school", high_school_director: "high_school" };
-    const division = leaderPosition === "vice_director" ? leaderDivision : divisionByPosition[leaderPosition] || null;
-    const { error } = await db.rpc("school_appoint_leader", {
-      p_target_membership_id: leaderTargetId,
-      p_position: leaderPosition,
-      p_division_scope: division,
-      p_team_name: null,
-      p_permissions: leaderPermissions,
-      p_start_date: leaderStartDate || new Date().toISOString().slice(0, 10),
-      p_end_date: leaderEndDate || null,
-    });
-    if (error) return toast.error(error.message || "The leadership appointment could not be saved.");
-    toast.success("Leadership appointment created and recorded.");
-    setLeaderTargetId("");
-    setLeaderTeamName("");
-    setLeaderStartDate("");
-    setLeaderEndDate("");
-    await loadLeadership();
-  };
-
   const saveDivisionMapping = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!schoolId || !mappingGrade) return toast.error("Choose a grade to map.");
@@ -386,7 +352,7 @@ export default function SchoolManagerPortal() {
   const appointedLeaderMembershipIds = new Set(leadershipAppointments.filter((appointment) => appointment.status === "active").map((appointment) => appointment.membership_id));
   const teachers = activeMembers.filter((member) => member.school_role === "teacher" && !appointedLeaderMembershipIds.has(member.id));
   const parents = activeMembers.filter((member) => member.school_role === "parent");
-  const staff = activeMembers.filter((member) => ["admin", "teacher", "finance"].includes(member.school_role));
+  const staff = activeMembers.filter((member) => ["teacher", "finance"].includes(member.school_role));
   const outstandingByCurrency = invoices.reduce((totals: Record<string, number>, invoice) => { const currency = invoice.currency || "ETB"; totals[currency] = (totals[currency] || 0) + Number(invoice.balance || 0); return totals; }, {});
   const outstandingSummary = Object.entries(outstandingByCurrency).map(([currency, amount]) => `${currency} ${amount.toLocaleString()}`).join(" · ") || "0";
 
@@ -413,7 +379,7 @@ export default function SchoolManagerPortal() {
       };
       return labels[appointment.position] || appointment.position;
     }
-    return member.school_role === "admin" ? "Unassigned School Admin" : member.school_role;
+    return member.school_role === "admin" ? "Legacy designation · action required" : member.school_role;
   };
 
 
@@ -437,6 +403,25 @@ export default function SchoolManagerPortal() {
     } finally {
       setLinkingExistingTeacher(false);
     }
+  };
+
+  const convertLegacyAdminToHrDirector = async (membership: any) => {
+    const personName = memberName(membership.id);
+    const reason = `Retired the legacy School Admin designation for ${personName} and appointed HR Director / Business Manager.`;
+    if (!window.confirm(`Convert ${personName} to HR Director / Business Manager? Their old designation will end and their existing account will be retained.`)) return;
+    setConvertingLegacyMembershipId(membership.id);
+    const { error } = await db.rpc("school_convert_legacy_admin_to_hr_director", {
+      p_target_membership_id: membership.id,
+      p_reason: reason,
+    });
+    if (error) {
+      toast.error(error.message || "The legacy membership could not be converted.");
+      setConvertingLegacyMembershipId(null);
+      return;
+    }
+    toast.success(`${personName} is now HR Director / Business Manager.`);
+    setConvertingLegacyMembershipId(null);
+    await Promise.all([load(), loadLeadership()]);
   };
 
   const createAccount = async (event: React.FormEvent) => {
@@ -854,8 +839,8 @@ export default function SchoolManagerPortal() {
         <SchoolPanel title="School accounts" description={`${members.length} total school memberships`}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[620px] text-left text-sm">
-              <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="pb-2 font-semibold">Person</th><th className="pb-2 font-semibold">Role</th><th className="pb-2 font-semibold">Grade / section</th><th className="pb-2 font-semibold">Status</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 text-slate-600">{membershipRoleLabel(member)}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td></tr>)}</tbody>
+              <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="pb-2 font-semibold">Person</th><th className="pb-2 font-semibold">Role</th><th className="pb-2 font-semibold">Grade / section</th><th className="pb-2 font-semibold">Status</th><th className="pb-2 font-semibold">Action</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 text-slate-600">{membershipRoleLabel(member)}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td><td className="py-3">{member.school_role === "admin" && member.status === "active" ? <button type="button" disabled={convertingLegacyMembershipId === member.id} onClick={() => void convertLegacyAdminToHrDirector(member)} className="rounded-md border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50">{convertingLegacyMembershipId === member.id ? "Converting…" : "Convert to HR Director"}</button> : <span className="text-xs text-slate-400">—</span>}</td></tr>)}</tbody>
             </table>
           </div>
         </SchoolPanel>
@@ -983,7 +968,7 @@ export default function SchoolManagerPortal() {
 
   const renderTasks = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Staff tasks & follow-ups" description="Assign follow-up work to Admins, teachers, and Finance. Staff submit their work; you can verify it or request corrections." />
+      <SchoolPageHeading title="Staff tasks & follow-ups" description="Assign follow-up work to Directors, teachers, and Finance. Staff submit their work; you can verify it or request corrections." />
       <SchoolPanel title="Assign a task">
         <form onSubmit={createTask} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SchoolField label="Assign to"><select className={schoolSelectClass} value={taskTargetId} onChange={(event) => setTaskTargetId(event.target.value)}><option value="">Choose staff member</option>{staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
@@ -1003,7 +988,7 @@ export default function SchoolManagerPortal() {
 
   const renderEvaluations = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Staff evaluations" description="Record staff performance evaluations. School Admins evaluate teachers' academic work separately." />
+      <SchoolPageHeading title="Staff evaluations" description="Record staff performance evaluations. Division Directors review teachers' academic work within their divisions." />
       <SchoolPanel title="Record staff performance evaluation">
         <form onSubmit={createEvaluation} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SchoolField label="Staff member"><select className={schoolSelectClass} value={evaluationTargetId} onChange={(event) => setEvaluationTargetId(event.target.value)}><option value="">Choose staff member</option>{staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
@@ -1027,7 +1012,7 @@ export default function SchoolManagerPortal() {
         <form onSubmit={createChangeRequest} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SchoolField label="Staff member"><select className={schoolSelectClass} value={requestTargetId} onChange={(event) => setRequestTargetId(event.target.value)}><option value="">Choose staff member</option>{staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
           <SchoolField label="Request type"><select className={schoolSelectClass} value={requestType} onChange={(event) => setRequestType(event.target.value)}><option value="responsibility_change">Responsibility change</option><option value="assignment_change">Assignment change</option><option value="role_change">Role change</option></select></SchoolField>
-          {requestType === "role_change" && <SchoolField label="Requested role"><select className={schoolSelectClass} value={requestedRole} onChange={(event) => setRequestedRole(event.target.value)}><option value="admin">Admin</option><option value="teacher">Teacher</option><option value="finance">Finance</option></select></SchoolField>}
+          {requestType === "role_change" && <SchoolField label="Requested role"><select className={schoolSelectClass} value={requestedRole} onChange={(event) => setRequestedRole(event.target.value)}><option value="teacher">Teacher</option><option value="finance">Finance</option></select></SchoolField>}
           <SchoolField label="Requested details (JSON)"><input className={schoolInputClass} value={requestDetails} onChange={(event) => setRequestDetails(event.target.value)} placeholder='{"new_section":"Grade 8A"}' /></SchoolField>
           <SchoolField label="Reason"><input className={schoolInputClass} value={requestReason} onChange={(event) => setRequestReason(event.target.value)} /></SchoolField>
           <div className="md:col-span-2 xl:col-span-4"><SchoolPrimaryButton type="submit">Send to Super Admin</SchoolPrimaryButton></div>
@@ -1041,23 +1026,23 @@ export default function SchoolManagerPortal() {
 
   const renderDiscipline = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Disciplinary oversight" description="Submit staff recommendations to the Super Admin and review student recommendations from the School Admin." />
+      <SchoolPageHeading title="Disciplinary oversight" description="Submit staff recommendations to the Super Admin and review student recommendations from Division Directors." />
       <SchoolPanel title="Recommend staff disciplinary action">
         <form onSubmit={submitStaffDisciplineRecommendation} className="grid gap-3 md:grid-cols-2">
-          <SchoolField label="Staff member"><select className={schoolSelectClass} value={staffDisciplineTargetId} onChange={(event) => setStaffDisciplineTargetId(event.target.value)}><option value="">Choose staff member</option>{members.filter((member) => ["admin", "teacher", "finance"].includes(member.school_role) && member.status === "active").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
+          <SchoolField label="Staff member"><select className={schoolSelectClass} value={staffDisciplineTargetId} onChange={(event) => setStaffDisciplineTargetId(event.target.value)}><option value="">Choose staff member</option>{members.filter((member) => ["teacher", "finance"].includes(member.school_role) && member.status === "active").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
           <SchoolField label="Reason"><input className={schoolInputClass} value={staffDisciplineReason} onChange={(event) => setStaffDisciplineReason(event.target.value)} /></SchoolField>
           <div className="md:col-span-2"><SchoolField label="Recommendation"><textarea className={schoolTextareaClass} value={staffDisciplineRecommendation} onChange={(event) => setStaffDisciplineRecommendation(event.target.value)} /></SchoolField></div>
           <div className="md:col-span-2"><SchoolPrimaryButton type="submit">Submit to Super Admin</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
-      <SchoolPanel title="Teacher conduct reports from School Admin">
-        {staffConductReports.length ? <div className="space-y-3">{staffConductReports.map((report) => <div key={report.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(report.target_teacher_membership_id)} · {report.report_type.replace(/_/g, " ")}</p><SchoolStatus value={report.status} /></div><p className="mt-1 text-xs text-slate-500">Submitted by {memberName(report.submitted_by_membership_id)} · {report.severity}</p><p className="mt-2 text-sm text-slate-700">{report.description}</p>{report.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={managerReviewNotes[report.id] || ""} onChange={(event) => setManagerReviewNotes((current) => ({ ...current, [report.id]: event.target.value }))} placeholder="Manager review note" /><div className="mt-2 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewStaffConductReport(report, "reviewed")}>Mark reviewed</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewStaffConductReport(report, "resolved")}>Resolve</SchoolSecondaryButton><SchoolSecondaryButton onClick={() => void reviewStaffConductReport(report, "dismissed")}>Dismiss</SchoolSecondaryButton></div></>}{report.manager_note && <p className="mt-2 text-xs text-emerald-700">Manager note: {report.manager_note}</p>}</div>)}</div> : <SchoolEmptyState title="No staff conduct reports" description="Admin-submitted reports will appear here." />}
+      <SchoolPanel title="Teacher conduct reports from Division Directors">
+        {staffConductReports.length ? <div className="space-y-3">{staffConductReports.map((report) => <div key={report.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(report.target_teacher_membership_id)} · {report.report_type.replace(/_/g, " ")}</p><SchoolStatus value={report.status} /></div><p className="mt-1 text-xs text-slate-500">Submitted by {memberName(report.submitted_by_membership_id)} · {report.severity}</p><p className="mt-2 text-sm text-slate-700">{report.description}</p>{report.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={managerReviewNotes[report.id] || ""} onChange={(event) => setManagerReviewNotes((current) => ({ ...current, [report.id]: event.target.value }))} placeholder="Manager review note" /><div className="mt-2 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewStaffConductReport(report, "reviewed")}>Mark reviewed</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewStaffConductReport(report, "resolved")}>Resolve</SchoolSecondaryButton><SchoolSecondaryButton onClick={() => void reviewStaffConductReport(report, "dismissed")}>Dismiss</SchoolSecondaryButton></div></>}{report.manager_note && <p className="mt-2 text-xs text-emerald-700">Manager note: {report.manager_note}</p>}</div>)}</div> : <SchoolEmptyState title="No staff conduct reports" description="Director-submitted reports will appear here." />}
       </SchoolPanel>
       <SchoolPanel title="Teacher assignment recommendations">
         {assignmentRecommendations.length ? <div className="space-y-3">{assignmentRecommendations.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.teacher_membership_id)} · {item.recommendation_type.replace(/_/g, " ")}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-500">Requested: {item.requested_section_id ? sectionLabel(item.requested_section_id) : "—"} · {item.requested_subject_name || "—"} · {item.requested_assignment_kind || "—"}</p><p className="mt-2 text-sm text-slate-700">{item.reason}</p>{item.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={managerReviewNotes[item.id] || ""} onChange={(event) => setManagerReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Manager decision note" /><div className="mt-2 flex gap-2"><SchoolPrimaryButton onClick={() => void reviewAssignmentRecommendation(item, true)}>Accept</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewAssignmentRecommendation(item, false)}>Decline</SchoolSecondaryButton></div></>}{item.manager_note && <p className="mt-2 text-xs text-emerald-700">Manager note: {item.manager_note}</p>}</div>)}</div> : <SchoolEmptyState title="No assignment recommendations" description="Admin recommendations will appear here." />}
       </SchoolPanel>
       <SchoolPanel title="Student disciplinary recommendations">
-        {disciplinaryRecommendations.filter((item) => item.target_kind === "student").length ? <div className="space-y-3">{disciplinaryRecommendations.filter((item) => item.target_kind === "student").map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.target_membership_id)}</p><SchoolStatus value={item.status} /></div><p className="mt-2 text-sm text-slate-700">Reason: {item.reason}</p><p className="mt-1 text-sm text-slate-700">Recommendation: {item.recommendation}</p>{item.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={disciplineReviewNotes[item.id] || ""} onChange={(event) => setDisciplineReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Decision note (optional)" /><div className="mt-2 flex gap-2"><SchoolPrimaryButton onClick={() => void reviewStudentDisciplineRecommendation(item, true)}>Accept</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewStudentDisciplineRecommendation(item, false)}>Reject</SchoolSecondaryButton></div></>}{item.decision_note && <p className="mt-2 text-xs text-slate-500">Decision: {item.decision_note}</p>}</div>)}</div> : <SchoolEmptyState title="No student recommendations" description="Admin-submitted student recommendations will appear here." />}
+        {disciplinaryRecommendations.filter((item) => item.target_kind === "student").length ? <div className="space-y-3">{disciplinaryRecommendations.filter((item) => item.target_kind === "student").map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.target_membership_id)}</p><SchoolStatus value={item.status} /></div><p className="mt-2 text-sm text-slate-700">Reason: {item.reason}</p><p className="mt-1 text-sm text-slate-700">Recommendation: {item.recommendation}</p>{item.status === "pending" && <><input className={schoolInputClass + " mt-3"} value={disciplineReviewNotes[item.id] || ""} onChange={(event) => setDisciplineReviewNotes((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Decision note (optional)" /><div className="mt-2 flex gap-2"><SchoolPrimaryButton onClick={() => void reviewStudentDisciplineRecommendation(item, true)}>Accept</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewStudentDisciplineRecommendation(item, false)}>Reject</SchoolSecondaryButton></div></>}{item.decision_note && <p className="mt-2 text-xs text-slate-500">Decision: {item.decision_note}</p>}</div>)}</div> : <SchoolEmptyState title="No student recommendations" description="Director-submitted student recommendations will appear here." />}
       </SchoolPanel>
       <SchoolPanel title="Staff disciplinary recommendations">
         {disciplinaryRecommendations.filter((item) => item.target_kind === "staff").length ? <div className="space-y-2">{disciplinaryRecommendations.filter((item) => item.target_kind === "staff").map((item) => <div key={item.id} className="rounded-md border border-slate-100 p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.target_membership_id)}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-600">{item.reason}</p><p className="mt-1 text-xs text-slate-600">Recommendation: {item.recommendation}</p><p className="mt-2 text-xs text-slate-500">Staff recommendations are reviewed by the Super Admin.</p></div>)}</div> : <SchoolEmptyState title="No staff recommendations" description="Staff recommendations submitted by the Manager will appear here." />}
@@ -1114,23 +1099,8 @@ export default function SchoolManagerPortal() {
       ["view_staff_evaluations", "View staff evaluations"],
     ] as const;
     const divisionDirectorPositions = ["kg_director", "elementary_director", "middle_school_director", "high_school_director"];
-    const visiblePermissionOptions = leaderPosition === "hr_director"
-      ? permissionOptions.filter(([permission]) => [
-          "view_staff", "view_staff_evaluations", "manage_team_tasks",
-          "view_reports", "view_finance_summary",
-        ].includes(permission))
-      : permissionOptions.filter(([permission]) => {
-          if (permission === "view_staff_evaluations") return false;
-          if (divisionDirectorPositions.includes(leaderPosition) && permission === "view_finance_summary") return false;
-          if (leaderPosition === "academic_director" && [
-            "review_attendance", "manage_team_tasks", "assign_team_tasks",
-            "view_discipline", "review_discipline", "view_finance_summary",
-          ].includes(permission)) return false;
-          return true;
-        });
     const activeAppointment = (position: string, division: string | null) =>
       leadershipAppointments.find((item) => item.status === "active" && item.position === position && (division === null || item.division_scope === division));
-    const vacancies = fixedPositions.filter(([position, , division]) => !activeAppointment(position, division));
     return (
       <div className="space-y-5">
         <SchoolPageHeading
