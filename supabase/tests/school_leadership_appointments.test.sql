@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(70);
+select plan(78);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -93,6 +93,17 @@ select ok(position('appointment.position = ''main_director''' in pg_get_function
 
 select ok(position('Only the Main Director may use the School Admin membership' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'non-Main-Director appointments cannot reuse the School Admin membership');
 select ok(position('already has an active School Admin account' in pg_get_functiondef('public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure)) > 0, 'a school cannot provision a second active School Admin membership');
+
+
+select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_vice_director_per_division'), 'each division can have its own active Vice Director');
+select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_legacy_schoolwide_vice_director'), 'legacy school-wide Vice Director appointments remain unique');
+select ok(position('Vice Directors must be assigned to one of the four school divisions' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'new Vice Director appointments require a division');
+select ok(position('vice_director' in pg_get_functiondef('public.school_leadership_has_permission(uuid,text,text,uuid,uuid)'::regprocedure)) > 0, 'Vice Director permissions are resolved by division scope');
+select ok(position('division_appointment.position' in pg_get_functiondef('public.school_can_view_leadership_appointment(uuid)'::regprocedure)) > 0, 'Division Directors can read their own division leadership appointments');
+select ok(position('appointment.position IN (''vice_director'', ''team_leader'')' in pg_get_functiondef('public.school_can_view_leadership_appointment(uuid)'::regprocedure)) > 0, 'Division leadership reads do not expose other divisions');
+select ok(exists (select 1 from pg_constraint where conrelid='public.school_leadership_appointments'::regclass and conname='school_leadership_appointments_position_division_scope_check'), 'leadership positions enforce division assignment rules');
+
+select ok(position('subordinate_appointment.position' in pg_get_functiondef('public.school_leadership_has_permission(uuid,text,text,uuid,uuid)'::regprocedure)) > 0, 'Division Directors can read only their appointed Vice Director and Team Leader memberships');
 
 select * from finish();
 rollback;

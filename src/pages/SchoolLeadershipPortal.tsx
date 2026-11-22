@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Users, UserCog, CalendarCheck, ClipboardCheck,
-  ClipboardList, FileBarChart, RefreshCw, ShieldCheck,
+  ClipboardList, FileBarChart, RefreshCw, ShieldCheck, Network,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +23,7 @@ const positionLabels: Record<string, string> = {
   team_leader: "Team Leader",
 };
 
-type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academics" | "discipline" | "tasks" | "reports";
+type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academics" | "discipline" | "tasks" | "reports" | "leadership";
 
 export default function SchoolLeadershipPortal() {
   const { appointment } = useSchoolLeadership();
@@ -39,6 +39,14 @@ function ScopedLeadershipWorkspace() {
   const permissions = useMemo(() => new Set(appointment.permissions || []), [appointment.permissions]);
   const can = (permission: string) => permissions.has(permission);
   const title = positionLabels[appointment.position] || "School Leader";
+  const divisionDetails: Record<string, { coverage: string; grades: string }> = {
+    kg: { coverage: "Nursery through KG 2", grades: "Nursery, KG 1 and KG 2" },
+    elementary: { coverage: "Grades 1–6", grades: "Grades 1, 2, 3, 4, 5 and 6" },
+    middle_school: { coverage: "Grades 7–8", grades: "Grades 7 and 8" },
+    high_school: { coverage: "Grades 9–12", grades: "Grades 9, 10, 11 and 12" },
+  };
+  const isDivisionDirector = ["kg_director", "elementary_director", "middle_school_director", "high_school_director"].includes(appointment.position);
+  const divisionInfo = appointment.division_scope ? divisionDetails[appointment.division_scope] : null;
   const scopeLabel = appointment.position === "team_leader"
     ? (appointment.team_name || "Assigned team")
     : appointment.division_scope
@@ -58,8 +66,9 @@ function ScopedLeadershipWorkspace() {
       items.push({ id: "tasks", label: "Team Tasks", icon: ClipboardList });
     }
     if (can("view_reports")) items.push({ id: "reports", label: "Reports", icon: FileBarChart });
+    if (isDivisionDirector && can("view_staff")) items.push({ id: "leadership", label: "Division Leadership", icon: Network });
     return items;
-  }, [appointment.permissions]);
+  }, [appointment.permissions, isDivisionDirector]);
 
   const [page, setPage] = useState<LeadershipPage>("overview");
   const [loading, setLoading] = useState(false);
@@ -73,6 +82,10 @@ function ScopedLeadershipWorkspace() {
   const [homework, setHomework] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [behaviorReports, setBehaviorReports] = useState<any[]>([]);
+  const [marks, setMarks] = useState<any[]>([]);
+  const [divisionAppointments, setDivisionAppointments] = useState<any[]>([]);
+  const [teamAssignments, setTeamAssignments] = useState<any[]>([]);
+  const [divisionGradeMappings, setDivisionGradeMappings] = useState<any[]>([]);
   const [reviewFeedback, setReviewFeedback] = useState<Record<string, string>>({});
   const [taskTargetId, setTaskTargetId] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
@@ -121,6 +134,29 @@ function ScopedLeadershipWorkspace() {
         .order("created_at", { ascending: false })
         .limit(100);
     }
+    if (can("review_results")) {
+      requests.marks = db.from("school_student_marks")
+        .select("id,assessment_id,student_membership_id,score,status,teacher_note")
+        .eq("school_id", schoolId)
+        .limit(500);
+    }
+    if (isDivisionDirector && can("view_staff")) {
+      requests.divisionAppointments = db.from("school_leadership_appointments")
+        .select("id,membership_id,position,division_scope,team_name,status,start_date,end_date")
+        .eq("school_id", schoolId)
+        .eq("division_scope", appointment.division_scope)
+        .in("position", ["vice_director", "team_leader"])
+        .eq("status", "active")
+        .order("position");
+      requests.teamAssignments = db.from("school_leadership_team_members")
+        .select("id,appointment_id,membership_id")
+        .eq("school_id", schoolId);
+      requests.divisionGradeMappings = db.from("school_division_grade_mappings")
+        .select("id,grade_label")
+        .eq("school_id", schoolId)
+        .eq("division_scope", appointment.division_scope)
+        .order("grade_label");
+    }
     if (can("view_discipline") || can("review_discipline")) {
       requests.behavior = db.from("school_behavior_reports")
         .select("id,student_membership_id,section_id,report_type,severity,description,status,created_at")
@@ -152,6 +188,10 @@ function ScopedLeadershipWorkspace() {
     if (results.homework) setHomework(results.homework.data ?? []);
     if (results.tasks) setTasks(results.tasks.data ?? []);
     if (results.behavior) setBehaviorReports(results.behavior.data ?? []);
+    if (results.marks) setMarks(results.marks.data ?? []);
+    if (results.divisionAppointments) setDivisionAppointments(results.divisionAppointments.data ?? []);
+    if (results.teamAssignments) setTeamAssignments(results.teamAssignments.data ?? []);
+    if (results.divisionGradeMappings) setDivisionGradeMappings(results.divisionGradeMappings.data ?? []);
 
     const userIds = [...new Set((results.members?.data ?? []).map((member: any) => member.user_id))];
     if (userIds.length) {
@@ -260,6 +300,66 @@ function ScopedLeadershipWorkspace() {
   const pendingAssessments = assessments.filter((item) => item.status === "submitted");
   const today = new Date().toLocaleDateString("en-CA");
   const todaySessions = attendanceSessions.filter((session) => session.attendance_date === today);
+  const divisionViceDirector = divisionAppointments.find((item) => item.position === "vice_director");
+  const divisionTeamLeaders = divisionAppointments.filter((item) => item.position === "team_leader");
+
+  const renderDivisionLeadership = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading
+        title="Division leadership"
+        description={`${title} · ${divisionInfo?.coverage || scopeLabel}. Review the leadership team and staff assignments within your division.`}
+      />
+      <SchoolPanel title="Division responsibility" description="This workspace is limited to the division assigned by the School Manager.">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div><p className="text-xs text-slate-500">Division</p><p className="mt-1 text-sm font-semibold capitalize text-slate-900">{appointment.division_scope?.replace(/_/g, " ")}</p></div>
+          <div><p className="text-xs text-slate-500">Expected grade coverage</p><p className="mt-1 text-sm font-semibold text-slate-900">{divisionInfo?.grades || "School-configured grades"}</p></div>
+        </div>
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Actual school grade labels mapped to this division</p>
+          {divisionGradeMappings.length
+            ? <div className="flex flex-wrap gap-2">{divisionGradeMappings.map((mapping) => <span key={mapping.id} className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">{mapping.grade_label}</span>)}</div>
+            : <SchoolEmptyState title="No grades mapped yet" description="Ask the School Manager to map the school's configured grade labels to this division. No grade records are invented here." />}
+        </div>
+      </SchoolPanel>
+      <SchoolPanel title="Leadership reporting line" description="The Division Director oversees the full division. The Vice Director and Team Leaders work under the Director's direction.">
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Division Director</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">{memberName(membership.id)}</p>
+            <p className="mt-1 text-xs text-slate-600">You · {divisionInfo?.coverage || scopeLabel}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vice Director</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">{divisionViceDirector ? memberName(divisionViceDirector.membership_id) : "Position vacant"}</p>
+            <p className="mt-1 text-xs text-slate-500">{divisionViceDirector ? "Active appointment" : "The School Manager can appoint an existing staff member."}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Team Leaders</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-900">{divisionTeamLeaders.length}</p>
+            <p className="mt-1 text-xs text-slate-500">Active team leadership appointments</p>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {divisionTeamLeaders.map((leader) => {
+            const assigned = teamAssignments.filter((item) => item.appointment_id === leader.id);
+            return (
+              <div key={leader.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 p-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">{memberName(leader.membership_id)}</p>
+                  <p className="mt-1 text-xs text-slate-500">{leader.team_name || "Assigned team"} · {assigned.length} assigned staff</p>
+                </div>
+                <SchoolStatus value={leader.status} />
+              </div>
+            );
+          })}
+          {!divisionTeamLeaders.length && <SchoolEmptyState title="No Team Leaders appointed" description="Team Leader appointments for this division will appear here when assigned by the School Manager." />}
+        </div>
+      </SchoolPanel>
+      <SchoolPanel title="Division oversight boundaries">
+        <p className="text-sm leading-6 text-slate-600">You oversee students, teachers, the Vice Director and Team Leaders within this division, subject to your granted permissions. The School Manager retains authority to appoint, suspend, replace and change leadership permissions. Cross-division academic policy remains under the Academic Director.</p>
+      </SchoolPanel>
+    </div>
+  );
 
   const renderOverview = () => (
     <div className="space-y-5">
@@ -286,6 +386,7 @@ function ScopedLeadershipWorkspace() {
       <SchoolPanel title="Scope and access">
         <p className="text-sm leading-6 text-slate-600">Your workspace only displays records the school database authorizes for this appointment. Division Directors are restricted to their mapped grades. Team Leaders are restricted to their assigned team and linked sections. The School Manager controls appointments and permissions.</p>
       </SchoolPanel>
+      {isDivisionDirector && <div>{renderDivisionLeadership()}</div>}
     </div>
   );
 
@@ -341,6 +442,10 @@ function ScopedLeadershipWorkspace() {
       <SchoolPanel title="Homework oversight">
         {homework.length ? <div className="space-y-2">{homework.map((item) => <div key={item.id} className="rounded-lg border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.subject_name} · {sectionName(item.section_id)} · Due {item.due_at ? new Date(item.due_at).toLocaleDateString() : "—"}</p></div><SchoolStatus value={item.status} /></div>{can("review_assessments") && item.status === "pending" && <div className="mt-3 flex flex-col gap-2"><input value={reviewFeedback[item.id] || ""} onChange={(event) => setReviewFeedback((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Optional review feedback" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /><div className="flex flex-wrap gap-2"><button onClick={() => void reviewHomework(item.id, true)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Approve homework</button><button onClick={() => void reviewHomework(item.id, false)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Return to teacher</button></div></div>}</div>)}</div> : <SchoolEmptyState title="No homework records in scope" description="Homework assignments will appear here." />}
       </SchoolPanel>
+      {can("review_results") && <SchoolPanel title="Marks and results oversight" description="Marks visible to your appointment. Official calculation and publication remain with the authorized school administration workflow.">
+        {marks.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Score</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{marks.map((mark) => { const student = members.find((item) => item.id === mark.student_membership_id); const assessment = assessments.find((item) => item.id === mark.assessment_id); return <tr key={mark.id}><td className="py-3 font-medium text-slate-800">{memberName(mark.student_membership_id)}</td><td className="py-3 text-slate-600">{assessment?.title || "Assessment"}</td><td className="py-3 text-slate-600">{student?.grade_label || "—"}</td><td className="py-3 tabular-nums text-slate-700">{mark.score ?? "—"}</td><td className="py-3"><SchoolStatus value={mark.status} /></td></tr>; })}</tbody></table></div> : <SchoolEmptyState title="No marks available" description="Teacher-entered marks will appear here when records are available within your scope." />}
+      </SchoolPanel>}
+
     </div>
   );
 
@@ -403,6 +508,7 @@ function ScopedLeadershipWorkspace() {
     case "discipline": content = can("view_discipline") || can("review_discipline") ? renderDiscipline() : renderOverview(); break;
     case "tasks": content = can("manage_team_tasks") || can("assign_team_tasks") ? renderTasks() : renderOverview(); break;
     case "reports": content = can("view_reports") ? renderReports() : renderOverview(); break;
+    case "leadership": content = isDivisionDirector && can("view_staff") ? renderDivisionLeadership() : renderOverview(); break;
     default: content = renderOverview();
   }
 
