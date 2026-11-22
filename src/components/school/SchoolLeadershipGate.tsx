@@ -7,7 +7,7 @@ export type SchoolLeadershipAppointment = {
   id: string;
   school_id: string;
   membership_id: string;
-  position: "main_director" | "academic_director" | "hr_director" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "team_leader";
+  position: "academic_director" | "hr_director" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "team_leader";
   division_scope: "kg" | "elementary" | "middle_school" | "high_school" | null;
   team_name: string | null;
   permissions: string[];
@@ -52,6 +52,7 @@ export default function SchoolLeadershipGate({ children }: { children: React.Rea
         .select("id,school_id,membership_id,position,division_scope,team_name,permissions,status,start_date,end_date")
         .in("membership_id", membershipIds)
         .eq("status", "active")
+        .neq("position", "main_director")
         .lte("start_date", today)
         .or(`end_date.is.null,end_date.gte.${today}`)
         .order("start_date", { ascending: false });
