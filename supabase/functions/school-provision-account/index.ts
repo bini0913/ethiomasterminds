@@ -302,7 +302,7 @@ Deno.serve(async (req) => {
           p_school_username: username, p_section_id: position === "teacher" ? sectionId : null,
           p_subject_name: position === "teacher" ? (assignmentKind === "homeroom" ? "Homeroom" : subjectName) : null,
           p_assignment_kind: position === "teacher" ? assignmentKind : null,
-          p_position: position, p_team_name: position === "team_leader" ? teamName : null,
+          p_position: position, p_team_name: position === "team_leader" ? teamName : null, p_team_leader_appointment_id: position === "teacher" ? (normalize(payload?.team_leader_appointment_id) || null) : null,
         });
         if (attachError || !membershipId) throw new Error(attachError?.message || "Could not attach the new account to your division");
         createdUserId = null;
