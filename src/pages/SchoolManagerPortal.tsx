@@ -1073,17 +1073,17 @@ export default function SchoolManagerPortal() {
       ["view_staff_evaluations", "View staff evaluations"],
       ["manage_meetings", "Manage assigned meetings"],
     ] as const;
-    const visiblePermissionOptions = leaderPosition === "academic_director"
-      ? permissionOptions.filter(([permission]) => ![
-          "review_attendance", "manage_team_tasks", "assign_team_tasks",
-          "view_discipline", "review_discipline", "view_finance_summary", "view_staff_evaluations",
+    const visiblePermissionOptions = leaderPosition === "hr_director"
+      ? permissionOptions.filter(([permission]) => [
+          "view_staff", "view_staff_evaluations", "manage_team_tasks",
+          "view_reports", "view_finance_summary", "manage_meetings",
         ].includes(permission))
-      : leaderPosition === "hr_director"
-        ? permissionOptions.filter(([permission]) => [
-            "view_staff", "view_staff_evaluations", "manage_team_tasks",
-            "view_reports", "view_finance_summary", "manage_meetings",
-          ].includes(permission))
-        : permissionOptions;
+      : permissionOptions.filter(([permission]) => permission !== "view_staff_evaluations" && (
+          leaderPosition !== "academic_director" || ![
+            "review_attendance", "manage_team_tasks", "assign_team_tasks",
+            "view_discipline", "review_discipline", "view_finance_summary",
+          ].includes(permission)
+        ));
     const activeAppointment = (position: string, division: string | null) =>
       leadershipAppointments.find((item) => item.status === "active" && item.position === position && (division === null || item.division_scope === division));
     const vacancies = fixedPositions.filter(([position, , division]) => !activeAppointment(position, division));
