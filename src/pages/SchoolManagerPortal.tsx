@@ -1183,45 +1183,7 @@ export default function SchoolManagerPortal() {
             )) : <SchoolEmptyState title="No division mappings configured" description="Map each grade used by this school to KG, Elementary, Middle School, or High School." />}
           </div>
         </SchoolPanel>
-        <SchoolPanel title="Team membership assignments" description="Assign existing school staff to each Team Leader. Team membership does not create accounts or change school roles.">
-          <form onSubmit={saveTeamMember} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-            <SchoolField label="Team Leader">
-              <select className={schoolSelectClass} value={teamAppointmentId} onChange={(event) => setTeamAppointmentId(event.target.value)} required>
-                <option value="">Choose Team Leader</option>
-                {leadershipAppointments.filter((item) => item.position === "team_leader" && item.status === "active").map((item) => <option key={item.id} value={item.id}>{memberName(item.membership_id)} · {item.team_name}</option>)}
-              </select>
-            </SchoolField>
-            <SchoolField label="Staff member">
-              <select className={schoolSelectClass} value={teamMemberId} onChange={(event) => setTeamMemberId(event.target.value)} required>
-                <option value="">Choose active staff</option>
-                {staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
-              </select>
-            </SchoolField>
-            <SchoolPrimaryButton type="submit">Assign to team</SchoolPrimaryButton>
-          </form>
-          <div className="mt-4 space-y-3">
-            {leadershipAppointments.filter((item) => item.position === "team_leader").map((leader) => {
-              const assigned = teamAssignments.filter((item) => item.appointment_id === leader.id);
-              return (
-                <div key={leader.id} className="rounded-lg border border-slate-200 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{memberName(leader.membership_id)} · {leader.team_name}</p>
-                    <SchoolStatus value={leader.status} />
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {assigned.length ? assigned.map((item) => (
-                      <span key={item.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700">
-                        {memberName(item.membership_id)}
-                        <button type="button" onClick={() => void removeTeamMember(leader.id, item.membership_id)} className="font-semibold text-rose-600" aria-label={"Remove " + memberName(item.membership_id)}>×</button>
-                      </span>
-                    )) : <span className="text-xs text-slate-500">No staff assigned to this team yet.</span>}
-                  </div>
-                </div>
-              );
-            })}
-            {!leadershipAppointments.some((item) => item.position === "team_leader") && <SchoolEmptyState title="No Team Leaders appointed" description="Division Directors create Team Leaders in their own portal; use this section to assign teachers to their teams." />}
-          </div>
-        </SchoolPanel>
+        
         <SchoolPanel title="Leadership appointments" description="Suspending or ending an appointment preserves its history. A replacement is appointed as a new record.">
           <div className="mb-3">
             <SchoolField label="Reason for suspension or ending">
