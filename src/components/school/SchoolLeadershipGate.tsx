@@ -7,7 +7,7 @@ export type SchoolLeadershipAppointment = {
   id: string;
   school_id: string;
   membership_id: string;
-  position: "main_director" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "team_leader";
+  position: "main_director" | "academic_director" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "team_leader";
   division_scope: "kg" | "elementary" | "middle_school" | "high_school" | null;
   team_name: string | null;
   permissions: string[];
