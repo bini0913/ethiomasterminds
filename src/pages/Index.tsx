@@ -64,7 +64,7 @@ const Index: React.FC = () => {
         return;
       }
       if (user.role === 'manager') {
-        navigate('/manager-dashboard');
+        navigate('/school/manager');
         return;
       }
       
