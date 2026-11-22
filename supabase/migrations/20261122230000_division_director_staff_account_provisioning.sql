@@ -139,19 +139,6 @@ BEGIN
     );
   END IF;
 
-  INSERT INTO public.school_leadership_structure_events (
-    school_id, actor_user_id, actor_membership_id, event_type, details
-  ) VALUES (
-    p_school_id, p_actor_id, v_actor_membership_id,
-    CASE WHEN p_position = 'team_leader' THEN 'team_leader_account_created' ELSE 'teacher_account_created' END,
-    jsonb_build_object(
-      'membership_id', v_membership_id,
-      'position', p_position,
-      'division_scope', v_division,
-      'section_id', p_section_id,
-      'assignment_kind', p_assignment_kind
-    )
-  );
   RETURN v_membership_id;
 END;
 $function$;
