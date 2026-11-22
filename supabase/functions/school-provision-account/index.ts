@@ -322,6 +322,9 @@ Deno.serve(async (req) => {
       if (!schoolId || !validRoles.includes(role) || !Array.isArray(accounts) || accounts.length < 1 || accounts.length > 100) {
         return json({ error: "Provide a school, valid role, and between 1 and 100 accounts" }, 400);
       }
+      if (role === "teacher" && accounts.some((account) => !normalize(account?.leadership_position))) {
+        return json({ error: "The School Manager creates Director accounts; Division Directors create Teacher accounts" }, 403);
+      }
       if (role === "manager" && !canProvisionNetwork) {
         return json({ error: "Only the Super Admin or Extreme Admin can create a school Manager" }, 403);
       }
