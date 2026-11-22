@@ -1098,7 +1098,6 @@ export default function SchoolManagerPortal() {
       ["view_finance_summary", "View finance summaries"],
       ["view_staff_evaluations", "View staff evaluations"],
     ] as const;
-    const divisionDirectorPositions = ["kg_director", "elementary_director", "middle_school_director", "high_school_director"];
     const activeAppointment = (position: string, division: string | null) =>
       leadershipAppointments.find((item) => item.status === "active" && item.position === position && (division === null || item.division_scope === division));
     return (
@@ -1217,7 +1216,6 @@ export default function SchoolManagerPortal() {
               ))}
             </div>
           ) : <SchoolEmptyState title="No leadership appointments yet" description="Create Director and Vice Director accounts in People & Accounts above." />}
-          {vacancies.length > 0 && <p className="mt-4 text-xs text-slate-500">Vacant positions: {vacancies.map(([, label]) => label).join(", ")}.</p>}
         </SchoolPanel>
         <SchoolPanel title="Leadership activity history" description="Appointment and permission changes are recorded by the database.">
           {leadershipAuditEvents.length ? (
