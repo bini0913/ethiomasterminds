@@ -685,10 +685,9 @@ const Lobby: React.FC = () => {
       if (newRoomData.inviteFriendIds.length > 0 && user?.id) {
         await Promise.all(
           newRoomData.inviteFriendIds.map((friendId) =>
-            db.from("messages").insert({
-              sender_id: user.id,
-              receiver_id: friendId,
-              content: `🎮 Join my ${newRoomData.subject} room "${newRoomData.name}" with code: ${inviteCode}`
+            db.rpc("send_direct_message", {
+              p_receiver_id: friendId,
+              p_content: `🎮 Join my ${newRoomData.subject} room "${newRoomData.name}" with code: ${inviteCode}`
             })
           )
         );

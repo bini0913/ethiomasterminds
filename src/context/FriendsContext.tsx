@@ -206,7 +206,8 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         .from('messages')
         .select('*')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .limit(500);
 
       if (messagesError) throw messagesError;
 
@@ -261,8 +262,15 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     fetchFriends();
 
-    // Set up realtime subscription for both directions
+    // Set up realtime subscription for both directions with recovery/resync.
     if (user?.id) {
+      let disposed = false;
+      let refreshTimer: number | undefined;
+      const scheduleRefresh = () => {
+        if (disposed) return;
+        if (refreshTimer) window.clearTimeout(refreshTimer);
+        refreshTimer = window.setTimeout(() => { void fetchFriends(); }, 250);
+      };
       const channel = supabase
         .channel('friends-realtime-full')
         .on('postgres_changes', {
@@ -283,8 +291,12 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
                   content: msg.content,
                   read: msg.read || false,
                   timestamp: new Date(msg.created_at)
-                }];
+                }].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
               });
+            } else if (payload.eventType === 'UPDATE' && msg.id) {
+              setMessages(prev => prev.map(message => message.id === msg.id
+                ? { ...message, read: msg.read ?? message.read }
+                : message));
             }
           }
         })
@@ -293,20 +305,34 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
           schema: 'public',
           table: 'friends'
         }, () => {
-          // Refresh on any friends table change
-          fetchFriends();
+          scheduleRefresh();
         })
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
           table: 'user_presence'
         }, () => {
-          // Keep online + last-seen data fresh
-          fetchFriends();
+          scheduleRefresh();
         })
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            scheduleRefresh();
+            if (!disposed) window.setTimeout(() => { if (!disposed) channel.subscribe(); }, 1000);
+          }
+        });
+
+      const onVisibility = () => {
+        if (document.visibilityState === 'visible') scheduleRefresh();
+      };
+      const onOnline = () => scheduleRefresh();
+      document.addEventListener('visibilitychange', onVisibility);
+      window.addEventListener('online', onOnline);
 
       return () => {
+        disposed = true;
+        if (refreshTimer) window.clearTimeout(refreshTimer);
+        document.removeEventListener('visibilitychange', onVisibility);
+        window.removeEventListener('online', onOnline);
         supabase.removeChannel(channel);
       };
     }
@@ -410,14 +436,17 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       });
       if (error) throw error;
       if (data) {
-        setMessages(prev => [...prev, {
-          id: data.id,
-          sender: data.sender_id,
-          receiver: data.receiver_id,
-          content: data.content,
-          read: false,
-          timestamp: new Date(data.created_at)
-        }]);
+        setMessages(prev => {
+          if (prev.some(message => message.id === data.id)) return prev;
+          return [...prev, {
+            id: data.id,
+            sender: data.sender_id,
+            receiver: data.receiver_id,
+            content: data.content,
+            read: false,
+            timestamp: new Date(data.created_at)
+          }].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        });
         const { error: pushError } = await supabase.functions.invoke('send-push-notification', {
           body: { kind: 'direct_message', event_id: data.id },
         });
@@ -430,7 +459,11 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const markMessageAsRead = (messageId: string) => {
-    db.rpc('mark_direct_message_read', { p_message_id: messageId }).then(() => {
+    void db.rpc('mark_direct_message_read', { p_message_id: messageId }).then(({ error }) => {
+      if (error) {
+        console.warn('Could not mark direct message as read:', error.message);
+        return;
+      }
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, read: true } : m));
     });
   };
