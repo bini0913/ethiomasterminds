@@ -21,6 +21,8 @@ type AccountInput = {
   parent_membership_ids?: string[];
   student_membership_ids?: string[];
   assignments?: Array<{ section_id: string; subject_name: string; assignment_kind?: "subject" | "homeroom" }>;
+  leadership_position?: string;
+  division_scope?: string | null;
 };
 
 const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -110,6 +112,18 @@ Deno.serve(async (req) => {
       input: AccountInput,
       studentNumber?: number,
     ) => {
+      if (role === "teacher" && input.leadership_position) {
+        const { data, error } = await admin.rpc("school_attach_leadership_account", {
+          p_actor_id: actorId,
+          p_school_id: schoolId,
+          p_user_id: userId,
+          p_school_username: username,
+          p_position: input.leadership_position,
+          p_division_scope: input.division_scope ?? null,
+        });
+        if (error || !data) throw new Error(error?.message || "Could not attach the leadership account to the school");
+        return data as string;
+      }
       const { data, error } = await admin.rpc("school_attach_account", {
         p_actor_id: actorId,
         p_school_id: schoolId,
