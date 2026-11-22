@@ -847,7 +847,7 @@ export default function SchoolManagerPortal() {
 
   const renderAccounts = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="People & accounts" description="Create school accounts and review each person's assigned school role." />
+      <SchoolPageHeading title="People & accounts" description="Create real school logins for staff, leaders, parents and students, or link an existing Master Minds account." />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <SchoolPanel title="Create school account" description="Initial credentials are shown once. Deliver them privately.">
           <form onSubmit={createAccount} className="space-y-3">
