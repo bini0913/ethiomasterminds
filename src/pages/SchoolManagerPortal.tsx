@@ -445,6 +445,11 @@ export default function SchoolManagerPortal() {
     setCreatedCredentials([]);
     if (!accountName.trim()) return setFormError("Enter the person's full name.");
     const account: any = { name: accountName.trim() };
+    const directorDivisionByPosition: Record<string, string> = { kg_director: "kg", elementary_director: "elementary", middle_school_director: "middle_school", high_school_director: "high_school" };
+    if (accountLeadershipPosition) {
+      account.leadership_position = accountLeadershipPosition;
+      account.division_scope = accountLeadershipPosition === "vice_director" ? accountLeadershipDivision : directorDivisionByPosition[accountLeadershipPosition] || null;
+    }
     const provisionRole: "teacher" | "finance" | "parent" | "student" = accountLeadershipPosition === "hr_director" ? "finance" : accountLeadershipPosition ? "teacher" : accountRole;
     if (accountRole === "student") {
       const age = Number(accountAge);
