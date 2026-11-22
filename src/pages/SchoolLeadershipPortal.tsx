@@ -109,6 +109,20 @@ function ScopedLeadershipWorkspace() {
   const [sectionGradeLabel, setSectionGradeLabel] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
   const [sectionNamesText, setSectionNamesText] = useState("A");
+
+  useEffect(() => {
+    if (!sectionAcademicYearId || !sectionGradeLabel) return;
+    const existingNames = sections
+      .filter((section) => section.academic_year_id === sectionAcademicYearId && section.grade_label === sectionGradeLabel)
+      .map((section) => section.section_name);
+    if (existingNames.length) {
+      setSectionCount(existingNames.length);
+      setSectionNamesText(existingNames.join(", "));
+    } else {
+      setSectionCount(1);
+      setSectionNamesText("A");
+    }
+  }, [sectionAcademicYearId, sectionGradeLabel, sections]);
   const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [attendanceDrafts, setAttendanceDrafts] = useState<Record<string, { status: string; note: string; reason: string }>>({});
@@ -376,7 +390,7 @@ function ScopedLeadershipWorkspace() {
   const renderClassSections = () => (
     <div className="space-y-5">
       <SchoolPageHeading title="Class sections" description={`Set the number of classes and name each section for grades in your ${divisionInfo?.coverage || scopeLabel} division.`} />
-      <SchoolPanel title="Create class sections" description="You control the number and names of sections for each grade assigned to your division. Existing sections are preserved; duplicate names are skipped safely.">
+      <SchoolPanel title="Create class sections" description="Set the total number and names of sections for each grade assigned to your division. Existing sections must remain in your submitted list; the system never removes or moves students from a class.">
         {divisionGradeMappings.length && academicYears.length ? (
           <form onSubmit={createDivisionSections} className="grid gap-3 md:grid-cols-2">
             <label className="block text-xs font-medium text-slate-600">Academic year
@@ -390,13 +404,13 @@ function ScopedLeadershipWorkspace() {
               </select>
             </label>
             <label className="block text-xs font-medium text-slate-600">Number of classes
-              <input type="number" min={1} max={30} step={1} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800" value={sectionCount} onChange={(event) => { const count = Math.max(1, Math.min(30, Number(event.target.value) || 1)); setSectionCount(count); setSectionNamesText(Array.from({ length: count }, (_, index) => index < 26 ? String.fromCharCode(65 + index) : `A${index - 25}`).join(", ")); }} />
+              <input type="number" min={1} max={30} step={1} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800" value={sectionCount} onChange={(event) => { const count = Math.max(sections.filter((section) => section.academic_year_id === sectionAcademicYearId && section.grade_label === sectionGradeLabel).length, Math.min(30, Number(event.target.value) || 1)); const names = sectionNamesText.split(",").map((name) => name.trim()).filter(Boolean); while (names.length < count) { const index = names.length; const candidate = index < 26 ? String.fromCharCode(65 + index) : `A${index - 25}`; names.push(candidate); } setSectionCount(Math.min(30, count)); setSectionNamesText(names.slice(0, count).join(", ")); }} />
             </label>
             <label className="block text-xs font-medium text-slate-600">Section names (comma-separated)
               <input type="text" maxLength={400} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800" value={sectionNamesText} onChange={(event) => setSectionNamesText(event.target.value)} placeholder="A, B, C" />
             </label>
             <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-              <p className="text-xs leading-5 text-slate-500">Enter exactly {sectionCount} unique names. For example: A, B, C. The system will not move students or remove existing classes.</p>
+              <p className="text-xs leading-5 text-slate-500">Enter exactly {sectionCount} unique names. Existing sections are prefilled automatically; include all of them when adding new sections. Existing student and teacher links are never moved.</p>
               <button type="submit" className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Create sections</button>
             </div>
           </form>
