@@ -41,7 +41,7 @@ BEGIN
       RAISE EXCEPTION USING errcode = '22023', message = 'A valid Team Leader team name is required';
     END IF;
   ELSE
-    IF p_section_id IS NULL OR p_assignment_kind NOT IN ('subject', 'homeroom')
+    IF p_section_id IS NULL OR p_assignment_kind IS NULL OR p_assignment_kind NOT IN ('subject', 'homeroom')
        OR nullif(btrim(p_subject_name), '') IS NULL THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'Teacher class, subject and assignment type are required';
     END IF;
