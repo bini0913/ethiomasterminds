@@ -17,12 +17,14 @@ select ok(
   'authenticated clients cannot bypass the trusted account service'
 );
 select ok(
-  not has_function_privilege('anon','public.school_attach_existing_teacher_account(uuid,uuid,uuid)','EXECUTE'),
+  not has_function_privilege('anon','public.school_attach_existing_school_teacher_account(uuid,uuid,uuid)','EXECUTE'),
   'anonymous clients cannot attach existing accounts'
 );
 select ok(
-  position('Only this school''s Manager or appointed Main Director' in pg_get_functiondef('public.school_attach_existing_teacher_account(uuid,uuid,uuid)'::regprocedure)) > 0,
-  'existing teacher attachment is restricted to the school Manager or appointed Main Director'
+  position('school_role = ''manager''' in pg_get_functiondef('public.school_attach_existing_teacher_account(uuid,uuid,uuid)'::regprocedure)) > 0
+  AND position('appointment.position = ''main_director''' in pg_get_functiondef('public.school_attach_existing_teacher_account(uuid,uuid,uuid)'::regprocedure)) > 0
+  AND position('IF NOT (v_is_manager OR v_is_main_director)' in pg_get_functiondef('public.school_attach_existing_teacher_account(uuid,uuid,uuid)'::regprocedure)) > 0,
+  'existing teacher attachment requires an active school Manager or appointed Main Director'
 );
 select ok(
   position('already has a membership in this school' in pg_get_functiondef('public.school_attach_existing_teacher_account(uuid,uuid,uuid)'::regprocedure)) > 0,
