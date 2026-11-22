@@ -427,7 +427,10 @@ export default function SchoolManagerPortal() {
     if (!accountName.trim()) return setFormError("Enter the person's full name.");
     const account: any = { name: accountName.trim() };
     if (accountRole === "student") {
-      if (!accountSectionId || !Number.isInteger(Number(accountAge))) return setFormError("Choose a section and enter a valid age.");
+      const age = Number(accountAge);
+      if (!accountSectionId || !Number.isInteger(age) || age < 3 || age > 120) {
+        return setFormError("Choose a section and enter an age from 3 to 120.");
+      }
       const section = sections.find((item) => item.id === accountSectionId);
       if (!section) return setFormError("Selected section is no longer available.");
       account.grade_label = section.grade_label;
@@ -468,13 +471,18 @@ export default function SchoolManagerPortal() {
       school_id: schoolId, name: yearName.trim(), starts_on: yearStart, ends_on: yearEnd, is_current: false,
     }).select("id").single();
     if (error || !createdYear) return toast.error(error?.message || "Academic year could not be created.");
+    let currentYearUpdated = !yearIsCurrent;
     if (yearIsCurrent) {
       const { error: currentError } = await db.rpc("school_set_current_academic_year", { p_academic_year_id: createdYear.id });
-      if (currentError) toast.error("Year created, but the current-year setting could not be changed: " + currentError.message);
+      currentYearUpdated = !currentError;
+      if (currentError) {
+        toast.error("Academic year was created, but could not be set as current: " + currentError.message);
+      }
     }
     setYearName(""); setYearStart(""); setYearEnd(""); setYearIsCurrent(false);
-    if (yearIsCurrent) toast.success("Academic year created and set as current.");
-    else toast.success("Academic year created.");
+    if (currentYearUpdated && yearIsCurrent) toast.success("Academic year created and set as current.");
+    else if (!yearIsCurrent) toast.success("Academic year created.");
+    else toast.info("Academic year was created. Refresh the page after resolving the current-year setting.");
     await load();
   };
 
@@ -556,6 +564,8 @@ export default function SchoolManagerPortal() {
   const addGradingCategory = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!gradingYearId || !gradingGradeLabel.trim() || !newCategoryName.trim()) return toast.error("Complete the new category details.");
+    const weight = Number(newCategoryWeight);
+    if (!Number.isFinite(weight) || weight < 0 || weight > 100) return toast.error("Enter a category weight from 0 to 100.");
     const categoryKey = newCategoryName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
     if (!categoryKey) return toast.error("Category name must contain letters or numbers.");
     const { error } = await db.from("school_assessment_categories").insert({
@@ -571,9 +581,13 @@ export default function SchoolManagerPortal() {
   const saveGradingPolicy = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!gradingYearId || !gradingGradeLabel.trim()) return toast.error("Choose an academic year and grade.");
+    const validatedPassMark = Number(passMark);
+    if (!Number.isFinite(validatedPassMark) || validatedPassMark < 0 || validatedPassMark > 100) {
+      return toast.error("Pass mark must be a number from 0 to 100.");
+    }
     const { error } = await db.from("school_grading_policies").upsert({
       school_id: schoolId, academic_year_id: gradingYearId, grade_label: gradingGradeLabel.trim(),
-      pass_mark: Number(passMark), rank_scope: rankScope, missing_mark_rule: missingMarkRule,
+      pass_mark: validatedPassMark, rank_scope: rankScope, missing_mark_rule: missingMarkRule,
       updated_by: members.find((member) => member.id === activeMembership?.id)?.user_id,
     }, { onConflict: "school_id,academic_year_id,grade_label" });
     if (error) return toast.error(error.message);
@@ -601,11 +615,15 @@ export default function SchoolManagerPortal() {
   const savePolicySettings = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!policySettings) return toast.error("School policy settings are not available.");
+    const absenceThreshold = Number(policySettings.absence_review_threshold);
+    if (!Number.isInteger(absenceThreshold) || absenceThreshold < 1 || absenceThreshold > 60) {
+      return toast.error("The absence review threshold must be a whole number from 1 to 60.");
+    }
     const { error } = await db.from("school_policy_settings").update({
       attendance_notifications_enabled: policySettings.attendance_notifications_enabled,
       behavior_notifications_enabled: policySettings.behavior_notifications_enabled,
       report_card_notifications_enabled: policySettings.report_card_notifications_enabled,
-      absence_review_threshold: Number(policySettings.absence_review_threshold),
+      absence_review_threshold: absenceThreshold,
       updated_by: members.find((member) => member.id === activeMembership?.id)?.user_id,
       updated_at: new Date().toISOString(),
     }).eq("school_id", schoolId);
@@ -672,10 +690,13 @@ export default function SchoolManagerPortal() {
 
   const addFeeStructure = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!feeYearId || !feeGrade.trim() || !feeName.trim() || Number(feeAmount) <= 0) return toast.error("Enter a valid fee structure.");
+    const amount = Number(feeAmount);
+    if (!feeYearId || !feeGrade.trim() || !feeName.trim() || !Number.isFinite(amount) || amount <= 0) {
+      return toast.error("Choose an academic year and enter a fee name and a valid amount greater than zero.");
+    }
     const { error } = await db.from("school_fee_structures").insert({
       school_id: schoolId, academic_year_id: feeYearId, grade_label: feeGrade.trim(),
-      fee_name: feeName.trim(), amount: Number(feeAmount), currency: feeCurrency,
+      fee_name: feeName.trim(), amount, currency: feeCurrency,
       due_date: feeDueDate || null,
       created_by: members.find((m) => m.id === activeMembership?.id)?.user_id,
     });
@@ -702,11 +723,14 @@ export default function SchoolManagerPortal() {
 
   const createEvaluation = async (event: React.FormEvent) => {
     event.preventDefault();
+    const rating = Number(evaluationRating);
     if (!evaluationTargetId || !evaluationNotes.trim()) return toast.error("Choose a staff member and add evaluation notes.");
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return toast.error("Evaluation rating must be from 1 to 5.");
+    if (evaluationStart && evaluationEnd && evaluationEnd < evaluationStart) return toast.error("Evaluation end date must not be before its start date.");
     const { error } = await db.from("school_staff_evaluations").insert({
       school_id: schoolId, target_membership_id: evaluationTargetId,
       reviewer_membership_id: activeMembership?.id, evaluation_type: "staff_performance",
-      rating: Number(evaluationRating), period_start: evaluationStart || null,
+      rating, period_start: evaluationStart || null,
       period_end: evaluationEnd || null, notes: evaluationNotes.trim(),
     });
     if (error) return toast.error(error.message);
