@@ -137,58 +137,27 @@ EXECUTE FUNCTION public.school_reject_platform_authority_appointment();
 -- This helper hides top-level authority identities only from users who would
 -- otherwise be entitled to view the target membership. Extreme Admin retains
 -- full visibility; the helper cannot be used as a cross-school role oracle.
-CREATE OR REPLACE FUNCTION public.school_is_platform_authority_membership(p_membership_id uuid)
+CREATE OR REPLACE FUNCTION public._school_is_platform_authority_user(p_user_id uuid)
 RETURNS boolean
-LANGUAGE plpgsql
+LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $function$
-DECLARE
-  v_school_id uuid;
-  v_user_id uuid;
-BEGIN
-  IF auth.uid() IS NULL OR p_membership_id IS NULL THEN
-    RETURN false;
-  END IF;
-
-  SELECT membership.school_id, membership.user_id
-  INTO v_school_id, v_user_id
-  FROM public.school_memberships membership
-  WHERE membership.id = p_membership_id;
-
-  IF v_school_id IS NULL OR public._is_extreme_admin() THEN
-    RETURN false;
-  END IF;
-
-  IF NOT (
-    public._is_super_admin()
-    OR public.is_school_manager_or_admin(v_school_id)
-    OR public.school_leadership_has_permission(
-      v_school_id,
-      'view_staff',
-      NULL,
-      p_membership_id,
-      NULL
-    )
-  ) THEN
-    RETURN false;
-  END IF;
-
-  RETURN EXISTS (
+  SELECT p_user_id IS NOT NULL AND EXISTS (
     SELECT 1
     FROM public.user_roles platform_role
-    WHERE platform_role.user_id = v_user_id
+    WHERE platform_role.user_id = p_user_id
       AND platform_role.role IN (
         'super_admin'::public.app_role,
         'extreme_admin'::public.app_role
       )
   );
-END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.school_is_platform_authority_membership(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.school_is_platform_authority_membership(uuid) TO authenticated;
+-- Internal detector is only called from security-definer visibility functions.
+-- Do not expose a direct platform-role lookup to authenticated school users.
+REVOKE ALL ON FUNCTION public._school_is_platform_authority_user(uuid) FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.school_can_view_membership(p_membership_id uuid)
 RETURNS boolean
@@ -201,7 +170,7 @@ AS $function$
     SELECT 1
     FROM public.school_memberships target
     WHERE target.id = p_membership_id
-      AND NOT public.school_is_platform_authority_membership(target.id)
+      AND NOT public._school_is_platform_authority_user(target.user_id)
       AND (
         target.user_id = auth.uid()
         OR public._is_extreme_admin()
@@ -252,7 +221,12 @@ AS $function$
     SELECT 1
     FROM public.school_leadership_appointments appointment
     WHERE appointment.id = p_appointment_id
-      AND NOT public.school_is_platform_authority_membership(appointment.membership_id)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.school_memberships authority_membership
+        WHERE authority_membership.id = appointment.membership_id
+          AND public._school_is_platform_authority_user(authority_membership.user_id)
+      )
       AND (
         public.is_school_manager(appointment.school_id)
         OR EXISTS (
@@ -301,6 +275,46 @@ AS $function$
   );
 $function$;
 
+CREATE OR REPLACE FUNCTION public.school_can_view_scoped_leadership_membership(p_membership_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $function$
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM public.school_memberships target
+    WHERE target.id = p_membership_id
+      AND NOT public._school_is_platform_authority_user(target.user_id)
+      AND (
+        (
+          target.school_role = 'student'
+          AND (
+            public.school_leadership_has_permission(target.school_id, 'view_students', target.grade_label, target.id, target.section_id)
+            OR public.school_leadership_has_permission(target.school_id, 'view_discipline', target.grade_label, target.id, target.section_id)
+            OR public.school_leadership_has_permission(target.school_id, 'review_discipline', target.grade_label, target.id, target.section_id)
+            OR public.school_leadership_has_permission(target.school_id, 'view_attendance', target.grade_label, target.id, target.section_id)
+            OR public.school_leadership_has_permission(target.school_id, 'review_attendance', target.grade_label, target.id, target.section_id)
+            OR public.school_leadership_has_permission(target.school_id, 'view_academics', target.grade_label, target.id, target.section_id)
+            OR public.school_leadership_has_permission(target.school_id, 'review_results', target.grade_label, target.id, target.section_id)
+          )
+        )
+        OR (
+          target.school_role = ANY (ARRAY['admin', 'teacher', 'finance']::text[])
+          AND (
+            public.school_leadership_has_permission(target.school_id, 'view_staff', target.grade_label, target.id, target.section_id)
+            OR public.school_leadership_has_permission(target.school_id, 'manage_team_tasks', target.grade_label, target.id, target.section_id)
+            OR public.school_leadership_has_permission(target.school_id, 'assign_team_tasks', target.grade_label, target.id, target.section_id)
+          )
+        )
+      )
+  );
+$function$;
+
+REVOKE ALL ON FUNCTION public.school_can_view_scoped_leadership_membership(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_can_view_scoped_leadership_membership(uuid) TO authenticated;
+
 DROP POLICY IF EXISTS school_memberships_manager_update ON public.school_memberships;
 CREATE POLICY school_memberships_manager_update
 ON public.school_memberships
@@ -309,14 +323,14 @@ USING (
   public._is_extreme_admin()
   OR (
     public.is_school_manager_or_admin(school_id)
-    AND NOT public.school_is_platform_authority_membership(id)
+    AND public.school_can_view_membership(id)
   )
 )
 WITH CHECK (
   public._is_extreme_admin()
   OR (
     public.is_school_manager_or_admin(school_id)
-    AND NOT public.school_is_platform_authority_membership(id)
+    AND public.school_can_view_membership(id)
   )
 );
 
@@ -324,30 +338,6 @@ DROP POLICY IF EXISTS school_leadership_view_scoped_memberships ON public.school
 CREATE POLICY school_leadership_view_scoped_memberships
 ON public.school_memberships
 FOR SELECT
-USING (
-  NOT public.school_is_platform_authority_membership(id)
-  AND (
-    (
-      school_role = 'student'
-      AND (
-        public.school_leadership_has_permission(school_id, 'view_students', grade_label, id, section_id)
-        OR public.school_leadership_has_permission(school_id, 'view_discipline', grade_label, id, section_id)
-        OR public.school_leadership_has_permission(school_id, 'review_discipline', grade_label, id, section_id)
-        OR public.school_leadership_has_permission(school_id, 'view_attendance', grade_label, id, section_id)
-        OR public.school_leadership_has_permission(school_id, 'review_attendance', grade_label, id, section_id)
-        OR public.school_leadership_has_permission(school_id, 'view_academics', grade_label, id, section_id)
-        OR public.school_leadership_has_permission(school_id, 'review_results', grade_label, id, section_id)
-      )
-    )
-    OR (
-      school_role = ANY (ARRAY['admin', 'teacher', 'finance']::text[])
-      AND (
-        public.school_leadership_has_permission(school_id, 'view_staff', grade_label, id, section_id)
-        OR public.school_leadership_has_permission(school_id, 'manage_team_tasks', grade_label, id, section_id)
-        OR public.school_leadership_has_permission(school_id, 'assign_team_tasks', grade_label, id, section_id)
-      )
-    )
-  )
-);
+USING (public.school_can_view_scoped_leadership_membership(id));
 
 COMMIT;
