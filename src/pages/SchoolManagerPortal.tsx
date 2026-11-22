@@ -1240,7 +1240,7 @@ export default function SchoolManagerPortal() {
                     </div>
                     <SchoolStatus value={appointment.status} />
                   </div>
-                  {appointment.position === "main_director" ? <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">This legacy appointment is retained for historical records only.</p> : <details className="mt-3 rounded-lg border border-slate-100 p-3">
+                  <details className="mt-3 rounded-lg border border-slate-100 p-3">
                     <summary className="cursor-pointer text-xs font-semibold text-blue-700">Manage permissions</summary>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       {permissionOptions.map(([permission, label]) => {
@@ -1272,7 +1272,7 @@ export default function SchoolManagerPortal() {
                       />
                       <SchoolSecondaryButton onClick={() => void updateLeaderPermissions(appointment.id, permissionDrafts[appointment.id] ?? appointment.permissions ?? [])}>Save permissions</SchoolSecondaryButton>
                     </div>
-                  </details>}
+                  </details>
                   {appointment.status !== "ended" && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {appointment.status === "active"
