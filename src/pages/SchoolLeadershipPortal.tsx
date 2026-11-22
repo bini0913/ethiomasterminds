@@ -53,6 +53,28 @@ function ScopedLeadershipWorkspace() {
   };
   const isDivisionDirector = ["kg_director", "elementary_director", "middle_school_director", "high_school_director"].includes(appointment.position);
   const divisionInfo = appointment.division_scope ? divisionDetails[appointment.division_scope] : null;
+  const divisionFocusCopy: Record<string, { heading: string; description: string; supportingText: string }> = {
+    kg: {
+      heading: "Early learning and care",
+      description: `${activeSchool?.name || "School"} · KG Division · Nursery through KG 2. Coordinate early-learning groups, staff, attendance and student support within the grades mapped to your division.`,
+      supportingText: "Use the school's configured Nursery, KG 1 and KG 2 labels. Counts below come only from live school records visible to your appointment.",
+    },
+    elementary: {
+      heading: "Foundational learning",
+      description: `${activeSchool?.name || "School"} · Elementary Division · Grades 1–6. Monitor foundational learning, classroom coverage, attendance and assessment progress across your mapped grades.`,
+      supportingText: "Review actual class sections, assessment submissions and homework records for the elementary grades configured by the School Manager.",
+    },
+    middle_school: {
+      heading: "Middle school progress",
+      description: `${activeSchool?.name || "School"} · Middle School Division · Grades 7–8. Coordinate the middle-school team and monitor attendance, student support and subject assessment progress.`,
+      supportingText: "Keep oversight focused on the school's mapped Grade 7 and Grade 8 sections and their real teaching and assessment records.",
+    },
+    high_school: {
+      heading: "Secondary academic progress",
+      description: `${activeSchool?.name || "School"} · High School Division · Grades 9–12. Monitor subject assessment progress, submitted results, attendance and teacher follow-through across your mapped grades.`,
+      supportingText: "Use actual assessment, homework and mark records for Grades 9–12. Result visibility and review actions depend on the permissions granted by the School Manager.",
+    },
+  };
   const scopeLabel = appointment.position === "team_leader"
     ? (appointment.team_name || "Assigned team")
     : appointment.division_scope
@@ -104,14 +126,14 @@ function ScopedLeadershipWorkspace() {
     setLoading(true);
     setLoadError(null);
     const requests: Record<string, Promise<any>> = {};
-    if (can("view_students") || can("view_staff") || can("manage_team_tasks") || can("assign_team_tasks")) {
+    if (can("view_students") || can("view_staff") || can("view_academics") || can("review_results") || can("manage_team_tasks") || can("assign_team_tasks")) {
       requests.members = db.from("school_memberships")
         .select("id,user_id,school_role,status,grade_label,section_id,school_username")
         .eq("school_id", schoolId)
         .eq("status", "active")
         .order("created_at", { ascending: false });
     }
-    if (can("view_students") || can("view_curriculum") || can("view_academics") || can("review_assessments") || can("view_attendance") || can("review_attendance") || can("view_discipline") || can("review_discipline")) {
+    if (can("view_students") || can("view_curriculum") || can("view_academics") || can("review_assessments") || can("review_results") || can("view_attendance") || can("review_attendance") || can("view_discipline") || can("review_discipline")) {
       requests.sections = db.from("school_sections")
         .select("id,grade_label,section_name")
         .eq("school_id", schoolId)
@@ -134,6 +156,8 @@ function ScopedLeadershipWorkspace() {
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false })
         .limit(100);
+    }
+    if (can("view_academics") || can("review_assessments")) {
       requests.homework = db.from("school_homework_assignments")
         .select("id,title,section_id,subject_name,due_at,status,created_at")
         .eq("school_id", schoolId)
@@ -146,22 +170,24 @@ function ScopedLeadershipWorkspace() {
         .eq("school_id", schoolId)
         .limit(500);
     }
-    if (isDivisionDirector && can("view_staff")) {
-      requests.divisionAppointments = db.from("school_leadership_appointments")
-        .select("id,membership_id,position,division_scope,team_name,status,start_date,end_date")
-        .eq("school_id", schoolId)
-        .eq("division_scope", appointment.division_scope)
-        .in("position", ["vice_director", "team_leader"])
-        .eq("status", "active")
-        .order("position");
-      requests.teamAssignments = db.from("school_leadership_team_members")
-        .select("id,appointment_id,membership_id")
-        .eq("school_id", schoolId);
+    if (isDivisionDirector) {
       requests.divisionGradeMappings = db.from("school_division_grade_mappings")
         .select("id,grade_label")
         .eq("school_id", schoolId)
         .eq("division_scope", appointment.division_scope)
         .order("grade_label");
+      if (can("view_staff")) {
+        requests.divisionAppointments = db.from("school_leadership_appointments")
+          .select("id,membership_id,position,division_scope,team_name,status,start_date,end_date")
+          .eq("school_id", schoolId)
+          .eq("division_scope", appointment.division_scope)
+          .in("position", ["vice_director", "team_leader"])
+          .eq("status", "active")
+          .order("position");
+        requests.teamAssignments = db.from("school_leadership_team_members")
+          .select("id,appointment_id,membership_id")
+          .eq("school_id", schoolId);
+      }
     }
     if (can("view_discipline") || can("review_discipline")) {
       requests.behavior = db.from("school_behavior_reports")
@@ -369,7 +395,12 @@ function ScopedLeadershipWorkspace() {
 
   const renderOverview = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title={title} description={`${activeSchool?.name || "School"} · ${scopeLabel} · Your appointment is limited to its assigned permissions and school scope.`} />
+      <SchoolPageHeading
+        title={isDivisionDirector ? `${title} · ${divisionInfo?.coverage || scopeLabel}` : title}
+        description={isDivisionDirector
+          ? divisionFocusCopy[appointment.division_scope || "elementary"].description
+          : `${activeSchool?.name || "School"} · ${scopeLabel} · Your appointment is limited to its assigned permissions and school scope.`}
+      />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {can("view_students") && <SchoolMetric label="Students in scope" value={activeStudents.length} detail="Active student memberships visible to your appointment" icon={Users} />}
         {can("view_staff") && <SchoolMetric label="Staff in scope" value={activeStaff.length} detail="Active staff memberships visible to your appointment" icon={UserCog} />}
@@ -377,6 +408,48 @@ function ScopedLeadershipWorkspace() {
         {(can("view_academics") || can("review_assessments")) && <SchoolMetric label="Pending assessments" value={pendingAssessments.length} detail="Submissions awaiting academic review" icon={ClipboardCheck} />}
         {(can("manage_team_tasks") || can("assign_team_tasks")) && <SchoolMetric label="Team tasks" value={tasks.length} detail="Tasks visible to your assigned team or division" icon={ClipboardList} />}
       </div>
+      {isDivisionDirector && (
+        <SchoolPanel
+          title={divisionFocusCopy[appointment.division_scope || "elementary"].heading}
+          description={divisionFocusCopy[appointment.division_scope || "elementary"].supportingText}
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg border border-slate-100 p-3">
+              <p className="text-xs text-slate-500">Mapped grades</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{divisionGradeMappings.length}</p>
+              <p className="mt-1 text-xs text-slate-500">{divisionGradeMappings.map((mapping) => mapping.grade_label).join(" · ") || "No grade mappings configured"}</p>
+            </div>
+            {(can("view_students") || can("view_curriculum") || can("view_academics")) && (
+              <div className="rounded-lg border border-slate-100 p-3">
+                <p className="text-xs text-slate-500">Visible class sections</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{sections.length}</p>
+                <p className="mt-1 text-xs text-slate-500">Configured sections in your division scope</p>
+              </div>
+            )}
+            {(can("view_academics") || can("review_assessments")) && (
+              <div className="rounded-lg border border-slate-100 p-3">
+                <p className="text-xs text-slate-500">Assessment submissions</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{assessments.length}</p>
+                <p className="mt-1 text-xs text-slate-500">{pendingAssessments.length} awaiting review</p>
+              </div>
+            )}
+            {(can("view_academics") || can("review_assessments")) && (
+              <div className="rounded-lg border border-slate-100 p-3">
+                <p className="text-xs text-slate-500">Homework assignments</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{homework.length}</p>
+                <p className="mt-1 text-xs text-slate-500">Existing assignments in the mapped grades</p>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {can("view_students") && <button onClick={() => setPage("students")} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Student directory</button>}
+            {can("view_staff") && <button onClick={() => setPage("staff")} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Staff directory</button>}
+            {(can("view_attendance") || can("review_attendance")) && <button onClick={() => setPage("attendance")} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Attendance oversight</button>}
+            {(can("view_academics") || can("review_assessments") || can("review_results")) && <button onClick={() => setPage("academics")} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Academic oversight</button>}
+            {(can("assign_team_tasks") || can("manage_team_tasks")) && <button onClick={() => setPage("tasks")} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Team tasks</button>}
+          </div>
+        </SchoolPanel>
+      )}
       <SchoolPanel title="Leadership appointment">
         <div className="grid gap-3 sm:grid-cols-2">
           <div><p className="text-xs text-slate-500">Position</p><p className="mt-1 text-sm font-semibold capitalize text-slate-900">{title}</p></div>
@@ -392,7 +465,7 @@ function ScopedLeadershipWorkspace() {
       <SchoolPanel title="Scope and access">
         <p className="text-sm leading-6 text-slate-600">Your workspace only displays records the school database authorizes for this appointment. Division Directors are restricted to their mapped grades. Team Leaders are restricted to their assigned team and linked sections. The School Manager controls appointments and permissions.</p>
       </SchoolPanel>
-      {isDivisionDirector && <div>{renderDivisionLeadership()}</div>}
+      {isDivisionDirector && can("view_staff") && <div>{renderDivisionLeadership()}</div>}
     </div>
   );
 
