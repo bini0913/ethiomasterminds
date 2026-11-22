@@ -64,13 +64,13 @@ select ok(has_function_privilege('authenticated','public.school_review_assessmen
 select ok(not has_function_privilege('anon','public.school_review_assessment(uuid,boolean,text)','EXECUTE'), 'anonymous users cannot call the guarded assessment review RPC');
 
 
-select ok((select qual like '%review_discipline%' from pg_policies where schemaname='public' and tablename='school_memberships' and policyname='school_leadership_view_scoped_memberships'), 'student identity reads are available to scoped student-support reviewers');
+select ok(position('review_discipline' in pg_get_functiondef('public.school_can_view_scoped_leadership_membership(uuid)'::regprocedure)) > 0, 'student identity reads are available to scoped student-support reviewers');
 select ok((select qual like '%review_assessments%' from pg_policies where schemaname='public' and tablename='school_sections' and policyname='school_leadership_view_scoped_sections'), 'section labels are readable to scoped academic reviewers');
 select ok((select qual like '%review_attendance%' from pg_policies where schemaname='public' and tablename='school_attendance_sessions' and policyname='school_leadership_view_scoped_attendance_sessions'), 'attendance sessions are readable to scoped attendance reviewers');
 select ok((select qual like '%review_attendance%' from pg_policies where schemaname='public' and tablename='school_attendance_records' and policyname='school_leadership_view_scoped_attendance_records'), 'attendance records are readable to scoped attendance reviewers');
 select ok((select qual like '%review_discipline%' from pg_policies where schemaname='public' and tablename='school_behavior_reports' and policyname='school_leadership_view_scoped_behavior_reports'), 'behavior reports are readable to scoped discipline reviewers');
 select ok((select qual like '%review_assessments%' from pg_policies where schemaname='public' and tablename='school_homework_assignments' and policyname='school_leadership_view_scoped_homework'), 'homework is readable to scoped academic reviewers');
-select ok((select qual like '%assign_team_tasks%' from pg_policies where schemaname='public' and tablename='school_memberships' and policyname='school_leadership_view_scoped_memberships'), 'team task leaders can read only assigned-scope staff memberships');
+select ok(position('assign_team_tasks' in pg_get_functiondef('public.school_can_view_scoped_leadership_membership(uuid)'::regprocedure)) > 0, 'team task leaders can read only assigned-scope staff memberships');
 
 
 select ok(to_regclass('public.school_leadership_action_events') is not null, 'operational leadership audit table exists');
@@ -140,12 +140,7 @@ select ok(
   'appointed division leaders can view student profiles only when the mapped student scope is permitted'
 );
 select ok(
-  coalesce((
-    select position('view_academics' in pg_get_expr(polqual, polrelid)) > 0
-    from pg_policy
-    where polname = 'school_leadership_view_scoped_memberships'
-      and polrelid = 'public.school_memberships'::regclass
-  ), false),
+  position('view_academics' in pg_get_functiondef('public.school_can_view_scoped_leadership_membership(uuid)'::regprocedure)) > 0,
   'academic oversight permission grants scoped student membership visibility'
 );
 select ok(
