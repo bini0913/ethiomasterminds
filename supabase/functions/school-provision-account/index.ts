@@ -21,6 +21,8 @@ type AccountInput = {
   parent_membership_ids?: string[];
   student_membership_ids?: string[];
   assignments?: Array<{ section_id: string; subject_name: string; assignment_kind?: "subject" | "homeroom" }>;
+  leadership_position?: string;
+  division_scope?: string | null;
 };
 
 const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -110,6 +112,18 @@ Deno.serve(async (req) => {
       input: AccountInput,
       studentNumber?: number,
     ) => {
+      if (role === "teacher" && input.leadership_position) {
+        const { data, error } = await admin.rpc("school_attach_leadership_account", {
+          p_actor_id: actorId,
+          p_school_id: schoolId,
+          p_user_id: userId,
+          p_school_username: username,
+          p_position: input.leadership_position,
+          p_division_scope: input.division_scope ?? null,
+        });
+        if (error || !data) throw new Error(error?.message || "Could not attach the leadership account to the school");
+        return data as string;
+      }
       const { data, error } = await admin.rpc("school_attach_account", {
         p_actor_id: actorId,
         p_school_id: schoolId,
@@ -192,30 +206,9 @@ Deno.serve(async (req) => {
         .eq("school_id", schoolId)
         .eq("user_id", actorId)
         .eq("status", "active")
-        .in("school_role", ["manager", "admin"]);
+        .eq("school_role", "manager");
       if (actorMembershipError) return json({ error: "Unable to verify this school's authority" }, 503);
-
-      const isManager = (actorMemberships ?? []).some((membership: { school_role: string }) => membership.school_role === "manager");
-      const adminMembership = (actorMemberships ?? []).find((membership: { id: string; school_role: string }) => membership.school_role === "admin");
-      let isMainDirector = false;
-      if (adminMembership) {
-        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
-        const { data: appointment, error: appointmentError } = await admin
-          .from("school_leadership_appointments")
-          .select("id")
-          .eq("school_id", schoolId)
-          .eq("membership_id", adminMembership.id)
-          .eq("position", "main_director")
-          .eq("status", "active")
-          .lte("start_date", today)
-          .or(`end_date.is.null,end_date.gte.${today}`)
-          .maybeSingle();
-        if (appointmentError) return json({ error: "Unable to verify Main Director appointment" }, 503);
-        isMainDirector = Boolean(appointment?.id);
-      }
-      if (!isManager && !isMainDirector) {
-        return json({ error: "Only this school's Manager or appointed Main Director can attach an existing teacher account" }, 403);
-      }
+      if (!(actorMemberships ?? []).length) return json({ error: "Only this school's Manager can attach an existing teacher account" }, 403);
 
       const { data: targetProfile, error: profileError } = await admin
         .from("profiles")
@@ -243,13 +236,94 @@ Deno.serve(async (req) => {
       }, 201);
     }
 
+    if (action === "create_division_staff") {
+      const schoolId = normalize(payload?.school_id);
+      const position = normalize(payload?.position);
+      const name = normalize(payload?.name);
+      const sectionId = normalize(payload?.section_id);
+      const assignmentKind = normalize(payload?.assignment_kind);
+      const subjectName = normalize(payload?.subject_name);
+      const teamName = normalize(payload?.team_name);
+      if (!schoolId || !["teacher", "team_leader"].includes(position) || name.length < 2 || name.length > 160) {
+        return json({ error: "Provide a valid name and account type" }, 400);
+      }
+      if (position === "team_leader" && (teamName.length < 2 || teamName.length > 100)) {
+        return json({ error: "Enter a valid Team Leader team name" }, 400);
+      }
+      if (position === "teacher" && (!sectionId || !["subject", "homeroom"].includes(assignmentKind) || (assignmentKind === "subject" && !subjectName))) {
+        return json({ error: "Choose the class, assignment type and subject for this teacher" }, 400);
+      }
+
+      const { data: actorMembership, error: actorError } = await admin
+        .from("school_memberships").select("id")
+        .eq("school_id", schoolId).eq("user_id", actorId)
+        .eq("school_role", "teacher").eq("status", "active").maybeSingle();
+      if (actorError || !actorMembership) return json({ error: "An active school staff account is required" }, 403);
+
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
+      const { data: directorAppointment, error: directorError } = await admin
+        .from("school_leadership_appointments").select("id,division_scope")
+        .eq("school_id", schoolId).eq("membership_id", actorMembership.id)
+        .in("position", ["kg_director", "elementary_director", "middle_school_director", "high_school_director"])
+        .eq("status", "active").lte("start_date", today)
+        .or("end_date.is.null,end_date.gte." + today).limit(1).maybeSingle();
+      if (directorError || !directorAppointment) return json({ error: "Only an active Division Director can create Team Leaders and Teachers" }, 403);
+
+      if (position === "teacher") {
+        const { data: section, error: sectionError } = await admin
+          .from("school_sections").select("id,grade_label,academic_year_id")
+          .eq("id", sectionId).eq("school_id", schoolId).maybeSingle();
+        if (sectionError || !section) return json({ error: "Choose a class section in your division" }, 400);
+        const { data: mapping, error: mappingError } = await admin
+          .from("school_division_grade_mappings").select("id")
+          .eq("school_id", schoolId).eq("division_scope", directorAppointment.division_scope)
+          .eq("grade_label", section.grade_label).maybeSingle();
+        if (mappingError || !mapping) return json({ error: "That class is outside your assigned division" }, 403);
+        const { data: year, error: yearError } = await admin
+          .from("school_academic_years").select("id")
+          .eq("id", section.academic_year_id).eq("school_id", schoolId)
+          .eq("is_current", true).maybeSingle();
+        if (yearError || !year) return json({ error: "Choose a class in the current academic year" }, 400);
+        if (assignmentKind === "subject") {
+          const { data: subject, error: subjectError } = await admin
+            .from("school_subjects").select("id")
+            .eq("school_id", schoolId).eq("academic_year_id", section.academic_year_id)
+            .eq("grade_label", section.grade_label).eq("subject_name", subjectName)
+            .eq("active", true).maybeSingle();
+          if (subjectError || !subject) return json({ error: "Choose an active subject for this grade" }, 400);
+        }
+      }
+
+      try {
+        const username = await uniqueStaffUsername();
+        const account = await createAuthAccount(name, username);
+        const { data: membershipId, error: attachError } = await admin.rpc("school_attach_division_staff_account", {
+          p_actor_id: actorId, p_school_id: schoolId, p_user_id: account.userId,
+          p_school_username: username, p_section_id: position === "teacher" ? sectionId : null,
+          p_subject_name: position === "teacher" ? (assignmentKind === "homeroom" ? "Homeroom" : subjectName) : null,
+          p_assignment_kind: position === "teacher" ? assignmentKind : null,
+          p_position: position, p_team_name: position === "team_leader" ? teamName : null, p_team_leader_appointment_id: position === "teacher" ? (normalize(payload?.team_leader_appointment_id) || null) : null,
+        });
+        if (attachError || !membershipId) throw new Error(attachError?.message || "Could not attach the new account to your division");
+        createdUserId = null;
+        return json({ created: { membership_id: membershipId, username, initial_password: account.password, role: position } }, 201);
+      } catch (error) {
+        if (createdUserId) await admin.auth.admin.deleteUser(createdUserId);
+        createdUserId = null;
+        return json({ error: error instanceof Error ? error.message : "Account creation failed" }, 400);
+      }
+    }
+
     if (action === "create_accounts") {
       const schoolId = normalize(payload?.school_id);
       const role = normalize(payload?.role) as SchoolRole;
       const accounts = payload?.accounts as AccountInput[];
-      const validRoles: SchoolRole[] = ["manager", "admin", "teacher", "finance", "parent", "student"];
+      const validRoles: SchoolRole[] = ["manager", "teacher", "finance", "parent", "student"];
       if (!schoolId || !validRoles.includes(role) || !Array.isArray(accounts) || accounts.length < 1 || accounts.length > 100) {
         return json({ error: "Provide a school, valid role, and between 1 and 100 accounts" }, 400);
+      }
+      if (role === "teacher" && accounts.some((account) => !normalize(account?.leadership_position))) {
+        return json({ error: "The School Manager creates Director accounts; Division Directors create Teacher accounts" }, 403);
       }
       if (role === "manager" && !canProvisionNetwork) {
         return json({ error: "Only the Super Admin or Extreme Admin can create a school Manager" }, 403);
@@ -257,34 +331,13 @@ Deno.serve(async (req) => {
       if (role !== "manager" && !canProvisionNetwork) {
         const { data: memberships, error: membershipError } = await admin
           .from("school_memberships")
-          .select("id,school_role")
+          .select("id")
           .eq("school_id", schoolId)
           .eq("user_id", actorId)
           .eq("status", "active")
-          .in("school_role", ["manager", "admin"]);
+          .eq("school_role", "manager");
         if (membershipError) return json({ error: "Unable to verify this school's provisioning authority" }, 503);
-
-        const isManager = (memberships ?? []).some((membership: { school_role: string }) => membership.school_role === "manager");
-        const adminMembership = (memberships ?? []).find((membership: { id: string; school_role: string }) => membership.school_role === "admin");
-        let isMainDirector = false;
-        if (adminMembership) {
-          const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
-          const { data: appointment, error: appointmentError } = await admin
-            .from("school_leadership_appointments")
-            .select("id")
-            .eq("school_id", schoolId)
-            .eq("membership_id", adminMembership.id)
-            .eq("position", "main_director")
-            .eq("status", "active")
-            .lte("start_date", today)
-            .or(`end_date.is.null,end_date.gte.${today}`)
-            .maybeSingle();
-          if (appointmentError) return json({ error: "Unable to verify Main Director appointment" }, 503);
-          isMainDirector = Boolean(appointment?.id);
-        }
-        if (!isManager && !isMainDirector) {
-          return json({ error: "Only this school's Manager or appointed Main Director can create staff, parent, and student accounts" }, 403);
-        }
+        if (!(memberships ?? []).length) return json({ error: "Only this school's Manager can create parent and student accounts or appoint school Directors" }, 403);
       }
 
       const { data: school, error: schoolError } = await admin
