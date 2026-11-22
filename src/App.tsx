@@ -343,9 +343,6 @@ const App = () => (
                               <Route path="/notifications" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
                               <Route path="/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><LegacyTeacherPortalRoute /></ProtectedRoute>} />
-                                  </ProtectedRoute>
-                                } 
-                              />
                               <Route
                                 path="/admin/early-content"
                                 element={
@@ -355,9 +352,6 @@ const App = () => (
                                 }
                               />
                               <Route path="/admin" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><Navigate to="/root-control-portal-9xA7" replace /></ProtectedRoute>} />
-                                  </ProtectedRoute>
-                                } 
-                              />
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
                               <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["teacher", "finance"]}><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></ProtectedRoute>} />
