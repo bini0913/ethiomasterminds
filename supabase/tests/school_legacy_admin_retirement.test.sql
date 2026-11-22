@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(15);
+select plan(19);
 select ok(exists (select 1 from pg_trigger where tgrelid='public.school_memberships'::regclass and tgname='school_reject_retired_admin_membership' and not tgisinternal), 'new legacy School Admin memberships are blocked');
 select ok(exists (select 1 from pg_trigger where tgrelid='public.school_leadership_appointments'::regclass and tgname='school_reject_retired_main_director_appointment' and not tgisinternal), 'new Main Director appointments are blocked');
 select ok(position('school_role = ''admin''' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) = 0, 'legacy School Admin memberships no longer grant school Admin authority');
@@ -16,5 +16,9 @@ select ok(position('school_leadership_structure_events' in pg_get_functiondef('p
 select ok(not exists (select 1 from public.school_leadership_appointments where position='main_director' and status='active'), 'active Main Director appointments are retired while history is retained');
 select ok(not exists (select 1 from public.school_memberships where school_role='admin' and status='active'), 'active legacy School Admin memberships are suspended pending reassignment');
 select ok((select relrowsecurity from pg_class where oid='public.school_leadership_structure_events'::regclass), 'leadership structure events retain row-level security');
+select ok(pg_get_triggerdef((select oid from pg_trigger where tgrelid='public.school_memberships'::regclass and tgname='school_reject_retired_admin_membership')) ilike '%INSERT OR UPDATE%', 'legacy School Admin trigger blocks both inserts and updates');
+select ok(pg_get_triggerdef((select oid from pg_trigger where tgrelid='public.school_leadership_appointments'::regclass and tgname='school_reject_retired_main_director_appointment')) ilike '%INSERT OR UPDATE%', 'Main Director trigger blocks both inserts and updates');
+select ok(position('NEW.status = ''active''' in pg_get_functiondef('public.school_reject_retired_admin_membership()'::regprocedure)) > 0, 'suspended legacy School Admin memberships cannot be reactivated');
+select ok(position('NEW.status = ''active''' in pg_get_functiondef('public.school_reject_retired_main_director_appointment()'::regprocedure)) > 0, 'ended Main Director appointments cannot be reactivated');
 select * from finish();
 rollback;
