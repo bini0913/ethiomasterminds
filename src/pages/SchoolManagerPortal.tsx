@@ -1131,11 +1131,11 @@ export default function SchoolManagerPortal() {
                       setLeaderPermissions([
                         "view_students", "view_staff", "view_attendance", "review_attendance",
                         "view_academics", "review_assessments", "review_results", "view_curriculum",
-                        "manage_team_tasks", "assign_team_tasks", "view_reports", "publish_announcements",
-                        "view_discipline", "review_discipline", "view_finance_summary", "manage_meetings",
+                        "manage_team_tasks", "assign_team_tasks", "view_reports",
+                        "view_discipline", "review_discipline", "view_finance_summary",
                       ]);
                     } else if (nextPosition === "hr_director") {
-                      setLeaderPermissions(["view_staff", "view_staff_evaluations", "manage_team_tasks", "view_reports", "view_finance_summary", "manage_meetings"]);
+                      setLeaderPermissions(["view_staff", "view_staff_evaluations", "manage_team_tasks", "view_reports", "view_finance_summary"]);
                     } else if (nextPosition === "academic_director") {
                       setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_reports"]);
                     } else if (nextPosition === "vice_director") {
