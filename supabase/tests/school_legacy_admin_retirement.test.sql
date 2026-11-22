@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(14);
+select plan(15);
 select ok(exists (select 1 from pg_trigger where tgrelid='public.school_memberships'::regclass and tgname='school_reject_retired_admin_membership' and not tgisinternal), 'new legacy School Admin memberships are blocked');
 select ok(exists (select 1 from pg_trigger where tgrelid='public.school_leadership_appointments'::regclass and tgname='school_reject_retired_main_director_appointment' and not tgisinternal), 'new Main Director appointments are blocked');
 select ok(position('school_role = ''admin''' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) = 0, 'legacy School Admin memberships no longer grant school Admin authority');
@@ -14,6 +14,7 @@ select ok(position('NEW.school_role = ''finance''' in pg_get_functiondef('public
 select ok(position('hr_director' in pg_get_functiondef('public.school_convert_legacy_admin_to_hr_director(uuid,text)'::regprocedure)) > 0, 'conversion appoints the HR Director / Business Manager');
 select ok(position('school_leadership_structure_events' in pg_get_functiondef('public.school_convert_legacy_admin_to_hr_director(uuid,text)'::regprocedure)) > 0, 'conversion writes an audit event');
 select ok(not exists (select 1 from public.school_leadership_appointments where position='main_director' and status='active'), 'active Main Director appointments are retired while history is retained');
+select ok(not exists (select 1 from public.school_memberships where school_role='admin' and status='active'), 'active legacy School Admin memberships are suspended pending reassignment');
 select ok((select relrowsecurity from pg_class where oid='public.school_leadership_structure_events'::regclass), 'leadership structure events retain row-level security');
 select * from finish();
 rollback;
