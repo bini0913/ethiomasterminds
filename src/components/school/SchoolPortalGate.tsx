@@ -26,11 +26,12 @@ export default function SchoolPortalGate({
     }
   }, [matchingMembership?.id, activeMembership?.id, switchSchool]);
 
-  // A teacher or Finance membership with an active leadership appointment belongs
-  // to the single Leadership workspace, not both Leadership and Teacher/Finance.
+  // A teacher membership with an active leadership appointment belongs to the
+  // Leadership workspace. HR Directors retain their explicit Finance Operations
+  // link and can switch to that school-scoped workspace when needed.
   useEffect(() => {
     if (loading) return;
-    if (role !== "teacher" && role !== "finance") {
+    if (role !== "teacher") {
       setLeadershipCheck("none");
       return;
     }
@@ -88,11 +89,11 @@ export default function SchoolPortalGate({
     );
   }
 
-  if ((role === "teacher" || role === "finance") && leadershipCheck === "assigned") {
+  if (role === "teacher" && leadershipCheck === "assigned") {
     return <Navigate to="/school/admin" replace />;
   }
 
-  if ((role === "teacher" || role === "finance") && leadershipCheck === "error") {
+  if (role === "teacher" && leadershipCheck === "error") {
     return (
       <div className="mx-auto mt-10 max-w-xl rounded-lg border border-red-200 bg-white p-5 text-sm text-red-700">
         Your leadership assignment could not be verified. Access is paused until it can be checked. Please refresh or contact the School Manager.
@@ -100,7 +101,7 @@ export default function SchoolPortalGate({
     );
   }
 
-  if ((role === "teacher" || role === "finance") && leadershipCheck !== "none") {
+  if (role === "teacher" && leadershipCheck !== "none") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-slate-50 px-5">
         <div className="text-center">
