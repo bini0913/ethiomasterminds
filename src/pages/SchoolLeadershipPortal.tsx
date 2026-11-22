@@ -68,7 +68,7 @@ function ScopedLeadershipWorkspace() {
     if (can("view_reports")) items.push({ id: "reports", label: "Reports", icon: FileBarChart });
     if (isDivisionDirector && can("view_staff")) items.push({ id: "leadership", label: "Division Leadership", icon: Network });
     return items;
-  }, [appointment.permissions]);
+  }, [appointment.permissions, isDivisionDirector]);
 
   const [page, setPage] = useState<LeadershipPage>("overview");
   const [loading, setLoading] = useState(false);
