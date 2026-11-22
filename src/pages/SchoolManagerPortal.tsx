@@ -106,9 +106,6 @@ export default function SchoolManagerPortal() {
   const [yearStart, setYearStart] = useState("");
   const [yearEnd, setYearEnd] = useState("");
   const [yearIsCurrent, setYearIsCurrent] = useState(true);
-  const [sectionYearId, setSectionYearId] = useState("");
-  const [sectionGrade, setSectionGrade] = useState("Grade 9");
-  const [sectionName, setSectionName] = useState("A");
   const [subjectYearId, setSubjectYearId] = useState("");
   const [subjectGrade, setSubjectGrade] = useState("Grade 9");
   const [subjectName, setSubjectName] = useState("");
@@ -221,13 +218,12 @@ export default function SchoolManagerPortal() {
       setProfiles({});
     }
 
-    if (!sectionYearId && yearsRes.data?.length) setSectionYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
     if (!subjectYearId && yearsRes.data?.length) setSubjectYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
     if (!feeYearId && yearsRes.data?.length) setFeeYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
     if (!gradingYearId && yearsRes.data?.length) setGradingYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
     if (sectionsRes.data?.length && gradingGradeLabel === "Grade 9" && !sectionsRes.data.some((section: any) => section.grade_label === "Grade 9")) setGradingGradeLabel(sectionsRes.data[0].grade_label);
     setLoading(false);
-  }, [schoolId, db, sectionYearId, subjectYearId, feeYearId, gradingYearId, gradingGradeLabel]);
+  }, [schoolId, db, subjectYearId, feeYearId, gradingYearId, gradingGradeLabel]);
 
   useEffect(() => {
     const hasActiveAdmin = members.some((member) => member.school_role === "admin" && member.status === "active");
@@ -544,19 +540,6 @@ export default function SchoolManagerPortal() {
     const { error } = await db.rpc("school_set_current_academic_year", { p_academic_year_id: yearId });
     if (error) return toast.error(error.message);
     toast.success("Current academic year updated.");
-    await load();
-  };
-
-  const addSection = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!sectionYearId || !sectionGrade.trim() || !sectionName.trim()) return toast.error("Complete the section details.");
-    const { error } = await db.from("school_sections").insert({
-      school_id: schoolId, academic_year_id: sectionYearId,
-      grade_label: sectionGrade.trim(), section_name: sectionName.trim(),
-    });
-    if (error) return toast.error(error.message);
-    setSectionName("A");
-    toast.success("Section created.");
     await load();
   };
 
@@ -923,8 +906,8 @@ export default function SchoolManagerPortal() {
 
   const renderStructure = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="School structure" description="Configure academic years, sections, and the subject catalog used for teacher assignments." />
-      <div className="grid gap-4 xl:grid-cols-3">
+      <SchoolPageHeading title="School structure" description="Manage academic years and the subject catalog. Division Directors create and organize class sections within their assigned grades." />
+      <div className="grid gap-4 xl:grid-cols-2">
         <SchoolPanel title="Academic year">
           <form onSubmit={addAcademicYear} className="space-y-3">
             <SchoolField label="Academic year name"><input className={schoolInputClass} value={yearName} onChange={(event) => setYearName(event.target.value)} placeholder="2026/2027" /></SchoolField>
@@ -932,14 +915,6 @@ export default function SchoolManagerPortal() {
             <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} /></SchoolField>
             <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={yearIsCurrent} onChange={(event) => setYearIsCurrent(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" /> Set as current academic year</label>
             <SchoolPrimaryButton type="submit">Add academic year</SchoolPrimaryButton>
-          </form>
-        </SchoolPanel>
-        <SchoolPanel title="Create section">
-          <form onSubmit={addSection} className="space-y-3">
-            <SchoolField label="Academic year"><select className={schoolSelectClass} value={sectionYearId} onChange={(event) => setSectionYearId(event.target.value)}><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></SchoolField>
-            <SchoolField label="Grade"><input className={schoolInputClass} value={sectionGrade} onChange={(event) => setSectionGrade(event.target.value)} placeholder="Grade 9" /></SchoolField>
-            <SchoolField label="Section"><input className={schoolInputClass} value={sectionName} onChange={(event) => setSectionName(event.target.value)} placeholder="A" /></SchoolField>
-            <SchoolPrimaryButton type="submit">Add section</SchoolPrimaryButton>
           </form>
         </SchoolPanel>
         <SchoolPanel title="Add subject">
@@ -953,7 +928,7 @@ export default function SchoolManagerPortal() {
       </div>
       <div className="grid gap-4 xl:grid-cols-3">
         <SchoolPanel title="Academic years"><div className="space-y-2">{years.map((year) => <div key={year.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-100 p-3"><div><p className="text-sm font-medium text-slate-800">{year.name}</p><p className="text-xs text-slate-500">{year.starts_on} – {year.ends_on}</p></div>{year.is_current ? <SchoolStatus value="active" /> : <button type="button" onClick={() => void setCurrentYear(year.id)} className="text-xs font-semibold text-blue-700 hover:underline">Set current</button>}</div>)}{!years.length && <SchoolEmptyState title="No years yet" description="Add the first academic year." />}</div></SchoolPanel>
-        <SchoolPanel title="Sections"><div className="space-y-2">{sections.map((section) => <div key={section.id} className="flex items-center justify-between rounded-md border border-slate-100 p-3"><p className="text-sm font-medium text-slate-800">{section.grade_label} {section.section_name}</p><span className="text-xs text-slate-500">{years.find((year) => year.id === section.academic_year_id)?.name || "Academic year"}</span></div>)}{!sections.length && <SchoolEmptyState title="No sections yet" description="Create sections for the current year." />}</div></SchoolPanel>
+        <SchoolPanel title="Sections"><div className="space-y-2">{sections.map((section) => <div key={section.id} className="flex items-center justify-between rounded-md border border-slate-100 p-3"><p className="text-sm font-medium text-slate-800">{section.grade_label} {section.section_name}</p><span className="text-xs text-slate-500">{years.find((year) => year.id === section.academic_year_id)?.name || "Academic year"}</span></div>)}{!sections.length && <SchoolEmptyState title="No sections yet" description="The relevant Division Director can create sections for grades in their division." />}</div></SchoolPanel>
         <SchoolPanel title="Subjects"><div className="space-y-2">{subjects.map((subject) => <div key={subject.id} className="flex items-center justify-between rounded-md border border-slate-100 p-3"><div><p className="text-sm font-medium text-slate-800">{subject.subject_name}</p><p className="text-xs text-slate-500">{subject.grade_label}</p></div><SchoolStatus value={subject.active ? "active" : "deactivated"} /></div>)}{!subjects.length && <SchoolEmptyState title="No subjects yet" description="Add subjects by grade and academic year." />}</div></SchoolPanel>
       </div>
     </div>

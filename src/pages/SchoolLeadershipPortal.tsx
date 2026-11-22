@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Users, UserCog, CalendarCheck, ClipboardCheck,
-  ClipboardList, FileBarChart, RefreshCw, ShieldCheck, Network,
+  ClipboardList, FileBarChart, RefreshCw, ShieldCheck, Network, PanelsTopLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,7 +27,7 @@ const positionLabels: Record<string, string> = {
   team_leader: "Team Leader",
 };
 
-type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academics" | "discipline" | "tasks" | "reports" | "leadership";
+type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academics" | "discipline" | "tasks" | "reports" | "leadership" | "sections";
 
 export default function SchoolLeadershipPortal() {
   const { appointment } = useSchoolLeadership();
@@ -95,6 +95,7 @@ function ScopedLeadershipWorkspace() {
     }
     if (can("view_reports")) items.push({ id: "reports", label: "Reports", icon: FileBarChart });
     if (isDivisionDirector && can("view_staff")) items.push({ id: "leadership", label: "Division Leadership", icon: Network });
+    if (isDivisionDirector) items.push({ id: "sections", label: "Class Sections", icon: PanelsTopLeft });
     return items;
   }, [appointment.permissions, isDivisionDirector]);
 
@@ -103,6 +104,25 @@ function ScopedLeadershipWorkspace() {
   const [members, setMembers] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [sections, setSections] = useState<any[]>([]);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
+  const [sectionAcademicYearId, setSectionAcademicYearId] = useState("");
+  const [sectionGradeLabel, setSectionGradeLabel] = useState("");
+  const [sectionCount, setSectionCount] = useState(1);
+  const [sectionNamesText, setSectionNamesText] = useState("A");
+
+  useEffect(() => {
+    if (!sectionAcademicYearId || !sectionGradeLabel) return;
+    const existingNames = sections
+      .filter((section) => section.academic_year_id === sectionAcademicYearId && section.grade_label === sectionGradeLabel)
+      .map((section) => section.section_name);
+    if (existingNames.length) {
+      setSectionCount(existingNames.length);
+      setSectionNamesText(existingNames.join(", "));
+    } else {
+      setSectionCount(1);
+      setSectionNamesText("A");
+    }
+  }, [sectionAcademicYearId, sectionGradeLabel, sections]);
   const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [attendanceDrafts, setAttendanceDrafts] = useState<Record<string, { status: string; note: string; reason: string }>>({});
@@ -133,9 +153,9 @@ function ScopedLeadershipWorkspace() {
         .eq("status", "active")
         .order("created_at", { ascending: false });
     }
-    if (can("view_students") || can("view_curriculum") || can("view_academics") || can("review_assessments") || can("review_results") || can("view_attendance") || can("review_attendance") || can("view_discipline") || can("review_discipline")) {
+    if (isDivisionDirector || can("view_students") || can("view_curriculum") || can("view_academics") || can("review_assessments") || can("review_results") || can("view_attendance") || can("review_attendance") || can("view_discipline") || can("review_discipline")) {
       requests.sections = db.from("school_sections")
-        .select("id,grade_label,section_name")
+        .select("id,academic_year_id,grade_label,section_name")
         .eq("school_id", schoolId)
         .order("grade_label");
     }
@@ -171,6 +191,11 @@ function ScopedLeadershipWorkspace() {
         .limit(500);
     }
     if (isDivisionDirector) {
+      requests.academicYears = db.from("school_academic_years")
+        .select("id,name,is_current,starts_on,ends_on")
+        .eq("school_id", schoolId)
+        .eq("is_current", true)
+        .order("starts_on", { ascending: false });
       requests.divisionGradeMappings = db.from("school_division_grade_mappings")
         .select("id,grade_label")
         .eq("school_id", schoolId)
@@ -214,6 +239,11 @@ function ScopedLeadershipWorkspace() {
     }
     if (results.members) setMembers(results.members.data ?? []);
     if (results.sections) setSections(results.sections.data ?? []);
+    if (results.academicYears) {
+      const currentYears = results.academicYears.data ?? [];
+      setAcademicYears(currentYears);
+      if (currentYears[0] && !currentYears.some((year: any) => year.id === sectionAcademicYearId)) setSectionAcademicYearId(currentYears[0].id);
+    }
     if (results.sessions) setAttendanceSessions(results.sessions.data ?? []);
     if (results.attendance) setAttendanceRecords(results.attendance.data ?? []);
     if (results.assessments) setAssessments(results.assessments.data ?? []);
@@ -223,7 +253,12 @@ function ScopedLeadershipWorkspace() {
     if (results.marks) setMarks(results.marks.data ?? []);
     if (results.divisionAppointments) setDivisionAppointments(results.divisionAppointments.data ?? []);
     if (results.teamAssignments) setTeamAssignments(results.teamAssignments.data ?? []);
-    if (results.divisionGradeMappings) setDivisionGradeMappings(results.divisionGradeMappings.data ?? []);
+    if (results.divisionGradeMappings) {
+      const mappings = results.divisionGradeMappings.data ?? [];
+      setDivisionGradeMappings(mappings);
+      if (!sectionGradeLabel && mappings[0]) setSectionGradeLabel(mappings[0].grade_label);
+      else if (sectionGradeLabel && !mappings.some((mapping: any) => mapping.grade_label === sectionGradeLabel)) setSectionGradeLabel(mappings[0]?.grade_label ?? "");
+    }
 
     const userIds = [...new Set((results.members?.data ?? []).map((member: any) => member.user_id))];
     if (userIds.length) {
@@ -231,6 +266,23 @@ function ScopedLeadershipWorkspace() {
       if (!error) setProfiles(Object.fromEntries((data ?? []).map((profile: any) => [profile.id, profile])));
     }
     setLoading(false);
+  };
+
+  const createDivisionSections = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const names = sectionNamesText.split(",").map((name) => name.trim()).filter(Boolean);
+    if (!schoolId || !sectionAcademicYearId || !sectionGradeLabel) return toast.error("Choose the current academic year and one of your mapped grades.");
+    if (names.length !== sectionCount) return toast.error(`Enter exactly ${sectionCount} section names, separated by commas.`);
+    if (new Set(names.map((name) => name.toLocaleLowerCase())).size !== names.length) return toast.error("Section names must be unique.");
+    const { data, error } = await db.rpc("school_division_director_create_sections", {
+      p_school_id: schoolId,
+      p_academic_year_id: sectionAcademicYearId,
+      p_grade_label: sectionGradeLabel,
+      p_section_names: names,
+    });
+    if (error) return toast.error(error.message || "The class sections could not be created.");
+    toast.success(`${Number(data ?? 0)} new class section(s) created. Existing sections were kept.`);
+    await load();
   };
 
   const reviewAttendance = async (recordId: string, currentStatus: string, currentNote: string | null) => {
@@ -334,6 +386,52 @@ function ScopedLeadershipWorkspace() {
   const todaySessions = attendanceSessions.filter((session) => session.attendance_date === today);
   const divisionViceDirector = divisionAppointments.find((item) => item.position === "vice_director");
   const divisionTeamLeaders = divisionAppointments.filter((item) => item.position === "team_leader");
+
+  const renderClassSections = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Class sections" description={`Set the number of classes and name each section for grades in your ${divisionInfo?.coverage || scopeLabel} division.`} />
+      <SchoolPanel title="Create class sections" description="Set the total number and names of sections for each grade assigned to your division. Existing sections must remain in your submitted list; the system never removes or moves students from a class.">
+        {divisionGradeMappings.length && academicYears.length ? (
+          <form onSubmit={createDivisionSections} className="grid gap-3 md:grid-cols-2">
+            <label className="block text-xs font-medium text-slate-600">Academic year
+              <select className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800" value={sectionAcademicYearId} onChange={(event) => setSectionAcademicYearId(event.target.value)}>
+                {academicYears.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}
+              </select>
+            </label>
+            <label className="block text-xs font-medium text-slate-600">Grade
+              <select className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800" value={sectionGradeLabel} onChange={(event) => setSectionGradeLabel(event.target.value)}>
+                {divisionGradeMappings.map((mapping) => <option key={mapping.id} value={mapping.grade_label}>{mapping.grade_label}</option>)}
+              </select>
+            </label>
+            <label className="block text-xs font-medium text-slate-600">Number of classes
+              <input type="number" min={1} max={30} step={1} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800" value={sectionCount} onChange={(event) => { const count = Math.max(sections.filter((section) => section.academic_year_id === sectionAcademicYearId && section.grade_label === sectionGradeLabel).length, Math.min(30, Number(event.target.value) || 1)); const names = sectionNamesText.split(",").map((name) => name.trim()).filter(Boolean); while (names.length < count) { const index = names.length; const candidate = index < 26 ? String.fromCharCode(65 + index) : `A${index - 25}`; names.push(candidate); } setSectionCount(Math.min(30, count)); setSectionNamesText(names.slice(0, count).join(", ")); }} />
+            </label>
+            <label className="block text-xs font-medium text-slate-600">Section names (comma-separated)
+              <input type="text" maxLength={400} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800" value={sectionNamesText} onChange={(event) => setSectionNamesText(event.target.value)} placeholder="A, B, C" />
+            </label>
+            <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+              <p className="text-xs leading-5 text-slate-500">Enter exactly {sectionCount} unique names. Existing sections are prefilled automatically; include all of them when adding new sections. Existing student and teacher links are never moved.</p>
+              <button type="submit" className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Create sections</button>
+            </div>
+          </form>
+        ) : (
+          <SchoolEmptyState title={!divisionGradeMappings.length ? "No grades mapped to this division" : "No current academic year"} description={!divisionGradeMappings.length ? "Ask the School Manager to map the grades belonging to your division before creating classes." : "Ask the School Manager to activate the academic year before creating class sections."} />
+        )}
+      </SchoolPanel>
+      <SchoolPanel title="Sections in your division" description="Only sections belonging to your mapped grades are shown here.">
+        <div className="space-y-3">
+          {divisionGradeMappings.map((mapping) => {
+            const gradeSections = sections.filter((section) => section.grade_label === mapping.grade_label && (!sectionAcademicYearId || section.academic_year_id === sectionAcademicYearId));
+            return <div key={mapping.id} className="rounded-lg border border-slate-100 p-3">
+              <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{mapping.grade_label}</p><span className="text-xs text-slate-500">{gradeSections.length} {gradeSections.length === 1 ? "class" : "classes"}</span></div>
+              <div className="mt-2 flex flex-wrap gap-2">{gradeSections.map((section) => <span key={section.id} className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700">{section.section_name}</span>)}</div>
+              {!gradeSections.length && <p className="mt-2 text-xs text-slate-500">No classes configured for this grade yet.</p>}
+            </div>;
+          })}
+        </div>
+      </SchoolPanel>
+    </div>
+  );
 
   const renderDivisionLeadership = () => (
     <div className="space-y-5">
@@ -588,6 +686,7 @@ function ScopedLeadershipWorkspace() {
     case "tasks": content = can("manage_team_tasks") || can("assign_team_tasks") ? renderTasks() : renderOverview(); break;
     case "reports": content = can("view_reports") ? renderReports() : renderOverview(); break;
     case "leadership": content = isDivisionDirector && can("view_staff") ? renderDivisionLeadership() : renderOverview(); break;
+    case "sections": content = isDivisionDirector ? renderClassSections() : renderOverview(); break;
     default: content = renderOverview();
   }
 
