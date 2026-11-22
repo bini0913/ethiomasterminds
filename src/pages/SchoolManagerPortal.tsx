@@ -282,7 +282,7 @@ export default function SchoolManagerPortal() {
       p_target_membership_id: leaderTargetId,
       p_position: leaderPosition,
       p_division_scope: division,
-      p_team_name: leaderPosition === "team_leader" ? leaderTeamName.trim() : null,
+      p_team_name: null,
       p_permissions: leaderPermissions,
       p_start_date: leaderStartDate || new Date().toISOString().slice(0, 10),
       p_end_date: leaderEndDate || null,
@@ -1294,7 +1294,7 @@ export default function SchoolManagerPortal() {
                 </div>
               );
             })}
-            {!leadershipAppointments.some((item) => item.position === "team_leader") && <SchoolEmptyState title="No Team Leaders appointed" description="Appoint a Team Leader above before assigning staff to a team." />}
+            {!leadershipAppointments.some((item) => item.position === "team_leader") && <SchoolEmptyState title="No Team Leaders appointed" description="Division Directors create Team Leaders in their own portal; use this section to assign teachers to their teams." />}
           </div>
         </SchoolPanel>
         <SchoolPanel title="Leadership appointments" description="Suspending or ending an appointment preserves its history. A replacement is appointed as a new record.">
