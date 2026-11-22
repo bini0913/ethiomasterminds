@@ -153,7 +153,7 @@ function ScopedLeadershipWorkspace() {
         .eq("status", "active")
         .order("created_at", { ascending: false });
     }
-    if (can("view_students") || can("view_curriculum") || can("view_academics") || can("review_assessments") || can("review_results") || can("view_attendance") || can("review_attendance") || can("view_discipline") || can("review_discipline")) {
+    if (isDivisionDirector || can("view_students") || can("view_curriculum") || can("view_academics") || can("review_assessments") || can("review_results") || can("view_attendance") || can("review_attendance") || can("view_discipline") || can("review_discipline")) {
       requests.sections = db.from("school_sections")
         .select("id,academic_year_id,grade_label,section_name")
         .eq("school_id", schoolId)
