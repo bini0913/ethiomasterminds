@@ -18,6 +18,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
 const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
+const AdminPortal = lazy(() => import("./pages/AdminPortal"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const StudentDashboardRoute = lazy(() => import("./components/dashboard/StudentDashboardRoute"));
 const SchoolManagerPortal = lazy(() => import("./pages/SchoolManagerPortal"));
@@ -346,12 +347,12 @@ const App = () => (
                               <Route
                                 path="/admin/early-content"
                                 element={
-                                  <ProtectedRoute allowedRoles={["extreme_admin"]}>
+                                  <ProtectedRoute allowedRoles={["admin", "extreme_admin"]}>
                                     <EarlyContentAdminPage />
                                   </ProtectedRoute>
                                 }
                               />
-                              <Route path="/admin" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><Navigate to="/root-control-portal-9xA7" replace /></ProtectedRoute>} />
+                              <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin", "extreme_admin"]}><AdminPortal /></ProtectedRoute>} />
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
                               <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["teacher", "finance"]}><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></ProtectedRoute>} />
@@ -373,7 +374,7 @@ const App = () => (
                               <Route
                                 path="/parent-dashboard"
                                 element={
-                                  <ProtectedRoute allowedRoles={['student', 'teacher', 'admin', 'manager', 'extreme_admin']}>
+                                  <ProtectedRoute allowedRoles={['student', 'teacher', 'admin', 'manager', 'parent', 'extreme_admin']}>
                                     <ParentDashboard />
                                   </ProtectedRoute>
                                 }
