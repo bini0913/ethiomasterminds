@@ -137,6 +137,10 @@ BEGIN
     IF p_team_leader_appointment_id IS NOT NULL THEN
       SELECT appointment.id INTO v_team_leader_appointment_id
       FROM public.school_leadership_appointments appointment
+      JOIN public.school_memberships team_leader_membership
+        ON team_leader_membership.id = appointment.membership_id
+       AND team_leader_membership.school_id = appointment.school_id
+       AND team_leader_membership.status = 'active'
       WHERE appointment.id = p_team_leader_appointment_id
         AND appointment.school_id = p_school_id
         AND appointment.position = 'team_leader'
