@@ -473,7 +473,7 @@ AS $function$
         AND student.status = 'active'
     )
   );
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.school_can_view_staff_evaluation(p_evaluation_id uuid)
@@ -493,7 +493,7 @@ AS $function$
         OR public.school_leadership_has_permission(evaluation.school_id, 'view_staff_evaluations', target.grade_label, target.id, target.section_id)
       )
   );
-$function$
+$function$;
 
 
 REVOKE ALL ON FUNCTION public.school_appoint_leader(uuid, text, text, text, text[], date, date) FROM PUBLIC, anon;
