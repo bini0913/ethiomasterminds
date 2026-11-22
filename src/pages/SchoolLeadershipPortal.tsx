@@ -29,7 +29,6 @@ type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academ
 
 export default function SchoolLeadershipPortal() {
   const { appointment } = useSchoolLeadership();
-  if (appointment.position === "main_director") return <div className="mx-auto max-w-2xl p-8"><div className="rounded-xl border border-amber-200 bg-amber-50 p-5"><p className="text-sm font-semibold text-amber-900">This legacy school appointment is no longer used.</p><p className="mt-2 text-sm text-amber-800">Please contact the School Manager to receive the correct current school responsibility.</p></div></div>;
   if (appointment.position === "academic_director") return <AcademicDirectorPortal />;
   if (appointment.position === "hr_director") return <HRDirectorPortal />;
   return <ScopedLeadershipWorkspace />;
@@ -441,7 +440,7 @@ function ScopedLeadershipWorkspace() {
     return section ? `${section.grade_label} · ${section.section_name}` : "—";
   };
   const activeStudents = members.filter((member) => member.school_role === "student");
-  const activeStaff = members.filter((member) => ["teacher", "admin", "finance"].includes(member.school_role));
+  const activeStaff = members.filter((member) => ["teacher", "finance"].includes(member.school_role));
   const pendingAssessments = assessments.filter((item) => item.status === "submitted");
   const today = new Date().toLocaleDateString("en-CA");
   const todaySessions = attendanceSessions.filter((session) => session.attendance_date === today);
@@ -680,7 +679,7 @@ function ScopedLeadershipWorkspace() {
       <SchoolPanel title="Homework oversight">
         {homework.length ? <div className="space-y-2">{homework.map((item) => <div key={item.id} className="rounded-lg border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.subject_name} · {sectionName(item.section_id)} · Due {item.due_at ? new Date(item.due_at).toLocaleDateString() : "—"}</p></div><SchoolStatus value={item.status} /></div>{can("review_assessments") && item.status === "pending" && <div className="mt-3 flex flex-col gap-2"><input value={reviewFeedback[item.id] || ""} onChange={(event) => setReviewFeedback((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Optional review feedback" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /><div className="flex flex-wrap gap-2"><button onClick={() => void reviewHomework(item.id, true)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Approve homework</button><button onClick={() => void reviewHomework(item.id, false)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Return to teacher</button></div></div>}</div>)}</div> : <SchoolEmptyState title="No homework records in scope" description="Homework assignments will appear here." />}
       </SchoolPanel>
-      {can("review_results") && <SchoolPanel title="Marks and results oversight" description="Marks visible to your appointment. Official calculation and publication remain with the authorized school administration workflow.">
+      {can("review_results") && <SchoolPanel title="Marks and results oversight" description="Marks visible to your appointment. Official calculation and publication remain with the authorized school academic leadership workflow.">
         {marks.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Score</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{marks.map((mark) => { const student = members.find((item) => item.id === mark.student_membership_id); const assessment = assessments.find((item) => item.id === mark.assessment_id); return <tr key={mark.id}><td className="py-3 font-medium text-slate-800">{memberName(mark.student_membership_id)}</td><td className="py-3 text-slate-600">{assessment?.title || "Assessment"}</td><td className="py-3 text-slate-600">{student?.grade_label || "—"}</td><td className="py-3 tabular-nums text-slate-700">{mark.score ?? "—"}</td><td className="py-3"><SchoolStatus value={mark.status} /></td></tr>; })}</tbody></table></div> : <SchoolEmptyState title="No marks available" description="Teacher-entered marks will appear here when records are available within your scope." />}
       </SchoolPanel>}
 
