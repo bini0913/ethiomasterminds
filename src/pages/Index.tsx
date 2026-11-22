@@ -50,10 +50,6 @@ const Index: React.FC = () => {
         memberships.some((membership) => membership.status === "active" && membership.school_role === role);
 
       const loginMode = safeStorage.getItem("masterminds_login_mode");
-      if (loginMode === "parent" && user.role !== "parent") {
-        navigate("/parent-dashboard", { replace: true });
-        return;
-      }
 
       if (["teacher", "finance", "parent", "student"].includes(user.role) && schoolMembershipsLoading) {
         return;
@@ -83,6 +79,10 @@ const Index: React.FC = () => {
       if (user.role === "student") {
         if (hasSchoolRole("student")) {
           navigate("/school/student", { replace: true });
+          return;
+        }
+        if (loginMode === "parent") {
+          navigate("/parent-dashboard", { replace: true });
           return;
         }
         if (!user.grade || !user.educationLevel) {
