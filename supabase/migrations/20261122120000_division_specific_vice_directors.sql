@@ -107,7 +107,7 @@ BEGIN
   IF p_position = 'main_director' AND p_division_scope IS NOT NULL THEN
     RAISE EXCEPTION 'Main Director is a school-wide position';
   END IF;
-  IF p_position = 'vice_director' AND p_division_scope NOT IN ('kg', 'elementary', 'middle_school', 'high_school') THEN
+  IF p_position = 'vice_director' AND (p_division_scope IS NULL OR p_division_scope NOT IN ('kg', 'elementary', 'middle_school', 'high_school')) THEN
     RAISE EXCEPTION 'Vice Directors must be assigned to one of the four school divisions';
   END IF;
   IF p_position = 'team_leader' AND (
