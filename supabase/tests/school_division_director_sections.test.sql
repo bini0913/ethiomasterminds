@@ -2,7 +2,18 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(7);
+select plan(9);
+
+select ok(
+  to_regprocedure('public.school_is_active_division_director_for_grade(uuid,text)') is not null,
+  'division-scope authorization helper exists'
+);
+
+select ok(
+  has_function_privilege('authenticated','public.school_is_active_division_director_for_grade(uuid,text)','EXECUTE')
+  and not has_function_privilege('anon','public.school_is_active_division_director_for_grade(uuid,text)','EXECUTE'),
+  'division-scope helper is only exposed to authenticated users'
+);
 
 select ok(
   to_regprocedure('public.school_division_director_create_sections(uuid,uuid,text,text[])') is not null,
@@ -40,6 +51,15 @@ select ok(
       and policyname='school_sections_manager_insert'
   ),
   'the old manager direct-insert policy is removed'
+);
+
+select ok(
+  (select qual like '%school_is_active_division_director_for_grade%'
+   from pg_policies
+   where schemaname='public'
+     and tablename='school_sections'
+     and policyname='school_leadership_view_scoped_sections'),
+  'division directors can read sections for their mapped grades'
 );
 
 select ok(
