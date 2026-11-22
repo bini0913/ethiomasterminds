@@ -86,6 +86,21 @@ BEGIN
     RAISE EXCEPTION USING errcode = '42501', message = 'Choose the active academic year for this school';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM public.school_sections existing
+    WHERE existing.school_id = p_school_id
+      AND existing.academic_year_id = p_academic_year_id
+      AND existing.grade_label = btrim(p_grade_label)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(v_names) AS submitted(section_name)
+        WHERE lower(submitted.section_name) = lower(existing.section_name)
+      )
+  ) THEN
+    RAISE EXCEPTION USING errcode = '23514', message = 'Include every existing section name in the requested class list. Existing classes cannot be removed or renamed here.';
+  END IF;
+
   FOREACH v_name IN ARRAY v_names LOOP
     IF EXISTS (
       SELECT 1
