@@ -83,7 +83,7 @@ select ok(position('school_leadership_action_events' in pg_get_functiondef('publ
 
 
 select ok(exists (select 1 from pg_trigger where tgrelid='public.school_leadership_appointments'::regclass and tgname='school_require_full_main_director_permissions' and not tgisinternal), 'Main Director appointment trigger enforces full School Admin permissions');
-select ok(position('full School Admin permission set' in pg_get_functiondef('public.school_require_full_main_director_permissions()'::regprocedure)) > 0, 'Main Director cannot be appointed with a reduced permission set');
+select ok(position('complete School Admin permission set' in pg_get_functiondef('public.school_require_full_main_director_permissions()'::regprocedure)) > 0, 'Main Director cannot be appointed with a reduced permission set');
 select ok(position('Main Director retains the full School Admin authority' in pg_get_functiondef('public.school_update_leadership_permissions(uuid,text[],text)'::regprocedure)) > 0, 'School Manager cannot reduce Main Director permissions through the update RPC');
 
 
