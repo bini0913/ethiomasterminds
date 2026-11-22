@@ -11,6 +11,7 @@ import UpperTierHome from "@/components/dashboard/UpperTierHome";
 import EarlyEncouragement from "@/components/early/EarlyEncouragement";
 import StudentBottomNav from "@/components/layout/StudentBottomNav";
 import { useUser } from "@/context/UserContext";
+import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import { useTier } from "@/context/TierContext";
 
 // App stages
@@ -23,62 +24,78 @@ enum AppStage {
 
 const Index: React.FC = () => {
   const { user, isAuthenticated, isLoading, refreshProfile } = useUser();
+  const { memberships, loading: schoolMembershipsLoading } = useSchoolPortal();
   const tier = useTier();
   const [appStage, setAppStage] = useState<AppStage>(AppStage.Welcome);
   const [userType, setUserType] = useState<"student" | "teacher" | "admin" | "manager">("student");
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const navigate = useNavigate();
   
-  // Redirect based on role when authenticated
+  // Resolve one landing portal from the authoritative global role and active school membership.
   useEffect(() => {
     if (isLoading) return;
-    
+
     if (isAuthenticated && user) {
+      // Platform authorities always win over school membership and remembered login mode.
+      if (user.role === "extreme_admin") {
+        navigate("/root-control-portal-9xA7", { replace: true });
+        return;
+      }
+      if (user.role === "super_admin") {
+        navigate("/super-admin", { replace: true });
+        return;
+      }
+
+      const hasSchoolRole = (role: string) =>
+        memberships.some((membership) => membership.status === "active" && membership.school_role === role);
+
       const loginMode = safeStorage.getItem("masterminds_login_mode");
-      if (loginMode === "parent") {
-        navigate('/parent-dashboard');
+      if (loginMode === "parent" && user.role !== "parent") {
+        navigate("/parent-dashboard", { replace: true });
         return;
       }
 
-      // Dedicated Finance accounts land directly in the Finance workspace.
-      if (user.role === 'finance') {
-        navigate('/finance');
+      if (["teacher", "finance", "parent", "student"].includes(user.role) && schoolMembershipsLoading) {
         return;
       }
 
-      // Redirect privileged roles to their portals
-      if (user.role === 'extreme_admin') {
-        navigate('/root-control-portal-9xA7');
+      if (user.role === "manager") {
+        navigate("/school/manager", { replace: true });
         return;
       }
-      if (user.role === 'super_admin') {
-        navigate('/super-admin');
+      if (user.role === "finance") {
+        navigate(hasSchoolRole("finance") ? "/school/finance" : "/finance", { replace: true });
         return;
       }
-      if (user.role === 'teacher') {
-        navigate('/teacher');
+      if (user.role === "teacher") {
+        navigate(hasSchoolRole("teacher") ? "/school/teacher" : "/teacher", { replace: true });
         return;
       }
-      if (user.role === 'admin') {
-        navigate('/admin');
+      if (user.role === "parent") {
+        navigate(hasSchoolRole("parent") ? "/school/parent" : "/parent-dashboard", { replace: true });
         return;
       }
-      if (user.role === 'manager') {
-        navigate('/school/manager');
+      if (user.role === "admin") {
+        navigate("/admin", { replace: true });
         return;
       }
-      
-      // For students, check if profile is complete
-      if (!user.grade || !user.educationLevel) {
-        setAppStage(AppStage.ProfileSetup);
-      } else {
-        setAppStage(AppStage.MainMenu);
+
+      if (user.role === "student") {
+        if (hasSchoolRole("student")) {
+          navigate("/school/student", { replace: true });
+          return;
+        }
+        if (!user.grade || !user.educationLevel) {
+          setAppStage(AppStage.ProfileSetup);
+        } else {
+          setAppStage(AppStage.MainMenu);
+        }
       }
     } else if (!isAuthenticated && appStage !== AppStage.Welcome) {
       setAppStage(AppStage.Auth);
     }
-  }, [isAuthenticated, user, isLoading, navigate, appStage]);
-  
+  }, [isAuthenticated, user, isLoading, navigate, appStage, memberships, schoolMembershipsLoading]);
+
   // Handle welcome screen continue button
   const handleWelcomeContinue = (type: "student" | "teacher" | "admin" | "manager" = "student", mode: "signin" | "signup" = "signin") => {
     setUserType(type);
