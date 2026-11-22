@@ -437,6 +437,8 @@ export default function SchoolManagerPortal() {
       setExistingTeacherUsername("");
       toast.success("Existing account linked as a school teacher. Assign sections and subjects in Teacher Assignments.");
       await load();
+    } catch (error: any) {
+      toast.error(error?.message || "The existing teacher account could not be linked.");
     } finally {
       setLinkingExistingTeacher(false);
     }
