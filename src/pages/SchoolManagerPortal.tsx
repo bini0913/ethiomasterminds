@@ -29,6 +29,7 @@ const navItems: SchoolNavItem[] = [
 ];
 
 type AccountRole = "admin" | "teacher" | "finance" | "parent" | "student";
+type LeadershipPosition = "" | "main_director" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "academic_director" | "hr_director" | "team_leader";
 
 export default function SchoolManagerPortal() {
   const { activeSchool, activeMembership } = useSchoolPortal();
@@ -88,6 +89,9 @@ export default function SchoolManagerPortal() {
   const [leadershipPermissionReason, setLeadershipPermissionReason] = useState("");
 
   const [accountRole, setAccountRole] = useState<AccountRole>("admin");
+  const [accountLeadershipPosition, setAccountLeadershipPosition] = useState<LeadershipPosition>("");
+  const [accountLeadershipDivision, setAccountLeadershipDivision] = useState("kg");
+  const [accountLeadershipTeam, setAccountLeadershipTeam] = useState("");
   const [accountName, setAccountName] = useState("");
   const [existingTeacherUsername, setExistingTeacherUsername] = useState("");
   const [linkingExistingTeacher, setLinkingExistingTeacher] = useState(false);
@@ -450,6 +454,9 @@ export default function SchoolManagerPortal() {
     setCreatedCredentials([]);
     if (!accountName.trim()) return setFormError("Enter the person's full name.");
     const account: any = { name: accountName.trim() };
+    const provisionRole: AccountRole = accountLeadershipPosition === "main_director" ? "admin" : accountLeadershipPosition === "hr_director" ? "finance" : accountLeadershipPosition ? "teacher" : accountRole;
+    if (accountLeadershipPosition === "main_director" && members.some((member) => member.school_role === "admin" && member.status === "active")) return setFormError("An active School Admin account already exists. Appoint that account as Main Director from Leadership Team.");
+    if (accountLeadershipPosition === "team_leader" && !accountLeadershipTeam.trim()) return setFormError("Enter the Team Leader team or department name.");
     if (accountRole === "student") {
       const age = Number(accountAge);
       if (!accountSectionId || !Number.isInteger(age) || age < 3 || age > 120) {
@@ -463,7 +470,7 @@ export default function SchoolManagerPortal() {
       account.parent_membership_ids = parentMembershipIds;
     }
     if (accountRole === "parent") account.student_membership_ids = studentMembershipIds;
-    if (accountRole === "teacher") {
+    if (provisionRole === "teacher" && !accountLeadershipPosition) {
       if (!assignSectionId || (accountAssignmentKind === "subject" && !accountSubject)) return setFormError("Choose a section and subject for the teacher.");
       account.assignments = [{
         section_id: assignSectionId,
@@ -473,18 +480,39 @@ export default function SchoolManagerPortal() {
     }
 
     const { data, error } = await supabase.functions.invoke("school-provision-account", {
-      body: { action: "create_accounts", school_id: schoolId, role: accountRole, accounts: [account] },
+      body: { action: "create_accounts", school_id: schoolId, role: provisionRole, accounts: [account] },
     });
     if (error || !data?.created?.length) {
       setFormError(data?.failed?.[0]?.message || error?.message || "Account could not be created.");
       return;
     }
     setCreatedCredentials(data.created);
+    let appointmentWarning = "";
+    if (accountLeadershipPosition && data.created[0]?.membership_id) {
+      const position = accountLeadershipPosition;
+      const division = ["vice_director", "kg_director", "elementary_director", "middle_school_director", "high_school_director", "team_leader"].includes(position) ? accountLeadershipDivision : null;
+      const hrPermissions = ["view_staff", "view_staff_evaluations", "manage_team_tasks", "view_reports", "view_finance_summary", "manage_meetings"];
+      const academicPermissions = ["view_students", "view_staff", "view_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_reports", "publish_announcements", "manage_meetings"];
+      const standardPermissions = ["view_students", "view_staff", "view_attendance", "review_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "manage_team_tasks", "assign_team_tasks", "view_reports"];
+      const { error: appointmentError } = await db.rpc("school_appoint_leader", {
+        p_target_membership_id: data.created[0].membership_id,
+        p_position: position,
+        p_division_scope: division,
+        p_team_name: position === "team_leader" ? accountLeadershipTeam.trim() : null,
+        p_permissions: position === "hr_director" ? hrPermissions : position === "academic_director" ? academicPermissions : position === "main_director" ? [] : standardPermissions,
+        p_start_date: new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" }),
+        p_end_date: null,
+      });
+      if (appointmentError) appointmentWarning = "Account created, but leadership appointment failed: " + appointmentError.message + ". Use Leadership Team to appoint this account.";
+    }
     setAccountName("");
     setParentMembershipIds([]);
     setStudentMembershipIds([]);
-    toast.success("School account created. Copy the initial credentials and deliver them privately.");
-    await load();
+    if (appointmentWarning) { setFormError(appointmentWarning); toast.error("Account created; leadership appointment needs attention."); }
+    else toast.success(accountLeadershipPosition ? "Account and leadership appointment created. Copy the initial credentials and deliver them privately." : "School account created. Copy the initial credentials and deliver them privately.");
+    setAccountLeadershipPosition("");
+    setAccountLeadershipTeam("");
+    await Promise.all([load(), loadLeadership()]);
   };
 
   const addAcademicYear = async (event: React.FormEvent) => {
@@ -844,7 +872,7 @@ export default function SchoolManagerPortal() {
               <SchoolField label="Link parent accounts"><select multiple className="min-h-24 w-full rounded-md border border-slate-200 bg-white p-2 text-sm" value={parentMembershipIds} onChange={(event) => setParentMembershipIds(Array.from(event.target.selectedOptions).map((option) => option.value))}>{parents.map((parent) => <option key={parent.id} value={parent.id}>{memberName(parent.id)}</option>)}</select></SchoolField>
             </>}
             {accountRole === "parent" && <SchoolField label="Link children"><select multiple className="min-h-24 w-full rounded-md border border-slate-200 bg-white p-2 text-sm" value={studentMembershipIds} onChange={(event) => setStudentMembershipIds(Array.from(event.target.selectedOptions).map((option) => option.value))}>{students.map((student) => <option key={student.id} value={student.id}>{memberName(student.id)} · {student.grade_label || "Student"}</option>)}</select></SchoolField>}
-            {accountRole === "teacher" && <>
+            {accountRole === "teacher" && !accountLeadershipPosition && <>
               <SchoolField label="Assigned section"><select className={schoolSelectClass} value={assignSectionId} onChange={(event) => setAssignSectionId(event.target.value)}><option value="">Choose section</option>{sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}</select></SchoolField>
               <SchoolField label="Assignment type"><select className={schoolSelectClass} value={accountAssignmentKind} onChange={(event) => setAccountAssignmentKind(event.target.value as "subject" | "homeroom")}><option value="subject">Subject teacher</option><option value="homeroom">Homeroom teacher</option></select></SchoolField>
               {accountAssignmentKind === "subject" && <SchoolField label="Subject"><select className={schoolSelectClass} value={accountSubject} onChange={(event) => setAccountSubject(event.target.value)}><option value="">Choose subject</option>{subjects.filter((subject) => subject.active && subject.grade_label === sections.find((section) => section.id === assignSectionId)?.grade_label && subject.academic_year_id === sections.find((section) => section.id === assignSectionId)?.academic_year_id).map((subject) => <option key={subject.id} value={subject.subject_name}>{subject.subject_name}</option>)}</select></SchoolField>}
