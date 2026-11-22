@@ -27,7 +27,7 @@ BEGIN
     RAISE EXCEPTION USING errcode = '22023', message = 'Manager, school, account and username are required';
   END IF;
 
-  IF p_position NOT IN (
+  IF p_position IS NULL OR p_position NOT IN (
     'kg_director', 'elementary_director', 'middle_school_director',
     'high_school_director', 'vice_director', 'academic_director'
   ) THEN
@@ -38,7 +38,7 @@ BEGIN
      OR p_position = 'elementary_director' AND p_division_scope IS DISTINCT FROM 'elementary'
      OR p_position = 'middle_school_director' AND p_division_scope IS DISTINCT FROM 'middle_school'
      OR p_position = 'high_school_director' AND p_division_scope IS DISTINCT FROM 'high_school'
-     OR p_position = 'vice_director' AND p_division_scope NOT IN ('kg','elementary','middle_school','high_school')
+     OR p_position = 'vice_director' AND (p_division_scope IS NULL OR p_division_scope NOT IN ('kg','elementary','middle_school','high_school'))
      OR p_position = 'academic_director' AND p_division_scope IS NOT NULL THEN
     RAISE EXCEPTION USING errcode = '22023', message = 'The leadership position and division scope do not match';
   END IF;
@@ -93,17 +93,6 @@ BEGIN
     p_school_id, p_user_id, 'teacher', 'active', lower(btrim(p_school_username)), p_actor_id
   )
   RETURNING id INTO v_membership_id;
-
-  INSERT INTO public.school_leadership_structure_events (
-    school_id, actor_user_id, actor_membership_id, event_type, details
-  ) VALUES (
-    p_school_id, p_actor_id, v_manager_membership_id, 'leadership_account_created',
-    jsonb_build_object(
-      'membership_id', v_membership_id,
-      'position', p_position,
-      'division_scope', p_division_scope
-    )
-  );
 
   RETURN v_membership_id;
 END;
