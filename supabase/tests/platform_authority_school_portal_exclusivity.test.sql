@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(13);
+SELECT plan(14);
 
 SELECT ok(
   EXISTS (
@@ -57,38 +57,47 @@ SELECT ok(
 );
 
 SELECT ok(
-  to_regprocedure('public.school_is_platform_authority_membership(uuid)') IS NOT NULL,
-  'scoped platform-authority visibility helper exists'
+  to_regprocedure('public._school_is_platform_authority_user(uuid)') IS NOT NULL,
+  'private platform-authority detector exists'
 );
 
 SELECT ok(
-  position('school_is_platform_authority_membership' in pg_get_functiondef('public.school_can_view_membership(uuid)'::regprocedure)) > 0,
+  position('_school_is_platform_authority_user' in pg_get_functiondef('public.school_can_view_membership(uuid)'::regprocedure)) > 0,
   'ordinary membership visibility hides platform authority accounts'
 );
 
 SELECT ok(
-  position('school_is_platform_authority_membership' in pg_get_functiondef('public.school_can_view_leadership_appointment(uuid)'::regprocedure)) > 0,
+  position('_school_is_platform_authority_user' in pg_get_functiondef('public.school_can_view_leadership_appointment(uuid)'::regprocedure)) > 0,
   'leadership appointment visibility hides platform authority accounts'
 );
 
 SELECT ok(
-  position('school_is_platform_authority_membership' in coalesce((
+  position('school_can_view_membership' in coalesce((
     SELECT qual FROM pg_policies
     WHERE schemaname = 'public'
       AND tablename = 'school_memberships'
       AND policyname = 'school_memberships_manager_update'
   ), '')) > 0,
-  'School Managers cannot update platform authority memberships'
+  'School Managers cannot update hidden platform authority memberships'
 );
 
 SELECT ok(
-  position('school_is_platform_authority_membership' in coalesce((
+  position('school_can_view_scoped_leadership_membership' in coalesce((
     SELECT qual FROM pg_policies
     WHERE schemaname = 'public'
       AND tablename = 'school_memberships'
       AND policyname = 'school_leadership_view_scoped_memberships'
   ), '')) > 0,
   'leadership staff directory policy hides platform authority memberships'
+);
+
+SELECT ok(
+  NOT has_function_privilege(
+    'authenticated',
+    'public._school_is_platform_authority_user(uuid)',
+    'EXECUTE'
+  ),
+  'authenticated users cannot call the private platform-role detector directly'
 );
 
 SELECT is(
