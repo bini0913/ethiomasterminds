@@ -10,7 +10,8 @@ CREATE OR REPLACE FUNCTION public.school_attach_division_staff_account(
   p_subject_name text,
   p_assignment_kind text,
   p_position text,
-  p_team_name text DEFAULT NULL
+  p_team_name text DEFAULT NULL,
+  p_team_leader_appointment_id uuid DEFAULT NULL
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -24,6 +25,7 @@ DECLARE
   v_academic_year_id uuid;
   v_membership_id uuid;
   v_team_name text;
+  v_team_leader_appointment_id uuid;
 BEGIN
   IF coalesce(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION USING errcode = '42501', message = 'Trusted account provisioning service required';
@@ -36,6 +38,9 @@ BEGIN
     RAISE EXCEPTION USING errcode = '22023', message = 'Division Directors can create Teachers or Team Leaders only';
   END IF;
   IF p_position = 'team_leader' THEN
+    IF p_team_leader_appointment_id IS NOT NULL THEN
+      RAISE EXCEPTION USING errcode = '22023', message = 'A Team Leader account cannot be assigned to another Team Leader';
+    END IF;
     v_team_name := nullif(btrim(p_team_name), '');
     IF v_team_name IS NULL OR char_length(v_team_name) > 100 THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'A valid Team Leader team name is required';
@@ -128,6 +133,32 @@ BEGIN
     ) VALUES (
       p_school_id, v_membership_id, p_section_id, btrim(p_subject_name), p_assignment_kind, p_actor_id
     );
+
+    IF p_team_leader_appointment_id IS NOT NULL THEN
+      SELECT appointment.id INTO v_team_leader_appointment_id
+      FROM public.school_leadership_appointments appointment
+      WHERE appointment.id = p_team_leader_appointment_id
+        AND appointment.school_id = p_school_id
+        AND appointment.position = 'team_leader'
+        AND appointment.division_scope = v_division
+        AND appointment.status = 'active'
+        AND appointment.start_date <= CURRENT_DATE
+        AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE);
+      IF v_team_leader_appointment_id IS NULL THEN
+        RAISE EXCEPTION USING errcode = '42501', message = 'Choose an active Team Leader in your own division';
+      END IF;
+      INSERT INTO public.school_leadership_team_members (
+        school_id, appointment_id, membership_id, assigned_by_membership_id
+      ) VALUES (
+        p_school_id, v_team_leader_appointment_id, v_membership_id, v_actor_membership_id
+      );
+      INSERT INTO public.school_leadership_structure_events (
+        school_id, actor_user_id, actor_membership_id, event_type, details
+      ) VALUES (
+        p_school_id, p_actor_id, v_actor_membership_id, 'team_member_assigned',
+        jsonb_build_object('appointment_id', v_team_leader_appointment_id, 'membership_id', v_membership_id)
+      );
+    END IF;
   ELSE
     INSERT INTO public.school_leadership_appointments (
       school_id, membership_id, position, division_scope, team_name,
@@ -143,5 +174,5 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.school_attach_division_staff_account(uuid,uuid,uuid,text,uuid,text,text,text,text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.school_attach_division_staff_account(uuid,uuid,uuid,text,uuid,text,text,text,text) TO service_role;
+REVOKE ALL ON FUNCTION public.school_attach_division_staff_account(uuid,uuid,uuid,text,uuid,text,text,text,text,uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.school_attach_division_staff_account(uuid,uuid,uuid,text,uuid,text,text,text,text,uuid) TO service_role;
