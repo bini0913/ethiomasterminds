@@ -170,7 +170,7 @@ AS $function$
     SELECT 1
     FROM public.school_memberships target
     WHERE target.id = p_membership_id
-      AND NOT public._school_is_platform_authority_user(target.user_id)
+      AND (public._is_extreme_admin() OR NOT public._school_is_platform_authority_user(target.user_id))
       AND (
         target.user_id = auth.uid()
         OR public._is_extreme_admin()
@@ -221,11 +221,14 @@ AS $function$
     SELECT 1
     FROM public.school_leadership_appointments appointment
     WHERE appointment.id = p_appointment_id
-      AND NOT EXISTS (
-        SELECT 1
-        FROM public.school_memberships authority_membership
-        WHERE authority_membership.id = appointment.membership_id
-          AND public._school_is_platform_authority_user(authority_membership.user_id)
+      AND (
+        public._is_extreme_admin()
+        OR NOT EXISTS (
+          SELECT 1
+          FROM public.school_memberships authority_membership
+          WHERE authority_membership.id = appointment.membership_id
+            AND public._school_is_platform_authority_user(authority_membership.user_id)
+        )
       )
       AND (
         public.is_school_manager(appointment.school_id)
@@ -282,12 +285,14 @@ STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $function$
-  SELECT auth.uid() IS NOT NULL AND EXISTS (
-    SELECT 1
-    FROM public.school_memberships target
-    WHERE target.id = p_membership_id
-      AND NOT public._school_is_platform_authority_user(target.user_id)
-      AND (
+  SELECT auth.uid() IS NOT NULL AND (
+    public._is_extreme_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public.school_memberships target
+      WHERE target.id = p_membership_id
+        AND NOT public._school_is_platform_authority_user(target.user_id)
+        AND (
         (
           target.school_role = 'student'
           AND (
@@ -309,6 +314,7 @@ AS $function$
           )
         )
       )
+    )
   );
 $function$;
 
