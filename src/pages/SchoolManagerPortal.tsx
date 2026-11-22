@@ -1070,6 +1070,12 @@ export default function SchoolManagerPortal() {
       ["view_finance_summary", "View finance summaries"],
       ["manage_meetings", "Manage assigned meetings"],
     ] as const;
+    const visiblePermissionOptions = leaderPosition === "academic_director"
+      ? permissionOptions.filter(([permission]) => ![
+          "review_attendance", "manage_team_tasks", "assign_team_tasks",
+          "view_discipline", "review_discipline", "view_finance_summary",
+        ].includes(permission))
+      : permissionOptions;
     const activeAppointment = (position: string, division: string | null) =>
       leadershipAppointments.find((item) => item.status === "active" && item.position === position && (division === null || item.division_scope === division));
     const vacancies = fixedPositions.filter(([position, , division]) => !activeAppointment(position, division));
@@ -1156,7 +1162,7 @@ export default function SchoolManagerPortal() {
             <div>
               <p className="mb-2 text-sm font-semibold text-slate-800">Granted responsibilities</p>
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                {permissionOptions.map(([permission, label]) => (
+                {visiblePermissionOptions.map(([permission, label]) => (
                   <label key={permission} className="flex items-start gap-2 rounded-lg border border-slate-100 p-2.5 text-xs text-slate-700">
                     <input
                       type="checkbox"
