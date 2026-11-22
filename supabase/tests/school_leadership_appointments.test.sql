@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(99);
+select plan(100);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -131,6 +131,8 @@ select ok(exists (select 1 from pg_indexes where schemaname='public' and indexna
 
 select ok(position('Staff evaluation access is reserved for the HR Director' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'other leadership appointments cannot receive HR-only evaluation access');
 select ok(position('Staff evaluation access is reserved for the HR Director' in pg_get_functiondef('public.school_update_leadership_permissions(uuid,text[],text)'::regprocedure)) > 0, 'School Manager cannot grant HR-only evaluation access to another leadership position');
+
+select ok(position('target.school_role IN (''admin'', ''teacher'', ''finance'')' in pg_get_functiondef('public.school_can_view_profile(uuid)'::regprocedure)) > 0, 'HR staff profile visibility excludes student and parent profiles');
 
 select * from finish();
 rollback;
