@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(77);
+select plan(78);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -102,6 +102,8 @@ select ok(position('vice_director' in pg_get_functiondef('public.school_leadersh
 select ok(position('division_appointment.position' in pg_get_functiondef('public.school_can_view_leadership_appointment(uuid)'::regprocedure)) > 0, 'Division Directors can read their own division leadership appointments');
 select ok(position('appointment.position IN (''vice_director'', ''team_leader'')' in pg_get_functiondef('public.school_can_view_leadership_appointment(uuid)'::regprocedure)) > 0, 'Division leadership reads do not expose other divisions');
 select ok(exists (select 1 from pg_constraint where conrelid='public.school_leadership_appointments'::regclass and conname='school_leadership_appointments_position_division_scope_check'), 'leadership positions enforce division assignment rules');
+
+select ok(position('subordinate_appointment.position' in pg_get_functiondef('public.school_leadership_has_permission(uuid,text,text,uuid,uuid)'::regprocedure)) > 0, 'Division Directors can read only their appointed Vice Director and Team Leader memberships');
 
 select * from finish();
 rollback;
