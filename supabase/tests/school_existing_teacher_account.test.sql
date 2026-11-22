@@ -17,7 +17,7 @@ select ok(
   'authenticated clients cannot bypass the trusted account service'
 );
 select ok(
-  not has_function_privilege('anon','public.school_attach_existing_school_teacher_account(uuid,uuid,uuid)','EXECUTE'),
+  not has_function_privilege('anon','public.school_attach_existing_teacher_account(uuid,uuid,uuid)','EXECUTE'),
   'anonymous clients cannot attach existing accounts'
 );
 select ok(
