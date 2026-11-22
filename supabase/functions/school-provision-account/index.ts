@@ -192,30 +192,9 @@ Deno.serve(async (req) => {
         .eq("school_id", schoolId)
         .eq("user_id", actorId)
         .eq("status", "active")
-        .in("school_role", ["manager", "admin"]);
+        .eq("school_role", "manager");
       if (actorMembershipError) return json({ error: "Unable to verify this school's authority" }, 503);
-
-      const isManager = (actorMemberships ?? []).some((membership: { school_role: string }) => membership.school_role === "manager");
-      const adminMembership = (actorMemberships ?? []).find((membership: { id: string; school_role: string }) => membership.school_role === "admin");
-      let isMainDirector = false;
-      if (adminMembership) {
-        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
-        const { data: appointment, error: appointmentError } = await admin
-          .from("school_leadership_appointments")
-          .select("id")
-          .eq("school_id", schoolId)
-          .eq("membership_id", adminMembership.id)
-          .eq("position", "main_director")
-          .eq("status", "active")
-          .lte("start_date", today)
-          .or(`end_date.is.null,end_date.gte.${today}`)
-          .maybeSingle();
-        if (appointmentError) return json({ error: "Unable to verify Main Director appointment" }, 503);
-        isMainDirector = Boolean(appointment?.id);
-      }
-      if (!isManager && !isMainDirector) {
-        return json({ error: "Only this school's Manager or appointed Main Director can attach an existing teacher account" }, 403);
-      }
+      if (!(actorMemberships ?? []).length) return json({ error: "Only this school's Manager can attach an existing teacher account" }, 403);
 
       const { data: targetProfile, error: profileError } = await admin
         .from("profiles")
@@ -296,34 +275,13 @@ Deno.serve(async (req) => {
       if (role !== "manager" && !canProvisionNetwork) {
         const { data: memberships, error: membershipError } = await admin
           .from("school_memberships")
-          .select("id,school_role")
+          .select("id")
           .eq("school_id", schoolId)
           .eq("user_id", actorId)
           .eq("status", "active")
-          .in("school_role", ["manager", "admin"]);
+          .eq("school_role", "manager");
         if (membershipError) return json({ error: "Unable to verify this school's provisioning authority" }, 503);
-
-        const isManager = (memberships ?? []).some((membership: { school_role: string }) => membership.school_role === "manager");
-        const adminMembership = (memberships ?? []).find((membership: { id: string; school_role: string }) => membership.school_role === "admin");
-        let isMainDirector = false;
-        if (adminMembership) {
-          const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
-          const { data: appointment, error: appointmentError } = await admin
-            .from("school_leadership_appointments")
-            .select("id")
-            .eq("school_id", schoolId)
-            .eq("membership_id", adminMembership.id)
-            .eq("position", "main_director")
-            .eq("status", "active")
-            .lte("start_date", today)
-            .or(`end_date.is.null,end_date.gte.${today}`)
-            .maybeSingle();
-          if (appointmentError) return json({ error: "Unable to verify Main Director appointment" }, 503);
-          isMainDirector = Boolean(appointment?.id);
-        }
-        if (!isManager && !isMainDirector) {
-          return json({ error: "Only this school's Manager or appointed Main Director can create staff, parent, and student accounts" }, 403);
-        }
+        if (!(memberships ?? []).length) return json({ error: "Only this school's Manager can create parent and student accounts or appoint school Directors" }, 403);
       }
 
       const { data: school, error: schoolError } = await admin
