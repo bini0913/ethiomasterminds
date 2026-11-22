@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(9);
+select plan(10);
 
 select ok(
   to_regprocedure('public.school_is_active_division_director_for_grade(uuid,text)') is not null,
