@@ -4,6 +4,54 @@ BEGIN;
 
 DROP POLICY IF EXISTS school_sections_manager_insert ON public.school_sections;
 
+CREATE OR REPLACE FUNCTION public.school_is_active_division_director_for_grade(
+  p_school_id uuid,
+  p_grade_label text
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1
+    FROM public.school_leadership_appointments appointment
+    JOIN public.school_memberships leader
+      ON leader.id = appointment.membership_id
+     AND leader.school_id = appointment.school_id
+    JOIN public.school_division_grade_mappings mapping
+      ON mapping.school_id = appointment.school_id
+     AND mapping.division_scope = appointment.division_scope
+     AND mapping.grade_label = btrim(p_grade_label)
+    WHERE appointment.school_id = p_school_id
+      AND appointment.position IN ('kg_director', 'elementary_director', 'middle_school_director', 'high_school_director')
+      AND appointment.status = 'active'
+      AND appointment.start_date <= CURRENT_DATE
+      AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE)
+      AND leader.user_id = auth.uid()
+      AND leader.status = 'active'
+  );
+$;
+
+REVOKE ALL ON FUNCTION public.school_is_active_division_director_for_grade(uuid, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.school_is_active_division_director_for_grade(uuid, text) TO authenticated;
+
+ALTER POLICY school_leadership_view_scoped_sections
+ON public.school_sections
+USING (
+  school_leadership_has_permission(school_id, 'view_students', grade_label, NULL, id)
+  OR school_leadership_has_permission(school_id, 'view_curriculum', grade_label, NULL, id)
+  OR school_leadership_has_permission(school_id, 'review_assessments', grade_label, NULL, id)
+  OR school_leadership_has_permission(school_id, 'view_attendance', grade_label, NULL, id)
+  OR school_leadership_has_permission(school_id, 'review_attendance', grade_label, NULL, id)
+  OR school_leadership_has_permission(school_id, 'view_discipline', grade_label, NULL, id)
+  OR school_leadership_has_permission(school_id, 'review_discipline', grade_label, NULL, id)
+  OR school_leadership_has_permission(school_id, 'view_academics', grade_label, NULL, id)
+  OR school_leadership_has_permission(school_id, 'review_results', grade_label, NULL, id)
+  OR public.school_is_active_division_director_for_grade(school_id, grade_label)
+);
+
 CREATE OR REPLACE FUNCTION public.school_division_director_create_sections(
   p_school_id uuid,
   p_academic_year_id uuid,
@@ -16,7 +64,6 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_division_scope text;
   v_name text;
   v_inserted integer := 0;
   v_total integer := 0;
@@ -53,26 +100,7 @@ BEGIN
     RAISE EXCEPTION USING errcode = '22023', message = 'Section names must be unique, ignoring letter case';
   END IF;
 
-  SELECT appointment.division_scope
-    INTO v_division_scope
-  FROM public.school_leadership_appointments appointment
-  JOIN public.school_memberships leader
-    ON leader.id = appointment.membership_id
-   AND leader.school_id = appointment.school_id
-  JOIN public.school_division_grade_mappings mapping
-    ON mapping.school_id = appointment.school_id
-   AND mapping.division_scope = appointment.division_scope
-   AND mapping.grade_label = btrim(p_grade_label)
-  WHERE appointment.school_id = p_school_id
-    AND appointment.position IN ('kg_director', 'elementary_director', 'middle_school_director', 'high_school_director')
-    AND appointment.status = 'active'
-    AND appointment.start_date <= CURRENT_DATE
-    AND (appointment.end_date IS NULL OR appointment.end_date >= CURRENT_DATE)
-    AND leader.user_id = auth.uid()
-    AND leader.status = 'active'
-  LIMIT 1;
-
-  IF v_division_scope IS NULL THEN
+  IF NOT public.school_is_active_division_director_for_grade(p_school_id, btrim(p_grade_label)) THEN
     RAISE EXCEPTION USING errcode = '42501', message = 'Only the active Director of the division mapped to this grade can create its class sections';
   END IF;
 
