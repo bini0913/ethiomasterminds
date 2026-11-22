@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(87);
+select plan(97);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -116,6 +116,18 @@ select ok(exists (select 1 from pg_indexes where schemaname='public' and indexna
 select ok(has_function_privilege('authenticated','public.school_appoint_leader(uuid,text,text,text,text[],date,date)','EXECUTE') and not has_function_privilege('anon','public.school_appoint_leader(uuid,text,text,text,text[],date,date)','EXECUTE'), 'Academic Director appointment remains manager-only and authenticated');
 
 select ok(position('Academic Director permissions are limited to school-wide academic oversight' in pg_get_functiondef('public.school_update_leadership_permissions(uuid,text[],text)'::regprocedure)) > 0, 'School Manager cannot grant finance or operational permissions to the Academic Director');
+
+
+select ok((select position('hr_director' in pg_get_constraintdef(oid)) > 0 from pg_constraint where conrelid='public.school_leadership_appointments'::regclass and conname='school_leadership_appointments_position_check'), 'leadership position constraint includes HR Director');
+select ok((select position('hr_director' in pg_get_constraintdef(oid)) > 0 from pg_constraint where conrelid='public.school_leadership_appointments'::regclass and conname='school_leadership_appointments_position_division_scope_check'), 'division-scope constraint allows school-wide HR Director');
+select ok(position('hr_director' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'School Manager appointment RPC supports HR Director');
+select ok(position('active Finance membership' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'HR Director appointment requires an active Finance membership');
+select ok(position('HR Director permissions are limited to school HR and finance operations' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'HR Director appointment permissions are restricted to HR and finance');
+select ok(position('WHEN appointment.position = ''hr_director''' in pg_get_functiondef('public.school_leadership_has_permission(uuid,text,text,uuid,uuid)'::regprocedure)) > 0, 'HR Director permissions are school-wide and finance-membership scoped');
+select ok(position('view_staff' in pg_get_functiondef('public.school_can_view_profile(uuid)'::regprocedure)) > 0, 'staff profiles are visible to appointed leaders with staff-view permission');
+select ok(position('view_staff_evaluations' in pg_get_functiondef('public.school_can_view_staff_evaluation(uuid)'::regprocedure)) > 0, 'staff evaluations require the dedicated HR review permission');
+select ok(position('HR Director permissions are limited to school HR and finance operations' in pg_get_functiondef('public.school_update_leadership_permissions(uuid,text[],text)'::regprocedure)) > 0, 'School Manager cannot grant unrelated permissions to the HR Director');
+select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_singleton_position'), 'only one active HR Director can be appointed per school');
 
 select * from finish();
 rollback;
