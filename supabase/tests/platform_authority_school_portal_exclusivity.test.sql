@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(14);
+SELECT plan(15);
 
 SELECT ok(
   EXISTS (
@@ -59,6 +59,11 @@ SELECT ok(
 SELECT ok(
   to_regprocedure('public._school_is_platform_authority_user(uuid)') IS NOT NULL,
   'private platform-authority detector exists'
+);
+
+SELECT ok(
+  position('_is_extreme_admin()' in pg_get_functiondef('public.school_can_view_scoped_leadership_membership(uuid)'::regprocedure)) > 0,
+  'Extreme Admin retains full school membership visibility'
 );
 
 SELECT ok(
