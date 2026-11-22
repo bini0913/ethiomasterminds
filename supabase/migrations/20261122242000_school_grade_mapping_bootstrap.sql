@@ -230,8 +230,8 @@ BEGIN
   )
   SELECT
     v_actor.school_id,
-    default_mapping[2],
-    default_mapping[1],
+    default_mapping.division_scope,
+    default_mapping.grade_label,
     v_actor.id,
     v_actor.id
   FROM (VALUES
