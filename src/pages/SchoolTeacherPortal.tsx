@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
+import SchoolLeadershipShortcut from "@/components/school/SchoolLeadershipShortcut";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
@@ -810,7 +811,7 @@ export default function SchoolTeacherPortal() {
   }
 
   return (
-    <SchoolPortalShell role="teacher" title="Teacher Portal" navItems={navItems} activeItem={page} onNavigate={setPage}>
+    <SchoolPortalShell role="teacher" title="Teacher Portal" navItems={navItems} activeItem={page} onNavigate={setPage} headerActions={<SchoolLeadershipShortcut />}>
       {loading && <div className="mb-4 text-xs text-slate-500">Refreshing assigned school records…</div>}
       {loadError && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"><span>{loadError}</span><SchoolSecondaryButton onClick={() => void load()}>Try again</SchoolSecondaryButton></div>}
       {content}

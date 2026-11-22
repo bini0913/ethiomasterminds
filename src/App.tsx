@@ -22,7 +22,8 @@ const AdminPortal = lazy(() => import("./pages/AdminPortal"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const StudentDashboardRoute = lazy(() => import("./components/dashboard/StudentDashboardRoute"));
 const SchoolManagerPortal = lazy(() => import("./pages/SchoolManagerPortal"));
-const SchoolAdminPortal = lazy(() => import("./pages/SchoolAdminPortal"));
+const SchoolLeadershipPortal = lazy(() => import("./pages/SchoolLeadershipPortal"));
+const SchoolLeadershipGate = lazy(() => import("./components/school/SchoolLeadershipGate"));
 const SchoolTeacherPortal = lazy(() => import("./pages/SchoolTeacherPortal"));
 const SchoolParentPortal = lazy(() => import("./pages/SchoolParentPortal"));
 const SchoolFinancePortal = lazy(() => import("./pages/SchoolFinancePortal"));
@@ -133,7 +134,7 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/admin/early-content", title: "Early Content" },
   { prefix: "/admin", title: "Admin Portal" },
   { prefix: "/school/manager", title: "School Manager Portal" },
-  { prefix: "/school/admin", title: "School Admin Portal" },
+  { prefix: "/school/admin", title: "School Leadership Portal" },
   { prefix: "/school/teacher", title: "School Teacher Portal" },
   { prefix: "/school/parent", title: "School Parent Portal" },
   { prefix: "/school/finance", title: "School Finance Portal" },
@@ -357,7 +358,7 @@ const App = () => (
                               />
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
                               <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
-                              <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["admin"]}><SchoolPortalGate role="admin"><SchoolAdminPortal /></SchoolPortalGate></ProtectedRoute>} />
+                              <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["admin", "teacher", "finance"]}><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></ProtectedRoute>} />
                               <Route path="/school/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolPortalGate role="teacher"><SchoolTeacherPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/parent" element={<ProtectedRoute allowedRoles={["parent"]}><SchoolPortalGate role="parent"><SchoolParentPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/finance" element={<ProtectedRoute allowedRoles={["finance"]}><SchoolPortalGate role="finance"><SchoolFinancePortal /></SchoolPortalGate></ProtectedRoute>} />

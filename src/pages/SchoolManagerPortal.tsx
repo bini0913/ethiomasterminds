@@ -62,6 +62,7 @@ export default function SchoolManagerPortal() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [leadershipAppointments, setLeadershipAppointments] = useState<any[]>([]);
+  const [leadershipActionEvents, setLeadershipActionEvents] = useState<any[]>([]);
   const [leadershipError, setLeadershipError] = useState<string | null>(null);
   const [leaderTargetId, setLeaderTargetId] = useState("");
   const [leaderPosition, setLeaderPosition] = useState("main_director");
@@ -222,11 +223,15 @@ export default function SchoolManagerPortal() {
     setLoading(false);
   }, [schoolId, db, sectionYearId, subjectYearId, feeYearId, gradingYearId, gradingGradeLabel]);
 
+  useEffect(() => {
+    const hasActiveAdmin = members.some((member) => member.school_role === "admin" && member.status === "active");
+    if (hasActiveAdmin && accountRole === "admin") setAccountRole("teacher");
+  }, [members, accountRole]);
   useEffect(() => { void load(); }, [load]);
 
   const loadLeadership = useCallback(async () => {
     if (!schoolId) return;
-    const [appointmentsRes, mappingsRes, teamMembersRes, auditRes] = await Promise.all([
+    const [appointmentsRes, mappingsRes, teamMembersRes, auditRes, actionEventsRes] = await Promise.all([
       db.from("school_leadership_appointments")
         .select("id,membership_id,position,division_scope,team_name,permissions,status,start_date,end_date,created_at")
         .eq("school_id", schoolId)
@@ -244,6 +249,11 @@ export default function SchoolManagerPortal() {
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false })
         .limit(100),
+      db.from("school_leadership_action_events")
+        .select("id,appointment_id,actor_user_id,action_type,target_table,target_id,reason,created_at,before_state,after_state")
+        .eq("school_id", schoolId)
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
     const loadError = appointmentsRes.error || mappingsRes.error || teamMembersRes.error || auditRes.error;
     if (loadError) {
@@ -252,6 +262,7 @@ export default function SchoolManagerPortal() {
       setDivisionMappings([]);
       setTeamAssignments([]);
       setLeadershipAuditEvents([]);
+      setLeadershipActionEvents([]);
       return;
     }
     setLeadershipError(null);
@@ -259,6 +270,7 @@ export default function SchoolManagerPortal() {
     setDivisionMappings(mappingsRes.data ?? []);
     setTeamAssignments(teamMembersRes.data ?? []);
     setLeadershipAuditEvents(auditRes.data ?? []);
+    setLeadershipActionEvents(actionEventsRes.error ? [] : (actionEventsRes.data ?? []));
   }, [schoolId, db]);
 
   useEffect(() => { void loadLeadership(); }, [loadLeadership]);
@@ -390,6 +402,23 @@ export default function SchoolManagerPortal() {
     const section = sections.find((item) => item.id === sectionId);
     return section ? `${section.grade_label} ${section.section_name}` : "—";
   };
+  const membershipRoleLabel = (member: any) => {
+    const appointment = leadershipAppointments.find((item) => item.membership_id === member.id && item.status === "active");
+    if (appointment) {
+      const labels: Record<string, string> = {
+        main_director: "Main Director",
+        vice_director: "Vice Director",
+        kg_director: "KG Director",
+        elementary_director: "Elementary Director",
+        middle_school_director: "Middle School Director",
+        high_school_director: "High School Director",
+        team_leader: "Team Leader",
+      };
+      return labels[appointment.position] || appointment.position;
+    }
+    return member.school_role === "admin" ? "Unassigned School Admin" : member.school_role;
+  };
+
 
   const createAccount = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -746,9 +775,10 @@ export default function SchoolManagerPortal() {
           <form onSubmit={createAccount} className="space-y-3">
             <SchoolField label="Account role">
               <select className={schoolSelectClass} value={accountRole} onChange={(event) => setAccountRole(event.target.value as AccountRole)}>
-                <option value="admin">School Admin</option><option value="teacher">Teacher</option><option value="finance">Finance</option><option value="parent">Parent</option><option value="student">Student</option>
+                <option value="admin" disabled={members.some((member) => member.school_role === "admin" && member.status === "active")}>Main Director account (one per school)</option><option value="teacher">Teacher</option><option value="finance">Finance</option><option value="parent">Parent</option><option value="student">Student</option>
               </select>
             </SchoolField>
+            {members.some((member) => member.school_role === "admin" && member.status === "active") && <p className="text-xs leading-5 text-slate-500">An active School Admin account already exists. Appoint that account as Main Director instead of creating another.</p>}
             <SchoolField label="Full name"><input className={schoolInputClass} value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder="Full name" /></SchoolField>
             {accountRole === "student" && <>
               <SchoolField label="Class section"><select className={schoolSelectClass} value={accountSectionId} onChange={(event) => setAccountSectionId(event.target.value)}><option value="">Choose section</option>{sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}</select></SchoolField>
@@ -774,7 +804,7 @@ export default function SchoolManagerPortal() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[620px] text-left text-sm">
               <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="pb-2 font-semibold">Person</th><th className="pb-2 font-semibold">Role</th><th className="pb-2 font-semibold">Grade / section</th><th className="pb-2 font-semibold">Status</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 capitalize text-slate-600">{member.school_role}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td></tr>)}</tbody>
+              <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 text-slate-600">{membershipRoleLabel(member)}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td></tr>)}</tbody>
             </table>
           </div>
         </SchoolPanel>
@@ -1066,7 +1096,7 @@ export default function SchoolManagerPortal() {
               <SchoolField label="Staff member">
                 <select className={schoolSelectClass} value={leaderTargetId} onChange={(event) => setLeaderTargetId(event.target.value)} required>
                   <option value="">Choose active staff</option>
-                  {staff.filter((member) => leaderPosition !== "main_director" || member.school_role === "admin").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
+                  {staff.filter((member) => leaderPosition === "main_director" ? member.school_role === "admin" : member.school_role !== "admin").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
                 </select>
               </SchoolField>
               <SchoolField label="Leadership position">
@@ -1221,7 +1251,7 @@ export default function SchoolManagerPortal() {
                     </div>
                     <SchoolStatus value={appointment.status} />
                   </div>
-                  <details className="mt-3 rounded-lg border border-slate-100 p-3">
+                  {appointment.position === "main_director" ? <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">The Main Director uses the existing full School Admin authority. Suspend or end this appointment to revoke access; individual permission editing is not available for this position.</p> : <details className="mt-3 rounded-lg border border-slate-100 p-3">
                     <summary className="cursor-pointer text-xs font-semibold text-blue-700">Manage permissions</summary>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       {permissionOptions.map(([permission, label]) => {
@@ -1253,7 +1283,7 @@ export default function SchoolManagerPortal() {
                       />
                       <SchoolSecondaryButton onClick={() => void updateLeaderPermissions(appointment.id, permissionDrafts[appointment.id] ?? appointment.permissions ?? [])}>Save permissions</SchoolSecondaryButton>
                     </div>
-                  </details>
+                  </details>}
                   {appointment.status !== "ended" && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {appointment.status === "active"
@@ -1286,6 +1316,23 @@ export default function SchoolManagerPortal() {
               ))}
             </div>
           ) : <SchoolEmptyState title="No leadership changes recorded" description="Appointments and permission changes will appear here." />}
+        </SchoolPanel>
+        <SchoolPanel title="Leadership operational audit" description="Attendance corrections and other leadership actions are recorded with their reason and before/after values.">
+          {leadershipActionEvents.length ? (
+            <div className="space-y-2">
+              {leadershipActionEvents.slice(0, 30).map((event) => (
+                <div key={event.id} className="border-b border-slate-100 py-2 last:border-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium capitalize text-slate-800">{event.action_type.replace(/_/g, " ")}</p>
+                    <span className="text-xs tabular-nums text-slate-500">{new Date(event.created_at).toLocaleString()}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600">{profiles[event.actor_user_id]?.name || "School leader"} · {event.reason}</p>
+                  {event.target_table === "school_attendance_records" && <p className="mt-1 text-xs text-slate-500">Attendance: {event.before_state?.attendance_status || "—"} → {event.after_state?.attendance_status || "—"}</p>}
+                  {event.target_table === "school_staff_tasks" && <p className="mt-1 text-xs text-slate-500">Task: {event.after_state?.title || "Staff task"} · Status: {event.after_state?.status || "created"}</p>}
+                </div>
+              ))}
+            </div>
+          ) : <SchoolEmptyState title="No operational leadership actions" description="Attendance corrections and leadership task actions will appear here." />}
         </SchoolPanel>
       </div>
     );

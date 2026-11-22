@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
+import SchoolLeadershipShortcut from "@/components/school/SchoolLeadershipShortcut";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
@@ -287,7 +288,7 @@ export default function SchoolFinancePortal() {
   }
 
   return (
-    <SchoolPortalShell role="finance" title="School Finance" navItems={navItems} activeItem={page} onNavigate={setPage}>
+    <SchoolPortalShell role="finance" title="School Finance" navItems={navItems} activeItem={page} onNavigate={setPage} headerActions={<SchoolLeadershipShortcut />}>
       {loading && <div className="mb-4 text-xs text-slate-500">Refreshing school finance records…</div>}
       {content}
     </SchoolPortalShell>

@@ -32,10 +32,11 @@ type SchoolPortalShellProps = {
   onNavigate: (id: string) => void;
   children: React.ReactNode;
   headerActions?: React.ReactNode;
+  roleLabelOverride?: string;
 };
 
 export default function SchoolPortalShell({
-  role, title, navItems, activeItem, onNavigate, children, headerActions,
+  role, title, navItems, activeItem, onNavigate, children, headerActions, roleLabelOverride,
 }: SchoolPortalShellProps) {
   const { user, logout } = useUser();
   const { memberships, activeMembership, activeSchool, switchSchool } = useSchoolPortal();
@@ -84,7 +85,7 @@ export default function SchoolPortalShell({
           <p className="mt-2 truncate text-sm font-semibold text-white">{role === "super_admin" ? "All schools" : activeSchool?.name || "Loading school"}</p>
           <p className="mt-1 text-xs text-slate-400">{role === "super_admin" ? "Platform-wide oversight" : activeSchool?.school_code || " "}</p>
           <span className="mt-3 inline-flex rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200">
-            {roleLabels[role]}
+            {roleLabelOverride || roleLabels[role]}
           </span>
         </div>
       </div>
@@ -94,7 +95,7 @@ export default function SchoolPortalShell({
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">{initials}</div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-white">{user?.name || "Account"}</p>
-            <p className="truncate text-xs text-slate-400">{user?.username ? `@${user.username}` : roleLabels[role]}</p>
+            <p className="truncate text-xs text-slate-400">{user?.username ? `@${user.username}` : (roleLabelOverride || roleLabels[role])}</p>
           </div>
         </div>
         <button
