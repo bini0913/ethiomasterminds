@@ -1024,6 +1024,7 @@ export default function SchoolManagerPortal() {
   const renderLeadership = () => {
     const fixedPositions = [
       ["main_director", "Main Director", null],
+      ["academic_director", "Academic Director", null],
       ["vice_director", "KG Vice Director", "kg"],
       ["vice_director", "Elementary Vice Director", "elementary"],
       ["vice_director", "Middle School Vice Director", "middle_school"],
@@ -1035,6 +1036,7 @@ export default function SchoolManagerPortal() {
     ] as const;
     const positionLabels: Record<string, string> = {
       main_director: "Main Director",
+      academic_director: "Academic Director",
       vice_director: "Vice Director",
       kg_director: "KG Director",
       elementary_director: "Elementary Director",
@@ -1068,6 +1070,12 @@ export default function SchoolManagerPortal() {
       ["view_finance_summary", "View finance summaries"],
       ["manage_meetings", "Manage assigned meetings"],
     ] as const;
+    const visiblePermissionOptions = leaderPosition === "academic_director"
+      ? permissionOptions.filter(([permission]) => ![
+          "review_attendance", "manage_team_tasks", "assign_team_tasks",
+          "view_discipline", "review_discipline", "view_finance_summary",
+        ].includes(permission))
+      : permissionOptions;
     const activeAppointment = (position: string, division: string | null) =>
       leadershipAppointments.find((item) => item.status === "active" && item.position === position && (division === null || item.division_scope === division));
     const vacancies = fixedPositions.filter(([position, , division]) => !activeAppointment(position, division));
@@ -1116,6 +1124,8 @@ export default function SchoolManagerPortal() {
                         "manage_team_tasks", "assign_team_tasks", "view_reports", "publish_announcements",
                         "view_discipline", "review_discipline", "view_finance_summary", "manage_meetings",
                       ]);
+                    } else if (nextPosition === "academic_director") {
+                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_reports", "publish_announcements", "manage_meetings"]);
                     } else if (nextPosition === "vice_director") {
                       setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "view_curriculum", "view_reports", "manage_team_tasks", "manage_meetings"]);
                     } else if (nextPosition === "team_leader") {
@@ -1126,6 +1136,7 @@ export default function SchoolManagerPortal() {
                   }}
                 >
                   <option value="main_director">Main Director</option>
+                  <option value="academic_director">Academic Director</option>
                   <option value="vice_director">Vice Director</option>
                   <option value="kg_director">KG Director</option>
                   <option value="elementary_director">Elementary Director</option>
@@ -1151,7 +1162,7 @@ export default function SchoolManagerPortal() {
             <div>
               <p className="mb-2 text-sm font-semibold text-slate-800">Granted responsibilities</p>
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                {permissionOptions.map(([permission, label]) => (
+                {visiblePermissionOptions.map(([permission, label]) => (
                   <label key={permission} className="flex items-start gap-2 rounded-lg border border-slate-100 p-2.5 text-xs text-slate-700">
                     <input
                       type="checkbox"

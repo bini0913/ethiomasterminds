@@ -9,12 +9,14 @@ import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import { useSchoolLeadership } from "@/components/school/SchoolLeadershipGate";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
 import SchoolAdminPortal from "@/pages/SchoolAdminPortal";
+import AcademicDirectorPortal from "@/pages/AcademicDirectorPortal";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
 } from "@/components/school/SchoolPortalPrimitives";
 
 const positionLabels: Record<string, string> = {
   main_director: "Main Director",
+  academic_director: "Academic Director",
   vice_director: "Vice Director",
   kg_director: "KG Director",
   elementary_director: "Elementary Director",
@@ -28,6 +30,7 @@ type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academ
 export default function SchoolLeadershipPortal() {
   const { appointment } = useSchoolLeadership();
   if (appointment.position === "main_director") return <SchoolAdminPortal />;
+  if (appointment.position === "academic_director") return <AcademicDirectorPortal />;
   return <ScopedLeadershipWorkspace />;
 }
 
