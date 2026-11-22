@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(78);
+select plan(86);
 
 select ok(to_regclass('public.school_leadership_appointments') is not null, 'leadership appointments table exists');
 select ok(to_regclass('public.school_leadership_audit_events') is not null, 'leadership audit table exists');
@@ -104,6 +104,16 @@ select ok(position('appointment.position IN (''vice_director'', ''team_leader'')
 select ok(exists (select 1 from pg_constraint where conrelid='public.school_leadership_appointments'::regclass and conname='school_leadership_appointments_position_division_scope_check'), 'leadership positions enforce division assignment rules');
 
 select ok(position('subordinate_appointment.position' in pg_get_functiondef('public.school_leadership_has_permission(uuid,text,text,uuid,uuid)'::regprocedure)) > 0, 'Division Directors can read only their appointed Vice Director and Team Leader memberships');
+
+
+select ok(position('academic_director' in pg_get_constraintdef(oid)) > 0, 'leadership position constraint includes Academic Director');
+select ok(position('academic_director' in pg_get_constraintdef(oid)) > 0, 'division-scope constraint allows school-wide Academic Director');
+select ok(position('academic_director' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'School Manager appointment RPC supports Academic Director');
+select ok(position('Academic Director permissions are limited to school-wide academic oversight' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'Academic Director appointment RPC restricts permissions to academic oversight');
+select ok(position('WHEN appointment.position = ''academic_director''' in pg_get_functiondef('public.school_leadership_has_permission(uuid,text,text,uuid,uuid)'::regprocedure)) > 0, 'Academic Director permissions cover configured grades across all divisions');
+select ok(position('academic_appointment.position = ''academic_director''' in pg_get_functiondef('public.school_can_view_leadership_appointment(uuid)'::regprocedure)) > 0, 'Academic Director can read the four division leadership appointments');
+select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_singleton_position'), 'only one active Academic Director can be appointed per school');
+select ok(has_function_privilege('authenticated','public.school_appoint_leader(uuid,text,text,text,text[],date,date)','EXECUTE') and not has_function_privilege('anon','public.school_appoint_leader(uuid,text,text,text,text[],date,date)','EXECUTE'), 'Academic Director appointment remains manager-only and authenticated');
 
 select * from finish();
 rollback;
