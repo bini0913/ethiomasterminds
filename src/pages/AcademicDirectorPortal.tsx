@@ -39,6 +39,7 @@ export default function AcademicDirectorPortal() {
   const [mappings, setMappings] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [assessments, setAssessments] = useState<any[]>([]);
   const [homework, setHomework] = useState<any[]>([]);
@@ -58,6 +59,12 @@ export default function AcademicDirectorPortal() {
         .eq("school_id", schoolId)
         .order("grade_label"),
     };
+    if (can("view_staff")) {
+      requests.teacherAssignments = db.from("school_teacher_assignments")
+        .select("teacher_membership_id,section_id")
+        .eq("school_id", schoolId)
+        .limit(2000);
+    }
     if (can("view_students") || can("view_staff")) {
       requests.members = db.from("school_memberships")
         .select("id,user_id,school_role,status,grade_label,section_id,school_username")
@@ -119,6 +126,7 @@ export default function AcademicDirectorPortal() {
     if (results.mappings) setMappings(results.mappings.data ?? []);
     if (results.sections) setSections(results.sections.data ?? []);
     if (results.members) setMembers(results.members.data ?? []);
+    if (results.teacherAssignments) setTeacherAssignments(results.teacherAssignments.data ?? []);
     if (results.assessments) setAssessments(results.assessments.data ?? []);
     if (results.homework) setHomework(results.homework.data ?? []);
     if (results.marks) setMarks(results.marks.data ?? []);
@@ -183,9 +191,13 @@ export default function AcademicDirectorPortal() {
   const divisionStats = divisions.map((division) => {
     const gradeLabels = new Set(mappings.filter((item) => item.division_scope === division.id).map((item) => item.grade_label));
     const divisionStudents = students.filter((item) => gradeLabels.has(item.grade_label));
-    const divisionTeachers = teachers.filter((item) =>
-      gradeLabels.has(item.grade_label) || (item.school_role === "teacher" && !item.grade_label && false)
-    );
+    const divisionTeacherIds = new Set(teacherAssignments
+      .filter((assignment) => {
+        const assignedSection = sections.find((item) => item.id === assignment.section_id);
+        return assignedSection && gradeLabels.has(assignedSection.grade_label);
+      })
+      .map((assignment) => assignment.teacher_membership_id));
+    const divisionTeachers = teachers.filter((item) => divisionTeacherIds.has(item.id));
     const divisionAssessments = assessments.filter((item) => sectionDivision(item.section_id) === division.id);
     const divisionHomework = homework.filter((item) => sectionDivision(item.section_id) === division.id);
     const divisionMarks = marks.filter((mark) => {
