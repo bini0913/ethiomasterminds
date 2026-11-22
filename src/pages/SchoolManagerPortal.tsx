@@ -17,7 +17,6 @@ const navItems: SchoolNavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "accounts", label: "People & Accounts", icon: Users },
   { id: "structure", label: "School Structure", icon: School },
-  { id: "assignments", label: "Teacher Assignments", icon: UserCog },
   { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
   { id: "tasks", label: "Staff Tasks", icon: ClipboardList },
@@ -384,7 +383,8 @@ export default function SchoolManagerPortal() {
 
   const activeMembers = members.filter((member) => member.status === "active");
   const students = activeMembers.filter((member) => member.school_role === "student");
-  const teachers = activeMembers.filter((member) => member.school_role === "teacher");
+  const appointedLeaderMembershipIds = new Set(leadershipAppointments.filter((appointment) => appointment.status === "active").map((appointment) => appointment.membership_id));
+  const teachers = activeMembers.filter((member) => member.school_role === "teacher" && !appointedLeaderMembershipIds.has(member.id));
   const parents = activeMembers.filter((member) => member.school_role === "parent");
   const staff = activeMembers.filter((member) => ["admin", "teacher", "finance"].includes(member.school_role));
   const outstandingByCurrency = invoices.reduce((totals: Record<string, number>, invoice) => { const currency = invoice.currency || "ETB"; totals[currency] = (totals[currency] || 0) + Number(invoice.balance || 0); return totals; }, {});
@@ -1308,7 +1308,6 @@ export default function SchoolManagerPortal() {
   switch (page) {
     case "accounts": content = renderAccounts(); break;
     case "structure": content = renderStructure(); break;
-    case "assignments": content = renderAssignments(); break;
     case "grading": content = renderGrading(); break;
     case "finance": content = renderFinance(); break;
     case "tasks": content = renderTasks(); break;
