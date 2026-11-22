@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import { useSchoolLeadership } from "@/components/school/SchoolLeadershipGate";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
-import SchoolAdminPortal from "@/pages/SchoolAdminPortal";
 import AcademicDirectorPortal from "@/pages/AcademicDirectorPortal";
 import HRDirectorPortal from "@/pages/HRDirectorPortal";
 import {
@@ -30,7 +29,7 @@ type LeadershipPage = "overview" | "students" | "staff" | "attendance" | "academ
 
 export default function SchoolLeadershipPortal() {
   const { appointment } = useSchoolLeadership();
-  if (appointment.position === "main_director") return <SchoolAdminPortal />;
+  if (appointment.position === "main_director") return <div className="mx-auto max-w-2xl p-8"><div className="rounded-xl border border-amber-200 bg-amber-50 p-5"><p className="text-sm font-semibold text-amber-900">This legacy school appointment is no longer used.</p><p className="mt-2 text-sm text-amber-800">Please contact the School Manager to receive the correct current school responsibility.</p></div></div>;
   if (appointment.position === "academic_director") return <AcademicDirectorPortal />;
   if (appointment.position === "hr_director") return <HRDirectorPortal />;
   return <ScopedLeadershipWorkspace />;
