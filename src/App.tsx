@@ -274,15 +274,26 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
 };
 
 
-const LegacyTeacherPortalRoute = () => {
+const SchoolAwareLegacyPortalRoute = ({
+  roles,
+  children,
+}: {
+  roles: string[];
+  children: React.ReactNode;
+}) => {
   const { memberships, loading } = useSchoolPortal();
   if (loading) {
-    return <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">Loading teacher workspace…</div>;
+    return <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">Loading school workspace…</div>;
   }
-  if (memberships.some((membership) => membership.school_role === "teacher" && membership.status === "active")) {
-    return <Navigate to="/school/teacher" replace />;
+
+  const activeRole = roles.find((role) =>
+    memberships.some((membership) => membership.school_role === role && membership.status === "active")
+  );
+  if (activeRole) {
+    return <Navigate to={`/school/${activeRole}`} replace />;
   }
-  return <TeacherPortal />;
+
+  return <>{children}</>;
 };
 
 const SelfProfileRedirect = () => {
@@ -343,7 +354,7 @@ const App = () => (
                               <Route path="/settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Settings /></ProtectedRoute>} />
                               <Route path="/notifications" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
-                              <Route path="/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><LegacyTeacherPortalRoute /></ProtectedRoute>} />
+                              <Route path="/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolAwareLegacyPortalRoute roles={["teacher"]}><TeacherPortal /></SchoolAwareLegacyPortalRoute></ProtectedRoute>} />
                               <Route
                                 path="/admin/early-content"
                                 element={
@@ -353,7 +364,7 @@ const App = () => (
                                 }
                               />
                               <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin", "extreme_admin"]}><AdminPortal /></ProtectedRoute>} />
-                              <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
+                              <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><SchoolAwareLegacyPortalRoute roles={["student"]}><StudentDashboardRoute /></SchoolAwareLegacyPortalRoute></ProtectedRoute>} />
                               <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["teacher", "finance"]}><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></ProtectedRoute>} />
                               <Route path="/school/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolPortalGate role="teacher"><SchoolTeacherPortal /></SchoolPortalGate></ProtectedRoute>} />
@@ -374,8 +385,8 @@ const App = () => (
                               <Route
                                 path="/parent-dashboard"
                                 element={
-                                  <ProtectedRoute allowedRoles={['student', 'teacher', 'admin', 'manager', 'parent', 'extreme_admin']}>
-                                    <ParentDashboard />
+                                  <ProtectedRoute allowedRoles={['student', 'parent']}>
+                                    <SchoolAwareLegacyPortalRoute roles={["parent", "student"]}><ParentDashboard /></SchoolAwareLegacyPortalRoute>
                                   </ProtectedRoute>
                                 }
                               />
@@ -411,7 +422,7 @@ const App = () => (
                                 path="/finance"
                                 element={
                                   <ProtectedRoute allowedRoles={["finance", "extreme_admin"]}>
-                                    <FinancePortal />
+                                    <SchoolAwareLegacyPortalRoute roles={["finance"]}><FinancePortal /></SchoolAwareLegacyPortalRoute>
                                   </ProtectedRoute>
                                 }
                               />
