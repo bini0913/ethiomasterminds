@@ -70,6 +70,18 @@ SET status = 'ended',
 WHERE position = 'main_director'
   AND status = 'active';
 
+-- Immediately disable active legacy Admin memberships so no remaining function
+-- that still recognizes the historical role can grant it access.
+UPDATE public.school_memberships
+SET status = 'suspended',
+    end_reason = 'Legacy School Admin role retired; awaiting Manager reassignment.',
+    ended_at = NULL
+WHERE school_role = 'admin'
+  AND status = 'active';
+
+DROP TRIGGER IF EXISTS school_require_full_main_director_permissions ON public.school_leadership_appointments;
+DROP FUNCTION IF EXISTS public.school_require_full_main_director_permissions();
+
 -- Legacy school Admin memberships no longer grant Admin authorization.
 CREATE OR REPLACE FUNCTION public.school_is_admin(p_school_id uuid)
 RETURNS boolean
@@ -183,8 +195,11 @@ BEGIN
   FROM public.school_memberships
   WHERE id = p_target_membership_id
   FOR UPDATE;
-  IF v_target.id IS NULL OR v_target.status <> 'active' OR v_target.school_role <> 'admin' THEN
-    RAISE EXCEPTION 'Choose an active legacy membership awaiting conversion';
+  IF v_target.id IS NULL
+     OR v_target.status <> 'suspended'
+     OR v_target.school_role <> 'admin'
+     OR v_target.end_reason IS DISTINCT FROM 'Legacy School Admin role retired; awaiting Manager reassignment.' THEN
+    RAISE EXCEPTION 'Choose a legacy membership retired by the migration and awaiting Manager reassignment';
   END IF;
 
   SELECT * INTO v_actor
@@ -199,6 +214,9 @@ BEGIN
   END IF;
   IF v_target.user_id = auth.uid() THEN
     RAISE EXCEPTION 'The School Manager cannot convert their own membership';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.schools WHERE id = v_target.school_id AND status = 'active') THEN
+    RAISE EXCEPTION 'The school must be active before a legacy membership can be converted';
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.school_memberships
@@ -242,7 +260,10 @@ BEGIN
 
   PERFORM set_config('app.school_membership_role_transition', 'true', true);
   UPDATE public.school_memberships
-  SET school_role = 'finance'
+  SET school_role = 'finance',
+      status = 'active',
+      end_reason = NULL,
+      ended_at = NULL
   WHERE id = v_target.id;
   PERFORM set_config('app.school_membership_role_transition', '', true);
 
