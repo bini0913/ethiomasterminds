@@ -46,12 +46,12 @@ select ok(not has_function_privilege('anon','public.school_update_leadership_per
 
 select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_appointment_per_member'), 'one staff member cannot hold conflicting active leadership appointments');
 
-select ok(position('main_director' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'generic school Admin authority is restricted by leadership appointment');
+select ok(position('main_director' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) = 0, 'retired Main Director appointments no longer grant school Admin authority');
 select ok(position('school_is_admin' in pg_get_functiondef('public.is_school_manager_or_admin(uuid)'::regprocedure)) > 0, 'manager-or-admin checks use the leadership-aware Admin guard');
 
 
-select ok(position('appointment.position = ''main_director''' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'only an active Main Director appointment grants school Admin authority');
-select ok(position('appointment.start_date' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'Main Director authority respects appointment start date');
+select ok(position('school_role = ''admin''' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) = 0, 'legacy School Admin memberships no longer grant school Admin authority');
+select ok(position('main_director' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) = 0, 'legacy leadership designations are excluded from school Admin authorization');
 select ok(position('review_assessments' in pg_get_functiondef('public.school_review_assessment(uuid,boolean,text)'::regprocedure)) > 0, 'assessment review checks the leadership permission and section scope');
 select ok(position('review_assessments' in pg_get_functiondef('public.school_review_homework(uuid,boolean,text)'::regprocedure)) > 0, 'homework review checks the leadership permission and section scope');
 select ok(position('review_discipline' in pg_get_functiondef('public.school_can_review_behavior_report(uuid)'::regprocedure)) > 0, 'student support review checks the leadership permission and section scope');
