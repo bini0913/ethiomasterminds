@@ -836,9 +836,9 @@ export default function SchoolManagerPortal() {
             <div className="mt-3 space-y-2">{createdCredentials.map((item, index) => <div key={index} className="rounded-md border border-emerald-200 bg-white p-2 text-xs"><p><span className="font-semibold">Username:</span> {item.username}</p><p className="mt-1 break-all"><span className="font-semibold">Initial password:</span> {item.initial_password}</p></div>)}</div>
           </div>}
         </SchoolPanel>
-        <SchoolPanel title="School accounts" description={`${members.length} total school memberships`}>
+        <SchoolPanel title="School accounts" description={`${members.length} school memberships. Legacy designations can be converted by the Manager.`}>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] text-left text-sm">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="pb-2 font-semibold">Person</th><th className="pb-2 font-semibold">Role</th><th className="pb-2 font-semibold">Grade / section</th><th className="pb-2 font-semibold">Status</th><th className="pb-2 font-semibold">Action</th></tr></thead>
               <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 text-slate-600">{membershipRoleLabel(member)}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td><td className="py-3">{member.school_role === "admin" && member.status === "active" ? <button type="button" disabled={convertingLegacyMembershipId === member.id} onClick={() => void convertLegacyAdminToHrDirector(member)} className="rounded-md border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50">{convertingLegacyMembershipId === member.id ? "Converting…" : "Convert to HR Director"}</button> : <span className="text-xs text-slate-400">—</span>}</td></tr>)}</tbody>
             </table>
