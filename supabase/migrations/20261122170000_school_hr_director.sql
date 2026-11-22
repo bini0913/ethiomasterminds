@@ -104,6 +104,10 @@ BEGIN
     RAISE EXCEPTION 'HR Director permissions are limited to school HR and finance operations';
   END IF;
 
+  IF p_position <> 'hr_director' AND 'view_staff_evaluations' = ANY(COALESCE(p_permissions, ARRAY[]::text[])) THEN
+    RAISE EXCEPTION 'Staff evaluation access is reserved for the HR Director';
+  END IF;
+
   IF p_position = 'academic_director' AND NOT (
     COALESCE(p_permissions, ARRAY[]::text[]) <@ ARRAY[
       'view_students', 'view_staff', 'view_attendance', 'view_academics',
@@ -187,6 +191,10 @@ BEGIN
     ]::text[]
   ) THEN
     RAISE EXCEPTION 'HR Director permissions are limited to school HR and finance operations';
+  END IF;
+
+  IF v_appointment.position <> 'hr_director' AND 'view_staff_evaluations' = ANY(COALESCE(p_permissions, ARRAY[]::text[])) THEN
+    RAISE EXCEPTION 'Staff evaluation access is reserved for the HR Director';
   END IF;
 
   IF v_appointment.position = 'academic_director' AND NOT (
