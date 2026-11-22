@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
 
+// "admin" is retained only to read and migrate legacy memberships; new assignments are blocked.
 export type SchoolRole = "manager" | "admin" | "teacher" | "finance" | "parent" | "student";
 
 export type SchoolMembership = {

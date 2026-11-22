@@ -46,12 +46,12 @@ select ok(not has_function_privilege('anon','public.school_update_leadership_per
 
 select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_appointment_per_member'), 'one staff member cannot hold conflicting active leadership appointments');
 
-select ok(position('main_director' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'generic school Admin authority is restricted by leadership appointment');
+select ok(position('main_director' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) = 0, 'retired Main Director appointments no longer grant school Admin authority');
 select ok(position('school_is_admin' in pg_get_functiondef('public.is_school_manager_or_admin(uuid)'::regprocedure)) > 0, 'manager-or-admin checks use the leadership-aware Admin guard');
 
 
-select ok(position('appointment.position = ''main_director''' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'only an active Main Director appointment grants school Admin authority');
-select ok(position('appointment.start_date' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) > 0, 'Main Director authority respects appointment start date');
+select ok(position('school_role = ''admin''' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) = 0, 'legacy School Admin memberships no longer grant school Admin authority');
+select ok(position('main_director' in pg_get_functiondef('public.school_is_admin(uuid)'::regprocedure)) = 0, 'legacy leadership designations are excluded from school Admin authorization');
 select ok(position('review_assessments' in pg_get_functiondef('public.school_review_assessment(uuid,boolean,text)'::regprocedure)) > 0, 'assessment review checks the leadership permission and section scope');
 select ok(position('review_assessments' in pg_get_functiondef('public.school_review_homework(uuid,boolean,text)'::regprocedure)) > 0, 'homework review checks the leadership permission and section scope');
 select ok(position('review_discipline' in pg_get_functiondef('public.school_can_review_behavior_report(uuid)'::regprocedure)) > 0, 'student support review checks the leadership permission and section scope');
@@ -82,17 +82,17 @@ select ok(position('review_attendance' in pg_get_functiondef('public.school_vali
 select ok(position('school_leadership_action_events' in pg_get_functiondef('public.school_validate_staff_task()'::regprocedure)) > 0, 'leadership task assignments and reviews are audited');
 
 
-select ok(exists (select 1 from pg_trigger where tgrelid='public.school_leadership_appointments'::regclass and tgname='school_require_full_main_director_permissions' and not tgisinternal), 'Main Director appointment trigger enforces full School Admin permissions');
-select ok(position('complete School Admin permission set' in pg_get_functiondef('public.school_require_full_main_director_permissions()'::regprocedure)) > 0, 'Main Director cannot be appointed with a reduced permission set');
-select ok(position('Main Director retains the full School Admin authority' in pg_get_functiondef('public.school_update_leadership_permissions(uuid,text[],text)'::regprocedure)) > 0, 'School Manager cannot reduce Main Director permissions through the update RPC');
+select ok(not exists (select 1 from pg_trigger where tgrelid='public.school_leadership_appointments'::regclass and tgname='school_require_full_main_director_permissions' and not tgisinternal), 'retired Main Director permission trigger is removed');
+select ok(to_regprocedure('public.school_require_full_main_director_permissions()') is null, 'retired Main Director permission function is removed');
+select ok(position('Legacy Main Director appointments are retired' in pg_get_functiondef('public.school_update_leadership_permissions(uuid,text[],text)'::regprocedure)) > 0, 'historical Main Director appointments cannot be modified');
 
 
-select ok(position('Only the appointed Main Director can provision school accounts' in pg_get_functiondef('public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure)) > 0, 'unappointed Admin memberships cannot provision school accounts');
-select ok(position('appointment.position = ''main_director''' in pg_get_functiondef('public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure)) > 0, 'staff provisioning verifies the Main Director appointment');
+select ok(position('Trusted account provisioning service required' in pg_get_functiondef('public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure)) > 0, 'school account creation remains restricted to the trusted provisioning service');
+select ok(not exists (select 1 from public.school_memberships where school_role='admin' and status='active'), 'legacy School Admin memberships cannot remain active');
 
 
-select ok(position('Only the Main Director may use the School Admin membership' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'non-Main-Director appointments cannot reuse the School Admin membership');
-select ok(position('already has an active School Admin account' in pg_get_functiondef('public.school_attach_account(uuid,uuid,uuid,text,text,text,integer,uuid,bigint,uuid[],uuid[],jsonb)'::regprocedure)) > 0, 'a school cannot provision a second active School Admin membership');
+select ok(position('An active School Manager membership in the target school is required' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'leadership appointments remain guarded by an active School Manager');
+select ok(exists (select 1 from pg_trigger where tgrelid='public.school_memberships'::regclass and tgname='school_reject_retired_admin_membership' and not tgisinternal), 'new legacy School Admin memberships are blocked');
 
 
 select ok(exists (select 1 from pg_indexes where schemaname='public' and indexname='school_leadership_one_active_vice_director_per_division'), 'each division can have its own active Vice Director');
