@@ -292,7 +292,7 @@ function ScopedLeadershipWorkspace() {
     if (divisionStaffKind === "team_leader" && !divisionStaffTeamName.trim()) return setDivisionStaffError("Enter the team name.");
     setDivisionStaffCreating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("school-provision-account", { body: { action: "create_division_staff", school_id: schoolId, position: divisionStaffKind, name: divisionStaffName.trim(), section_id: section.id, assignment_kind: divisionStaffAssignmentKind, subject_name: divisionStaffAssignmentKind === "homeroom" ? "Homeroom" : divisionStaffSubject, team_name: divisionStaffKind === "team_leader" ? divisionStaffTeamName.trim() : null } });
+      const { data, error } = await supabase.functions.invoke("school-provision-account", { body: { action: "create_division_staff", school_id: schoolId, position: divisionStaffKind, name: divisionStaffName.trim(), section_id: divisionStaffKind === "teacher" ? section?.id : null, assignment_kind: divisionStaffKind === "teacher" ? divisionStaffAssignmentKind : null, subject_name: divisionStaffAssignmentKind === "homeroom" ? "Homeroom" : divisionStaffSubject, team_name: divisionStaffKind === "team_leader" ? divisionStaffTeamName.trim() : null } });
       if (error || data?.error || !data?.created?.membership_id) return setDivisionStaffError(data?.error || error?.message || "The account could not be created.");
       setDivisionStaffCredentials(data.created); setDivisionStaffName(""); setDivisionStaffTeamName(""); setDivisionStaffSubject("");
       toast.success(divisionStaffKind === "team_leader" ? "Team Leader account created." : "Teacher account created."); await load();
