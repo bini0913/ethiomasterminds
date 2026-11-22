@@ -28,7 +28,7 @@ const navItems: SchoolNavItem[] = [
   { id: "leadership", label: "Leadership Team", icon: UserCog },
 ];
 
-type AccountRole = "teacher" | "finance" | "parent" | "student";
+type AccountRole = "finance" | "parent" | "student";
 type LeadershipPosition = "" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "academic_director" | "hr_director";
 
 export default function SchoolManagerPortal() {
