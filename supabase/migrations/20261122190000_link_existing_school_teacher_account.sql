@@ -85,7 +85,7 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM public.school_memberships
-    WHERE school_id = p_school_id AND lower(school_username) = v_username
+    WHERE lower(school_username) = v_username
   ) THEN
     RAISE EXCEPTION 'This school username is already in use';
   END IF;
