@@ -89,6 +89,8 @@ export default function SchoolManagerPortal() {
 
   const [accountRole, setAccountRole] = useState<AccountRole>("admin");
   const [accountName, setAccountName] = useState("");
+  const [existingTeacherUsername, setExistingTeacherUsername] = useState("");
+  const [linkingExistingTeacher, setLinkingExistingTeacher] = useState(false);
   const [accountSectionId, setAccountSectionId] = useState("");
   const [accountAge, setAccountAge] = useState("12");
   const [accountSubject, setAccountSubject] = useState("");
@@ -419,6 +421,26 @@ export default function SchoolManagerPortal() {
     return member.school_role === "admin" ? "Unassigned School Admin" : member.school_role;
   };
 
+
+  const attachExistingTeacher = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const username = existingTeacherUsername.trim().toLowerCase();
+    if (!username) return toast.error("Enter the username of an existing Master Minds account.");
+    setLinkingExistingTeacher(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("school-provision-account", {
+        body: { action: "attach_existing_teacher", school_id: schoolId, username },
+      });
+      if (error || data?.error || !data?.membership_id) {
+        return toast.error(data?.error || error?.message || "The existing teacher account could not be linked.");
+      }
+      setExistingTeacherUsername("");
+      toast.success("Existing account linked as a school teacher. Assign sections and subjects in Teacher Assignments.");
+      await load();
+    } finally {
+      setLinkingExistingTeacher(false);
+    }
+  };
 
   const createAccount = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -833,6 +855,27 @@ export default function SchoolManagerPortal() {
           </div>
         </SchoolPanel>
       </div>
+      <SchoolPanel title="Link an existing account as a teacher" description="Use this when a person already has a Master Minds login. It creates a school teacher membership only; it does not create another login or change the person's global role.">
+        <form onSubmit={attachExistingTeacher} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <SchoolField label="Existing Master Minds username">
+              <input
+                className={schoolInputClass}
+                value={existingTeacherUsername}
+                onChange={(event) => setExistingTeacherUsername(event.target.value)}
+                placeholder="e.g. jote"
+                minLength={3}
+                maxLength={64}
+                required
+              />
+            </SchoolField>
+          </div>
+          <SchoolPrimaryButton type="submit" disabled={linkingExistingTeacher || !existingTeacherUsername.trim()}>
+            {linkingExistingTeacher ? "Linking account…" : "Link teacher account"}
+          </SchoolPrimaryButton>
+        </form>
+        <p className="mt-2 text-xs text-slate-500">The teacher will appear in the school staff directory. Assign at least one section and subject later under Teacher Assignments before expecting class work to appear in their workspace.</p>
+      </SchoolPanel>
     </div>
   );
 
