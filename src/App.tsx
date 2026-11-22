@@ -67,7 +67,7 @@ const SupabaseMigration = lazy(() => import("./pages/SupabaseMigration"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import EarlyTierRestrictedRoute from "./components/auth/EarlyTierRestrictedRoute";
 import { UserProvider } from "./context/UserContext";
-import { SchoolPortalProvider } from "./context/SchoolPortalContext";
+import { SchoolPortalProvider, useSchoolPortal } from "./context/SchoolPortalContext";
 import SchoolPortalGate from "./components/school/SchoolPortalGate";
 import { TierProvider } from "./context/TierContext";
 import { QuizProvider } from "./context/QuizContext";
