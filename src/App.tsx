@@ -18,7 +18,6 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
 const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
-const AdminPortal = lazy(() => import("./pages/AdminPortal"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const StudentDashboardRoute = lazy(() => import("./components/dashboard/StudentDashboardRoute"));
 const SchoolManagerPortal = lazy(() => import("./pages/SchoolManagerPortal"));
@@ -274,6 +273,17 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
 };
 
 
+const LegacyTeacherPortalRoute = () => {
+  const { memberships, loading } = useSchoolPortal();
+  if (loading) {
+    return <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">Loading teacher workspace…</div>;
+  }
+  if (memberships.some((membership) => membership.school_role === "teacher" && membership.status === "active")) {
+    return <Navigate to="/school/teacher" replace />;
+  }
+  return <TeacherPortal />;
+};
+
 const SelfProfileRedirect = () => {
   const { user, session } = useUser();
   const targetUserId = user?.id || session?.user?.id;
@@ -332,33 +342,25 @@ const App = () => (
                               <Route path="/settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Settings /></ProtectedRoute>} />
                               <Route path="/notifications" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
-                              <Route 
-                                path="/teacher" 
-                                element={
-                                  <ProtectedRoute allowedRoles={['teacher', 'admin', 'manager', 'extreme_admin']}>
-                                    <TeacherPortal />
+                              <Route path="/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><LegacyTeacherPortalRoute /></ProtectedRoute>} />
                                   </ProtectedRoute>
                                 } 
                               />
                               <Route
                                 path="/admin/early-content"
                                 element={
-                                  <ProtectedRoute allowedRoles={['admin', 'manager', 'extreme_admin']}>
+                                  <ProtectedRoute allowedRoles={["extreme_admin"]}>
                                     <EarlyContentAdminPage />
                                   </ProtectedRoute>
                                 }
                               />
-                              <Route 
-                                path="/admin" 
-                                element={
-                                  <ProtectedRoute allowedRoles={['admin', 'manager', 'extreme_admin']}>
-                                    <AdminPortal />
+                              <Route path="/admin" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><Navigate to="/root-control-portal-9xA7" replace /></ProtectedRoute>} />
                                   </ProtectedRoute>
                                 } 
                               />
                               <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
                               <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
-                              <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["admin", "teacher", "finance", "super_admin"]}><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></ProtectedRoute>} />
+                              <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["teacher", "finance"]}><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></ProtectedRoute>} />
                               <Route path="/school/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolPortalGate role="teacher"><SchoolTeacherPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/parent" element={<ProtectedRoute allowedRoles={["parent"]}><SchoolPortalGate role="parent"><SchoolParentPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/finance" element={<ProtectedRoute allowedRoles={["finance"]}><SchoolPortalGate role="finance"><SchoolFinancePortal /></SchoolPortalGate></ProtectedRoute>} />
@@ -413,7 +415,7 @@ const App = () => (
                               <Route
                                 path="/finance"
                                 element={
-                                  <ProtectedRoute allowedRoles={['finance', 'admin', 'manager', 'extreme_admin']}>
+                                  <ProtectedRoute allowedRoles={["finance", "extreme_admin"]}>
                                     <FinancePortal />
                                   </ProtectedRoute>
                                 }
@@ -434,7 +436,7 @@ const App = () => (
                                   </ProtectedRoute>
                                 } 
                               />
-                              <Route path="/migrate-supabase" element={<ProtectedRoute allowedRoles={["admin", "manager", "extreme_admin"]}><SupabaseMigration /></ProtectedRoute>} />
+                              <Route path="/migrate-supabase" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><SupabaseMigration /></ProtectedRoute>} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             </RouteErrorBoundary>
