@@ -279,7 +279,7 @@ export default function SchoolManagerPortal() {
     event.preventDefault();
     if (!leaderTargetId) return toast.error("Choose an active school staff member.");
     if (leaderPosition === "team_leader" && !leaderTeamName.trim()) return toast.error("Enter the team or department name.");
-    const division = ["kg_director", "elementary_director", "middle_school_director", "high_school_director", "team_leader"].includes(leaderPosition)
+    const division = ["vice_director", "kg_director", "elementary_director", "middle_school_director", "high_school_director", "team_leader"].includes(leaderPosition)
       ? leaderDivision
       : null;
     const { error } = await db.rpc("school_appoint_leader", {
@@ -1024,7 +1024,10 @@ export default function SchoolManagerPortal() {
   const renderLeadership = () => {
     const fixedPositions = [
       ["main_director", "Main Director", null],
-      ["vice_director", "Vice Director", null],
+      ["vice_director", "KG Vice Director", "kg"],
+      ["vice_director", "Elementary Vice Director", "elementary"],
+      ["vice_director", "Middle School Vice Director", "middle_school"],
+      ["vice_director", "High School Vice Director", "high_school"],
       ["kg_director", "KG Director", "kg"],
       ["elementary_director", "Elementary Director", "elementary"],
       ["middle_school_director", "Middle School Director", "middle_school"],
@@ -1079,7 +1082,7 @@ export default function SchoolManagerPortal() {
           {fixedPositions.map(([position, label, division]) => {
             const appointment = activeAppointment(position, division);
             return (
-              <div key={position} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div key={`${position}-${division || "school"}`} className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-slate-900">{label}</p>
                   <SchoolStatus value={appointment ? "appointed" : "vacant"} />
@@ -1118,7 +1121,7 @@ export default function SchoolManagerPortal() {
                     } else if (nextPosition === "team_leader") {
                       setLeaderPermissions(["view_staff", "view_attendance", "view_academics", "view_curriculum", "manage_team_tasks", "assign_team_tasks", "view_reports"]);
                     } else {
-                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_discipline", "view_reports", "manage_team_tasks"]);
+                      setLeaderPermissions(["view_students", "view_staff", "view_attendance", "review_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_discipline", "review_discipline", "view_reports", "manage_team_tasks", "assign_team_tasks", "publish_announcements", "manage_meetings"]);
                     }
                   }}
                 >
@@ -1131,7 +1134,7 @@ export default function SchoolManagerPortal() {
                   <option value="team_leader">Team Leader</option>
                 </select>
               </SchoolField>
-              {["kg_director", "elementary_director", "middle_school_director", "high_school_director", "team_leader"].includes(leaderPosition) && (
+              {["vice_director", "kg_director", "elementary_director", "middle_school_director", "high_school_director", "team_leader"].includes(leaderPosition) && (
                 <SchoolField label="Division">
                   <select className={schoolSelectClass} value={leaderDivision} onChange={(event) => setLeaderDivision(event.target.value)}>
                     <option value="kg">KG</option>
