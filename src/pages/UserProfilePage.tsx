@@ -760,16 +760,20 @@ const UserProfilePage = () => {
   if (profileMissing || !profile) return <div className="p-8">Profile not found.</div>;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={upperStudent ? "mm-upper-profile min-h-screen bg-background px-3 pb-14 pt-4 text-foreground md:px-8" : "min-h-screen bg-background px-3 pb-14 pt-4 text-foreground md:px-8"}>
-      <div className="mx-auto max-w-6xl space-y-5">
-        <header className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate(-1)} className={upperStudent ? "gap-2 border-border bg-card md:hidden" : "gap-2 border-border bg-card"}>
-            <ArrowLeft className="h-4 w-4" /> Back
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={upperStudent ? "mm-upper-profile min-h-screen bg-background px-3 pb-16 pt-3 text-foreground md:px-8" : "min-h-screen bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.12),transparent_34rem),hsl(var(--background))] px-3 pb-16 pt-3 text-foreground md:px-8"}>
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="sticky top-0 z-20 -mx-3 flex items-center justify-between border-b border-border/60 bg-background/85 px-3 py-3 backdrop-blur-xl md:-mx-8 md:px-8">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2 rounded-xl px-2 text-muted-foreground hover:bg-card hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
           </Button>
-          <p className="text-xs text-muted-foreground">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "Date unavailable"}</p>
+          <div className="flex items-center gap-3 text-right">
+            <div className="hidden text-xs text-muted-foreground sm:block">{isSelf ? "Your learning identity" : "Learner profile"}</div>
+            <div className="h-1 w-1 rounded-full bg-primary" />
+            <p className="text-xs text-muted-foreground">Joined {joinedAt ? new Date(joinedAt).toLocaleDateString() : "Date unavailable"}</p>
+          </div>
         </header>
 
-        <section className={upperStudent ? "relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm" : "relative overflow-hidden rounded-[2rem] border border-border bg-gradient-to-br from-primary/70 via-primary/60 to-cyan-900/50 shadow-sm"}>
+        <section className={upperStudent ? "relative overflow-hidden rounded-[2rem] border border-border bg-card shadow-sm" : "relative overflow-hidden rounded-[2.25rem] border border-white/10 bg-[linear-gradient(120deg,#101a33_0%,#182b52_48%,#0d5264_100%)] shadow-2xl shadow-primary/10"}>
           {!upperStudent && <motion.div
             aria-hidden
             className="absolute inset-0"
@@ -780,7 +784,14 @@ const UserProfilePage = () => {
           <div className="pointer-events-none absolute -left-20 top-10 h-64 w-64 rounded-full bg-primary/20 hidden" />
           <div className="pointer-events-none absolute -right-20 bottom-10 h-64 w-64 rounded-full bg-cyan-500/20 hidden" />
 
-          <div className="relative flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-5 sm:p-5 md:p-6">
+          <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:42px_42px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+          <div className="relative flex flex-col gap-6 p-5 sm:p-7 md:p-9">
+            <div className="flex items-center justify-between gap-3">
+              <div className={upperStudent ? "inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-primary" : "inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-white/80"}>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.9)]" /> Learning identity
+              </div>
+              <span className={upperStudent ? "text-xs text-muted-foreground" : "text-xs text-white/60"}>Ranked learner</span>
+            </div>
             <motion.button
               type="button"
               onClick={() => {
@@ -797,7 +808,7 @@ const UserProfilePage = () => {
                 <img
                   src={profile.avatar}
                   alt={`${profile.name || profile.username}'s profile`}
-                  className="relative h-28 w-28 rounded-full border-2 border-border object-cover shadow-lg sm:h-32 sm:w-32"
+                  className="relative h-32 w-32 rounded-full border-4 border-white/20 object-cover shadow-2xl sm:h-36 sm:w-36"
                 />
               ) : (
                 <AvatarShowcase3D avatar={profile.avatar ?? undefined} avatarConfig={profile.avatarConfig as any} size={116} autoRotate={false} className="[&>p]:hidden" />
@@ -822,15 +833,15 @@ const UserProfilePage = () => {
 
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profile.name || profile.username}</h1>
+                <h1 className={upperStudent ? "text-3xl font-black tracking-tight sm:text-4xl" : "text-3xl font-black tracking-tight text-white sm:text-5xl"}>{profile.name || profile.username}</h1>
                 <Badge className={upperStudent ? "border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary" : `bg-gradient-to-r ${tierStyle(profile.level)} px-3 py-1 text-xs shadow-sm`}>
                   {currentTier.icon} {currentTier.name}
                 </Badge>
               </div>
-              <p className="text-sm text-foreground/80">@{profile.username}</p>
+              <p className={upperStudent ? "text-sm text-muted-foreground" : "text-sm text-white/65"}>@{profile.username} <span className="mx-1">·</span> Grade {profile.grade ?? "Not set"}</p>
 
               <div className="max-w-2xl space-y-1">
-                <div className={upperStudent ? "flex items-center justify-between text-xs text-muted-foreground" : "flex items-center justify-between text-xs text-white/85"}>
+                <div className={upperStudent ? "flex items-center justify-between text-xs text-muted-foreground" : "flex items-center justify-between text-xs text-white/75"}>
                   <span>Level {profile.level}</span>
                   <span>{xpProgress.current}/220 XP</span>
                 </div>
@@ -838,17 +849,17 @@ const UserProfilePage = () => {
                 <p className="text-[11px] text-muted-foreground">Next tier: {nextTier ? nextTier.name : "MAX RANK"}</p>
               </div>
 
-              <p className="text-sm text-foreground/80">
-                Level {profile.level} • {(profile.xp ?? 0).toLocaleString()} XP • #{profileRank > 0 ? profileRank : "-"} Rank • Grade {profile.grade ?? "Not set"}
+              <p className={upperStudent ? "text-sm text-muted-foreground" : "text-sm text-white/75"}>
+                Level {profile.level} <span className="mx-1 text-primary">•</span> {(profile.xp ?? 0).toLocaleString()} XP <span className="mx-1 text-primary">•</span> #{profileRank > 0 ? profileRank : "-"} overall
               </p>
 
               {isSelf ? (
                 <div className="pt-1">
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button onClick={() => navigate("/avatar-creator")} size="sm" className="gap-2">
+                    <Button onClick={() => navigate("/avatar-creator")} size="sm" className="gap-2 rounded-xl">
                       <Pencil className="h-4 w-4" /> Customize avatar
                     </Button>
-                    <Button type="button" size="sm" variant="outline" disabled={photoUploading} onClick={() => photoInputRef.current?.click()} className="gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={photoUploading} onClick={() => photoInputRef.current?.click()} className={upperStudent ? "gap-2 rounded-xl" : "gap-2 rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"}>
                       {photoUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
                       {photoUploading ? "Uploading…" : "Add profile photo"}
                     </Button>
@@ -860,14 +871,17 @@ const UserProfilePage = () => {
           </div>
         </section>
 
+        {canViewPublicSections && <nav aria-label="Profile sections" className="flex snap-x gap-2 overflow-x-auto border-b border-border/70 pb-2 text-sm">
+          {[{ href: "#overview", label: "Overview" }, { href: "#achievements", label: "Achievements" }, { href: "#collection", label: "Collection" }, { href: "#activity", label: "Activity" }].map((item) => <a key={item.href} href={item.href} className="shrink-0 rounded-full border border-border bg-card px-4 py-2 font-semibold text-muted-foreground transition hover:border-primary/40 hover:text-foreground">{item.label}</a>)}
+        </nav>}
         {!canViewPublicSections && (
-          <Card className="border-border bg-card/80">
+          <Card className="border-border/70 bg-card/70 shadow-sm">
             <CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
               <Lock className="h-4 w-4" /> This learner has a private profile.
             </CardContent>
           </Card>
         )}
-        {canViewPublicSections && <Card className="border-border bg-card/80">
+        {canViewPublicSections && <Card id="overview" className="border-border/70 bg-card/65 shadow-sm backdrop-blur">
           <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4">
             <div className="flex flex-wrap gap-2">
               {!isSelf ? (
@@ -892,10 +906,10 @@ const UserProfilePage = () => {
           </CardContent>
         </Card>}
 
-        {canViewStats && <Card className="border-border bg-card/80 backdrop-blur">
+        {canViewStats && <Card className="border-border/70 bg-card/65 shadow-sm backdrop-blur">
           <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
             {[{ label: "Followers", value: followersCount, icon: Users }, { label: "Following", value: followingCount, icon: UserRoundPlus }, { label: "Streak", value: streak, icon: Flame }, { label: "Wins", value: wins, icon: Trophy }].map((stat) => (
-              <motion.div key={stat.label} whileHover={{ y: -4 }} className="rounded-2xl border border-border bg-card p-3 text-center">
+                <motion.div key={stat.label} whileHover={{ y: -4 }} className="rounded-2xl border border-border/70 bg-background/60 p-4 text-center transition-shadow hover:shadow-lg hover:shadow-primary/5">
                 <stat.icon className="mx-auto mb-1 h-4 w-4 text-primary" />
                 <p className="text-xs text-muted-foreground">{stat.label}</p>
                 <p className="text-xl font-extrabold">{stat.value.toLocaleString()}</p>
@@ -924,7 +938,7 @@ const UserProfilePage = () => {
           </CardContent>
         </Card>}
 
-        {canViewStats && <section className="space-y-3 rounded-3xl border border-border bg-card/70 p-5">
+        {canViewStats && <section id="achievements" className="scroll-mt-24 space-y-3 rounded-3xl border border-border/70 bg-card/65 p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="h-5 w-5 text-primary" />Achievements</h2>
             <p className="text-xs text-muted-foreground">Tap a badge for details</p>
@@ -953,7 +967,7 @@ const UserProfilePage = () => {
           </div>
         </section>}
 
-        {canViewStats && <section className="space-y-4 rounded-3xl border border-border bg-card/70 p-5">
+        {canViewStats && <section id="collection" className="scroll-mt-24 space-y-4 rounded-3xl border border-border/70 bg-card/65 p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><Sparkles className="h-5 w-5 text-primary" />Collection Showroom</h2>
             <Badge variant="secondary">{collections.length}/{totalCollectionItems || 0} owned</Badge>
@@ -1006,7 +1020,7 @@ const UserProfilePage = () => {
           </Tabs>
         </section>}
 
-        {canViewStats && <section className="space-y-3 rounded-3xl border border-border bg-card/70 p-5">
+        {canViewStats && <section id="activity" className="scroll-mt-24 space-y-3 rounded-3xl border border-border/70 bg-card/65 p-5 shadow-sm">
           <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><Rocket className="h-5 w-5 text-primary" />Activity Feed</h2>
           {activities.length ? activities.map((activity, index) => (
             <motion.div key={activity.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.08 }} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
