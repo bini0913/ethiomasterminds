@@ -106,8 +106,8 @@ select ok(exists (select 1 from pg_constraint where conrelid='public.school_lead
 select ok(position('subordinate_appointment.position' in pg_get_functiondef('public.school_leadership_has_permission(uuid,text,text,uuid,uuid)'::regprocedure)) > 0, 'Division Directors can read only their appointed Vice Director and Team Leader memberships');
 
 
-select ok(position('academic_director' in pg_get_constraintdef(oid)) > 0, 'leadership position constraint includes Academic Director');
-select ok(position('academic_director' in pg_get_constraintdef(oid)) > 0, 'division-scope constraint allows school-wide Academic Director');
+select ok((select position('academic_director' in pg_get_constraintdef(oid)) > 0 from pg_constraint where conrelid='public.school_leadership_appointments'::regclass and conname='school_leadership_appointments_position_check'), 'leadership position constraint includes Academic Director');
+select ok((select position('academic_director' in pg_get_constraintdef(oid)) > 0 from pg_constraint where conrelid='public.school_leadership_appointments'::regclass and conname='school_leadership_appointments_position_division_scope_check'), 'division-scope constraint allows school-wide Academic Director');
 select ok(position('academic_director' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'School Manager appointment RPC supports Academic Director');
 select ok(position('Academic Director permissions are limited to school-wide academic oversight' in pg_get_functiondef('public.school_appoint_leader(uuid,text,text,text,text[],date,date)'::regprocedure)) > 0, 'Academic Director appointment RPC restricts permissions to academic oversight');
 select ok(position('WHEN appointment.position = ''academic_director''' in pg_get_functiondef('public.school_leadership_has_permission(uuid,text,text,uuid,uuid)'::regprocedure)) > 0, 'Academic Director permissions cover configured grades across all divisions');
