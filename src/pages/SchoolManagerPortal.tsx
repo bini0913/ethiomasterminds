@@ -1025,6 +1025,7 @@ export default function SchoolManagerPortal() {
     const fixedPositions = [
       ["main_director", "Main Director", null],
       ["academic_director", "Academic Director", null],
+      ["hr_director", "HR Director / Business Manager", null],
       ["vice_director", "KG Vice Director", "kg"],
       ["vice_director", "Elementary Vice Director", "elementary"],
       ["vice_director", "Middle School Vice Director", "middle_school"],
@@ -1037,6 +1038,7 @@ export default function SchoolManagerPortal() {
     const positionLabels: Record<string, string> = {
       main_director: "Main Director",
       academic_director: "Academic Director",
+      hr_director: "HR Director / Business Manager",
       vice_director: "Vice Director",
       kg_director: "KG Director",
       elementary_director: "Elementary Director",
@@ -1068,14 +1070,20 @@ export default function SchoolManagerPortal() {
       ["view_discipline", "View student-support records"],
       ["review_discipline", "Review student-support reports"],
       ["view_finance_summary", "View finance summaries"],
+      ["view_staff_evaluations", "View staff evaluations"],
       ["manage_meetings", "Manage assigned meetings"],
     ] as const;
     const visiblePermissionOptions = leaderPosition === "academic_director"
       ? permissionOptions.filter(([permission]) => ![
           "review_attendance", "manage_team_tasks", "assign_team_tasks",
-          "view_discipline", "review_discipline", "view_finance_summary",
+          "view_discipline", "review_discipline", "view_finance_summary", "view_staff_evaluations",
         ].includes(permission))
-      : permissionOptions;
+      : leaderPosition === "hr_director"
+        ? permissionOptions.filter(([permission]) => [
+            "view_staff", "view_staff_evaluations", "manage_team_tasks",
+            "view_reports", "view_finance_summary", "manage_meetings",
+          ].includes(permission))
+        : permissionOptions;
     const activeAppointment = (position: string, division: string | null) =>
       leadershipAppointments.find((item) => item.status === "active" && item.position === position && (division === null || item.division_scope === division));
     const vacancies = fixedPositions.filter(([position, , division]) => !activeAppointment(position, division));
@@ -1107,7 +1115,7 @@ export default function SchoolManagerPortal() {
               <SchoolField label="Staff member">
                 <select className={schoolSelectClass} value={leaderTargetId} onChange={(event) => setLeaderTargetId(event.target.value)} required>
                   <option value="">Choose active staff</option>
-                  {staff.filter((member) => leaderPosition === "main_director" ? member.school_role === "admin" : member.school_role !== "admin").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
+                  {staff.filter((member) => leaderPosition === "main_director" ? member.school_role === "admin" : leaderPosition === "hr_director" ? member.school_role === "finance" : member.school_role !== "admin").map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}
                 </select>
               </SchoolField>
               <SchoolField label="Leadership position">
@@ -1124,6 +1132,8 @@ export default function SchoolManagerPortal() {
                         "manage_team_tasks", "assign_team_tasks", "view_reports", "publish_announcements",
                         "view_discipline", "review_discipline", "view_finance_summary", "manage_meetings",
                       ]);
+                    } else if (nextPosition === "hr_director") {
+                      setLeaderPermissions(["view_staff", "view_staff_evaluations", "manage_team_tasks", "view_reports", "view_finance_summary", "manage_meetings"]);
                     } else if (nextPosition === "academic_director") {
                       setLeaderPermissions(["view_students", "view_staff", "view_attendance", "view_academics", "review_assessments", "review_results", "view_curriculum", "view_reports", "publish_announcements", "manage_meetings"]);
                     } else if (nextPosition === "vice_director") {
@@ -1137,6 +1147,7 @@ export default function SchoolManagerPortal() {
                 >
                   <option value="main_director">Main Director</option>
                   <option value="academic_director">Academic Director</option>
+                  <option value="hr_director">HR Director / Business Manager</option>
                   <option value="vice_director">Vice Director</option>
                   <option value="kg_director">KG Director</option>
                   <option value="elementary_director">Elementary Director</option>
