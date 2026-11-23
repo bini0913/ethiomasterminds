@@ -345,7 +345,7 @@ export default function SchoolTeacherPortal() {
     if (!selectedAssessmentId) return toast.error("Choose an assessment first.");
     const { error } = await db.rpc("school_submit_assessment", { p_assessment_id: selectedAssessmentId });
     if (error) return toast.error(error.message);
-    toast.success("Assessment and marks submitted to the School Manager for review.");
+    toast.success("Assessment and marks submitted to the authorized academic leader for review.");
     await load();
   };
 
@@ -400,7 +400,7 @@ export default function SchoolTeacherPortal() {
     const { error: submitError } = await db.rpc("school_submit_homework", { p_homework_id: data.id });
     if (submitError) return toast.error(submitError.message);
     setHomeworkTitle(""); setHomeworkInstructions(""); setHomeworkDueAt("");
-    toast.success("Homework submitted for School Manager approval.");
+    toast.success("Homework submitted for authorized academic leader approval.");
     await load();
   };
 
@@ -627,7 +627,7 @@ export default function SchoolTeacherPortal() {
       <SchoolPanel title="Enter student marks" description="Choose one of your draft or rejected assessments, enter scores, and save.">
         <div className="mb-4 max-w-md"><SchoolField label="Assessment"><select className={schoolSelectClass} value={selectedAssessmentId} onChange={(event) => setSelectedAssessmentId(event.target.value)}><option value="">Choose assessment</option>{assessments.filter((item) => ["draft", "rejected"].includes(item.status)).map((item) => <option key={item.id} value={item.id}>{item.title} · {sectionLabel(item.section_id)}</option>)}</select></SchoolField></div>
         {selectedAssessmentId ? <div className="space-y-3">{assignedStudents.filter((student) => student.section_id === assessments.find((item) => item.id === selectedAssessmentId)?.section_id).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)] sm:items-center"><div><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><p className="text-xs text-slate-500">{student.school_username}</p></div><SchoolField label="Score"><input type="number" min="0" max={assessments.find((item) => item.id === selectedAssessmentId)?.max_score || 100} step="0.5" className={schoolInputClass} value={markValues[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.score ?? ""} onChange={(event) => setMarkValues((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField><SchoolField label="Teacher note"><input className={schoolInputClass} value={markNotes[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.teacher_note ?? ""} onChange={(event) => setMarkNotes((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField></div>)}
-          <div className="flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void saveMarks()}>Save draft marks</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void submitAssessment()}>Submit for School Manager review</SchoolSecondaryButton></div>
+          <div className="flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void saveMarks()}>Save draft marks</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void submitAssessment()}>Submit for authorized academic leader review</SchoolSecondaryButton></div>
         </div> : <SchoolEmptyState title="Choose an assessment" description="Student mark entry will appear after you select a draft or rejected assessment." />}
       </SchoolPanel>
       <SchoolPanel title="Your assessment records">
@@ -664,7 +664,7 @@ export default function SchoolTeacherPortal() {
               </div>
             </div>)}
           </div>
-          <div className="flex flex-wrap gap-2"><SchoolSecondaryButton onClick={addQuestionRow} disabled={quizQuestions.length >= 40}><Plus className="mr-2 h-4 w-4" />Add question</SchoolSecondaryButton><SchoolPrimaryButton type="submit" disabled={Boolean(activeMembership?.question_submission_suspended)}>Submit quiz for School Manager approval</SchoolPrimaryButton></div>
+          <div className="flex flex-wrap gap-2"><SchoolSecondaryButton onClick={addQuestionRow} disabled={quizQuestions.length >= 40}><Plus className="mr-2 h-4 w-4" />Add question</SchoolSecondaryButton><SchoolPrimaryButton type="submit" disabled={Boolean(activeMembership?.question_submission_suspended)}>Submit quiz for authorized academic leader approval</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your submitted quizzes">
@@ -675,7 +675,7 @@ export default function SchoolTeacherPortal() {
 
   const renderHomework = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Homework & assignments" description="Create homework for your assigned sections. School Manager approves it before students and parents can see it." />
+      <SchoolPageHeading title="Homework & assignments" description="Create homework for your assigned sections. authorized academic leader approves it before students and parents can see it." />
       <SchoolPanel title="Create homework">
         <form onSubmit={createHomework} className="grid gap-3 md:grid-cols-2">
           <SchoolField label="Title"><input className={schoolInputClass} value={homeworkTitle} onChange={(event) => setHomeworkTitle(event.target.value)} /></SchoolField>
@@ -697,7 +697,7 @@ export default function SchoolTeacherPortal() {
 
   const renderLibrary = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Textbooks, notes & resources" description="Upload PDFs for your assigned subject and section. Resources remain unavailable to students until the School Manager approves them." />
+      <SchoolPageHeading title="Textbooks, notes & resources" description="Upload PDFs for your assigned subject and section. Resources remain unavailable to students until the authorized academic leader approves them." />
       <SchoolPanel title="Upload learning resource">
         <form onSubmit={uploadLibraryBook} className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <SchoolField label="Resource title"><input className={schoolInputClass} value={bookTitle} onChange={(event) => setBookTitle(event.target.value)} /></SchoolField>
@@ -707,7 +707,7 @@ export default function SchoolTeacherPortal() {
           <SchoolField label="Resource type"><select className={schoolSelectClass} value={bookType} onChange={(event) => setBookType(event.target.value as typeof bookType)}><option value="textbook">Textbook</option><option value="notes">Notes</option><option value="practice">Practice</option><option value="reference">Reference</option></select></SchoolField>
           <SchoolField label="PDF file"><input type="file" accept="application/pdf,.pdf" className={schoolInputClass + " py-2"} onChange={(event) => setBookFile(event.target.files?.[0] ?? null)} /></SchoolField>
           <div className="md:col-span-2 xl:col-span-3"><SchoolField label="Description"><textarea className={schoolTextareaClass} value={bookDescription} onChange={(event) => setBookDescription(event.target.value)} /></SchoolField></div>
-          <div className="md:col-span-2 xl:col-span-3"><SchoolPrimaryButton type="submit" disabled={bookUploading}><Upload className="mr-2 h-4 w-4" />{bookUploading ? "Uploading…" : "Upload for School Manager approval"}</SchoolPrimaryButton></div>
+          <div className="md:col-span-2 xl:col-span-3"><SchoolPrimaryButton type="submit" disabled={bookUploading}><Upload className="mr-2 h-4 w-4" />{bookUploading ? "Uploading…" : "Upload for authorized academic leader approval"}</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your submitted resources">
