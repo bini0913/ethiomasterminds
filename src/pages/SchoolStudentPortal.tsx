@@ -208,7 +208,7 @@ export default function SchoolStudentPortal() {
 
   const renderResults = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="My academic results" description="Only official results published by your School Manager appear here." />
+      <SchoolPageHeading title="My academic results" description="Only official results published by an authorized academic leader appear here." />
       {results.length ? <SchoolPanel title="Published report card"><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Term</th><th className="pb-2">Subject</th><th className="pb-2">Average</th><th className="pb-2">Letter grade</th><th className="pb-2">Rank</th></tr></thead><tbody className="divide-y divide-slate-100">{results.map((result) => <tr key={result.id}><td className="py-3 text-slate-600">{termName(result.term_id)}</td><td className="py-3 font-medium text-slate-800">{result.subject_name}</td><td className="py-3 tabular-nums text-slate-700">{result.average_score ?? "—"}</td><td className="py-3 text-slate-600">{result.letter_grade || "—"}</td><td className="py-3 tabular-nums text-slate-600">{result.rank_position ?? "—"}</td></tr>)}</tbody></table></div></SchoolPanel> : <SchoolEmptyState title="No results published yet" description="Your official averages and ranks will appear after the School Manager publishes them." />}
     </div>
   );
@@ -260,8 +260,8 @@ export default function SchoolStudentPortal() {
 
   const renderQuizzes = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="School quizzes" description="Quizzes approved by your School Manager for your section." />
-      {quizzes.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{quizzes.map((quiz) => <SchoolPanel key={quiz.id} title={quiz.title} description={`${quiz.subject} · ${quiz.difficulty}`}><p className="text-sm text-slate-600">{quiz.description}</p><p className="mt-2 text-xs text-slate-500">{quiz.time_limit} minute time limit</p><SchoolStatus value="approved" /></SchoolPanel>)}</div> : <SchoolEmptyState title="No approved quizzes" description="Your teachers' quizzes will appear after School Manager approval." />}
+      <SchoolPageHeading title="School quizzes" description="Quizzes approved by an authorized academic leader for your section." />
+      {quizzes.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{quizzes.map((quiz) => <SchoolPanel key={quiz.id} title={quiz.title} description={`${quiz.subject} · ${quiz.difficulty}`}><p className="text-sm text-slate-600">{quiz.description}</p><p className="mt-2 text-xs text-slate-500">{quiz.time_limit} minute time limit</p><SchoolStatus value="approved" /></SchoolPanel>)}</div> : <SchoolEmptyState title="No approved quizzes" description="Your teachers' quizzes will appear after academic leadership approval." />}
     </div>
   );
 
