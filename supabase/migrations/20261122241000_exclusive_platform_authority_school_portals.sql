@@ -27,8 +27,7 @@ WHERE appointment.membership_id = membership.id
 
 UPDATE public.school_memberships membership
 SET status = 'suspended',
-    end_reason = 'Suspended automatically because this account holds a platform-level authority role and cannot occupy a school portal.',
-    ended_at = coalesce(membership.ended_at, now())
+    end_reason = 'Suspended automatically because this account holds a platform-level authority role and cannot occupy a school portal.'
 WHERE membership.status = 'active'
   AND EXISTS (
     SELECT 1
