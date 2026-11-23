@@ -975,20 +975,20 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
   }
 
   return (
-    <div className="min-h-[100dvh] w-full min-w-0 bg-gradient-to-b from-slate-950 via-blue-950 to-accent p-2 pb-[calc(1rem+env(safe-area-inset-bottom))] text-white relative sm:p-4">
-      <div className="absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_20%_10%,rgba(59,130,246,0.28),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(168,85,247,0.24),transparent_35%)]" />
+    <div className="min-h-[100dvh] w-full min-w-0 bg-[#070b18] overflow-x-hidden p-2 pb-[calc(1rem+env(safe-area-inset-bottom))] text-white relative sm:p-4">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(34,211,238,.16),transparent_32rem),radial-gradient(circle_at_90%_12%,rgba(124,58,237,.18),transparent_30rem)]" />
 
-      <div className="relative z-10 mx-auto w-full min-w-0 max-w-6xl">
+      <div className="relative z-10 mx-auto w-full min-w-0 max-w-[1500px]">
         {isOffline && (
           <Card className="mb-4 p-3 border-amber-300/30 bg-amber-500/10 text-amber-100">
             Connection lost… your room membership is preserved while we reconnect.
           </Card>
         )}
 
-        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="sticky top-0 z-30 -mx-2 mb-5 flex min-w-0 flex-col gap-3 border-b border-white/10 bg-[#070b18]/90 px-2 py-3 backdrop-blur-xl sm:-mx-4 sm:px-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="break-words text-xl font-display font-bold sm:text-2xl">{roomName}</h1>
-            <p className="break-words text-xs text-blue-100/75 sm:text-sm">Room ID: {roomId.slice(0, 8)}... · Subject: {roomConfig.subject} · Mode: {modeLabel}</p>
+            <h1 className="truncate text-xl font-black tracking-tight sm:text-2xl">{roomName}</h1>
+            <p className="truncate text-[11px] uppercase tracking-[0.12em] text-white/45">Room ID: {roomId.slice(0, 8)}... · Subject: {roomConfig.subject} · Mode: {modeLabel}</p>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
             <Button className="min-h-10" variant="outline" size="sm" onClick={() => setSoundEnabled((prev) => !prev)}>
@@ -1012,10 +1012,10 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           </div>
         </div>
 
-        <div className="grid min-w-0 grid-cols-1 items-start gap-3 sm:gap-4 lg:grid-cols-3">
-          <div className="min-w-0 space-y-3 sm:space-y-4 lg:col-span-2">
+        <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          <div className="min-w-0 space-y-4 lg:col-span-2">
             {roomState.status === 'waiting' && (
-              <Card className="bg-white/5 border-white/10 p-4 shadow-sm transition-all duration-200 sm:p-6">
+              <Card className="overflow-hidden border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-cyan-950/20 backdrop-blur-sm sm:p-6">
                 <div className="text-center space-y-4">
                   <h2 className="text-xl font-bold">Lobby Ready Check</h2>
                   <p className="text-blue-100/80">{players.length}/{roomMaxPlayers} players connected</p>
@@ -1102,7 +1102,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             )}
 
             {(roomState.status === 'countdown' || roomState.status === 'starting') && (
-              <Card className="bg-white/5 border-white/10 p-6 text-center sm:p-12">
+              <Card className="overflow-hidden border-cyan-300/15 bg-gradient-to-br from-cyan-500/10 via-white/[0.04] to-violet-500/10 p-6 text-center shadow-2xl shadow-cyan-950/20 sm:p-12">
                 <motion.div key={countdownValue} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-7xl font-display font-bold text-cyan-300 sm:text-8xl">
                   {countdownValue}
                 </motion.div>
@@ -1141,7 +1141,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
             )}
 
             {roomState.status === 'playing' && currentQuestion && (
-              <Card className={cn('bg-white/5 p-3 border-white/10 transition-all duration-200 sm:p-6', answerShake && 'animate-pulse')}>
+              <Card className={cn('overflow-hidden border-white/10 bg-white/[0.055] p-3 shadow-2xl shadow-cyan-950/25 backdrop-blur-sm transition-all duration-200 sm:p-6', answerShake && 'animate-pulse')}>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center gap-2 flex-wrap">
                     <Badge variant="secondary">{roomConfig.gameMode === 'accuracy' ? `Question ${playerQuestionNumber}/${totalQuestions}` : `Question ${playerQuestionNumber} • as many as possible`}</Badge>
@@ -1171,7 +1171,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                     </div>
                   )}
 
-                  <h3 className="py-3 text-xl font-bold text-center leading-relaxed break-words sm:py-4 sm:text-2xl">
+                  <h3 className="mx-auto max-w-3xl py-5 text-center text-2xl font-black leading-tight tracking-tight break-words sm:py-8 sm:text-4xl">
                     {highlightKeywords(currentQuestion.question_text)}
                   </h3>
 
@@ -1196,7 +1196,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                           whileTap={{ scale: selectedAnswer === null ? 0.98 : 1 }}
                           onClick={() => handleAnswer(index)}
                           disabled={selectedAnswer !== null || timeRemaining <= 0}
-                          className={cn('min-h-14 rounded-xl border-2 p-3 text-left transition-all duration-200 relative overflow-hidden sm:p-4', buttonClass)}
+                          className={cn('min-h-16 rounded-2xl border-2 p-4 text-left text-base transition-all duration-200 relative overflow-hidden sm:min-h-20 sm:p-5', buttonClass)}
                         >
                           <span className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity" />
                           <span className="font-medium relative z-10">
@@ -1270,13 +1270,13 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
               </Card>
             )}
 
-            <Card className="p-4 bg-white/5 border-white/10">
+            <Card className="border-white/10 bg-white/[0.045] p-4 shadow-xl backdrop-blur-sm">
               <h3 className="font-bold mb-3 flex items-center gap-2">
                 <Users className="h-4 w-4" /> Players ({players.length}/{roomMaxPlayers})
               </h3>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {players.map((player) => (
-                  <motion.div key={player.id} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={cn('p-3 rounded-xl border text-center', player.isReady ? 'border-green-400/50 bg-green-500/10' : 'border-white/15 bg-white/5')}>
+                  <motion.div key={player.id} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={cn('rounded-2xl border p-3 text-center transition-colors', player.isReady ? 'border-green-400/50 bg-green-500/10' : 'border-white/15 bg-white/5')}>
                     <AvatarRenderer avatar={player.avatar} size="md" className="mx-auto mb-1" />
                     <div className="text-[11px] uppercase tracking-wide text-blue-100/70">Player {players.findIndex((p) => p.id === player.id) + 1}</div>
                     <div className="text-sm font-medium truncate">{player.name}</div>
@@ -1305,7 +1305,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
           <AnimatePresence>
             {showChat && (
               <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }}>
-                <Card className="flex h-[min(70dvh,560px)] min-h-[320px] flex-col bg-white/5 border-white/10">
+                <Card className="flex h-[min(72dvh,620px)] min-h-[360px] flex-col border-white/10 bg-white/[0.045] shadow-2xl shadow-violet-950/20 backdrop-blur-sm">
                   <div className="p-3 border-b border-white/10">
                     <h3 className="font-bold flex items-center gap-2">
                       <MessageCircle className="h-4 w-4" />
