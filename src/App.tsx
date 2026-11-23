@@ -28,7 +28,6 @@ const SchoolTeacherPortal = lazy(() => import("./pages/SchoolTeacherPortal"));
 const SchoolParentPortal = lazy(() => import("./pages/SchoolParentPortal"));
 const SchoolFinancePortal = lazy(() => import("./pages/SchoolFinancePortal"));
 const SchoolStudentPortal = lazy(() => import("./pages/SchoolStudentPortal"));
-const SchoolGlobalAdminPortal = lazy(() => import("./pages/SchoolGlobalAdminPortal"));
 const NetworkSuperAdminPortal = lazy(() => import("./pages/NetworkSuperAdminPortal"));
 const Chat = lazy(() => import("./pages/Chat"));
 const AITutor = lazy(() => import("./pages/AITutor"));
@@ -371,7 +370,7 @@ const App = () => (
                               <Route path="/school/parent" element={<ProtectedRoute allowedRoles={["parent"]}><SchoolPortalGate role="parent"><SchoolParentPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/finance" element={<ProtectedRoute allowedRoles={["finance"]}><SchoolPortalGate role="finance"><SchoolFinancePortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/student" element={<ProtectedRoute allowedRoles={["student"]}><SchoolPortalGate role="student"><SchoolStudentPortal /></SchoolPortalGate></ProtectedRoute>} />
-                              <Route path="/school/super-admin" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><SchoolGlobalAdminPortal /></ProtectedRoute>} />
+                              <Route path="/school/super-admin" element={<ProtectedRoute allowedRoles={["super_admin"]}><Navigate to="/super-admin" replace /></ProtectedRoute>} />
                               {/* Compatibility aliases: the school-scoped portal is the sole Manager experience. */}
                               <Route path="/manager" element={<ProtectedRoute allowedRoles={["manager"]}><Navigate to="/school/manager" replace /></ProtectedRoute>} />
                               <Route path="/manager-dashboard" element={<ProtectedRoute allowedRoles={["manager"]}><Navigate to="/school/manager" replace /></ProtectedRoute>} />
