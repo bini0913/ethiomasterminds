@@ -67,7 +67,7 @@ const SupabaseMigration = lazy(() => import("./pages/SupabaseMigration"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import EarlyTierRestrictedRoute from "./components/auth/EarlyTierRestrictedRoute";
 import { UserProvider } from "./context/UserContext";
-import { SchoolPortalProvider } from "./context/SchoolPortalContext";
+import { SchoolPortalProvider, useSchoolPortal } from "./context/SchoolPortalContext";
 import SchoolPortalGate from "./components/school/SchoolPortalGate";
 import { TierProvider } from "./context/TierContext";
 import { QuizProvider } from "./context/QuizContext";
@@ -274,6 +274,28 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
 };
 
 
+const SchoolAwareLegacyPortalRoute = ({
+  roles,
+  children,
+}: {
+  roles: string[];
+  children: React.ReactNode;
+}) => {
+  const { memberships, loading } = useSchoolPortal();
+  if (loading) {
+    return <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">Loading school workspace…</div>;
+  }
+
+  const activeRole = roles.find((role) =>
+    memberships.some((membership) => membership.school_role === role && membership.status === "active")
+  );
+  if (activeRole) {
+    return <Navigate to={`/school/${activeRole}`} replace />;
+  }
+
+  return <>{children}</>;
+};
+
 const SelfProfileRedirect = () => {
   const { user, session } = useUser();
   const targetUserId = user?.id || session?.user?.id;
@@ -332,33 +354,19 @@ const App = () => (
                               <Route path="/settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Settings /></ProtectedRoute>} />
                               <Route path="/notifications" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
-                              <Route 
-                                path="/teacher" 
-                                element={
-                                  <ProtectedRoute allowedRoles={['teacher', 'admin', 'manager', 'extreme_admin']}>
-                                    <TeacherPortal />
-                                  </ProtectedRoute>
-                                } 
-                              />
+                              <Route path="/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolAwareLegacyPortalRoute roles={["teacher"]}><TeacherPortal /></SchoolAwareLegacyPortalRoute></ProtectedRoute>} />
                               <Route
                                 path="/admin/early-content"
                                 element={
-                                  <ProtectedRoute allowedRoles={['admin', 'manager', 'extreme_admin']}>
+                                  <ProtectedRoute allowedRoles={["admin", "extreme_admin"]}>
                                     <EarlyContentAdminPage />
                                   </ProtectedRoute>
                                 }
                               />
-                              <Route 
-                                path="/admin" 
-                                element={
-                                  <ProtectedRoute allowedRoles={['admin', 'manager', 'extreme_admin']}>
-                                    <AdminPortal />
-                                  </ProtectedRoute>
-                                } 
-                              />
-                              <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><StudentDashboardRoute /></ProtectedRoute>} />
+                              <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin", "extreme_admin"]}><AdminPortal /></ProtectedRoute>} />
+                              <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={["student"]}><SchoolAwareLegacyPortalRoute roles={["student"]}><StudentDashboardRoute /></SchoolAwareLegacyPortalRoute></ProtectedRoute>} />
                               <Route path="/school/manager" element={<ProtectedRoute allowedRoles={["manager"]}><SchoolPortalGate role="manager"><SchoolManagerPortal /></SchoolPortalGate></ProtectedRoute>} />
-                              <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["admin", "teacher", "finance", "super_admin"]}><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></ProtectedRoute>} />
+                              <Route path="/school/admin" element={<ProtectedRoute allowedRoles={["teacher", "finance"]}><SchoolLeadershipGate><SchoolLeadershipPortal /></SchoolLeadershipGate></ProtectedRoute>} />
                               <Route path="/school/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolPortalGate role="teacher"><SchoolTeacherPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/parent" element={<ProtectedRoute allowedRoles={["parent"]}><SchoolPortalGate role="parent"><SchoolParentPortal /></SchoolPortalGate></ProtectedRoute>} />
                               <Route path="/school/finance" element={<ProtectedRoute allowedRoles={["finance"]}><SchoolPortalGate role="finance"><SchoolFinancePortal /></SchoolPortalGate></ProtectedRoute>} />
@@ -377,8 +385,8 @@ const App = () => (
                               <Route
                                 path="/parent-dashboard"
                                 element={
-                                  <ProtectedRoute allowedRoles={['student', 'teacher', 'admin', 'manager', 'extreme_admin']}>
-                                    <ParentDashboard />
+                                  <ProtectedRoute allowedRoles={['student', 'parent']}>
+                                    <SchoolAwareLegacyPortalRoute roles={["parent", "student"]}><ParentDashboard /></SchoolAwareLegacyPortalRoute>
                                   </ProtectedRoute>
                                 }
                               />
@@ -413,8 +421,8 @@ const App = () => (
                               <Route
                                 path="/finance"
                                 element={
-                                  <ProtectedRoute allowedRoles={['finance', 'admin', 'manager', 'extreme_admin']}>
-                                    <FinancePortal />
+                                  <ProtectedRoute allowedRoles={["finance", "extreme_admin"]}>
+                                    <SchoolAwareLegacyPortalRoute roles={["finance"]}><FinancePortal /></SchoolAwareLegacyPortalRoute>
                                   </ProtectedRoute>
                                 }
                               />
@@ -434,7 +442,7 @@ const App = () => (
                                   </ProtectedRoute>
                                 } 
                               />
-                              <Route path="/migrate-supabase" element={<ProtectedRoute allowedRoles={["admin", "manager", "extreme_admin"]}><SupabaseMigration /></ProtectedRoute>} />
+                              <Route path="/migrate-supabase" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><SupabaseMigration /></ProtectedRoute>} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                             </RouteErrorBoundary>
