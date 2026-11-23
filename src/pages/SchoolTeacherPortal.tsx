@@ -664,7 +664,7 @@ export default function SchoolTeacherPortal() {
               </div>
             </div>)}
           </div>
-          <div className="flex flex-wrap gap-2"><SchoolSecondaryButton onClick={addQuestionRow} disabled={quizQuestions.length >= 40}><Plus className="mr-2 h-4 w-4" />Add question</SchoolSecondaryButton><SchoolPrimaryButton type="submit" disabled={Boolean(activeMembership?.question_submission_suspended)}>Submit quiz for authorized academic leader approval</SchoolPrimaryButton></div>
+          <div className="flex flex-wrap gap-2"><SchoolSecondaryButton onClick={addQuestionRow} disabled={quizQuestions.length >= 40}><Plus className="mr-2 h-4 w-4" />Add question</SchoolSecondaryButton><SchoolPrimaryButton type="submit" disabled={Boolean(activeMembership?.question_submission_suspended)}>Submit quiz for academic review</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your submitted quizzes">
@@ -675,7 +675,7 @@ export default function SchoolTeacherPortal() {
 
   const renderHomework = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Homework & assignments" description="Create homework for your assigned sections. authorized academic leader approves it before students and parents can see it." />
+      <SchoolPageHeading title="Homework & assignments" description="Create homework for your assigned sections. An authorized academic leader approves it before students and parents can see it." />
       <SchoolPanel title="Create homework">
         <form onSubmit={createHomework} className="grid gap-3 md:grid-cols-2">
           <SchoolField label="Title"><input className={schoolInputClass} value={homeworkTitle} onChange={(event) => setHomeworkTitle(event.target.value)} /></SchoolField>
