@@ -383,7 +383,7 @@ export default function SchoolTeacherPortal() {
     const { error: submitError } = await db.rpc("school_submit_quiz", { p_quiz_id: quiz.id });
     if (submitError) return toast.error(submitError.message);
     setQuizTitle(""); setQuizDescription(""); setQuizQuestions([blankQuestion()]);
-    toast.success("Quiz submitted to the School Manager for approval.");
+    toast.success("Quiz submitted to an authorized academic leader for approval.");
     await load();
   };
 
@@ -431,7 +431,7 @@ export default function SchoolTeacherPortal() {
         uploaderId: user.id, uploaderRole: "teacher",
         schoolSubmission: { schoolId: schoolId!, sectionId: section.id },
       });
-      toast.success("Resource uploaded and sent to the School Manager for approval.");
+      toast.success("Resource uploaded and sent to an authorized academic leader for approval.");
       setBookTitle(""); setBookAuthor(""); setBookDescription(""); setBookFile(null);
       await load();
     } catch (error: any) {
@@ -638,7 +638,7 @@ export default function SchoolTeacherPortal() {
 
   const renderQuizzes = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Questions & quizzes" description="Create original questions for your assigned subjects. Every school quiz is reviewed by the School Manager before students can access it." />
+      <SchoolPageHeading title="Questions & quizzes" description="Create original questions for your assigned subjects. Every school quiz is reviewed by an authorized academic leader before students can access it." />
       <SchoolPanel title="Create quiz and questions">
         {activeMembership?.question_submission_suspended && <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Question submissions are temporarily suspended by the School Manager. Your teacher account and other portal features remain active. Reason: {activeMembership.question_submission_suspension_reason}</div>}
         <form onSubmit={createQuiz} className="space-y-4">
@@ -776,7 +776,7 @@ export default function SchoolTeacherPortal() {
 
   const renderTasks = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Assigned tasks" description="Complete follow-up tasks assigned by the School Manager or Admin, and submit your work for review." />
+      <SchoolPageHeading title="Assigned tasks" description="Complete follow-up tasks assigned by your School Manager or Division Director, and submit your work for review." />
       <SchoolPanel title="Your task list">
         {tasks.length ? <div className="space-y-3">{tasks.map((task) => <div key={task.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.task_type} · {task.priority} priority · {task.due_date ? `Due ${task.due_date}` : "No due date"}</p><p className="mt-2 text-sm text-slate-700">{task.description}</p></div><SchoolStatus value={task.status} /></div><textarea className={schoolTextareaClass + " mt-3"} disabled={!["open", "in_progress", "returned"].includes(task.status)} value={taskResponseById[task.id] ?? task.response ?? ""} onChange={(event) => setTaskResponseById((current) => ({ ...current, [task.id]: event.target.value }))} placeholder="Describe your work or response" />{["open", "in_progress", "returned"].includes(task.status) && <div className="mt-3 flex gap-2"><SchoolSecondaryButton onClick={() => void updateTask(task, "in_progress")}>Mark in progress</SchoolSecondaryButton><SchoolPrimaryButton onClick={() => void updateTask(task, "submitted")}>Submit for review</SchoolPrimaryButton></div>}</div>)}</div> : <SchoolEmptyState title="No assigned tasks" description="Tasks assigned to you will appear here." />}
       </SchoolPanel>
