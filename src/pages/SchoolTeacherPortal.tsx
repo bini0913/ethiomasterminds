@@ -604,13 +604,13 @@ export default function SchoolTeacherPortal() {
     <div className="space-y-5">
       <SchoolPageHeading title="My classes" description="Only students in your assigned sections are included in your class records." />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{assignedSections.map((section) => <SchoolPanel key={section.id} title={sectionLabel(section.id)} description={`${assignedStudents.filter((student) => student.section_id === section.id).length} active students`}><div className="space-y-2">{assignmentsForSection(section.id).map((assignment) => <div key={assignment.id} className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2"><span className="text-sm text-slate-700">{assignment.subject_name}</span><SchoolStatus value={assignment.assignment_kind} /></div>)}</div></SchoolPanel>)}</div>
-      {!assignedSections.length && <SchoolEmptyState title="No assigned classes" description="Your class list will appear after the School Manager assigns your sections." />}
+      {!assignedSections.length && <SchoolEmptyState title="No assigned classes" description="Your class list will appear after your Division Director assigns your sections." />}
     </div>
   );
 
   const renderAssessments = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Assessments & marks" description="Create class activities, tests, and exam assessments. Save marks as drafts, then submit the assessment to the School Manager for verification." />
+      <SchoolPageHeading title="Assessments & marks" description="Create class activities, tests, and exam assessments. Save marks as drafts, then submit the assessment to an authorized academic leader for verification." />
       <SchoolPanel title="Create assessment">
         <form onSubmit={createAssessment} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SchoolField label="Assessment title"><input className={schoolInputClass} value={assessmentTitle} onChange={(event) => setAssessmentTitle(event.target.value)} placeholder="Chapter 1 test" /></SchoolField>
@@ -720,7 +720,7 @@ export default function SchoolTeacherPortal() {
     <div className="space-y-5">
       <SchoolPageHeading title="Homeroom attendance" description="Daily attendance can only be recorded for sections where you are the assigned homeroom teacher." />
       <SchoolPanel title="Record daily attendance">
-        {!homeroomSections.length ? <SchoolEmptyState title="No homeroom section assigned" description="You can record attendance after the School Manager assigns you as a homeroom teacher." /> : <form onSubmit={recordAttendance} className="space-y-4">
+        {!homeroomSections.length ? <SchoolEmptyState title="No homeroom section assigned" description="You can record attendance after your Division Director assigns you as a homeroom teacher." /> : <form onSubmit={recordAttendance} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2"><SchoolField label="Homeroom section"><select className={schoolSelectClass} value={attendanceSectionId} onChange={(event) => setAttendanceSectionId(event.target.value)} disabled={attendanceReadOnly}><option value="">Choose homeroom section</option>{homeroomSections.map((section) => <option key={section.id} value={section.id}>{sectionLabel(section.id)}</option>)}</select></SchoolField><SchoolField label="Attendance date"><input type="date" className={schoolInputClass} value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} disabled={attendanceReadOnly} /></SchoolField></div>
           {attendanceReadOnly && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">This attendance session is {selectedAttendanceSession?.status === "open" ? "owned by another teacher" : selectedAttendanceSession?.status}. It is read-only.</div>}
           {assignedStudents.filter((student) => student.section_id === attendanceSectionId).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_160px_minmax(0,1fr)] sm:items-center"><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><select className={schoolSelectClass} value={attendanceValues[student.id] || "present"} onChange={(event) => setAttendanceValues((current) => ({ ...current, [student.id]: event.target.value }))} disabled={attendanceReadOnly}><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select><input className={schoolInputClass} placeholder="Optional note" value={attendanceNotes[student.id] || ""} onChange={(event) => setAttendanceNotes((current) => ({ ...current, [student.id]: event.target.value }))} disabled={attendanceReadOnly} /></div>)}
