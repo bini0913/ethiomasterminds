@@ -83,8 +83,9 @@ export default function SchoolPortalGate({
 
   if (error) {
     return (
-      <div className="mx-auto mt-10 max-w-xl rounded-lg border border-red-200 bg-white p-5 text-sm text-red-700">
-        {error}
+      <div role="alert" className="mx-auto mt-10 max-w-xl rounded-lg border border-red-200 bg-white p-5 text-sm text-red-700">
+        <p>{error}</p>
+        <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-50">Retry school access check</button>
       </div>
     );
   }
@@ -95,8 +96,9 @@ export default function SchoolPortalGate({
 
   if (role === "teacher" && leadershipCheck === "error") {
     return (
-      <div className="mx-auto mt-10 max-w-xl rounded-lg border border-red-200 bg-white p-5 text-sm text-red-700">
-        Your leadership assignment could not be verified. Access is paused until it can be checked. Please refresh or contact the School Manager.
+      <div role="alert" className="mx-auto mt-10 max-w-xl rounded-lg border border-red-200 bg-white p-5 text-sm text-red-700">
+        <p>Your leadership assignment could not be verified. Access is paused until it can be checked. You can retry the check or contact the School Manager.</p>
+        <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-50">Retry leadership check</button>
       </div>
     );
   }
