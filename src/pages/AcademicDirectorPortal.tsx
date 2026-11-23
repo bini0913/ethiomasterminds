@@ -43,6 +43,7 @@ export default function AcademicDirectorPortal() {
   const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [assessments, setAssessments] = useState<any[]>([]);
   const [homework, setHomework] = useState<any[]>([]);
+  const [contentReviews, setContentReviews] = useState<any[]>([]);
   const [marks, setMarks] = useState<any[]>([]);
   const [attendanceSessions, setAttendanceSessions] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
@@ -88,6 +89,9 @@ export default function AcademicDirectorPortal() {
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false })
         .limit(500);
+      if (can("review_assessments")) {
+        requests.contentReviews = db.rpc("school_list_pending_content_reviews", { p_school_id: schoolId });
+      }
     }
     if (can("review_results")) {
       requests.marks = db.from("school_student_marks")
@@ -129,6 +133,7 @@ export default function AcademicDirectorPortal() {
     if (results.teacherAssignments) setTeacherAssignments(results.teacherAssignments.data ?? []);
     if (results.assessments) setAssessments(results.assessments.data ?? []);
     if (results.homework) setHomework(results.homework.data ?? []);
+    if (results.contentReviews) setContentReviews(results.contentReviews.data ?? []);
     if (results.marks) setMarks(results.marks.data ?? []);
     if (results.attendanceSessions) setAttendanceSessions(results.attendanceSessions.data ?? []);
     if (results.attendanceRecords) setAttendanceRecords(results.attendanceRecords.data ?? []);
@@ -177,6 +182,18 @@ export default function AcademicDirectorPortal() {
     });
     if (rpcError) return toast.error(rpcError.message || "Homework review failed.");
     toast.success(approve ? "Homework approved." : "Homework returned to the teacher.");
+    await load();
+  };
+  const reviewContentItem = async (item: any, approve: boolean) => {
+    const isQuiz = item.content_type === "quiz";
+    const { error: rpcError } = await db.rpc(
+      isQuiz ? "school_review_quiz" : "school_review_library_book",
+      isQuiz
+        ? { p_quiz_id: item.content_id, p_approved: approve, p_feedback: feedback[item.content_id] || null }
+        : { p_book_id: item.content_id, p_approved: approve, p_feedback: feedback[item.content_id] || null },
+    );
+    if (rpcError) return toast.error(rpcError.message || "Content review failed.");
+    toast.success(approve ? "Learning content approved." : "Learning content returned to its teacher.");
     await load();
   };
 
@@ -301,6 +318,15 @@ export default function AcademicDirectorPortal() {
                 <div className="mt-3 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewHomework(item.id, true)}>Approve homework</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewHomework(item.id, false)}>Return to teacher</SchoolSecondaryButton></div>
               </div>
             ))}</div> : <SchoolEmptyState title="No pending homework" description="Homework awaiting academic review will appear here." />}
+          </SchoolPanel>
+          <SchoolPanel title="Pending quizzes and library resources" description="Review school quizzes and uploaded learning resources within your active academic-leadership permissions.">
+            {contentReviews.length ? <div className="space-y-3">{contentReviews.map((item) => (
+              <div key={`${item.content_type}:${item.content_id}`} className="rounded-lg border border-slate-200 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-900">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.content_type === "quiz" ? "School quiz" : "Library resource"} · {item.subject_name} · {item.grade_label} · {section(item.section_id)?.section_name || "Section"}</p><p className="mt-1 text-xs text-slate-500">Submitted by {item.submitted_by_name} · {new Date(item.submitted_at).toLocaleDateString()}</p></div><SchoolStatus value="pending" /></div>
+                <input value={feedback[item.content_id] || ""} onChange={(event) => setFeedback((current) => ({ ...current, [item.content_id]: event.target.value }))} placeholder="Optional review feedback" className="mt-3 h-10 w-full rounded-md border border-slate-200 px-3 text-sm" />
+                <div className="mt-3 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewContentItem(item, true)}>Approve</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewContentItem(item, false)}>Return to teacher</SchoolSecondaryButton></div>
+              </div>
+            ))}</div> : <SchoolEmptyState title="No pending quizzes or resources" description="Teacher-submitted school quizzes and library resources will appear here when they need review." />}
           </SchoolPanel>
         </>
       )}
