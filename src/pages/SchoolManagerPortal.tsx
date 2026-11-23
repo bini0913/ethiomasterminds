@@ -1026,7 +1026,7 @@ export default function SchoolManagerPortal() {
 
   const renderRequests = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Staff responsibility requests" description="Request role or assignment changes. The School Manager reviews staff responsibility requests and controls school-level appointments." />
+      <SchoolPageHeading title="Staff responsibility requests" description="Request role or assignment changes. The Super Admin reviews requests; this portal never changes staff permissions directly." />
       <SchoolPanel title="Submit a change request">
         <form onSubmit={createChangeRequest} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SchoolField label="Staff member"><select className={schoolSelectClass} value={requestTargetId} onChange={(event) => setRequestTargetId(event.target.value)}><option value="">Choose staff member</option>{staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
