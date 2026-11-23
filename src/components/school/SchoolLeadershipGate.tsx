@@ -80,7 +80,7 @@ export default function SchoolLeadershipGate({ children }: { children: React.Rea
     return <div className="flex min-h-[60vh] items-center justify-center bg-slate-50 px-5"><div className="text-center"><div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" /><p className="mt-3 text-sm text-slate-500">Verifying school leadership access…</p></div></div>;
   }
   if (membershipError || error) {
-    return <div className="mx-auto mt-10 max-w-xl rounded-lg border border-red-200 bg-white p-5 text-sm text-red-700">{error || membershipError}</div>;
+    return <div role="alert" className="mx-auto mt-10 max-w-xl rounded-lg border border-red-200 bg-white p-5 text-sm text-red-700"><p>{error || membershipError}</p><button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-50">Retry leadership verification</button></div>;
   }
   const appointmentMembership = memberships.find((membership) => membership.id === appointment?.membership_id) ?? activeMembership;
   if (!appointmentMembership) return <Navigate to="/" replace />;
