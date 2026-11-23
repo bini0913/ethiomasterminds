@@ -30,6 +30,12 @@ const navItems: SchoolNavItem[] = [
 type AccountRole = "finance" | "parent" | "student";
 type LeadershipPosition = "" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "academic_director" | "hr_director";
 
+const STANDARD_ETHIOPIAN_GRADE_LABELS = [
+  "Nursery", "KG 1", "KG 2",
+  "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6",
+  "Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11", "Grade 12",
+];
+
 export default function SchoolManagerPortal() {
   const { activeSchool, activeMembership } = useSchoolPortal();
   const [page, setPage] = useState("overview");
@@ -271,6 +277,19 @@ export default function SchoolManagerPortal() {
     });
     if (error) return toast.error(error.message || "The division mapping could not be saved.");
     toast.success("Grade mapped to its school division.");
+    await loadLeadership();
+  };
+
+  const initializeStandardEthiopianGradeMappings = async () => {
+    if (!schoolId) return;
+    const { data, error } = await db.rpc("school_initialize_default_ethiopian_grade_mappings", {
+      p_school_id: schoolId,
+    });
+    if (error) return toast.error(error.message || "The standard grade structure could not be applied.");
+    const added = Number(data ?? 0);
+    toast.success(added > 0
+      ? `Added ${added} standard Ethiopian grade mappings.`
+      : "The standard Ethiopian grade mappings are already configured.");
     await loadLeadership();
   };
 
@@ -1122,13 +1141,30 @@ export default function SchoolManagerPortal() {
             );
           })}
         </div>
-        <SchoolPanel title="Grade-to-division mapping" description="Configure how this school groups its actual grade labels. These mappings are school-specific and are not hardcoded by Master Minds.">
+        <SchoolPanel title="Grade-to-division mapping" description="Map grades before class sections are created. Division Directors can create sections only after their grades are mapped.">
+          <div className="mb-3 flex justify-end">
+            <SchoolSecondaryButton onClick={() => void initializeStandardEthiopianGradeMappings()}>
+              Use standard Ethiopian grade structure
+            </SchoolSecondaryButton>
+          </div>
           <form onSubmit={saveDivisionMapping} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
             <SchoolField label="School grade">
-              <select className={schoolSelectClass} value={mappingGrade} onChange={(event) => setMappingGrade(event.target.value)} required>
-                <option value="">Choose a configured grade</option>
-                {[...new Set(sections.map((section) => section.grade_label))].sort((a, b) => a.localeCompare(b)).map((grade) => <option key={grade} value={grade}>{grade}</option>)}
-              </select>
+              <input
+                className={schoolInputClass}
+                value={mappingGrade}
+                onChange={(event) => setMappingGrade(event.target.value)}
+                placeholder="Choose or enter a grade label"
+                list="school-grade-label-options"
+                maxLength={80}
+                required
+              />
+              <datalist id="school-grade-label-options">
+                {[...new Set([
+                  ...STANDARD_ETHIOPIAN_GRADE_LABELS,
+                  ...sections.map((section) => section.grade_label),
+                  ...divisionMappings.map((mapping) => mapping.grade_label),
+                ])].map((grade) => <option key={grade} value={grade} />)}
+              </datalist>
             </SchoolField>
             <SchoolField label="Division">
               <select className={schoolSelectClass} value={mappingDivision} onChange={(event) => setMappingDivision(event.target.value)}>
@@ -1149,7 +1185,7 @@ export default function SchoolManagerPortal() {
                   <SchoolSecondaryButton onClick={() => void removeDivisionMapping(mapping.grade_label)}>Remove</SchoolSecondaryButton>
                 </div>
               </div>
-            )) : <SchoolEmptyState title="No division mappings configured" description="Map each grade used by this school to KG, Elementary, Middle School, or High School." />}
+            )) : <SchoolEmptyState title="No division mappings configured" description="Use the standard Ethiopian grade structure or map the school's own grade labels. Class sections can be created by Directors after mapping." />}
           </div>
         </SchoolPanel>
         
