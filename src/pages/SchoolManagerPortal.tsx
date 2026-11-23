@@ -398,7 +398,7 @@ export default function SchoolManagerPortal() {
       };
       return labels[appointment.position] || appointment.position;
     }
-    return member.school_role === "admin" ? "Legacy designation · pending Manager conversion" : member.school_role;
+    return member.school_role === "admin" ? "Retired role · needs reassignment" : member.school_role;
   };
 
 
@@ -426,7 +426,7 @@ export default function SchoolManagerPortal() {
 
   const convertLegacyAdminToHrDirector = async (membership: any) => {
     const personName = memberName(membership.id);
-    const reason = `Retired the legacy School Admin designation for ${personName} and appointed HR Director / Business Manager.`;
+    const reason = `Retired the legacy School Manager designation for ${personName} and appointed HR Director / Business Manager.`;
     if (!window.confirm(`Convert ${personName} to HR Director / Business Manager? Their old designation will end and their existing account will be retained.`)) return;
     setConvertingLegacyMembershipId(membership.id);
     const { error } = await db.rpc("school_convert_legacy_admin_to_hr_director", {
@@ -855,11 +855,11 @@ export default function SchoolManagerPortal() {
             <div className="mt-3 space-y-2">{createdCredentials.map((item, index) => <div key={index} className="rounded-md border border-emerald-200 bg-white p-2 text-xs"><p><span className="font-semibold">Username:</span> {item.username}</p><p className="mt-1 break-all"><span className="font-semibold">Initial password:</span> {item.initial_password}</p></div>)}</div>
           </div>}
         </SchoolPanel>
-        <SchoolPanel title="School accounts" description={`${members.length} school memberships. Legacy designations can be converted by the Manager.`}>
+        <SchoolPanel title="School accounts" description={`${members.length} school memberships. Existing retired staff records can be reassigned to current leadership roles.`}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead><tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><th className="pb-2 font-semibold">Person</th><th className="pb-2 font-semibold">Role</th><th className="pb-2 font-semibold">Grade / section</th><th className="pb-2 font-semibold">Status</th><th className="pb-2 font-semibold">Action</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 text-slate-600">{membershipRoleLabel(member)}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td><td className="py-3">{member.school_role === "admin" && member.status === "suspended" && member.end_reason === "Legacy School Admin role retired; awaiting Manager reassignment." ? <button type="button" disabled={convertingLegacyMembershipId === member.id} onClick={() => void convertLegacyAdminToHrDirector(member)} className="rounded-md border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50">{convertingLegacyMembershipId === member.id ? "Converting…" : "Convert to HR Director"}</button> : <span className="text-xs text-slate-400">—</span>}</td></tr>)}</tbody>
+              <tbody className="divide-y divide-slate-100">{members.map((member) => <tr key={member.id}><td className="py-3"><p className="font-medium text-slate-800">{memberName(member.id)}</p><p className="mt-0.5 text-xs text-slate-500">{member.school_username}</p></td><td className="py-3 text-slate-600">{membershipRoleLabel(member)}</td><td className="py-3 text-slate-600">{member.grade_label ? `${member.grade_label} · ${sectionLabel(member.section_id)}` : "—"}</td><td className="py-3"><SchoolStatus value={member.status} /></td><td className="py-3">{member.school_role === "admin" && member.status === "suspended" && member.end_reason === "Legacy School Manager role retired; awaiting Manager reassignment." ? <button type="button" disabled={convertingLegacyMembershipId === member.id} onClick={() => void convertLegacyAdminToHrDirector(member)} className="rounded-md border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50">{convertingLegacyMembershipId === member.id ? "Converting…" : "Appoint HR Director"}</button> : <span className="text-xs text-slate-400">—</span>}</td></tr>)}</tbody>
             </table>
           </div>
         </SchoolPanel>
@@ -954,7 +954,7 @@ export default function SchoolManagerPortal() {
           <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.attendance_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, attendance_notifications_enabled: event.target.checked }))} />Send automatic parent notifications when homeroom attendance is submitted</label>
           <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.behavior_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, behavior_notifications_enabled: event.target.checked }))} />Notify parents after a behavior report is approved</label>
           <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.report_card_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, report_card_notifications_enabled: event.target.checked }))} />Notify parents when official report cards are published</label>
-          <SchoolField label="Absences requiring Admin review"><input type="number" min="1" max="60" className={schoolInputClass} value={policySettings.absence_review_threshold} onChange={(event) => setPolicySettings((current: any) => ({ ...current, absence_review_threshold: event.target.value }))} /></SchoolField>
+          <SchoolField label="Absences requiring School Manager review"><input type="number" min="1" max="60" className={schoolInputClass} value={policySettings.absence_review_threshold} onChange={(event) => setPolicySettings((current: any) => ({ ...current, absence_review_threshold: event.target.value }))} /></SchoolField>
           <SchoolPrimaryButton type="submit">Save school policies</SchoolPrimaryButton>
         </form> : <SchoolEmptyState title="Policy settings unavailable" description="The school's policy settings row has not been created." />}
       </SchoolPanel>
@@ -1026,7 +1026,7 @@ export default function SchoolManagerPortal() {
 
   const renderRequests = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Staff responsibility requests" description="Request role or assignment changes. The Super Admin reviews requests; this portal never changes staff permissions directly." />
+      <SchoolPageHeading title="Staff responsibility requests" description="Request role or assignment changes. The School Manager reviews staff responsibility requests and controls school-level appointments." />
       <SchoolPanel title="Submit a change request">
         <form onSubmit={createChangeRequest} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SchoolField label="Staff member"><select className={schoolSelectClass} value={requestTargetId} onChange={(event) => setRequestTargetId(event.target.value)}><option value="">Choose staff member</option>{staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
