@@ -472,6 +472,10 @@ const Settings: React.FC = () => {
                     <Trash2 className="h-4 w-4 mr-2" />
                     Request Account Deletion
                   </Button>
+                  <p className="text-xs text-muted-foreground">
+                    You can also submit a deletion request from any browser using the{" "}
+                    <a href="/delete-account" className="font-medium text-primary underline underline-offset-4">external account deletion page</a>.
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>
