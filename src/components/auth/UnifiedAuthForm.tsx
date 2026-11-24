@@ -406,14 +406,10 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                 {Number(age) > 0 && Number(age) < 18 && (
                   <div className="space-y-3 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
                     <div>
-                      <p className="text-sm font-extrabold text-foreground">Guardian consent required</p>
-                      <p className="mt-1 text-xs font-medium text-muted-foreground">Learners under 18 need a guardian email and permission before an account can be created.</p>
+                      <p className="text-sm font-extrabold text-foreground">Parent or guardian verification required</p>
+                      <p className="mt-1 text-xs font-medium text-muted-foreground">Enter a parent or guardian email. They must verify approval before social features can be enabled. Learning remains available.</p>
                     </div>
                     <input aria-label="Guardian email" type="email" autoComplete="email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} placeholder="Parent or guardian email" className="mm-field" />
-                    <label className="flex items-start gap-3 text-xs font-semibold text-foreground">
-                      <input type="checkbox" checked={guardianConsent} onChange={(e) => setGuardianConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
-                      <span>I confirm that my parent or legal guardian has given permission for this account.</span>
-                    </label>
                   </div>
                 )}
                 <div>
