@@ -20,6 +20,7 @@ const CommunityGuidelinesPage = lazy(() => import("./pages/CommunityGuidelinesPa
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const GuardianConsentPage = lazy(() => import("./pages/GuardianConsentPage"));
 const GuardianControlsPage = lazy(() => import("./pages/GuardianControlsPage"));
+const GuardianConsentRequestPage = lazy(() => import("./pages/GuardianConsentRequestPage"));
 const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
 const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
@@ -343,6 +344,7 @@ const App = () => (
                               <Route path="/delete-account" element={<DeleteAccountPage />} />
                               <Route path="/guardian-consent" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "parent", "finance", "super_admin", "extreme_admin"]}><GuardianConsentPage /></ProtectedRoute>} />
                               <Route path="/guardian-controls" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "parent", "finance", "super_admin", "extreme_admin"]}><GuardianControlsPage /></ProtectedRoute>} />
+                              <Route path="/guardian-consent-request" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "parent", "finance", "super_admin", "extreme_admin"]}><GuardianConsentRequestPage /></ProtectedRoute>} />
                               <Route path="/quiz" element={<EarlyTierRestrictedRoute><ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Quiz /></ProtectedRoute></EarlyTierRestrictedRoute>} />
                               <Route path="/early-games" element={<EarlyTierOnlyRoute><EarlyGamesPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-quiz" element={<EarlyTierOnlyRoute><EarlyQuizPage /></EarlyTierOnlyRoute>} />
