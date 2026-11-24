@@ -568,7 +568,7 @@ begin
     end if;
   elsif tg_table_name = 'study_call_participants' then
     if tg_op = 'UPDATE' and new.status in ('declined','left') then return new; end if;
-    if not app_private.guardian_allows(new.invited_by, 'study_calls')
+    if (new.invited_by is not null and not app_private.guardian_allows(new.invited_by, 'study_calls'))
        or not app_private.guardian_allows(new.user_id, 'study_calls') then
       raise exception using errcode = '42501', message = 'Study Mode calls are not enabled for both participants';
     end if;
@@ -903,7 +903,7 @@ create policy "invitees respond within guardian call controls"
       status in ('declined','left')
       or (
         app_private.guardian_allows(user_id, 'study_calls')
-        and app_private.guardian_allows(invited_by, 'study_calls')
+        and (invited_by is null or app_private.guardian_allows(invited_by, 'study_calls'))
       )
     )
   );
