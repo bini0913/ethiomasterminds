@@ -4,6 +4,7 @@ import { ArrowLeft, MailCheck, ShieldAlert, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import LegalLinksFooter from "@/components/legal/LegalLinksFooter";
 import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -220,6 +221,7 @@ const DeleteAccountPage: React.FC = () => {
             </p>
           </CardContent>
         </Card>
+        <LegalLinksFooter />
       </div>
     </main>
   );
