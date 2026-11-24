@@ -13,6 +13,10 @@ create table if not exists public.guardian_consent_requests (
   verified_at timestamptz
 );
 
+alter table public.guardian_consent_requests
+  add column if not exists guardian_attested_at timestamptz,
+  add column if not exists guardian_attestation_version text;
+
 create unique index if not exists guardian_consent_one_pending_per_student
   on public.guardian_consent_requests(student_id) where status = 'pending';
 
@@ -250,7 +254,7 @@ begin
 end;
 $function$;
 
-create or replace function public.approve_guardian_consent(p_request_id uuid)
+create or replace function public.approve_guardian_consent(p_request_id uuid, p_is_adult_guardian boolean)
 returns boolean
 language plpgsql
 security definer
@@ -263,6 +267,9 @@ declare
   v_guardian_age integer;
 begin
   if auth.uid() is null then raise exception 'Guardian sign-in required'; end if;
+  if coalesce(p_is_adult_guardian, false) is not true then
+    raise exception 'Confirm that you are an adult parent or legal guardian before approving';
+  end if;
 
   select email, email_confirmed_at into v_email, v_email_confirmed_at
   from auth.users where id = auth.uid();
@@ -290,7 +297,11 @@ begin
   end if;
 
   update public.guardian_consent_requests
-  set status = 'approved', guardian_user_id = auth.uid(), verified_at = now()
+  set status = 'approved',
+      guardian_user_id = auth.uid(),
+      verified_at = now(),
+      guardian_attested_at = now(),
+      guardian_attestation_version = 'guardian-social-v1'
   where id = p_request_id;
 
   update public.profiles
@@ -1007,8 +1018,8 @@ revoke all on function public.update_my_guardian_email(text) from public, anon;
 grant execute on function public.update_my_guardian_email(text) to authenticated;
 revoke all on function public.request_guardian_consent() from public, anon;
 grant execute on function public.request_guardian_consent() to authenticated;
-revoke all on function public.approve_guardian_consent(uuid) from public, anon;
-grant execute on function public.approve_guardian_consent(uuid) to authenticated;
+revoke all on function public.approve_guardian_consent(uuid,boolean) from public, anon;
+grant execute on function public.approve_guardian_consent(uuid,boolean) to authenticated;
 revoke all on function public.revoke_guardian_consent(uuid) from public, anon;
 grant execute on function public.revoke_guardian_consent(uuid) to authenticated;
 revoke all on function public.get_my_social_access() from public, anon;
