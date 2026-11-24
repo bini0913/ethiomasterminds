@@ -89,6 +89,17 @@ begin
   elsif tg_table_name = 'study_call_participants' then
     v_first_user := new.invited_by;
     v_second_user := new.user_id;
+  elsif tg_table_name = 'followers' then
+    v_first_user := new.follower_id;
+    v_second_user := new.following_id;
+  elsif tg_table_name in ('social_post_comments', 'social_post_likes', 'social_post_reactions', 'saved_posts') then
+    v_first_user := new.user_id;
+    select p.author_id into v_second_user
+    from public.social_posts p
+    where p.id = new.post_id;
+    if v_second_user is null then
+      return new;
+    end if;
   else
     return new;
   end if;
@@ -135,6 +146,10 @@ begin
   delete from public.friends f
   where (f.user_id = new.blocker_id and f.friend_id = new.blocked_user_id)
      or (f.user_id = new.blocked_user_id and f.friend_id = new.blocker_id);
+
+  delete from public.followers f
+  where (f.follower_id = new.blocker_id and f.following_id = new.blocked_user_id)
+     or (f.follower_id = new.blocked_user_id and f.following_id = new.blocker_id);
   return new;
 end;
 $function$;
@@ -179,3 +194,163 @@ create policy "members can view group messages excluding blocked senders"
 
 create index if not exists user_blocks_blocked_user_idx
   on public.user_blocks (blocked_user_id, blocker_id);
+
+-- Extend blocking to public social content and follower relationships.
+drop trigger if exists reject_blocked_follow on public.followers;
+create trigger reject_blocked_follow
+  before insert or update of follower_id, following_id on public.followers
+  for each row execute function app_private.reject_blocked_social_interaction();
+
+drop trigger if exists reject_blocked_social_comment on public.social_post_comments;
+create trigger reject_blocked_social_comment
+  before insert or update of user_id, post_id on public.social_post_comments
+  for each row execute function app_private.reject_blocked_social_interaction();
+
+drop trigger if exists reject_blocked_social_like on public.social_post_likes;
+create trigger reject_blocked_social_like
+  before insert or update of user_id, post_id on public.social_post_likes
+  for each row execute function app_private.reject_blocked_social_interaction();
+
+drop trigger if exists reject_blocked_social_reaction on public.social_post_reactions;
+create trigger reject_blocked_social_reaction
+  before insert or update of user_id, post_id on public.social_post_reactions
+  for each row execute function app_private.reject_blocked_social_interaction();
+
+drop trigger if exists reject_blocked_saved_post on public.saved_posts;
+create trigger reject_blocked_saved_post
+  before insert or update of user_id, post_id on public.saved_posts
+  for each row execute function app_private.reject_blocked_social_interaction();
+
+-- Rebuild the follower policies without a permissive ALL policy that could
+-- bypass the block-aware SELECT policy.
+drop policy if exists "involved users can view" on public.followers;
+drop policy if exists "user manages own follow" on public.followers;
+create policy "users can view unblocked follows"
+  on public.followers for select to authenticated
+  using (
+    (follower_id = (select auth.uid()) or following_id = (select auth.uid()))
+    and not app_private.is_user_blocked(follower_id, following_id)
+  );
+create policy "users can create unblocked follows"
+  on public.followers for insert to authenticated
+  with check (
+    follower_id = (select auth.uid())
+    and not app_private.is_user_blocked(follower_id, following_id)
+  );
+create policy "users can update own unblocked follows"
+  on public.followers for update to authenticated
+  using (
+    follower_id = (select auth.uid())
+    and not app_private.is_user_blocked(follower_id, following_id)
+  )
+  with check (
+    follower_id = (select auth.uid())
+    and not app_private.is_user_blocked(follower_id, following_id)
+  );
+create policy "users can remove own follows"
+  on public.followers for delete to authenticated
+  using (follower_id = (select auth.uid()));
+
+-- Split the social-post ALL policies so public feed reads can respect blocks
+-- while moderator and owner write permissions remain intact.
+drop policy if exists "Authenticated users can view opted-in posts" on public.social_posts;
+drop policy if exists "author manages own post" on public.social_posts;
+drop policy if exists "extreme admin full control social_posts" on public.social_posts;
+create policy "users can view opted-in posts excluding blocked authors"
+  on public.social_posts for select to authenticated
+  using (
+    (
+      author_id = (select auth.uid())
+      or coalesce((select p.is_public from public.profile_privacy_settings p where p.user_id = social_posts.author_id), true)
+      or has_role((select auth.uid()), 'admin'::public.app_role)
+      or has_role((select auth.uid()), 'manager'::public.app_role)
+      or (select public._is_extreme_admin())
+    )
+    and (
+      author_id = (select auth.uid())
+      or has_role((select auth.uid()), 'admin'::public.app_role)
+      or has_role((select auth.uid()), 'manager'::public.app_role)
+      or (select public._is_extreme_admin())
+      or not app_private.is_user_blocked(author_id, (select auth.uid()))
+    )
+  );
+create policy "authors and moderators can update social posts"
+  on public.social_posts for update to authenticated
+  using (
+    author_id = (select auth.uid())
+    or has_role((select auth.uid()), 'admin'::public.app_role)
+    or has_role((select auth.uid()), 'manager'::public.app_role)
+    or (select public._is_extreme_admin())
+  )
+  with check (
+    author_id = (select auth.uid())
+    or has_role((select auth.uid()), 'admin'::public.app_role)
+    or has_role((select auth.uid()), 'manager'::public.app_role)
+    or (select public._is_extreme_admin())
+  );
+create policy "authors and moderators can delete social posts"
+  on public.social_posts for delete to authenticated
+  using (
+    author_id = (select auth.uid())
+    or has_role((select auth.uid()), 'admin'::public.app_role)
+    or has_role((select auth.uid()), 'manager'::public.app_role)
+    or (select public._is_extreme_admin())
+  );
+
+-- A blocked user's comments and reactions are hidden from the blocker as well.
+drop policy if exists "authenticated can view visible post comments" on public.social_post_comments;
+create policy "users can view visible comments excluding blocked authors"
+  on public.social_post_comments for select to authenticated
+  using (
+    not app_private.is_user_blocked(user_id, (select auth.uid()))
+    and exists (
+      select 1
+      from public.social_posts p
+      where p.id = social_post_comments.post_id
+        and (
+          p.author_id = (select auth.uid())
+          or coalesce((select s.is_public from public.profile_privacy_settings s where s.user_id = p.author_id), true)
+          or has_role((select auth.uid()), 'admin'::public.app_role)
+          or has_role((select auth.uid()), 'manager'::public.app_role)
+          or (select public._is_extreme_admin())
+        )
+    )
+  );
+
+drop policy if exists "authenticated can view visible post likes" on public.social_post_likes;
+create policy "users can view visible likes excluding blocked users"
+  on public.social_post_likes for select to authenticated
+  using (
+    not app_private.is_user_blocked(user_id, (select auth.uid()))
+    and exists (
+      select 1 from public.social_posts p
+      where p.id = social_post_likes.post_id
+    )
+  );
+
+drop policy if exists "authenticated can view visible post reactions" on public.social_post_reactions;
+create policy "users can view visible reactions excluding blocked users"
+  on public.social_post_reactions for select to authenticated
+  using (
+    not app_private.is_user_blocked(user_id, (select auth.uid()))
+    and exists (
+      select 1 from public.social_posts p
+      where p.id = social_post_reactions.post_id
+    )
+  );
+
+-- Public multiplayer lobby and room chat also hide messages from accounts
+-- that either side has blocked.
+drop policy if exists "authenticated can view lobby" on public.lobby_messages;
+create policy "authenticated can view unblocked lobby messages"
+  on public.lobby_messages for select to authenticated
+  using (not app_private.is_user_blocked(user_id, (select auth.uid())));
+
+drop policy if exists "Room players can view room chat" on public.room_chat_messages;
+drop policy if exists "room_chat_member_read" on public.room_chat_messages;
+create policy "room members can view unblocked room chat"
+  on public.room_chat_messages for select to authenticated
+  using (
+    is_multiplayer_room_member(room_id)
+    and not app_private.is_user_blocked(user_id, (select auth.uid()))
+  );
