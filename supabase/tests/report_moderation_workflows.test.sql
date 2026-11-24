@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(21);
+select plan(22);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.moderation_actions'::regclass),
