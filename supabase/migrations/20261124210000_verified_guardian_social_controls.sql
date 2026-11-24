@@ -473,9 +473,13 @@ declare
   v_second_user uuid;
   v_post_author uuid;
 begin
-  if current_setting('request.jwt.claim.role', true) = 'service_role' then return new; end if;
+  if current_setting('request.jwt.claim.role', true) = 'service_role'
+     or session_user in ('postgres', 'supabase_admin') then
+    return new;
+  end if;
 
   if tg_table_name = 'friends' then
+    if tg_op = 'UPDATE' and new.status is distinct from old.status and new.status <> 'accepted' then return new; end if;
     v_first_user := new.user_id; v_second_user := new.friend_id;
     if not app_private.guardian_allows(v_first_user, 'friends') or not app_private.guardian_allows(v_second_user, 'friends') then
       raise exception using errcode = '42501', message = 'Parent or guardian approval is required for friend connections';
@@ -532,6 +536,7 @@ begin
       raise exception using errcode = '42501', message = 'Multiplayer room chat is not enabled by the parent or guardian';
     end if;
   elsif tg_table_name = 'multiplayer_invites' then
+    if tg_op = 'UPDATE' and new.status in ('declined','cancelled') then return new; end if;
     if not app_private.guardian_allows(new.sender_id, 'multiplayer')
        or not app_private.guardian_allows(new.receiver_id, 'multiplayer') then
       raise exception using errcode = '42501', message = 'Multiplayer invitations are not enabled by the parent or guardian';
@@ -541,6 +546,7 @@ begin
       raise exception using errcode = '42501', message = 'Study Mode calls are not enabled by the parent or guardian';
     end if;
   elsif tg_table_name = 'study_call_participants' then
+    if tg_op = 'UPDATE' and new.status in ('declined','left') then return new; end if;
     if not app_private.guardian_allows(new.invited_by, 'study_calls')
        or not app_private.guardian_allows(new.user_id, 'study_calls') then
       raise exception using errcode = '42501', message = 'Study Mode calls are not enabled for both participants';
@@ -593,10 +599,10 @@ drop trigger if exists guardian_check_messages on public.messages;
 create trigger guardian_check_messages before insert on public.messages
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_social_posts on public.social_posts;
-create trigger guardian_check_social_posts before insert on public.social_posts
+create trigger guardian_check_social_posts before insert or update on public.social_posts
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_social_comments on public.social_post_comments;
-create trigger guardian_check_social_comments before insert on public.social_post_comments
+create trigger guardian_check_social_comments before insert or update on public.social_post_comments
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_social_likes on public.social_post_likes;
 create trigger guardian_check_social_likes before insert on public.social_post_likes
@@ -623,13 +629,13 @@ drop trigger if exists guardian_check_room_chat on public.room_chat_messages;
 create trigger guardian_check_room_chat before insert on public.room_chat_messages
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_multiplayer_invites on public.multiplayer_invites;
-create trigger guardian_check_multiplayer_invites before insert on public.multiplayer_invites
+create trigger guardian_check_multiplayer_invites before insert or update on public.multiplayer_invites
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_study_call_rooms on public.study_call_rooms;
 create trigger guardian_check_study_call_rooms before insert on public.study_call_rooms
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_study_call_participants on public.study_call_participants;
-create trigger guardian_check_study_call_participants before insert on public.study_call_participants
+create trigger guardian_check_study_call_participants before insert or update on public.study_call_participants
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_room_players on public.room_players;
 create trigger guardian_check_room_players before insert on public.room_players
