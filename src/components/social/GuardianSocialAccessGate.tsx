@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
 
+type PermissionKey = "allow_friends" | "allow_group_chat" | "allow_public_posts" | "allow_multiplayer";
+
 type SocialAccess = {
   age: number | null;
   guardian_consent: boolean;
@@ -31,7 +33,7 @@ const GuardianSocialAccessGate: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
 
-  const permission = useMemo(() => {
+  const permission = useMemo<PermissionKey | null>(() => {
     const path = location.pathname;
     if (path === "/friends" || path.startsWith("/friends/")) return "allow_friends";
     if (path === "/chat" || path.startsWith("/chat/")) return "allow_group_chat";
