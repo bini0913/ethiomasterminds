@@ -23,6 +23,9 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Verify route registry
+        run: npm run check:routes
+
       - name: Install Electron tooling
         run: npm install --save-dev electron@31 @electron/packager@18 --legacy-peer-deps
 
