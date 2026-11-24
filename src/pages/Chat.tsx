@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import BackButton from '@/components/ui/BackButton';
+import ReportButton from '@/components/social/ReportButton';
 
 // Types
 interface ChatRoom {
@@ -665,6 +666,7 @@ const Chat: React.FC = () => {
                               : 'bg-muted/70 text-foreground rounded-bl-md',
                           )}>
                             <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                             {!isMe && <div className="mt-1 flex justify-end"><ReportButton reportedType="group_message" reportedId={msg.id} size="icon" /></div>}
 
                             {/* Quick react on hover */}
                             <div className={cn(
