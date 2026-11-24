@@ -238,9 +238,6 @@ begin
       when r.reported_type = 'group_message' then group_author.name
       when r.reported_type = 'lobby_message' then lobby_author.name
       when r.reported_type = 'room_message' then room_author.name
-      when r.reported_type = 'group_message' then coalesce(group_message.content, 'Group message unavailable')
-      when r.reported_type = 'lobby_message' then coalesce(lobby_message.content, 'Lobby message unavailable')
-      when r.reported_type = 'room_message' then coalesce(room_message.content, 'Room message unavailable')
       else null
     end,
     r.reported_type,
