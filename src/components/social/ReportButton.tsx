@@ -10,7 +10,7 @@ import { useUser } from '@/context/UserContext';
 import { toast } from 'sonner';
 
 interface ReportButtonProps {
-  reportedType: 'post' | 'comment' | 'message' | 'user';
+  reportedType: 'post' | 'comment' | 'message' | 'group_message' | 'lobby_message' | 'room_message' | 'user';
   reportedId: string;
   variant?: 'ghost' | 'outline' | 'default';
   size?: 'sm' | 'default' | 'icon';
@@ -21,6 +21,7 @@ const reportReasons = [
   { id: 'harassment', label: 'Harassment or bullying' },
   { id: 'inappropriate', label: 'Inappropriate content' },
   { id: 'violence', label: 'Violence or threats' },
+  { id: 'child_safety', label: 'Child safety concern' },
   { id: 'cheating', label: 'Cheating or unfair play' },
   { id: 'other', label: 'Other' }
 ];
