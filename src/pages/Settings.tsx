@@ -129,7 +129,7 @@ const Settings: React.FC = () => {
   };
 
   const handleDeleteAccount = async () => {
-    if (window.confirm("Delete your account and all associated data permanently? This cannot be undone.")) {
+    if (window.confirm("Submit a permanent account deletion request? School, parent, financial, and audit records may need handover or lawful retention review before deletion can be completed.")) {
       await deleteAccount();
     }
   };
@@ -470,7 +470,7 @@ const Settings: React.FC = () => {
                     onClick={handleDeleteAccount}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Account
+                    Request Account Deletion
                   </Button>
                 </CardContent>
               </Card>
