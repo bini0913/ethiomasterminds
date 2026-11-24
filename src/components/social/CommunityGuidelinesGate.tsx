@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
+import GuardianSocialAccessGate from "@/components/social/GuardianSocialAccessGate";
 
 const POLICY_KEY = "community_guidelines";
 const POLICY_VERSION = "2026-11-24-v1";
@@ -82,7 +83,8 @@ const CommunityGuidelinesGate: React.FC = () => {
     }
   };
 
-  if (!needsAcceptance || status === "idle" || status === "accepted") return null;
+  if (!needsAcceptance || status === "idle") return null;
+  if (status === "accepted") return <GuardianSocialAccessGate />;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4" role="presentation">
