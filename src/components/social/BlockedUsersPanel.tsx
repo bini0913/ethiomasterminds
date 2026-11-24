@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ShieldBan, UserRoundX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,7 @@ const BlockedUsersPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [unblockingId, setUnblockingId] = useState<string | null>(null);
 
-  const loadBlockedUsers = async () => {
+  const loadBlockedUsers = useCallback(async () => {
     if (!user?.id) {
       setBlockedUsers([]);
       setLoading(false);
@@ -28,7 +28,7 @@ const BlockedUsersPanel: React.FC = () => {
 
     setLoading(true);
     try {
-      const { data: blocks, error } = await supabase
+      const { data: blocks, error } = await (supabase as any)
         .from("user_blocks")
         .select("blocked_user_id, created_at")
         .eq("blocker_id", user.id)
@@ -41,7 +41,7 @@ const BlockedUsersPanel: React.FC = () => {
         return;
       }
 
-      const { data: profiles, error: profileError } = await supabase
+      const { data: profiles, error: profileError } = await (supabase as any)
         .from("profiles")
         .select("id, name, username")
         .in("id", ids);
@@ -73,7 +73,7 @@ const BlockedUsersPanel: React.FC = () => {
     if (!user?.id) return;
     setUnblockingId(blockedUserId);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("user_blocks")
         .delete()
         .eq("blocker_id", user.id)
