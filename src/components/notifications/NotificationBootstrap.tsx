@@ -62,6 +62,7 @@ export default function NotificationBootstrap() {
 
         const { data, error } = await supabase.functions.invoke("notification-action", { body: payload });
         if (error || data?.error || !data?.ok) {
+          handledActionIds.delete(actionId);
           toast.error(data?.error || error?.message || "Could not process notification action. Open Master Minds and try again.");
           return;
         }
@@ -79,7 +80,10 @@ export default function NotificationBootstrap() {
           toast.success("Reply sent.");
           window.dispatchEvent(new CustomEvent("master-minds-notification-route", { detail: "/friends" }));
         }
-      })().catch(() => toast.error("Could not process notification action."));
+      })().catch(() => {
+        handledActionIds.delete(actionId);
+        toast.error("Could not process notification action.");
+      });
       return true;
     };
 

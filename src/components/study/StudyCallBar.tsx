@@ -163,9 +163,15 @@ export default function StudyCallBar() {
   };
 
   const respond = async (invitation: Invitation, accept: boolean) => {
-    const { error } = await db.from("study_call_participants").update({ status: accept ? "accepted" : "declined", responded_at: new Date().toISOString() })
-      .eq("room_id", invitation.room_id).eq("user_id", user?.id);
-    if (error) { toast.error("Could not respond to invitation: " + error.message); return; }
+    const { data: updatedInvitation, error } = await db.from("study_call_participants")
+      .update({ status: accept ? "accepted" : "declined", responded_at: new Date().toISOString() })
+      .eq("room_id", invitation.room_id).eq("user_id", user?.id).eq("status", "invited")
+      .select("room_id").maybeSingle();
+    if (error || !updatedInvitation) {
+      toast.error(error ? "Could not respond to invitation: " + error.message : "This invitation has already been handled.");
+      await loadInvitations();
+      return;
+    }
     setIncoming((old) => old.filter((item) => item.room_id !== invitation.room_id));
     if (accept) await connect(invitation.room_id);
   };

@@ -68,11 +68,14 @@ Deno.serve(async (req) => {
       const { data: room, error: roomError } = await admin.from("study_call_rooms").select("id,ended_at")
         .eq("id", invite.room_id).maybeSingle();
       if (roomError || !room || room.ended_at) return json({ error: "This study call has ended." }, 409);
-      const { error: updateError } = await admin.from("study_call_participants").update({
+      const { data: updatedInvite, error: updateError } = await admin.from("study_call_participants").update({
         status: payload.action === "call_accept" ? "accepted" : "declined",
         responded_at: new Date().toISOString(),
-      }).eq("room_id", invite.room_id).eq("user_id", userId).eq("status", "invited");
-      if (updateError) return json({ error: "Could not respond to the call invitation." }, 409);
+      }).eq("room_id", invite.room_id).eq("user_id", userId).eq("status", "invited")
+        .select("room_id").maybeSingle();
+      if (updateError || !updatedInvite) {
+        return json({ error: "This call invitation has already been handled or could not be updated." }, 409);
+      }
       return json({ ok: true, action: payload.action, room_id: invite.room_id });
     }
 
