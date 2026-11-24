@@ -47,7 +47,7 @@ interface UserContextType {
   login: (email: string, password: string) => Promise<boolean>;
   loginWithUsername: (username: string, password: string) => Promise<UserProfile | null>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
-  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string, profileDetails?: { age: number; gender: "male" | "female"; avatar: string; guardianConsent?: boolean; guardianEmail?: string; learningGoal?: { id: string; minutes: number; xp: number }; academicStream?: "Natural Science" | "Social Science" }) => Promise<UserProfile | null>;
+  signupWithRole: (email: string, password: string, name: string, username: string, role: UserRole, grade?: string, profileDetails?: { age: number; gender: "male" | "female"; avatar: string; guardianEmail?: string; learningGoal?: { id: string; minutes: number; xp: number }; academicStream?: "Natural Science" | "Social Science" }) => Promise<UserProfile | null>;
   logout: () => Promise<void>;
   updateProfile: (profileData: EditableProfileData) => Promise<boolean>;
   addXP: (amount: number) => Promise<void>;
@@ -360,7 +360,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     username: string,
     role: UserRole,
     grade?: string,
-    profileDetails?: { age: number; gender: "male" | "female"; avatar: string; guardianConsent?: boolean; guardianEmail?: string; learningGoal?: { id: string; minutes: number; xp: number }; academicStream?: "Natural Science" | "Social Science" },
+    profileDetails?: { age: number; gender: "male" | "female"; avatar: string; guardianEmail?: string; learningGoal?: { id: string; minutes: number; xp: number }; academicStream?: "Natural Science" | "Social Science" },
   ): Promise<UserProfile | null> => {
     try {
       if (role !== 'student') {
@@ -405,7 +405,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           data: {
             name: name.trim(),
             username: username.trim().toLowerCase(),
-            ...(profileDetails ? { age: profileDetails.age, gender: profileDetails.gender, avatar: profileDetails.avatar, guardian_consent: profileDetails.guardianConsent ?? false, guardian_email: profileDetails.guardianEmail || null, ...(profileDetails.learningGoal ? { learning_goal: profileDetails.learningGoal } : {}), ...(profileDetails.academicStream ? { academic_stream: profileDetails.academicStream } : {}) } : {}),
+            ...(profileDetails ? { age: profileDetails.age, gender: profileDetails.gender, avatar: profileDetails.avatar, guardian_consent: false, guardian_email: profileDetails.guardianEmail || null, ...(profileDetails.learningGoal ? { learning_goal: profileDetails.learningGoal } : {}), ...(profileDetails.academicStream ? { academic_stream: profileDetails.academicStream } : {}) } : {}),
             ...(grade?.trim()
               ? {
                   grade: grade.trim(),
@@ -465,9 +465,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           profileFields.age = profileDetails.age;
           profileFields.gender = profileDetails.gender;
           profileFields.avatar = profileDetails.avatar;
-          profileFields.guardian_consent = profileDetails.guardianConsent ?? false;
+          profileFields.guardian_consent = false;
           profileFields.guardian_email = profileDetails.guardianEmail || null;
-          profileFields.consent_at = profileDetails.guardianConsent ? new Date().toISOString() : null;
+          profileFields.consent_at = null;
         }
         // Ensure the base row exists first (creates it if the trigger hasn't).
         await fetchUserProfile(data.user.id, data.user);
