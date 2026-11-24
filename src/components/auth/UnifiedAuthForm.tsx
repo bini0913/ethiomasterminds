@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeStorage } from "@/lib/safeStorage";
@@ -64,7 +64,6 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
   const [email, setEmail] = useState("");
   const [age, setAge] = useState("");
   const [guardianEmail, setGuardianEmail] = useState("");
-  const [guardianConsent, setGuardianConsent] = useState(false);
   const [gender, setGender] = useState<"male" | "female" | "">("");
   const [avatar, setAvatar] = useState("avatar-1");
   const [password, setPassword] = useState("");
@@ -156,7 +155,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
       toast.error("Enter a valid age.");
       return;
     }
-    if (parsedAge < 18 && (!guardianConsent || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim()))) {
+    if (parsedAge < 18 && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim()))) {
       toast.error("Learners under 18 need a valid guardian email and consent.");
       setStep(4);
       return;
@@ -169,7 +168,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     try {
       const profile = await signupWithRole(
         email.trim(), password, name.trim(), username.trim().toLowerCase(), "student", grade,
-        { age: parsedAge, gender, avatar, guardianConsent: parsedAge < 18 ? guardianConsent : false, guardianEmail: parsedAge < 18 ? guardianEmail.trim().toLowerCase() : undefined, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp }, academicStream: academicStream || undefined },
+        { age: parsedAge, gender, avatar, guardianConsent: false, guardianEmail: parsedAge < 18 ? guardianEmail.trim().toLowerCase() : undefined, learningGoal: { id: goal.id, minutes: goal.minutes, xp: goal.xp }, academicStream: academicStream || undefined },
       );
       if (profile) {
         safeStorage.setItem("masterminds_learning_goal", JSON.stringify({ id: goal.id, minutes: goal.minutes, xp: goal.xp, academicStream: academicStream || null }));
@@ -205,7 +204,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
     if (!Number.isInteger(Number(age)) || Number(age) < 3 || Number(age) > 120) {
       toast.error("Enter a valid age."); return;
     }
-    if (Number(age) < 18 && (!guardianConsent || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim()))) {
+    if (Number(age) < 18 && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim()))) {
       toast.error("Learners under 18 need a valid guardian email and consent."); return;
     }
     if (password.length < 8 || score < 3) {
@@ -407,14 +406,13 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
                 {Number(age) > 0 && Number(age) < 18 && (
                   <div className="space-y-3 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
                     <div>
-                      <p className="text-sm font-extrabold text-foreground">Guardian consent required</p>
-                      <p className="mt-1 text-xs font-medium text-muted-foreground">Learners under 18 need a guardian email and permission before an account can be created.</p>
+                      <p className="text-sm font-extrabold text-foreground">Parent or guardian approval</p>
+                      <p className="mt-1 text-xs font-medium text-muted-foreground">We will send a secure approval link to a separate parent or guardian email. Community features stay off until the guardian verifies their email and approves.</p>
                     </div>
-                    <input aria-label="Guardian email" type="email" autoComplete="email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} placeholder="Guardian email" className="mm-field" />
-                    <label className="flex items-start gap-3 text-xs font-semibold text-foreground">
-                      <input type="checkbox" checked={guardianConsent} onChange={(e) => setGuardianConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
-                      <span>I confirm that my parent or legal guardian has given permission for this account.</span>
-                    </label>
+                    <input aria-label="Parent or guardian email" type="email" autoComplete="off" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} placeholder="Parent or guardian email" className="mm-field" />
+                    {guardianEmail.trim() && guardianEmail.trim().toLowerCase() === email.trim().toLowerCase() && (
+                      <p className="text-xs font-semibold text-destructive">Use a different email address from the learner account.</p>
+                    )}
                   </div>
                 )}
                 <div>
@@ -470,6 +468,13 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
             )}
           </div>
         )}
+        <div className="px-5 pb-4 pt-3 text-center text-xs text-muted-foreground">
+          By continuing, you agree to the <Link className="font-semibold text-primary underline" to="/terms">Terms of Use</Link> and acknowledge the <Link className="font-semibold text-primary underline" to="/privacy">Privacy Policy</Link>.
+          <div className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1">
+            <Link className="hover:text-foreground" to="/child-safety">Child Safety Standards</Link>
+            <Link className="hover:text-foreground" to="/delete-account">Account deletion</Link>
+          </div>
+        </div>
       </form>
     </main>
   );

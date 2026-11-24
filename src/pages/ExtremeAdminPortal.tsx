@@ -36,6 +36,7 @@ type PortalReport = {
   id: string; reporter_id: string; reporter_name: string | null; reported_id: string | null;
   reported_name: string | null; reported_type: string; reason: string; description: string;
   status: string; created_at: string; reviewed_at: string | null; reviewed_by: string | null;
+  reported_content?: string;
 };
 type PortalBook = {
   id: string; title: string; author: string | null; subject: string | null;
@@ -46,6 +47,12 @@ type PortalPost = {
   id: string; author_id: string; author_name: string | null; content: string;
   post_type: string; image_url: string | null; created_at: string;
 };
+type DeletionRequest = {
+  id: string; user_id: string | null; requested_email: string; requested_username: string | null;
+  source: 'in_app' | 'external_email'; status: 'pending' | 'in_review' | 'completed' | 'rejected';
+  requested_at: string; reviewed_at: string | null; reviewed_by: string | null; resolution_note: string | null;
+};
+
 type FinanceOverview = {
   available?: boolean; accounts?: number; invoices?: number; payments?: number;
   transactions?: number; balance?: number;
@@ -61,6 +68,10 @@ const ExtremeAdminPortal: React.FC = () => {
   const [securitySummary, setSecuritySummary] = useState<Record<string, number>>({});
   const [schools, setSchools] = useState<PortalSchool[]>([]);
   const [reports, setReports] = useState<PortalReport[]>([]);
+  const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
+  const [externalDeletionEmail, setExternalDeletionEmail] = useState('');
+  const [externalDeletionUsername, setExternalDeletionUsername] = useState('');
+  const [externalDeletionNote, setExternalDeletionNote] = useState('');
   const [books, setBooks] = useState<PortalBook[]>([]);
   const [posts, setPosts] = useState<PortalPost[]>([]);
   const [financeOverview, setFinanceOverview] = useState<FinanceOverview>({});
@@ -102,6 +113,7 @@ const ExtremeAdminPortal: React.FC = () => {
         { data: bookData, error: booksError },
         { data: postData, error: postsError },
         { data: financeData, error: financeError },
+        { data: deletionRequestData, error: deletionRequestsError },
       ] = await Promise.all([
         supabase.rpc('extreme_admin_get_dashboard' as any),
         supabase.rpc('extreme_admin_list_users' as any, { p_limit: 300 }),
@@ -114,9 +126,10 @@ const ExtremeAdminPortal: React.FC = () => {
         supabase.rpc('extreme_admin_list_books' as any, { p_search: null, p_limit: 100, p_offset: 0 }),
         supabase.rpc('extreme_admin_list_posts' as any, { p_search: null, p_limit: 100, p_offset: 0 }),
         supabase.rpc('extreme_admin_finance_overview' as any),
+        supabase.rpc('extreme_admin_list_account_deletion_requests' as any, { p_status: null, p_limit: 200 }),
       ]);
 
-      const firstError = dashboardError || usersError || logsError || settingsError || securityError || schoolsError || superAdminError || reportsError || booksError || postsError || financeError;
+      const firstError = dashboardError || usersError || logsError || settingsError || securityError || schoolsError || superAdminError || reportsError || booksError || postsError || financeError || deletionRequestsError;
       if (firstError) throw firstError;
 
       setDashboard((dashboardData as Record<string, number>) || {});
@@ -125,10 +138,20 @@ const ExtremeAdminPortal: React.FC = () => {
       setSchools((schoolData as PortalSchool[]) || []);
       setSecuritySummary((securityData as Record<string, number>) || {});
       setSuperAdminUsers((superAdminData as PortalUser[]) || []);
-      setReports((reportData as PortalReport[]) || []);
+      const baseReports = (reportData as PortalReport[]) || [];
+      const { data: reportContext, error: reportContextError } = baseReports.length
+        ? await supabase.rpc('moderation_get_report_context' as any, { p_report_ids: baseReports.map((report) => report.id) })
+        : { data: [], error: null };
+      if (reportContextError) console.error('Could not load report content previews:', reportContextError);
+      const contextMap = new Map(((reportContext as any[]) || []).map((item: any) => [item.report_id, item.reported_content]));
+      setReports(baseReports.map((report) => ({
+        ...report,
+        reported_content: contextMap.get(report.id) || 'Reported content is unavailable',
+      })));
       setBooks((bookData as PortalBook[]) || []);
       setPosts((postData as PortalPost[]) || []);
       setFinanceOverview((financeData as FinanceOverview) || {});
+      setDeletionRequests((deletionRequestData as DeletionRequest[]) || []);
 
       const mappedSettings = (settingsData || []).reduce((acc: Record<string, boolean | number>, row: any) => {
         acc[row.setting_key] = typeof row.setting_value === 'number' ? row.setting_value : row.setting_value === true;
@@ -258,12 +281,12 @@ const ExtremeAdminPortal: React.FC = () => {
     await deleteBookById(bookId.trim());
   };
 
-  const updateReport = async (reportId: string, nextStatus: 'reviewed' | 'resolved' | 'dismissed') => {
-    const actionLabel = nextStatus === 'dismissed' ? 'dismiss this report' : nextStatus === 'resolved' ? 'resolve this report' : 'mark this report reviewed';
+  const updateReport = async (reportId: string, nextStatus: 'resolved' | 'dismissed') => {
+    const actionLabel = nextStatus === 'dismissed' ? 'dismiss this report' : 'resolve this report';
     if (!window.confirm(`Are you sure you want to ${actionLabel}?`)) return;
-    const { error } = await supabase.rpc('extreme_admin_set_report_status' as any, {
+    const { error } = await supabase.rpc('moderate_user_report' as any, {
       p_report_id: reportId,
-      p_status: nextStatus,
+      p_action: nextStatus,
       p_reason: statusReason.trim() || null,
     });
     if (error) return toast.error(error.message || 'Report could not be updated');
@@ -271,10 +294,55 @@ const ExtremeAdminPortal: React.FC = () => {
     await refreshAll();
   };
 
+  const enforceReportedAccount = async (report: PortalReport, action: 'remove_content' | 'suspend_user' | 'ban_user') => {
+    if (!statusReason.trim()) return toast.error('Enter a moderation reason first.');
+    const label = action === 'remove_content' ? 'remove the reported content' : action === 'suspend_user' ? 'suspend this account' : 'ban this account';
+    if (!window.confirm(`Are you sure you want to ${label}? This action will be recorded in the moderation audit log.`)) return;
+    const { error } = await supabase.rpc('moderate_user_report' as any, {
+      p_report_id: report.id,
+      p_action: action,
+      p_reason: statusReason.trim(),
+    });
+    if (error) return toast.error(error.message || 'Moderation action failed');
+    toast.success(action === 'remove_content' ? 'Reported content removed' : action === 'suspend_user' ? 'Account suspended' : 'Account banned');
+    await refreshAll();
+  };
+
   const filteredUsers = users.filter((item) => {
     const needle = userSearch.trim().toLowerCase();
     return !needle || item.name.toLowerCase().includes(needle) || (item.username || '').toLowerCase().includes(needle) || item.id.toLowerCase().includes(needle);
   });
+
+  const createExternalDeletionRequest = async () => {
+    if (!externalDeletionEmail.trim()) return toast.error('Enter the account email from the request.');
+    const { error } = await supabase.rpc('extreme_admin_create_external_deletion_request' as any, {
+      p_email: externalDeletionEmail.trim(),
+      p_username: externalDeletionUsername.trim() || null,
+      p_note: externalDeletionNote.trim() || null,
+    });
+    if (error) return toast.error(error.message || 'External deletion request could not be recorded');
+    setExternalDeletionEmail('');
+    setExternalDeletionUsername('');
+    setExternalDeletionNote('');
+    toast.success('External deletion request recorded.');
+    await refreshAll();
+  };
+
+  const updateDeletionRequest = async (request: DeletionRequest, nextStatus: 'in_review' | 'completed' | 'rejected') => {
+    if (nextStatus === 'completed' && request.user_id) {
+      return toast.error('Delete the account through the supported Auth Admin workflow first. Then refresh and mark this request complete.');
+    }
+    const note = statusReason.trim() || null;
+    if (nextStatus === 'rejected' && !note) return toast.error('Add a reason before rejecting a deletion request.');
+    const { error } = await supabase.rpc('extreme_admin_update_account_deletion_request' as any, {
+      p_request_id: request.id,
+      p_status: nextStatus,
+      p_note: note,
+    });
+    if (error) return toast.error(error.message || 'Deletion request could not be updated');
+    toast.success(`Deletion request marked ${nextStatus.replace('_', ' ')}`);
+    await refreshAll();
+  };
 
   const updateSetting = async (key: string, value: boolean) => {
     const { error } = await supabase.rpc('admin_set_setting' as any, {
@@ -376,6 +444,7 @@ const ExtremeAdminPortal: React.FC = () => {
             <TabsTrigger value="super-admin">Super Admin</TabsTrigger>
             <TabsTrigger value="schools">Schools</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="deletion-requests">Deletion Requests</TabsTrigger>
             <TabsTrigger value="finance">Finance</TabsTrigger>
             <TabsTrigger value="economy">Economy</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
@@ -527,18 +596,67 @@ const ExtremeAdminPortal: React.FC = () => {
                       </div>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{report.status}</span>
                     </div>
+                    <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reported {report.reported_type}</p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{report.reported_content || 'Reported content is unavailable'}</p>
+                    </div>
                     {report.description && <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{report.description}</p>}
-                    {report.status !== 'resolved' && report.status !== 'dismissed' && (
+                    {report.status === 'pending' && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <Button size="sm" variant="outline" onClick={() => void updateReport(report.id, 'reviewed')}>Mark reviewed</Button>
+                        {report.reported_type === 'user' ? <><Button size="sm" variant="destructive" onClick={() => void enforceReportedAccount(report, 'suspend_user')}>Suspend account</Button><Button size="sm" variant="destructive" onClick={() => void enforceReportedAccount(report, 'ban_user')}>Ban account</Button></> : <Button size="sm" variant="destructive" onClick={() => void enforceReportedAccount(report, 'remove_content')}>Remove content</Button>}
                         <Button size="sm" onClick={() => void updateReport(report.id, 'resolved')}>Resolve</Button>
-                        <Button size="sm" variant="destructive" onClick={() => void updateReport(report.id, 'dismissed')}>Dismiss</Button>
+                        <Button size="sm" variant="outline" onClick={() => void updateReport(report.id, 'dismissed')}>Dismiss</Button>
                       </div>
                     )}
                     <p className="mt-2 break-all text-[11px] text-slate-400">Report ID: {report.id}</p>
                   </div>
                 ))}
                 {!reports.length && <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No reports found in the latest 100 records.</p>}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="deletion-requests" className="space-y-4">
+            <Card className="border-slate-200 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><ShieldAlert className="h-5 w-5" />Account deletion requests</CardTitle>
+                <CardDescription>Only Extreme Admin can review global deletion requests. Mark a request complete only after the account and eligible personal data have been processed through the approved deletion workflow. School, finance and audit records may require limited retention.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-xl border border-slate-200 p-4 space-y-3">
+                  <h3 className="font-semibold text-slate-900">Record an external email request</h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1"><Label>Account email</Label><Input type="email" value={externalDeletionEmail} onChange={(e) => setExternalDeletionEmail(e.target.value)} placeholder="Email supplied by the requester" /></div>
+                    <div className="space-y-1"><Label>Username (optional)</Label><Input value={externalDeletionUsername} onChange={(e) => setExternalDeletionUsername(e.target.value)} placeholder="Master Minds username" /></div>
+                  </div>
+                  <div className="space-y-1"><Label>Support note (optional)</Label><Textarea value={externalDeletionNote} onChange={(e) => setExternalDeletionNote(e.target.value)} placeholder="Verification or request context; do not store passwords or verification codes." rows={2} /></div>
+                  <Button onClick={() => void createExternalDeletionRequest()}>Record external request</Button>
+                </div>
+
+                <div className="space-y-3">
+                  {deletionRequests.map((request) => (
+                    <div key={request.id} className="rounded-xl border border-slate-200 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-slate-900">{request.requested_email}</p>
+                          <p className="mt-1 text-xs text-slate-500">{request.requested_username ? `@${request.requested_username} · ` : ''}{request.source === 'in_app' ? 'In-app request' : 'External email request'} · {new Date(request.requested_at).toLocaleString()}</p>
+                        </div>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{request.status.replace('_', ' ')}</span>
+                      </div>
+                      {request.resolution_note && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{request.resolution_note}</p>}
+                      <p className="mt-2 text-xs text-slate-500">{request.user_id ? 'Account still exists; verify identity, review record retention, and process deletion before completion.' : 'No linked Auth account remains. Verify the request outcome before closing it.'}</p>
+                      {request.status !== 'completed' && request.status !== 'rejected' && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {request.status === 'pending' && <Button size="sm" variant="outline" onClick={() => void updateDeletionRequest(request, 'in_review')}>Mark in review</Button>}
+                          <Button size="sm" variant="destructive" onClick={() => void updateDeletionRequest(request, 'rejected')}>Reject request</Button>
+                          <Button size="sm" disabled={!!request.user_id} onClick={() => void updateDeletionRequest(request, 'completed')}>Mark completed</Button>
+                        </div>
+                      )}
+                      <p className="mt-2 break-all text-[11px] text-slate-400">Request ID: {request.id}</p>
+                    </div>
+                  ))}
+                  {!deletionRequests.length && <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No account deletion requests found.</p>}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

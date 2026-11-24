@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
 import { useFriends, type FriendPresence } from "@/context/FriendsContext";
+import { useCommunityTerms } from "@/context/CommunityTermsContext";
 
 declare global {
   interface Window {
@@ -20,6 +21,7 @@ type Friend = { id: string; name?: string; username?: string };
 
 export default function StudyCallBar() {
   const { user } = useUser();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const { friends, onlineFriends, friendPresence, refreshFriends, loading: friendsLoading } = useFriends();
   const [expanded, setExpanded] = useState(true);
   const [selectedFriend, setSelectedFriend] = useState("");
@@ -139,41 +141,49 @@ export default function StudyCallBar() {
 
   const startCall = async () => {
     if (!selectedFriend) { toast.error("Choose a friend first."); return; }
-    setConnecting(true);
-    try {
-      // Use the authenticated Supabase identity for RLS checks, not cached profile state.
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      const authUser = authData.user;
-      if (authError || !authUser?.id) throw new Error("Your sign-in session is unavailable. Please log out and sign in again.");
-      const { data: createdRoomId, error: inviteError } = await db.rpc("create_study_call_invite", { _friend_id: selectedFriend });
-      if (inviteError || !createdRoomId) {
-        const detail = inviteError?.message || "The server did not return a call room.";
-        if (/permission denied|row-level security|42501/i.test(detail)) throw new Error("The database denied creating the call invitation. Refresh and sign in again. Details: " + detail);
-        throw new Error("Could not invite friend: " + detail);
+    await runWithCommunityTerms(async () => {
+      setConnecting(true);
+      try {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        const authUser = authData.user;
+        if (authError || !authUser?.id) throw new Error("Your sign-in session is unavailable. Please log out and sign in again.");
+        const { data: createdRoomId, error: inviteError } = await db.rpc("create_study_call_invite", { _friend_id: selectedFriend });
+        if (inviteError || !createdRoomId) {
+          const detail = inviteError?.message || "The server did not return a call room.";
+          if (/permission denied|row-level security|42501/i.test(detail)) throw new Error("The database denied creating the call invitation. Refresh and sign in again. Details: " + detail);
+          throw new Error("Could not invite friend: " + detail);
+        }
+        setOutgoingRoomId(createdRoomId);
+        setCallStatus("Ringing your friend…");
+        const { error: pushError } = await supabase.functions.invoke("send-push-notification", {
+          body: { kind: "study_call_invite", event_id: createdRoomId },
+        });
+        if (pushError) console.warn("Study call push could not be sent:", pushError.message);
+        await connect(createdRoomId, true);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Could not start call.");
+      } finally {
+        setConnecting(false);
       }
-      setOutgoingRoomId(createdRoomId);
-      setCallStatus("Ringing your friend…");
-      const { error: pushError } = await supabase.functions.invoke("send-push-notification", {
-        body: { kind: "study_call_invite", event_id: createdRoomId },
-      });
-      if (pushError) console.warn("Study call push could not be sent:", pushError.message);
-      await connect(createdRoomId, true);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start call."); }
-    finally { setConnecting(false); }
+    }, 'calls');
   };
 
   const respond = async (invitation: Invitation, accept: boolean) => {
-    const { data: updatedInvitation, error } = await db.from("study_call_participants")
-      .update({ status: accept ? "accepted" : "declined", responded_at: new Date().toISOString() })
-      .eq("room_id", invitation.room_id).eq("user_id", user?.id).eq("status", "invited")
-      .select("room_id").maybeSingle();
-    if (error || !updatedInvitation) {
-      toast.error(error ? "Could not respond to invitation: " + error.message : "This invitation has already been handled.");
-      await loadInvitations();
-      return;
-    }
-    setIncoming((old) => old.filter((item) => item.room_id !== invitation.room_id));
-    if (accept) await connect(invitation.room_id);
+    const performResponse = async () => {
+      const { data: updatedInvitation, error } = await db.from("study_call_participants")
+        .update({ status: accept ? "accepted" : "declined", responded_at: new Date().toISOString() })
+        .eq("room_id", invitation.room_id).eq("user_id", user?.id).eq("status", "invited")
+        .select("room_id").maybeSingle();
+      if (error || !updatedInvitation) {
+        toast.error(error ? "Could not respond to invitation: " + error.message : "This invitation has already been handled.");
+        await loadInvitations();
+        return;
+      }
+      setIncoming((old) => old.filter((item) => item.room_id !== invitation.room_id));
+      if (accept) await connect(invitation.room_id);
+    };
+    if (accept) await runWithCommunityTerms(performResponse, 'calls');
+    else await performResponse();
   };
 
   const leave = useCallback(async (finalStatus = "Call ended") => {

@@ -34,6 +34,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
+  // Suspended, banned and purged accounts cannot enter protected app workflows.
+  if (user.accountStatus && user.accountStatus !== "active") {
+    return <Navigate to="/account-restricted" state={{ status: user.accountStatus }} replace />;
+  }
+
   // Check role requirements if specified
   if (allowedRoles && allowedRoles.length > 0) {
     if (!allowedRoles.includes(user.role)) {

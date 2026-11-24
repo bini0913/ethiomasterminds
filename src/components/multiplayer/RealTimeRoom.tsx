@@ -30,6 +30,8 @@ import { supabase } from '@/integrations/supabase/client';
 import AvatarRenderer from '@/components/avatar/AvatarRenderer';
 import { useFriends } from '@/context/FriendsContext';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ReportButton from '@/components/social/ReportButton';
+import BlockUserButton from '@/components/social/BlockUserButton';
 
 interface Player {
   id: string;
@@ -1327,6 +1329,16 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
                         <div key={msg.id} className={cn('p-2 rounded-lg text-sm', msg.senderId === currentUserId ? 'bg-cyan-500/15' : 'bg-white/10')}>
                           <div className="flex items-center gap-1 mb-1">
                             <span className="font-medium text-xs">{msg.sender}</span>
+                            {msg.senderId !== currentUserId && (
+                              <div className="ml-auto flex items-center">
+                                <ReportButton reportedType="room_message" reportedId={msg.id} size="icon" />
+                                <BlockUserButton
+                                  userId={msg.senderId}
+                                  displayName={msg.sender}
+                                  onBlocked={() => setMessages((current) => current.filter((item) => item.senderId !== msg.senderId))}
+                                />
+                              </div>
+                            )}
                           </div>
                           <p>{msg.content}</p>
                         </div>

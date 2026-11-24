@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from './UserContext';
 import { toast } from 'sonner';
+import { useCommunityTerms } from '@/context/CommunityTermsContext';
 
 export interface ChatGroup {
   id: string;
@@ -61,6 +62,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [currentGroup, setCurrentGroup] = useState<ChatGroup | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
@@ -243,52 +245,46 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const createGroup = async (name: string, description?: string, type: string = 'private'): Promise<ChatGroup | null> => {
     if (!user?.id) return null;
-
-    try {
-      const { data, error } = await supabase.rpc('create_chat_group', {
-        p_name: name,
-        p_description: description,
-        p_group_type: type,
-      });
-
-      if (error) throw error;
-
-      const newGroup: ChatGroup = {
-        ...data,
-        group_type: data.group_type as ChatGroup['group_type'],
-        member_count: 1
-      };
-
-      setGroups(prev => [newGroup, ...prev]);
-      toast.success('Group created!');
-      return newGroup;
-    } catch (err) {
-      console.error('Error creating group:', err);
-      toast.error('Failed to create group');
-      return null;
-    }
+    let createdGroup: ChatGroup | null = null;
+    await runWithCommunityTerms(async () => {
+      try {
+        const { data, error } = await supabase.rpc('create_chat_group', {
+          p_name: name,
+          p_description: description,
+          p_group_type: type,
+        });
+        if (error) throw error;
+        createdGroup = {
+          ...data,
+          group_type: data.group_type as ChatGroup['group_type'],
+          member_count: 1
+        };
+        setGroups(prev => [createdGroup as ChatGroup, ...prev]);
+        toast.success('Group created!');
+      } catch (err) {
+        console.error('Error creating group:', err);
+        toast.error('Failed to create group');
+      }
+    }, 'social');
+    return createdGroup;
   };
 
   const joinGroup = async (groupId: string) => {
     if (!user?.id) return;
-
-    try {
-      const { error } = await supabase.rpc('join_chat_group', {
-        p_group_id: groupId,
-      });
-
-      if (error) throw error;
-
-      await fetchGroups();
-      toast.success('Joined group!');
-    } catch (err: any) {
-      if (err.code === '23505') {
-        toast.info('You are already a member of this group');
-      } else {
-        console.error('Error joining group:', err);
-        toast.error('Failed to join group');
+    await runWithCommunityTerms(async () => {
+      try {
+        const { error } = await supabase.rpc('join_chat_group', { p_group_id: groupId });
+        if (error) throw error;
+        await fetchGroups();
+        toast.success('Joined group!');
+      } catch (err: any) {
+        if (err.code === '23505') toast.info('You are already a member of this group');
+        else {
+          console.error('Error joining group:', err);
+          toast.error(err?.message || 'Failed to join group');
+        }
       }
-    }
+    }, 'social');
   };
 
   const leaveGroup = async (groupId: string) => {
@@ -315,45 +311,41 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   const sendMessage = async (content: string, replyToId?: string) => {
     if (!user?.id || !currentGroup || !content.trim()) return;
-
-    try {
-      const { error } = await supabase.rpc('send_group_message', {
-        p_group_id: currentGroup.id,
-        p_content: content.trim(),
-        p_message_type: 'text',
-        p_reply_to_id: replyToId || null,
-      });
-
-      if (error) throw error;
-    } catch (err) {
-      console.error('Error sending message:', err);
-      toast.error('Failed to send message');
-    }
+    await runWithCommunityTerms(async () => {
+      try {
+        const { error } = await supabase.rpc('send_group_message', {
+          p_group_id: currentGroup.id,
+          p_content: content.trim(),
+          p_message_type: 'text',
+          p_reply_to_id: replyToId || null,
+        });
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error sending message:', err);
+        toast.error(err?.message || 'Failed to send message');
+      }
+    }, 'direct_messages');
   };
 
   const addMember = async (groupId: string, userId: string) => {
     if (!user?.id) return;
-
-    try {
-      const { error } = await supabase.rpc('add_chat_group_member', {
-        p_group_id: groupId,
-        p_user_id: userId,
-      });
-
-      if (error) throw error;
-
-      if (currentGroup?.id === groupId) {
-        await fetchMembers(groupId);
+    await runWithCommunityTerms(async () => {
+      try {
+        const { error } = await supabase.rpc('add_chat_group_member', {
+          p_group_id: groupId,
+          p_user_id: userId,
+        });
+        if (error) throw error;
+        if (currentGroup?.id === groupId) await fetchMembers(groupId);
+        toast.success('Member added!');
+      } catch (err: any) {
+        if (err.code === '23505') toast.info('User is already a member');
+        else {
+          console.error('Error adding member:', err);
+          toast.error(err?.message || 'Failed to add member');
+        }
       }
-      toast.success('Member added!');
-    } catch (err: any) {
-      if (err.code === '23505') {
-        toast.info('User is already a member');
-      } else {
-        console.error('Error adding member:', err);
-        toast.error('Failed to add member');
-      }
-    }
+    }, 'social');
   };
 
   const searchGroups = async (query: string): Promise<ChatGroup[]> => {
