@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(22);
+select plan(23);
 
 select ok((select relrowsecurity from pg_class where oid='public.guardian_consent_requests'::regclass), 'guardian consent requests have RLS enabled');
 select ok((select relrowsecurity from pg_class where oid='public.guardian_social_controls'::regclass), 'guardian social controls have RLS enabled');
@@ -8,7 +8,7 @@ select ok(not has_table_privilege('authenticated','public.guardian_consent_reque
 select ok(not has_table_privilege('authenticated','public.guardian_social_controls','select'), 'students and guardians cannot query control rows directly');
 select ok(has_function_privilege('authenticated','public.request_guardian_consent()','execute'), 'students can request verified guardian approval');
 select ok(not has_function_privilege('anon','public.request_guardian_consent()','execute'), 'anonymous users cannot request guardian approval');
-select ok(has_function_privilege('authenticated','public.approve_guardian_consent(uuid)','execute'), 'verified guardian sessions can approve a request');
+select ok(has_function_privilege('authenticated','public.approve_guardian_consent(uuid,boolean)','execute'), 'verified guardian sessions can approve a request');
 select ok(has_function_privilege('authenticated','public.get_my_social_access()','execute'), 'learners can read only their own social access flags');
 select ok(has_function_privilege('authenticated','public.get_my_guardian_students()','execute'), 'guardians can list only their linked learners');
 select ok(has_function_privilege('authenticated','public.update_guardian_social_controls(uuid,boolean,boolean,boolean,boolean,boolean,boolean)','execute'), 'guardians can update granular social controls');
