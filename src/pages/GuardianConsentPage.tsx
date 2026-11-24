@@ -14,6 +14,7 @@ const GuardianConsentPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
   const [sent, setSent] = useState(false);
   const [approved, setApproved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +50,7 @@ const GuardianConsentPage: React.FC = () => {
     try {
       const { error: approvalError } = await (supabase as any).rpc("approve_guardian_consent", {
         p_request_id: requestId,
+        p_is_adult_guardian: adultConfirmed,
       });
       if (approvalError) throw approvalError;
       setApproved(true);
@@ -92,7 +94,11 @@ const GuardianConsentPage: React.FC = () => {
                 <div className="rounded-lg border p-4 text-sm text-muted-foreground">
                   All social controls start turned off. You can enable or revoke individual features at any time from Guardian Controls.
                 </div>
-                <Button className="w-full" onClick={() => void approve()} disabled={approving}>
+                <label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
+                  <input type="checkbox" checked={adultConfirmed} onChange={(event) => setAdultConfirmed(event.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+                  <span>I confirm that I am at least 18 years old and am the parent or legal guardian responsible for this learner.</span>
+                </label>
+                <Button className="w-full" onClick={() => void approve()} disabled={approving || !adultConfirmed}>
                   {approving ? "Verifying approval…" : "Approve as parent or guardian"}
                 </Button>
               </>
