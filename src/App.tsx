@@ -342,7 +342,7 @@ const App = () => (
                               <Route path="/" element={<Index />} />
                               <Route path="/community-guidelines" element={<CommunityGuidelinesPage />} />
                               <Route path="/delete-account" element={<DeleteAccountPage />} />
-                              <Route path="/guardian-consent" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "parent", "finance", "super_admin", "extreme_admin"]}><GuardianConsentPage /></ProtectedRoute>} />
+                              <Route path="/guardian-consent" element={<GuardianConsentPage />} />
                               <Route path="/guardian-controls" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "parent", "finance", "super_admin", "extreme_admin"]}><GuardianControlsPage /></ProtectedRoute>} />
                               <Route path="/guardian-consent-request" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "parent", "finance", "super_admin", "extreme_admin"]}><GuardianConsentRequestPage /></ProtectedRoute>} />
                               <Route path="/quiz" element={<EarlyTierRestrictedRoute><ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Quiz /></ProtectedRoute></EarlyTierRestrictedRoute>} />
