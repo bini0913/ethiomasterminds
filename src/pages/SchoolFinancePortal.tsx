@@ -156,13 +156,13 @@ export default function SchoolFinancePortal() {
 
   const reportUnpaid = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!followupInvoiceId || !followupNote.trim()) return toast.error("Choose an invoice and explain why Admin follow-up is needed.");
+    if (!followupInvoiceId || !followupNote.trim()) return toast.error("Choose an invoice and explain why Manager follow-up is needed.");
     const { error } = await db.rpc("school_report_unpaid_invoice_to_admin", {
       p_invoice_id: followupInvoiceId, p_note: followupNote.trim(),
     });
     if (error) return toast.error(error.message);
     setFollowupNote("");
-    toast.success("Unpaid invoice reported to the School Admin.");
+    toast.success("Unpaid invoice reported to the School Manager.");
     await load();
   };
 
@@ -183,7 +183,7 @@ export default function SchoolFinancePortal() {
         <SchoolMetric label="Outstanding balance" value={outstandingSummary} detail={`${outstandingInvoices.length} unpaid or partial invoices`} icon={Wallet} />
         <SchoolMetric label="Confirmed payments" value={confirmedSummary} detail={`${confirmedPayments.length} confirmed receipts`} icon={CreditCard} />
         <SchoolMetric label="Invoices issued" value={invoices.length} detail="School invoice ledger" icon={Receipt} />
-        <SchoolMetric label="Unpaid follow-ups" value={followups.filter((item) => item.status !== "resolved").length} detail="Reported to School Admin" icon={ClipboardList} />
+        <SchoolMetric label="Unpaid follow-ups" value={followups.filter((item) => item.status !== "resolved").length} detail="Reported to School Manager" icon={ClipboardList} />
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <SchoolPanel title="Recent payments">
@@ -248,16 +248,16 @@ export default function SchoolFinancePortal() {
 
   const renderFollowups = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Unpaid invoice follow-ups" description="Report unpaid invoices to School Admin so they can address student or family follow-up." />
+      <SchoolPageHeading title="Unpaid invoice follow-ups" description="Report unpaid invoices to School Manager so they can address student or family follow-up." />
       <SchoolPanel title="Report an unpaid invoice">
         <form onSubmit={reportUnpaid} className="grid gap-3 md:grid-cols-2">
           <SchoolField label="Invoice"><select className={schoolSelectClass} value={followupInvoiceId} onChange={(event) => setFollowupInvoiceId(event.target.value)}><option value="">Choose invoice</option>{outstandingInvoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.invoice_number} · {memberName(invoice.student_membership_id)}</option>)}</select></SchoolField>
-          <SchoolField label="Reason for Admin follow-up"><input className={schoolInputClass} value={followupNote} onChange={(event) => setFollowupNote(event.target.value)} placeholder="Explain the follow-up needed" /></SchoolField>
-          <div className="md:col-span-2"><SchoolPrimaryButton type="submit">Report to School Admin</SchoolPrimaryButton></div>
+          <SchoolField label="Reason for Manager follow-up"><input className={schoolInputClass} value={followupNote} onChange={(event) => setFollowupNote(event.target.value)} placeholder="Explain the follow-up needed" /></SchoolField>
+          <div className="md:col-span-2"><SchoolPrimaryButton type="submit">Report to School Manager</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
       <SchoolPanel title="Follow-up history">
-        {followups.length ? <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Invoice</th><th className="pb-2">Student</th><th className="pb-2">Reported by</th><th className="pb-2">Note</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{followups.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800">{invoiceFor(item.invoice_id)?.invoice_number}</td><td className="py-3 text-slate-600">{memberName(item.student_membership_id)}</td><td className="py-3 text-slate-600">{memberName(item.submitted_by_membership_id)}</td><td className="py-3 text-slate-600">{item.note}</td><td className="py-3"><SchoolStatus value={item.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No follow-ups reported" description="Reports sent to the School Admin will appear here." />}
+        {followups.length ? <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Invoice</th><th className="pb-2">Student</th><th className="pb-2">Reported by</th><th className="pb-2">Note</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{followups.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800">{invoiceFor(item.invoice_id)?.invoice_number}</td><td className="py-3 text-slate-600">{memberName(item.student_membership_id)}</td><td className="py-3 text-slate-600">{memberName(item.submitted_by_membership_id)}</td><td className="py-3 text-slate-600">{item.note}</td><td className="py-3"><SchoolStatus value={item.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No follow-ups reported" description="Reports sent to the School Manager will appear here." />}
       </SchoolPanel>
     </div>
   );

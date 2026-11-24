@@ -144,7 +144,7 @@ export default function SchoolStudentPortal() {
 
   const createConversation = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newContactId) return toast.error("Choose a teacher or School Admin.");
+    if (!newContactId) return toast.error("Choose a teacher or School Manager.");
     const { data, error } = await db.rpc("school_create_conversation", {
       p_school_id: schoolId,
       p_conversation_type: "direct",
@@ -208,8 +208,8 @@ export default function SchoolStudentPortal() {
 
   const renderResults = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="My academic results" description="Only official results published by your School Admin appear here." />
-      {results.length ? <SchoolPanel title="Published report card"><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Term</th><th className="pb-2">Subject</th><th className="pb-2">Average</th><th className="pb-2">Letter grade</th><th className="pb-2">Rank</th></tr></thead><tbody className="divide-y divide-slate-100">{results.map((result) => <tr key={result.id}><td className="py-3 text-slate-600">{termName(result.term_id)}</td><td className="py-3 font-medium text-slate-800">{result.subject_name}</td><td className="py-3 tabular-nums text-slate-700">{result.average_score ?? "—"}</td><td className="py-3 text-slate-600">{result.letter_grade || "—"}</td><td className="py-3 tabular-nums text-slate-600">{result.rank_position ?? "—"}</td></tr>)}</tbody></table></div></SchoolPanel> : <SchoolEmptyState title="No results published yet" description="Your official averages and ranks will appear after the School Admin publishes them." />}
+      <SchoolPageHeading title="My academic results" description="Only official results published by an authorized academic leader appear here." />
+      {results.length ? <SchoolPanel title="Published report card"><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Term</th><th className="pb-2">Subject</th><th className="pb-2">Average</th><th className="pb-2">Letter grade</th><th className="pb-2">Rank</th></tr></thead><tbody className="divide-y divide-slate-100">{results.map((result) => <tr key={result.id}><td className="py-3 text-slate-600">{termName(result.term_id)}</td><td className="py-3 font-medium text-slate-800">{result.subject_name}</td><td className="py-3 tabular-nums text-slate-700">{result.average_score ?? "—"}</td><td className="py-3 text-slate-600">{result.letter_grade || "—"}</td><td className="py-3 tabular-nums text-slate-600">{result.rank_position ?? "—"}</td></tr>)}</tbody></table></div></SchoolPanel> : <SchoolEmptyState title="No results published yet" description="Your official averages and ranks will appear after the School Manager publishes them." />}
     </div>
   );
 
@@ -260,8 +260,8 @@ export default function SchoolStudentPortal() {
 
   const renderQuizzes = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="School quizzes" description="Quizzes approved by your School Admin for your section." />
-      {quizzes.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{quizzes.map((quiz) => <SchoolPanel key={quiz.id} title={quiz.title} description={`${quiz.subject} · ${quiz.difficulty}`}><p className="text-sm text-slate-600">{quiz.description}</p><p className="mt-2 text-xs text-slate-500">{quiz.time_limit} minute time limit</p><SchoolStatus value="approved" /></SchoolPanel>)}</div> : <SchoolEmptyState title="No approved quizzes" description="Your teachers' quizzes will appear after School Admin approval." />}
+      <SchoolPageHeading title="School quizzes" description="Quizzes approved by an authorized academic leader for your section." />
+      {quizzes.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{quizzes.map((quiz) => <SchoolPanel key={quiz.id} title={quiz.title} description={`${quiz.subject} · ${quiz.difficulty}`}><p className="text-sm text-slate-600">{quiz.description}</p><p className="mt-2 text-xs text-slate-500">{quiz.time_limit} minute time limit</p><SchoolStatus value="approved" /></SchoolPanel>)}</div> : <SchoolEmptyState title="No approved quizzes" description="Your teachers' quizzes will appear after academic leadership approval." />}
     </div>
   );
 
@@ -274,10 +274,10 @@ export default function SchoolStudentPortal() {
 
   const renderMessages = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Messages" description="Contact teachers assigned to your class or your School Admin." />
+      <SchoolPageHeading title="Messages" description="Contact teachers assigned to your class or your School Manager." />
       <SchoolPanel title="Start a conversation">
         <form onSubmit={createConversation} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="w-full max-w-sm"><SchoolField label="Teacher or School Admin"><select className={schoolSelectClass} value={newContactId} onChange={(event) => setNewContactId(event.target.value)}><option value="">Choose contact</option>{contacts.map((contact) => <option key={contact.contact_membership_id} value={contact.contact_membership_id}>{contact.contact_name} · {contact.contact_role}{contact.subject_name ? ` · ${contact.subject_name}` : ""}</option>)}</select></SchoolField></div>
+          <div className="w-full max-w-sm"><SchoolField label="Teacher or School Manager"><select className={schoolSelectClass} value={newContactId} onChange={(event) => setNewContactId(event.target.value)}><option value="">Choose contact</option>{contacts.map((contact) => <option key={contact.contact_membership_id} value={contact.contact_membership_id}>{contact.contact_name} · {contact.contact_role}{contact.subject_name ? ` · ${contact.subject_name}` : ""}</option>)}</select></SchoolField></div>
           <SchoolPrimaryButton type="submit">Start conversation</SchoolPrimaryButton>
         </form>
       </SchoolPanel>

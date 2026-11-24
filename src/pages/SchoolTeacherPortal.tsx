@@ -345,7 +345,7 @@ export default function SchoolTeacherPortal() {
     if (!selectedAssessmentId) return toast.error("Choose an assessment first.");
     const { error } = await db.rpc("school_submit_assessment", { p_assessment_id: selectedAssessmentId });
     if (error) return toast.error(error.message);
-    toast.success("Assessment and marks submitted to the School Admin for review.");
+    toast.success("Assessment and marks submitted to the authorized academic leader for review.");
     await load();
   };
 
@@ -353,7 +353,7 @@ export default function SchoolTeacherPortal() {
   const updateQuestion = (key: number, patch: Partial<QuizQuestionDraft>) => setQuizQuestions((current) => current.map((question) => question.key === key ? { ...question, ...patch } : question));
   const createQuiz = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (activeMembership?.question_submission_suspended) return toast.error(activeMembership.question_submission_suspension_reason || "Question submissions are temporarily suspended by the School Admin.");
+    if (activeMembership?.question_submission_suspended) return toast.error(activeMembership.question_submission_suspension_reason || "Question submissions are temporarily suspended by the School Manager.");
     const section = sections.find((item) => item.id === quizSectionId);
     const assigned = assignmentsForSection(quizSectionId).some((assignment) => assignment.assignment_kind === "subject" && assignment.subject_name === quizSubject);
     if (!section || !assigned || !quizTitle.trim() || !quizQuestions.length) return toast.error("Choose an assigned subject and complete the quiz title.");
@@ -383,7 +383,7 @@ export default function SchoolTeacherPortal() {
     const { error: submitError } = await db.rpc("school_submit_quiz", { p_quiz_id: quiz.id });
     if (submitError) return toast.error(submitError.message);
     setQuizTitle(""); setQuizDescription(""); setQuizQuestions([blankQuestion()]);
-    toast.success("Quiz submitted to the School Admin for approval.");
+    toast.success("Quiz submitted to an authorized academic leader for approval.");
     await load();
   };
 
@@ -400,7 +400,7 @@ export default function SchoolTeacherPortal() {
     const { error: submitError } = await db.rpc("school_submit_homework", { p_homework_id: data.id });
     if (submitError) return toast.error(submitError.message);
     setHomeworkTitle(""); setHomeworkInstructions(""); setHomeworkDueAt("");
-    toast.success("Homework submitted for School Admin approval.");
+    toast.success("Homework submitted for authorized academic leader approval.");
     await load();
   };
 
@@ -431,7 +431,7 @@ export default function SchoolTeacherPortal() {
         uploaderId: user.id, uploaderRole: "teacher",
         schoolSubmission: { schoolId: schoolId!, sectionId: section.id },
       });
-      toast.success("Resource uploaded and sent to the School Admin for approval.");
+      toast.success("Resource uploaded and sent to an authorized academic leader for approval.");
       setBookTitle(""); setBookAuthor(""); setBookDescription(""); setBookFile(null);
       await load();
     } catch (error: any) {
@@ -604,13 +604,13 @@ export default function SchoolTeacherPortal() {
     <div className="space-y-5">
       <SchoolPageHeading title="My classes" description="Only students in your assigned sections are included in your class records." />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{assignedSections.map((section) => <SchoolPanel key={section.id} title={sectionLabel(section.id)} description={`${assignedStudents.filter((student) => student.section_id === section.id).length} active students`}><div className="space-y-2">{assignmentsForSection(section.id).map((assignment) => <div key={assignment.id} className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2"><span className="text-sm text-slate-700">{assignment.subject_name}</span><SchoolStatus value={assignment.assignment_kind} /></div>)}</div></SchoolPanel>)}</div>
-      {!assignedSections.length && <SchoolEmptyState title="No assigned classes" description="Your class list will appear after the School Manager assigns your sections." />}
+      {!assignedSections.length && <SchoolEmptyState title="No assigned classes" description="Your class list will appear after your Division Director assigns your sections." />}
     </div>
   );
 
   const renderAssessments = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Assessments & marks" description="Create class activities, tests, and exam assessments. Save marks as drafts, then submit the assessment to the School Admin for verification." />
+      <SchoolPageHeading title="Assessments & marks" description="Create class activities, tests, and exam assessments. Save marks as drafts, then submit the assessment to an authorized academic leader for verification." />
       <SchoolPanel title="Create assessment">
         <form onSubmit={createAssessment} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SchoolField label="Assessment title"><input className={schoolInputClass} value={assessmentTitle} onChange={(event) => setAssessmentTitle(event.target.value)} placeholder="Chapter 1 test" /></SchoolField>
@@ -627,20 +627,20 @@ export default function SchoolTeacherPortal() {
       <SchoolPanel title="Enter student marks" description="Choose one of your draft or rejected assessments, enter scores, and save.">
         <div className="mb-4 max-w-md"><SchoolField label="Assessment"><select className={schoolSelectClass} value={selectedAssessmentId} onChange={(event) => setSelectedAssessmentId(event.target.value)}><option value="">Choose assessment</option>{assessments.filter((item) => ["draft", "rejected"].includes(item.status)).map((item) => <option key={item.id} value={item.id}>{item.title} · {sectionLabel(item.section_id)}</option>)}</select></SchoolField></div>
         {selectedAssessmentId ? <div className="space-y-3">{assignedStudents.filter((student) => student.section_id === assessments.find((item) => item.id === selectedAssessmentId)?.section_id).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)] sm:items-center"><div><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><p className="text-xs text-slate-500">{student.school_username}</p></div><SchoolField label="Score"><input type="number" min="0" max={assessments.find((item) => item.id === selectedAssessmentId)?.max_score || 100} step="0.5" className={schoolInputClass} value={markValues[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.score ?? ""} onChange={(event) => setMarkValues((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField><SchoolField label="Teacher note"><input className={schoolInputClass} value={markNotes[student.id] ?? marks.find((mark) => mark.assessment_id === selectedAssessmentId && mark.student_membership_id === student.id)?.teacher_note ?? ""} onChange={(event) => setMarkNotes((current) => ({ ...current, [student.id]: event.target.value }))} /></SchoolField></div>)}
-          <div className="flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void saveMarks()}>Save draft marks</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void submitAssessment()}>Submit for Admin review</SchoolSecondaryButton></div>
+          <div className="flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void saveMarks()}>Save draft marks</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void submitAssessment()}>Submit for authorized academic leader review</SchoolSecondaryButton></div>
         </div> : <SchoolEmptyState title="Choose an assessment" description="Student mark entry will appear after you select a draft or rejected assessment." />}
       </SchoolPanel>
       <SchoolPanel title="Your assessment records">
-        {assessments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Marks</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{assessments.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800"><p>{item.title}</p>{item.review_feedback && <p className="mt-1 text-xs font-normal text-amber-700">Admin feedback: {item.review_feedback}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(item.section_id)}</td><td className="py-3 text-slate-600">{item.subject_name}</td><td className="py-3 tabular-nums text-slate-600">{marks.filter((mark) => mark.assessment_id === item.id).length}</td><td className="py-3"><SchoolStatus value={item.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No assessments yet" description="Create your first assessment above." />}
+        {assessments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Marks</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{assessments.map((item) => <tr key={item.id}><td className="py-3 font-medium text-slate-800"><p>{item.title}</p>{item.review_feedback && <p className="mt-1 text-xs font-normal text-amber-700">Manager feedback: {item.review_feedback}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(item.section_id)}</td><td className="py-3 text-slate-600">{item.subject_name}</td><td className="py-3 tabular-nums text-slate-600">{marks.filter((mark) => mark.assessment_id === item.id).length}</td><td className="py-3"><SchoolStatus value={item.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No assessments yet" description="Create your first assessment above." />}
       </SchoolPanel>
     </div>
   );
 
   const renderQuizzes = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Questions & quizzes" description="Create original questions for your assigned subjects. Every school quiz is reviewed by the School Admin before students can access it." />
+      <SchoolPageHeading title="Questions & quizzes" description="Create original questions for your assigned subjects. Every school quiz is reviewed by an authorized academic leader before students can access it." />
       <SchoolPanel title="Create quiz and questions">
-        {activeMembership?.question_submission_suspended && <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Question submissions are temporarily suspended by the School Admin. Your teacher account and other portal features remain active. Reason: {activeMembership.question_submission_suspension_reason}</div>}
+        {activeMembership?.question_submission_suspended && <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Question submissions are temporarily suspended by the School Manager. Your teacher account and other portal features remain active. Reason: {activeMembership.question_submission_suspension_reason}</div>}
         <form onSubmit={createQuiz} className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <SchoolField label="Quiz title"><input className={schoolInputClass} value={quizTitle} onChange={(event) => setQuizTitle(event.target.value)} /></SchoolField>
@@ -664,18 +664,18 @@ export default function SchoolTeacherPortal() {
               </div>
             </div>)}
           </div>
-          <div className="flex flex-wrap gap-2"><SchoolSecondaryButton onClick={addQuestionRow} disabled={quizQuestions.length >= 40}><Plus className="mr-2 h-4 w-4" />Add question</SchoolSecondaryButton><SchoolPrimaryButton type="submit" disabled={Boolean(activeMembership?.question_submission_suspended)}>Submit quiz for Admin approval</SchoolPrimaryButton></div>
+          <div className="flex flex-wrap gap-2"><SchoolSecondaryButton onClick={addQuestionRow} disabled={quizQuestions.length >= 40}><Plus className="mr-2 h-4 w-4" />Add question</SchoolSecondaryButton><SchoolPrimaryButton type="submit" disabled={Boolean(activeMembership?.question_submission_suspended)}>Submit quiz for academic review</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your submitted quizzes">
-        {quizzes.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Quiz</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{quizzes.map((quiz) => <tr key={quiz.id}><td className="py-3 font-medium text-slate-800"><p>{quiz.title}</p>{quiz.school_review_feedback && <p className="mt-1 text-xs font-normal text-amber-700">Admin feedback: {quiz.school_review_feedback}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(quiz.school_section_id)}</td><td className="py-3 text-slate-600">{quiz.subject}</td><td className="py-3"><SchoolStatus value={quiz.school_review_status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No quizzes created" description="Create a quiz for one of your assigned subjects." />}
+        {quizzes.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Quiz</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{quizzes.map((quiz) => <tr key={quiz.id}><td className="py-3 font-medium text-slate-800"><p>{quiz.title}</p>{quiz.school_review_feedback && <p className="mt-1 text-xs font-normal text-amber-700">Manager feedback: {quiz.school_review_feedback}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(quiz.school_section_id)}</td><td className="py-3 text-slate-600">{quiz.subject}</td><td className="py-3"><SchoolStatus value={quiz.school_review_status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No quizzes created" description="Create a quiz for one of your assigned subjects." />}
       </SchoolPanel>
     </div>
   );
 
   const renderHomework = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Homework & assignments" description="Create homework for your assigned sections. School Admin approves it before students and parents can see it." />
+      <SchoolPageHeading title="Homework & assignments" description="Create homework for your assigned sections. An authorized academic leader approves it before students and parents can see it." />
       <SchoolPanel title="Create homework">
         <form onSubmit={createHomework} className="grid gap-3 md:grid-cols-2">
           <SchoolField label="Title"><input className={schoolInputClass} value={homeworkTitle} onChange={(event) => setHomeworkTitle(event.target.value)} /></SchoolField>
@@ -687,7 +687,7 @@ export default function SchoolTeacherPortal() {
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your homework">
-        {homework.length ? <div className="space-y-3">{homework.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{sectionLabel(item.section_id)} · {item.subject_name} · Due {item.due_at ? new Date(item.due_at).toLocaleString() : "No due date"}</p></div><SchoolStatus value={item.status} /></div>{item.review_feedback && <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-800">Admin feedback: {item.review_feedback}</p>}<button type="button" onClick={() => setSelectedHomeworkId(item.id)} className="mt-3 text-xs font-semibold text-blue-700 hover:underline">View student submissions ({submissions.filter((submission) => submission.homework_id === item.id).length})</button></div>)}</div> : <SchoolEmptyState title="No homework assignments" description="Create homework above." />}
+        {homework.length ? <div className="space-y-3">{homework.map((item) => <div key={item.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{sectionLabel(item.section_id)} · {item.subject_name} · Due {item.due_at ? new Date(item.due_at).toLocaleString() : "No due date"}</p></div><SchoolStatus value={item.status} /></div>{item.review_feedback && <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-800">Manager feedback: {item.review_feedback}</p>}<button type="button" onClick={() => setSelectedHomeworkId(item.id)} className="mt-3 text-xs font-semibold text-blue-700 hover:underline">View student submissions ({submissions.filter((submission) => submission.homework_id === item.id).length})</button></div>)}</div> : <SchoolEmptyState title="No homework assignments" description="Create homework above." />}
       </SchoolPanel>
       {selectedHomeworkId && <SchoolPanel title="Student submissions" action={<button type="button" onClick={() => setSelectedHomeworkId("")} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Close</button>}>
         {submissionsError ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{submissionsError} <button type="button" onClick={() => void load()} className="ml-2 font-semibold underline">Retry</button></div> : submissions.filter((submission) => submission.homework_id === selectedHomeworkId).length ? <div className="space-y-3">{submissions.filter((submission) => submission.homework_id === selectedHomeworkId).map((submission) => <div key={submission.id} className="rounded-md border border-slate-100 p-3"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-800">{memberName(submission.student_membership_id)}</p><SchoolStatus value={submission.status} /></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{submission.response_text || "No written response"}</p>{submission.attachment_path && <p className="mt-1 text-xs text-slate-500">Attachment: {submission.attachment_path}</p>}<div className="mt-3 grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_auto]"><input type="number" min="0" className={schoolInputClass} placeholder="Grade" value={gradeValues[submission.id] ?? submission.grade ?? ""} onChange={(event) => setGradeValues((current) => ({ ...current, [submission.id]: event.target.value }))} /><input className={schoolInputClass} placeholder="Feedback" value={gradeFeedback[submission.id] ?? submission.feedback ?? ""} onChange={(event) => setGradeFeedback((current) => ({ ...current, [submission.id]: event.target.value }))} /><SchoolSecondaryButton onClick={() => void gradeSubmission(submission)}>Save feedback</SchoolSecondaryButton></div></div>)}</div> : <SchoolEmptyState title="No submissions yet" description="Student submissions appear after homework is approved." />}
@@ -697,7 +697,7 @@ export default function SchoolTeacherPortal() {
 
   const renderLibrary = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Textbooks, notes & resources" description="Upload PDFs for your assigned subject and section. Resources remain unavailable to students until the School Admin approves them." />
+      <SchoolPageHeading title="Textbooks, notes & resources" description="Upload PDFs for your assigned subject and section. Resources remain unavailable to students until the authorized academic leader approves them." />
       <SchoolPanel title="Upload learning resource">
         <form onSubmit={uploadLibraryBook} className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <SchoolField label="Resource title"><input className={schoolInputClass} value={bookTitle} onChange={(event) => setBookTitle(event.target.value)} /></SchoolField>
@@ -707,11 +707,11 @@ export default function SchoolTeacherPortal() {
           <SchoolField label="Resource type"><select className={schoolSelectClass} value={bookType} onChange={(event) => setBookType(event.target.value as typeof bookType)}><option value="textbook">Textbook</option><option value="notes">Notes</option><option value="practice">Practice</option><option value="reference">Reference</option></select></SchoolField>
           <SchoolField label="PDF file"><input type="file" accept="application/pdf,.pdf" className={schoolInputClass + " py-2"} onChange={(event) => setBookFile(event.target.files?.[0] ?? null)} /></SchoolField>
           <div className="md:col-span-2 xl:col-span-3"><SchoolField label="Description"><textarea className={schoolTextareaClass} value={bookDescription} onChange={(event) => setBookDescription(event.target.value)} /></SchoolField></div>
-          <div className="md:col-span-2 xl:col-span-3"><SchoolPrimaryButton type="submit" disabled={bookUploading}><Upload className="mr-2 h-4 w-4" />{bookUploading ? "Uploading…" : "Upload for Admin approval"}</SchoolPrimaryButton></div>
+          <div className="md:col-span-2 xl:col-span-3"><SchoolPrimaryButton type="submit" disabled={bookUploading}><Upload className="mr-2 h-4 w-4" />{bookUploading ? "Uploading…" : "Upload for authorized academic leader approval"}</SchoolPrimaryButton></div>
         </form>
       </SchoolPanel>
       <SchoolPanel title="Your submitted resources">
-        {books.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Resource</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{books.map((book) => <tr key={book.id}><td className="py-3 font-medium text-slate-800"><p>{book.title}</p>{bookUploads.find((upload) => upload.book_id === book.id)?.moderation_note && <p className="mt-1 text-xs font-normal text-amber-700">Admin feedback: {bookUploads.find((upload) => upload.book_id === book.id)?.moderation_note}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(book.school_section_id)}</td><td className="py-3 text-slate-600">{book.subject}</td><td className="py-3"><SchoolStatus value={book.school_review_status || book.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No resources uploaded" description="Upload textbooks, notes, and learning PDFs for your assigned classes." />}
+        {books.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Resource</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{books.map((book) => <tr key={book.id}><td className="py-3 font-medium text-slate-800"><p>{book.title}</p>{bookUploads.find((upload) => upload.book_id === book.id)?.moderation_note && <p className="mt-1 text-xs font-normal text-amber-700">Manager feedback: {bookUploads.find((upload) => upload.book_id === book.id)?.moderation_note}</p>}</td><td className="py-3 text-slate-600">{sectionLabel(book.school_section_id)}</td><td className="py-3 text-slate-600">{book.subject}</td><td className="py-3"><SchoolStatus value={book.school_review_status || book.status} /></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No resources uploaded" description="Upload textbooks, notes, and learning PDFs for your assigned classes." />}
       </SchoolPanel>
     </div>
   );
@@ -720,7 +720,7 @@ export default function SchoolTeacherPortal() {
     <div className="space-y-5">
       <SchoolPageHeading title="Homeroom attendance" description="Daily attendance can only be recorded for sections where you are the assigned homeroom teacher." />
       <SchoolPanel title="Record daily attendance">
-        {!homeroomSections.length ? <SchoolEmptyState title="No homeroom section assigned" description="You can record attendance after the School Manager assigns you as a homeroom teacher." /> : <form onSubmit={recordAttendance} className="space-y-4">
+        {!homeroomSections.length ? <SchoolEmptyState title="No homeroom section assigned" description="You can record attendance after your Division Director assigns you as a homeroom teacher." /> : <form onSubmit={recordAttendance} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2"><SchoolField label="Homeroom section"><select className={schoolSelectClass} value={attendanceSectionId} onChange={(event) => setAttendanceSectionId(event.target.value)} disabled={attendanceReadOnly}><option value="">Choose homeroom section</option>{homeroomSections.map((section) => <option key={section.id} value={section.id}>{sectionLabel(section.id)}</option>)}</select></SchoolField><SchoolField label="Attendance date"><input type="date" className={schoolInputClass} value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} disabled={attendanceReadOnly} /></SchoolField></div>
           {attendanceReadOnly && <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">This attendance session is {selectedAttendanceSession?.status === "open" ? "owned by another teacher" : selectedAttendanceSession?.status}. It is read-only.</div>}
           {assignedStudents.filter((student) => student.section_id === attendanceSectionId).map((student) => <div key={student.id} className="grid gap-2 rounded-md border border-slate-100 p-3 sm:grid-cols-[minmax(0,1fr)_160px_minmax(0,1fr)] sm:items-center"><p className="text-sm font-medium text-slate-800">{memberName(student.id)}</p><select className={schoolSelectClass} value={attendanceValues[student.id] || "present"} onChange={(event) => setAttendanceValues((current) => ({ ...current, [student.id]: event.target.value }))} disabled={attendanceReadOnly}><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select><input className={schoolInputClass} placeholder="Optional note" value={attendanceNotes[student.id] || ""} onChange={(event) => setAttendanceNotes((current) => ({ ...current, [student.id]: event.target.value }))} disabled={attendanceReadOnly} /></div>)}
@@ -776,7 +776,7 @@ export default function SchoolTeacherPortal() {
 
   const renderTasks = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Assigned tasks" description="Complete follow-up tasks assigned by the School Manager or Admin, and submit your work for review." />
+      <SchoolPageHeading title="Assigned tasks" description="Complete follow-up tasks assigned by your School Manager or Division Director, and submit your work for review." />
       <SchoolPanel title="Your task list">
         {tasks.length ? <div className="space-y-3">{tasks.map((task) => <div key={task.id} className="rounded-lg border border-slate-200 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.task_type} · {task.priority} priority · {task.due_date ? `Due ${task.due_date}` : "No due date"}</p><p className="mt-2 text-sm text-slate-700">{task.description}</p></div><SchoolStatus value={task.status} /></div><textarea className={schoolTextareaClass + " mt-3"} disabled={!["open", "in_progress", "returned"].includes(task.status)} value={taskResponseById[task.id] ?? task.response ?? ""} onChange={(event) => setTaskResponseById((current) => ({ ...current, [task.id]: event.target.value }))} placeholder="Describe your work or response" />{["open", "in_progress", "returned"].includes(task.status) && <div className="mt-3 flex gap-2"><SchoolSecondaryButton onClick={() => void updateTask(task, "in_progress")}>Mark in progress</SchoolSecondaryButton><SchoolPrimaryButton onClick={() => void updateTask(task, "submitted")}>Submit for review</SchoolPrimaryButton></div>}</div>)}</div> : <SchoolEmptyState title="No assigned tasks" description="Tasks assigned to you will appear here." />}
       </SchoolPanel>
