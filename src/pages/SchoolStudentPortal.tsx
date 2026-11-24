@@ -71,6 +71,7 @@ export default function SchoolStudentPortal() {
   const load = useCallback(async () => {
     if (!schoolId || !studentId) return;
     setLoading(true);
+    try {
     const [
       profileRes, resultsRes, termsRes, attendanceRes, behaviorRes,
       homeworkRes, submissionsRes, booksRes, quizzesRes, announcementsRes, conversationsRes,
@@ -115,6 +116,12 @@ export default function SchoolStudentPortal() {
     const { data: contactRows, error: contactsError } = await db.rpc("school_student_school_contacts");
     if (contactsError) toast.error(contactsError.message);
     setContacts(contactRows ?? []);
+    } catch (error: unknown) {
+      console.error("[Master Minds] SchoolStudentPortal.tsx data load failed", error);
+      toast.error(error instanceof Error ? error.message : "This workspace could not load its records. Please retry.");
+    } finally {
+      setLoading(false);
+    }
     setLoading(false);
   }, [schoolId, studentId, activeMembership?.user_id, activeMembership?.section_id, db]);
 
