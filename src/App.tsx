@@ -21,6 +21,8 @@ const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const GuardianConsentPage = lazy(() => import("./pages/GuardianConsentPage"));
 const GuardianControlsPage = lazy(() => import("./pages/GuardianControlsPage"));
 const GuardianConsentRequestPage = lazy(() => import("./pages/GuardianConsentRequestPage"));
+const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
+const TermsPage = lazy(() => import("./pages/TermsPage"));
 const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
 const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
@@ -341,6 +343,8 @@ const App = () => (
                             <Routes>
                               <Route path="/" element={<Index />} />
                               <Route path="/community-guidelines" element={<CommunityGuidelinesPage />} />
+                              <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                              <Route path="/terms" element={<TermsPage />} />
                               <Route path="/delete-account" element={<DeleteAccountPage />} />
                               <Route path="/guardian-consent" element={<GuardianConsentPage />} />
                               <Route path="/guardian-controls" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "parent", "finance", "super_admin", "extreme_admin"]}><GuardianControlsPage /></ProtectedRoute>} />
