@@ -63,11 +63,11 @@ const BlockedUsersPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     void loadBlockedUsers();
-  }, [user?.id]);
+  }, [loadBlockedUsers]);
 
   const unblockUser = async (blockedUserId: string) => {
     if (!user?.id) return;
