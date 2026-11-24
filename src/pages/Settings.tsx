@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
+import LegalLinksFooter from "@/components/legal/LegalLinksFooter";
 import { 
   ChevronLeft, Languages, Volume2, Bell, UserCircle, 
   Palette, Shield, Info, LogOut, Trash2,
@@ -491,6 +492,7 @@ const Settings: React.FC = () => {
         >
           <p>Master Minds v1.0.0</p>
           <p className="mt-1">Created by Biniam Bogale</p>
+          <LegalLinksFooter />
         </motion.div>
       </div>
     </div>
