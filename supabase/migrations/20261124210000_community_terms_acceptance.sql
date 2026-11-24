@@ -506,4 +506,4 @@ grant execute on function public.create_study_competition(text) to authenticated
 revoke all on function public.multiplayer_create_room(text, text, text, integer, integer, text) from public, anon;
 grant execute on function public.multiplayer_create_room(text, text, text, integer, integer, text) to authenticated;
 
-comment on table public.user_policy_acceptances is 'Immutable, versioned record of a user's acceptance of service policies.';
+comment on table public.user_policy_acceptances is 'Immutable, versioned record of a user accepting service policies.';
