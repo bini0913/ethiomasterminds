@@ -42,7 +42,7 @@ declare
 begin
   -- Allow trusted server-side maintenance jobs, but never anonymous clients.
   if v_uid is null then
-    if v_jwt_role = 'service_role' then
+    if v_jwt_role = 'service_role' or session_user in ('postgres', 'supabase_admin') then
       return new;
     end if;
     raise exception using errcode = '42501', message = 'Sign in and accept the Community Guidelines before posting or messaging';
