@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import ReportButton from './ReportButton';
+import BlockUserButton from './BlockUserButton';
 import ImageUploader from './ImageUploader';
 
 interface Post {
@@ -475,7 +476,8 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
                   {post.isFollowing ? 'Following' : 'Follow'}
                 </Button>
               )}
-              <ReportButton reportedType="post" reportedId={post.id} />
+              <ReportButton reportedType="post" reportedId={post.id} size="icon" />
+              <BlockUserButton userId={post.authorId} userName={post.authorName} />
             </div>
           </div>
 
