@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(18);
+select plan(19);
 
 select ok((select relrowsecurity from pg_class where oid='public.account_deletion_requests'::regclass), 'account deletion requests have RLS enabled');
 select ok(has_table_privilege('authenticated','public.account_deletion_requests','select'), 'users can read their own request records');
@@ -28,6 +28,11 @@ select ok(
   exists (select 1 from information_schema.columns where table_schema='public' and table_name='reports' and column_name='reporter_anonymized')
   and exists (select 1 from information_schema.columns where table_schema='public' and table_name='moderation_actions' and column_name='actor_anonymized'),
   'report and moderation audit records support anonymization'
+);
+select is(
+  coalesce(array_length(app_private.account_deletion_blockers('00000000-0000-0000-0000-000000000000'::uuid), 1), 0),
+  0,
+  'account dependency review can inspect all protected records without deleting data'
 );
 
 select * from finish();
