@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, MailCheck, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -216,8 +216,7 @@ const GuardianSocialAccessGate: React.FC<GuardianSocialAccessGateProps> = ({ fea
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Guardian controls</p>
             <h2 id="guardian-social-gate-title" className="mt-2 text-2xl font-bold">This feature is currently turned off</h2>
             <p className="mt-3 text-sm text-muted-foreground">
-              Your parent or guardian has not enabled {featureName}. Ask them to review your settings on the{" "}
-              <Link to="/guardian-controls" className="font-medium text-primary underline underline-offset-4">Guardian Controls page</Link>.
+              Your parent or guardian has not enabled {featureName}. Ask them to sign in with their verified guardian email and review the learner's settings on the Guardian Controls page.
             </p>
           </>
         )}
