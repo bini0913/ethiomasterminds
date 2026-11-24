@@ -617,10 +617,10 @@ drop trigger if exists guardian_check_group_messages on public.group_messages;
 create trigger guardian_check_group_messages before insert on public.group_messages
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_chat_groups on public.chat_groups;
-create trigger guardian_check_chat_groups before insert on public.chat_groups
+create trigger guardian_check_chat_groups before insert or update on public.chat_groups
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_chat_group_members on public.chat_group_members;
-create trigger guardian_check_chat_group_members before insert on public.chat_group_members
+create trigger guardian_check_chat_group_members before insert or update on public.chat_group_members
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_lobby_messages on public.lobby_messages;
 create trigger guardian_check_lobby_messages before insert on public.lobby_messages
@@ -632,7 +632,7 @@ drop trigger if exists guardian_check_multiplayer_invites on public.multiplayer_
 create trigger guardian_check_multiplayer_invites before insert or update on public.multiplayer_invites
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_study_call_rooms on public.study_call_rooms;
-create trigger guardian_check_study_call_rooms before insert on public.study_call_rooms
+create trigger guardian_check_study_call_rooms before insert or update on public.study_call_rooms
   for each row execute function app_private.enforce_guardian_social_permission();
 drop trigger if exists guardian_check_study_call_participants on public.study_call_participants;
 create trigger guardian_check_study_call_participants before insert or update on public.study_call_participants
@@ -775,7 +775,7 @@ create policy "users can view visible likes excluding blocked users"
   using (
     not app_private.is_user_blocked(user_id, (select auth.uid()))
     and app_private.guardian_allows(user_id, 'public_posts')
-    and exists (select 1 from public.social_posts p where p.id = social_post_likes.post_id)
+    and exists (select 1 from public.social_posts p where p.id = social_post_likes.post_id and app_private.guardian_allows(p.author_id, 'public_posts'))
   );
 
 drop policy if exists "users can view visible reactions excluding blocked users" on public.social_post_reactions;
@@ -784,7 +784,7 @@ create policy "users can view visible reactions excluding blocked users"
   using (
     not app_private.is_user_blocked(user_id, (select auth.uid()))
     and app_private.guardian_allows(user_id, 'public_posts')
-    and exists (select 1 from public.social_posts p where p.id = social_post_reactions.post_id)
+    and exists (select 1 from public.social_posts p where p.id = social_post_reactions.post_id and app_private.guardian_allows(p.author_id, 'public_posts'))
   );
 
 drop policy if exists "users can view own saved posts" on public.saved_posts;
@@ -828,6 +828,162 @@ create policy "authenticated can view participants"
   using (
     app_private.guardian_allows(user_id, 'multiplayer')
     and app_private.guardian_allows((select auth.uid()), 'multiplayer')
+  );
+
+
+-- Replace remaining permissive group and call policies so a disabled feature
+-- cannot be recovered through a direct table query or an old ALL policy.
+drop policy if exists "users can create unblocked follows" on public.followers;
+create policy "users can create guardian-enabled follows"
+  on public.followers for insert to authenticated
+  with check (
+    follower_id = (select auth.uid())
+    and not app_private.is_user_blocked(follower_id, following_id)
+    and app_private.guardian_allows(follower_id, 'friends')
+    and app_private.guardian_allows(following_id, 'friends')
+  );
+drop policy if exists "users can update own unblocked follows" on public.followers;
+create policy "users can update guardian-enabled follows"
+  on public.followers for update to authenticated
+  using (
+    follower_id = (select auth.uid())
+    and not app_private.is_user_blocked(follower_id, following_id)
+  )
+  with check (
+    follower_id = (select auth.uid())
+    and not app_private.is_user_blocked(follower_id, following_id)
+    and app_private.guardian_allows(follower_id, 'friends')
+    and app_private.guardian_allows(following_id, 'friends')
+  );
+
+drop policy if exists "receiver responds to invite" on public.multiplayer_invites;
+create policy "participants respond to guardian-enabled invites"
+  on public.multiplayer_invites for update to authenticated
+  using (sender_id = (select auth.uid()) or receiver_id = (select auth.uid()))
+  with check (
+    (sender_id = (select auth.uid()) or receiver_id = (select auth.uid()))
+    and (
+      status in ('declined','cancelled')
+      or (
+        app_private.guardian_allows(sender_id, 'multiplayer')
+        and app_private.guardian_allows(receiver_id, 'multiplayer')
+      )
+    )
+  );
+
+drop policy if exists "invitee responds to own call invitation" on public.study_call_participants;
+create policy "invitees respond within guardian call controls"
+  on public.study_call_participants for update to authenticated
+  using (user_id = (select auth.uid()))
+  with check (
+    user_id = (select auth.uid())
+    and status = any (array['accepted'::text,'declined'::text,'left'::text])
+    and (
+      status in ('declined','left')
+      or (
+        app_private.guardian_allows(user_id, 'study_calls')
+        and app_private.guardian_allows(invited_by, 'study_calls')
+      )
+    )
+  );
+
+drop policy if exists "user updates own entry" on public.tournament_participants;
+create policy "users update guardian-enabled tournament entry"
+  on public.tournament_participants for update to authenticated
+  using (user_id = (select auth.uid()) or has_role((select auth.uid()), 'admin'::public.app_role))
+  with check (
+    (
+      user_id = (select auth.uid())
+      and app_private.guardian_allows(user_id, 'multiplayer')
+    )
+    or has_role((select auth.uid()), 'admin'::public.app_role)
+  );
+
+drop policy if exists "creator manages group" on public.chat_groups;
+drop policy if exists "members can view group" on public.chat_groups;
+create policy "members view guardian-enabled groups"
+  on public.chat_groups for select to authenticated
+  using (
+    (
+      group_type = any (array['public'::text,'class'::text])
+      or created_by = (select auth.uid())
+      or exists (
+        select 1 from public.chat_group_members m
+        where m.group_id = chat_groups.id and m.user_id = (select auth.uid())
+      )
+    )
+    and (
+      app_private.guardian_allows((select auth.uid()), 'group_chat')
+      or has_role((select auth.uid()), 'admin'::public.app_role)
+      or has_role((select auth.uid()), 'manager'::public.app_role)
+      or (select public._is_extreme_admin())
+    )
+  );
+create policy "creators and moderators update groups"
+  on public.chat_groups for update to authenticated
+  using (
+    (created_by = (select auth.uid()) and app_private.guardian_allows(created_by, 'group_chat'))
+    or has_role((select auth.uid()), 'admin'::public.app_role)
+    or has_role((select auth.uid()), 'manager'::public.app_role)
+    or (select public._is_extreme_admin())
+  )
+  with check (
+    (created_by = (select auth.uid()) and app_private.guardian_allows(created_by, 'group_chat'))
+    or has_role((select auth.uid()), 'admin'::public.app_role)
+    or has_role((select auth.uid()), 'manager'::public.app_role)
+    or (select public._is_extreme_admin())
+  );
+create policy "creators and moderators delete groups"
+  on public.chat_groups for delete to authenticated
+  using (
+    created_by = (select auth.uid())
+    or has_role((select auth.uid()), 'admin'::public.app_role)
+    or has_role((select auth.uid()), 'manager'::public.app_role)
+    or (select public._is_extreme_admin())
+  );
+
+drop policy if exists "group admin manages members" on public.chat_group_members;
+drop policy if exists "members can view roster" on public.chat_group_members;
+create policy "members view guardian-enabled roster"
+  on public.chat_group_members for select to authenticated
+  using (
+    (user_id = (select auth.uid()) or is_chat_group_member(group_id))
+    and app_private.guardian_allows(user_id, 'group_chat')
+    and app_private.guardian_allows((select auth.uid()), 'group_chat')
+  );
+create policy "group creators add guardian-enabled members"
+  on public.chat_group_members for insert to authenticated
+  with check (
+    is_chat_group_creator(group_id)
+    and app_private.guardian_allows(user_id, 'group_chat')
+  );
+create policy "group creators update guardian-enabled members"
+  on public.chat_group_members for update to authenticated
+  using (user_id = (select auth.uid()) or is_chat_group_creator(group_id))
+  with check (
+    (user_id = (select auth.uid()) or is_chat_group_creator(group_id))
+    and app_private.guardian_allows(user_id, 'group_chat')
+  );
+create policy "members leave or creators remove members"
+  on public.chat_group_members for delete to authenticated
+  using (user_id = (select auth.uid()) or is_chat_group_creator(group_id));
+
+drop policy if exists "study call participants can view their rooms" on public.study_call_rooms;
+drop policy if exists "users can view own created study call rooms" on public.study_call_rooms;
+create policy "participants view guardian-enabled study call rooms"
+  on public.study_call_rooms for select to authenticated
+  using (
+    (
+      created_by = (select auth.uid())
+      and app_private.guardian_allows(created_by, 'study_calls')
+    )
+    or exists (
+      select 1 from public.study_call_participants p
+      where p.room_id = study_call_rooms.id
+        and p.user_id = (select auth.uid())
+        and app_private.guardian_allows(p.user_id, 'study_calls')
+        and (p.invited_by is null or app_private.guardian_allows(p.invited_by, 'study_calls'))
+    )
   );
 
 -- Public RPCs used by the learner gate and verified guardian controls.
