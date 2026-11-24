@@ -176,7 +176,7 @@ const Friends: React.FC = () => {
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase.from("user_blocks").insert({
+      const { error } = await (supabase as any).from("user_blocks").insert({
         blocker_id: user.id,
         blocked_user_id: selectedFriend.id,
       });
