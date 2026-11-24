@@ -15,6 +15,8 @@ const Friends = lazy(() => import("./pages/Friends"));
 const Settings = lazy(() => import("./pages/Settings"));
 const EnhancedSettings = lazy(() => import("./pages/EnhancedSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const CommunityGuidelinesPage = lazy(() => import("./pages/CommunityGuidelinesPage"));
+import CommunityGuidelinesGate from "./components/social/CommunityGuidelinesGate";
 const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
 const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
@@ -321,6 +323,7 @@ const App = () => (
                           <Toaster />
                           <Sonner />
                           <BrowserRouter>
+                            <CommunityGuidelinesGate />
                             <AppChrome>
                             <Suspense fallback={
                               <div className="min-h-screen flex items-center justify-center bg-background">
@@ -333,6 +336,7 @@ const App = () => (
                             <RouteErrorBoundary>
                             <Routes>
                               <Route path="/" element={<Index />} />
+                              <Route path="/community-guidelines" element={<CommunityGuidelinesPage />} />
                               <Route path="/quiz" element={<EarlyTierRestrictedRoute><ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Quiz /></ProtectedRoute></EarlyTierRestrictedRoute>} />
                               <Route path="/early-games" element={<EarlyTierOnlyRoute><EarlyGamesPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-quiz" element={<EarlyTierOnlyRoute><EarlyQuizPage /></EarlyTierOnlyRoute>} />
