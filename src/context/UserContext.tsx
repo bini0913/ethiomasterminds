@@ -574,16 +574,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       const { error } = await (supabase as any).rpc("delete_my_account");
       if (error) throw error;
 
-      // Delete the local session only after the destructive server operation
-      // has completed successfully.
+      // The server now records a deletion request for review. It does not
+      // immediately delete school, financial, or audit records.
       await supabase.auth.signOut();
       safeStorage.removeItem("masterminds_login_mode");
       setUser(null);
       setSession(null);
-      toast.success("Your account and associated data were permanently deleted.");
+      toast.success("Your account deletion request was submitted. Any school or financial records will be reviewed before deletion is completed.");
     } catch (error) {
       console.error('Delete account error:', error);
-      toast.error("We couldn't delete your account. No data was removed; please try again.");
+      toast.error("We couldn't submit your deletion request. No data was removed; please try again.");
     }
   };
 
