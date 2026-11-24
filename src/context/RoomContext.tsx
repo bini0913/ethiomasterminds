@@ -147,7 +147,18 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
         p_question_count: settings.questionCount,
         p_max_players: maxPlayers,
       });
-      if (settingsError) throw settingsError;
+      if (settingsError) {
+        // Room creation and settings persistence are separate RPCs. If the
+        // settings write fails, release the host membership so the empty room
+        // is removed instead of leaving an unusable room in the public lobby.
+        const { error: cleanupError } = await db.rpc("multiplayer_leave_room", {
+          p_room_id: data.id,
+        });
+        if (cleanupError) {
+          console.error("Could not roll back the incomplete multiplayer room:", cleanupError);
+        }
+        throw settingsError;
+      }
 
       const room: Room = {
         id: data.id,
