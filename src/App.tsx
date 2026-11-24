@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import RouteErrorBoundary from "@/components/layout/RouteErrorBoundary";
+import CommunityGuidelinesGate from "./components/social/CommunityGuidelinesGate";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,7 +17,6 @@ const Settings = lazy(() => import("./pages/Settings"));
 const EnhancedSettings = lazy(() => import("./pages/EnhancedSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const CommunityGuidelinesPage = lazy(() => import("./pages/CommunityGuidelinesPage"));
-import CommunityGuidelinesGate from "./components/social/CommunityGuidelinesGate";
 const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
 const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
