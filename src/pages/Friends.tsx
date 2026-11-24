@@ -12,6 +12,8 @@ import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import BackButton from "@/components/ui/BackButton";
 import { motion } from "framer-motion";
 import { getUserTier } from "@/lib/getUserTier";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Friends: React.FC = () => {
   const { user } = useUser();
@@ -29,7 +31,8 @@ const Friends: React.FC = () => {
     markMessageAsRead,
     searchUsers,
     onlineFriends,
-    friendPresence
+    friendPresence,
+    refreshFriends
   } = useFriends();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -163,6 +166,31 @@ const Friends: React.FC = () => {
   
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const handleBlockSelectedFriend = async () => {
+    if (!user?.id || !selectedFriend) return;
+    const confirmed = window.confirm(
+      `Block ${selectedFriend.name}? They will no longer be able to message, friend-request, invite, or call you. Your existing conversation will be hidden.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase.from("user_blocks").insert({
+        blocker_id: user.id,
+        blocked_user_id: selectedFriend.id,
+      });
+      if (error && error.code !== "23505") throw error;
+
+      setSelectedFriend(null);
+      setMessageInput("");
+      navigate("/friends", { replace: true });
+      await refreshFriends();
+      toast.success(`${selectedFriend.name} has been blocked.`);
+    } catch (error) {
+      console.error("Could not block user:", error);
+      toast.error("Could not block this user. Please try again.");
+    }
   };
 
   const handleSendFriendRequest = async (targetUser: UserProfile) => {
@@ -511,7 +539,17 @@ const Friends: React.FC = () => {
                   </Button>
                   <Button type="button" size="icon" variant="ghost" className="h-7 w-7"><Bell className="h-3.5 w-3.5" /></Button>
                   <Button type="button" size="icon" variant="ghost" className="h-7 w-7"><VolumeX className="h-3.5 w-3.5" /></Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7"><ShieldBan className="h-3.5 w-3.5" /></Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                    title="Block this user"
+                    aria-label={`Block ${selectedFriend.name}`}
+                    onClick={handleBlockSelectedFriend}
+                  >
+                    <ShieldBan className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
                 <form onSubmit={handleSendMessage} className="flex gap-2">
                   <Input
