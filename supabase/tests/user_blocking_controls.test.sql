@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(20);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.user_blocks'::regclass),
@@ -28,6 +28,35 @@ select ok(
 select ok(
   exists (select 1 from pg_trigger where tgname='reject_blocked_multiplayer_invite' and not tgisinternal),
   'multiplayer invites are checked against blocks'
+);
+select ok(
+  exists (select 1 from pg_trigger where tgname='reject_blocked_study_call_invite' and not tgisinternal),
+  'Study Mode call invitations are checked against blocks'
+);
+select ok(
+  exists (select 1 from pg_policies where schemaname='public' and tablename='social_posts' and policyname='users can view opted-in posts excluding blocked authors'),
+  'social feed reads hide blocked authors'
+);
+select ok(
+  exists (select 1 from pg_policies where schemaname='public' and tablename='followers' and policyname='users can view unblocked follows'),
+  'follower reads respect blocks'
+);
+select ok(
+  exists (select 1 from pg_policies where schemaname='public' and tablename='social_post_comments' and policyname='users can view visible comments excluding blocked authors'),
+  'comments by blocked users are hidden'
+);
+select ok(
+  exists (select 1 from pg_policies where schemaname='public' and tablename='lobby_messages' and policyname='authenticated can view unblocked lobby messages'),
+  'lobby messages from blocked users are hidden'
+);
+select ok(
+  exists (select 1 from pg_policies where schemaname='public' and tablename='room_chat_messages' and policyname='room members can view unblocked room chat'),
+  'multiplayer room chat from blocked users is hidden'
+);
+select ok(
+  exists (select 1 from pg_trigger where tgname='reject_blocked_social_comment' and not tgisinternal)
+  and exists (select 1 from pg_trigger where tgname='reject_blocked_follow' and not tgisinternal),
+  'social comments and follows are checked against blocks'
 );
 
 select * from finish();
