@@ -11,6 +11,7 @@ const POLICY_KEY = "community_guidelines";
 const POLICY_VERSION = "2026-11-24-v1";
 const UGC_ROUTES = [
   "/friends",
+  "/profile",
   "/chat",
   "/social",
   "/social/community",
