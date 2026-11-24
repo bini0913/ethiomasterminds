@@ -54,6 +54,8 @@ import { getUserTier } from "@/lib/getUserTier";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import ReportButton from "@/components/social/ReportButton";
+import BlockUserButton from "@/components/social/BlockUserButton";
 
 type Activity = { id: string; text: string; time: string; icon: "trophy" | "zap" | "spark" };
 type Achievement = { id: string; name: string; icon: string; description: string; date: string; locked?: boolean };
