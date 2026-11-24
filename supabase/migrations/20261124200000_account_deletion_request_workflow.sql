@@ -392,6 +392,7 @@ begin
   delete from public.user_missions where user_id = p_user_id;
   delete from public.user_presence where user_id = p_user_id;
   delete from public.user_streaks where user_id = p_user_id;
+  delete from public.user_roles where user_id = p_user_id;
 
   update public.reports
   set reporter_id = '00000000-0000-0000-0000-000000000000',
@@ -406,9 +407,10 @@ begin
   update public.moderation_actions
   set actor_id = case when actor_id = p_user_id then '00000000-0000-0000-0000-000000000000' else actor_id end,
       actor_anonymized = actor_anonymized or actor_id = p_user_id,
+      target_id = case when target_type = 'user' and target_id = p_user_id then '00000000-0000-0000-0000-000000000000' else target_id end,
       target_user_id = case when target_user_id = p_user_id then '00000000-0000-0000-0000-000000000000' else target_user_id end,
       target_user_anonymized = target_user_anonymized or target_user_id = p_user_id
-  where actor_id = p_user_id or target_user_id = p_user_id;
+  where actor_id = p_user_id or target_user_id = p_user_id or (target_type = 'user' and target_id = p_user_id);
 
   update public.platform_settings set updated_by = null where updated_by = p_user_id;
   update public.school_memberships set created_by = null where created_by = p_user_id;
@@ -449,6 +451,13 @@ begin
 
   if v_request.id is null or v_request.status <> 'approved' or v_request.user_id is null then
     raise exception 'Only approved, active deletion requests can be completed';
+  end if;
+  if v_request.user_id = auth.uid() then
+    raise exception 'A moderator cannot complete their own account deletion request';
+  end if;
+  if not public._is_extreme_admin()
+     and not exists (select 1 from public.user_roles where user_id = v_request.user_id and role = 'student'::public.app_role) then
+    raise exception 'Only the Extreme Admin can complete deletion of non-student accounts';
   end if;
 
   v_blockers := app_private.account_deletion_blockers(v_request.user_id);
