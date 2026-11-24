@@ -35,6 +35,10 @@ export type UserProfile = {
   avatarConfig?: AvatarConfig | null;
   rank?: string;
   badges?: string[];
+  accountStatus?: 'active' | 'suspended' | 'banned' | 'purged';
+  guardianConsentStatus?: 'not_required' | 'pending' | 'verified' | 'rejected' | 'revoked';
+  guardianEmail?: string;
+  guardianUserId?: string;
 };
 
 export type EditableProfileData = Partial<Pick<UserProfile, 'name' | 'username' | 'gender' | 'avatar' | 'avatarConfig'>>;
@@ -164,6 +168,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         avatarConfig: profile.avatar_config as AvatarConfig | null,
         rank: profile.rank || undefined,
         badges: profile.badges || [],
+        accountStatus: (profile as any).account_status || 'active',
+        guardianConsentStatus: (profile as any).guardian_consent_status || 'not_required',
+        guardianEmail: (profile as any).guardian_email || undefined,
+        guardianUserId: (profile as any).guardian_user_id || undefined,
       };
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
@@ -394,6 +402,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         return null;
       }
 
+      const isMinor = profileDetails?.age !== undefined && profileDetails.age < 18;
+      const guardianEmail = profileDetails?.guardianEmail?.trim().toLowerCase() || "";
+      if (isMinor && (!guardianEmail || guardianEmail === email.trim().toLowerCase() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail))) {
+        toast.error("Learners under 18 need a separate, valid parent or guardian email.");
+        return null;
+      }
+      const guardianRequestId = isMinor ? crypto.randomUUID() : null;
+
       const redirectUrl = `${window.location.origin}/`;
 
       // Create auth user
@@ -405,7 +421,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           data: {
             name: name.trim(),
             username: username.trim().toLowerCase(),
-            ...(profileDetails ? { age: profileDetails.age, gender: profileDetails.gender, avatar: profileDetails.avatar, guardian_consent: profileDetails.guardianConsent ?? false, guardian_email: profileDetails.guardianEmail || null, ...(profileDetails.learningGoal ? { learning_goal: profileDetails.learningGoal } : {}), ...(profileDetails.academicStream ? { academic_stream: profileDetails.academicStream } : {}) } : {}),
+            ...(profileDetails ? { age: profileDetails.age, gender: profileDetails.gender, avatar: profileDetails.avatar, guardian_consent: false, guardian_email: guardianEmail || null, ...(guardianRequestId ? { guardian_consent_request_id: guardianRequestId } : {}), ...(profileDetails.learningGoal ? { learning_goal: profileDetails.learningGoal } : {}), ...(profileDetails.academicStream ? { academic_stream: profileDetails.academicStream } : {}) } : {}),
             ...(grade?.trim()
               ? {
                   grade: grade.trim(),
@@ -439,9 +455,28 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           return null;
         }
 
+        // Send a separate, verified-email approval link to the parent or guardian.
+        // The Auth trigger creates the pending request using guardianRequestId.
+        if (isMinor && guardianEmail && guardianRequestId) {
+          const { error: guardianInviteError } = await supabase.auth.signInWithOtp({
+            email: guardianEmail,
+            options: {
+              emailRedirectTo: `${window.location.origin}/guardian-consent?request=${guardianRequestId}`,
+              shouldCreateUser: true,
+              data: { account_type: "individual_parent", name: "Parent or Guardian" },
+            },
+          });
+          if (guardianInviteError) {
+            console.error("Guardian approval email could not be sent:", guardianInviteError);
+            toast.error("Your learner account was created, but the guardian email could not be sent. Please ask support for help.");
+          } else {
+            toast.success("A parent or guardian approval link has been sent to the email you provided.");
+          }
+        }
+
         // Supabase returns a user without a session when email confirmation is required.
         if (!data.session) {
-          toast.success("Account created! Please check your email to confirm your account, then sign in.");
+          toast.success("Account created! Confirm your learner email to sign in. Community features remain disabled until guardian approval.");
           return null;
         }
 
@@ -465,9 +500,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           profileFields.age = profileDetails.age;
           profileFields.gender = profileDetails.gender;
           profileFields.avatar = profileDetails.avatar;
-          profileFields.guardian_consent = profileDetails.guardianConsent ?? false;
+          profileFields.guardian_consent = false;
           profileFields.guardian_email = profileDetails.guardianEmail || null;
-          profileFields.consent_at = profileDetails.guardianConsent ? new Date().toISOString() : null;
+          profileFields.consent_at = null;
         }
         // Ensure the base row exists first (creates it if the trigger hasn't).
         await fetchUserProfile(data.user.id, data.user);
@@ -522,6 +557,34 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     toast.success("Logged out");
   };
 
+  // Keep account restrictions live so moderation actions take effect without waiting for a new sign-in.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`profile-account-status-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+        (payload) => {
+          const profileUpdate = payload.new as any;
+          setUser((current) => current ? {
+            ...current,
+            accountStatus: profileUpdate?.account_status || 'active',
+            guardianConsentStatus: profileUpdate?.guardian_consent_status || current.guardianConsentStatus,
+            guardianEmail: profileUpdate?.guardian_email || undefined,
+            guardianUserId: profileUpdate?.guardian_user_id || undefined,
+          } : current);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
+
   const updateProfile = async (profileData: EditableProfileData): Promise<boolean> => {
     if (!user || !session?.user) return false;
 
@@ -571,19 +634,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     if (!session?.user) return;
 
     try {
-      const { error } = await (supabase as any).rpc("delete_my_account");
-      if (error) throw error;
+      const { data: requestId, error } = await (supabase as any).rpc("request_my_account_deletion");
+      if (error || !requestId) throw error || new Error("The deletion request was not recorded.");
 
-      // Delete the local session only after the destructive server operation
-      // has completed successfully.
+      // The request is persisted and the account is restricted by the server.
+      // Sign out only after the request has been confirmed.
       await supabase.auth.signOut();
       safeStorage.removeItem("masterminds_login_mode");
       setUser(null);
       setSession(null);
-      toast.success("Your account and associated data were permanently deleted.");
+      toast.success("Your deletion request was submitted. The support team will verify and process it.");
     } catch (error) {
-      console.error('Delete account error:', error);
-      toast.error("We couldn't delete your account. No data was removed; please try again.");
+      console.error('Account deletion request error:', error);
+      toast.error("We couldn't submit your deletion request. Your account was not changed; please try again or contact support.");
     }
   };
 

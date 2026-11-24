@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { toast } from 'sonner';
+import { useCommunityTerms } from '@/context/CommunityTermsContext';
 import { X, Image as ImageIcon, Send, Loader2 } from 'lucide-react';
 
 interface CreatePostModalProps {
@@ -13,6 +14,7 @@ interface CreatePostModalProps {
 
 const CreatePostModal: React.FC<CreatePostModalProps> = ({ onClose }) => {
   const { user } = useUser();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const [content, setContent] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -79,7 +81,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onClose }) => {
           size="sm"
           className="rounded-full px-5"
           disabled={isPosting || !content.trim()}
-          onClick={handlePost}
+          onClick={() => void runWithCommunityTerms(handlePost, 'social')}
         >
           {isPosting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
           Post

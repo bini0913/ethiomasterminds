@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { supabase } from '@/integrations/supabase/client';
 import { useUser, UserProfile } from './UserContext';
 import { toast } from 'sonner';
+import { useCommunityTerms } from '@/context/CommunityTermsContext';
 
 export type FriendStatus = "pending" | "accepted" | "declined";
 
@@ -54,6 +55,7 @@ const FriendsContext = createContext<FriendsContextType | undefined>(undefined);
 
 export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const [friends, setFriends] = useState<UserProfile[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
@@ -372,37 +374,39 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const sendFriendRequest = async (targetUserId: string) => {
     if (!user?.id) return;
-    try {
-      const { error } = await db.rpc('send_friend_request', { p_target_user_id: targetUserId });
-      if (error) throw error;
-      // Look up the newly-created request so the server can validate it before
-      // sending a push; recipient and message copy are derived server-side.
-      const { data: request } = await db.from('friends').select('id')
-        .eq('user_id', user.id).eq('friend_id', targetUserId).eq('status', 'pending')
-        .order('created_at', { ascending: false }).limit(1).maybeSingle();
-      if (request?.id) {
-        const { error: pushError } = await supabase.functions.invoke('send-push-notification', {
-          body: { kind: 'friend_request', event_id: request.id },
-        });
-        if (pushError) console.warn('Friend request push could not be sent:', pushError.message);
+    await runWithCommunityTerms(async () => {
+      try {
+        const { error } = await db.rpc('send_friend_request', { p_target_user_id: targetUserId });
+        if (error) throw error;
+        const { data: request } = await db.from('friends').select('id')
+          .eq('user_id', user.id).eq('friend_id', targetUserId).eq('status', 'pending')
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (request?.id) {
+          const { error: pushError } = await supabase.functions.invoke('send-push-notification', {
+            body: { kind: 'friend_request', event_id: request.id },
+          });
+          if (pushError) console.warn('Friend request push could not be sent:', pushError.message);
+        }
+        toast.success('Friend request sent!');
+        await fetchFriends();
+      } catch (err: any) {
+        toast.error(err?.message?.includes('already') ? 'Friend request already exists' : err?.message || 'Failed to send friend request');
       }
-      toast.success('Friend request sent!');
-      await fetchFriends();
-    } catch (err: any) {
-      toast.error(err?.message?.includes('already') ? 'Friend request already exists' : 'Failed to send friend request');
-    }
+    }, 'friend_requests');
   };
 
   const acceptFriendRequest = async (requestId: string) => {
-    try {
-      const { error } = await db.rpc('respond_friend_request', { p_request_id: requestId, p_accept: true });
-      if (error) throw error;
-      toast.success('Friend request accepted!');
-      await fetchFriends();
-    } catch (err) {
-      console.error('Error accepting friend request:', err);
-      toast.error('Failed to accept friend request');
-    }
+    await runWithCommunityTerms(async () => {
+      try {
+        const { error } = await db.rpc('respond_friend_request', { p_request_id: requestId, p_accept: true });
+        if (error) throw error;
+        toast.success('Friend request accepted!');
+        await fetchFriends();
+      } catch (err: any) {
+        console.error('Error accepting friend request:', err);
+        toast.error(err?.message || 'Failed to accept friend request');
+      }
+    }, 'friend_requests');
   };
 
   const declineFriendRequest = async (requestId: string) => {
@@ -429,33 +433,35 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
   const sendMessage = async (receiverId: string, content: string) => {
     if (!user?.id || !content.trim()) return;
-    try {
-      const { data, error } = await db.rpc('send_direct_message', {
-        p_receiver_id: receiverId,
-        p_content: content.trim(),
-      });
-      if (error) throw error;
-      if (data) {
-        setMessages(prev => {
-          if (prev.some(message => message.id === data.id)) return prev;
-          return [...prev, {
-            id: data.id,
-            sender: data.sender_id,
-            receiver: data.receiver_id,
-            content: data.content,
-            read: false,
-            timestamp: new Date(data.created_at)
-          }].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    await runWithCommunityTerms(async () => {
+      try {
+        const { data, error } = await db.rpc('send_direct_message', {
+          p_receiver_id: receiverId,
+          p_content: content.trim(),
         });
-        const { error: pushError } = await supabase.functions.invoke('send-push-notification', {
-          body: { kind: 'direct_message', event_id: data.id },
-        });
-        if (pushError) console.warn('Message push could not be sent:', pushError.message);
+        if (error) throw error;
+        if (data) {
+          setMessages(prev => {
+            if (prev.some(message => message.id === data.id)) return prev;
+            return [...prev, {
+              id: data.id,
+              sender: data.sender_id,
+              receiver: data.receiver_id,
+              content: data.content,
+              read: false,
+              timestamp: new Date(data.created_at)
+            }].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+          });
+          const { error: pushError } = await supabase.functions.invoke('send-push-notification', {
+            body: { kind: 'direct_message', event_id: data.id },
+          });
+          if (pushError) console.warn('Message push could not be sent:', pushError.message);
+        }
+      } catch (err: any) {
+        console.error('Error sending message:', err);
+        toast.error(err?.message || 'Failed to send message');
       }
-    } catch (err) {
-      console.error('Error sending message:', err);
-      toast.error('Failed to send message');
-    }
+    }, 'direct_messages');
   };
 
   const markMessageAsRead = (messageId: string) => {
