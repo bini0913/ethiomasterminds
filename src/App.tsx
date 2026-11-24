@@ -13,6 +13,13 @@ const Lobby = lazy(() => import("./pages/Lobby"));
 const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const Friends = lazy(() => import("./pages/Friends"));
 const Settings = lazy(() => import("./pages/Settings"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfUse = lazy(() => import("./pages/TermsOfUse"));
+const DeleteAccountRequest = lazy(() => import("./pages/DeleteAccountRequest"));
+const AccountRestricted = lazy(() => import("./pages/AccountRestricted"));
+const GuardianConsentPage = lazy(() => import("./pages/GuardianConsentPage"));
+const GuardianControlsPage = lazy(() => import("./pages/GuardianControlsPage"));
+const ChildSafetyStandards = lazy(() => import("./pages/ChildSafetyStandards"));
 const EnhancedSettings = lazy(() => import("./pages/EnhancedSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
@@ -66,6 +73,7 @@ const SupabaseMigration = lazy(() => import("./pages/SupabaseMigration"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import EarlyTierRestrictedRoute from "./components/auth/EarlyTierRestrictedRoute";
 import { UserProvider } from "./context/UserContext";
+import { CommunityTermsProvider } from "./context/CommunityTermsContext";
 import { SchoolPortalProvider, useSchoolPortal } from "./context/SchoolPortalContext";
 import SchoolPortalGate from "./components/school/SchoolPortalGate";
 import { TierProvider } from "./context/TierContext";
@@ -295,6 +303,15 @@ const SchoolAwareLegacyPortalRoute = ({
   return <>{children}</>;
 };
 
+const AccountStatusGuard = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useUser();
+  const location = useLocation();
+  if (user && user.accountStatus && user.accountStatus !== "active" && location.pathname !== "/account-restricted") {
+    return <Navigate to="/account-restricted" replace state={{ status: user.accountStatus, from: location.pathname }} />;
+  }
+  return <>{children}</>;
+};
+
 const SelfProfileRedirect = () => {
   const { user, session } = useUser();
   const targetUserId = user?.id || session?.user?.id;
@@ -307,6 +324,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <UserProvider>
+        <CommunityTermsProvider>
         <SchoolPortalProvider>
         <TierProvider>
           <LanguageProvider>
@@ -331,8 +349,16 @@ const App = () => (
                               </div>
                             }>
                             <RouteErrorBoundary>
+                            <AccountStatusGuard>
                             <Routes>
                               <Route path="/" element={<Index />} />
+                              <Route path="/privacy" element={<PrivacyPolicy />} />
+                              <Route path="/terms" element={<TermsOfUse />} />
+                              <Route path="/delete-account" element={<DeleteAccountRequest />} />
+                              <Route path="/account-restricted" element={<AccountRestricted />} />
+                              <Route path="/guardian-consent" element={<GuardianConsentPage />} />
+                              <Route path="/child-safety" element={<ChildSafetyStandards />} />
+                              <Route path="/guardian-controls" element={<ProtectedRoute allowedRoles={["parent"]}><GuardianControlsPage /></ProtectedRoute>} />
                               <Route path="/quiz" element={<EarlyTierRestrictedRoute><ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Quiz /></ProtectedRoute></EarlyTierRestrictedRoute>} />
                               <Route path="/early-games" element={<EarlyTierOnlyRoute><EarlyGamesPage /></EarlyTierOnlyRoute>} />
                               <Route path="/early-quiz" element={<EarlyTierOnlyRoute><EarlyQuizPage /></EarlyTierOnlyRoute>} />
@@ -444,6 +470,7 @@ const App = () => (
                               <Route path="/migrate-supabase" element={<ProtectedRoute allowedRoles={["extreme_admin"]}><SupabaseMigration /></ProtectedRoute>} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
+                            </AccountStatusGuard>
                             </RouteErrorBoundary>
                             </Suspense>
                             </AppChrome>
@@ -464,6 +491,7 @@ const App = () => (
           </LanguageProvider>
         </TierProvider>
         </SchoolPortalProvider>
+        </CommunityTermsProvider>
       </UserProvider>
     </ThemeProvider>
   </QueryClientProvider>

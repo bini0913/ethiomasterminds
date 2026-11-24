@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from './UserContext';
 import { toast } from 'sonner';
+import { useCommunityTerms } from '@/context/CommunityTermsContext';
 
 let cleanupUnavailable = false;
 
@@ -41,6 +42,7 @@ const RoomContext = createContext<RoomContextType | undefined>(undefined);
 
 export const RoomProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useUser();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,117 +130,111 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
 
   const createRoom = async (name: string, settings: Room['gameSettings'], maxPlayers: number, password?: string): Promise<Room | null> => {
     if (!user?.id) return null;
-    try {
-      const { data, error } = await db.rpc('multiplayer_create_room', {
-        p_name: name,
-        p_subject: settings.subject,
-        p_difficulty: settings.difficulty,
-        p_question_count: settings.questionCount,
-        p_max_players: maxPlayers,
-        p_password: password || null,
-      });
-      if (error) throw error;
-
-      const { error: settingsError } = await db.rpc('multiplayer_update_room', {
-        p_room_id: data.id,
-        p_subject: settings.subject,
-        p_difficulty: settings.difficulty,
-        p_game_mode: settings.gameMode,
-        p_question_count: settings.questionCount,
-        p_max_players: maxPlayers,
-      });
-      if (settingsError) {
-        // Room creation and settings persistence are separate RPCs. If the
-        // settings write fails, release the host membership so the empty room
-        // is removed instead of leaving an unusable room in the public lobby.
-        const { error: cleanupError } = await db.rpc("multiplayer_leave_room", {
-          p_room_id: data.id,
+    let createdRoom: Room | null = null;
+    await runWithCommunityTerms(async () => {
+      try {
+        const { data, error } = await db.rpc('multiplayer_create_room', {
+          p_name: name,
+          p_subject: settings.subject,
+          p_difficulty: settings.difficulty,
+          p_question_count: settings.questionCount,
+          p_max_players: maxPlayers,
+          p_password: password || null,
         });
-        if (cleanupError) {
-          console.error("Could not roll back the incomplete multiplayer room:", cleanupError);
-        }
-        throw settingsError;
-      }
+        if (error) throw error;
 
-      const room: Room = {
-        id: data.id,
-        name: data.name,
-        host: data.host_id,
-        hostName: user.name,
-        players: [user.id],
-        maxPlayers: data.max_players,
-        hasPassword: Boolean(password?.trim()),
-        gameSettings: settings,
-        status: data.status as Room['status'],
-        createdAt: new Date(data.created_at),
-      };
-      setCurrentRoom(room);
-      toast.success('Room created!');
-      await fetchRooms();
-      return room;
-    } catch (err: any) {
-      console.error('Error creating room:', err);
-      toast.error(err?.message || 'Failed to create room');
-      return null;
-    }
+        const { error: settingsError } = await db.rpc('multiplayer_update_room', {
+          p_room_id: data.id,
+          p_subject: settings.subject,
+          p_difficulty: settings.difficulty,
+          p_game_mode: settings.gameMode,
+          p_question_count: settings.questionCount,
+          p_max_players: maxPlayers,
+        });
+        if (settingsError) {
+          const { error: cleanupError } = await db.rpc("multiplayer_leave_room", { p_room_id: data.id });
+          if (cleanupError) console.error("Could not roll back the incomplete multiplayer room:", cleanupError);
+          throw settingsError;
+        }
+
+        createdRoom = {
+          id: data.id,
+          name: data.name,
+          host: data.host_id,
+          hostName: user.name,
+          players: [user.id],
+          maxPlayers: data.max_players,
+          hasPassword: Boolean(password?.trim()),
+          gameSettings: settings,
+          status: data.status as Room['status'],
+          createdAt: new Date(data.created_at),
+        };
+        setCurrentRoom(createdRoom);
+        toast.success('Room created!');
+        await fetchRooms();
+      } catch (err: any) {
+        console.error('Error creating room:', err);
+        toast.error(err?.message || 'Failed to create room');
+      }
+    }, 'multiplayer');
+    return createdRoom;
   };
 
   const joinRoom = async (roomId: string, playerName: string, password?: string): Promise<boolean> => {
     if (!user?.id) return false;
-    try {
-      const { data: existingRow } = await supabase
-        .from('room_players')
-        .select('user_id')
-        .eq('room_id', roomId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      const existingMembership = Boolean(existingRow);
+    let joined = false;
+    await runWithCommunityTerms(async () => {
+      try {
+        const { data: existingRow } = await supabase
+          .from('room_players')
+          .select('user_id')
+          .eq('room_id', roomId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        const existingMembership = Boolean(existingRow);
 
-      // Join through the password- and capacity-validated RPC before reading
-      // private room metadata. Membership RLS then authorizes the following read.
-      const { error: joinError } = await db.rpc('multiplayer_join_room', {
-        p_room_id: roomId,
-        p_password: password || null,
-      });
-      if (joinError) throw joinError;
+        const { error: joinError } = await db.rpc('multiplayer_join_room', {
+          p_room_id: roomId,
+          p_password: password || null,
+        });
+        if (joinError) throw joinError;
 
-      const { data: roomData, error: roomError } = await supabase
-        .from('multiplayer_rooms')
-        .select('id, name, host_id, max_players, subject, difficulty, question_count, game_mode, status, created_at, current_question, started_at, finished_at, has_password')
-        .eq('id', roomId)
-        .in('status', ['waiting', 'countdown', 'playing'])
-        .single();
-      if (roomError || !roomData) {
-        throw roomError || new Error('Room is no longer available');
+        const { data: roomData, error: roomError } = await supabase
+          .from('multiplayer_rooms')
+          .select('id, name, host_id, max_players, subject, difficulty, question_count, game_mode, status, created_at, current_question, started_at, finished_at, has_password')
+          .eq('id', roomId)
+          .in('status', ['waiting', 'countdown', 'playing'])
+          .single();
+        if (roomError || !roomData) throw roomError || new Error('Room is no longer available');
+
+        const room: Room = {
+          id: roomData.id,
+          name: roomData.name,
+          host: roomData.host_id,
+          hostName: undefined,
+          players: [],
+          maxPlayers: roomData.max_players,
+          hasPassword: Boolean(roomData.has_password),
+          gameSettings: {
+            subject: roomData.subject || 'Mixed',
+            difficulty: (roomData.difficulty || 'Medium') as Room['gameSettings']['difficulty'],
+            questionCount: roomData.question_count || 10,
+            timePerQuestion: 30,
+            gameMode: roomData.game_mode === 'speed' ? 'speed' : 'accuracy',
+          },
+          status: roomData.status as Room['status'],
+          createdAt: new Date(roomData.created_at),
+        };
+        setCurrentRoom(room);
+        toast.success(existingMembership ? `Rejoined ${roomData.name}!` : `Joined ${roomData.name}!`);
+        await fetchRooms();
+        joined = true;
+      } catch (err: any) {
+        console.error('Error joining room:', err);
+        toast.error(err?.message || 'Failed to join room');
       }
-
-      const room: Room = {
-        id: roomData.id,
-        name: roomData.name,
-        host: roomData.host_id,
-        hostName: undefined,
-        players: [],
-        maxPlayers: roomData.max_players,
-        hasPassword: Boolean(roomData.has_password),
-        gameSettings: {
-          subject: roomData.subject || 'Mixed',
-          difficulty: (roomData.difficulty || 'Medium') as Room['gameSettings']['difficulty'],
-          questionCount: roomData.question_count || 10,
-          timePerQuestion: 30,
-          gameMode: roomData.game_mode === 'speed' ? 'speed' : 'accuracy',
-        },
-        status: roomData.status as Room['status'],
-        createdAt: new Date(roomData.created_at),
-      };
-      setCurrentRoom(room);
-      toast.success(existingMembership ? `Rejoined ${roomData.name}!` : `Joined ${roomData.name}!`);
-      await fetchRooms();
-      return true;
-    } catch (err: any) {
-      console.error('Error joining room:', err);
-      toast.error(err?.message || 'Failed to join room');
-      return false;
-    }
+    }, 'multiplayer');
+    return joined;
   };
 
   const leaveRoom = useCallback(async (roomId: string, _playerName: string) => {

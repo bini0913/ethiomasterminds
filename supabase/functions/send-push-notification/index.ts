@@ -135,6 +135,12 @@ Deno.serve(async (req) => {
         return json({ error: "Students can only send notifications for verified social events" }, 403);
       }
       if (payload.user_id && payload.user_id !== recipientId) return json({ error: "Recipient does not match the social event" }, 403);
+      const { data: blocked, error: blockCheckError } = await admin.rpc("are_users_blocked", {
+        p_user_a: authData.user.id,
+        p_user_b: recipientId,
+      });
+      if (blockCheckError) return json({ error: "Could not verify social safety settings" }, 500);
+      if (blocked) return json({ skipped: true, reason: "users_blocked", sent: 0 }, 200);
     }
 
     if (title.length > 160 || body.length > 2000) return json({ error: "Notification payload is too large" }, 400);

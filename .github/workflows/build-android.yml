@@ -61,6 +61,29 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Verify packaged Android permissions and backup policy
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq 'targetSdkVersion[[:space:]]*=[[:space:]]*36' variables.gradle
+          grep -q 'android:allowBackup="false"' app/src/main/AndroidManifest.xml
+          merged_manifest="$(find app/build/intermediates -type f -name AndroidManifest.xml | grep -E 'merged_manifest|merged_manifests' | head -n 1)"
+          if [[ -z "${merged_manifest}" ]]; then
+            echo "::error::Merged Android manifest was not produced"
+            exit 1
+          fi
+          for permission in READ_CONTACTS ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION; do
+            if grep -q "android.permission.${permission}" "${merged_manifest}"; then
+              echo "::error::Unexpected sensitive permission in merged manifest: ${permission}"
+              exit 1
+            fi
+          done
+          grep -q 'android.permission.CAMERA' "${merged_manifest}"
+          grep -q 'android.permission.RECORD_AUDIO' "${merged_manifest}"
+          grep -q 'android.permission.POST_NOTIFICATIONS' "${merged_manifest}"
+
+
       - name: Validate release AAB build
         working-directory: android
         run: ./gradlew bundleRelease --no-daemon

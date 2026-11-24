@@ -8,12 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Send, Smile, Users, MessageCircle, 
-  Bot, Flag, X, Heart, ThumbsUp, Laugh, Loader2, Plus
+  Bot, X, Heart, ThumbsUp, Laugh, Loader2, Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import ReportButton from '@/components/social/ReportButton';
+import BlockUserButton from '@/components/social/BlockUserButton';
 
 interface Message {
   id: string;
@@ -357,10 +359,6 @@ const EnhancedChatSystem: React.FC<EnhancedChatSystemProps> = ({
     );
   };
 
-  const reportMessage = (messageId: string) => {
-    toast.success('Message reported. Our moderators will review it.');
-  };
-
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -555,7 +553,7 @@ const EnhancedChatSystem: React.FC<EnhancedChatSystemProps> = ({
                       </div>
 
                       {/* Message Actions */}
-                      {message.senderId !== currentUserId && (
+                      {message.senderId !== currentUserId && !message.isNPC && (
                         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity">
                           {QUICK_REACTIONS.map(({ emoji, icon: Icon }) => (
                             <motion.button
@@ -567,13 +565,12 @@ const EnhancedChatSystem: React.FC<EnhancedChatSystemProps> = ({
                               <Icon className="h-3 w-3 text-muted-foreground" />
                             </motion.button>
                           ))}
-                          <motion.button
-                            whileHover={{ scale: 1.2 }}
-                            onClick={() => reportMessage(message.id)}
-                            className="h-6 w-6 rounded-full bg-muted/50 flex items-center justify-center hover:bg-destructive/20"
-                          >
-                            <Flag className="h-3 w-3 text-destructive" />
-                          </motion.button>
+                          <ReportButton reportedType="group_message" reportedId={message.id} size="icon" />
+                          <BlockUserButton
+                            userId={message.senderId}
+                            displayName={message.senderName}
+                            onBlocked={() => setMessages((current) => current.filter((item) => item.senderId !== message.senderId))}
+                          />
                         </div>
                       )}
                     </motion.div>
