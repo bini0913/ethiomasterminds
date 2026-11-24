@@ -36,6 +36,7 @@ const GuardianSocialAccessGate: React.FC = () => {
   const permission = useMemo<PermissionKey | null>(() => {
     const path = location.pathname;
     if (path === "/friends" || path.startsWith("/friends/")) return "allow_friends";
+    if (path === "/profile" || path.startsWith("/profile/")) return "allow_friends";
     if (path === "/chat" || path.startsWith("/chat/")) return "allow_group_chat";
     if (path === "/social" || path.startsWith("/social/")) return "allow_public_posts";
     if (path === "/multiplayer" || path.startsWith("/multiplayer/")) return "allow_multiplayer";
