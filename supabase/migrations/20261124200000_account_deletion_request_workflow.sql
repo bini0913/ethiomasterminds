@@ -74,7 +74,8 @@ begin
      or exists (select 1 from public.quizzes where created_by = p_user_id)
      or exists (select 1 from public.study_competitions where created_by = p_user_id)
      or exists (select 1 from public.tournaments where created_by = p_user_id)
-     or exists (select 1 from public.flashcards where created_by = p_user_id) then
+     or exists (select 1 from public.flashcards where created_by = p_user_id)
+     or exists (select 1 from public.library_books where uploader_id = p_user_id) then
     v_blockers := array_append(v_blockers, 'Shared learning content or groups requiring ownership transfer');
   end if;
   if exists (select 1 from public.parent_links where parent_id = p_user_id or student_id = p_user_id)
