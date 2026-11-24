@@ -232,9 +232,15 @@ begin
     r.reported_id,
     case
       when r.reported_type = 'user' then target_profile.name
-      when r.reported_type = 'post' then coalesce(post.content, 'Post unavailable')
-      when r.reported_type = 'comment' then coalesce(comment_row.content, 'Comment unavailable')
-      when r.reported_type = 'message' then coalesce(message_row.content, 'Message unavailable')
+      when r.reported_type = 'post' then post_author.name
+      when r.reported_type = 'comment' then comment_author.name
+      when r.reported_type = 'message' then message_author.name
+      when r.reported_type = 'group_message' then group_author.name
+      when r.reported_type = 'lobby_message' then lobby_author.name
+      when r.reported_type = 'room_message' then room_author.name
+      when r.reported_type = 'group_message' then coalesce(group_message.content, 'Group message unavailable')
+      when r.reported_type = 'lobby_message' then coalesce(lobby_message.content, 'Lobby message unavailable')
+      when r.reported_type = 'room_message' then coalesce(room_message.content, 'Room message unavailable')
       else null
     end,
     r.reported_type,
@@ -248,6 +254,9 @@ begin
       when r.reported_type = 'post' then left(coalesce(post.content, ''), 500)
       when r.reported_type = 'comment' then left(coalesce(comment_row.content, ''), 500)
       when r.reported_type = 'message' then left(coalesce(message_row.content, ''), 500)
+      when r.reported_type = 'group_message' then left(coalesce(group_message.content, ''), 500)
+      when r.reported_type = 'lobby_message' then left(coalesce(lobby_message.content, ''), 500)
+      when r.reported_type = 'room_message' then left(coalesce(room_message.content, ''), 500)
       else null
     end,
     r.moderation_action
@@ -255,8 +264,17 @@ begin
   left join public.profiles reporter on reporter.id = r.reporter_id
   left join public.profiles target_profile on target_profile.id = r.reported_id
   left join public.social_posts post on post.id = r.reported_id and r.reported_type = 'post'
+  left join public.profiles post_author on post_author.id = post.author_id
   left join public.social_post_comments comment_row on comment_row.id = r.reported_id and r.reported_type = 'comment'
+  left join public.profiles comment_author on comment_author.id = comment_row.user_id
   left join public.messages message_row on message_row.id = r.reported_id and r.reported_type = 'message'
+  left join public.profiles message_author on message_author.id = message_row.sender_id
+  left join public.group_messages group_message on group_message.id = r.reported_id and r.reported_type = 'group_message'
+  left join public.profiles group_author on group_author.id = group_message.sender_id
+  left join public.lobby_messages lobby_message on lobby_message.id = r.reported_id and r.reported_type = 'lobby_message'
+  left join public.profiles lobby_author on lobby_author.id = lobby_message.user_id
+  left join public.room_chat_messages room_message on room_message.id = r.reported_id and r.reported_type = 'room_message'
+  left join public.profiles room_author on room_author.id = room_message.user_id
   order by (r.reason = 'child_safety') desc, r.created_at desc
   limit greatest(1, least(coalesce(p_limit, 200), 500));
 end;
@@ -331,6 +349,21 @@ begin
       set moderation_status = 'removed', moderated_at = now(), moderated_by = auth.uid(), moderation_reason = v_reason
       where id = v_report.reported_id;
       select sender_id into v_target_user from public.messages where id = v_report.reported_id;
+    elsif v_report.reported_type = 'group_message' then
+      update public.group_messages
+      set moderation_status = 'removed', moderated_at = now(), moderated_by = auth.uid(), moderation_reason = v_reason
+      where id = v_report.reported_id;
+      select sender_id into v_target_user from public.group_messages where id = v_report.reported_id;
+    elsif v_report.reported_type = 'lobby_message' then
+      update public.lobby_messages
+      set moderation_status = 'removed', moderated_at = now(), moderated_by = auth.uid(), moderation_reason = v_reason
+      where id = v_report.reported_id;
+      select user_id into v_target_user from public.lobby_messages where id = v_report.reported_id;
+    elsif v_report.reported_type = 'room_message' then
+      update public.room_chat_messages
+      set moderation_status = 'removed', moderated_at = now(), moderated_by = auth.uid(), moderation_reason = v_reason
+      where id = v_report.reported_id;
+      select user_id into v_target_user from public.room_chat_messages where id = v_report.reported_id;
     else
       raise exception 'This report type does not reference removable content';
     end if;
