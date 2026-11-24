@@ -38,6 +38,9 @@ jobs:
         # npm install keeps CI usable until the lockfile is regenerated normally.
         run: npm install --legacy-peer-deps
 
+      - name: Verify route registry
+        run: npm run check:routes
+
       - name: TypeScript check
         run: npm run typecheck
 
