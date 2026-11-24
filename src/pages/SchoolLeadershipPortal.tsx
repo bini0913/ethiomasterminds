@@ -137,6 +137,7 @@ function ScopedLeadershipWorkspace() {
   const [attendanceDrafts, setAttendanceDrafts] = useState<Record<string, { status: string; note: string; reason: string }>>({});
   const [assessments, setAssessments] = useState<any[]>([]);
   const [homework, setHomework] = useState<any[]>([]);
+  const [contentReviews, setContentReviews] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [behaviorReports, setBehaviorReports] = useState<any[]>([]);
   const [marks, setMarks] = useState<any[]>([]);
@@ -192,6 +193,9 @@ function ScopedLeadershipWorkspace() {
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false })
         .limit(100);
+      if (can("review_assessments")) {
+        requests.contentReviews = db.rpc("school_list_pending_content_reviews", { p_school_id: schoolId });
+      }
     }
     if (can("review_results")) {
       requests.marks = db.from("school_student_marks")
@@ -263,6 +267,7 @@ function ScopedLeadershipWorkspace() {
     if (results.attendance) setAttendanceRecords(results.attendance.data ?? []);
     if (results.assessments) setAssessments(results.assessments.data ?? []);
     if (results.homework) setHomework(results.homework.data ?? []);
+    if (results.contentReviews) setContentReviews(results.contentReviews.data ?? []);
     if (results.tasks) setTasks(results.tasks.data ?? []);
     if (results.behavior) setBehaviorReports(results.behavior.data ?? []);
     if (results.marks) setMarks(results.marks.data ?? []);
@@ -383,6 +388,19 @@ function ScopedLeadershipWorkspace() {
     });
     if (error) return toast.error(error.message || "Homework review failed.");
     toast.success(approve ? "Homework approved." : "Homework returned to the teacher.");
+    await load();
+  };
+
+  const reviewContentItem = async (item: any, approve: boolean) => {
+    const isQuiz = item.content_type === "quiz";
+    const { error } = await db.rpc(
+      isQuiz ? "school_review_quiz" : "school_review_library_book",
+      isQuiz
+        ? { p_quiz_id: item.content_id, p_approved: approve, p_feedback: reviewFeedback[item.content_id] || null }
+        : { p_book_id: item.content_id, p_approved: approve, p_feedback: reviewFeedback[item.content_id] || null },
+    );
+    if (error) return toast.error(error.message || "Content review failed.");
+    toast.success(approve ? "Learning content approved." : "Learning content returned to its teacher.");
     await load();
   };
 
@@ -679,6 +697,15 @@ function ScopedLeadershipWorkspace() {
       <SchoolPanel title="Homework oversight">
         {homework.length ? <div className="space-y-2">{homework.map((item) => <div key={item.id} className="rounded-lg border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.subject_name} · {sectionName(item.section_id)} · Due {item.due_at ? new Date(item.due_at).toLocaleDateString() : "—"}</p></div><SchoolStatus value={item.status} /></div>{can("review_assessments") && item.status === "pending" && <div className="mt-3 flex flex-col gap-2"><input value={reviewFeedback[item.id] || ""} onChange={(event) => setReviewFeedback((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="Optional review feedback" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /><div className="flex flex-wrap gap-2"><button onClick={() => void reviewHomework(item.id, true)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Approve homework</button><button onClick={() => void reviewHomework(item.id, false)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Return to teacher</button></div></div>}</div>)}</div> : <SchoolEmptyState title="No homework records in scope" description="Homework assignments will appear here." />}
       </SchoolPanel>
+      {can("review_assessments") && <SchoolPanel title="Pending quizzes and library resources" description="Review school quizzes and uploaded learning resources within your active division permissions.">
+        {contentReviews.length ? <div className="space-y-3">{contentReviews.map((item) => (
+          <div key={`${item.content_type}:${item.content_id}`} className="rounded-lg border border-slate-100 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.content_type === "quiz" ? "School quiz" : "Library resource"} · {item.subject_name} · {item.grade_label} · {sectionName(item.section_id)}</p><p className="mt-1 text-xs text-slate-500">Submitted by {item.submitted_by_name} · {new Date(item.submitted_at).toLocaleDateString()}</p></div><SchoolStatus value="pending" /></div>
+            <input value={reviewFeedback[item.content_id] || ""} onChange={(event) => setReviewFeedback((current) => ({ ...current, [item.content_id]: event.target.value }))} placeholder="Optional review feedback" className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+            <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => void reviewContentItem(item, true)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Approve</button><button onClick={() => void reviewContentItem(item, false)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Return to teacher</button></div>
+          </div>
+        ))}</div> : <SchoolEmptyState title="No pending quizzes or resources" description="Teacher-submitted school quizzes and library resources will appear here when they need review." />}
+      </SchoolPanel>}
       {can("review_results") && <SchoolPanel title="Marks and results oversight" description="Marks visible to your appointment. Official calculation and publication remain with the authorized school academic leadership workflow.">
         {marks.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Student</th><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Score</th><th className="pb-2">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{marks.map((mark) => { const student = members.find((item) => item.id === mark.student_membership_id); const assessment = assessments.find((item) => item.id === mark.assessment_id); return <tr key={mark.id}><td className="py-3 font-medium text-slate-800">{memberName(mark.student_membership_id)}</td><td className="py-3 text-slate-600">{assessment?.title || "Assessment"}</td><td className="py-3 text-slate-600">{student?.grade_label || "—"}</td><td className="py-3 tabular-nums text-slate-700">{mark.score ?? "—"}</td><td className="py-3"><SchoolStatus value={mark.status} /></td></tr>; })}</tbody></table></div> : <SchoolEmptyState title="No marks available" description="Teacher-entered marks will appear here when records are available within your scope." />}
       </SchoolPanel>}
