@@ -26,6 +26,11 @@ select ok(
   and exists (select 1 from information_schema.columns where table_schema='public' and table_name='guardian_social_controls' and column_name='allow_study_calls' and column_default like '%false%'),
   'every guardian-controlled feature defaults off'
 );
+select ok(
+  exists (select 1 from information_schema.columns where table_schema='public' and table_name='guardian_consent_requests' and column_name='guardian_attested_at')
+  and exists (select 1 from information_schema.columns where table_schema='public' and table_name='guardian_consent_requests' and column_name='guardian_attestation_version'),
+  'guardian approval stores adult attestation evidence and its version'
+);
 select ok(exists(select 1 from pg_trigger where tgrelid='public.profiles'::regclass and tgname='profiles_guardian_consent_guard' and not tgisinternal), 'profile consent is guarded by a verified approval trigger');
 select ok(exists(select 1 from pg_trigger where tgrelid='public.social_posts'::regclass and tgname='guardian_check_social_posts' and not tgisinternal), 'social post creation and updates are guardian-gated');
 select ok(exists(select 1 from pg_trigger where tgrelid='public.messages'::regclass and tgname='guardian_check_messages' and not tgisinternal), 'direct messages are guardian-gated');
