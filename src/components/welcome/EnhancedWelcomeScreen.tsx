@@ -42,6 +42,7 @@ const EnhancedWelcomeScreen: React.FC<EnhancedWelcomeScreenProps> = ({ onContinu
       >
         Teacher, parent or staff? Sign in here
       </button>
+      <LegalLinksFooter />
     </footer>
   </main>
 );
