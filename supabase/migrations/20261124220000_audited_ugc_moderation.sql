@@ -1,3 +1,31 @@
+-- Preserve the exact reported text for authorised moderation review before removal.
+-- Only platform moderators can inspect archived evidence; clients cannot create or alter it.
+create table if not exists public.moderation_content_archive (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references public.reports(id) on delete restrict,
+  target_type text not null check (target_type in ('post', 'comment', 'message', 'group_message', 'lobby_message', 'room_message')),
+  target_id uuid not null,
+  content_snapshot jsonb not null,
+  removed_by uuid references auth.users(id) on delete set null,
+  removed_at timestamptz not null default now(),
+  constraint moderation_content_archive_report_unique unique (report_id)
+);
+
+create index if not exists moderation_content_archive_target_idx
+  on public.moderation_content_archive (target_type, target_id, removed_at desc);
+
+alter table public.moderation_content_archive enable row level security;
+revoke all on public.moderation_content_archive from public, anon, authenticated;
+grant select on public.moderation_content_archive to authenticated;
+
+drop policy if exists "Platform moderators can view archived moderation content" on public.moderation_content_archive;
+create policy "Platform moderators can view archived moderation content"
+  on public.moderation_content_archive for select to authenticated
+  using (
+    public.has_role((select auth.uid()), 'admin'::public.app_role)
+    or public.has_role((select auth.uid()), 'extreme_admin'::public.app_role)
+  );
+
 -- Moderation actions are server-authoritative and auditable.
 create table if not exists public.moderation_actions (
   id uuid primary key default gen_random_uuid(),
@@ -154,26 +182,32 @@ begin
       )
       when 'post' then coalesce(
         (select left(p.content, 500) from public.social_posts p where p.id = r.reported_id),
+        (select left(a.content_snapshot ->> 'content', 500) from public.moderation_content_archive a where a.report_id = r.id),
         'Reported content is no longer available'
       )
       when 'comment' then coalesce(
         (select left(c.content, 500) from public.social_post_comments c where c.id = r.reported_id),
+        (select left(a.content_snapshot ->> 'content', 500) from public.moderation_content_archive a where a.report_id = r.id),
         'Reported content is no longer available'
       )
       when 'message' then coalesce(
         (select left(m.content, 500) from public.messages m where m.id = r.reported_id),
+        (select left(a.content_snapshot ->> 'content', 500) from public.moderation_content_archive a where a.report_id = r.id),
         'Reported content is no longer available'
       )
       when 'group_message' then coalesce(
         (select left(m.content, 500) from public.group_messages m where m.id = r.reported_id),
+        (select left(a.content_snapshot ->> 'content', 500) from public.moderation_content_archive a where a.report_id = r.id),
         'Reported content is no longer available'
       )
       when 'lobby_message' then coalesce(
         (select left(m.content, 500) from public.lobby_messages m where m.id = r.reported_id),
+        (select left(a.content_snapshot ->> 'content', 500) from public.moderation_content_archive a where a.report_id = r.id),
         'Reported content is no longer available'
       )
       when 'room_message' then coalesce(
         (select left(m.content, 500) from public.room_chat_messages m where m.id = r.reported_id),
+        (select left(a.content_snapshot ->> 'content', 500) from public.moderation_content_archive a where a.report_id = r.id),
         'Reported content is no longer available'
       )
       else 'No preview is available for this report type'
@@ -200,6 +234,9 @@ declare
   v_actor uuid := auth.uid();
   v_report public.reports%rowtype;
   v_new_status text;
+  v_target_content text;
+  v_target_has_student_role boolean := false;
+  v_target_has_non_student_role boolean := false;
   v_reason text := nullif(left(trim(coalesce(p_reason, '')), 1000), '');
 begin
   if v_actor is null then raise exception using errcode = '42501', message = 'Authentication required'; end if;
@@ -223,30 +260,128 @@ begin
     when 'dismiss' then
       v_new_status := 'dismissed';
     when 'remove_content' then
+      -- Capture the reported text before removing the item from its public surface.
       case v_report.reported_type
         when 'post' then
-          delete from public.social_posts where id = v_report.reported_id;
+          select p.content into v_target_content from public.social_posts p where p.id = v_report.reported_id;
         when 'comment' then
-          delete from public.social_post_comments where id = v_report.reported_id;
+          select c.content into v_target_content from public.social_post_comments c where c.id = v_report.reported_id;
         when 'message' then
-          delete from public.messages where id = v_report.reported_id;
+          select m.content into v_target_content from public.messages m where m.id = v_report.reported_id;
         when 'group_message' then
-          delete from public.group_messages where id = v_report.reported_id;
+          select m.content into v_target_content from public.group_messages m where m.id = v_report.reported_id;
         when 'lobby_message' then
-          delete from public.lobby_messages where id = v_report.reported_id;
+          select m.content into v_target_content from public.lobby_messages m where m.id = v_report.reported_id;
         when 'room_message' then
-          delete from public.room_chat_messages where id = v_report.reported_id;
+          select m.content into v_target_content from public.room_chat_messages m where m.id = v_report.reported_id;
         else
           raise exception 'This report type does not support content removal';
       end case;
+
+      if v_target_content is null then
+        raise exception 'Reported content is no longer available to archive';
+      end if;
+
+      insert into public.moderation_content_archive(
+        report_id, target_type, target_id, content_snapshot, removed_by
+      )
+      values (
+        v_report.id,
+        v_report.reported_type,
+        v_report.reported_id,
+        jsonb_build_object('content', v_target_content),
+        v_actor
+      );
+
+      case v_report.reported_type
+        when 'post' then delete from public.social_posts where id = v_report.reported_id;
+        when 'comment' then delete from public.social_post_comments where id = v_report.reported_id;
+        when 'message' then delete from public.messages where id = v_report.reported_id;
+        when 'group_message' then delete from public.group_messages where id = v_report.reported_id;
+        when 'lobby_message' then delete from public.lobby_messages where id = v_report.reported_id;
+        when 'room_message' then delete from public.room_chat_messages where id = v_report.reported_id;
+      end case;
+
       v_new_status := 'resolved';
     when 'suspend_user' then
       if v_report.reported_type <> 'user' then raise exception 'Only user reports can suspend an account'; end if;
+      if v_report.reported_id = v_actor then raise exception 'Moderators cannot suspend their own account'; end if;
+
+      select
+        exists (
+          select 1 from public.user_roles ur
+          where ur.user_id = v_report.reported_id
+            and ur.role = 'student'::public.app_role
+        )
+        or exists (
+          select 1 from public.school_memberships sm
+          where sm.user_id = v_report.reported_id
+            and sm.status = 'active'
+            and sm.school_role::text = 'student'
+        )
+      into v_target_has_student_role;
+
+      select
+        exists (
+          select 1 from public.user_roles ur
+          where ur.user_id = v_report.reported_id
+            and ur.role <> 'student'::public.app_role
+        )
+        or exists (
+          select 1 from public.school_memberships sm
+          where sm.user_id = v_report.reported_id
+            and sm.status = 'active'
+            and sm.school_role::text <> 'student'
+        )
+      into v_target_has_non_student_role;
+
+      if not public.has_role(v_actor, 'extreme_admin'::public.app_role)
+         and (not v_target_has_student_role or v_target_has_non_student_role) then
+        raise exception using errcode = '42501',
+          message = 'Only Extreme Admin may suspend non-student or mixed-role accounts';
+      end if;
+
       update public.profiles set account_status = 'suspended' where id = v_report.reported_id;
       if not found then raise exception 'Reported account was not found'; end if;
       v_new_status := 'resolved';
     when 'ban_user' then
       if v_report.reported_type <> 'user' then raise exception 'Only user reports can ban an account'; end if;
+      if v_report.reported_id = v_actor then raise exception 'Moderators cannot ban their own account'; end if;
+
+      select
+        exists (
+          select 1 from public.user_roles ur
+          where ur.user_id = v_report.reported_id
+            and ur.role = 'student'::public.app_role
+        )
+        or exists (
+          select 1 from public.school_memberships sm
+          where sm.user_id = v_report.reported_id
+            and sm.status = 'active'
+            and sm.school_role::text = 'student'
+        )
+      into v_target_has_student_role;
+
+      select
+        exists (
+          select 1 from public.user_roles ur
+          where ur.user_id = v_report.reported_id
+            and ur.role <> 'student'::public.app_role
+        )
+        or exists (
+          select 1 from public.school_memberships sm
+          where sm.user_id = v_report.reported_id
+            and sm.status = 'active'
+            and sm.school_role::text <> 'student'
+        )
+      into v_target_has_non_student_role;
+
+      if not public.has_role(v_actor, 'extreme_admin'::public.app_role)
+         and (not v_target_has_student_role or v_target_has_non_student_role) then
+        raise exception using errcode = '42501',
+          message = 'Only Extreme Admin may ban non-student or mixed-role accounts';
+      end if;
+
       update public.profiles set account_status = 'banned' where id = v_report.reported_id;
       if not found then raise exception 'Reported account was not found'; end if;
       v_new_status := 'resolved';
