@@ -281,7 +281,10 @@ begin
   if auth.uid() = v_request.student_id then raise exception 'The learner cannot approve their own guardian request'; end if;
 
   select age into v_guardian_age from public.profiles where id = auth.uid();
-  if coalesce(v_guardian_age, 0) < 18
+  if v_guardian_age is not null and v_guardian_age < 18 then
+    raise exception 'A verified adult guardian account is required';
+  end if;
+  if v_guardian_age is null
      and not exists (select 1 from public.user_roles where user_id = auth.uid() and role = 'parent'::public.app_role) then
     raise exception 'A verified adult guardian account is required';
   end if;
