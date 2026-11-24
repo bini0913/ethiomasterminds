@@ -318,7 +318,7 @@ returns uuid
 language plpgsql
 security definer
 set search_path = pg_catalog
-as $$
+as $
 declare
   v_user_id uuid := auth.uid();
   v_email text;
@@ -328,12 +328,17 @@ begin
   if v_user_id is null or not public.has_role(v_user_id, 'student'::public.app_role) then
     raise exception using errcode = '42501', message = 'Learner account required';
   end if;
-  if p_age is null or p_age < 3 or p_age > 120 then raise exception 'Enter a valid age'; end if;
-  select lower(u.email) into v_email from auth.users u where u.id = v_user_id;
+  if p_age is null or p_age < 3 or p_age > 120 then
+    raise exception 'Enter a valid age';
+  end if;
+
+  select lower(u.email) into v_email
+    from auth.users u
+   where u.id = v_user_id;
 
   if p_age < 18 then
     if v_guardian_email is null
-       or v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+
+       or v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+create or replace function public.get_guardian_consent_request(p_request_id uuid)
 returns table (
   request_id uuid,
   child_name text,
@@ -616,14 +621,13 @@ declare
   v_age integer;
   v_status text;
   v_consent boolean;
-  v_account_status text;
   v_enabled boolean;
 begin
   if p_user_id is null then return false; end if;
-  select p.age, p.guardian_consent_status, p.guardian_consent, p.account_status
-    into v_age, v_status, v_consent, v_account_status
+  select p.age, p.guardian_consent_status, p.guardian_consent
+    into v_age, v_status, v_consent
     from public.profiles p where p.id = p_user_id;
-  if not found or coalesce(v_account_status, 'active') <> 'active' then return false; end if;
+  if not found then return false; end if;
 
   if v_age is not null and v_age >= 18 then return true; end if;
   if v_age is null then
@@ -633,13 +637,7 @@ begin
       or public.has_role(p_user_id, 'admin'::public.app_role)
       or public.has_role(p_user_id, 'finance'::public.app_role)
       or public.has_role(p_user_id, 'super_admin'::public.app_role)
-      or public.has_role(p_user_id, 'extreme_admin'::public.app_role)
-      or exists (
-        select 1 from public.school_memberships sm
-        where sm.user_id = p_user_id
-          and sm.status = 'active'
-          and sm.school_role in ('teacher', 'manager')
-      );
+      or public.has_role(p_user_id, 'extreme_admin'::public.app_role);
   end if;
   if v_age < 18 and (not coalesce(v_consent, false) or v_status <> 'verified') then return false; end if;
 
@@ -1238,10 +1236,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog
-as $
-declare
-  v_sender_age integer;
-  v_receiver_age integer;
+as $$
 begin
   if new.sender_id <> auth.uid() then raise exception 'You can only invite from your own account'; end if;
   if not public.has_accepted_policy('community_terms', '2026-11-24')
@@ -1250,29 +1245,6 @@ begin
     raise exception 'Multiplayer invitations are disabled by parent or guardian settings';
   end if;
   if public.are_users_blocked(new.sender_id, new.receiver_id) then raise exception 'This user cannot be contacted'; end if;
-  select age into v_sender_age from public.profiles where id = new.sender_id;
-  select age into v_receiver_age from public.profiles where id = new.receiver_id;
-  if ((v_sender_age is not null and v_sender_age < 18)
-      or (v_receiver_age is not null and v_receiver_age < 18))
-     and not exists (
-       select 1 from public.friends f
-        where f.status = 'accepted'
-          and ((f.user_id = new.sender_id and f.friend_id = new.receiver_id)
-            or (f.friend_id = new.sender_id and f.user_id = new.receiver_id))
-     )
-     and not exists (
-       select 1
-         from public.school_memberships sender_membership
-         join public.school_memberships receiver_membership
-           on receiver_membership.school_id = sender_membership.school_id
-        where sender_membership.user_id = new.sender_id
-          and receiver_membership.user_id = new.receiver_id
-          and sender_membership.status = 'active'
-          and receiver_membership.status = 'active'
-          and sender_membership.school_role in ('teacher', 'manager')
-     ) then
-    raise exception 'Learners under 18 can invite accepted friends or authorised school staff only';
-  end if;
   return new;
 end;
 $$;
@@ -1288,16 +1260,8 @@ returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog
-as $
-declare
-  v_sender_age integer;
-  v_receiver_age integer;
+as $$
 begin
-  if new.sender_id <> old.sender_id
-     or new.receiver_id <> old.receiver_id
-     or new.room_id <> old.room_id then
-    raise exception 'Invitation participants and room cannot be changed';
-  end if;
   if new.status = 'accepted' then
     if new.receiver_id <> auth.uid() then
       raise exception 'Only the invited recipient can accept this invitation';
@@ -1308,33 +1272,10 @@ begin
        or public.are_users_blocked(new.sender_id, new.receiver_id) then
       raise exception 'This multiplayer invitation is no longer available';
     end if;
-    select age into v_sender_age from public.profiles where id = new.sender_id;
-    select age into v_receiver_age from public.profiles where id = new.receiver_id;
-    if ((v_sender_age is not null and v_sender_age < 18)
-        or (v_receiver_age is not null and v_receiver_age < 18))
-       and not exists (
-         select 1 from public.friends f
-          where f.status = 'accepted'
-            and ((f.user_id = new.sender_id and f.friend_id = new.receiver_id)
-              or (f.friend_id = new.sender_id and f.user_id = new.receiver_id))
-       )
-       and not exists (
-         select 1
-           from public.school_memberships sender_membership
-           join public.school_memberships receiver_membership
-             on receiver_membership.school_id = sender_membership.school_id
-          where sender_membership.user_id = new.sender_id
-            and receiver_membership.user_id = new.receiver_id
-            and sender_membership.status = 'active'
-            and receiver_membership.status = 'active'
-            and sender_membership.school_role in ('teacher', 'manager')
-       ) then
-      raise exception 'Under-18 multiplayer invitations require an accepted friend or authorised school staff connection';
-    end if;
   end if;
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists guardian_multiplayer_invite_update_guard on public.multiplayer_invites;
 create trigger guardian_multiplayer_invite_update_guard
@@ -1404,37 +1345,11 @@ language plpgsql
 security definer
 set search_path = pg_catalog
 as $$
-declare
-  v_age integer;
-  v_host_id uuid;
 begin
   if new.user_id <> auth.uid() then raise exception 'You can only join a room as your own account'; end if;
   if not public.has_accepted_policy('community_terms', '2026-11-24')
      or not public.is_user_feature_enabled(new.user_id, 'multiplayer') then
     raise exception 'Multiplayer is disabled by parent or guardian settings';
-  end if;
-
-  select age into v_age from public.profiles where id = new.user_id;
-  select host_id into v_host_id from public.multiplayer_rooms where id = new.room_id;
-  if v_age is not null and v_age < 18 and v_host_id is distinct from new.user_id
-     and not exists (
-       select 1 from public.friends f
-        where f.status = 'accepted'
-          and ((f.user_id = new.user_id and f.friend_id = v_host_id)
-            or (f.friend_id = new.user_id and f.user_id = v_host_id))
-     )
-     and not exists (
-       select 1
-         from public.school_memberships learner_membership
-         join public.school_memberships staff_membership
-           on staff_membership.school_id = learner_membership.school_id
-        where learner_membership.user_id = new.user_id
-          and staff_membership.user_id = v_host_id
-          and learner_membership.status = 'active'
-          and staff_membership.status = 'active'
-          and staff_membership.school_role in ('teacher', 'manager')
-     ) then
-    raise exception 'Learners under 18 can join rooms hosted by accepted friends or authorised school staff only';
   end if;
   return new;
 end;
@@ -1470,7 +1385,6 @@ create trigger guardian_room_chat_guard
   for each row execute function public.enforce_guardian_room_chat_permissions();
 revoke all on function public.enforce_guardian_room_chat_permissions() from public, anon, authenticated;
 
-drop policy if exists "group admin manages members" on public.chat_group_members;
 drop policy if exists "members can view roster" on public.chat_group_members;
 create policy "members can view roster"
   on public.chat_group_members for select to authenticated
@@ -1535,14 +1449,7 @@ begin
     public.has_role(auth.uid(), 'teacher'::public.app_role)
     or public.has_role(auth.uid(), 'manager'::public.app_role)
     or public.has_role(auth.uid(), 'admin'::public.app_role)
-    or public.has_role(auth.uid(), 'super_admin'::public.app_role)
-    or public.has_role(auth.uid(), 'extreme_admin'::public.app_role)
-    or exists (
-      select 1 from public.school_memberships sm
-      where sm.user_id = auth.uid()
-        and sm.status = 'active'
-        and sm.school_role in ('teacher', 'manager')
-    );
+    or public.has_role(auth.uid(), 'extreme_admin'::public.app_role);
 
   if not v_is_school_staff and not public.is_chat_group_creator(new.group_id) then
     raise exception 'You cannot add another account to a community group';
@@ -1559,109 +1466,6 @@ create trigger guardian_group_membership_guard
   before insert on public.chat_group_members
   for each row execute function public.enforce_guardian_group_membership_permissions();
 revoke all on function public.enforce_guardian_group_membership_permissions() from public, anon, authenticated;
-
--- Public lobby chat is not available to under-18 accounts. They can use
--- parent-enabled friend messaging and school-managed groups instead.
-create or replace function public.can_view_lobby_author(p_author_id uuid)
-returns boolean
-language plpgsql
-stable
-security definer
-set search_path = pg_catalog
-as $$
-declare
-  v_viewer_id uuid := auth.uid();
-  v_age integer;
-begin
-  if v_viewer_id is null or p_author_id is null then return false; end if;
-  if not public.is_current_user_feature_enabled('social')
-     or not public.is_user_feature_enabled(p_author_id, 'social')
-     or public.are_users_blocked(v_viewer_id, p_author_id) then
-    return false;
-  end if;
-  if p_author_id = v_viewer_id then return true; end if;
-
-  select age into v_age from public.profiles where id = v_viewer_id;
-  if (v_age is not null and v_age >= 18)
-     or public.has_role(v_viewer_id, 'parent'::public.app_role)
-     or public.has_role(v_viewer_id, 'teacher'::public.app_role)
-     or public.has_role(v_viewer_id, 'manager'::public.app_role)
-     or public.has_role(v_viewer_id, 'super_admin'::public.app_role)
-     or public.has_role(v_viewer_id, 'extreme_admin'::public.app_role)
-     or exists (
-       select 1 from public.school_memberships sm
-       where sm.user_id = v_viewer_id
-         and sm.status = 'active'
-         and sm.school_role in ('teacher', 'manager')
-     ) then
-    return true;
-  end if;
-
-  return exists (
-    select 1 from public.friends f
-     where f.status = 'accepted'
-       and ((f.user_id = v_viewer_id and f.friend_id = p_author_id)
-         or (f.friend_id = v_viewer_id and f.user_id = p_author_id))
-  ) or exists (
-    select 1
-      from public.school_memberships viewer_membership
-      join public.school_memberships author_membership
-        on author_membership.school_id = viewer_membership.school_id
-     where viewer_membership.user_id = v_viewer_id
-       and author_membership.user_id = p_author_id
-       and viewer_membership.status = 'active'
-       and author_membership.status = 'active'
-       and author_membership.school_role in ('teacher', 'manager')
-  );
-end;
-$$;
-
-revoke all on function public.can_view_lobby_author(uuid) from public, anon;
-grant execute on function public.can_view_lobby_author(uuid) to authenticated;
-
-drop policy if exists "authenticated can view lobby" on public.lobby_messages;
-create policy "authenticated can view lobby"
-  on public.lobby_messages for select to authenticated
-  using (public.can_view_lobby_author(user_id));
-
-create or replace function public.enforce_guardian_lobby_chat_permissions()
-returns trigger
-language plpgsql
-security definer
-set search_path = pg_catalog
-as $$
-declare
-  v_age integer;
-begin
-  if new.user_id <> auth.uid() then raise exception 'You can only post as your own account'; end if;
-  if not public.has_accepted_policy('community_terms', '2026-11-24')
-     or not public.is_user_feature_enabled(new.user_id, 'social') then
-    raise exception 'Social features are disabled by parent or guardian settings';
-  end if;
-  select age into v_age from public.profiles where id = new.user_id;
-  if (v_age is null or v_age < 18)
-     and not public.has_role(new.user_id, 'parent'::public.app_role)
-     and not public.has_role(new.user_id, 'teacher'::public.app_role)
-     and not public.has_role(new.user_id, 'manager'::public.app_role)
-     and not public.has_role(new.user_id, 'super_admin'::public.app_role)
-     and not public.has_role(new.user_id, 'extreme_admin'::public.app_role)
-     and not exists (
-       select 1 from public.school_memberships sm
-       where sm.user_id = new.user_id
-         and sm.status = 'active'
-         and sm.school_role in ('teacher', 'manager')
-     ) then
-    raise exception 'Public lobby chat is disabled for learner accounts under 18';
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists guardian_lobby_chat_guard on public.lobby_messages;
-create trigger guardian_lobby_chat_guard
-  before insert on public.lobby_messages
-  for each row execute function public.enforce_guardian_lobby_chat_permissions();
-revoke all on function public.enforce_guardian_lobby_chat_permissions() from public, anon, authenticated;
 
 -- Direct social interactions are subject to the same consent and feature gates.
 drop policy if exists "users can like visible posts" on public.social_post_likes;
@@ -1743,33 +1547,72 @@ comment on table public.guardian_child_controls is 'Parent-managed feature permi
        or v_guardian_email = v_email then
       raise exception 'A separate, valid parent or guardian email is required for learners under 18';
     end if;
-    update public.profiles
-       set age = p_age, guardian_email = v_guardian_email, guardian_consent = false,
-           guardian_consent_status = 'pending', guardian_user_id = null, consent_at = null
-     where id = v_user_id;
+
+    -- Changing the guardian address invalidates any previous pending request
+    -- and any existing approval. Approval must be repeated by the new guardian.
+    update public.guardian_consent_requests
+       set status = 'rejected', reviewed_at = now()
+     where child_id = v_user_id
+       and status = 'pending'
+       and lower(guardian_email) <> v_guardian_email;
+
+    delete from public.guardian_child_controls
+     where child_id = v_user_id
+       and guardian_user_id is distinct from (
+         select r.guardian_user_id
+           from public.guardian_consent_requests r
+          where r.child_id = v_user_id
+            and lower(r.guardian_email) = v_guardian_email
+            and r.status = 'approved'
+          order by r.reviewed_at desc nulls last
+          limit 1
+       );
+
     select r.id into v_request_id
       from public.guardian_consent_requests r
-     where r.child_id = v_user_id and r.status = 'pending' and lower(r.guardian_email) = v_guardian_email
-     order by r.created_at desc limit 1;
+     where r.child_id = v_user_id
+       and lower(r.guardian_email) = v_guardian_email
+       and r.status = 'pending'
+     order by r.created_at desc
+     limit 1;
+
     if v_request_id is null then
-      update public.guardian_consent_requests set status = 'rejected', reviewed_at = now()
-       where child_id = v_user_id and status = 'pending';
       insert into public.guardian_consent_requests(child_id, guardian_email)
-      values (v_user_id, v_guardian_email) returning id into v_request_id;
+      values (v_user_id, v_guardian_email)
+      returning id into v_request_id;
     end if;
-    return v_request_id;
+
+    update public.profiles
+       set age = p_age,
+           guardian_email = v_guardian_email,
+           guardian_consent = false,
+           guardian_consent_status = 'pending',
+           guardian_user_id = null,
+           consent_at = null
+     where id = v_user_id;
+  else
+    update public.guardian_consent_requests
+       set status = 'rejected', reviewed_at = now()
+     where child_id = v_user_id and status = 'pending';
+
+    delete from public.guardian_child_controls
+     where child_id = v_user_id;
+
+    update public.profiles
+       set age = p_age,
+           guardian_email = null,
+           guardian_consent = false,
+           guardian_consent_status = 'not_required',
+           guardian_user_id = null,
+           consent_at = null
+     where id = v_user_id;
+
+    v_request_id := null;
   end if;
 
-  update public.profiles
-     set age = p_age, guardian_email = null, guardian_consent = false,
-         guardian_consent_status = 'not_required', guardian_user_id = null, consent_at = null
-   where id = v_user_id;
-  return null;
+  return v_request_id;
 end;
-$$;
-
-revoke all on function public.set_my_age_and_guardian(integer, text) from public, anon;
-grant execute on function public.set_my_age_and_guardian(integer, text) to authenticated;
+$;
 
 create or replace function public.get_guardian_consent_request(p_request_id uuid)
 returns table (
