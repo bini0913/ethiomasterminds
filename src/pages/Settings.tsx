@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { safeStorage } from "@/lib/safeStorage";
 import { getUserTier } from "@/lib/getUserTier";
+import BlockedUsersPanel from "@/components/social/BlockedUsersPanel";
 
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 const SETTINGS_PREFERENCES_STORAGE_KEY = "masterminds-settings-preferences-v1";
@@ -416,6 +417,7 @@ const Settings: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
+              <BlockedUsersPanel />
               <Card className="glass neon-border">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3">
