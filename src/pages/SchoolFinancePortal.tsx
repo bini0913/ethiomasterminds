@@ -54,6 +54,7 @@ export default function SchoolFinancePortal() {
   const load = useCallback(async () => {
     if (!schoolId) return;
     setLoading(true);
+    try {
     const [
       feesRes, invoicesRes, paymentsRes, followupsRes, membersRes,
       sectionsRes, yearsRes, auditRes,
@@ -86,6 +87,12 @@ export default function SchoolFinancePortal() {
       const { data: profileRows, error: profileError } = await db.from("profiles").select("id,name,username").in("id", userIds);
       if (profileError) toast.error(profileError.message);
       setProfiles(Object.fromEntries((profileRows ?? []).map((profile: any) => [profile.id, profile])));
+    }
+    } catch (error: unknown) {
+      console.error("[Master Minds] SchoolFinancePortal.tsx data load failed", error);
+      toast.error(error instanceof Error ? error.message : "This workspace could not load its records. Please retry.");
+    } finally {
+      setLoading(false);
     }
     setLoading(false);
   }, [schoolId, db]);
