@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
 
-type PermissionKey = "allow_friends" | "allow_group_chat" | "allow_public_posts" | "allow_multiplayer";
+type PermissionKey = "allow_friends" | "allow_direct_messages" | "allow_group_chat" | "allow_public_posts" | "allow_multiplayer" | "allow_study_calls";
 
 type SocialAccess = {
   age: number | null;
@@ -20,7 +20,9 @@ type SocialAccess = {
   allow_study_calls: boolean;
 };
 
-const GuardianSocialAccessGate: React.FC = () => {
+type GuardianSocialAccessGateProps = { featureOverride?: PermissionKey };
+
+const GuardianSocialAccessGate: React.FC<GuardianSocialAccessGateProps> = ({ featureOverride }) => {
   const { user } = useUser();
   const location = useLocation();
   const navigate = useNavigate();
@@ -34,6 +36,7 @@ const GuardianSocialAccessGate: React.FC = () => {
   const [retry, setRetry] = useState(0);
 
   const permission = useMemo<PermissionKey | null>(() => {
+    if (featureOverride) return featureOverride;
     const path = location.pathname;
     if (path === "/friends" || path.startsWith("/friends/")) return "allow_friends";
     if (path === "/profile" || path.startsWith("/profile/")) return "allow_friends";
@@ -43,7 +46,7 @@ const GuardianSocialAccessGate: React.FC = () => {
     if (path === "/lobby" || path.startsWith("/lobby/")) return "allow_multiplayer";
     if (path === "/tournaments" || path.startsWith("/tournaments/")) return "allow_multiplayer";
     return null;
-  }, [location.pathname]);
+  }, [location.pathname, featureOverride]);
 
   const loadAccess = useCallback(async () => {
     if (!user?.id || !permission) {
@@ -118,9 +121,11 @@ const GuardianSocialAccessGate: React.FC = () => {
 
   const featureNames: Record<string, string> = {
     allow_friends: "friend connections",
+    allow_direct_messages: "direct messages",
     allow_group_chat: "group chat",
     allow_public_posts: "social posts and comments",
     allow_multiplayer: "multiplayer and tournament features",
+    allow_study_calls: "Study Mode calls",
   };
   const featureName = featureNames[permission] || "this social feature";
 
