@@ -115,10 +115,10 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (!friendship) return json({ error: "Messages can only notify accepted friends" }, 403);
         recipientId = event.receiver_id;
-        const { data: profile } = await admin.from("profiles").select("name,username").eq("id", authData.user.id).maybeSingle();
-        const senderName = profile?.name || profile?.username || "Your friend";
-        title = senderName;
-        body = String(event.content ?? "").slice(0, 180);
+        // Keep private message text and sender identity out of FCM payloads and lock-screen previews.
+        // The recipient opens the authenticated conversation to read the message.
+        title = "New message";
+        body = "You have a new message. Open Master Minds to view it.";
         route = "/friends";
         eventData = { message_id: event.id, sender_id: event.sender_id, route, action: "reply" };
       } else if (payload.kind === "study_call_invite") {
