@@ -1557,16 +1557,7 @@ comment on table public.guardian_child_controls is 'Parent-managed feature permi
        and lower(guardian_email) <> v_guardian_email;
 
     delete from public.guardian_child_controls
-     where child_id = v_user_id
-       and guardian_user_id is distinct from (
-         select r.guardian_user_id
-           from public.guardian_consent_requests r
-          where r.child_id = v_user_id
-            and lower(r.guardian_email) = v_guardian_email
-            and r.status = 'approved'
-          order by r.reviewed_at desc nulls last
-          limit 1
-       );
+     where child_id = v_user_id;
 
     select r.id into v_request_id
       from public.guardian_consent_requests r
