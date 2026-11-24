@@ -1,6 +1,7 @@
 import { db } from "@/integrations/untypedClient";
 import React, { useEffect, useMemo, useState } from 'react';
 import FinanceOversightCard from "@/components/portals/FinanceOversightCard";
+import AccountDeletionRequestsPanel from "@/components/admin/AccountDeletionRequestsPanel";
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
@@ -1498,6 +1499,7 @@ const AdminPortal: React.FC = () => {
 
             <TabsContent value="reports" className="space-y-4">
               <Card><CardHeader><CardTitle className="flex items-center gap-2"><Flag className="w-4 h-4 text-destructive" />Reports & Flags</CardTitle><CardDescription>Child-safety reports are prioritized. Content removal and account suspension are audited server-side.</CardDescription></CardHeader><CardContent><ScrollArea className="h-[620px]"><div className="space-y-3">{reports.map((report) => (<div key={report.id} className="border rounded-xl p-3"><div className="flex flex-wrap items-center gap-2 mb-2"><Badge variant={report.status === 'pending' ? 'destructive' : 'outline'}>{report.status}</Badge>{report.reason === 'child_safety' && <Badge variant="destructive">Child safety priority</Badge>}<Badge variant="outline">{report.reported_type}</Badge><span className="text-xs text-muted-foreground">{new Date(report.created_at).toLocaleString()}</span></div><p className="text-sm font-medium">{report.reason.replaceAll('_', ' ')}</p><p className="text-xs text-muted-foreground">Reporter: {report.reporter_name || 'Unknown'}{report.reported_name ? ` · Reported: ${report.reported_name}` : ''}</p>{report.content_preview && <p className="mt-2 rounded-lg bg-muted/50 p-3 text-sm whitespace-pre-wrap break-words">{report.content_preview}</p>}{report.description && <p className="text-sm italic mt-2">{report.description}</p>}{report.moderation_action && <p className="mt-2 text-xs text-muted-foreground">Action: {report.moderation_action}</p>}{report.status === 'pending' && <div className="flex flex-wrap gap-2 mt-3"><Button size="sm" onClick={() => handleModerateReport(report, 'resolve')}><Check className="w-3 h-3 mr-1" />Resolve</Button><Button size="sm" variant="outline" onClick={() => handleModerateReport(report, 'dismiss')}><X className="w-3 h-3 mr-1" />Dismiss</Button>{['post','comment','message','group_message','lobby_message','room_message'].includes(report.reported_type) && <Button size="sm" variant="destructive" onClick={() => handleModerateReport(report, 'remove_content')}>Remove content</Button>}{report.reported_type === 'user' && <Button size="sm" variant="destructive" onClick={() => handleModerateReport(report, 'suspend_user')}>Suspend account</Button>}</div>}</div>))}</div></ScrollArea></CardContent></Card>
+              <AccountDeletionRequestsPanel />
             </TabsContent>
 
             <TabsContent value="announcements" className="space-y-4">
