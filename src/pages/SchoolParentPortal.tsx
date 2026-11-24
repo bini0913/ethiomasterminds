@@ -55,6 +55,7 @@ export default function SchoolParentPortal() {
   const load = useCallback(async () => {
     if (!schoolId || !activeMembership?.id) return;
     setLoading(true);
+    try {
     const { data: links, error: linksError } = await db.from("school_parent_student_links")
       .select("student_membership_id,status")
       .eq("school_id", schoolId)
@@ -133,6 +134,12 @@ export default function SchoolParentPortal() {
       setProfiles(Object.fromEntries((profileRows ?? []).map((profile: any) => [profile.id, profile])));
     }
 
+    } catch (error: unknown) {
+      console.error("[Master Minds] SchoolParentPortal.tsx data load failed", error);
+      toast.error(error instanceof Error ? error.message : "This workspace could not load its records. Please retry.");
+    } finally {
+      setLoading(false);
+    }
     setLoading(false);
   }, [schoolId, activeMembership?.id, selectedChildId, db]);
 

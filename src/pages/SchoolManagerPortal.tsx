@@ -152,6 +152,7 @@ export default function SchoolManagerPortal() {
   const load = useCallback(async () => {
     if (!schoolId) return;
     setLoading(true);
+    try {
     const [
       membershipsRes, yearsRes, sectionsRes, subjectsRes, assignmentsRes,
       feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, staffConductRes, assignmentRecommendationsRes,
@@ -216,6 +217,12 @@ export default function SchoolManagerPortal() {
     if (!feeYearId && yearsRes.data?.length) setFeeYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
     if (!gradingYearId && yearsRes.data?.length) setGradingYearId(yearsRes.data.find((year: any) => year.is_current)?.id ?? yearsRes.data[0].id);
     if (sectionsRes.data?.length && gradingGradeLabel === "Grade 9" && !sectionsRes.data.some((section: any) => section.grade_label === "Grade 9")) setGradingGradeLabel(sectionsRes.data[0].grade_label);
+    } catch (error: unknown) {
+      console.error("[Master Minds] SchoolManagerPortal.tsx data load failed", error);
+      toast.error(error instanceof Error ? error.message : "This workspace could not load its records. Please retry.");
+    } finally {
+      setLoading(false);
+    }
     setLoading(false);
   }, [schoolId, db, subjectYearId, feeYearId, gradingYearId, gradingGradeLabel]);
 
