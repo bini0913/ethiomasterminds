@@ -48,10 +48,9 @@ const BlockedUsersPanel: React.FC = () => {
       if (profileError) throw profileError;
 
       const profileMap = new Map<string, { name?: string | null; username?: string | null }>(
-        (profiles || []).map((profile: { id: string; name?: string | null; username?: string | null }) => [
-          profile.id,
-          profile,
-        ])
+        (profiles || []).map((profile: { id: string; name?: string | null; username?: string | null }) =>
+          [profile.id, profile] as [string, { name?: string | null; username?: string | null }]
+        )
       );
       setBlockedUsers((blocks || []).map((block) => {
         const profile = profileMap.get(block.blocked_user_id);
