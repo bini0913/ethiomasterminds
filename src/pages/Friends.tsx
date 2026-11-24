@@ -14,6 +14,7 @@ import { motion } from "framer-motion";
 import { getUserTier } from "@/lib/getUserTier";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import ReportButton from "@/components/social/ReportButton";
 
 const Friends: React.FC = () => {
   const { user } = useUser();
@@ -511,6 +512,11 @@ const Friends: React.FC = () => {
                           <div>{msg.content}</div>
                           {messageReactions[msg.id] && (
                             <div className="mt-1 text-sm">{messageReactions[msg.id]}</div>
+                          )}
+                          {msg.sender !== user?.id && (
+                            <div className="mt-1 flex justify-end">
+                              <ReportButton reportedType="message" reportedId={msg.id} size="icon" />
+                            </div>
                           )}
                           <div className={`text-xs mt-1 ${
                             msg.sender === user?.id ? 'text-primary-foreground/70' : 'text-muted-foreground'
