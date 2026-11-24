@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 const root = process.cwd();
 const appPath = path.join(root, "src", "App.tsx");
@@ -26,7 +25,7 @@ const resolveLocalImport = (specifier) => {
 };
 
 const localImports = new Set();
-const importPattern = /(?:from\\s*|import\\s*\\()\s*["']([^"']+)["']/g;
+const importPattern = /(?:from\s*|import\s*\()\s*["']([^"']+)["']/g;
 for (const match of app.matchAll(importPattern)) {
   const specifier = match[1];
   if (specifier.startsWith("./") || specifier.startsWith("@/")) localImports.add(specifier);
@@ -35,7 +34,7 @@ for (const specifier of localImports) {
   if (!resolveLocalImport(specifier)) failures.push(`Missing local App dependency: ${specifier}`);
 }
 
-const routes = [...app.matchAll(/<Route\\s+path=["']([^"']+)["']/g)].map((match) => match[1]);
+const routes = [...app.matchAll(/<Route\s+path=["']([^"']+)["']/g)].map((match) => match[1]);
 const duplicateRoutes = routes.filter((route, index) => routes.indexOf(route) !== index);
 for (const route of new Set(duplicateRoutes)) failures.push(`Duplicate route registration: ${route}`);
 
