@@ -12,6 +12,8 @@ import {
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import ReportButton from './ReportButton';
+import BlockUserButton from './BlockUserButton';
+import { useCommunityTerms } from '@/context/CommunityTermsContext';
 import ImageUploader from './ImageUploader';
 
 interface Post {
@@ -57,6 +59,7 @@ interface SocialFeedViewProps {
 
 const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
   const { user } = useUser();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
@@ -361,18 +364,20 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
     const auth = await supabase.auth.getUser();
     if (!text?.trim() || !auth.data.user?.id) return;
 
-    try {
-      await supabase.from('social_post_comments').insert({
+    await runWithCommunityTerms(async () => {
+      const { error } = await supabase.from('social_post_comments').insert({
         post_id: postId,
         user_id: auth.data.user.id,
         content: text.trim(),
       });
+      if (error) {
+        toast.error(error.message || 'Failed to add comment');
+        return;
+      }
       setNewComments(prev => ({ ...prev, [postId]: '' }));
       loadComments(postId);
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, commentsCount: p.commentsCount + 1 } : p));
-    } catch {
-      toast.error('Failed to add comment');
-    }
+    }, 'social');
   };
 
   const getRankColor = (rank: string | null) => {
@@ -476,6 +481,8 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
                 </Button>
               )}
               <ReportButton reportedType="post" reportedId={post.id} />
+              {post.authorId !== user?.id && <ReportButton reportedType="user" reportedId={post.authorId} size="icon" />}
+              {post.authorId !== user?.id && <BlockUserButton userId={post.authorId} displayName={post.authorName} onBlocked={() => setPosts((current) => current.filter((item) => item.authorId !== post.authorId))} />}
             </div>
           </div>
 
@@ -581,6 +588,19 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
                     <span className="text-xs font-semibold">{c.userName}</span>
                     <p className="text-xs text-foreground">{c.content}</p>
                   </div>
+                  {c.userId !== user?.id && (
+                    <>
+                      <ReportButton reportedType="comment" reportedId={c.id} size="icon" />
+                      <BlockUserButton
+                        userId={c.userId}
+                        displayName={c.userName}
+                        onBlocked={() => setComments((current) => ({
+                          ...current,
+                          [post.id]: (current[post.id] || []).filter((item) => item.userId !== c.userId),
+                        }))}
+                      />
+                    </>
+                  )}
                 </div>
               ))}
 

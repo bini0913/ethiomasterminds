@@ -7,7 +7,7 @@ import {
   Palette, Shield, Info, LogOut, Trash2,
   Smartphone, Globe, Lock, Eye, EyeOff
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -22,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { safeStorage } from "@/lib/safeStorage";
 import { getUserTier } from "@/lib/getUserTier";
+import BlockedUsersManager from "@/components/social/BlockedUsersManager";
+import GuardianApprovalCard from "@/components/guardian/GuardianApprovalCard";
 
 const HOME_ONBOARDING_STORAGE_KEY = "home_onboarding_completed_v1";
 const SETTINGS_PREFERENCES_STORAGE_KEY = "masterminds-settings-preferences-v1";
@@ -128,7 +130,7 @@ const Settings: React.FC = () => {
   };
 
   const handleDeleteAccount = async () => {
-    if (window.confirm("Delete your account and all associated data permanently? This cannot be undone.")) {
+    if (window.confirm("Request deletion of your Master Minds account? You will be signed out and your account access will be restricted while support verifies and processes the request. Some school, financial or legal records may need to be retained.")) {
       await deleteAccount();
     }
   };
@@ -194,7 +196,8 @@ const Settings: React.FC = () => {
         </div>
       </header>
 
-      <div className="container max-w-4xl mx-auto py-8 px-4 relative z-10">
+      <div className="container max-w-4xl mx-auto py-8 px-4 relative z-10 space-y-6">
+        <GuardianApprovalCard />
         <Tabs defaultValue="general" className="space-y-6">
           <TabsList className="glass grid w-full grid-cols-4 p-1">
             {settingsSections.map((section) => (
@@ -445,6 +448,22 @@ const Settings: React.FC = () => {
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <Shield className="h-5 w-5 text-primary" />
+                    Privacy and legal information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <Button asChild variant="outline"><Link to="/privacy">Privacy Policy</Link></Button>
+                  <Button asChild variant="outline"><Link to="/terms">Terms of Use</Link></Button>
+                  <Button asChild variant="outline"><Link to="/delete-account">Request account deletion</Link></Button>
+                </CardContent>
+              </Card>
+
+              <BlockedUsersManager />
+
               {/* Danger Zone */}
               <Card className="glass border-destructive/30">
                 <CardHeader>
@@ -468,7 +487,7 @@ const Settings: React.FC = () => {
                     onClick={handleDeleteAccount}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Account
+                    Request Account Deletion
                   </Button>
                 </CardContent>
               </Card>

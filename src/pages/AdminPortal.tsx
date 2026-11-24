@@ -435,12 +435,35 @@ const AdminPortal: React.FC = () => {
   }, [seasonConversionRate]);
 
   const fetchReports = async () => {
-    const { data } = await db.from('reports').select('*').order('created_at', { ascending: false }).limit(200);
-    const enriched = await Promise.all((data || []).map(async (report: any) => {
-      const { data: profile } = await db.from('profiles').select('name').eq('id', report.reporter_id).single();
-      return { ...report, reporter_name: profile?.name || 'Unknown' };
-    }));
-    setReports(enriched);
+    const { data, error } = await db.from('reports').select('*').order('created_at', { ascending: false }).limit(200);
+    if (error) {
+      console.error('Could not load moderation reports:', error);
+      toast.error('Moderation reports could not be loaded.');
+      return;
+    }
+
+    const rows = data || [];
+    const reporterIds = [...new Set(rows.map((report: any) => report.reporter_id).filter(Boolean))];
+    const [reporters, contextResult] = await Promise.all([
+      reporterIds.length
+        ? db.from('profiles').select('id,name').in('id', reporterIds)
+        : Promise.resolve({ data: [] as any[] }),
+      rows.length
+        ? (db as any).rpc('moderation_get_report_context', { p_report_ids: rows.map((report: any) => report.id) })
+        : Promise.resolve({ data: [] as any[], error: null }),
+    ]);
+
+    if (contextResult.error) {
+      console.error('Could not load report context:', contextResult.error);
+    }
+    const reporterMap = new Map((reporters.data || []).map((profile: any) => [profile.id, profile.name]));
+    const contextMap = new Map((contextResult.data || []).map((item: any) => [item.report_id, item.reported_content]));
+
+    setReports(rows.map((report: any) => ({
+      ...report,
+      reporter_name: reporterMap.get(report.reporter_id) || 'Unknown',
+      reported_content: contextMap.get(report.id) || 'Reported content is unavailable',
+    })));
   };
 
   const fetchAuditLogs = async () => {
@@ -714,14 +737,50 @@ const AdminPortal: React.FC = () => {
   };
 
   const handleModerateReport = async (reportId: string, status: 'resolved' | 'dismissed') => {
-    const { error } = await db.from('reports').update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq('id', reportId);
+    const { error } = await (db as any).rpc('moderate_user_report', {
+      p_report_id: reportId,
+      p_action: status,
+      p_reason: null,
+    });
     if (error) {
-      toast.error('Failed to update report');
+      toast.error(error.message || 'Failed to update report');
       return;
     }
     toast.success(`Report ${status}`);
     pushNotification(`Report ${status}`);
     logAction(`Report ${status}`, reportId);
+    fetchReports();
+    fetchStatsAndCharts();
+  };
+
+  const handleModerationAction = async (
+    report: Report,
+    action: 'remove_content' | 'suspend_user' | 'ban_user',
+  ) => {
+    const actionLabel = action === 'remove_content'
+      ? 'remove the reported content'
+      : action === 'suspend_user'
+        ? 'suspend this account'
+        : 'ban this account';
+    if (!window.confirm(`Are you sure you want to ${actionLabel}? This action will be recorded in the moderation audit log.`)) return;
+    const reason = window.prompt('Enter the moderation reason (required):');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      toast.error('A moderation reason is required.');
+      return;
+    }
+
+    const { error } = await (db as any).rpc('moderate_user_report', {
+      p_report_id: report.id,
+      p_action: action,
+      p_reason: reason.trim(),
+    });
+    if (error) {
+      toast.error(error.message || 'Moderation action failed');
+      return;
+    }
+    toast.success(action === 'remove_content' ? 'Reported content removed' : action === 'suspend_user' ? 'Account suspended' : 'Account banned');
+    logAction(`Moderation: ${action}`, report.reported_id);
     fetchReports();
     fetchStatsAndCharts();
   };
@@ -1482,7 +1541,7 @@ const AdminPortal: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="reports" className="space-y-4">
-              <Card><CardHeader><CardTitle className="flex items-center gap-2"><Flag className="w-4 h-4 text-destructive" />Reports & Flags</CardTitle></CardHeader><CardContent><ScrollArea className="h-[620px]"><div className="space-y-3">{reports.map((report) => (<div key={report.id} className="border rounded-xl p-3"><div className="flex items-center gap-2 mb-2"><Badge variant={report.status === 'pending' ? 'destructive' : 'outline'}>{report.status}</Badge><Badge variant="outline">{report.reported_type}</Badge><span className="text-xs text-muted-foreground">{new Date(report.created_at).toLocaleString()}</span></div><p className="text-sm">{report.reason}</p><p className="text-xs text-muted-foreground">Reporter: {report.reporter_name}</p>{report.description && <p className="text-sm italic mt-1">"{report.description}"</p>} {report.status === 'pending' && <div className="flex gap-2 mt-3"><Button size="sm" onClick={() => handleModerateReport(report.id, 'resolved')}><Check className="w-3 h-3 mr-1" />Resolve</Button><Button size="sm" variant="outline" onClick={() => handleModerateReport(report.id, 'dismissed')}><X className="w-3 h-3 mr-1" />Dismiss</Button></div>}</div>))}</div></ScrollArea></CardContent></Card>
+              <Card><CardHeader><CardTitle className="flex items-center gap-2"><Flag className="w-4 h-4 text-destructive" />Reports & Flags</CardTitle></CardHeader><CardContent><ScrollArea className="h-[620px]"><div className="space-y-3">{reports.map((report) => (<div key={report.id} className="border rounded-xl p-3"><div className="flex items-center gap-2 mb-2"><Badge variant={report.status === 'pending' ? 'destructive' : 'outline'}>{report.status}</Badge><Badge variant="outline">{report.reported_type}</Badge><span className="text-xs text-muted-foreground">{new Date(report.created_at).toLocaleString()}</span></div><p className="text-sm">{report.reason}</p><div className="mt-2 rounded-lg bg-muted/50 p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Reported {report.reported_type}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{report.reported_content || "Reported content is unavailable"}</p></div><p className="mt-2 text-xs text-muted-foreground">Reporter: {report.reporter_name}</p>{report.description && <p className="text-sm italic mt-1">"{report.description}"</p>} {report.status === 'pending' && <div className="flex flex-wrap gap-2 mt-3">{report.reported_type === 'user' ? <><Button size="sm" variant="destructive" onClick={() => handleModerationAction(report, 'suspend_user')}>Suspend account</Button><Button size="sm" variant="destructive" onClick={() => handleModerationAction(report, 'ban_user')}>Ban account</Button></> : <Button size="sm" variant="destructive" onClick={() => handleModerationAction(report, 'remove_content')}>Remove content</Button>}<Button size="sm" onClick={() => handleModerateReport(report.id, 'resolved')}><Check className="w-3 h-3 mr-1" />Resolve</Button><Button size="sm" variant="outline" onClick={() => handleModerateReport(report.id, 'dismissed')}><X className="w-3 h-3 mr-1" />Dismiss</Button></div>}</div>))}</div></ScrollArea></CardContent></Card>
             </TabsContent>
 
             <TabsContent value="announcements" className="space-y-4">

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, UserPlus, Check, X, Users, Home, MessageCircle, Search, Loader2, Swords, Gamepad2, BookOpen, Bell, ShieldBan, VolumeX } from "lucide-react";
+import { Send, UserPlus, Check, X, Users, Home, MessageCircle, Search, Loader2, Swords, Gamepad2, BookOpen } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFriends, FriendRequest } from "@/context/FriendsContext";
 import { useUser, UserProfile } from "@/context/UserContext";
@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import BackButton from "@/components/ui/BackButton";
+import ReportButton from "@/components/social/ReportButton";
+import BlockUserButton from "@/components/social/BlockUserButton";
 import { motion } from "framer-motion";
 import { getUserTier } from "@/lib/getUserTier";
 
@@ -446,13 +448,15 @@ const Friends: React.FC = () => {
                     Level {selectedFriend.level} • {selectedFriend.xp} XP • {isOnline(selectedFriend.id) ? "🟢 Online" : `⚪ ${getLastSeenText(selectedFriend.id)}`}
                   </div>
                 </div>
-                <div className="ml-auto flex gap-1.5">
+                <div className="ml-auto flex items-center gap-1.5">
                   <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => navigate("/lobby")}>
                     <Gamepad2 className="h-3 w-3" /> Join Room
                   </Button>
                   <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => navigate("/multiplayer")}>
                     <Swords className="h-3 w-3" /> Challenge
                   </Button>
+                  <ReportButton reportedType="user" reportedId={selectedFriend.id} size="icon" />
+                  <BlockUserButton userId={selectedFriend.id} displayName={selectedFriend.name} onBlocked={() => { setSelectedFriend(null); navigate("/friends", { replace: true }); }} />
                 </div>
               </div>
               
@@ -490,6 +494,7 @@ const Friends: React.FC = () => {
                             {formatTime(msg.timestamp)} • {msg.sender === user?.id ? (msg.read ? "seen" : "sent") : "delivered"}
                           </div>
                         </div>
+                        {msg.sender !== user?.id && <ReportButton reportedType="message" reportedId={msg.id} size="icon" />}
                       </motion.div>
                     ))
                   )}
@@ -509,9 +514,6 @@ const Friends: React.FC = () => {
                   <Button type="button" size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setMessageInput(prev => `${prev}${prev ? " " : ""}📝 Shared study note: `)}>
                     <BookOpen className="h-3 w-3" /> Notes
                   </Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7"><Bell className="h-3.5 w-3.5" /></Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7"><VolumeX className="h-3.5 w-3.5" /></Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7"><ShieldBan className="h-3.5 w-3.5" /></Button>
                 </div>
                 <form onSubmit={handleSendMessage} className="flex gap-2">
                   <Input

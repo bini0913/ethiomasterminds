@@ -11,6 +11,7 @@ import StudyLeaderboard from "@/components/study/StudyLeaderboard";
 import StudyShareCard from "@/components/study/StudyShareCard";
 import { useUser } from "@/context/UserContext";
 import { getUserTier } from "@/lib/getUserTier";
+import { useCommunityTerms } from "@/context/CommunityTermsContext";
 import { ArrowLeft, Brain, Check, Clock, Flame, Pause, Play, RotateCcw, StopCircle, Trophy, Users, Zap } from "lucide-react";
 
 type StudyMode = "pomodoro" | "deep" | "custom";
@@ -92,6 +93,7 @@ const clampMinutes = (v: number, min: number, max: number) => Math.max(min, Math
 
 const StudyModePage: React.FC = () => {
   const { user } = useUser();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const upperStudent = getUserTier(user?.grade) === "upper";
 
   const [loading, setLoading] = useState(true);
@@ -564,19 +566,18 @@ const StudyModePage: React.FC = () => {
       return;
     }
 
-    const { data, error } = await db.rpc("create_study_competition", { p_name: competitionName.trim() });
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    const created = data as StudyCompetition;
-    setCompetitionName("");
-    setSelectedCompetitionId(created.id);
-
-    toast.success("Competition created and joined.");
-    await loadData();
+    await runWithCommunityTerms(async () => {
+      const { data, error } = await db.rpc("create_study_competition", { p_name: competitionName.trim() });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      const created = data as StudyCompetition;
+      setCompetitionName("");
+      setSelectedCompetitionId(created.id);
+      toast.success("Competition created and joined.");
+      await loadData();
+    }, 'multiplayer');
   };
 
   const joinCompetition = async () => {
@@ -584,15 +585,15 @@ const StudyModePage: React.FC = () => {
       toast.error("Select a competition first.");
       return;
     }
-
-    const { error } = await db.rpc("join_study_competition", { p_competition_id: selectedCompetitionId });
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    toast.success("Joined competition.");
-    await loadData();
+    await runWithCommunityTerms(async () => {
+      const { error } = await db.rpc("join_study_competition", { p_competition_id: selectedCompetitionId });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Joined competition.");
+      await loadData();
+    }, 'multiplayer');
   };
 
   const todayMinutes = studyStats.today_minutes;

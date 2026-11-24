@@ -10,7 +10,7 @@ import { useUser } from '@/context/UserContext';
 import { toast } from 'sonner';
 
 interface ReportButtonProps {
-  reportedType: 'post' | 'comment' | 'message' | 'user';
+  reportedType: 'post' | 'comment' | 'message' | 'group_message' | 'lobby_message' | 'room_message' | 'user';
   reportedId: string;
   variant?: 'ghost' | 'outline' | 'default';
   size?: 'sm' | 'default' | 'icon';

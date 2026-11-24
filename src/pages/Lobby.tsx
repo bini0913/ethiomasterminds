@@ -14,6 +14,7 @@ import { useRoom } from "@/context/RoomContext";
 import { useFriends } from "@/context/FriendsContext";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useCommunityTerms } from "@/context/CommunityTermsContext";
 import { 
   Users, 
   MessageSquare, 
@@ -37,6 +38,8 @@ import {
   Timer,
 } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
+import ReportButton from "@/components/social/ReportButton";
+import BlockUserButton from "@/components/social/BlockUserButton";
 import RoomCard, { Room } from "@/components/multiplayer/RoomCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -107,6 +110,7 @@ interface NewTournamentForm {
 
 const Lobby: React.FC = () => {
   const navigate = useNavigate();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const [searchParams] = useSearchParams();
   const { user } = useUser();
   const upperStudent = getUserTier(user?.grade) === "upper";
@@ -114,6 +118,7 @@ const Lobby: React.FC = () => {
   const { friends, onlineFriends } = useFriends();
   
   const [chatMessage, setChatMessage] = useState("");
+  const canUsePublicLobbyChat = Boolean(user && ((user.age != null && user.age >= 18) || ['parent', 'teacher', 'manager', 'admin', 'super_admin', 'extreme_admin'].includes(user.role)));
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [createTournamentOpen, setCreateTournamentOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -629,19 +634,21 @@ const Lobby: React.FC = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim() || !user) return;
-    
-    const { error } = await supabase
-      .from('lobby_messages')
-      .insert({
-        user_id: user.id,
-        content: chatMessage.trim()
-      });
 
-    if (error) {
-      toast.error('Failed to send message');
-    } else {
-      setChatMessage("");
-    }
+    await runWithCommunityTerms(async () => {
+      const { error } = await supabase
+        .from('lobby_messages')
+        .insert({
+          user_id: user.id,
+          content: chatMessage.trim()
+        });
+
+      if (error) {
+        toast.error(error.message || 'Failed to send message');
+      } else {
+        setChatMessage("");
+      }
+    }, 'social');
   };
 
   const createRoom = async () => {
@@ -926,78 +933,77 @@ const Lobby: React.FC = () => {
 
   const challengePlayer = async (playerId: string, playerName: string) => {
     if (!user) return;
-    setSendingInviteForUserId(playerId);
-    try {
-      const { data: room, error: roomError } = await db.rpc("multiplayer_create_room", {
-        p_name: `${user.name || "Player"}'s Challenge`,
-        p_subject: "Mixed",
-        p_difficulty: "Medium",
-        p_question_count: 10,
-        p_max_players: 2,
-        p_password: null,
-      });
-      if (roomError) throw roomError;
+    await runWithCommunityTerms(async () => {
+      setSendingInviteForUserId(playerId);
+      try {
+        const { data: room, error: roomError } = await db.rpc("multiplayer_create_room", {
+          p_name: `${user.name || "Player"}'s Challenge`,
+          p_subject: "Mixed",
+          p_difficulty: "Medium",
+          p_question_count: 10,
+          p_max_players: 2,
+          p_password: null,
+        });
+        if (roomError) throw roomError;
 
-      const { error: settingsError } = await db.rpc("multiplayer_update_room", {
-        p_room_id: room.id,
-        p_subject: "Mixed",
-        p_difficulty: "Medium",
-        p_game_mode: "accuracy",
-        p_question_count: 10,
-        p_max_players: 2,
-      });
-      if (settingsError) throw settingsError;
+        const { error: settingsError } = await db.rpc("multiplayer_update_room", {
+          p_room_id: room.id,
+          p_subject: "Mixed",
+          p_difficulty: "Medium",
+          p_game_mode: "accuracy",
+          p_question_count: 10,
+          p_max_players: 2,
+        });
+        if (settingsError) throw settingsError;
 
-      const { error: inviteError } = await db.rpc("create_multiplayer_invite", {
-        _receiver_id: playerId,
-        _room_id: room.id,
-      });
-      if (inviteError) throw inviteError;
+        const { error: inviteError } = await db.rpc("create_multiplayer_invite", {
+          _receiver_id: playerId,
+          _room_id: room.id,
+        });
+        if (inviteError) throw inviteError;
 
-      // The challenger is already the room host, so enter the newly-created room immediately.
-      // The invited player will join the same room after accepting.
-      toast.success(`Invite sent to ${playerName}`);
-      pushActivity(`${playerName} was invited to a multiplayer challenge`);
-      navigate(`/multiplayer?room=${room.id}`);
-    } catch (error: any) {
-      console.error("Error sending multiplayer challenge:", error);
-      toast.error(error?.message || "Could not send invite");
-    } finally {
-      setSendingInviteForUserId(null);
-    }
+        toast.success(`Invite sent to ${playerName}`);
+        pushActivity(`${playerName} was invited to a multiplayer challenge`);
+        navigate(`/multiplayer?room=${room.id}`);
+      } catch (error: any) {
+        console.error("Error sending multiplayer challenge:", error);
+        toast.error(error?.message || "Could not send invite");
+      } finally {
+        setSendingInviteForUserId(null);
+      }
+    }, 'multiplayer');
   };
 
   const respondToInvite = async (response: "accepted" | "rejected") => {
     if (!incomingInvite || !user) return;
 
-    try {
-      const { data, error } = await (supabase as any).rpc("respond_multiplayer_invite", {
-        _invite_id: incomingInvite.id,
-        _accept: response === "accepted",
-      });
+    const performResponse = async () => {
+      try {
+        const { data, error } = await (supabase as any).rpc("respond_multiplayer_invite", {
+          _invite_id: incomingInvite.id,
+          _accept: response === "accepted",
+        });
+        if (error) throw error;
+        const roomId = data?.room_id || incomingInvite.room_id;
+        setIncomingInvite(null);
 
-      if (error) throw error;
-
-      const roomId = data?.room_id || incomingInvite.room_id;
-      setIncomingInvite(null);
-
-      if (response === "accepted" && roomId) {
-        const success = await contextJoinRoom(roomId, user.name || "Player");
-        if (!success) throw new Error("Could not join the invited game room");
-
-        // An accepted direct challenge is a ready-to-play action. Mark the invitee ready
-        // so the host can automatically start the match as soon as both players are present.
-        const { error: readyError } = await db.rpc("multiplayer_toggle_ready", { p_room_id: roomId });
-        if (readyError) throw readyError;
-
-        navigate(`/multiplayer?room=${roomId}`);
-      } else {
-        toast.success("Invite declined");
+        if (response === "accepted" && roomId) {
+          const success = await contextJoinRoom(roomId, user.name || "Player");
+          if (!success) throw new Error("Could not join the invited game room");
+          const { error: readyError } = await db.rpc("multiplayer_toggle_ready", { p_room_id: roomId });
+          if (readyError) throw readyError;
+          navigate(`/multiplayer?room=${roomId}`);
+        } else {
+          toast.success("Invite declined");
+        }
+      } catch (error: any) {
+        console.error("Error responding to multiplayer invite:", error);
+        toast.error(error?.message || "Invite response failed");
       }
-    } catch (error: any) {
-      console.error("Error responding to multiplayer invite:", error);
-      toast.error(error?.message || "Invite response failed");
-    }
+    };
+
+    if (response === "accepted") await runWithCommunityTerms(performResponse, 'multiplayer');
+    else await performResponse();
   };
 
   const formatTimeRemaining = (startTime: Date) => {
@@ -1317,17 +1323,33 @@ const Lobby: React.FC = () => {
                           </div>
                           <p className="text-sm text-muted-foreground break-words">{msg.message}</p>
                         </div>
+                        {msg.userId !== user?.id && (
+                          <div className="flex shrink-0 items-center">
+                            <ReportButton reportedType="lobby_message" reportedId={msg.id} size="icon" />
+                            <BlockUserButton
+                              userId={msg.userId}
+                              displayName={msg.userName}
+                              onBlocked={() => setChatMessages((current) => current.filter((item) => item.userId !== msg.userId))}
+                            />
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
                 </div>
               </ScrollArea>
-              <form onSubmit={handleSendMessage} className="p-3 border-t border-border/50">
-                <div className="flex gap-2">
-                  <Input value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Type a message..." className="flex-1" />
-                  <Button type="submit" size="icon" className="flex-shrink-0"><Send className="h-4 w-4" /></Button>
+              {canUsePublicLobbyChat ? (
+                <form onSubmit={handleSendMessage} className="p-3 border-t border-border/50">
+                  <div className="flex gap-2">
+                    <Input value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="Type a message..." className="flex-1" />
+                    <Button type="submit" size="icon" className="flex-shrink-0"><Send className="h-4 w-4" /></Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="border-t border-border/50 p-3 text-xs text-muted-foreground">
+                  Public lobby chat is disabled for learners under 18. Use approved friend messages or school-managed groups instead.
                 </div>
-              </form>
+              )}
             </CardContent>
           </Card>
 
