@@ -52,7 +52,7 @@ begin
   -- This helper is only useful to a participant in the pair. It must not
   -- become a way to probe whether two unrelated accounts have blocked each other.
   if v_uid <> p_user_a and v_uid <> p_user_b then
-    raise exception using errcode = '42501', message = 'Not allowed to inspect this user pair';
+    return false;
   end if;
 
   return exists (
