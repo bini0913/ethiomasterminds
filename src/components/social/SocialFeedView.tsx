@@ -477,7 +477,11 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
                 </Button>
               )}
               <ReportButton reportedType="post" reportedId={post.id} size="icon" />
-              <BlockUserButton userId={post.authorId} userName={post.authorName} />
+              <BlockUserButton
+                userId={post.authorId}
+                userName={post.authorName}
+                onBlocked={() => setPosts((current) => current.filter((item) => item.authorId !== post.authorId))}
+              />
             </div>
           </div>
 
