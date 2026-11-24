@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(20);
 
 select ok((select relrowsecurity from pg_class where oid='public.account_deletion_requests'::regclass), 'account deletion requests have RLS enabled');
 select ok(has_table_privilege('authenticated','public.account_deletion_requests','select'), 'users can read their own request records');
@@ -33,6 +33,12 @@ select is(
   coalesce(array_length(app_private.account_deletion_blockers('00000000-0000-0000-0000-000000000000'::uuid), 1), 0),
   0,
   'account dependency review can inspect all protected records without deleting data'
+);
+select throws_ok(
+  $select app_private.delete_account_data('00000000-0000-0000-0000-000000000000'::uuid)$,
+  'P0001',
+  'Account no longer exists',
+  'account deletion worker resolves every referenced personal-data table before refusing an unknown account'
 );
 
 select * from finish();
