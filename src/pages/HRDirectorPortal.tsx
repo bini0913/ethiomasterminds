@@ -107,7 +107,7 @@ export default function HRDirectorPortal() {
     }
     } catch (error: unknown) {
       console.error("[Master Minds] HRDirectorPortal.tsx data load failed", error);
-      toast.error(error instanceof Error ? error.message : "This workspace could not load its records. Please retry.");
+      setLoadError(error instanceof Error ? error.message : "School records could not be loaded. Please retry.");
     } finally {
       setLoading(false);
     }
