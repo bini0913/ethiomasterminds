@@ -14,6 +14,7 @@ import { useRoom } from "@/context/RoomContext";
 import { useFriends } from "@/context/FriendsContext";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import ReportButton from "@/components/social/ReportButton";
 import { 
   Users, 
   MessageSquare, 
@@ -1316,6 +1317,7 @@ const Lobby: React.FC = () => {
                             </span>
                           </div>
                           <p className="text-sm text-muted-foreground break-words">{msg.message}</p>
+                           {msg.userId !== user?.id && <div className="mt-1"><ReportButton reportedType="lobby_message" reportedId={msg.id} size="icon" /></div>}
                         </div>
                       </div>
                     ))
