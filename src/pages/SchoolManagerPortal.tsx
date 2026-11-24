@@ -455,7 +455,7 @@ export default function SchoolManagerPortal() {
       account.division_scope = accountLeadershipPosition === "vice_director" ? accountLeadershipDivision : directorDivisionByPosition[accountLeadershipPosition] || null;
     }
     const provisionRole: "teacher" | "finance" | "parent" | "student" = accountLeadershipPosition === "hr_director" ? "finance" : accountLeadershipPosition ? "teacher" : accountRole;
-    if (accountRole === "student") {
+    if (!accountLeadershipPosition && accountRole === "student") {
       const age = Number(accountAge);
       if (!accountSectionId || !Number.isInteger(age) || age < 3 || age > 120) {
         return setFormError("Choose a section and enter an age from 3 to 120.");
@@ -467,7 +467,7 @@ export default function SchoolManagerPortal() {
       account.section_id = accountSectionId;
       account.parent_membership_ids = parentMembershipIds;
     }
-    if (accountRole === "parent") account.student_membership_ids = studentMembershipIds;
+    if (!accountLeadershipPosition && accountRole === "parent") account.student_membership_ids = studentMembershipIds;
     const { data, error } = await supabase.functions.invoke("school-provision-account", {
       body: { action: "create_accounts", school_id: schoolId, role: provisionRole, accounts: [account] },
     });
