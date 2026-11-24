@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(25);
 
 select ok(to_regclass('public.guardian_consent_requests') is not null, 'guardian consent request records exist');
 select ok((select relrowsecurity from pg_class where oid = 'public.guardian_consent_requests'::regclass), 'guardian consent requests have RLS enabled');
@@ -26,6 +26,9 @@ select ok(exists (select 1 from pg_trigger where tgrelid = 'public.multiplayer_i
 select ok(exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'lobby_messages' and policyname = 'authenticated can view lobby' and qual like '%can_view_lobby_author%'), 'lobby message visibility is relationship-aware');
 select ok(not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'chat_group_members' and policyname = 'group admin manages members'), 'broad group-member access policy is removed');
 select ok(position('account_status' in pg_get_functiondef('public.has_role(uuid,public.app_role)'::regprocedure)) > 0, 'role checks deny suspended and banned accounts');
+
+select ok(position('A separate, valid parent or guardian email is required' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'existing learner age updates require a separate guardian email when under 18');
+select ok(position('guardian_consent_status' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'age updates explicitly reset guardian approval state');
 
 select * from finish();
 rollback;
