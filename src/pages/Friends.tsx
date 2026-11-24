@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, UserPlus, Check, X, Users, Home, MessageCircle, Search, Loader2, Swords, Gamepad2, BookOpen, Bell, ShieldBan, VolumeX } from "lucide-react";
+import { Send, UserPlus, Check, X, Users, Home, MessageCircle, Search, Loader2, Swords, Gamepad2, BookOpen, Bell, ShieldBan, VolumeX, ShieldAlert } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFriends, FriendRequest } from "@/context/FriendsContext";
 import { useUser, UserProfile } from "@/context/UserContext";
@@ -49,6 +49,31 @@ const Friends: React.FC = () => {
   const [searching, setSearching] = useState(false);
   const [pendingSentRequests, setPendingSentRequests] = useState<Set<string>>(new Set());
   const [messageReactions, setMessageReactions] = useState<Record<string, string>>({});
+  const [allowDirectMessages, setAllowDirectMessages] = useState(false);
+  const [guardianAccessLoading, setGuardianAccessLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const checkDirectMessageAccess = async () => {
+      if (!user?.id) {
+        if (active) { setAllowDirectMessages(false); setGuardianAccessLoading(false); }
+        return;
+      }
+      if (user.role !== "student") {
+        if (active) { setAllowDirectMessages(true); setGuardianAccessLoading(false); }
+        return;
+      }
+      setGuardianAccessLoading(true);
+      const { data, error } = await (supabase as any).rpc("get_my_social_access");
+      const row = Array.isArray(data) ? data[0] : data;
+      if (active) {
+        setAllowDirectMessages(!error && !!row && (Number(row.age) >= 18 || row.allow_direct_messages === true));
+        setGuardianAccessLoading(false);
+      }
+    };
+    void checkDirectMessageAccess();
+    return () => { active = false; };
+  }, [user?.id, user?.role]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -486,6 +511,16 @@ const Friends: React.FC = () => {
               </div>
               
               {/* Messages */}
+              {guardianAccessLoading ? (
+                <div className="flex-1 p-6 text-center text-sm text-muted-foreground">Checking guardian messaging controls…</div>
+              ) : !allowDirectMessages ? (
+                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+                  <ShieldAlert className="h-10 w-10 text-amber-600" />
+                  <h3 className="text-lg font-semibold text-foreground">Direct messages are turned off</h3>
+                  <p className="max-w-sm text-sm text-muted-foreground">Your parent or guardian has not enabled private messaging. Friend connections can remain available separately.</p>
+                  <Button variant="outline" onClick={() => navigate("/guardian-consent-request?feature=allow_direct_messages")}>Open guardian approval</Button>
+                </div>
+              ) : (
               <ScrollArea className="flex-1 p-4">
                 <div className="space-y-3">
                   {getMessagesWithUser(selectedFriend.id).length === 0 ? (
@@ -530,9 +565,10 @@ const Friends: React.FC = () => {
                   <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
+              )}
               
               {/* Message Input */}
-              <div className="p-3 border-t bg-card/90 backdrop-blur-sm">
+              {allowDirectMessages && !guardianAccessLoading && <div className="p-3 border-t bg-card/90 backdrop-blur-sm">
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   <Button type="button" size="sm" variant="secondary" className="h-7 text-xs gap-1" onClick={() => setMessageInput(prev => `${prev}${prev ? " " : ""}📚 Quiz challenge: `)}>
                     <BookOpen className="h-3 w-3" /> Quiz Link
@@ -571,7 +607,7 @@ const Friends: React.FC = () => {
                 {messageInput.trim() && (
                   <p className="mt-2 text-[11px] text-muted-foreground">Typing… real-time sync enabled</p>
                 )}
-              </div>
+              </div>}
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
