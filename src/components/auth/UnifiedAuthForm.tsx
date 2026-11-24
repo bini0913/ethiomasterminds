@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import LegalLinksFooter from "@/components/legal/LegalLinksFooter";
 import { safeStorage } from "@/lib/safeStorage";
 import { useUser } from "@/context/UserContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -466,6 +467,7 @@ const UnifiedAuthForm: React.FC<UnifiedAuthFormProps> = ({
           </div>
         )}
       </form>
+      <LegalLinksFooter />
     </main>
   );
 };
