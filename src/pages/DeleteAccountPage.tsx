@@ -165,7 +165,7 @@ const DeleteAccountPage: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                  Signed in as <span className="font-medium">{user.email || user.username || "your Master Minds account"}</span>
+                  Signed in as <span className="font-medium">{user.username || "your Master Minds account"}</span>
                 </div>
 
                 {loading ? (
