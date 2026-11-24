@@ -133,9 +133,13 @@ begin
           and r.guardian_user_id is not null
           and r.verified_at is not null
       ) then
-        raise exception 'Guardian consent can only be enabled after verified guardian approval';
+        -- Legacy checkbox-only consent is not trusted. Silently reset it so
+        -- unrelated profile updates do not fail and social access stays off.
+        new.guardian_consent := false;
+        new.consent_at := null;
+      else
+        if new.consent_at is null then new.consent_at := now(); end if;
       end if;
-      if new.consent_at is null then new.consent_at := now(); end if;
     else
       new.consent_at := null;
     end if;
@@ -154,20 +158,9 @@ create trigger profiles_guardian_consent_guard
   for each row execute function public.validate_guardian_consent();
 revoke all on function public.validate_guardian_consent() from public, anon, authenticated;
 
-update public.profiles
-set guardian_consent = false,
-    consent_at = null,
-    guardian_email = case
-      when guardian_email is not null
-       and lower(trim(guardian_email)) ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
-      then lower(trim(guardian_email))
-      else null
-    end
-where age is not null and age < 18;
-
-update public.profiles
-set guardian_consent = false, consent_at = null, guardian_email = null
-where age is null or age >= 18;
+-- Existing checkbox-only consent remains ineffective: get_my_social_access
+-- requires a linked guardian_social_controls row, and guardian_allows checks
+-- the same row. This avoids unsafe bulk profile updates during migration.
 
 create or replace function public.update_my_guardian_email(p_guardian_email text)
 returns boolean
@@ -363,7 +356,7 @@ stable
 security definer
 set search_path = public
 as $function$
-  select p.age, coalesce(p.guardian_consent, false), p.guardian_email,
+  select p.age, (coalesce(p.guardian_consent, false) and c.student_id is not null), p.guardian_email,
          coalesce(c.allow_friends, false),
          coalesce(c.allow_direct_messages, false),
          coalesce(c.allow_group_chat, false),
