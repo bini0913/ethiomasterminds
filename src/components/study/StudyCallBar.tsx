@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Users, Check, X, Circle, RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Users, Check, X, Circle, RefreshCw, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +22,31 @@ type Friend = { id: string; name?: string; username?: string };
 export default function StudyCallBar() {
   const { user } = useUser();
   const { friends, onlineFriends, friendPresence, refreshFriends, loading: friendsLoading } = useFriends();
+  const [guardianCallsAllowed, setGuardianCallsAllowed] = useState(false);
+  const [guardianAccessLoading, setGuardianAccessLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const checkGuardianAccess = async () => {
+      if (!user?.id) {
+        if (active) { setGuardianCallsAllowed(false); setGuardianAccessLoading(false); }
+        return;
+      }
+      if (user.role !== "student") {
+        if (active) { setGuardianCallsAllowed(true); setGuardianAccessLoading(false); }
+        return;
+      }
+      setGuardianAccessLoading(true);
+      const { data, error } = await db.rpc("get_my_social_access");
+      const row = Array.isArray(data) ? data[0] : data;
+      if (active) {
+        setGuardianCallsAllowed(!error && !!row && (Number(row.age) >= 18 || row.allow_study_calls === true));
+        setGuardianAccessLoading(false);
+      }
+    };
+    void checkGuardianAccess();
+    return () => { active = false; };
+  }, [user?.id, user?.role]);
   const [expanded, setExpanded] = useState(true);
   const [selectedFriend, setSelectedFriend] = useState("");
   const [incoming, setIncoming] = useState<Invitation[]>([]);
@@ -260,6 +286,21 @@ export default function StudyCallBar() {
     };
   }, [user?.id]);
   const chosenFriend = friends.find(friend => friend.id === selectedFriend);
+
+  if (guardianAccessLoading) {
+    return <Card className="border-white/10 bg-white/5 text-white"><CardContent className="p-4 text-sm text-white/65">Checking Study Mode call permissions…</CardContent></Card>;
+  }
+  if (!guardianCallsAllowed) {
+    return <Card className="border-amber-400/20 bg-amber-400/5 text-white">
+      <CardContent className="space-y-3 p-4">
+        <div className="flex items-center gap-2 font-semibold"><ShieldAlert className="h-5 w-5 text-amber-300" />Study Mode calls are turned off</div>
+        <p className="text-sm text-white/65">A parent or guardian must verify approval and enable Study Mode calls before voice or video invitations can be sent or accepted.</p>
+        <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10">
+          <Link to="/guardian-consent-request?feature=allow_study_calls">Open guardian approval</Link>
+        </Button>
+      </CardContent>
+    </Card>;
+  }
 
   return <Card className={`overflow-hidden border-white/10 text-white ${roomId ? "bg-slate-950/90 shadow-xl shadow-black/20" : "bg-white/5"}`}>
     <CardContent className={roomId ? "p-0" : "p-4 space-y-3"}>
