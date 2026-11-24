@@ -41,6 +41,7 @@ export default function NetworkSuperAdminPortal() {
 
   const loadCore = useCallback(async () => {
     setLoading(true);
+    try {
     const [summary, directory, financeRes, settings, alertsRes] = await Promise.all([
       rpc("super_admin_get_network_dashboard"),
       rpc("super_admin_list_network_schools", { p_search: search.trim() || null, p_limit: 100, p_offset: 0 }),
@@ -58,7 +59,12 @@ export default function NetworkSuperAdminPortal() {
       const setting = (settings.data || [])[0];
       if (setting) { setNetworkName(setting.name || ""); }
     }
-    setLoading(false);
+    } catch (error: unknown) {
+      console.error("[Master Minds] NetworkSuperAdminPortal.tsx data load failed", error);
+      toast.error(error instanceof Error ? error.message : "This workspace could not load its records. Please retry.");
+    } finally {
+      setLoading(false);
+    }
   }, [search]);
 
   const loadPeople = useCallback(async () => {

@@ -44,6 +44,7 @@ export default function HRDirectorPortal() {
     if (!schoolId) return;
     setLoading(true);
     setLoadError(null);
+    try {
     const requests: Record<string, Promise<any>> = {
       staff: db.from("school_memberships")
         .select("id,user_id,school_role,status,school_username,grade_label,section_id,created_at")
@@ -104,7 +105,12 @@ export default function HRDirectorPortal() {
     } else {
       setProfiles({});
     }
-    setLoading(false);
+    } catch (error: unknown) {
+      console.error("[Master Minds] HRDirectorPortal.tsx data load failed", error);
+      setLoadError(error instanceof Error ? error.message : "School records could not be loaded. Please retry.");
+    } finally {
+      setLoading(false);
+    }
   }, [schoolId, appointment.permissions]);
 
   useEffect(() => { void load(); }, [load]);

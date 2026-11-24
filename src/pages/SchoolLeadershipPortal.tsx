@@ -155,6 +155,7 @@ function ScopedLeadershipWorkspace() {
     if (!schoolId) return;
     setLoading(true);
     setLoadError(null);
+    try {
     const requests: Record<string, Promise<any>> = {};
     if (can("view_students") || can("view_staff") || can("view_academics") || can("review_results") || can("manage_team_tasks") || can("assign_team_tasks")) {
       requests.members = db.from("school_memberships")
@@ -285,7 +286,12 @@ function ScopedLeadershipWorkspace() {
       const { data, error } = await db.from("profiles").select("id,name,username").in("id", userIds);
       if (!error) setProfiles(Object.fromEntries((data ?? []).map((profile: any) => [profile.id, profile])));
     }
-    setLoading(false);
+    } catch (error: unknown) {
+      console.error("[Master Minds] SchoolLeadershipPortal.tsx data load failed", error);
+      setLoadError(error instanceof Error ? error.message : "School leadership records could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const createDivisionStaff = async (event: React.FormEvent) => {

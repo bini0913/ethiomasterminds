@@ -54,6 +54,7 @@ export default function AcademicDirectorPortal() {
     if (!schoolId) return;
     setLoading(true);
     setError(null);
+    try {
     const requests: Record<string, Promise<any>> = {
       mappings: db.from("school_division_grade_mappings")
         .select("id,division_scope,grade_label")
@@ -144,7 +145,12 @@ export default function AcademicDirectorPortal() {
       const { data, error: profileError } = await db.from("profiles").select("id,name,username").in("id", userIds);
       if (!profileError) setProfiles(Object.fromEntries((data ?? []).map((profile: any) => [profile.id, profile])));
     }
-    setLoading(false);
+    } catch (error: unknown) {
+      console.error("[Master Minds] AcademicDirectorPortal.tsx data load failed", error);
+      setError(error instanceof Error ? error.message : "Academic records could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
   }, [schoolId, appointment.id, appointment.permissions]);
 
   useEffect(() => { void load(); }, [load]);
