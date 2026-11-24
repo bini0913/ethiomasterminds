@@ -65,9 +65,9 @@ begin
   if exists (select 1 from public.admin_audit_logs where actor_id = p_user_id) then
     v_blockers := array_append(v_blockers, 'Platform administrator audit history');
   end if;
-  if exists (select 1 from public.early_video_resources where reviewed_by = p_user_id) then
-    v_blockers := array_append(v_blockers, 'Reviewed learning resources');
-  end if;
+  -- Reviewer attribution on legacy video resources is not part of the tracked
+  -- migration schema. If a remote-only FK exists, the deletion worker catches
+  -- the FK violation and pauses the request for handover rather than deleting it.
   if exists (select 1 from public.access_codes where created_by = p_user_id)
      or exists (select 1 from public.announcements where author_id = p_user_id)
      or exists (select 1 from public.chat_groups where created_by = p_user_id)
