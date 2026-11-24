@@ -442,9 +442,16 @@ begin
   into v_age, v_consent
   from public.profiles p where p.id = p_user_id;
 
-  if not found or v_age is null then return false; end if;
-  if v_age >= 18 then return true; end if;
-  if not v_consent then return false; end if;
+  if not found then return false; end if;
+  if v_age is not null and v_age >= 18 then return true; end if;
+  if v_age is null and exists (
+    select 1 from public.user_roles r
+    where r.user_id = p_user_id
+      and r.role in ('teacher'::public.app_role,'admin'::public.app_role,'manager'::public.app_role,'finance'::public.app_role,'parent'::public.app_role,'super_admin'::public.app_role,'extreme_admin'::public.app_role)
+  ) then
+    return true;
+  end if;
+  if v_age is null or not v_consent then return false; end if;
 
   select case p_feature
     when 'friends' then c.allow_friends
@@ -778,7 +785,7 @@ create policy "users can view visible likes excluding blocked users"
   using (
     not app_private.is_user_blocked(user_id, (select auth.uid()))
     and app_private.guardian_allows(user_id, 'public_posts')
-    and exists (select 1 from public.social_posts p where p.id = social_post_likes.post_id and app_private.guardian_allows(p.author_id, 'public_posts'))
+    and exists (select 1 from public.social_posts p where p.id = social_post_likes.post_id and p.moderation_status = 'visible' and app_private.guardian_allows(p.author_id, 'public_posts') and not app_private.is_user_blocked(p.author_id, (select auth.uid())))
   );
 
 drop policy if exists "users can view visible reactions excluding blocked users" on public.social_post_reactions;
@@ -787,7 +794,7 @@ create policy "users can view visible reactions excluding blocked users"
   using (
     not app_private.is_user_blocked(user_id, (select auth.uid()))
     and app_private.guardian_allows(user_id, 'public_posts')
-    and exists (select 1 from public.social_posts p where p.id = social_post_reactions.post_id and app_private.guardian_allows(p.author_id, 'public_posts'))
+    and exists (select 1 from public.social_posts p where p.id = social_post_reactions.post_id and p.moderation_status = 'visible' and app_private.guardian_allows(p.author_id, 'public_posts') and not app_private.is_user_blocked(p.author_id, (select auth.uid())))
   );
 
 drop policy if exists "users can view own saved posts" on public.saved_posts;
@@ -914,6 +921,12 @@ create policy "members view guardian-enabled groups"
         select 1 from public.chat_group_members m
         where m.group_id = chat_groups.id and m.user_id = (select auth.uid())
       )
+    )
+    and (
+      app_private.guardian_allows(created_by, 'group_chat')
+      or has_role((select auth.uid()), 'admin'::public.app_role)
+      or has_role((select auth.uid()), 'manager'::public.app_role)
+      or (select public._is_extreme_admin())
     )
     and (
       app_private.guardian_allows((select auth.uid()), 'group_chat')
