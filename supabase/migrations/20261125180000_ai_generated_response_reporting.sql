@@ -120,10 +120,18 @@ begin
 
   if p_source = 'ai_tutor' then
     if p_conversation_id is null or not exists (
-      select 1 from public.ai_tutor_conversations c
-      where c.id = p_conversation_id and c.user_id = v_reporter
+      select 1
+        from public.ai_tutor_conversations c
+       where c.id = p_conversation_id
+         and c.user_id = v_reporter
+         and exists (
+           select 1
+             from jsonb_array_elements(coalesce(c.messages, '[]'::jsonb)) as item(value)
+            where item.value ->> 'role' = 'assistant'
+              and left(item.value ->> 'content', 12000) = v_response
+         )
     ) then
-      raise exception using errcode = '42501', message = 'The AI Tutor conversation does not belong to your account';
+      raise exception using errcode = '42501', message = 'The AI Tutor response could not be verified for your account';
     end if;
   elsif p_conversation_id is not null then
     raise exception 'AI Helper reports cannot reference an AI Tutor conversation';
