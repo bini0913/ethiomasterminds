@@ -26,6 +26,13 @@ This runbook is for authorised Master Minds moderators. It is an operational che
 - Report to the appropriate competent authority in the relevant jurisdiction where required by applicable law. Confirm the current local reporting obligation with qualified counsel or the relevant authority; do not assume one country's reporting process applies everywhere.
 - Cooperate with lawful requests from competent authorities. Do not disclose reporter or child information publicly.
 
+## AI-generated content reports
+
+- Review reports submitted from AI Tutor and the floating AI Learning Assistant.
+- The report queue includes a private snapshot of the reported response and the learner-selected reason.
+- Resolve or dismiss AI response reports after review. AI responses are not public posts and cannot be removed through the social-content removal action.
+- Escalate reports involving dangerous advice, harassment, personal information or other child-safety concerns using the child-safety intake procedure above.
+
 ## Other UGC reports
 
 - Review harassment, bullying, threats, spam, privacy violations and inappropriate content.

@@ -5,6 +5,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  generated?: boolean;
 }
 
 interface AIHelperContextType {
@@ -13,7 +14,7 @@ interface AIHelperContextType {
   closeHelper: () => void;
   toggleHelper: () => void;
   messages: Message[];
-  addMessage: (content: string, role: 'user' | 'assistant') => void;
+  addMessage: (content: string, role: 'user' | 'assistant', generated?: boolean) => void;
   sendMessage: (content: string) => Promise<void>;
   isLoading: boolean;
   clearMessages: () => void;
@@ -36,10 +37,10 @@ export const AIHelperProvider: React.FC<{ children: ReactNode }> = ({ children }
   const closeHelper = () => setIsOpen(false);
   const toggleHelper = () => setIsOpen(!isOpen);
 
-  const addMessage = (content: string, role: 'user' | 'assistant') => {
+  const addMessage = (content: string, role: 'user' | 'assistant', generated = false) => {
     setMessages(prev => [
       ...prev,
-      { role, content, timestamp: new Date() }
+      { role, content, timestamp: new Date(), generated }
     ]);
   };
 
@@ -69,7 +70,7 @@ export const AIHelperProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
 
       // Add AI response
-      addMessage(data.response || "I'm sorry, I couldn't process your request. Please try again.", 'assistant');
+      addMessage(data.response || "I'm sorry, I couldn't process your request. Please try again.", 'assistant', Boolean(data.response));
     } catch (error) {
       console.error('Error getting AI response:', error);
       addMessage("I'm sorry, I couldn't process your request. Please try again.", 'assistant');

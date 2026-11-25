@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { Avatar } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import ReportAIResponseButton from '@/components/ai/ReportAIResponseButton';
 
 const AIHelper: React.FC = () => {
   const { 
@@ -103,8 +104,11 @@ const AIHelper: React.FC = () => {
                       `}
                     >
                       <div className="text-sm">{message.content}</div>
-                      <div className="text-xs opacity-70 mt-1 text-right">
+                      <div className="mt-1 flex items-center justify-end gap-1 text-xs opacity-70">
                         {format(message.timestamp, 'HH:mm')}
+                        {message.role === 'assistant' && message.generated && (
+                          <ReportAIResponseButton source="ai_helper" responseText={message.content} />
+                        )}
                       </div>
                     </div>
                   </div>
