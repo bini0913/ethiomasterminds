@@ -650,6 +650,22 @@ begin
 end;
 $$;
 
+-- Client-callable guardian RPCs are explicitly restricted to authenticated users.
+revoke all on function public.create_guardian_consent_request(text) from public, anon;
+grant execute on function public.create_guardian_consent_request(text) to authenticated;
+revoke all on function public.get_guardian_consent_request(uuid) from public, anon;
+grant execute on function public.get_guardian_consent_request(uuid) to authenticated;
+revoke all on function public.approve_guardian_consent(uuid, boolean) from public, anon;
+grant execute on function public.approve_guardian_consent(uuid, boolean) to authenticated;
+revoke all on function public.reject_guardian_consent(uuid) from public, anon;
+grant execute on function public.reject_guardian_consent(uuid) to authenticated;
+revoke all on function public.list_guardian_children() from public, anon;
+grant execute on function public.list_guardian_children() to authenticated;
+revoke all on function public.update_guardian_child_controls(uuid, boolean, boolean, boolean, boolean, boolean, boolean) from public, anon;
+grant execute on function public.update_guardian_child_controls(uuid, boolean, boolean, boolean, boolean, boolean, boolean) to authenticated;
+revoke all on function public.revoke_guardian_consent(uuid) from public, anon;
+grant execute on function public.revoke_guardian_consent(uuid) to authenticated;
+
 create or replace function public.is_user_feature_enabled(p_user_id uuid, p_feature text)
 returns boolean
 language plpgsql
