@@ -20,6 +20,13 @@ values
 on conflict (id) do nothing;
 alter table public.profiles enable trigger guard_student_profile_updates;
 
+insert into public.user_policy_acceptances (user_id, policy_key, policy_version, source)
+values
+  ('a2000000-0000-4000-8000-000000000001', 'community_terms', '2026-11-24', 'signup'),
+  ('a2000000-0000-4000-8000-000000000002', 'community_terms', '2026-11-24', 'signup'),
+  ('a2000000-0000-4000-8000-000000000003', 'community_terms', '2026-11-24', 'signup')
+on conflict (user_id, policy_key, policy_version) do nothing;
+
 insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)
 values
   ('a1000000-0000-4000-8000-000000000001', 'RLS public room', 'a2000000-0000-4000-8000-000000000001', 4, 'waiting', false),
@@ -32,12 +39,15 @@ values (
   extensions.crypt(encode(extensions.digest('private-pass', 'sha256'), 'hex'), extensions.gen_salt('bf'))
 );
 
+-- Seed test-only roster rows independently of the user-facing join guard.
+alter table public.room_players disable trigger guardian_room_player_guard;
 insert into public.room_players (room_id, user_id, is_ready)
 values
   ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', true),
   ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', true),
   ('a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000002', true),
   ('a1000000-0000-4000-8000-000000000003', 'a2000000-0000-4000-8000-000000000003', true);
+alter table public.room_players enable trigger guardian_room_player_guard;
 
 insert into public.room_state (room_id, status, question_index)
 values
