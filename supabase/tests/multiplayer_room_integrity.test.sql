@@ -18,6 +18,14 @@ values
   ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'multiplayer-fixture-2@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 2","age":"18"}'::jsonb, now(), now()),
   ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'multiplayer-fixture-3@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 3","age":"18"}'::jsonb, now(), now())
 on conflict (id) do nothing;
+-- The feature gate reads profiles.age, not raw auth metadata.
+update public.profiles
+set age = 18
+where id in (
+  'a2000000-0000-4000-8000-000000000001',
+  'a2000000-0000-4000-8000-000000000002',
+  'a2000000-0000-4000-8000-000000000003'
+);
 alter table public.profiles enable trigger guard_student_profile_updates;
 
 insert into public.user_policy_acceptances (user_id, policy_key, policy_version, source)
@@ -54,10 +62,14 @@ values
   ('a1000000-0000-4000-8000-000000000001', 'waiting', 0),
   ('a1000000-0000-4000-8000-000000000002', 'waiting', 0);
 
+-- These are historical fixture rows, not user chat submissions. The RPC/trigger
+-- behavior is covered by its dedicated tests; bypass the insert guard only here.
+alter table public.room_chat_messages disable trigger guardian_room_chat_guard;
 insert into public.room_chat_messages (room_id, user_id, content)
 values
   ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'room A message'),
   ('a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000002', 'room B message');
+alter table public.room_chat_messages enable trigger guardian_room_chat_guard;
 
 insert into public.quizzes (id, created_by, title, subject, is_approved, difficulty)
 values ('a3000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'Multiplayer integrity fixture', 'Math', true, 'Medium');
