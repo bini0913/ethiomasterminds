@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(33);
 
 select ok(to_regclass('public.account_deletion_requests') is not null, 'account deletion request queue exists');
 select ok((select relrowsecurity from pg_class where oid = 'public.account_deletion_requests'::regclass), 'account deletion requests have RLS enabled');
@@ -32,6 +32,7 @@ select ok(position('A resolution note is required' in pg_get_functiondef('public
 select ok(exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'account_deletion_requests' and column_name = 'previous_account_status'), 'deletion requests retain the pre-request account status');
 select ok(exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'account_deletion_requests' and column_name = 'suspension_applied_by_request'), 'deletion requests record whether they caused the suspension');
 select ok(position('v_account_status = ''active''' in pg_get_functiondef('public.request_my_account_deletion()'::regprocedure)) > 0, 'in-app deletion requests only suspend accounts that were active');
+select ok(position('coalesce(v_account_status = ''active'', false)' in pg_get_functiondef('public.request_my_account_deletion()'::regprocedure)) > 0, 'null account status cannot create a null suspension marker');
 select ok(position('suspension_applied_by_request' in pg_get_functiondef('public.extreme_admin_update_account_deletion_request(uuid,text,text)'::regprocedure)) > 0, 'rejection rollback is limited to suspensions applied by the deletion request');
 select ok(position('and account_status = ''suspended''' in pg_get_functiondef('public.extreme_admin_update_account_deletion_request(uuid,text,text)'::regprocedure)) > 0, 'rejection rollback preserves a later moderation status change');
 select ok(position('A verification note is required' in pg_get_functiondef('public.extreme_admin_update_account_deletion_request(uuid,text,text)'::regprocedure)) > 0, 'deletion review transitions require an auditable verification or resolution note');
