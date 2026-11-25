@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(13);
+select plan(22);
 
 select ok(to_regclass('public.account_deletion_requests') is not null, 'account deletion request queue exists');
 select ok((select relrowsecurity from pg_class where oid = 'public.account_deletion_requests'::regclass), 'account deletion requests have RLS enabled');
@@ -15,6 +15,17 @@ select ok(not has_function_privilege('authenticated', 'public.delete_my_account(
 select ok(has_function_privilege('authenticated', 'public.extreme_admin_list_account_deletion_requests(text,integer)', 'EXECUTE'), 'signed-in users can call the role-guarded Extreme Admin queue RPC');
 select ok(has_function_privilege('authenticated', 'public.extreme_admin_update_account_deletion_request(uuid,text,text)', 'EXECUTE'), 'signed-in users can call the role-guarded deletion review RPC');
 select ok(has_function_privilege('authenticated', 'public.extreme_admin_create_external_deletion_request(text,text,text)', 'EXECUTE'), 'signed-in users can call the role-guarded external request logging RPC');
+
+select ok(to_regclass('private.external_deletion_request_rate_limits') is not null, 'external deletion rate-limit storage exists in a private schema');
+select ok((select relrowsecurity from pg_class where oid = 'private.external_deletion_request_rate_limits'::regclass), 'external deletion rate-limit storage has RLS enabled');
+select ok(not has_table_privilege('anon', 'private.external_deletion_request_rate_limits', 'select'), 'anonymous clients cannot read rate-limit keys');
+select ok(not has_table_privilege('authenticated', 'private.external_deletion_request_rate_limits', 'select'), 'authenticated clients cannot read rate-limit keys');
+select ok(has_function_privilege('service_role', 'public.consume_external_deletion_rate_limit(text,text,integer,integer)', 'EXECUTE'), 'service role can consume external deletion rate limits');
+select ok(not has_function_privilege('anon', 'public.consume_external_deletion_rate_limit(text,text,integer,integer)', 'EXECUTE'), 'anonymous clients cannot call the rate limiter');
+select ok(has_function_privilege('service_role', 'public.submit_external_deletion_request(text,text,text)', 'EXECUTE'), 'service role can submit external deletion requests');
+select ok(not has_function_privilege('anon', 'public.submit_external_deletion_request(text,text,text)', 'EXECUTE'), 'anonymous clients cannot call the privileged intake RPC directly');
+select ok(not has_function_privilege('authenticated', 'public.submit_external_deletion_request(text,text,text)', 'EXECUTE'), 'authenticated clients cannot forge external web requests');
+select ok((select pg_get_constraintdef(oid) like '%external_web%' from pg_constraint where conrelid = 'public.account_deletion_requests'::regclass and conname = 'account_deletion_requests_source_check'), 'request source constraint permits external web intake');
 
 select * from finish();
 rollback;
