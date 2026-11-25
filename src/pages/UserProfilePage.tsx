@@ -634,7 +634,7 @@ const UserProfilePage = () => {
   }, [currentTier.name, isSelf, profile?.level]);
 
   const onFollowToggle = async () => {
-    if (!authUser?.id || !profile) return;
+    if (!authUser?.id || !profile || isBlocked) return;
     try {
       if (isFollowing) {
         await unfollowUser(authUser.id, profile.id);
@@ -648,8 +648,12 @@ const UserProfilePage = () => {
   };
 
   const onChallenge = async () => {
-    if (!authUser?.id || isSelf || !profile || isBlocked) {
+    if (!authUser?.id || isSelf || !profile) {
       navigate("/multiplayer");
+      return;
+    }
+    if (isBlocked) {
+      toast.error("You cannot interact with this learner because one of you has blocked the other.");
       return;
     }
 
@@ -680,7 +684,7 @@ const UserProfilePage = () => {
 
   const onTransferCoins = async () => {
     const amount = Number(transferAmount);
-    if (!profile) return;
+    if (!profile || isBlocked) return;
     if (!Number.isFinite(amount) || amount < 10) {
       toast.error("Minimum transfer is 10 coins.");
       return;
