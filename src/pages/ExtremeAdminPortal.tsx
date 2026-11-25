@@ -603,7 +603,7 @@ const ExtremeAdminPortal: React.FC = () => {
                     {report.description && <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{report.description}</p>}
                     {report.status === 'pending' && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {report.reported_type === 'user' ? <><Button size="sm" variant="destructive" onClick={() => void enforceReportedAccount(report, 'suspend_user')}>Suspend account</Button><Button size="sm" variant="destructive" onClick={() => void enforceReportedAccount(report, 'ban_user')}>Ban account</Button></> : <Button size="sm" variant="destructive" onClick={() => void enforceReportedAccount(report, 'remove_content')}>Remove content</Button>}
+                        {report.reported_type === 'user' ? <><Button size="sm" variant="destructive" onClick={() => void enforceReportedAccount(report, 'suspend_user')}>Suspend account</Button><Button size="sm" variant="destructive" onClick={() => void enforceReportedAccount(report, 'ban_user')}>Ban account</Button></> : report.reported_type !== 'ai_response' ? <Button size="sm" variant="destructive" onClick={() => void enforceReportedAccount(report, 'remove_content')}>Remove content</Button> : null}
                         <Button size="sm" onClick={() => void updateReport(report.id, 'resolved')}>Resolve</Button>
                         <Button size="sm" variant="outline" onClick={() => void updateReport(report.id, 'dismissed')}>Dismiss</Button>
                       </div>
