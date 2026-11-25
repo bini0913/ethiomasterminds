@@ -14,11 +14,26 @@ insert into auth.users (
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
 )
 values
-  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'multiplayer-fixture-1@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 1"}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'multiplayer-fixture-2@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 2"}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'multiplayer-fixture-3@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 3"}'::jsonb, now(), now())
+  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'multiplayer-fixture-1@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 1","age":"18"}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'multiplayer-fixture-2@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 2","age":"18"}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'multiplayer-fixture-3@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 3","age":"18"}'::jsonb, now(), now())
 on conflict (id) do nothing;
+-- The feature gate reads profiles.age, not raw auth metadata.
+update public.profiles
+set age = 18
+where id in (
+  'a2000000-0000-4000-8000-000000000001',
+  'a2000000-0000-4000-8000-000000000002',
+  'a2000000-0000-4000-8000-000000000003'
+);
 alter table public.profiles enable trigger guard_student_profile_updates;
+
+insert into public.user_policy_acceptances (user_id, policy_key, policy_version, source)
+values
+  ('a2000000-0000-4000-8000-000000000001', 'community_terms', '2026-11-24', 'signup'),
+  ('a2000000-0000-4000-8000-000000000002', 'community_terms', '2026-11-24', 'signup'),
+  ('a2000000-0000-4000-8000-000000000003', 'community_terms', '2026-11-24', 'signup')
+on conflict (user_id, policy_key, policy_version) do nothing;
 
 insert into public.multiplayer_rooms (id, name, host_id, max_players, status, has_password)
 values
@@ -32,22 +47,29 @@ values (
   extensions.crypt(encode(extensions.digest('private-pass', 'sha256'), 'hex'), extensions.gen_salt('bf'))
 );
 
+-- Seed test-only roster rows independently of the user-facing join guard.
+alter table public.room_players disable trigger guardian_room_player_guard;
 insert into public.room_players (room_id, user_id, is_ready)
 values
   ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', true),
   ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', true),
   ('a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000002', true),
   ('a1000000-0000-4000-8000-000000000003', 'a2000000-0000-4000-8000-000000000003', true);
+alter table public.room_players enable trigger guardian_room_player_guard;
 
 insert into public.room_state (room_id, status, question_index)
 values
   ('a1000000-0000-4000-8000-000000000001', 'waiting', 0),
   ('a1000000-0000-4000-8000-000000000002', 'waiting', 0);
 
+-- These are historical fixture rows, not user chat submissions. The RPC/trigger
+-- behavior is covered by its dedicated tests; bypass the insert guard only here.
+alter table public.room_chat_messages disable trigger guardian_room_chat_guard;
 insert into public.room_chat_messages (room_id, user_id, content)
 values
   ('a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'room A message'),
   ('a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000002', 'room B message');
+alter table public.room_chat_messages enable trigger guardian_room_chat_guard;
 
 insert into public.quizzes (id, created_by, title, subject, is_approved, difficulty)
 values ('a3000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'Multiplayer integrity fixture', 'Math', true, 'Medium');
@@ -127,9 +149,12 @@ where room_id = 'a1000000-0000-4000-8000-000000000001'
 update public.multiplayer_rooms
 set status = 'playing', game_mode = 'accuracy', started_at = clock_timestamp()
 where id = 'a1000000-0000-4000-8000-000000000002';
+-- Add the second test-only player while bypassing the user-facing join guard.
+alter table public.room_players disable trigger guardian_room_player_guard;
 insert into public.room_players (room_id, user_id, is_ready, completed_at)
 values ('a1000000-0000-4000-8000-000000000002',
         'a2000000-0000-4000-8000-000000000001', true, null);
+alter table public.room_players enable trigger guardian_room_player_guard;
 update public.room_players
 set completed_at = clock_timestamp() - interval '6 seconds'
 where room_id = 'a1000000-0000-4000-8000-000000000002'
