@@ -200,9 +200,13 @@ begin
   end if;
 
   if v_age is not null and v_age < 18 then
-    if v_guardian_email is null
-       or v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
-       or v_guardian_email = lower(new.email) then
+    if v_guardian_email is null then
+      raise exception 'A separate, valid parent or guardian email is required for learners under 18';
+    end if;
+    if v_guardian_email = lower(new.email) then
+      raise exception 'A separate, valid parent or guardian email is required for learners under 18';
+    end if;
+    if v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' then
       raise exception 'A separate, valid parent or guardian email is required for learners under 18';
     end if;
     if coalesce(new.raw_user_meta_data ->> 'guardian_consent_request_id', '') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
