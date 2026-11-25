@@ -45,7 +45,13 @@ declare
   v_now timestamptz := clock_timestamp();
   v_allowed boolean;
 begin
-  if p_key_hash is null or length(p_key_hash) <> 64 or p_key_hash ~ '[^0-9a-f]'
+  if p_key_hash is null
+     or length(p_key_hash) <> 64
+     or p_key_hash ~ '[^0-9a-f]'
+     or p_bucket is null or p_bucket not in ('ip', 'email')
+     or p_max_attempts is null or p_max_attempts < 1 or p_max_attempts > 20
+     or p_window_seconds is null or p_window_seconds < 60 or p_window_seconds > 86400
+  then
     raise exception 'Invalid rate-limit parameters';
   end if;
 
