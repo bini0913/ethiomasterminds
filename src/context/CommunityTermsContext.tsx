@@ -146,7 +146,10 @@ export const CommunityTermsProvider = ({ children }: { children: ReactNode }) =>
               Before posting, commenting, messaging or creating community content, please review these rules. Be respectful, do not bully or threaten anyone, do not share private information or images without permission, and never post sexual, exploitative or dangerous content.
             </p>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              You can report content or users in the app. Use blocking when you do not want another account to contact you. Serious safety concerns should also be shared with a parent, guardian or trusted adult.
+              Online interactions can carry real-world risks. Only connect through trusted school or friend relationships. Never share your home address, phone number, passwords, private images or live location, and do not arrange to meet someone you first met online.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              You can report content or users in the app. Use blocking when you do not want another account to contact you. If an interaction makes you uncomfortable or you have a safety concern, tell a parent, guardian, teacher or trusted adult.
             </p>
             <a className="mt-3 inline-block text-sm font-medium text-primary underline underline-offset-4" href="/terms" target="_blank" rel="noreferrer">
               Read the full Terms of Use and Community Guidelines
