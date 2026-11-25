@@ -329,7 +329,7 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const updateDeletionRequest = async (request: DeletionRequest, nextStatus: 'in_review' | 'completed' | 'rejected') => {
-    if (nextStatus === 'completed' && request.user_id) {
+    if (nextStatus === 'completed' && !statusReason.trim()) {\n      return toast.error('Add a resolution note documenting the verification and deletion outcome before completing this request.');\n    }\n    if (nextStatus === 'completed' && request.user_id) {
       return toast.error('Delete the account through the supported Auth Admin workflow first. Then refresh and mark this request complete.');
     }
     const note = statusReason.trim() || null;
