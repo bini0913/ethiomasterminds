@@ -54,13 +54,30 @@ begin
   if p_key_hash ~ '[^0-9a-f]' then
     raise exception 'Invalid rate-limit key';
   end if;
-  if p_bucket is null or p_bucket not in ('ip', 'email') then
+  if p_bucket is null then
     raise exception 'Invalid rate-limit bucket';
   end if;
-  if p_max_attempts is null or p_max_attempts < 1 or p_max_attempts > 20 then
+  if p_bucket <> 'ip' then
+    if p_bucket <> 'email' then
+      raise exception 'Invalid rate-limit bucket';
+    end if;
+  end if;
+  if p_max_attempts is null then
     raise exception 'Invalid rate-limit attempt limit';
   end if;
-  if p_window_seconds is null or p_window_seconds < 60 or p_window_seconds > 86400 then
+  if p_max_attempts < 1 then
+    raise exception 'Invalid rate-limit attempt limit';
+  end if;
+  if p_max_attempts > 20 then
+    raise exception 'Invalid rate-limit attempt limit';
+  end if;
+  if p_window_seconds is null then
+    raise exception 'Invalid rate-limit window';
+  end if;
+  if p_window_seconds < 60 then
+    raise exception 'Invalid rate-limit window';
+  end if;
+  if p_window_seconds > 86400 then
     raise exception 'Invalid rate-limit window';
   end if;
 
