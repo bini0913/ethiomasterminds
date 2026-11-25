@@ -45,14 +45,23 @@ declare
   v_now timestamptz := clock_timestamp();
   v_allowed boolean;
 begin
-  if p_key_hash is null
-     or length(p_key_hash) <> 64
-     or p_key_hash ~ '[^0-9a-f]'
-     or p_bucket is null or p_bucket not in ('ip', 'email')
-     or p_max_attempts is null or p_max_attempts < 1 or p_max_attempts > 20
-     or p_window_seconds is null or p_window_seconds < 60 or p_window_seconds > 86400
-  then
-    raise exception 'Invalid rate-limit parameters';
+  if p_key_hash is null then
+    raise exception 'Invalid rate-limit key';
+  end if;
+  if length(p_key_hash) <> 64 then
+    raise exception 'Invalid rate-limit key';
+  end if;
+  if p_key_hash ~ '[^0-9a-f]' then
+    raise exception 'Invalid rate-limit key';
+  end if;
+  if p_bucket is null or p_bucket not in ('ip', 'email') then
+    raise exception 'Invalid rate-limit bucket';
+  end if;
+  if p_max_attempts is null or p_max_attempts < 1 or p_max_attempts > 20 then
+    raise exception 'Invalid rate-limit attempt limit';
+  end if;
+  if p_window_seconds is null or p_window_seconds < 60 or p_window_seconds > 86400 then
+    raise exception 'Invalid rate-limit window';
   end if;
 
   insert into deletion_private.external_deletion_request_rate_limits
