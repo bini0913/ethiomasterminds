@@ -184,6 +184,7 @@ declare
   v_education_level text;
   v_guardian_email text := nullif(lower(trim(new.raw_user_meta_data ->> 'guardian_email')), '');
   v_guardian_request_id uuid;
+  v_at_position integer;
 begin
   if v_gender not in ('male', 'female') then v_gender := null; end if;
   if v_age_text ~ '^[0-9]{1,3}$' then
@@ -206,7 +207,12 @@ begin
     if v_guardian_email = lower(new.email) then
       raise exception 'A separate, valid parent or guardian email is required for learners under 18';
     end if;
-    if v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' then
+    v_at_position := position('@' in v_guardian_email);
+    if v_at_position <= 1
+       or position('@' in substring(v_guardian_email from v_at_position + 1)) > 0
+       or position('.' in split_part(v_guardian_email, '@', 2)) <= 1
+       or right(v_guardian_email, 1) = '.'
+       or position(' ' in v_guardian_email) > 0 then
       raise exception 'A separate, valid parent or guardian email is required for learners under 18';
     end if;
     if coalesce(new.raw_user_meta_data ->> 'guardian_consent_request_id', '') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
