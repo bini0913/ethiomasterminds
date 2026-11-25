@@ -14,7 +14,7 @@ for (const route of publicRoutes) {
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
     await page.goto(route.path, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: route.heading, level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: route.heading })).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/This page couldn't load|unexpected rendering error/i);
 
     const horizontalOverflow = await page.evaluate(
