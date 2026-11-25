@@ -1572,3 +1572,22 @@ create policy "users can update own comments"
   );
 
 -- Parent revocation removes access to social feeds by making the child's profile private.
+
+-- Guardian RPCs are callable only by authenticated users. Each RPC performs
+-- its own role, email-verification, ownership, and consent checks.
+revoke all on function public.create_guardian_consent_request(text) from public, anon;
+grant execute on function public.create_guardian_consent_request(text) to authenticated;
+revoke all on function public.set_my_age_and_guardian(integer, text) from public, anon;
+grant execute on function public.set_my_age_and_guardian(integer, text) to authenticated;
+revoke all on function public.get_guardian_consent_request(uuid) from public, anon;
+grant execute on function public.get_guardian_consent_request(uuid) to authenticated;
+revoke all on function public.approve_guardian_consent(uuid, boolean) from public, anon;
+grant execute on function public.approve_guardian_consent(uuid, boolean) to authenticated;
+revoke all on function public.reject_guardian_consent(uuid) from public, anon;
+grant execute on function public.reject_guardian_consent(uuid) to authenticated;
+revoke all on function public.list_guardian_children() from public, anon;
+grant execute on function public.list_guardian_children() to authenticated;
+revoke all on function public.update_guardian_child_controls(uuid, boolean, boolean, boolean, boolean, boolean, boolean) from public, anon;
+grant execute on function public.update_guardian_child_controls(uuid, boolean, boolean, boolean, boolean, boolean, boolean) to authenticated;
+revoke all on function public.revoke_guardian_consent(uuid) from public, anon;
+grant execute on function public.revoke_guardian_consent(uuid) to authenticated;
