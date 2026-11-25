@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(34);
+select plan(38);
 
 -- Isolated fixtures; the test transaction rolls back all inserted rows.
 -- Room and player foreign keys point at auth.users. Create deterministic users
@@ -160,8 +160,38 @@ set completed_at = clock_timestamp() - interval '6 seconds'
 where room_id = 'a1000000-0000-4000-8000-000000000002'
   and user_id = 'a2000000-0000-4000-8000-000000000002';
 
+-- User 2 blocks user 1. The two fixture users already share room 1, and user 2
+-- is the host/player in private room 2. Room join, reconnect and room chat RPCs
+-- must reject the blocked pair even though they execute as SECURITY DEFINER.
+insert into public.user_blocks (blocker_id, blocked_id)
+values ('a2000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000001');
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'a2000000-0000-4000-8000-000000000001', true);
+select throws_ok(
+  'select public.multiplayer_join_room(''a1000000-0000-4000-8000-000000000002'', ''private-pass'')',
+  'P0001',
+  'This room contains someone you cannot interact with',
+  'blocked users cannot join a room containing the other account'
+);
+select throws_ok(
+  'select public.multiplayer_ensure_membership(''a1000000-0000-4000-8000-000000000002'')',
+  'P0001',
+  'This room contains someone you cannot interact with',
+  'blocked users cannot restore membership in a room containing the other account'
+);
+select throws_ok(
+  'select public.multiplayer_join_room(''a1000000-0000-4000-8000-000000000001'', null)',
+  'P0001',
+  'This room contains someone you cannot interact with',
+  'a block added after joining also prevents reconnecting to the shared room'
+);
+select throws_ok(
+  'select public.multiplayer_send_room_message(''a1000000-0000-4000-8000-000000000001'', ''blocked chat'')',
+  'P0001',
+  'This room contains someone you cannot interact with',
+  'blocked users cannot send multiplayer room chat to a shared room'
+);
 select throws_ok(
   'select public.multiplayer_advance_player(''a1000000-0000-4000-8000-000000000001'')',
   'P0001',
