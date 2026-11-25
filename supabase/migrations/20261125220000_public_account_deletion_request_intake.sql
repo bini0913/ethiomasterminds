@@ -206,3 +206,67 @@ revoke all on function public.extreme_admin_list_account_deletion_requests(text,
   from public, anon;
 grant execute on function public.extreme_admin_list_account_deletion_requests(text, integer)
   to authenticated;
+
+-- A reviewer must record an explicit resolution before closing a request.
+create or replace function public.extreme_admin_update_account_deletion_request(
+  p_request_id uuid,
+  p_status text,
+  p_note text default null
+)
+returns public.account_deletion_requests
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_request public.account_deletion_requests%rowtype;
+  v_note text := nullif(left(trim(coalesce(p_note, '')), 2000), '');
+begin
+  if v_actor is null or not public.has_role(v_actor, 'extreme_admin'::public.app_role) then
+    raise exception using errcode = '42501', message = 'Extreme Admin access required';
+  end if;
+  if p_status not in ('in_review', 'completed', 'rejected') then
+    raise exception 'Unsupported deletion-request status';
+  end if;
+  if p_status = 'completed' and v_note is null then
+    raise exception 'A resolution note is required before completing a deletion request';
+  end if;
+
+  select * into v_request
+    from public.account_deletion_requests
+   where id = p_request_id
+   for update;
+  if not found then raise exception 'Deletion request not found'; end if;
+
+  if p_status = 'completed' and v_request.user_id is not null then
+    raise exception 'The account must be deleted through the supported Auth Admin workflow before this request can be marked complete';
+  end if;
+
+  if p_status = 'in_review' and v_request.user_id is not null then
+    update public.profiles set account_status = 'suspended' where id = v_request.user_id;
+  end if;
+
+  if p_status = 'rejected' and v_request.user_id is not null then
+    update public.profiles set account_status = 'active' where id = v_request.user_id;
+  end if;
+
+  update public.account_deletion_requests
+     set status = p_status,
+         reviewed_at = now(),
+         reviewed_by = v_actor,
+         resolution_note = coalesce(v_note, resolution_note)
+   where id = p_request_id
+   returning * into v_request;
+
+  insert into public.account_deletion_request_events(request_id, actor_id, action, note)
+  values (v_request.id, v_actor, p_status, v_note);
+
+  return v_request;
+end;
+$$;
+
+revoke all on function public.extreme_admin_update_account_deletion_request(uuid, text, text)
+  from public, anon;
+grant execute on function public.extreme_admin_update_account_deletion_request(uuid, text, text)
+  to authenticated;
