@@ -333,7 +333,7 @@ begin
 
   if p_age < 18 then
     if v_guardian_email is null
-       or v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
+       or v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+.[^[:space:]@]+$'
        or v_guardian_email = v_email then
       raise exception 'A separate, valid parent or guardian email is required';
     end if;
