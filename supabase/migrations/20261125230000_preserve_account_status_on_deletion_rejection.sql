@@ -100,8 +100,10 @@ begin
   if p_status not in ('in_review', 'completed', 'rejected') then
     raise exception 'Unsupported deletion-request status';
   end if;
-  if p_status in ('in_review', 'completed', 'rejected') and v_note is null then
-    raise exception 'A verification or resolution note is required';
+  if p_status = 'completed' and v_note is null then
+    raise exception 'A resolution note is required before completing a deletion request';
+  elsif v_note is null then
+    raise exception 'A verification note is required before changing a deletion request';
   end if;
 
   select * into v_request
