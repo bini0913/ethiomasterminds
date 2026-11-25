@@ -1,0 +1,51 @@
+name: Public route browser smoke tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "playwright.config.ts"
+      - "tests/e2e/**"
+      - ".github/workflows/public-route-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "playwright.config.ts"
+      - "tests/e2e/**"
+      - ".github/workflows/public-route-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  public-route-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      VITE_SUPABASE_URL: https://mytbjkchvfybhyqcynnl.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_GtWjzcVR3XxRddFfyxqeaA_5xZ33-lM' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install application dependencies
+        run: npm install --legacy-peer-deps
+      - name: Install Playwright test runner
+        run: npm install --no-save --legacy-peer-deps @playwright/test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify route registry
+        run: npm run check:routes
+      - name: Run public route browser smoke tests
+        run: npx playwright test
