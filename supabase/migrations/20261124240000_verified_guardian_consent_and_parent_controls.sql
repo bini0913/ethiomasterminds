@@ -333,9 +333,54 @@ begin
 
   if p_age < 18 then
     if v_guardian_email is null
-       or v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+
+       or v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
+       or v_guardian_email = v_email then
+      raise exception 'A separate, valid parent or guardian email is required';
+    end if;
+
+    update public.guardian_consent_requests
+       set status = 'rejected', reviewed_at = now()
+     where child_id = v_user_id and status = 'pending'
+       and lower(guardian_email) <> v_guardian_email;
+
+    select r.id into v_request_id
+      from public.guardian_consent_requests r
+     where r.child_id = v_user_id and lower(r.guardian_email) = v_guardian_email
+       and r.status = 'pending'
+     order by r.created_at desc limit 1;
+
+    if v_request_id is null then
+      insert into public.guardian_consent_requests(child_id, guardian_email)
+      values (v_user_id, v_guardian_email)
+      returning id into v_request_id;
+    end if;
+
+    update public.profiles
+       set age = p_age, guardian_email = v_guardian_email,
+           guardian_consent = false, guardian_consent_status = 'pending',
+           guardian_user_id = null, consent_at = null
+     where id = v_user_id;
+  else
+    update public.guardian_consent_requests
+       set status = 'revoked', reviewed_at = now()
+     where child_id = v_user_id and status in ('pending', 'approved');
+    update public.profiles
+       set age = p_age, guardian_email = null, guardian_consent = false,
+           guardian_consent_status = 'not_required',
+           guardian_user_id = null, consent_at = null
+     where id = v_user_id;
+    delete from public.guardian_child_controls where child_id = v_user_id;
+    v_request_id := null;
+  end if;
+
+  return v_request_id;
+end;
+$$;
+
+create or replace function public.get_guardian_consent_request(p_request_id uuid)
 returns table (
   request_id uuid,
+
   child_name text,
   child_username text,
   child_grade text,
