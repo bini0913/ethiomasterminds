@@ -34,7 +34,7 @@ select ok(exists (select 1 from information_schema.columns where table_schema = 
 select ok(position('v_account_status = ''active''' in pg_get_functiondef('public.request_my_account_deletion()'::regprocedure)) > 0, 'in-app deletion requests only suspend accounts that were active');
 select ok(position('suspension_applied_by_request' in pg_get_functiondef('public.extreme_admin_update_account_deletion_request(uuid,text,text)'::regprocedure)) > 0, 'rejection rollback is limited to suspensions applied by the deletion request');
 select ok(position('and account_status = ''suspended''' in pg_get_functiondef('public.extreme_admin_update_account_deletion_request(uuid,text,text)'::regprocedure)) > 0, 'rejection rollback preserves a later moderation status change');
-select ok(position('A verification or resolution note is required' in pg_get_functiondef('public.extreme_admin_update_account_deletion_request(uuid,text,text)'::regprocedure)) > 0, 'deletion review transitions require an auditable verification or resolution note');
+select ok(position('A verification note is required' in pg_get_functiondef('public.extreme_admin_update_account_deletion_request(uuid,text,text)'::regprocedure)) > 0, 'deletion review transitions require an auditable verification or resolution note');
 select ok(position('A closed deletion request cannot be changed' in pg_get_functiondef('public.extreme_admin_update_account_deletion_request(uuid,text,text)'::regprocedure)) > 0, 'completed or rejected deletion requests cannot be reopened or overwritten');
 
 select * from finish();
