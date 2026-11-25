@@ -137,9 +137,12 @@ where room_id = 'a1000000-0000-4000-8000-000000000001'
 update public.multiplayer_rooms
 set status = 'playing', game_mode = 'accuracy', started_at = clock_timestamp()
 where id = 'a1000000-0000-4000-8000-000000000002';
+-- Add the second test-only player while bypassing the user-facing join guard.
+alter table public.room_players disable trigger guardian_room_player_guard;
 insert into public.room_players (room_id, user_id, is_ready, completed_at)
 values ('a1000000-0000-4000-8000-000000000002',
         'a2000000-0000-4000-8000-000000000001', true, null);
+alter table public.room_players enable trigger guardian_room_player_guard;
 update public.room_players
 set completed_at = clock_timestamp() - interval '6 seconds'
 where room_id = 'a1000000-0000-4000-8000-000000000002'
