@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(37);
+select plan(38);
 
 -- Isolated fixtures; the test transaction rolls back all inserted rows.
 -- Room and player foreign keys point at auth.users. Create deterministic users
@@ -179,6 +179,12 @@ select throws_ok(
   'P0001',
   'This room contains someone you cannot interact with',
   'blocked users cannot restore membership in a room containing the other account'
+);
+select throws_ok(
+  'select public.multiplayer_join_room(''a1000000-0000-4000-8000-000000000001'', null)',
+  'P0001',
+  'This room contains someone you cannot interact with',
+  'a block added after joining also prevents reconnecting to the shared room'
 );
 select throws_ok(
   'select public.multiplayer_send_room_message(''a1000000-0000-4000-8000-000000000001'', ''blocked chat'')',
