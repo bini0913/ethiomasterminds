@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.school-provision-account]
 verify_jwt = true
+
+[functions.public-account-deletion-request]
+verify_jwt = false

@@ -72,6 +72,8 @@ jobs:
           deno-version: v2.x
       - name: Type-check school account provisioning function
         run: deno check --node-modules-dir=auto supabase/functions/school-provision-account/index.ts
+      - name: Type-check public account deletion request function
+        run: deno check --node-modules-dir=auto supabase/functions/public-account-deletion-request/index.ts
 
   migration-deploy-dry-run:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
