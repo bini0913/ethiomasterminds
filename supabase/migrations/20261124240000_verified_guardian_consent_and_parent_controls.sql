@@ -1497,6 +1497,110 @@ create trigger guardian_tournament_participant_guard
   for each row execute function public.enforce_guardian_competition_permissions();
 revoke all on function public.enforce_guardian_competition_permissions() from public, anon, authenticated;
 
+-- Public lobby chat is not available to under-18 accounts. They can use
+-- parent-enabled friend messaging and school-managed groups instead.
+create or replace function public.can_view_lobby_author(p_author_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_viewer_id uuid := auth.uid();
+  v_age integer;
+begin
+  if v_viewer_id is null or p_author_id is null then return false; end if;
+  if not public.is_current_user_feature_enabled('social')
+     or not public.is_user_feature_enabled(p_author_id, 'social')
+     or public.are_users_blocked(v_viewer_id, p_author_id) then
+    return false;
+  end if;
+  if p_author_id = v_viewer_id then return true; end if;
+
+  select age into v_age from public.profiles where id = v_viewer_id;
+  if (v_age is not null and v_age >= 18)
+     or public.has_role(v_viewer_id, 'parent'::public.app_role)
+     or public.has_role(v_viewer_id, 'teacher'::public.app_role)
+     or public.has_role(v_viewer_id, 'manager'::public.app_role)
+     or public.has_role(v_viewer_id, 'super_admin'::public.app_role)
+     or public.has_role(v_viewer_id, 'extreme_admin'::public.app_role)
+     or exists (
+       select 1 from public.school_memberships sm
+       where sm.user_id = v_viewer_id
+         and sm.status = 'active'
+         and sm.school_role in ('teacher', 'manager')
+     ) then
+    return true;
+  end if;
+
+  return exists (
+    select 1 from public.friends f
+     where f.status = 'accepted'
+       and ((f.user_id = v_viewer_id and f.friend_id = p_author_id)
+         or (f.friend_id = v_viewer_id and f.user_id = p_author_id))
+  ) or exists (
+    select 1
+      from public.school_memberships viewer_membership
+      join public.school_memberships author_membership
+        on author_membership.school_id = viewer_membership.school_id
+     where viewer_membership.user_id = v_viewer_id
+       and author_membership.user_id = p_author_id
+       and viewer_membership.status = 'active'
+       and author_membership.status = 'active'
+       and author_membership.school_role in ('teacher', 'manager')
+  );
+end;
+$$;
+
+revoke all on function public.can_view_lobby_author(uuid) from public, anon;
+grant execute on function public.can_view_lobby_author(uuid) to authenticated;
+
+drop policy if exists "authenticated can view lobby" on public.lobby_messages;
+create policy "authenticated can view lobby"
+  on public.lobby_messages for select to authenticated
+  using (public.can_view_lobby_author(user_id));
+
+create or replace function public.enforce_guardian_lobby_chat_permissions()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_age integer;
+begin
+  if new.user_id <> auth.uid() then raise exception 'You can only post as your own account'; end if;
+  if not public.has_accepted_policy('community_terms', '2026-11-24')
+     or not public.is_user_feature_enabled(new.user_id, 'social') then
+    raise exception 'Social features are disabled by parent or guardian settings';
+  end if;
+  select age into v_age from public.profiles where id = new.user_id;
+  if (v_age is null or v_age < 18)
+     and not public.has_role(new.user_id, 'parent'::public.app_role)
+     and not public.has_role(new.user_id, 'teacher'::public.app_role)
+     and not public.has_role(new.user_id, 'manager'::public.app_role)
+     and not public.has_role(new.user_id, 'super_admin'::public.app_role)
+     and not public.has_role(new.user_id, 'extreme_admin'::public.app_role)
+     and not exists (
+       select 1 from public.school_memberships sm
+       where sm.user_id = new.user_id
+         and sm.status = 'active'
+         and sm.school_role in ('teacher', 'manager')
+     ) then
+    raise exception 'Public lobby chat is disabled for learner accounts under 18';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists guardian_lobby_chat_guard on public.lobby_messages;
+create trigger guardian_lobby_chat_guard
+  before insert on public.lobby_messages
+  for each row execute function public.enforce_guardian_lobby_chat_permissions();
+revoke all on function public.enforce_guardian_lobby_chat_permissions() from public, anon, authenticated;
+
+
 -- Direct social interactions are subject to the same consent and feature gates.
 drop policy if exists "users can like visible posts" on public.social_post_likes;
 create policy "users can like visible posts"
