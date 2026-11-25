@@ -7,16 +7,19 @@ create table if not exists public.ai_response_report_evidence (
   source text not null check (source in ('ai_tutor', 'ai_helper')),
   conversation_id uuid references public.ai_tutor_conversations(id) on delete set null,
   response_text text not null check (char_length(response_text) between 1 and 12000),
+  response_fingerprint text not null,
   created_at timestamptz not null default now(),
   constraint ai_response_report_evidence_source_conversation_check
     check (
-      (source = 'ai_tutor' and conversation_id is not null)
+      source = 'ai_tutor'
       or (source = 'ai_helper' and conversation_id is null)
     )
 );
 
 create index if not exists ai_response_report_evidence_reporter_created_idx
   on public.ai_response_report_evidence (reporter_id, created_at desc);
+create index if not exists ai_response_report_evidence_duplicate_idx
+  on public.ai_response_report_evidence (reporter_id, source, conversation_id, response_fingerprint);
 
 alter table public.ai_response_report_evidence enable row level security;
 revoke all on public.ai_response_report_evidence from public, anon, authenticated;
@@ -107,11 +110,11 @@ begin
   if v_reporter is null then
     raise exception using errcode = '42501', message = 'Authentication required';
   end if;
-  if p_source not in ('ai_tutor', 'ai_helper') then
+  if p_source is null or p_source not in ('ai_tutor', 'ai_helper') then
     raise exception 'Unsupported AI response source';
   end if;
   if v_response = '' then raise exception 'The AI response is empty'; end if;
-  if v_reason not in ('inappropriate', 'harassment', 'violence', 'misinformation', 'privacy', 'other') then
+  if v_reason is null or v_reason not in ('inappropriate', 'harassment', 'violence', 'misinformation', 'privacy', 'other') then
     raise exception 'Choose a valid report reason';
   end if;
 
@@ -126,10 +129,25 @@ begin
     raise exception 'AI Helper reports cannot reference an AI Tutor conversation';
   end if;
 
+  if exists (
+    select 1
+      from public.ai_response_report_evidence e
+      join public.reports r
+        on r.reported_type = 'ai_response'
+       and r.reported_id = e.id
+     where e.reporter_id = v_reporter
+       and e.source = p_source
+       and e.conversation_id is not distinct from p_conversation_id
+       and e.response_fingerprint = md5(v_response)
+       and r.status = 'pending'
+  ) then
+    raise exception 'You already have a pending report for this AI response';
+  end if;
+
   insert into public.ai_response_report_evidence(
-    reporter_id, source, conversation_id, response_text
+    reporter_id, source, conversation_id, response_text, response_fingerprint
   ) values (
-    v_reporter, p_source, p_conversation_id, v_response
+    v_reporter, p_source, p_conversation_id, v_response, md5(v_response)
   ) returning id into v_evidence_id;
 
   insert into public.reports(
