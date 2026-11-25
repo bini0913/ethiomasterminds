@@ -337,7 +337,7 @@ begin
    where u.id = v_user_id;
 
   if p_age < 18 then
-    if v_guardian_email is null or v_guardian_email = v_email or not (v_guardian_email ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+
+    if v_guardian_email is null or v_guardian_email = v_email or v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' then
       raise exception 'A separate, valid parent or guardian email is required for learners under 18';
     end if;
 
