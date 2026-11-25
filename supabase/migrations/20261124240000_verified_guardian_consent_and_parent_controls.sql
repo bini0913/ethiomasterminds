@@ -1007,7 +1007,7 @@ create or replace function public.multiplayer_create_room(
 returns public.multiplayer_rooms
 language plpgsql
 security definer
-set search_path = pg_catalog
+set search_path = pg_catalog, auth
 as $$
 declare
   v_uid uuid := auth.uid();
