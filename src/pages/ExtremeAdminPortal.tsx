@@ -329,6 +329,9 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const updateDeletionRequest = async (request: DeletionRequest, nextStatus: 'in_review' | 'completed' | 'rejected') => {
+    if (nextStatus === 'in_review' && !statusReason.trim()) {
+      return toast.error('Document how account ownership and, where applicable, guardian authority were verified before review.');
+    }
     if (nextStatus === 'completed' && !statusReason.trim()) {
       return toast.error('Add a resolution note documenting the verification and deletion outcome before completing this request.');
     }
@@ -344,6 +347,7 @@ const ExtremeAdminPortal: React.FC = () => {
     });
     if (error) return toast.error(error.message || 'Deletion request could not be updated');
     toast.success(`Deletion request marked ${nextStatus.replace('_', ' ')}`);
+    setStatusReason('');
     await refreshAll();
   };
 
@@ -634,6 +638,17 @@ const ExtremeAdminPortal: React.FC = () => {
                   </div>
                   <div className="space-y-1"><Label>Support note (optional)</Label><Textarea value={externalDeletionNote} onChange={(e) => setExternalDeletionNote(e.target.value)} placeholder="Verification or request context; do not store passwords or verification codes." rows={2} /></div>
                   <Button onClick={() => void createExternalDeletionRequest()}>Record external request</Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Verification / resolution note</Label>
+                  <Textarea
+                    value={statusReason}
+                    onChange={(e) => setStatusReason(e.target.value)}
+                    placeholder="For review: record how account email ownership and, when applicable, guardian authority were verified. For rejection or completion: record the reason and outcome. Never enter passwords, codes or identity numbers."
+                    rows={3}
+                  />
+                  <p className="text-xs text-slate-500">This note is required for every status change and is retained in the deletion-request audit history.</p>
                 </div>
 
                 <div className="space-y-3">
