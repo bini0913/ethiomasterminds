@@ -329,7 +329,10 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const updateDeletionRequest = async (request: DeletionRequest, nextStatus: 'in_review' | 'completed' | 'rejected') => {
-    if (nextStatus === 'completed' && !statusReason.trim()) {\n      return toast.error('Add a resolution note documenting the verification and deletion outcome before completing this request.');\n    }\n    if (nextStatus === 'completed' && request.user_id) {
+    if (nextStatus === 'completed' && !statusReason.trim()) {
+      return toast.error('Add a resolution note documenting the verification and deletion outcome before completing this request.');
+    }
+    if (nextStatus === 'completed' && request.user_id) {
       return toast.error('Delete the account through the supported Auth Admin workflow first. Then refresh and mark this request complete.');
     }
     const note = statusReason.trim() || null;
@@ -643,7 +646,8 @@ const ExtremeAdminPortal: React.FC = () => {
                         </div>
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{request.status.replace('_', ' ')}</span>
                       </div>
-                      {request.requester_note && <p className="mt-2 whitespace-pre-wrap rounded-md bg-slate-50 p-2 text-sm text-slate-700"><span className="font-medium">Requester details: </span>{request.requester_note}</p>}\n                      {request.resolution_note && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{request.resolution_note}</p>}
+                      {request.requester_note && <p className="mt-2 whitespace-pre-wrap rounded-md bg-slate-50 p-2 text-sm text-slate-700"><span className="font-medium">Requester details: </span>{request.requester_note}</p>}
+                      {request.resolution_note && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{request.resolution_note}</p>}
                       <p className="mt-2 text-xs text-slate-500">{request.user_id ? 'Account still exists; verify identity, review record retention, and process deletion before completion.' : 'No linked Auth account remains. Verify the request outcome before closing it.'}</p>
                       {request.status !== 'completed' && request.status !== 'rejected' && (
                         <div className="mt-3 flex flex-wrap gap-2">
