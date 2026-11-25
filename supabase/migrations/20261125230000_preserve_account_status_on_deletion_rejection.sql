@@ -47,7 +47,7 @@ begin
 
   if v_request_id is not null then return v_request_id; end if;
 
-  v_suspended_by_request := v_account_status = 'active';
+  v_suspended_by_request := coalesce(v_account_status = 'active', false);
 
   insert into public.account_deletion_requests(
     user_id, requested_email, requested_username, source,
@@ -97,7 +97,7 @@ begin
   if v_actor is null or not public.has_role(v_actor, 'extreme_admin'::public.app_role) then
     raise exception using errcode = '42501', message = 'Extreme Admin access required';
   end if;
-  if p_status not in ('in_review', 'completed', 'rejected') then
+  if p_status is null or p_status not in ('in_review', 'completed', 'rejected') then
     raise exception 'Unsupported deletion-request status';
   end if;
   if p_status = 'completed' and v_note is null then
