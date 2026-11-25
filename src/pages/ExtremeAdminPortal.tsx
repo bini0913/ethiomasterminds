@@ -49,7 +49,7 @@ type PortalPost = {
 };
 type DeletionRequest = {
   id: string; user_id: string | null; requested_email: string; requested_username: string | null;
-  source: 'in_app' | 'external_email'; status: 'pending' | 'in_review' | 'completed' | 'rejected';
+  source: 'in_app' | 'external_email' | 'external_web'; requester_note: string | null; status: 'pending' | 'in_review' | 'completed' | 'rejected';
   requested_at: string; reviewed_at: string | null; reviewed_by: string | null; resolution_note: string | null;
 };
 
@@ -624,7 +624,7 @@ const ExtremeAdminPortal: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-xl border border-slate-200 p-4 space-y-3">
-                  <h3 className="font-semibold text-slate-900">Record an external email request</h3>
+                  <h3 className="font-semibold text-slate-900">Manually record an external email request</h3>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1"><Label>Account email</Label><Input type="email" value={externalDeletionEmail} onChange={(e) => setExternalDeletionEmail(e.target.value)} placeholder="Email supplied by the requester" /></div>
                     <div className="space-y-1"><Label>Username (optional)</Label><Input value={externalDeletionUsername} onChange={(e) => setExternalDeletionUsername(e.target.value)} placeholder="Master Minds username" /></div>
@@ -639,11 +639,11 @@ const ExtremeAdminPortal: React.FC = () => {
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <p className="font-semibold text-slate-900">{request.requested_email}</p>
-                          <p className="mt-1 text-xs text-slate-500">{request.requested_username ? `@${request.requested_username} · ` : ''}{request.source === 'in_app' ? 'In-app request' : 'External email request'} · {new Date(request.requested_at).toLocaleString()}</p>
+                          <p className="mt-1 text-xs text-slate-500">{request.requested_username ? `@${request.requested_username} · ` : ''}{request.source === 'in_app' ? 'In-app request' : request.source === 'external_web' ? 'External web form' : 'External email request'} · {new Date(request.requested_at).toLocaleString()}</p>
                         </div>
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{request.status.replace('_', ' ')}</span>
                       </div>
-                      {request.resolution_note && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{request.resolution_note}</p>}
+                      {request.requester_note && <p className="mt-2 whitespace-pre-wrap rounded-md bg-slate-50 p-2 text-sm text-slate-700"><span className="font-medium">Requester details: </span>{request.requester_note}</p>}\n                      {request.resolution_note && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{request.resolution_note}</p>}
                       <p className="mt-2 text-xs text-slate-500">{request.user_id ? 'Account still exists; verify identity, review record retention, and process deletion before completion.' : 'No linked Auth account remains. Verify the request outcome before closing it.'}</p>
                       {request.status !== 'completed' && request.status !== 'rejected' && (
                         <div className="mt-3 flex flex-wrap gap-2">
