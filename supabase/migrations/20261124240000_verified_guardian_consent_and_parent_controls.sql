@@ -327,6 +327,7 @@ declare
   v_user_id uuid := auth.uid();
   v_email text;
   v_guardian_email text := nullif(lower(trim(coalesce(p_guardian_email, ''))), '');
+  v_at_position integer;
   v_request_id uuid;
 begin
   if v_user_id is null or not public.has_role(v_user_id, 'student'::public.app_role) then
@@ -341,14 +342,15 @@ begin
    where u.id = v_user_id;
 
   if p_age < 18 then
-    if v_guardian_email is null then
-      raise exception 'A separate, valid parent or guardian email is required for learners under 18';
-    end if;
-    if v_guardian_email = v_email then
-      raise exception 'A separate, valid parent or guardian email is required for learners under 18';
-    end if;
-    if v_guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' then
-      raise exception 'A separate, valid parent or guardian email is required for learners under 18';
+    v_at_position := position('@' in coalesce(v_guardian_email, ''));
+    if v_guardian_email is null
+       or v_guardian_email = v_email
+       or v_at_position <= 1
+       or position('@' in substring(v_guardian_email from v_at_position + 1)) > 0
+       or position('.' in split_part(v_guardian_email, '@', 2)) <= 1
+       or right(v_guardian_email, 1) = '.'
+       or position(' ' in v_guardian_email) > 0 then
+      raise exception 'A separate, valid parent or guardian email is required';
     end if;
 
     update public.guardian_consent_requests
@@ -357,7 +359,6 @@ begin
        and status = 'pending'
        and lower(guardian_email) <> v_guardian_email;
 
-    -- A change to age or guardian details requires fresh approval.
     delete from public.guardian_child_controls
      where child_id = v_user_id;
 
