@@ -14,9 +14,9 @@ insert into auth.users (
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
 )
 values
-  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'multiplayer-fixture-1@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 1"}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'multiplayer-fixture-2@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 2"}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'multiplayer-fixture-3@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 3"}'::jsonb, now(), now())
+  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'multiplayer-fixture-1@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 1","age":"18"}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'multiplayer-fixture-2@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 2","age":"18"}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'multiplayer-fixture-3@example.test', 'fixture', now(), '{}'::jsonb, '{"name":"Multiplayer Fixture 3","age":"18"}'::jsonb, now(), now())
 on conflict (id) do nothing;
 alter table public.profiles enable trigger guard_student_profile_updates;
 
