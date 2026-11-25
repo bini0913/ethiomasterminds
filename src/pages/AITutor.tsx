@@ -281,7 +281,7 @@ const AITutor: React.FC = () => {
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">
                     {message.role === 'assistant' ? <div className="prose prose-sm max-w-none text-[15px] leading-7 text-[#2d2d36] prose-p:my-2 prose-p:leading-7 prose-headings:mb-3 prose-headings:mt-5 prose-headings:text-base prose-strong:text-[#202123] prose-code:rounded prose-code:bg-[#f7f7f8] prose-code:px-1"><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown></div> : <p className="whitespace-pre-wrap text-[15px] leading-7 text-[#202123]">{message.content}</p>}
-                    <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <div className="mt-2 flex items-center gap-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100">
                       <span className="text-[10px] text-[#a0a0ad]">{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       {message.role === 'assistant' && <><button type="button" onClick={() => void copyMessage(message.content, index)} className="rounded p-1 text-[#8e8ea0] hover:bg-[#f7f7f8] hover:text-[#287c68]" aria-label="Copy response">{copiedIdx === index ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</button><ReportAIResponseButton source="ai_tutor" responseText={message.content} conversationId={conversationId} /></>}
                     </div>
