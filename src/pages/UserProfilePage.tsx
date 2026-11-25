@@ -34,6 +34,7 @@ import {
   Zap,
 } from "lucide-react";
 import AvatarShowcase3D from "@/components/avatar/AvatarShowcase3D";
+import BlockUserButton from "@/components/social/BlockUserButton";
 import { useUser } from "@/context/UserContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,6 +88,7 @@ const UserProfilePage = () => {
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferAmount, setTransferAmount] = useState("10");
   const [isFriend, setIsFriend] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [equippedAvatar, setEquippedAvatar] = useState<string | null>(null);
   const [collections, setCollections] = useState<Array<{ item_id: string; equipped: boolean; acquired_at: string; section: string; rarity: string; name: string; preview: string; price: number }>>([]);
   const [allCollectionItems, setAllCollectionItems] = useState<Array<{ item_id: string; section: string; rarity: string; name: string; preview: string; price: number }>>([]);
@@ -277,7 +279,7 @@ const UserProfilePage = () => {
 
   const refreshSocial = async () => {
     if (!authUser?.id || !userId) return;
-    const [mine, viewed, friendship] = await Promise.all([
+    const [mine, viewed, friendship, blockStatus] = await Promise.all([
       fetchFollowing(authUser.id),
       fetchFollowerCounts(userId),
       (supabase as any)
@@ -286,11 +288,18 @@ const UserProfilePage = () => {
         .or(`and(user_id.eq.${authUser.id},friend_id.eq.${userId}),and(user_id.eq.${userId},friend_id.eq.${authUser.id})`)
         .eq("status", "accepted")
         .maybeSingle(),
+      (supabase as any).rpc("is_blocked_with", { p_other_user_id: userId }),
     ]);
     setFollowingIds(mine);
     setFollowersCount(viewed.followers);
     setFollowingCount(viewed.following);
     setIsFriend(Boolean(friendship?.data));
+    if (blockStatus.error) {
+      console.warn("Could not resolve profile block status", blockStatus.error);
+      setIsBlocked(false);
+    } else {
+      setIsBlocked(Boolean(blockStatus.data));
+    }
   };
 
   const refreshProfileDetails = async () => {
@@ -639,7 +648,7 @@ const UserProfilePage = () => {
   };
 
   const onChallenge = async () => {
-    if (!authUser?.id || isSelf || !profile) {
+    if (!authUser?.id || isSelf || !profile || isBlocked) {
       navigate("/multiplayer");
       return;
     }
@@ -837,6 +846,13 @@ const UserProfilePage = () => {
                 <Badge className={upperStudent ? "border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary" : `bg-gradient-to-r ${tierStyle(profile.level)} px-3 py-1 text-xs shadow-sm`}>
                   {currentTier.icon} {currentTier.name}
                 </Badge>
+                {!isSelf && !isBlocked && (
+                  <BlockUserButton
+                    userId={profile.id}
+                    displayName={profile.name || profile.username || "this learner"}
+                    onBlocked={() => setIsBlocked(true)}
+                  />
+                )}
               </div>
               <p className={upperStudent ? "text-sm text-muted-foreground" : "text-sm text-white/65"}>@{profile.username} <span className="mx-1">·</span> Grade {profile.grade ?? "Not set"}</p>
 
@@ -885,17 +901,21 @@ const UserProfilePage = () => {
           <CardContent className="flex flex-wrap items-center justify-between gap-2 p-4">
             <div className="flex flex-wrap gap-2">
               {!isSelf ? (
-                <>
-                  <Button variant={isFollowing ? "secondary" : "default"} className="gap-2" onClick={onFollowToggle}>
-                    <UserRoundPlus className="h-4 w-4" /> {isFollowing ? "Unfollow" : "Follow"}
-                  </Button>
-                  <Button variant="outline" className="gap-2" onClick={onChallenge}>
-                    <Sword className="h-4 w-4" /> Invite to battle
-                  </Button>
-                  <Button variant="outline" className="gap-2" disabled={!isFriend} onClick={() => setTransferOpen(true)}>
-                    <Send className="h-4 w-4" /> Send coins
-                  </Button>
-                </>
+                isBlocked ? (
+                  <p className="text-sm text-muted-foreground">Interactions are unavailable because one of you has blocked the other.</p>
+                ) : (
+                  <>
+                    <Button variant={isFollowing ? "secondary" : "default"} className="gap-2" onClick={onFollowToggle}>
+                      <UserRoundPlus className="h-4 w-4" /> {isFollowing ? "Unfollow" : "Follow"}
+                    </Button>
+                    <Button variant="outline" className="gap-2" onClick={onChallenge}>
+                      <Sword className="h-4 w-4" /> Invite to battle
+                    </Button>
+                    <Button variant="outline" className="gap-2" disabled={!isFriend} onClick={() => setTransferOpen(true)}>
+                      <Send className="h-4 w-4" /> Send coins
+                    </Button>
+                  </>
+                )
               ) : (
                 <Button variant="outline" onClick={onChallenge} className="gap-2">
                   <Sword className="h-4 w-4" /> Challenge
