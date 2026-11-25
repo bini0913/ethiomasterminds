@@ -45,7 +45,7 @@ declare
   v_now timestamptz := clock_timestamp();
   v_allowed boolean;
 begin
-  if p_key_hash is null or p_key_hash !~ '^[0-9a-f]{64}
+  if p_key_hash is null or length(p_key_hash) <> 64 or p_key_hash ~ '[^0-9a-f]'
     raise exception 'Invalid rate-limit parameters';
   end if;
 
