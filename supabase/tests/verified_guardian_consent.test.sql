@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(33);
 
 select ok(to_regclass('public.guardian_consent_requests') is not null, 'guardian consent request records exist');
 select ok((select relrowsecurity from pg_class where oid = 'public.guardian_consent_requests'::regclass), 'guardian consent requests have RLS enabled');
@@ -9,6 +9,14 @@ select ok(to_regclass('public.guardian_child_controls') is not null, 'parent-con
 select ok((select relrowsecurity from pg_class where oid = 'public.guardian_child_controls'::regclass), 'parent-controlled feature settings have RLS enabled');
 select ok(not has_table_privilege('authenticated', 'public.guardian_child_controls', 'select'), 'clients cannot read guardian controls directly');
 select ok(has_function_privilege('authenticated', 'public.create_guardian_consent_request(text)', 'EXECUTE'), 'learners can request guardian approval');
+select ok(not has_function_privilege('anon', 'public.create_guardian_consent_request(text)', 'EXECUTE'), 'anonymous users cannot create guardian requests');
+select ok(not has_function_privilege('anon', 'public.set_my_age_and_guardian(integer,text)', 'EXECUTE'), 'anonymous users cannot set learner age or guardian details');
+select ok(not has_function_privilege('anon', 'public.get_guardian_consent_request(uuid)', 'EXECUTE'), 'anonymous users cannot inspect guardian requests');
+select ok(not has_function_privilege('anon', 'public.approve_guardian_consent(uuid,boolean)', 'EXECUTE'), 'anonymous users cannot approve guardian requests');
+select ok(not has_function_privilege('anon', 'public.reject_guardian_consent(uuid)', 'EXECUTE'), 'anonymous users cannot reject guardian requests');
+select ok(not has_function_privilege('anon', 'public.list_guardian_children()', 'EXECUTE'), 'anonymous users cannot list linked children');
+select ok(not has_function_privilege('anon', 'public.update_guardian_child_controls(uuid,boolean,boolean,boolean,boolean,boolean,boolean)', 'EXECUTE'), 'anonymous users cannot change parent controls');
+select ok(not has_function_privilege('anon', 'public.revoke_guardian_consent(uuid)', 'EXECUTE'), 'anonymous users cannot revoke guardian consent');
 select ok(has_function_privilege('authenticated', 'public.get_guardian_consent_request(uuid)', 'EXECUTE'), 'parent accounts can fetch a matching approval request through the guarded RPC');
 select ok(has_function_privilege('authenticated', 'public.approve_guardian_consent(uuid,boolean)', 'EXECUTE'), 'parent accounts can approve through the guarded RPC');
 select ok(has_function_privilege('authenticated', 'public.reject_guardian_consent(uuid)', 'EXECUTE'), 'parent accounts can decline through the guarded RPC');
