@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(22);
+select plan(23);
 
 select ok(to_regclass('public.account_deletion_requests') is not null, 'account deletion request queue exists');
 select ok((select relrowsecurity from pg_class where oid = 'public.account_deletion_requests'::regclass), 'account deletion requests have RLS enabled');
@@ -26,6 +26,7 @@ select ok(has_function_privilege('service_role', 'public.submit_external_deletio
 select ok(not has_function_privilege('anon', 'public.submit_external_deletion_request(text,text,text)', 'EXECUTE'), 'anonymous clients cannot call the privileged intake RPC directly');
 select ok(not has_function_privilege('authenticated', 'public.submit_external_deletion_request(text,text,text)', 'EXECUTE'), 'authenticated clients cannot forge external web requests');
 select ok((select pg_get_constraintdef(oid) like '%external_web%' from pg_constraint where conrelid = 'public.account_deletion_requests'::regclass and conname = 'account_deletion_requests_source_check'), 'request source constraint permits external web intake');
+select ok(position('A resolution note is required' in pg_get_functiondef('public.extreme_admin_update_account_deletion_request(uuid,text,text)'::regprocedure)) > 0, 'deletion requests require a resolution note before completion');
 
 select * from finish();
 rollback;
