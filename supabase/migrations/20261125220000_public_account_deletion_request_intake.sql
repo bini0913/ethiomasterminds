@@ -15,9 +15,9 @@ create unique index if not exists account_deletion_requests_external_web_pending
   on public.account_deletion_requests (lower(requested_email))
   where source = 'external_web' and status in ('pending', 'in_review');
 
-create schema if not exists private;
+create schema if not exists deletion_private;
 
-create table if not exists private.external_deletion_request_rate_limits (
+create table if not exists deletion_private.external_deletion_request_rate_limits (
   key_hash text not null,
   bucket text not null check (bucket in ('ip', 'email')),
   window_started_at timestamptz not null,
@@ -26,9 +26,9 @@ create table if not exists private.external_deletion_request_rate_limits (
   check (key_hash ~ '^[0-9a-f]{64}$')
 );
 
-alter table private.external_deletion_request_rate_limits enable row level security;
-revoke all on schema private from public, anon, authenticated;
-revoke all on private.external_deletion_request_rate_limits from public, anon, authenticated, service_role;
+alter table deletion_private.external_deletion_request_rate_limits enable row level security;
+revoke all on schema deletion_private from public, anon, authenticated;
+revoke all on deletion_private.external_deletion_request_rate_limits from public, anon, authenticated, service_role;
 
 create or replace function public.consume_external_deletion_rate_limit(
   p_key_hash text,
@@ -49,25 +49,25 @@ begin
     raise exception 'Invalid rate-limit parameters';
   end if;
 
-  insert into private.external_deletion_request_rate_limits
+  insert into deletion_private.external_deletion_request_rate_limits
     (key_hash, bucket, window_started_at, attempts)
   values (p_key_hash, p_bucket, v_now, 1)
   on conflict (key_hash, bucket) do update
     set window_started_at = case
-          when private.external_deletion_request_rate_limits.window_started_at
+          when deletion_private.external_deletion_request_rate_limits.window_started_at
                <= v_now - make_interval(secs => p_window_seconds)
             then v_now
-          else private.external_deletion_request_rate_limits.window_started_at
+          else deletion_private.external_deletion_request_rate_limits.window_started_at
         end,
         attempts = case
-          when private.external_deletion_request_rate_limits.window_started_at
+          when deletion_private.external_deletion_request_rate_limits.window_started_at
                <= v_now - make_interval(secs => p_window_seconds)
             then 1
-          else private.external_deletion_request_rate_limits.attempts + 1
+          else deletion_private.external_deletion_request_rate_limits.attempts + 1
         end
   returning attempts <= p_max_attempts into v_allowed;
 
-  delete from private.external_deletion_request_rate_limits
+  delete from deletion_private.external_deletion_request_rate_limits
    where window_started_at < v_now - interval '7 days';
 
   return v_allowed;
@@ -279,25 +279,25 @@ grant execute on function public.extreme_admin_update_account_deletion_request(u
     raise exception 'Invalid rate-limit parameters';
   end if;
 
-  insert into private.external_deletion_request_rate_limits
+  insert into deletion_private.external_deletion_request_rate_limits
     (key_hash, bucket, window_started_at, attempts)
   values (p_key_hash, p_bucket, v_now, 1)
   on conflict (key_hash, bucket) do update
     set window_started_at = case
-          when private.external_deletion_request_rate_limits.window_started_at
+          when deletion_private.external_deletion_request_rate_limits.window_started_at
                <= v_now - make_interval(secs => p_window_seconds)
             then v_now
-          else private.external_deletion_request_rate_limits.window_started_at
+          else deletion_private.external_deletion_request_rate_limits.window_started_at
         end,
         attempts = case
-          when private.external_deletion_request_rate_limits.window_started_at
+          when deletion_private.external_deletion_request_rate_limits.window_started_at
                <= v_now - make_interval(secs => p_window_seconds)
             then 1
-          else private.external_deletion_request_rate_limits.attempts + 1
+          else deletion_private.external_deletion_request_rate_limits.attempts + 1
         end
   returning attempts <= p_max_attempts into v_allowed;
 
-  delete from private.external_deletion_request_rate_limits
+  delete from deletion_private.external_deletion_request_rate_limits
    where window_started_at < v_now - interval '7 days';
 
   return v_allowed;
