@@ -1607,6 +1607,8 @@ create trigger guardian_lobby_chat_guard
 revoke all on function public.enforce_guardian_lobby_chat_permissions() from public, anon, authenticated;
 
 
+drop policy if exists "group admin manages members" on public.chat_group_members;
+
 -- Direct social interactions are subject to the same consent and feature gates.
 drop policy if exists "users can like visible posts" on public.social_post_likes;
 create policy "users can like visible posts"
