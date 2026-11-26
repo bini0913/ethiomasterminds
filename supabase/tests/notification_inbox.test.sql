@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(20);
+SELECT plan(22);
 
 SELECT has_column('public', 'notification_events', 'read_at', 'notification events have persistent read state');
 SELECT has_column('public', 'notification_events', 'archived_at', 'notification events have persistent archive state');
@@ -75,6 +75,15 @@ SELECT ok(
 SELECT ok(
   (SELECT NOT prosecdef FROM pg_proc WHERE oid = 'public.get_my_group_unread_counts()'::regprocedure),
   'group unread count RPC runs with caller privileges'
+);
+
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'multiplayer_invites'),
+  'multiplayer invitations are available to Realtime'
+);
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'study_call_participants'),
+  'study call invitations are available to Realtime'
 );
 
 SELECT * FROM finish();
