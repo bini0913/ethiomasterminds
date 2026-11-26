@@ -14,7 +14,7 @@ const json = (body: unknown, status = 200) =>
   });
 
 type ServiceAccount = { client_email: string; private_key: string; project_id: string };
-type Payload = { kind: string; event_id?: string; data?: Record<string, string> };
+type Payload = { kind: string; event_id?: string };
 type AuthorizedNotification = {
   recipient_id: string;
   notification_kind: string;
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
     for (const item of authorized) {
       const title = item.notification_title.trim();
       const body = item.notification_body.trim();
-      if (title.length > 160 || body.length > 2000) return json({ error: "Notification payload is too large" }, 400);
+      if (!title || !body || title.length > 160 || body.length > 2000) return json({ error: "Notification payload is invalid" }, 400);
       const { data: prefs, error: prefsError } = await admin.from("notification_preferences").select("enabled,social,game_invites").eq("user_id", item.recipient_id).maybeSingle();
       if (prefsError) return json({ error: "Could not read notification preferences" }, 500);
       if (prefs?.enabled === false) continue;
@@ -138,20 +138,33 @@ Deno.serve(async (req) => {
       if (item.notification_kind === "study_call_invite" && prefs?.game_invites === false) continue;
       const { data: devices, error: devicesError } = await admin.from("notification_devices").select("id,token").eq("user_id", item.recipient_id).eq("enabled", true);
       if (devicesError) return json({ error: "Could not read notification devices" }, 500);
-      attempted += devices?.length ?? 0;
+      const itemAttempted = devices?.length ?? 0;
+      const itemFailures: Array<{ device_id: string; status: number; token_invalid: boolean }> = [];
+      let itemSent = 0;
+      attempted += itemAttempted;
       for (const device of devices ?? []) {
         const response = await fetch("https://fcm.googleapis.com/v1/projects/" + serviceAccount.project_id + "/messages:send", {
           method: "POST",
           headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
-          body: JSON.stringify({ message: { token: device.token, data: { ...(item.notification_data ?? {}), ...(payload.data ?? {}), kind: item.notification_kind, title, body }, android: { priority: "HIGH" } } }),
+          body: JSON.stringify({ message: { token: device.token, data: { ...(item.notification_data ?? {}), kind: item.notification_kind, title, body }, android: { priority: "HIGH" } } }),
         });
-        if (response.ok) { sent++; continue; }
+        if (response.ok) { sent++; itemSent++; continue; }
         const details = await response.text();
         const invalid = response.status === 404 && (details.includes("UNREGISTERED") || details.includes("registration-token-not-registered"));
         if (invalid) await admin.from("notification_devices").update({ enabled: false }).eq("id", device.id);
-        failures.push({ device_id: device.id, status: response.status, token_invalid: invalid });
+        const failure = { device_id: device.id, status: response.status, token_invalid: invalid };
+        failures.push(failure);
+        itemFailures.push(failure);
       }
-      await admin.from("notification_events").insert({ user_id: item.recipient_id, kind: item.notification_kind, title, body, data: { ...(item.notification_data ?? {}), delivery_status: sent > 0 ? "sent" : "failed", sent }, delivered_at: sent > 0 ? new Date().toISOString() : null });
+      const { error: eventError } = await admin.from("notification_events").insert({
+        user_id: item.recipient_id,
+        kind: item.notification_kind,
+        title,
+        body,
+        data: { ...(item.notification_data ?? {}), delivery_status: itemSent > 0 ? "sent" : "failed", sent: itemSent, attempted: itemAttempted, failure_count: itemFailures.length },
+        delivered_at: itemSent > 0 ? new Date().toISOString() : null,
+      });
+      if (eventError) return json({ error: "Could not record notification delivery", sent, attempted, failures, event_recorded: false }, 500);
     }
 
     return json({ sent, attempted, failures, event_recorded: true });
