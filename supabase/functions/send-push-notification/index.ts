@@ -121,6 +121,11 @@ Deno.serve(async (req) => {
     }
 
     if (!authorized.length) return json({ sent: 0, attempted: 0, reason: "no_authorized_recipients" });
+    for (const item of authorized) {
+      if (!item.notification_title?.trim() || !item.notification_body?.trim() || item.notification_title.length > 180 || item.notification_body.length > 1200) {
+        return json({ error: "Invalid notification payload" }, 400);
+      }
+    }
 
     // Persist every authorized notification before checking push preferences or
     // device availability. The in-app inbox must work even when push is off.
