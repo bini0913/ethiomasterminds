@@ -24,8 +24,8 @@ select ok(
   'self-assignment is restricted to the student role'
 );
 select ok(
-  position('top-level' in pg_get_functiondef('public.platform_assign_role(uuid,public.app_role)'::regprocedure)) > 0
-    and position('super_admin' in pg_get_functiondef('public.platform_assign_role(uuid,public.app_role)'::regprocedure)) > 0,
+  position('top-level' in lower(pg_get_functiondef('public.platform_assign_role(uuid,public.app_role)'::regprocedure))) > 0
+    and position('super_admin' in lower(pg_get_functiondef('public.platform_assign_role(uuid,public.app_role)'::regprocedure))) > 0,
   'ordinary role assignment cannot provision either top-level role'
 );
 select ok(

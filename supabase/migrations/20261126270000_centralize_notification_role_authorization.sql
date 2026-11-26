@@ -16,6 +16,8 @@ CREATE INDEX IF NOT EXISTS notification_events_user_created_idx
   ON public.notification_events(user_id, created_at DESC);
 ALTER TABLE public.notification_events ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.notification_events FROM PUBLIC, anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.notification_devices FROM authenticated;
+GRANT SELECT ON TABLE public.notification_devices TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.platform_assign_role(
   p_user_id uuid,
