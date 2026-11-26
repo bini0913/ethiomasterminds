@@ -44,3 +44,37 @@ If a foreign-key dependency or data ownership is unclear, stop and escalate to t
 ## Automation boundary
 
 Public intake, rate limiting, request deduplication, the audit queue and review status are implemented in the application. Full cross-table data erasure is intentionally not automated yet because school ownership, finance records, safety reports and storage layouts require per-table retention and handover rules. Do not describe a request as fully deleted until the review above has actually been completed.
+
+
+## Production schema dependency inventory (2026-11-26)
+
+A read-only PostgreSQL catalog review of the production project's foreign keys to `auth.users` and `public.profiles` found that deleting an Auth user is **not a simple cascade**. Several dependencies intentionally use `NO ACTION`, `RESTRICT`, or `SET NULL`. This catalog inventory identifies schema blockers only; it did not count per-request rows and is not a deletion clearance.
+
+### Foreign-key dependencies that can block Auth deletion
+
+The following Auth-user references use `NO ACTION` or `RESTRICT` and must be reviewed for the particular account before deletion:
+
+- `auth.scim_users.user_id` (NO ACTION)
+- `flashcards.user_id` (NO ACTION)
+- `guardian_consent_requests.guardian_user_id` (NO ACTION)
+- `school_assessments.reviewed_by`, `school_behavior_reports.reviewed_by`, and `school_disciplinary_recommendations.reviewed_by_user_id` (NO ACTION)
+- `school_fee_payments.recorded_by`, `school_fee_structures.created_by`, `school_finance_audit_events.actor_id`, and `school_grading_policies.updated_by` (NO ACTION)
+- `school_leadership_action_events.actor_user_id`, `school_leadership_audit_events.actor_user_id`, and `school_leadership_structure_events.actor_user_id` (NO ACTION)
+- `school_memberships.user_id` (RESTRICT), `school_memberships.created_by`, and `school_memberships.question_submission_suspended_by` (NO ACTION)
+- `school_networks.created_by`, `school_parent_student_links.linked_by`, `school_policy_settings.updated_by`, and `school_record_events.actor_id` (NO ACTION)
+- `school_sections.homeroom_teacher_id`, `school_staff_change_requests.reviewed_by_user_id`, `school_student_invoices.created_by`, `school_subjects.created_by`, `school_teacher_assignments.created_by`, and `school_term_results.published_by` (NO ACTION)
+- `school_student_id_reservations.reserved_by` and `used_by_user_id` (RESTRICT)
+- `schools.created_by` (RESTRICT)
+- `transactions.sender_id` and `receiver_id` (NO ACTION)
+
+### Profile-level dependencies
+
+- `finance_invoices.student_id` references the profile with RESTRICT; invoice history must not be discarded to satisfy account erasure.
+- `social_posts.author_id` and `social_post_comments.user_id` use SET NULL when the profile is deleted. Content retention, de-identification, and safety-report context still need review before removal.
+- `academic_profiles`, `profile_privacy_settings`, `upper_student_topic_progress`, `upper_student_daily_activity`, and `student_exam_targets` use CASCADE from profiles. Verify whether each record is eligible to erase or retain before deleting the profile.
+
+### References that generally detach or cascade
+
+Auth's own identity/session/MFA/token tables cascade. Other application references such as request/review actor IDs, moderation actors, finance audit actors, and platform-setting authors commonly use SET NULL. User-owned learning, notification, multiplayer, call, social-block, consent-child and onboarding records commonly cascade. **Do not assume cascade is appropriate for every data category**; the retention review and legal policy must determine what should remain, be anonymised, or be deleted first.
+
+This inventory is not a substitute for a per-request blocker query, storage inventory, ownership handover, or legal retention decision. A future deletion tool must display these dependencies, require a documented verification and retention decision, and use the supported Auth Admin deletion path only after all blockers are cleared. No production rows were changed during this catalog review.
