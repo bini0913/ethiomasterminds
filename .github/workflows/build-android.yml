@@ -137,17 +137,44 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew bundleRelease --no-daemon
 
-      - name: Verify signed release AAB
+      - name: Verify signed release AAB and upload certificate
         if: steps.signing.outputs.ready == 'true'
         working-directory: android
         shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           bundle="app/build/outputs/bundle/release/app-release.aab"
           test -s "$bundle"
-          jarsigner -verify -verbose -certs "$bundle" >/dev/null
-          keytool -printcert -jarfile "$bundle" -v | grep -q 'SHA256:'
-          echo "Signed AAB signature and signing certificate verified."
+          jarsigner -verify -verbose -certs "$bundle" > "$RUNNER_TEMP/aab-signature-check.txt" 2>&1
+          grep -q 'jar verified.' "$RUNNER_TEMP/aab-signature-check.txt"
+
+          keystore_fingerprint="$(
+            keytool -list -v \
+              -keystore "$ANDROID_KEYSTORE_PATH" \
+              -alias "$ANDROID_KEY_ALIAS" \
+              -storepass:env ANDROID_KEYSTORE_PASSWORD \
+              -keypass:env ANDROID_KEY_PASSWORD |
+            sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1 |
+            tr -d ':' | tr '[:lower:]' '[:upper:]'
+          )"
+          bundle_fingerprint="$(
+            keytool -printcert -jarfile "$bundle" -v |
+            sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1 |
+            tr -d ':' | tr '[:lower:]' '[:upper:]'
+          )"
+          if [[ -z "$keystore_fingerprint" || -z "$bundle_fingerprint" ]]; then
+            echo "::error::Could not read the SHA-256 upload certificate fingerprint."
+            exit 1
+          fi
+          if [[ "$keystore_fingerprint" != "$bundle_fingerprint" ]]; then
+            echo "::error::The AAB signer certificate does not match the configured upload key."
+            exit 1
+          fi
+          echo "AAB signature verified; signer certificate matches the configured upload key."
 
       - name: Reject unsigned AAB from release publishing
         if: steps.signing.outputs.ready != 'true'
@@ -181,6 +208,13 @@ jobs:
           files: ${{ steps.release_files.outputs.files }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove temporary Android upload keystore
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/master-minds-upload-key.jks"
+          rm -f "$RUNNER_TEMP/aab-signature-check.txt"
 
   public-route-smoke:
     runs-on: ubuntu-latest
