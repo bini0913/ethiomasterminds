@@ -45,10 +45,11 @@ begin
     perform set_config('request.jwt.claim.sub', v_user.id::text, true);
 
     insert into auth.users (
-      id, aud, role, email, encrypted_password, email_confirmed_at,
+      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
       raw_app_meta_data, raw_user_meta_data, created_at, updated_at
     )
     values (
+      '00000000-0000-0000-0000-000000000000',
       v_user.id,
       'authenticated',
       'authenticated',
@@ -69,7 +70,8 @@ begin
       now()
     )
     on conflict (id) do update
-      set email = excluded.email,
+      set instance_id = excluded.instance_id,
+          email = excluded.email,
           encrypted_password = excluded.encrypted_password,
           email_confirmed_at = excluded.email_confirmed_at,
           raw_app_meta_data = excluded.raw_app_meta_data,
