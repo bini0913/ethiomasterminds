@@ -605,33 +605,12 @@ const AdminPortal: React.FC = () => {
       return;
     }
 
-    // Admin notifications target students and/or teachers. Managers and
-    // owner-only roles are intentionally outside this workflow.
-    const allowedRoles =
-      createdAnnouncement.target_type === 'students'
-        ? ['student']
-        : createdAnnouncement.target_type === 'teachers'
-          ? ['teacher']
-          : ['student', 'teacher'];
-
-    const { data: roleRows } = await supabase
-      .from('user_roles')
-      .select('user_id, role')
-      .in('role', allowedRoles as any);
-
-    const recipientIds = Array.from(
-      new Set((roleRows || []).map((row: any) => row.user_id).filter((id: string) => id && id !== user.id)),
-    );
-
-    const sentCount = await sendRemoteNotifications(
-      recipientIds.map((recipientId) => ({
-        userId: recipientId,
-        kind: 'admin_announcement',
-        title: createdAnnouncement.title,
-        body: createdAnnouncement.content,
-        data: { route: '/notifications', announcement_id: createdAnnouncement.id },
-      })),
-    );
+    // Recipient selection and payload construction are database-owned. The
+    // client submits only the announcement source record.
+    const sentCount = await sendRemoteNotifications([{
+      sourceId: createdAnnouncement.id,
+      kind: 'admin_announcement',
+    }]);
 
     setLoading(false);
     toast.success(

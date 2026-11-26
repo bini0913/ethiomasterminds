@@ -698,33 +698,12 @@ const TeacherPortal: React.FC = () => {
       return;
     }
 
-    // Deliver the same announcement as a real push notification to the
-    // students targeted by this teacher. The database announcement remains
-    // the source of truth if a device is offline or has notifications disabled.
-    let recipientIds: string[] = [];
-    if (createdAnnouncement.target_type === 'class' && createdAnnouncement.target_id) {
-      const { data: members } = await supabase
-        .from('class_students')
-        .select('student_id')
-        .eq('class_id', createdAnnouncement.target_id);
-      recipientIds = (members || []).map((member) => member.student_id);
-    } else if (createdAnnouncement.target_type === 'students') {
-      const { data: memberships } = await supabase
-        .from('class_students')
-        .select('student_id, classes!inner(teacher_id)')
-        .eq('classes.teacher_id', user.id);
-      recipientIds = Array.from(new Set((memberships || []).map((member: any) => member.student_id)));
-    }
-
-    const sentCount = await sendRemoteNotifications(
-      recipientIds.map((studentId) => ({
-        userId: studentId,
-        kind: 'teacher_announcement',
-        title: createdAnnouncement.title,
-        body: createdAnnouncement.content,
-        data: { route: '/notifications', announcement_id: createdAnnouncement.id },
-      })),
-    );
+    // The database verifies ownership, class scope, recipients, and message
+    // content before the Edge Function delivers any push notification.
+    const sentCount = await sendRemoteNotifications([{
+      sourceId: createdAnnouncement.id,
+      kind: 'teacher_announcement',
+    }]);
 
     const shouldShareToStudentSocial = ['all', 'students', 'class'].includes(createdAnnouncement.target_type);
 
@@ -780,7 +759,7 @@ ${createdAnnouncement.content}`;
       return;
     }
 
-    const { error } = await (supabase.rpc as any)('create_teacher_assignment', {
+    const { data: assignmentId, error } = await (supabase.rpc as any)('create_teacher_assignment', {
       p_quiz_id: quizId,
       p_class_id: classId,
       p_due_date: dueDate?.toISOString() ?? null,
@@ -793,18 +772,9 @@ ${createdAnnouncement.content}`;
       return;
     }
 
-    const { data: members, error: membersError } = await supabase
-      .from('class_students')
-      .select('student_id')
-      .eq('class_id', classId);
-    const studentIds = Array.from(new Set((members || []).map((member: { student_id: string }) => member.student_id).filter(Boolean)));
-    const sentCount = membersError ? 0 : await sendRemoteNotifications(studentIds.map(studentId => ({
-      userId: studentId,
-      kind: 'quiz_assignment',
-      title: `New assignment: ${selectedQuiz?.title || 'Quiz'}`,
-      body: `Your teacher assigned ${selectedQuiz?.title || 'a quiz'}${dueDate ? `, due ${dueDate.toLocaleDateString()}` : ''}. Open Master Minds to get started.`,
-      data: { route: '/notifications', quiz_id: quizId, class_id: classId },
-    })));
+    const sentCount = assignmentId
+      ? await sendRemoteNotifications([{ sourceId: assignmentId, kind: 'quiz_assignment' }])
+      : 0;
 
     await fetchAssignments();
     setAssigningQuiz(false);
