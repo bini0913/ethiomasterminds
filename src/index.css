@@ -136,6 +136,15 @@
   body { @apply bg-background text-foreground antialiased; min-height: 100%; font-family: var(--font-sans); font-size: 1rem; line-height: 1.5; }
   button, input, select, textarea { font: inherit; }
   :focus-visible { outline: 2px solid hsl(var(--focus-ring)); outline-offset: 2px; }
+  :where(button, a, [role="button"], input[type="submit"], input[type="button"]) {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where(button, a, [role="button"], input[type="submit"], input[type="button"]):active:not(:disabled) {
+      transform: scale(.985);
+    }
+  }
   h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; }
   h1 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.1; } h2 { font-size: clamp(1.5rem, 3vw, 2.25rem); line-height: 1.15; } h3 { font-size: 1.5rem; line-height: 1.2; } h4 { font-size: 1.25rem; line-height: 1.3; }
   small { font-size: .875rem; line-height: 1.45; }
@@ -202,8 +211,11 @@
 .early-pop { animation: early-pop .45s ease-out; }
 .early-wiggle { animation: early-wiggle .5s ease-in-out 2; }
 .early-sheet { animation: early-sheet .25s ease-out; }
-.early-shake { animation: early-shake .3s ease-in-out 2; }
-@media (prefers-reduced-motion: reduce) { .early-pop, .early-wiggle, .early-sheet, .early-shake { animation: none; } }
+  .early-shake { animation: early-shake .3s ease-in-out 2; }
+  @media (prefers-reduced-motion: reduce) { .early-pop, .early-wiggle, .early-sheet, .early-shake { animation: none; } }
+  @keyframes tactile-success { 0% { transform: scale(.92); opacity: .55; } 65% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+  .tactile-success { animation: tactile-success .42s cubic-bezier(.2,.9,.25,1.2); }
+  @media (prefers-reduced-motion: reduce) { .tactile-success { animation: none; } }
 
 
 /*

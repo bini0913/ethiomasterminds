@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useRe
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeStorage } from "@/lib/safeStorage";
+import { triggerTactileFeedback } from "@/lib/tactileFeedback";
 import { User, Session } from "@supabase/supabase-js";
 
 // Types
@@ -476,6 +477,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
         // Supabase returns a user without a session when email confirmation is required.
         if (!data.session) {
+          triggerTactileFeedback('success');
           toast.success("Account created! Confirm your learner email to sign in. Community features remain disabled until guardian approval.");
           return null;
         }
@@ -520,6 +522,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
         if (!profile) {
           toast.error("Account created, but your profile couldn't be loaded. Please sign in again.");
+        } else {
+          triggerTactileFeedback('success');
         }
         return profile;
       }
