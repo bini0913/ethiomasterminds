@@ -898,7 +898,7 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
 
     setSendingInviteTo(friendId);
     try {
-      const { error } = await db.rpc('create_multiplayer_invite', {
+      const { data: inviteId, error } = await db.rpc('create_multiplayer_invite', {
         _receiver_id: friendId,
         _room_id: roomId,
       });
@@ -906,8 +906,21 @@ const RealTimeRoom: React.FC<RealTimeRoomProps> = ({
       if (error) {
         throw error;
       }
+      if (!inviteId) throw new Error("The server did not return the invitation ID.");
 
-      toast.success(`Invite sent to ${friendName}`);
+      const { data: pushResult, error: pushError } = await supabase.functions.invoke("send-push-notification", {
+        body: { kind: "multiplayer_invite", event_id: inviteId },
+      });
+      if (pushError) {
+        console.warn("Multiplayer invite push could not be confirmed:", pushError.message);
+        toast.info(`Invite created for ${friendName}. Push delivery could not be confirmed; the invite remains available in Multiplayer.`);
+      } else if (Number(pushResult?.sent ?? 0) > 0) {
+        toast.success(`Invite created for ${friendName}; FCM accepted the push.`);
+      } else if (pushResult?.event_recorded === true) {
+        toast.success(`Invite saved for ${friendName}. No push-enabled device was available or recipient preferences paused push.`);
+      } else {
+        toast.success(`Invite created for ${friendName}.`);
+      }
       setInviteDialogOpen(false);
     } catch (err: any) {
       toast.error(err?.message || `Could not invite ${friendName}`);
