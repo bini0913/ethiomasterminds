@@ -10,3 +10,6 @@ Use an enterprise education SaaS command center: deep navy authority rail, royal
 
 ## Implementation boundary
 `AdminCommandCenterShell.tsx` owns only visual chrome and navigation presentation. `ExtremeAdminPortal.tsx` and `NetworkSuperAdminPortal.tsx` continue to own data fetching, RPC/function calls, confirmations, permission checks, and mutation feedback. No fabricated health, analytics, finance, or audit records are introduced. Loading, empty, error, and denied states remain truthful.
+
+## Extreme Admin redesign slice
+The Extreme Admin now lands on a data-backed Overview command center with scale metrics, attention queues for pending reports and privacy requests, control-assurance values from the existing security RPC, and quick navigation into users, schools, and audit logs. The detailed sketch-by-sketch interaction and responsive contract lives in `docs/extreme-admin-world-class-redesign.md`.
