@@ -77,4 +77,5 @@
 - [ ] **Resource discovery** — Provide real search, subject/grade filters, truthful result counts, responsive cards, one primary Read action, and contextual overflow actions for save/download/edit/moderation/delete.
 - [ ] **Reading workspace** — Preserve PDF opening, retry, reading progress, saved position, annotation/highlight/note behavior, AI actions, saved questions, and flashcards while making reading the visual priority.
 - [ ] **Responsive and accessible states** — Support desktop rail, mobile section switcher, full-screen reader, keyboard-visible focus, labeled controls, Escape close, reduced motion, empty/loading/error/retry states, and touch-safe controls.
+- [ ] **Glass visual system** — Use the shared translucent surface treatment for library cards, navigation, reader chrome, and dialogs with readable contrast, dark/theme compatibility, blur fallbacks, and no backend or permission changes.
 - [ ] **Validation evidence** — Run typecheck, lint, build, diff checks, and a source-level review. Authenticated Supabase-backed browser testing remains unverified unless a test account is available.
