@@ -123,8 +123,8 @@ begin
     (v_high_membership, v_school_id, '00000000-0000-4000-8000-000000000013', 'teacher', 'active', 30, 'ci_high_school_director', '00000000-0000-4000-8000-000000000004')
   on conflict (id) do nothing;
 
-  insert into public.school_sections(id, school_id, academic_year_id, grade_label, section_name, homeroom_teacher_id)
-  values (v_section_id, v_school_id, v_year_id, 'Grade 9', 'A', v_teacher_membership)
+  insert into public.school_sections(id, school_id, academic_year_id, grade_label, section_name)
+  values (v_section_id, v_school_id, v_year_id, 'Grade 9', 'A')
   on conflict (id) do nothing;
 
   insert into public.school_memberships(id, school_id, user_id, school_role, status, grade_label, age_at_enrollment, section_id, student_number, school_username, created_by)
