@@ -385,7 +385,7 @@ const App = () => (
                               <Route path="/friends" element={<EarlyTierRestrictedRoute><Friends /></EarlyTierRestrictedRoute>} />
                               <Route path="/settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Settings /></ProtectedRoute>} />
                               <Route path="/notifications" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "finance", "parent", "super_admin", "extreme_admin"]}><NotificationInboxPage /></ProtectedRoute>} />
-                              <Route path="/notification-settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "parent", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
+                              <Route path="/notification-settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "finance", "parent", "super_admin", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
                               <Route path="/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolAwareLegacyPortalRoute roles={["teacher"]}><TeacherPortal /></SchoolAwareLegacyPortalRoute></ProtectedRoute>} />
                               <Route
