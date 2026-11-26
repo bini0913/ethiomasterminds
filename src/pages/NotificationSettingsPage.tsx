@@ -61,13 +61,14 @@ export default function NotificationSettingsPage() {
       : null;
     setPrefs(next);
     setSaving(true);
+    let pushRegistrationUnavailable = false;
     try {
       await saveNotificationPreferences(user.id, next);
       if (key === "enabled") {
         if (value) {
           const registered = await registrationPromise;
           await scheduleDailyLearningReminder(next);
-          if (!registered) toast.info("Preferences saved, but this device could not be registered for push. Check browser permission and Firebase web configuration; your in-app inbox remains available.");
+          if (!registered) pushRegistrationUnavailable = true;
         } else {
           await unregisterPushNotifications(user.id);
           await cancelDailyLearningReminder();
@@ -77,7 +78,11 @@ export default function NotificationSettingsPage() {
         if (value && next.enabled) await scheduleDailyLearningReminder(next);
         else await cancelDailyLearningReminder();
       }
-      toast.success("Notification settings saved.");
+      if (pushRegistrationUnavailable) {
+        toast.info("Preferences saved, but this device could not be registered for push. Check notification permission and Firebase web configuration; your in-app inbox remains available.");
+      } else {
+        toast.success("Notification settings saved.");
+      }
     } catch {
       setPrefs(previous);
       toast.error("Could not save notification settings. Your previous choices were restored.");
