@@ -774,16 +774,20 @@ ${createdAnnouncement.content}`;
       return;
     }
 
-    const sentCount = assignmentId
+    const delivery = assignmentId
       ? await sendRemoteNotifications([{ sourceId: assignmentId, kind: 'quiz_assignment' }])
-      : 0;
+      : null;
 
     await fetchAssignments();
     setAssigningQuiz(false);
     setAssignmentForm({ quiz_id: '', class_id: '', due_date: '' });
-    toast.success(sentCount > 0
-      ? `Quiz assigned. ${sentCount} student device(s) notified.`
-      : 'Quiz assigned successfully. Students can see it in their assignments when they open Master Minds.');
+    if (!delivery?.inboxRecorded) {
+      toast.info('Quiz assigned, but the recipient inbox notification could not be confirmed.');
+    } else if (delivery.attemptedDevices === 0) {
+      toast.success("Quiz assigned and saved to students' inboxes. Push was not attempted because no eligible device or preference allowed it.");
+    } else {
+      toast.success(`Quiz assigned and saved to students' inboxes. FCM accepted push on ${delivery.sentDevices} of ${delivery.attemptedDevices} attempted device(s).`);
+    }
   };
 
   const handleDeleteAssignment = async (assignmentId: string) => {
