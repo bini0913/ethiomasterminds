@@ -55,3 +55,45 @@ BEGIN
   END IF;
 END;
 $migration$;
+
+-- Persist a per-member read cursor so group chat unread badges are real rather
+-- than hard-coded to zero.
+ALTER TABLE public.chat_group_members
+  ADD COLUMN IF NOT EXISTS last_read_at timestamptz;
+UPDATE public.chat_group_members
+  SET last_read_at = joined_at
+  WHERE last_read_at IS NULL;
+ALTER TABLE public.chat_group_members
+  ALTER COLUMN last_read_at SET DEFAULT now(),
+  ALTER COLUMN last_read_at SET NOT NULL;
+
+DROP POLICY IF EXISTS "Members update own group read cursor" ON public.chat_group_members;
+CREATE POLICY "Members update own group read cursor"
+  ON public.chat_group_members
+  FOR UPDATE
+  TO authenticated
+  USING ((SELECT auth.uid()) = user_id)
+  WITH CHECK ((SELECT auth.uid()) = user_id);
+GRANT UPDATE (last_read_at) ON TABLE public.chat_group_members TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_my_group_unread_counts()
+RETURNS TABLE(group_id uuid, unread_count bigint)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $function$
+  SELECT
+    membership.group_id,
+    count(message.id)::bigint AS unread_count
+  FROM public.chat_group_members AS membership
+  LEFT JOIN public.group_messages AS message
+    ON message.group_id = membership.group_id
+   AND message.sender_id <> (SELECT auth.uid())
+   AND message.created_at > membership.last_read_at
+  WHERE membership.user_id = (SELECT auth.uid())
+  GROUP BY membership.group_id;
+$function$;
+
+REVOKE ALL ON FUNCTION public.get_my_group_unread_counts() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_my_group_unread_counts() TO authenticated;
