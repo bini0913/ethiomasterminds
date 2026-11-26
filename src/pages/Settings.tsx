@@ -30,14 +30,12 @@ const SETTINGS_PREFERENCES_STORAGE_KEY = "masterminds-settings-preferences-v1";
 
 type SettingsPreferences = {
   volume: number;
-  notifications: boolean;
   soundEffects: boolean;
   vibration: boolean;
 };
 
 const DEFAULT_SETTINGS_PREFERENCES: SettingsPreferences = {
   volume: 70,
-  notifications: true,
   soundEffects: true,
   vibration: true,
 };
@@ -57,9 +55,6 @@ const readSettingsPreferences = (): SettingsPreferences => {
 
     return {
       volume,
-      notifications: typeof candidate.notifications === "boolean"
-        ? candidate.notifications
-        : DEFAULT_SETTINGS_PREFERENCES.notifications,
       soundEffects: typeof candidate.soundEffects === "boolean"
         ? candidate.soundEffects
         : DEFAULT_SETTINGS_PREFERENCES.soundEffects,
@@ -80,7 +75,6 @@ const Settings: React.FC = () => {
   const [initialPreferences] = useState(readSettingsPreferences);
   
   const [volume, setVolume] = useState(initialPreferences.volume);
-  const [notifications, setNotifications] = useState(initialPreferences.notifications);
   const [soundEffects, setSoundEffects] = useState(initialPreferences.soundEffects);
   const [vibration, setVibration] = useState(initialPreferences.vibration);
   
@@ -89,13 +83,12 @@ const Settings: React.FC = () => {
     is_public: true,
     show_online_status: false,
     activity_history_enabled: true,
-    notifications_enabled: true,
   });
   const [savingPrivacy, setSavingPrivacy] = useState(false);
 
   useEffect(() => {
-    safeStorage.setItem(SETTINGS_PREFERENCES_STORAGE_KEY, JSON.stringify({ volume, notifications, soundEffects, vibration }));
-  }, [volume, notifications, soundEffects, vibration]);
+    safeStorage.setItem(SETTINGS_PREFERENCES_STORAGE_KEY, JSON.stringify({ volume, soundEffects, vibration }));
+  }, [volume, soundEffects, vibration]);
 
   useEffect(() => {
     let mounted = true;
@@ -103,7 +96,7 @@ const Settings: React.FC = () => {
       if (!user?.id) return;
       const { data, error } = await (supabase as any)
         .from("profile_privacy_settings")
-        .select("is_public,show_online_status,activity_history_enabled,notifications_enabled")
+        .select("is_public,show_online_status,activity_history_enabled")
         .eq("user_id", user.id)
         .maybeSingle();
       if (mounted && !error && data) setPrivacy((current) => ({ ...current, ...data }));
@@ -348,65 +341,26 @@ const Settings: React.FC = () => {
             </motion.div>
           </TabsContent>
           
-          {/* Notifications Settings */}
+          {/* Notifications are managed in one server-backed preferences page. */}
           <TabsContent value="notifications">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card className="glass neon-border">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+              <Card className="glass border-border/50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                      <Bell className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <span className="text-foreground">Notifications</span>
-                      <p className="text-sm text-muted-foreground font-normal">Manage your alerts</p>
-                    </div>
+                    <Bell className="h-5 w-5 text-primary" />
+                    <span>Notifications</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Master Toggle */}
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-primary/30 bg-primary/5">
-                    <div>
-                      <Label htmlFor="notifications" className="text-foreground font-medium">Enable All Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Master switch for all alerts</p>
-                    </div>
-                    <Switch
-                      id="notifications"
-                      checked={privacy.notifications_enabled}
-                      disabled={savingPrivacy}
-                      onCheckedChange={(value) => {
-                        setNotifications(value);
-                        void updatePrivacy("notifications_enabled", value);
-                      }}
-                    />
-                  </div>
-                  
-                  <Button variant="outline" className="w-full" onClick={() => navigate("/notifications")}>
-                    <Bell className="h-4 w-4 mr-2" />
-                    Open notification settings
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Your inbox and delivery preferences now use the same notification system across devices.
+                  </p>
+                  <Button className="w-full" onClick={() => navigate("/notifications")}>
+                    <Bell className="mr-2 h-4 w-4" /> Open notification inbox
                   </Button>
-
-                  {/* Individual Toggles */}
-                  <div className="space-y-3 opacity-80" style={{ opacity: privacy.notifications_enabled ? 1 : 0.5 }}>
-                    {[
-                      { id: 'friend-requests', label: 'Friend Requests', desc: 'When someone adds you', default: true },
-                      { id: 'messages', label: 'Messages', desc: 'New chat messages', default: true },
-                      { id: 'game-invites', label: 'Game Invites', desc: 'Multiplayer invitations', default: true },
-                      { id: 'daily-quiz', label: 'Daily Quiz Reminder', desc: 'Daily challenge notifications', default: false },
-                      { id: 'achievements', label: 'Achievements', desc: 'When you unlock badges', default: true },
-                    ].map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50">
-                        <div>
-                          <Label htmlFor={item.id} className="text-foreground">{item.label}</Label>
-                          <p className="text-sm text-muted-foreground">{item.desc}</p>
-                        </div>
-                        <Switch id={item.id} defaultChecked={item.default} disabled={!privacy.notifications_enabled} />
-                      </div>
-                    ))}
-                  </div>
+                  <Button variant="outline" className="w-full" onClick={() => navigate("/notification-settings")}>
+                    Manage notification preferences
+                  </Button>
                 </CardContent>
               </Card>
             </motion.div>
