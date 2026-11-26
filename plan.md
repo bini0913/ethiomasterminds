@@ -160,3 +160,27 @@ Establish a single admin navigation/page hierarchy and an explicit permission ma
 
 Keep all existing student/parent/teacher/school/admin routes available; do not redesign non-admin portals. School administrators remain school-scoped. Only Super Admin retains the authority provided by existing owner-only backend contracts. Role/account changes, wallet writes and other privileged actions require authoritative server authorization and trustworthy audit records. Do not fabricate service health, operational events, usage, school subscriptions or financial records. The initial audit demonstrates that some RPC operations and their client-side audit calls are separate transactions; do not describe such logging as atomic until a tested database contract provides atomicity.
 
+
+# Active Plan — World-Class Digital Library Redesign
+
+## Scope
+Replace the existing `/library` presentation and information architecture with a focused library home, personal shelf, and distraction-free reader. Preserve the existing route, Supabase data contracts, role/tier filtering, uploads, moderation, bookmarks, downloads, reading progress, highlights, notes, AI actions, loading states, and permissions.
+
+## Implementation
+- Keep `src/pages/LibraryPage.tsx` as the route owner, but rebuild its presentation around clear primary and secondary destinations.
+- Use real `libraryApi` data; do not add demo books or invented progress.
+- Use a desktop rail and compact mobile section switcher. Put management actions behind contextual menus.
+- Keep the PDF reader as a full-screen dialog. Expose AI and annotation tools only when requested, with a responsive stacked layout.
+- Preserve accessible Radix dialogs, visible focus, labels, keyboard operation, reduced-motion behavior, and safe-area spacing.
+
+## Design direction
+- **Movement:** quiet editorial reading studio.
+- **Core principles:** one next action; calm reading surface; progressive disclosure; truthful learning state.
+- **Color philosophy:** warm paper-like canvas with teal/blue action color and restrained semantic accents; theme tokens remain semantic and compatible with existing themes.
+- **Layout paradigm:** bounded reading canvas with a persistent desktop rail, compact mobile switcher, and full-screen reader overlay.
+- **Signature elements:** reading-progress spine, quiet cover cards, contextual tool drawers.
+- **Interaction philosophy:** read first, save second, manage only when needed; every async mutation communicates its state.
+- **Animation:** short card entrance/hover only, disabled under reduced motion; no motion inside the reading surface that competes with comprehension.
+- **Typography:** existing Space Grotesk display and DM Sans body tokens, with generous reading line-height.
+- **Brand essence:** a calm Ethiopian learning library that helps students find, understand, and remember useful material.
+- **Brand voice:** direct and supportive — “Pick up where you left off.” and “Find the next useful resource.”
