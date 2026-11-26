@@ -33,6 +33,17 @@ Review at least:
 
 If a foreign-key dependency or data ownership is unclear, stop and escalate to the database maintainer. Do not force-delete rows, disable constraints, or delete from `auth.users` with SQL.
 
+## Read-only deletion preflight
+
+The Extreme Admin deletion-request card now includes **Check deletion blockers**. This invokes `extreme_admin_preflight_account_deletion(request_id)`, which:
+
+- Counts actual rows behind current `NO ACTION` and `RESTRICT` foreign keys to `auth.users` and `public.profiles`.
+- Counts user-owned Storage objects grouped by bucket.
+- Displays the technical blockers for that specific request.
+- Does not delete, anonymise, detach, suspend, or update any data.
+
+A clear technical preflight is **not** permission to delete. School membership handover, academic-record retention, finance/audit obligations, reports and safety/legal holds still require a documented human review. Resolve blockers only through reviewed workflows; never disable constraints or delete rows just to make the preflight clear.
+
 ## Complete the request
 
 1. Verify the data review and any required handover are complete.
@@ -43,7 +54,7 @@ If a foreign-key dependency or data ownership is unclear, stop and escalate to t
 
 ## Automation boundary
 
-Public intake, rate limiting, request deduplication, the audit queue and review status are implemented in the application. Full cross-table data erasure is intentionally not automated yet because school ownership, finance records, safety reports and storage layouts require per-table retention and handover rules. Do not describe a request as fully deleted until the review above has actually been completed.
+Public intake, rate limiting, request deduplication, the audit queue, review status and a read-only per-request technical preflight are implemented in the application. Full cross-table data erasure remains a verified human-operated process because school ownership, finance records, safety reports and storage layouts require per-table retention and handover rules. Do not describe a request as fully deleted until the review above has actually been completed.
 
 
 ## Production schema dependency inventory (2026-11-26)
