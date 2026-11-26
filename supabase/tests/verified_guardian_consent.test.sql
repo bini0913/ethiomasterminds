@@ -96,7 +96,7 @@ begin
   perform set_config('request.jwt.claim.sub', '', true);
   perform set_config('request.jwt.claim.role', '', true);
 end;
-$;
+$$;
 select ok(true, 'runtime regression proves a minor cannot self-promote through the RPC or direct profile updates, including age clearing');
 
 select * from finish();
