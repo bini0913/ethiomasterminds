@@ -33,11 +33,11 @@ select ok(
   'role transitions replace ordinary platform roles atomically'
 );
 select ok(
-  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'user_roles_single_extreme_admin_idx'),
+  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'exactly_one_extreme_admin'),
   'Extreme Admin remains singleton constrained'
 );
 select ok(
-  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'user_roles_single_super_admin_idx'),
+  exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'exactly_one_super_admin'),
   'Super Admin remains singleton constrained'
 );
 select ok(
