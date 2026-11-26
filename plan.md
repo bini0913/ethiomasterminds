@@ -243,3 +243,8 @@ Reuse Space Grotesk for display and DM Sans for body. Page titles are compact an
 - `src/pages/Chat.tsx`: group/public messaging workspace with existing realtime/RPC authority.
 - `src/context/FriendsContext.tsx` and `src/context/CommunityTermsContext.tsx`: behavior, permission, consent, and realtime owners; do not duplicate them in visual components.
 - `src/index.css`: shared semantic glass/responsive policies; avoid changing upper-tier-only contracts.
+
+
+## Feed interaction slice
+
+The next reviewable slice deepens the feed without changing its data authority. Post cards use separated glass surfaces and deliberate rhythm; likes, reactions, follows, saves, and comments expose per-post pending locks; comments expose loading and retry boundaries; the composer validates image input, cleans preview URLs, enforces its content limit, and keeps submit/close states truthful. All mutations continue to use the existing tables, `runWithCommunityTerms`, and realtime refresh paths.

@@ -65,9 +65,12 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [commentsLoading, setCommentsLoading] = useState<Set<string>>(new Set());
+  const [commentErrors, setCommentErrors] = useState<Record<string, string>>({});
   const [newComments, setNewComments] = useState<Record<string, string>>({});
   const [showReactions, setShowReactions] = useState<string | null>(null);
   const [doubleTapPost, setDoubleTapPost] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const lastTapRef = useRef<Record<string, number>>({});
 
   const loadPosts = useCallback(async () => {
@@ -234,12 +237,14 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
   };
 
   const toggleLike = async (postId: string) => {
+    if (pendingAction) return;
     const auth = await supabase.auth.getUser();
     if (!auth.data.user?.id) return;
 
     const post = posts.find(p => p.id === postId);
     if (!post) return;
 
+    setPendingAction(`like:${postId}`);
     // Optimistic update
     setPosts(prev => prev.map(p =>
       p.id === postId
@@ -256,26 +261,33 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
     } catch {
       // Revert on error
       loadPosts();
+    } finally {
+      setPendingAction(null);
     }
   };
 
   const addReaction = async (postId: string, reactionType: string) => {
+    if (pendingAction) return;
     const auth = await supabase.auth.getUser();
     if (!auth.data.user?.id) return;
+    setPendingAction(`reaction:${postId}`);
     try {
       await supabase.from('social_post_reactions').delete().eq('post_id', postId).eq('user_id', auth.data.user.id);
       await supabase.from('social_post_reactions').insert({ post_id: postId, user_id: auth.data.user.id, reaction_type: reactionType });
       setShowReactions(null);
       loadPosts();
     } catch { loadPosts(); }
+    finally { setPendingAction(null); }
   };
 
   const toggleSave = async (postId: string) => {
+    if (pendingAction) return;
     const auth = await supabase.auth.getUser();
     if (!auth.data.user?.id) return;
     const post = posts.find(p => p.id === postId);
     if (!post) return;
 
+    setPendingAction(`save:${postId}`);
     setPosts(prev => prev.map(p => p.id === postId ? { ...p, isSaved: !p.isSaved } : p));
 
     try {
@@ -287,16 +299,20 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
       toast.success(post.isSaved ? 'Removed from saved' : 'Saved!');
     } catch {
       loadPosts();
+    } finally {
+      setPendingAction(null);
     }
   };
 
   const toggleFollow = async (targetUserId: string) => {
+    if (pendingAction) return;
     const auth = await supabase.auth.getUser();
     if (!auth.data.user?.id || auth.data.user.id === targetUserId) return;
 
     const post = posts.find(p => p.authorId === targetUserId);
     const wasFollowing = post?.isFollowing;
 
+    setPendingAction(`follow:${targetUserId}`);
     // Optimistic
     setPosts(prev => prev.map(p => p.authorId === targetUserId ? { ...p, isFollowing: !wasFollowing } : p));
 
@@ -309,6 +325,8 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
       toast.success(wasFollowing ? 'Unfollowed' : 'Following!');
     } catch {
       loadPosts();
+    } finally {
+      setPendingAction(null);
     }
   };
 
@@ -323,30 +341,44 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
   };
 
   const loadComments = async (postId: string) => {
-    const { data } = await supabase
-      .from('social_post_comments')
-      .select('id, content, user_id, created_at')
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true });
+    setCommentsLoading(prev => new Set(prev).add(postId));
+    setCommentErrors(prev => ({ ...prev, [postId]: '' }));
+    try {
+      const { data, error } = await supabase
+        .from('social_post_comments')
+        .select('id, content, user_id, created_at')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
 
-    const userIds = [...new Set((data || []).map((c: any) => c.user_id))];
-    const { data: profiles } = userIds.length
-      ? await supabase.from('profiles').select('id, name').in('id', userIds)
-      : { data: [] };
+      const userIds = [...new Set((data || []).map((c: any) => c.user_id))];
+      const { data: profiles } = userIds.length
+        ? await supabase.from('profiles').select('id, name').in('id', userIds)
+        : { data: [] };
 
-    const pMap: Record<string, string> = {};
-    (profiles || []).forEach((p: any) => { pMap[p.id] = p.name; });
+      const pMap: Record<string, string> = {};
+      (profiles || []).forEach((p: any) => { pMap[p.id] = p.name; });
 
-    setComments(prev => ({
-      ...prev,
-      [postId]: (data || []).map((c: any) => ({
-        id: c.id,
-        content: c.content,
-        userId: c.user_id,
-        userName: pMap[c.user_id] || 'Student',
-        createdAt: c.created_at,
-      })),
-    }));
+      setComments(prev => ({
+        ...prev,
+        [postId]: (data || []).map((c: any) => ({
+          id: c.id,
+          content: c.content,
+          userId: c.user_id,
+          userName: pMap[c.user_id] || 'Student',
+          createdAt: c.created_at,
+        })),
+      }));
+    } catch (error) {
+      console.error('Error loading comments:', error);
+      setCommentErrors(prev => ({ ...prev, [postId]: 'Comments could not be loaded. Try again.' }));
+    } finally {
+      setCommentsLoading(prev => {
+        const next = new Set(prev);
+        next.delete(postId);
+        return next;
+      });
+    }
   };
 
   const toggleComments = (postId: string) => {
@@ -361,10 +393,12 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
   };
 
   const addComment = async (postId: string) => {
+    if (pendingAction) return;
     const text = newComments[postId];
     const auth = await supabase.auth.getUser();
     if (!text?.trim() || !auth.data.user?.id) return;
 
+    setPendingAction(`comment:${postId}`);
     await runWithCommunityTerms(async () => {
       const { error } = await supabase.from('social_post_comments').insert({
         post_id: postId,
@@ -379,6 +413,7 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
       loadComments(postId);
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, commentsCount: p.commentsCount + 1 } : p));
     }, 'social');
+    setPendingAction(null);
   };
 
   const getRankColor = (rank: string | null) => {
@@ -441,11 +476,11 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
   }
 
   return (
-    <div className="divide-y divide-border/30">
+    <div className="space-y-3">
       {posts.map((post) => (
         <article
           key={post.id}
-          className="px-4 py-4 relative"
+          className="relative mx-1 overflow-visible rounded-[1.5rem] border border-border/70 bg-card/75 p-4 shadow-sm transition hover:border-primary/25 hover:shadow-md sm:p-5"
           onClick={() => handlePostTap(post.id)}
         >
           {/* Double-tap heart animation */}
@@ -488,9 +523,10 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
                   variant={post.isFollowing ? 'secondary' : 'default'}
                   size="sm"
                   className="h-7 text-xs px-3 rounded-full"
+                  disabled={pendingAction === `follow:${post.authorId}`}
                   onClick={(e) => { e.stopPropagation(); toggleFollow(post.authorId); }}
                 >
-                  {post.isFollowing ? 'Following' : 'Follow'}
+                  {pendingAction === `follow:${post.authorId}` ? <Loader2 className="h-3 w-3 animate-spin" /> : post.isFollowing ? 'Following' : 'Follow'}
                 </Button>
               )}
               <ReportButton reportedType="post" reportedId={post.id} />
@@ -535,6 +571,7 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
                 variant="ghost"
                 size="sm"
                 className={`h-9 px-2 ${post.isLiked ? 'text-red-500' : 'text-muted-foreground'}`}
+                disabled={pendingAction === `like:${post.id}`}
                 onClick={() => toggleLike(post.id)}
                 onMouseEnter={() => setShowReactions(post.id)}
               >
@@ -550,7 +587,9 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
                   {reactionTypes.map(r => (
                     <button
                       key={r.type}
-                      className={`text-lg hover:scale-150 transition-transform p-1 ${post.userReaction === r.type ? 'scale-125' : ''}`}
+                      disabled={pendingAction === `reaction:${post.id}`}
+                      aria-label={`React ${r.type}`}
+                      className={`text-lg hover:scale-150 transition-transform p-1 disabled:opacity-50 ${post.userReaction === r.type ? 'scale-125' : ''}`}
                       onClick={() => addReaction(post.id, r.type)}
                     >
                       {r.label}
@@ -583,15 +622,18 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
               variant="ghost"
               size="sm"
               className={`h-9 px-2 ${post.isSaved ? 'text-primary' : 'text-muted-foreground'}`}
+              disabled={pendingAction === `save:${post.id}`}
               onClick={() => toggleSave(post.id)}
             >
-              <Bookmark className={`h-5 w-5 ${post.isSaved ? 'fill-current' : ''}`} />
+              {pendingAction === `save:${post.id}` ? <Loader2 className="h-5 w-5 animate-spin" /> : <Bookmark className={`h-5 w-5 ${post.isSaved ? 'fill-current' : ''}`} />}
             </Button>
           </div>
 
           {/* Comments */}
           {expandedComments.has(post.id) && (
             <div className="mt-3 space-y-2.5 border-t border-border/30 pt-3" onClick={(e) => e.stopPropagation()}>
+              {commentsLoading.has(post.id) && <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading comments…</div>}
+              {commentErrors[post.id] && <div className="flex items-center justify-between gap-3 rounded-xl bg-destructive/5 px-3 py-2 text-xs"><span className="text-muted-foreground">{commentErrors[post.id]}</span><Button variant="outline" size="sm" className="h-8" onClick={() => void loadComments(post.id)}>Retry</Button></div>}
               {(comments[post.id] || []).map(c => (
                 <div key={c.id} className="flex gap-2">
                   <Avatar className="h-7 w-7">
@@ -622,12 +664,14 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
                   type="text"
                   value={newComments[post.id] || ''}
                   onChange={(e) => setNewComments(prev => ({ ...prev, [post.id]: e.target.value }))}
+                  maxLength={500}
                   placeholder="Add a comment..."
-                  className="flex-1 bg-muted/30 rounded-full px-4 py-2 text-xs outline-none border border-border/40 focus:border-primary/50"
+                  aria-label="Add a comment"
+                  className="min-h-10 flex-1 rounded-full border border-border/40 bg-muted/30 px-4 py-2 text-xs outline-none focus:border-primary/50"
                   onKeyDown={(e) => e.key === 'Enter' && addComment(post.id)}
                 />
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => addComment(post.id)}>
-                  <Send className="h-4 w-4" />
+                <Button size="icon" variant="ghost" className="h-10 w-10" disabled={pendingAction === `comment:${post.id}` || !newComments[post.id]?.trim()} onClick={() => addComment(post.id)} aria-label="Send comment">
+                  {pendingAction === `comment:${post.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
             </div>

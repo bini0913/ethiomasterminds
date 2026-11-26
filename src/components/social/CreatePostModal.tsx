@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -21,13 +21,22 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onClose }) => {
   const [isPosting, setIsPosting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+  }, [imagePreview]);
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Choose an image file');
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image must be under 5MB');
       return;
     }
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
@@ -73,7 +82,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onClose }) => {
     <div className="fixed inset-0 z-[60] flex flex-col bg-background/95 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="create-post-title">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
-        <Button variant="ghost" size="sm" onClick={onClose}>
+        <Button variant="ghost" size="sm" onClick={onClose} disabled={isPosting} aria-label="Close composer">
           <X className="h-5 w-5" />
         </Button>
         <span id="create-post-title" className="text-sm font-semibold">Create Post</span>
@@ -111,12 +120,13 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onClose }) => {
 
         {imagePreview && (
           <div className="mt-4 relative">
-            <img src={imagePreview} alt="Preview" className="rounded-xl max-h-72 w-full object-cover" />
+            <img src={imagePreview} alt={`Preview of ${imageFile?.name || 'selected image'}`} className="rounded-xl max-h-72 w-full object-cover" />
             <Button
               variant="destructive"
               size="icon"
               className="absolute top-2 right-2 h-8 w-8 rounded-full"
-              onClick={() => { setImageFile(null); setImagePreview(null); }}
+              aria-label="Remove selected image"
+              onClick={() => { if (imagePreview) URL.revokeObjectURL(imagePreview); setImageFile(null); setImagePreview(null); }}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -127,7 +137,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onClose }) => {
       {/* Bottom bar */}
       <div className="border-t border-border/40 px-4 py-3 flex items-center gap-3">
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
-        <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
+        <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()} disabled={isPosting}>
           <ImageIcon className="h-5 w-5 mr-1 text-primary" />
           Photo
         </Button>
