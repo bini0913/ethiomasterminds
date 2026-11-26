@@ -79,9 +79,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // Get groups where user is a member
-      const { data: memberData, error: memberError } = await supabase
-        .from('chat_group_members')
-        .select('group_id')
+      const { data: memberData, error: memberError } = await (supabase.from('chat_group_members') as any)
+        .select('group_id,last_read_at')
         .eq('user_id', user.id);
 
       if (memberError) throw memberError;
@@ -113,10 +112,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         countMap.set(c.group_id, (countMap.get(c.group_id) || 0) + 1);
       });
 
+      const { data: unreadRows, error: unreadError } = await (supabase.rpc as any)('get_my_group_unread_counts');
+      if (unreadError) throw unreadError;
+      const unreadMap = new Map<string, number>(
+        (unreadRows || []).map((row: { group_id: string; unread_count: number | string }) => [
+          row.group_id,
+          Number(row.unread_count) || 0,
+        ]),
+      );
+
       const enrichedGroups: ChatGroup[] = (groupsData || []).map(g => ({
         ...g,
         group_type: g.group_type as ChatGroup['group_type'],
-        member_count: countMap.get(g.id) || 0
+        member_count: countMap.get(g.id) || 0,
+        unread_count: unreadMap.get(g.id) || 0,
       }));
 
       setGroups(enrichedGroups);
@@ -134,13 +143,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .from('group_messages')
         .select('*')
         .eq('group_id', groupId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
 
       // Get sender profiles
-      const senderIds = [...new Set((data || []).map(m => m.sender_id))];
+      const latestFirstMessages = [...(data || [])].reverse();
+      const senderIds = [...new Set(latestFirstMessages.map(m => m.sender_id))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, name, avatar')
@@ -148,7 +158,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
-      const enrichedMessages: GroupMessage[] = (data || []).map(m => ({
+      const enrichedMessages: GroupMessage[] = latestFirstMessages.map(m => ({
         ...m,
         message_type: m.message_type as GroupMessage['message_type'],
         sender_name: profileMap.get(m.sender_id)?.name || 'Unknown',
@@ -156,12 +166,26 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       }));
 
       setMessages(enrichedMessages);
+      if (user?.id) {
+        const readAt = new Date().toISOString();
+        const { error: cursorError } = await (supabase.from('chat_group_members') as any)
+          .update({ last_read_at: readAt })
+          .eq('group_id', groupId)
+          .eq('user_id', user.id);
+        if (cursorError) {
+          console.warn('Could not update group read cursor:', cursorError);
+        } else {
+          setGroups((current) => current.map((group) =>
+            group.id === groupId ? { ...group, unread_count: 0 } : group
+          ));
+        }
+      }
     } catch (err) {
       console.error('Error fetching messages:', err);
     } finally {
       setLoadingMessages(false);
     }
-  }, []);
+  }, [user?.id]);
 
   const fetchMembers = useCallback(async (groupId: string) => {
     try {
@@ -198,6 +222,28 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
+
+  // Refresh unread badges for groups that are not currently open.
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`group-unread-${user.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'group_messages',
+      }, (payload) => {
+        const message = payload.new as { group_id?: string; sender_id?: string };
+        if (!message.group_id || message.sender_id === user.id || message.group_id === currentGroup?.id) return;
+        void fetchGroups();
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('Group unread realtime subscription:', status);
+        }
+      });
+    return () => { void supabase.removeChannel(channel); };
+  }, [user?.id, currentGroup?.id, fetchGroups]);
 
   // Fetch messages when current group changes
   useEffect(() => {
