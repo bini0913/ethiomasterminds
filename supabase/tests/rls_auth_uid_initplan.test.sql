@@ -11,7 +11,7 @@ select ok(
         replace(
           regexp_replace(
             coalesce(p.qual, ''),
-            '\\([[:space:]]*select[[:space:]]+auth\\.uid\\(\\)([[:space:]]+as[[:space:]]+uid)?[[:space:]]*\\)',
+            '[(][[:space:]]*select[[:space:]]+auth[.]uid[(][)]([[:space:]]+as[[:space:]]+uid)?[[:space:]]*[)]',
             'auth.uid()',
             'gi'
           ),
@@ -22,7 +22,7 @@ select ok(
         replace(
           regexp_replace(
             coalesce(p.with_check, ''),
-            '\\([[:space:]]*select[[:space:]]+auth\\.uid\\(\\)([[:space:]]+as[[:space:]]+uid)?[[:space:]]*\\)',
+            '[(][[:space:]]*select[[:space:]]+auth[.]uid[(][)]([[:space:]]+as[[:space:]]+uid)?[[:space:]]*[)]',
             'auth.uid()',
             'gi'
           ),
