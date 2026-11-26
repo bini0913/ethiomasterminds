@@ -57,6 +57,52 @@ jobs:
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
+      # PRs can validate the release build without access to production signing
+      # secrets. A partial secret configuration is always an error.
+      - name: Prepare protected release signing
+        id: signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          values=(
+            "${ANDROID_KEYSTORE_BASE64}"
+            "${ANDROID_KEYSTORE_PASSWORD}"
+            "${ANDROID_KEY_ALIAS}"
+            "${ANDROID_KEY_PASSWORD}"
+          )
+          present=0
+          missing=0
+          for value in "${values[@]}"; do
+            if [[ -n "${value}" ]]; then
+              ((present+=1))
+            else
+              ((missing+=1))
+            fi
+          done
+          if [[ "${present}" -ne 0 && "${missing}" -ne 0 ]]; then
+            echo "::error::Android signing secrets are incomplete. Configure all four secrets together."
+            exit 1
+          fi
+          if [[ "${present}" -eq 0 ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Android upload key configured. Release AAB will be build-tested but will not be published."
+            exit 0
+          fi
+          keystore_path="$RUNNER_TEMP/master-minds-upload-key.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+          if [[ ! -s "$keystore_path" ]]; then
+            echo "::error::Decoded Android keystore is empty."
+            exit 1
+          fi
+          echo "ANDROID_KEYSTORE_PATH=$keystore_path" >> "$GITHUB_ENV"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
@@ -83,24 +129,97 @@ jobs:
           grep -q 'android.permission.RECORD_AUDIO' "${merged_manifest}"
           grep -q 'android.permission.POST_NOTIFICATIONS' "${merged_manifest}"
 
-
-      - name: Validate release AAB build
+      - name: Build signed release Android App Bundle
+        if: steps.signing.outputs.ready == 'true'
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew bundleRelease --no-daemon
 
-      # Publish release downloads on main instead of consuming Actions artifact storage.
-      # Pull-request runs still compile and validate, but do not upload large artifacts.
+      - name: Skip release bundle until upload key is configured
+        if: steps.signing.outputs.ready != 'true'
+        run: echo "Release bundle packaging is intentionally blocked until the protected upload key is configured."
+
+      - name: Verify signed release AAB and upload certificate
+        if: steps.signing.outputs.ready == 'true'
+        working-directory: android
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          bundle="app/build/outputs/bundle/release/app-release.aab"
+          test -s "$bundle"
+          jarsigner -verify -verbose -certs "$bundle" > "$RUNNER_TEMP/aab-signature-check.txt" 2>&1
+          grep -q 'jar verified.' "$RUNNER_TEMP/aab-signature-check.txt"
+
+          keystore_fingerprint="$(
+            keytool -list -v \
+              -keystore "$ANDROID_KEYSTORE_PATH" \
+              -alias "$ANDROID_KEY_ALIAS" \
+              -storepass:env ANDROID_KEYSTORE_PASSWORD \
+              -keypass:env ANDROID_KEY_PASSWORD |
+            sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1 |
+            tr -d ':' | tr '[:lower:]' '[:upper:]'
+          )"
+          bundle_fingerprint="$(
+            keytool -printcert -jarfile "$bundle" -v |
+            sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1 |
+            tr -d ':' | tr '[:lower:]' '[:upper:]'
+          )"
+          if [[ -z "$keystore_fingerprint" || -z "$bundle_fingerprint" ]]; then
+            echo "::error::Could not read the SHA-256 upload certificate fingerprint."
+            exit 1
+          fi
+          if [[ "$keystore_fingerprint" != "$bundle_fingerprint" ]]; then
+            echo "::error::The AAB signer certificate does not match the configured upload key."
+            exit 1
+          fi
+          echo "AAB signature verified; signer certificate matches the configured upload key."
+
+      - name: Reject unsigned AAB from release publishing
+        if: steps.signing.outputs.ready != 'true'
+        run: |
+          echo "Unsigned AAB is retained only as a CI build check; it is excluded from published release files."
+
+      # Do not attach an AAB to a GitHub release unless its signature passed.
+      - name: Prepare release download list
+        if: github.ref == 'refs/heads/main'
+        id: release_files
+        shell: bash
+        run: |
+          {
+            echo 'files<<EOF'
+            echo 'android/app/build/outputs/apk/debug/app-debug.apk'
+            if [[ "${{ steps.signing.outputs.ready }}" == "true" ]]; then
+              echo 'android/app/build/outputs/bundle/release/app-release.aab'
+            fi
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish Android downloads
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-build-${{ github.run_number }}
-          name: Master Minds Android Build ${{ github.run_number }}
-          files: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-            android/app/build/outputs/bundle/release/app-release.aab
+          name: Master Minds Android CI Build ${{ github.run_number }}
+          body: |
+            The Android App Bundle is attached only when its upload-key signature has passed CI verification.
+            If no AAB is attached, signing credentials have not yet been configured.
+          files: ${{ steps.release_files.outputs.files }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove temporary Android upload keystore
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/master-minds-upload-key.jks"
+          rm -f "$RUNNER_TEMP/aab-signature-check.txt"
 
   public-route-smoke:
     runs-on: ubuntu-latest
