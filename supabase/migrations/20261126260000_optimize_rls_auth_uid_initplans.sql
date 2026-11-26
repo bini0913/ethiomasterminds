@@ -23,7 +23,7 @@ begin
     if v_using is not null then
       v_using := regexp_replace(
         v_using,
-        '\\([[:space:]]*select[[:space:]]+auth\\.uid\\(\\)([[:space:]]+as[[:space:]]+uid)?[[:space:]]*\\)',
+        '[(][[:space:]]*select[[:space:]]+auth[.]uid[(][)]([[:space:]]+as[[:space:]]+uid)?[[:space:]]*[)]',
         'auth.uid()',
         'gi'
       );
@@ -33,7 +33,7 @@ begin
     if v_check is not null then
       v_check := regexp_replace(
         v_check,
-        '\\([[:space:]]*select[[:space:]]+auth\\.uid\\(\\)([[:space:]]+as[[:space:]]+uid)?[[:space:]]*\\)',
+        '[(][[:space:]]*select[[:space:]]+auth[.]uid[(][)]([[:space:]]+as[[:space:]]+uid)?[[:space:]]*[)]',
         'auth.uid()',
         'gi'
       );
