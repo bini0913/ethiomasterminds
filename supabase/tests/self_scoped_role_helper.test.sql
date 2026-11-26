@@ -36,6 +36,7 @@ declare
   v_caller_id uuid := gen_random_uuid();
   v_target_id uuid := gen_random_uuid();
 begin
+  perform set_config('request.jwt.claim.role', 'service_role', true);
   perform set_config('request.jwt.claim.sub', v_caller_id::text, true);
   insert into auth.users (id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
   values (
@@ -46,6 +47,7 @@ begin
     now(), now()
   );
 
+  perform set_config('request.jwt.claim.role', 'service_role', true);
   perform set_config('request.jwt.claim.sub', v_target_id::text, true);
   insert into auth.users (id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
   values (
@@ -60,6 +62,7 @@ begin
   values (v_target_id, 'admin'::public.app_role)
   on conflict (user_id, role) do nothing;
 
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
   perform set_config('request.jwt.claim.sub', v_caller_id::text, true);
 
   if not public.has_role(v_caller_id, 'student'::public.app_role) then
@@ -73,6 +76,7 @@ begin
   end if;
 
   perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
 end;
 $$;
 select ok(true, 'runtime regression proves public role checks are self-only while trusted internal checks remain available');
