@@ -2,12 +2,16 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(10);
 
-select has_table('public', 'notification_preferences', 'notification preferences table exists');
 select ok(
-  has_column('public', 'notification_preferences', 'user_id')
-  and has_column('public', 'notification_preferences', 'daily_reminders')
-  and has_column('public', 'notification_preferences', 'quiet_start')
-  and has_column('public', 'notification_preferences', 'reminder_hour'),
+  to_regclass('public.notification_preferences') is not null,
+  'notification preferences table exists'
+);
+select ok(
+  (select count(*) = 4
+   from information_schema.columns
+   where table_schema = 'public'
+     and table_name = 'notification_preferences'
+     and column_name in ('user_id', 'daily_reminders', 'quiet_start', 'reminder_hour')),
   'notification preferences has the client contract columns'
 );
 select ok(
