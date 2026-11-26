@@ -42,7 +42,7 @@ select ok(position('for update' in lower(pg_get_functiondef('public.set_my_age_a
 select ok(position('old.age < 18' in pg_get_functiondef('public.validate_guardian_consent()'::regprocedure)) > 0 and position('auth.uid() = old.id' in pg_get_functiondef('public.validate_guardian_consent()'::regprocedure)) > 0, 'the profile trigger blocks direct self-service age escalation and age clearing');
 select ok(exists (select 1 from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'profiles_guardian_consent_guard' and not tgisinternal), 'the guardian and age-integrity trigger remains installed');
 
-do $
+do $$
 declare
   v_child_id uuid := gen_random_uuid();
   v_child_email text := 'age-guard-' || gen_random_uuid()::text || '@example.test';
@@ -86,7 +86,7 @@ begin
   end if;
   perform set_config('request.jwt.claim.sub', '', true);
 end;
-$;
+$$;
 select ok(true, 'runtime regression proves a minor cannot self-promote through the RPC or direct profile updates, including age clearing');
 
 select * from finish();
