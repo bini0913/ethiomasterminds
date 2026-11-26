@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(33);
+select plan(37);
 
 select ok(to_regclass('public.guardian_consent_requests') is not null, 'guardian consent request records exist');
 select ok((select relrowsecurity from pg_class where oid = 'public.guardian_consent_requests'::regclass), 'guardian consent requests have RLS enabled');
@@ -25,7 +25,6 @@ select ok(has_function_privilege('authenticated', 'public.update_guardian_child_
 select ok(has_function_privilege('authenticated', 'public.revoke_guardian_consent(uuid)', 'EXECUTE'), 'parent accounts can revoke consent through the guarded RPC');
 select ok(has_function_privilege('authenticated', 'public.is_current_user_feature_enabled(text)', 'EXECUTE'), 'learners can check their own parent-approved feature access');
 select ok(not has_function_privilege('authenticated', 'public.is_user_feature_enabled(uuid,text)', 'EXECUTE'), 'clients cannot inspect another account parent-control flags');
-
 select ok(has_function_privilege('authenticated', 'public.set_my_age_and_guardian(integer,text)', 'EXECUTE'), 'existing learners can complete age and guardian details through the guarded RPC');
 select ok(has_function_privilege('authenticated', 'public.can_view_lobby_author(uuid)', 'EXECUTE'), 'lobby visibility is decided by a safe relationship-aware helper');
 select ok(exists (select 1 from pg_trigger where tgrelid = 'public.lobby_messages'::regclass and tgname = 'guardian_lobby_chat_guard' and not tgisinternal), 'under-18 public lobby chat is blocked by a database trigger');
@@ -34,9 +33,13 @@ select ok(exists (select 1 from pg_trigger where tgrelid = 'public.multiplayer_i
 select ok(exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'lobby_messages' and policyname = 'authenticated can view lobby' and qual like '%can_view_lobby_author%'), 'lobby message visibility is relationship-aware');
 select ok(not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'chat_group_members' and policyname = 'group admin manages members'), 'broad group-member access policy is removed');
 select ok(position('account_status' in pg_get_functiondef('public.has_role(uuid,public.app_role)'::regprocedure)) > 0, 'role checks deny suspended and banned accounts');
-
 select ok(position('A separate, valid parent or guardian email is required' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'existing learner age updates require a separate guardian email when under 18');
 select ok(position('guardian_consent_status' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'age updates explicitly reset guardian approval state');
+
+select ok(position('v_existing_age < 18 and p_age >= 18' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'self-service age RPC blocks an existing minor from changing age to adult');
+select ok(position('A learner cannot change an existing under-18 age to 18 or older through self-service' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'age escalation returns a clear authorization error');
+select ok(position('auth.uid() = old.id' in pg_get_functiondef('public.validate_guardian_consent()'::regprocedure)) > 0, 'profile trigger blocks direct self-service age escalation');
+select ok(position('old.age < 18' in pg_get_functiondef('public.validate_guardian_consent()'::regprocedure)) > 0, 'profile trigger checks the previously recorded minor age');
 
 select * from finish();
 rollback;
