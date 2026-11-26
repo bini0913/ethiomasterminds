@@ -165,10 +165,18 @@ Deno.serve(async (req) => {
         if (error || !event) return json({ error: "Call invitation not found or not authorized" }, 403);
         authorized = [{ recipient_id: event.user_id, notification_kind: payload.kind, notification_title: "Incoming study call", notification_body: "Your friend invited you to a Study Mode call.", notification_data: { room_id: event.room_id, route: "/study-mode", action: "call_invite" } }];
       }
-      const recipientId = authorized[0]?.recipient_id;
-      const { data: blocked, error: blockCheckError } = await admin.rpc("are_users_blocked", { p_user_a: callerId, p_user_b: recipientId });
-      if (blockCheckError) return json({ error: "Could not verify social safety settings" }, 500);
-      if (blocked) return json({ skipped: true, reason: "users_blocked", sent: 0 }, 200);
+      // Filter every recipient before persisting inbox events. Group messages
+      // can target many members, so checking only the first recipient is unsafe.
+      const eligibleRecipients: typeof authorized = [];
+      for (const item of authorized) {
+        const { data: blocked, error: blockCheckError } = await admin.rpc("are_users_blocked", {
+          p_user_a: callerId,
+          p_user_b: item.recipient_id,
+        });
+        if (blockCheckError) return json({ error: "Could not verify social safety settings" }, 500);
+        if (!blocked) eligibleRecipients.push(item);
+      }
+      authorized = eligibleRecipients;
     }
 
     if (!authorized.length) return json({ sent: 0, attempted: 0, reason: "no_authorized_recipients" });
