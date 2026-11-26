@@ -70,7 +70,16 @@ const Leaderboard = () => {
     }
   };
 
-  const loadClassCompetition = async () => setClassRows(await fetchClassCompetitionLeaderboard(12));
+  const loadClassCompetition = async () => {
+    try {
+      setClassRows(await fetchClassCompetitionLeaderboard(12));
+    } catch (error) {
+      // Class rankings are an optional view. Do not turn a secondary RPC or
+      // school-membership issue into a failure for the global leaderboard.
+      console.warn("Class competition leaderboard unavailable", error);
+      setClassRows([]);
+    }
+  };
 
   const loadFollowing = async () => {
     if (!user?.id) return;
