@@ -47,6 +47,7 @@ declare
   v_child_id uuid := gen_random_uuid();
   v_child_email text := 'age-guard-' || gen_random_uuid()::text || '@example.test';
 begin
+  perform set_config('request.jwt.claim.role', 'service_role', true);
   perform set_config('request.jwt.claim.sub', v_child_id::text, true);
   insert into auth.users (id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
   values (
@@ -86,6 +87,7 @@ begin
     raise exception 'Minor age was cleared despite the escalation guard';
   end if;
   perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
 end;
 $$;
 select ok(true, 'runtime regression proves a minor cannot self-promote through the RPC or direct profile updates, including age clearing');
