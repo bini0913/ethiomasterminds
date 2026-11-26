@@ -367,10 +367,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         });
         if (error) throw error;
         if (message?.id) {
-          const { error: pushError } = await supabase.functions.invoke("send-push-notification", {
+          void supabase.functions.invoke("send-push-notification", {
             body: { kind: "group_message", event_id: message.id },
+          }).then(({ error: pushError }) => {
+            if (pushError) console.warn("Group message push could not be confirmed:", pushError.message);
+          }).catch((pushError) => {
+            console.warn("Group message push request failed:", pushError);
           });
-          if (pushError) console.warn("Group message push could not be confirmed:", pushError.message);
         }
       } catch (err: any) {
         console.error('Error sending message:', err);
