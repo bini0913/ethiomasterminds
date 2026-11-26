@@ -52,10 +52,62 @@ for (const route of requiredRoutes) {
   if (!routes.includes(route)) failures.push(`Required portal route is not registered: ${route}`);
 }
 
+
+const protectedRouteRoleContracts = new Map([
+  ["/guardian-controls", ["parent"]],
+  ["/teacher", ["teacher"]],
+  ["/admin/early-content", ["admin", "extreme_admin"]],
+  ["/admin", ["admin", "extreme_admin"]],
+  ["/student-dashboard", ["student"]],
+  ["/school/manager", ["manager"]],
+  ["/school/admin", ["teacher", "finance"]],
+  ["/school/teacher", ["teacher"]],
+  ["/school/parent", ["parent"]],
+  ["/school/finance", ["finance"]],
+  ["/school/student", ["student"]],
+  ["/school/super-admin", ["super_admin"]],
+  ["/manager", ["manager"]],
+  ["/manager-dashboard", ["manager"]],
+  ["/finance", ["finance", "extreme_admin"]],
+  ["/super-admin", ["super_admin"]],
+  ["/root-control-portal-9xA7", ["extreme_admin"]],
+  ["/migrate-supabase", ["extreme_admin"]],
+]);
+
+for (const [route, expectedRoles] of protectedRouteRoleContracts) {
+  const routeStart = app.indexOf(`path="${route}"`);
+  if (routeStart < 0) {
+    failures.push(`Role-protected route is not registered: ${route}`);
+    continue;
+  }
+
+  const routeEnd = app.indexOf("</Route>", routeStart);
+  const routeBlock = routeEnd >= 0
+    ? app.slice(routeStart, routeEnd + "</Route>".length)
+    : app.slice(routeStart, app.indexOf("/>", routeStart) + 2);
+
+  if (!routeBlock.includes("<ProtectedRoute")) {
+    failures.push(`Role-protected route lacks ProtectedRoute: ${route}`);
+    continue;
+  }
+
+  const allowedRolesMatch = routeBlock.match(/allowedRoles=\{(\[[\s\S]*?\])\}/);
+  if (!allowedRolesMatch) {
+    failures.push(`Protected route has no explicit allowedRoles: ${route}`);
+    continue;
+  }
+
+  const actualRoles = [...allowedRolesMatch[1].matchAll(/["']([a-z_]+)["']/g)].map((match) => match[1]).sort();
+  const expectedSorted = [...expectedRoles].sort();
+  if (actualRoles.length !== expectedSorted.length || actualRoles.some((role, index) => role !== expectedSorted[index])) {
+    failures.push(`Role guard mismatch for ${route}: expected [${expectedSorted.join(", ")}], found [${actualRoles.join(", ")}]`);
+  }
+}
+
 if (failures.length) {
-  console.error("Route registry check failed:");
+  console.error("Route registry and role-guard checks failed:");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exitCode = 1;
 } else {
-  console.log(`Route registry check passed: ${routes.length} routes, ${localImports.size} local App dependencies, and all required portal routes.`);
+  console.log(`Route registry and role-guard checks passed: ${routes.length} routes, ${localImports.size} local App dependencies, and ${protectedRouteRoleContracts.size} exact role-guard contracts.`);
 }
