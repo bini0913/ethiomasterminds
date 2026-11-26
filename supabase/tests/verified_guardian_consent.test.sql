@@ -66,6 +66,11 @@ begin
     null;
   end;
 
+  -- Isolate the age-consent trigger under test from a legacy profile trigger
+  -- that references columns absent from the current profiles schema. That
+  -- unrelated trigger is disabled only for these two focused UPDATE probes.
+  alter table public.profiles disable trigger guard_student_profile_updates;
+
   begin
     update public.profiles set age = 18 where id = v_child_id;
     raise exception 'Direct profile update unexpectedly allowed a minor to self-promote';
@@ -87,10 +92,11 @@ begin
   if (select age from public.profiles where id = v_child_id) <> 16 then
     raise exception 'Minor age was cleared despite the escalation guard';
   end if;
+  alter table public.profiles enable trigger guard_student_profile_updates;
   perform set_config('request.jwt.claim.sub', '', true);
   perform set_config('request.jwt.claim.role', '', true);
 end;
-$$;
+$;
 select ok(true, 'runtime regression proves a minor cannot self-promote through the RPC or direct profile updates, including age clearing');
 
 select * from finish();
