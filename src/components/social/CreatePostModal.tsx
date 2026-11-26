@@ -70,13 +70,13 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-sm flex flex-col">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-background/95 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="create-post-title">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
         <Button variant="ghost" size="sm" onClick={onClose}>
           <X className="h-5 w-5" />
         </Button>
-        <span className="font-semibold text-sm">Create Post</span>
+        <span id="create-post-title" className="text-sm font-semibold">Create Post</span>
         <Button
           size="sm"
           className="rounded-full px-5"
@@ -101,6 +101,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onClose }) => {
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              maxLength={500}
               placeholder="What's on your mind? Share wins, study tips, or ask for help..."
               className="min-h-[120px] resize-none border-0 bg-transparent p-0 text-sm focus-visible:ring-0 shadow-none"
               autoFocus

@@ -2,18 +2,18 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, UserPlus, Check, X, Users, Home, MessageCircle, Search, Loader2, Swords, Gamepad2, BookOpen } from "lucide-react";
+import { Send, UserPlus, Check, X, MessageCircle, Search, Loader2, Swords, Gamepad2, BookOpen } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useFriends, FriendRequest } from "@/context/FriendsContext";
 import { useUser, UserProfile } from "@/context/UserContext";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
-import BackButton from "@/components/ui/BackButton";
 import ReportButton from "@/components/social/ReportButton";
 import BlockUserButton from "@/components/social/BlockUserButton";
 import { motion } from "framer-motion";
 import { getUserTier } from "@/lib/getUserTier";
+import CommunityFrame from "@/components/community/CommunityFrame";
 
 const Friends: React.FC = () => {
   const { user } = useUser();
@@ -194,26 +194,7 @@ const Friends: React.FC = () => {
   };
 
   return (
-    <div className={upperStudent ? "tier-upper min-h-screen bg-background text-foreground flex flex-col" : "min-h-screen bg-background flex flex-col"}>
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <BackButton />
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Users className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold">Friends</h1>
-              <p className="truncate text-xs text-muted-foreground">{friends.length} friends • {onlineFriends.length} online now</p>
-            </div>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => navigate("/social")} className="gap-2">
-            <Home className="h-4 w-4" /> Social
-          </Button>
-        </div>
-      </header>
-
+    <CommunityFrame title="Friends" eyebrow="Your people" description="Keep up with your network, respond to requests, and start a focused conversation." className={upperStudent ? "tier-upper" : undefined}>
       <div className="flex flex-col flex-1 md:flex-row">
         {/* Sidebar */}
         <div className="w-full md:w-1/3 border-r">
@@ -562,7 +543,7 @@ const Friends: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+    </CommunityFrame>
   );
 };
 
