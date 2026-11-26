@@ -144,13 +144,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .from('group_messages')
         .select('*')
         .eq('group_id', groupId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
 
       // Get sender profiles
-      const senderIds = [...new Set((data || []).map(m => m.sender_id))];
+      const latestFirstMessages = [...(data || [])].reverse();
+      const senderIds = [...new Set(latestFirstMessages.map(m => m.sender_id))];
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, name, avatar')
@@ -158,7 +159,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
-      const enrichedMessages: GroupMessage[] = (data || []).map(m => ({
+      const enrichedMessages: GroupMessage[] = latestFirstMessages.map(m => ({
         ...m,
         message_type: m.message_type as GroupMessage['message_type'],
         sender_name: profileMap.get(m.sender_id)?.name || 'Unknown',
