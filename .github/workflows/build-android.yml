@@ -129,13 +129,18 @@ jobs:
           grep -q 'android.permission.RECORD_AUDIO' "${merged_manifest}"
           grep -q 'android.permission.POST_NOTIFICATIONS' "${merged_manifest}"
 
-      - name: Build release Android App Bundle
+      - name: Build signed release Android App Bundle
+        if: steps.signing.outputs.ready == 'true'
         working-directory: android
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew bundleRelease --no-daemon
+
+      - name: Skip release bundle until upload key is configured
+        if: steps.signing.outputs.ready != 'true'
+        run: echo "Release bundle packaging is intentionally blocked until the protected upload key is configured."
 
       - name: Verify signed release AAB and upload certificate
         if: steps.signing.outputs.ready == 'true'
