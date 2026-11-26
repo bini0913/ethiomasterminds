@@ -91,3 +91,6 @@
 - [ ] **Responsive accessibility baseline** — Community surfaces work at phone, tablet, and desktop widths without horizontal overflow; controls have visible focus, semantic labels, touch-safe targets, Escape-safe dialogs/sheets, reduced-motion behavior, and safe-area-aware bottom navigation clearance.
 - [ ] **Async and safety states** — Loading, empty, error/retry, disabled/pending, terms-consent, report, and block states are visible and truthful; no authenticated Supabase or realtime behavior is claimed unless it was actually exercised with an authenticated account.
 - [ ] **Validation and PR delivery** — Run `npm run typecheck`, `npm run lint`, `npm run build`, and `git diff --check`; review changed source against the preserved route/context/RPC contracts; push a focused Community branch and open a PR without merging it automatically.
+
+
+- [ ] **Feed interaction quality slice** — Community post cards use separated responsive glass surfaces; like, reaction, follow, save, and comment actions prevent duplicate submissions and show only the affected action's pending state; comments show loading, empty, error/retry, and submit states; the composer validates image input, cleans previews, enforces the 500-character limit, and preserves CommunityTermsContext and existing Supabase mutations.
