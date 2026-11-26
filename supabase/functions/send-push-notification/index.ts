@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const raw = Deno.env.get("FCM_SERVICE_ACCOUNT_JSON");
-    if (!url || !anonKey || !serviceRoleKey || !raw) return json({ error: "Push service configuration missing" }, 503);
+    if (!url || !anonKey || !serviceRoleKey) return json({ error: "Push service configuration missing" }, 503);
 
     const bearer = auth.replace(/^Bearer\s+/i, "");
     const userClient = createClient(url, anonKey, {
@@ -121,6 +121,24 @@ Deno.serve(async (req) => {
     }
 
     if (!authorized.length) return json({ sent: 0, attempted: 0, reason: "no_authorized_recipients" });
+
+    // Persist every authorized notification before checking push preferences or
+    // device availability. The in-app inbox must work even when push is off.
+    const { data: inboxEvents, error: inboxError } = await admin.from("notification_events").insert(
+      authorized.map((item) => ({
+        user_id: item.recipient_id,
+        kind: item.notification_kind,
+        title: item.notification_title.trim(),
+        body: item.notification_body.trim(),
+        data: { ...(item.notification_data ?? {}), delivery_status: "not_attempted", sent: 0, attempted: 0, failure_count: 0 },
+      })),
+    ).select("id,user_id");
+    if (inboxError) return json({ error: "Could not record notification inbox event" }, 500);
+    const eventIdByRecipient = new Map((inboxEvents ?? []).map((event) => [event.user_id, event.id]));
+
+    if (!raw) {
+      return json({ error: "Push service configuration missing; inbox event was recorded", inbox_recorded: true, sent: 0, attempted: 0 }, 503);
+    }
     const serviceAccount = JSON.parse(raw) as ServiceAccount;
     const accessToken = await getGoogleAccessToken(serviceAccount);
     let sent = 0;
@@ -131,12 +149,19 @@ Deno.serve(async (req) => {
       const title = item.notification_title.trim();
       const body = item.notification_body.trim();
       if (!title || !body || title.length > 160 || body.length > 2000) return json({ error: "Notification payload is invalid" }, 400);
-      const { data: prefs, error: prefsError } = await admin.from("notification_preferences").select("enabled,social,game_invites").eq("user_id", item.recipient_id).maybeSingle();
+      const { data: prefs, error: prefsError } = await admin.from("notification_preferences").select("enabled,social,game_invites,new_content,study_reminders").eq("user_id", item.recipient_id).maybeSingle();
       if (prefsError) return json({ error: "Could not read notification preferences" }, 500);
-      if (prefs?.enabled === false) continue;
-      if (socialKinds.has(item.notification_kind) && prefs?.social === false) continue;
-      if (item.notification_kind === "study_call_invite" && prefs?.game_invites === false) continue;
-      const { data: devices, error: devicesError } = await admin.from("notification_devices").select("id,token").eq("user_id", item.recipient_id).eq("enabled", true);
+      const preferenceKey = item.notification_kind === "study_call_invite"
+        ? "game_invites"
+        : socialKinds.has(item.notification_kind)
+          ? "social"
+          : item.notification_kind === "quiz_assignment"
+            ? "study_reminders"
+            : "new_content";
+      const preferenceDisabled = prefs?.enabled === false || prefs?.[preferenceKey] === false;
+      const { data: devices, error: devicesError } = preferenceDisabled
+        ? { data: [], error: null }
+        : await admin.from("notification_devices").select("id,token").eq("user_id", item.recipient_id).eq("enabled", true);
       if (devicesError) return json({ error: "Could not read notification devices" }, 500);
       const itemAttempted = devices?.length ?? 0;
       const itemFailures: Array<{ device_id: string; status: number; token_invalid: boolean }> = [];
@@ -156,15 +181,27 @@ Deno.serve(async (req) => {
         failures.push(failure);
         itemFailures.push(failure);
       }
-      const { error: eventError } = await admin.from("notification_events").insert({
-        user_id: item.recipient_id,
-        kind: item.notification_kind,
-        title,
-        body,
-        data: { ...(item.notification_data ?? {}), delivery_status: itemSent > 0 ? "sent" : "failed", sent: itemSent, attempted: itemAttempted, failure_count: itemFailures.length },
+      const eventId = eventIdByRecipient.get(item.recipient_id);
+      if (!eventId) return json({ error: "Notification inbox event could not be resolved", sent, attempted, failures }, 500);
+      const deliveryStatus = preferenceDisabled
+        ? "skipped_preferences"
+        : itemSent > 0
+          ? "sent"
+          : itemAttempted === 0
+            ? "no_eligible_devices"
+            : "failed";
+      const { error: eventUpdateError } = await admin.from("notification_events").update({
+        data: {
+          ...(item.notification_data ?? {}),
+          delivery_status: deliveryStatus,
+          delivery_reason: preferenceDisabled ? "recipient_preference_disabled" : itemAttempted === 0 ? "no_enabled_device" : null,
+          sent: itemSent,
+          attempted: itemAttempted,
+          failure_count: itemFailures.length,
+        },
         delivered_at: itemSent > 0 ? new Date().toISOString() : null,
-      });
-      if (eventError) return json({ error: "Could not record notification delivery", sent, attempted, failures, event_recorded: false }, 500);
+      }).eq("id", eventId);
+      if (eventUpdateError) return json({ error: "Could not update notification delivery status", sent, attempted, failures, inbox_recorded: true }, 500);
     }
 
     return json({ sent, attempted, failures, event_recorded: true });
