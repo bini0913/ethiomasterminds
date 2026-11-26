@@ -13,7 +13,7 @@ select ok(has_function_privilege('authenticated','public.is_student_in_class(uui
 select ok(not has_function_privilege('anon','public.is_teacher_of_class(uuid,uuid)','execute'),'anon cannot query teacher-class relationships');
 select ok(has_function_privilege('authenticated','public.is_teacher_of_class(uuid,uuid)','execute'),'authenticated callers retain teacher-class checks');
 select ok(not has_function_privilege('anon','public.is_teacher_of_student(uuid,uuid)','execute'),'anon cannot query teacher-student relationships');
-select ok(has_function_privilege('authenticated','public.is_teacher_of_student(uuid,uuid)','execute'),'authenticated callers retain teacher-student checks');
+select ok(not has_function_privilege('authenticated','public.is_teacher_of_student(uuid,uuid)','execute'),'unused direct teacher-student relationship oracle is not callable by authenticated users');
 select ok(not has_function_privilege('anon','public.manager_get_dashboard()','execute'),'anon cannot call manager dashboard RPC');
 select ok(has_function_privilege('authenticated','public.manager_get_dashboard()','execute'),'authenticated manager dashboard remains available behind its role guard');
 select ok(not has_function_privilege('anon','public.manager_list_users(text,public.app_role,integer,integer)','execute'),'anon cannot call manager user listing');
