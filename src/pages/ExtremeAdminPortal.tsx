@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldAlert, AlertTriangle, RefreshCw, UserCog, Coins, Shield, Lock, Building2, Crown, Users, FileText, Wallet, Search, BookOpen, MessageSquare } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, UserCog, Coins, Shield, Lock, Building2, Crown, Users, FileText, Wallet, Search, BookOpen, MessageSquare } from 'lucide-react';
 import { useUser, UserRole } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import AdminCommandCenterShell from '@/components/admin/AdminCommandCenterShell';
 
 type AccountStatus = 'active' | 'suspended' | 'banned';
 
@@ -90,6 +91,7 @@ const ExtremeAdminPortal: React.FC = () => {
   const [userSearch, setUserSearch] = useState('');
   const [aiDailyLimit, setAiDailyLimit] = useState('50');
   const [superAdminUsers, setSuperAdminUsers] = useState<PortalUser[]>([]);
+  const [activeTab, setActiveTab] = useState('users');
 
   const [targetUserId, setTargetUserId] = useState('');
   const [targetRole, setTargetRole] = useState<UserRole>('student');
@@ -415,6 +417,20 @@ const ExtremeAdminPortal: React.FC = () => {
     { label: 'Online now', value: dashboard.active_users_10m ?? 0, Icon: Shield },
   ];
 
+  const navItems = [
+    { key: 'users', label: 'User management', description: 'Accounts and access', icon: UserCog },
+    { key: 'super-admin', label: 'Super Admin', description: 'Owner-controlled authority', icon: Crown },
+    { key: 'schools', label: 'Schools', description: 'Global school oversight', icon: Building2 },
+    { key: 'reports', label: 'Reports', description: 'Moderation queue', icon: FileText },
+    { key: 'deletion-requests', label: 'Deletion requests', description: 'Privacy operations', icon: ShieldAlert },
+    { key: 'finance', label: 'Finance', description: 'Read-only totals', icon: Wallet },
+    { key: 'economy', label: 'Rewards & economy', description: 'Virtual balances', icon: Coins },
+    { key: 'content', label: 'Content', description: 'Books and posts', icon: BookOpen },
+    { key: 'chats', label: 'Chats', description: 'Archive review', icon: MessageSquare },
+    { key: 'system', label: 'System settings', description: 'Platform controls', icon: Shield },
+    { key: 'logs', label: 'Audit logs', description: 'Privileged history', icon: FileText },
+  ];
+
   if (!isExtremeAdmin) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center px-6">
@@ -436,25 +452,8 @@ const ExtremeAdminPortal: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="bg-white border-slate-200 text-slate-900">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-slate-900">
-              <ShieldAlert className="h-5 w-5" /> Extreme Admin · Global platform control
-            </CardTitle>
-            <CardDescription className="text-slate-600">
-              Global oversight of the Super Admin, every school, individual accounts, platform settings, and audited operations.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-
-        <div className="flex items-center gap-3">
-          <Button onClick={refreshAll} variant="outline" disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
-          {loading && <p className="text-sm text-slate-500">Syncing live platform data...</p>}
-        </div>
+    <AdminCommandCenterShell roleLabel="Extreme Admin" eyebrow="Master Minds platform control" title="Global platform control" description="Owner-only oversight of accounts, schools, moderation, economy, finance, settings, and audit history." activeKey={activeTab} navItems={navItems} onNavigate={setActiveTab} onRefresh={() => void refreshAll()} refreshing={loading}>
+      <div className="mb-6 flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-cyan-300"><ShieldAlert className="h-5 w-5" /></div><div><p className="text-sm font-semibold text-slate-900">Owner-only platform authority</p><p className="mt-1 text-sm leading-relaxed text-slate-600">Sensitive changes are confirmed here, authorized by the backend, and written to the appropriate audit path.</p></div></div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {overviewMetrics.map(({ label, value, Icon }) => (
             <Card key={label} className="border-slate-200 bg-white">
@@ -469,7 +468,7 @@ const ExtremeAdminPortal: React.FC = () => {
           ))}
         </div>
 
-        <Tabs defaultValue="users" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="bg-white border border-slate-200 flex h-auto flex-wrap">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="super-admin">Super Admin</TabsTrigger>
@@ -938,8 +937,7 @@ const ExtremeAdminPortal: React.FC = () => {
           <AlertTriangle className="h-4 w-4" />
           This workspace is intentionally restricted to the single Extreme Admin account.
         </div>
-      </div>
-    </div>
+    </AdminCommandCenterShell>
   );
 };
 
