@@ -41,6 +41,7 @@ begin
       ('00000000-0000-4000-8000-000000000013'::uuid, 'ci-high-school-director@masterminds.test', 'ci_high_school_director', 'CI High School Director', 30, null, null, 'teacher'::public.app_role)
     ) as users(id,email,username,display_name,age,grade,guardian_email,role)
   loop
+    perform set_config('request.jwt.claim.role', 'service_role', true);
     perform set_config('request.jwt.claim.sub', v_user.id::text, true);
 
     insert into auth.users (
@@ -73,7 +74,8 @@ begin
     insert into public.user_roles(user_id, role) values (v_user.id, v_user.role);
   end loop;
 
-  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claim.role', 'service_role', true);
+  perform set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000004', true);
 
   select id into v_network_id
     from public.school_networks
@@ -173,7 +175,9 @@ begin
     '00000000-0000-4000-8000-000000000004'
   )
   on conflict do nothing;
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claim.role', '', true);
 end;
-$$;
+$;
 
 commit;
