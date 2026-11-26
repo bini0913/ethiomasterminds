@@ -70,6 +70,12 @@ begin
     )
     on conflict (id) do nothing;
 
+    -- Fresh local migrations may provision a bootstrap Extreme Admin. The
+    -- CI fixture transfers that singleton role to its known test principal.
+    if v_user.role = 'extreme_admin'::public.app_role then
+      delete from public.user_roles where role = 'extreme_admin'::public.app_role;
+    end if;
+
     delete from public.user_roles where user_id = v_user.id;
     insert into public.user_roles(user_id, role) values (v_user.id, v_user.role);
   end loop;
