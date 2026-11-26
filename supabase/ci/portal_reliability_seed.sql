@@ -46,6 +46,8 @@ begin
 
     insert into auth.users (
       instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      confirmation_token, recovery_token, email_change_token_new, email_change,
+      email_change_token_current, reauthentication_token,
       raw_app_meta_data, raw_user_meta_data, created_at, updated_at
     )
     values (
@@ -56,6 +58,7 @@ begin
       v_user.email,
       crypt('Local-Only-Test-Password-2026!', gen_salt('bf')),
       now(),
+      '', '', '', '', '', '',
       '{"provider":"email","providers":["email"]}'::jsonb,
       jsonb_build_object(
         'name', v_user.display_name,
@@ -74,6 +77,12 @@ begin
           email = excluded.email,
           encrypted_password = excluded.encrypted_password,
           email_confirmed_at = excluded.email_confirmed_at,
+          confirmation_token = excluded.confirmation_token,
+          recovery_token = excluded.recovery_token,
+          email_change_token_new = excluded.email_change_token_new,
+          email_change = excluded.email_change,
+          email_change_token_current = excluded.email_change_token_current,
+          reauthentication_token = excluded.reauthentication_token,
           raw_app_meta_data = excluded.raw_app_meta_data,
           raw_user_meta_data = excluded.raw_user_meta_data,
           updated_at = now();
