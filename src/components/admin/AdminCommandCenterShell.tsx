@@ -22,24 +22,7 @@ type AdminCommandCenterShellProps = {
 const Navigation = ({ items, activeKey, onNavigate, compact = false }: { items: AdminNavItem[]; activeKey: string; onNavigate: (key: string) => void; compact?: boolean }) => (
   <nav aria-label="Administration sections" className={cn("space-y-1", compact && "grid gap-1")}> 
     {items.map(({ key, label, description, icon: Icon }) => (
-      <button
-        key={key}
-        type="button"
-        aria-current={activeKey === key ? "page" : undefined}
-        onClick={() => onNavigate(key)}
-        className={cn(
-          "group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-          activeKey === key ? "bg-primary text-primary-foreground shadow-sm" : "text-slate-300 hover:bg-white/10 hover:text-white",
-          compact && "min-h-12 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-950",
-          compact && activeKey === key && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
-        )}
-      >
-        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">{label}</span>
-          {description && <span className={cn("mt-0.5 block truncate text-[11px]", activeKey === key && !compact ? "text-primary-foreground/70" : compact ? "text-slate-500" : "text-slate-400")}>{description}</span>}
-        </span>
-      </button>
+      compact ? <SheetClose key={key} asChild><button type="button" aria-current={activeKey === key ? "page" : undefined} onClick={() => onNavigate(key)} className={cn("group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", activeKey === key ? "bg-primary text-primary-foreground shadow-sm" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950", "min-h-12", activeKey === key && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")}><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{label}</span>{description && <span className={cn("mt-0.5 block truncate text-[11px]", activeKey === key ? "text-primary-foreground/70" : "text-slate-500")}>{description}</span>}</span></button></SheetClose> : <button key={key} type="button" aria-current={activeKey === key ? "page" : undefined} onClick={() => onNavigate(key)} className={cn("group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", activeKey === key ? "bg-primary text-primary-foreground shadow-sm" : "text-slate-300 hover:bg-white/10 hover:text-white")}><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{label}</span>{description && <span className={cn("mt-0.5 block truncate text-[11px]", activeKey === key ? "text-primary-foreground/70" : "text-slate-400")}>{description}</span>}</span></button>
     ))}
   </nav>
 );
@@ -67,7 +50,7 @@ export default function AdminCommandCenterShell({ roleLabel, eyebrow = "Master M
                 <SheetTrigger asChild><Button variant="outline" size="icon" className="h-10 w-10 lg:hidden" aria-label="Open administration navigation"><Menu className="h-4 w-4" /></Button></SheetTrigger>
                 <SheetContent side="left" className="w-[min(88vw,22rem)] bg-white p-0 text-slate-950">
                   <SheetHeader className="border-b border-slate-200 px-5 py-5 text-left"><SheetTitle>Administration</SheetTitle><SheetDescription>Choose a workspace section.</SheetDescription></SheetHeader>
-                  <div className="p-4"><Navigation items={navItems} activeKey={activeKey} onNavigate={handleNavigate} compact /><SheetClose className="sr-only">Close navigation</SheetClose></div>
+                  <div className="p-4"><Navigation items={navItems} activeKey={activeKey} onNavigate={handleNavigate} compact /></div>
                 </SheetContent>
               </Sheet>
               <div className="min-w-0"><p className="hidden text-[11px] font-bold uppercase tracking-[.16em] text-primary sm:block">{eyebrow}</p><h1 className="truncate font-display text-xl font-bold sm:text-2xl">{title}</h1><p className="hidden max-w-2xl truncate text-sm text-slate-500 md:block">{description}</p></div>
