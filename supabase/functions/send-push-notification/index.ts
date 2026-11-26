@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     const payload = await req.json() as Payload;
     if (!payload.kind || payload.kind.length > 100) return json({ error: "kind is required" }, 400);
 
-    const socialKinds = new Set(["friend_request", "direct_message", "study_call_invite"]);
+    const socialKinds = new Set(["friend_request", "direct_message", "study_call_invite", "multiplayer_invite"]);
     let authorized: AuthorizedNotification[] = [];
 
     if (!socialKinds.has(payload.kind)) {
@@ -109,6 +109,24 @@ Deno.serve(async (req) => {
         const { data: profile } = await admin.from("profiles").select("name,username").eq("id", callerId).maybeSingle();
         const senderName = profile?.name || profile?.username || "Your friend";
         authorized = [{ recipient_id: event.receiver_id, notification_kind: payload.kind, notification_title: senderName, notification_body: String(event.content ?? "").slice(0, 180), notification_data: { message_id: event.id, sender_id: event.sender_id, route: "/friends", action: "reply" } }];
+      } else if (payload.kind === "multiplayer_invite") {
+        const { data: event, error } = await admin.from("multiplayer_invites")
+          .select("id,room_id,sender_id,receiver_id,status,expires_at")
+          .eq("id", payload.event_id)
+          .eq("sender_id", callerId)
+          .eq("status", "pending")
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle();
+        if (error || !event) return json({ error: "Multiplayer invitation not found or not authorized" }, 403);
+        const { data: profile } = await admin.from("profiles").select("name,username").eq("id", callerId).maybeSingle();
+        const senderName = profile?.name || profile?.username || "A student";
+        authorized = [{
+          recipient_id: event.receiver_id,
+          notification_kind: payload.kind,
+          notification_title: "Multiplayer invitation",
+          notification_body: senderName + " invited you to a multiplayer match.",
+          notification_data: { invite_id: event.id, room_id: event.room_id, route: "/multiplayer", action: "multiplayer_invite" },
+        }];
       } else {
         const { data: event, error } = await admin.from("study_call_participants").select("room_id,user_id,invited_by,status").eq("room_id", payload.event_id).eq("invited_by", callerId).eq("status", "invited").maybeSingle();
         if (error || !event) return json({ error: "Call invitation not found or not authorized" }, 403);
@@ -158,7 +176,7 @@ Deno.serve(async (req) => {
       if (!title || !body || title.length > 160 || body.length > 2000) return json({ error: "Notification payload is invalid" }, 400);
       const { data: prefs, error: prefsError } = await admin.from("notification_preferences").select("enabled,social,game_invites,new_content,study_reminders").eq("user_id", item.recipient_id).maybeSingle();
       if (prefsError) return json({ error: "Could not read notification preferences" }, 500);
-      const preferenceKey = item.notification_kind === "study_call_invite"
+      const preferenceKey = ["study_call_invite", "multiplayer_invite"].includes(item.notification_kind)
         ? "game_invites"
         : socialKinds.has(item.notification_kind)
           ? "social"
