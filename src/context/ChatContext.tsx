@@ -79,8 +79,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // Get groups where user is a member
-      const { data: memberData, error: memberError } = await supabase
-        .from('chat_group_members')
+      const { data: memberData, error: memberError } = await (supabase.from('chat_group_members') as any)
         .select('group_id,last_read_at')
         .eq('user_id', user.id);
 
