@@ -24,7 +24,7 @@ begin
     new.guardian_email := nullif(lower(trim(coalesce(new.guardian_email, ''))), '');
     if new.guardian_email is not null then
       select lower(u.email) into v_child_email from auth.users u where u.id = new.id;
-      if new.guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
+      if new.guardian_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
          or new.guardian_email = v_child_email then
         raise exception 'A separate, valid parent or guardian email is required';
       end if;
