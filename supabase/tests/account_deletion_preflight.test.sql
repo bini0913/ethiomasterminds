@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(9);
+select plan(11);
 
 select ok(
   to_regprocedure('public.extreme_admin_preflight_account_deletion(uuid)') is not null,
@@ -23,6 +23,23 @@ select ok(
   'deletion preflight is read-only and marked stable'
 );
 select ok(
+  (select proconfig @> array['search_path=pg_catalog, public']
+     from pg_proc
+    where oid = 'public.extreme_admin_preflight_account_deletion(uuid)'::regprocedure),
+  'deletion preflight pins its search path'
+);
+select ok(
+  not exists (
+    select 1
+      from pg_proc p,
+           lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+     where p.oid = 'public.extreme_admin_preflight_account_deletion(uuid)'::regprocedure
+       and acl.grantee = 0
+       and acl.privilege_type = 'EXECUTE'
+  ),
+  'the preflight is not executable by PUBLIC'
+);
+select ok(
   position('public.has_role(v_actor, ''extreme_admin''::public.app_role)' in pg_get_functiondef('public.extreme_admin_preflight_account_deletion(uuid)'::regprocedure)) > 0,
   'only an Extreme Admin can run the preflight'
 );
@@ -37,7 +54,7 @@ select ok(
 select ok(
   position('deletion_executed' in pg_get_functiondef('public.extreme_admin_preflight_account_deletion(uuid)'::regprocedure)) > 0
   and position('retention_review_required' in pg_get_functiondef('public.extreme_admin_preflight_account_deletion(uuid)'::regprocedure)) > 0,
-  'preflight clearly distinguishes technical blockers from mandatory manual retention review and never deletes data'
+  'preflight distinguishes technical blockers from mandatory manual retention review and reports that no deletion was executed'
 );
 
 select * from finish();
