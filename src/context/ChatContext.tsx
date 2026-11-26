@@ -359,13 +359,19 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id || !currentGroup || !content.trim()) return;
     await runWithCommunityTerms(async () => {
       try {
-        const { error } = await supabase.rpc('send_group_message', {
+        const { data: message, error } = await supabase.rpc('send_group_message', {
           p_group_id: currentGroup.id,
           p_content: content.trim(),
           p_message_type: 'text',
           p_reply_to_id: replyToId || null,
         });
         if (error) throw error;
+        if (message?.id) {
+          const { error: pushError } = await supabase.functions.invoke("send-push-notification", {
+            body: { kind: "group_message", event_id: message.id },
+          });
+          if (pushError) console.warn("Group message push could not be confirmed:", pushError.message);
+        }
       } catch (err: any) {
         console.error('Error sending message:', err);
         toast.error(err?.message || 'Failed to send message');
