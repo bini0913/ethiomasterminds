@@ -83,6 +83,20 @@ jobs:
       - name: Test signed-in portals on desktop and mobile
         run: npx playwright test tests/e2e/signed-in-portals.spec.ts --project=desktop-chromium --project=mobile-chromium
 
+
+      - name: Diagnose Supabase Auth failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Auth containers ==="
+          docker ps --format '{{.Names}} {{.Image}}' | grep -E 'auth|supabase' || true
+          AUTH_CONTAINER="$(docker ps --format '{{.Names}}' | grep -E 'supabase_auth|auth' | head -n 1)"
+          if [ -n "$AUTH_CONTAINER" ]; then
+            docker logs "$AUTH_CONTAINER" --tail 250 2>&1 || true
+          fi
+          echo "=== Auth fixture records ==="
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "select u.id,u.email,u.instance_id,u.aud,u.role,u.email_confirmed_at,i.provider,i.provider_id,i.identity_data from auth.users u left join auth.identities i on i.user_id=u.id where u.email like 'ci-%@masterminds.test' order by u.email;"
+
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup
