@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(15);
+SELECT plan(19);
 
 SELECT has_column('public', 'notification_events', 'read_at', 'notification events have persistent read state');
 SELECT has_column('public', 'notification_events', 'archived_at', 'notification events have persistent archive state');
@@ -55,6 +55,21 @@ SELECT ok(
 SELECT ok(
   EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'notification_events'),
   'notification inbox updates are available to Realtime'
+);
+
+SELECT has_column('public', 'chat_group_members', 'last_read_at', 'group members persist their last-read cursor');
+SELECT ok(
+  has_column_privilege('authenticated', 'public.chat_group_members', 'last_read_at', 'UPDATE'),
+  'members can update only their own group read cursor'
+);
+SELECT ok(
+  to_regprocedure('public.get_my_group_unread_counts()') IS NOT NULL,
+  'group unread count RPC exists'
+);
+SELECT ok(
+  has_function_privilege('authenticated', 'public.get_my_group_unread_counts()', 'execute')
+    AND NOT has_function_privilege('anon', 'public.get_my_group_unread_counts()', 'execute'),
+  'group unread count RPC is authenticated-only'
 );
 
 SELECT * FROM finish();
