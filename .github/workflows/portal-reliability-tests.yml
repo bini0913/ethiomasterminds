@@ -63,6 +63,7 @@ jobs:
           eval "$(supabase status -o env)"
           echo "VITE_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
           echo "VITE_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "CI_SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
           echo "DB_URL=$DB_URL" >> "$GITHUB_ENV"
           echo "CI_TEST_PASSWORD=Local-Only-Test-Password-2026!" >> "$GITHUB_ENV"
 
@@ -73,6 +74,9 @@ jobs:
 
       - name: Seed isolated school and role fixtures
         run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/ci/portal_reliability_seed.sql
+
+      - name: Set deterministic local Auth credentials
+        run: node scripts/ci/refresh-portal-test-auth.mjs
 
       - name: Install Playwright test runner
         run: npm install --no-save --legacy-peer-deps @playwright/test
