@@ -166,7 +166,10 @@ const AppChrome = ({ children }: { children: React.ReactNode }) => {
   const { user, isAuthenticated, logout } = useUser();
 
   // Standalone role workspaces provide their own navigation and layout.
-  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/") || location.pathname === "/super-admin" || location.pathname.startsWith("/school/")) return <>{children}</>;
+  // Standalone role workspaces own their complete navigation. Wrapping them in
+  // the generic app chrome adds a misleading history back button and a second
+  // header above the portal's real control plane.
+  if (location.pathname === "/finance" || location.pathname.startsWith("/finance/") || location.pathname === "/super-admin" || location.pathname.startsWith("/school/") || location.pathname === "/root-control-portal-9xA7") return <>{children}</>;
 
   if (!isAuthenticated || !user) return <>{children}</>;
   if (user.role === "student" && getUserTier(user.grade) === "upper") return <UpperTierStudioShell>{children}</UpperTierStudioShell>;

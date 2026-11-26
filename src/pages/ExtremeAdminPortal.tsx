@@ -3,7 +3,7 @@ import { ArrowRight, ShieldAlert, AlertTriangle, UserCog, Coins, Shield, Lock, B
 import { useUser, UserRole } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import AdminCommandCenterShell from '@/components/admin/AdminCommandCenterShell';
+import { useNavigate } from 'react-router-dom';
 
 type AccountStatus = 'active' | 'suspended' | 'banned';
 
@@ -70,7 +71,8 @@ type FinanceOverview = {
 };
 
 const ExtremeAdminPortal: React.FC = () => {
-  const { user } = useUser();
+  const { user, logout } = useUser();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [dashboard, setDashboard] = useState<Record<string, number>>({});
@@ -418,18 +420,18 @@ const ExtremeAdminPortal: React.FC = () => {
   ];
 
   const navItems = [
-    { key: 'overview', label: 'Overview', description: 'Platform pulse and queues', icon: LayoutDashboard },
-    { key: 'users', label: 'User management', description: 'Accounts and access', icon: UserCog },
-    { key: 'super-admin', label: 'Super Admin', description: 'Owner-controlled authority', icon: Crown },
-    { key: 'schools', label: 'Schools', description: 'Global school oversight', icon: Building2 },
-    { key: 'reports', label: 'Reports', description: 'Moderation queue', icon: FileText },
-    { key: 'deletion-requests', label: 'Deletion requests', description: 'Privacy operations', icon: ShieldAlert },
-    { key: 'finance', label: 'Finance', description: 'Read-only totals', icon: Wallet },
-    { key: 'economy', label: 'Rewards & economy', description: 'Virtual balances', icon: Coins },
-    { key: 'content', label: 'Content', description: 'Books and posts', icon: BookOpen },
-    { key: 'chats', label: 'Chats', description: 'Archive review', icon: MessageSquare },
-    { key: 'system', label: 'System settings', description: 'Platform controls', icon: Shield },
-    { key: 'logs', label: 'Audit logs', description: 'Privileged history', icon: FileText },
+    { key: 'overview', label: 'Overview', description: 'Platform pulse and queues', section: 'Command center', icon: LayoutDashboard },
+    { key: 'users', label: 'User management', description: 'Accounts and access', section: 'People & access', icon: UserCog },
+    { key: 'super-admin', label: 'Super Admin', description: 'Owner-controlled authority', section: 'People & access', icon: Crown },
+    { key: 'schools', label: 'Schools', description: 'Global school oversight', section: 'People & access', icon: Building2 },
+    { key: 'reports', label: 'Reports', description: 'Moderation queue', section: 'Trust & privacy', icon: FileText },
+    { key: 'deletion-requests', label: 'Deletion requests', description: 'Privacy operations', section: 'Trust & privacy', icon: ShieldAlert },
+    { key: 'finance', label: 'Finance', description: 'Read-only totals', section: 'Platform', icon: Wallet },
+    { key: 'economy', label: 'Rewards & economy', description: 'Virtual balances', section: 'Platform', icon: Coins },
+    { key: 'content', label: 'Content', description: 'Books and posts', section: 'Platform', icon: BookOpen },
+    { key: 'chats', label: 'Chats', description: 'Archive review', section: 'Platform', icon: MessageSquare },
+    { key: 'system', label: 'System settings', description: 'Platform controls', section: 'Control plane', icon: Shield },
+    { key: 'logs', label: 'Audit logs', description: 'Privileged history', section: 'Control plane', icon: FileText },
   ];
 
   if (!isExtremeAdmin) {
@@ -453,24 +455,9 @@ const ExtremeAdminPortal: React.FC = () => {
   }
 
   return (
-    <AdminCommandCenterShell roleLabel="Extreme Admin" eyebrow="Master Minds platform control" title="Global platform control" description="Owner-only oversight of accounts, schools, moderation, economy, finance, settings, and audit history." activeKey={activeTab} navItems={navItems} onNavigate={setActiveTab} onRefresh={() => void refreshAll()} refreshing={loading}>
+    <AdminCommandCenterShell roleLabel="Extreme Admin" eyebrow="Master Minds platform control" title="Global platform control" description="Owner-only oversight of accounts, schools, moderation, economy, finance, settings, and audit history." activeKey={activeTab} navItems={navItems} onNavigate={setActiveTab} onRefresh={() => void refreshAll()} refreshing={loading} onLogout={async () => { await logout(); navigate('/', { replace: true }); }}>
       <div className="mb-6 flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-cyan-300"><ShieldAlert className="h-5 w-5" /></div><div><p className="text-sm font-semibold text-slate-900">Owner-only platform authority</p><p className="mt-1 text-sm leading-relaxed text-slate-600">Sensitive changes are confirmed here, authorized by the backend, and written to the appropriate audit path.</p></div></div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="flex h-auto w-full gap-1 overflow-x-auto border border-slate-200 bg-white p-1 lg:hidden">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="super-admin">Super Admin</TabsTrigger>
-            <TabsTrigger value="schools">Schools</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="deletion-requests">Deletion Requests</TabsTrigger>
-            <TabsTrigger value="finance">Finance</TabsTrigger>
-            <TabsTrigger value="economy">Economy</TabsTrigger>
-            <TabsTrigger value="content">Content</TabsTrigger>
-            <TabsTrigger value="chats">Chats</TabsTrigger>
-            <TabsTrigger value="system">System Settings</TabsTrigger>
-            <TabsTrigger value="logs">Audit Logs</TabsTrigger>
-          </TabsList>
-
           <TabsContent value="overview" className="space-y-6">
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
               {overviewMetrics.map(({ label, value, Icon, tone }) => {
