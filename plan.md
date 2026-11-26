@@ -172,6 +172,7 @@ Replace the existing `/library` presentation and information architecture with a
 - Use a desktop rail and compact mobile section switcher. Put management actions behind contextual menus.
 - Keep the PDF reader as a full-screen dialog. Expose AI and annotation tools only when requested, with a responsive stacked layout.
 - Preserve accessible Radix dialogs, visible focus, labels, keyboard operation, reduced-motion behavior, and safe-area spacing.
+- Use a restrained Apple-inspired glass system for navigation, cards, dialogs, and reader tools: translucent semantic surfaces, subtle blur, crisp borders, soft depth, and opaque fallbacks when backdrop filtering is unavailable.
 
 ## Design direction
 - **Movement:** quiet editorial reading studio.
