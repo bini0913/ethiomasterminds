@@ -23,6 +23,7 @@ const ChildSafetyStandards = lazy(() => import("./pages/ChildSafetyStandards"));
 const EnhancedSettings = lazy(() => import("./pages/EnhancedSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
+const NotificationInboxPage = lazy(() => import("./pages/NotificationInboxPage"));
 const StorePage = lazy(() => import("./pages/StorePage"));
 const TeacherPortal = lazy(() => import("./pages/TeacherPortal"));
 const AdminPortal = lazy(() => import("./pages/AdminPortal"));
@@ -134,6 +135,7 @@ const appRouteTitles: Array<{ prefix: string; title: string }> = [
   { prefix: "/avatar-creator", title: "Avatar" },
   { prefix: "/profile/", title: "Profile" },
   { prefix: "/notifications", title: "Notifications" },
+  { prefix: "/notification-settings", title: "Notification Settings" },
   { prefix: "/enhanced-settings", title: "Settings" },
   { prefix: "/settings", title: "Settings" },
   { prefix: "/revision", title: "Revision" },
@@ -379,7 +381,8 @@ const App = () => (
                               <Route path="/profile/:userId" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><UserProfilePage /></ProtectedRoute>} />
                               <Route path="/friends" element={<EarlyTierRestrictedRoute><Friends /></EarlyTierRestrictedRoute>} />
                               <Route path="/settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><Settings /></ProtectedRoute>} />
-                              <Route path="/notifications" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
+                              <Route path="/notifications" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><NotificationInboxPage /></ProtectedRoute>} />
+                              <Route path="/notification-settings" element={<ProtectedRoute allowedRoles={["student", "teacher", "admin", "manager", "extreme_admin"]}><NotificationSettingsPage /></ProtectedRoute>} />
                               <Route path="/chat" element={<EarlyTierRestrictedRoute><Chat /></EarlyTierRestrictedRoute>} />
                               <Route path="/teacher" element={<ProtectedRoute allowedRoles={["teacher"]}><SchoolAwareLegacyPortalRoute roles={["teacher"]}><TeacherPortal /></SchoolAwareLegacyPortalRoute></ProtectedRoute>} />
                               <Route
