@@ -26,7 +26,7 @@ const resolveLocalImport = (specifier) => {
 };
 
 const localImports = new Set();
-const importPattern = /(?:from\\s*|import\\s*\\()\\s*["']([^"']+)["']/g;
+const importPattern = /(?:from\s*|import\s*\()\s*["']([^"']+)["']/g;
 for (const match of app.matchAll(importPattern)) {
   const specifier = match[1];
   if (specifier.startsWith("./") || specifier.startsWith("@/")) localImports.add(specifier);
@@ -35,7 +35,7 @@ for (const specifier of localImports) {
   if (!resolveLocalImport(specifier)) failures.push(`Missing local App dependency: ${specifier}`);
 }
 
-const routes = [...app.matchAll(/<Route\\s+path=["']([^"']+)["']/g)].map((match) => match[1]);
+const routes = [...app.matchAll(/<Route\s+path=["']([^"']+)["']/g)].map((match) => match[1]);
 const duplicateRoutes = routes.filter((route, index) => routes.indexOf(route) !== index);
 for (const route of new Set(duplicateRoutes)) failures.push(`Duplicate route registration: ${route}`);
 
@@ -104,7 +104,7 @@ for (const [route, expectedRoles] of protectedRouteRoleContracts) {
     continue;
   }
 
-  const allowedRolesMatch = routeBlock.match(/allowedRoles=\\{(\\[[\\s\\S]*?\\])\\}/);
+  const allowedRolesMatch = routeBlock.match(/allowedRoles=\{(\[[\s\S]*?\])\}/);
   if (!allowedRolesMatch) {
     failures.push(`Protected route has no explicit allowedRoles: ${route}`);
     continue;
