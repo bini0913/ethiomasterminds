@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(37);
+select plan(38);
 
 select ok(to_regclass('public.guardian_consent_requests') is not null, 'guardian consent request records exist');
 select ok((select relrowsecurity from pg_class where oid = 'public.guardian_consent_requests'::regclass), 'guardian consent requests have RLS enabled');
@@ -41,6 +41,53 @@ select ok(position('v_existing_age < 18 and p_age >= 18' in pg_get_functiondef('
 select ok(position('for update' in lower(pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure))) > 0, 'age classification is locked while the learner update is checked');
 select ok(position('old.age < 18' in pg_get_functiondef('public.validate_guardian_consent()'::regprocedure)) > 0 and position('auth.uid() = old.id' in pg_get_functiondef('public.validate_guardian_consent()'::regprocedure)) > 0, 'the profile trigger blocks direct self-service age escalation and age clearing');
 select ok(exists (select 1 from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'profiles_guardian_consent_guard' and not tgisinternal), 'the guardian and age-integrity trigger remains installed');
+
+do $
+declare
+  v_child_id uuid := gen_random_uuid();
+  v_child_email text := 'age-guard-' || gen_random_uuid()::text || '@example.test';
+begin
+  insert into auth.users (id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+  values (
+    v_child_id, 'authenticated', 'authenticated', v_child_email, '',
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    jsonb_build_object('name', 'Age Guard Test', 'username', 'ageguard' || left(replace(v_child_id::text, '-', ''), 10), 'age', '16', 'guardian_email', 'guardian@example.test'),
+    now(), now()
+  );
+
+  perform set_config('request.jwt.claim.sub', v_child_id::text, true);
+  begin
+    perform public.set_my_age_and_guardian(18, null);
+    raise exception 'RPC unexpectedly allowed a minor to self-promote';
+  exception when sqlstate '42501' then
+    null;
+  end;
+
+  begin
+    update public.profiles set age = 18 where id = v_child_id;
+    raise exception 'Direct profile update unexpectedly allowed a minor to self-promote';
+  exception when sqlstate '42501' then
+    null;
+  end;
+
+  if (select age from public.profiles where id = v_child_id) <> 16 then
+    raise exception 'Minor age changed despite the escalation guard';
+  end if;
+
+  begin
+    update public.profiles set age = null where id = v_child_id;
+    raise exception 'Direct profile update unexpectedly allowed a minor to clear their age';
+  exception when sqlstate '42501' then
+    null;
+  end;
+
+  if (select age from public.profiles where id = v_child_id) <> 16 then
+    raise exception 'Minor age was cleared despite the escalation guard';
+  end if;
+  perform set_config('request.jwt.claim.sub', '', true);
+end;
+$;
+select ok(true, 'runtime regression proves a minor cannot self-promote through the RPC or direct profile updates, including age clearing');
 
 select * from finish();
 rollback;
