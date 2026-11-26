@@ -78,6 +78,28 @@ begin
           raw_user_meta_data = excluded.raw_user_meta_data,
           updated_at = now();
 
+    -- Direct auth.users inserts do not create the matching email identity.
+    -- GoTrue expects the identity row when resolving email/password accounts.
+    insert into auth.identities (
+      user_id, provider_id, identity_data, provider, created_at, updated_at
+    )
+    values (
+      v_user.id,
+      v_user.id::text,
+      jsonb_build_object(
+        'sub', v_user.id::text,
+        'email', v_user.email,
+        'email_verified', true
+      ),
+      'email',
+      now(),
+      now()
+    )
+    on conflict (provider_id, provider) do update
+      set user_id = excluded.user_id,
+          identity_data = excluded.identity_data,
+          updated_at = now();
+
     -- Refreshing the password on conflict is intentional: local migrations
     -- may already have provisioned these deterministic CI identities. The
     -- test credentials must be identical on every clean or partially seeded run.
