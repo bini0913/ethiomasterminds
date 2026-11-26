@@ -154,8 +154,104 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return true;
 }
 
-export async function registerForPushNotifications(userId: string): Promise<boolean> {
-  if (!isNative()) return false;
+declare global {
+  interface Window {
+    firebase?: any;
+    __masterMindsWebPushMessageListener?: boolean;
+  }
+}
+
+const firebaseWebConfig = () => {
+  const env = import.meta.env as unknown as Record<string, string | undefined>;
+  const config = {
+    apiKey: env.VITE_FIREBASE_API_KEY,
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: env.VITE_FIREBASE_APP_ID,
+  };
+  const vapidKey = env.VITE_FIREBASE_VAPID_KEY;
+  return Object.values(config).every(Boolean) && vapidKey ? { config, vapidKey } : null;
+};
+
+async function loadFirebaseCompatScript(fileName: string): Promise<void> {
+  const id = `master-minds-${fileName.replace(/[^a-z0-9]/gi, "-")}`;
+  const existing = document.getElementById(id) as HTMLScriptElement | null;
+  if (existing?.dataset.loaded === "true") return;
+  if (existing) {
+    await new Promise<void>((resolve, reject) => {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Firebase web SDK failed to load")), { once: true });
+    });
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.id = id;
+    script.src = `https://www.gstatic.com/firebasejs/10.14.1/${fileName}`;
+    script.async = true;
+    script.onload = () => { script.dataset.loaded = "true"; resolve(); };
+    script.onerror = () => reject(new Error("Firebase web SDK failed to load"));
+    document.head.appendChild(script);
+  });
+}
+
+async function registerWebPushNotifications(requestPermission: boolean): Promise<boolean> {
+  if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) return false;
+  const firebaseSetup = firebaseWebConfig();
+  if (!firebaseSetup) {
+    console.warn("Web push is not configured: Firebase web app values and the VAPID public key are required.");
+    return false;
+  }
+
+  let permission = Notification.permission;
+  if (permission === "default" && requestPermission) permission = await Notification.requestPermission();
+  if (permission !== "granted") return false;
+
+  try {
+    await loadFirebaseCompatScript("firebase-app-compat.js");
+    await loadFirebaseCompatScript("firebase-messaging-compat.js");
+    const firebase = window.firebase;
+    if (!firebase?.messaging) return false;
+    if (firebase.apps.length === 0) firebase.initializeApp(firebaseSetup.config);
+    if (firebase.messaging.isSupported && !(await firebase.messaging.isSupported())) return false;
+
+    const workerUrl = new URL("/firebase-messaging-sw.js", window.location.origin);
+    Object.entries(firebaseSetup.config).forEach(([key, value]) => {
+      if (value) workerUrl.searchParams.set(key, value);
+    });
+    const serviceWorkerRegistration = await navigator.serviceWorker.register(workerUrl.toString(), { scope: "/" });
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({
+      vapidKey: firebaseSetup.vapidKey,
+      serviceWorkerRegistration,
+    });
+    if (!token) return false;
+
+    const { error } = await db.rpc("upsert_notification_device" as any, {
+      p_token: token,
+      p_platform: "web",
+      p_app_version: "web",
+      p_enabled: true,
+    });
+    if (error) throw error;
+
+    if (!window.__masterMindsWebPushMessageListener) {
+      messaging.onMessage((payload: unknown) => {
+        window.dispatchEvent(new CustomEvent("master-minds-notification", { detail: payload }));
+      });
+      window.__masterMindsWebPushMessageListener = true;
+    }
+    return true;
+  } catch (error) {
+    console.warn("Web push registration could not finish:", error);
+    return false;
+  }
+}
+
+export async function registerForPushNotifications(userId: string, requestBrowserPermission = false): Promise<boolean> {
+  if (!isNative()) return registerWebPushNotifications(requestBrowserPermission);
   await ensureNotificationChannel();
   if (!(await requestNotificationPermission())) return false;
 
@@ -203,7 +299,6 @@ export async function registerForPushNotifications(userId: string): Promise<bool
 }
 
 export async function unregisterPushNotifications(userId: string): Promise<void> {
-  if (!isNative()) return;
   const { data, error } = await db
     .from("notification_devices" as any)
     .select("token")
