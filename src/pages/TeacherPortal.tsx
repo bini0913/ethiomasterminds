@@ -495,9 +495,7 @@ const TeacherPortal: React.FC = () => {
 
   const fetchQuizQuestions = async (quizId: string) => {
     const { data, error } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('quiz_id', quizId)
+      .rpc('get_teacher_quiz_questions', { p_quiz_id: quizId })
       .order('order_index');
     
     if (!error && data) {
