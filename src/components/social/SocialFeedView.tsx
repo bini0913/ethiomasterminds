@@ -7,7 +7,7 @@ import { useUser } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Heart, MessageCircle, Share2, Bookmark, Send, Loader2,
-  ThumbsUp, PartyPopper, Flame, Trophy, Swords
+  ThumbsUp, PartyPopper, Flame, Trophy, Swords, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -62,6 +62,7 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
   const { runWithCommunityTerms } = useCommunityTerms();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [newComments, setNewComments] = useState<Record<string, string>>({});
@@ -70,6 +71,7 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
   const lastTapRef = useRef<Record<string, number>>({});
 
   const loadPosts = useCallback(async () => {
+    setLoadError(null);
     try {
       // Load following list
       let followingIds: string[] = [];
@@ -137,13 +139,11 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
         if (r.user_id === user?.id) reactionsMap[r.post_id].userReaction = r.reaction_type;
       });
 
-      // Index comments count — batch via grouping
+      // Index comment counts from the single batched result.
       const commentsCountMap: Record<string, number> = {};
-      // We need per-post counts, do individual counts
-      await Promise.all(postIds.map(async (pid: string) => {
-        const { count } = await supabase.from('social_post_comments').select('id', { count: 'exact', head: true }).eq('post_id', pid);
-        commentsCountMap[pid] = count || 0;
-      }));
+      (commentsRes.data || []).forEach((comment: any) => {
+        commentsCountMap[comment.post_id] = (commentsCountMap[comment.post_id] || 0) + 1;
+      });
 
       const savedSet = new Set((savedRes.data || []).map((s: any) => s.post_id));
       const followingSet = new Set(followingIds);
@@ -196,6 +196,7 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
       setPosts(mapped);
     } catch (error) {
       console.error('Error loading posts:', error);
+      setLoadError('The community feed could not be loaded. Check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -409,6 +410,18 @@ const SocialFeedView: React.FC<SocialFeedViewProps> = ({ mode }) => {
             <Skeleton className="h-48 w-full rounded-xl" />
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-1 rounded-2xl border border-destructive/25 bg-destructive/5 px-5 py-12 text-center">
+        <p className="text-sm font-semibold text-foreground">We could not refresh this view.</p>
+        <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{loadError}</p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => { setIsLoading(true); void loadPosts(); }}>
+          <RefreshCw className="mr-2 h-4 w-4" /> Try again
+        </Button>
       </div>
     );
   }
