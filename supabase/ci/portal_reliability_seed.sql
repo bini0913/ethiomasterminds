@@ -16,7 +16,7 @@ declare
   v_middle_membership uuid := '70000000-0000-4000-8000-000000000012';
   v_high_membership uuid := '70000000-0000-4000-8000-000000000013';
   v_school_id uuid := '20000000-0000-4000-8000-000000000001';
-  v_network_id uuid := '10000000-0000-4000-8000-000000000001';
+  v_network_id uuid;
   v_year_id uuid := '30000000-0000-4000-8000-000000000001';
   v_section_id uuid := '40000000-0000-4000-8000-000000000001';
   v_term_id uuid := '50000000-0000-4000-8000-000000000001';
@@ -75,9 +75,24 @@ begin
 
   perform set_config('request.jwt.claim.sub', '', true);
 
-  insert into public.school_networks(id, network_key, name, created_by)
-  values (v_network_id, false, 'Master Minds CI Network', '00000000-0000-4000-8000-000000000004')
-  on conflict (id) do nothing;
+  select id into v_network_id
+    from public.school_networks
+   where network_key = true
+   order by created_at
+   limit 1;
+
+  if v_network_id is null then
+    v_network_id := '10000000-0000-4000-8000-000000000001';
+    insert into public.school_networks(id, network_key, name, created_by)
+    values (v_network_id, true, 'Master Minds CI Network', '00000000-0000-4000-8000-000000000004')
+    on conflict do nothing;
+
+    select id into v_network_id
+      from public.school_networks
+     where network_key = true
+     order by created_at
+     limit 1;
+  end if;
 
   insert into public.schools(id, name, school_code, status, created_by, network_id)
   values (v_school_id, 'Master Minds CI Test School', 'CITEST01', 'active', '00000000-0000-4000-8000-000000000004', v_network_id)
