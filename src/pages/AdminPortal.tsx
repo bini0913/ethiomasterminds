@@ -607,17 +607,19 @@ const AdminPortal: React.FC = () => {
 
     // Recipient selection and payload construction are database-owned. The
     // client submits only the announcement source record.
-    const sentCount = await sendRemoteNotifications([{
+    const delivery = await sendRemoteNotifications([{
       sourceId: createdAnnouncement.id,
       kind: 'admin_announcement',
     }]);
 
     setLoading(false);
-    toast.success(
-      sentCount > 0
-        ? `Announcement sent! ${sentCount} device(s) notified.`
-        : 'Announcement saved. No recipient device was available for push notification.',
-    );
+    if (!delivery.inboxRecorded) {
+      toast.info('Announcement saved, but recipient inbox delivery could not be confirmed.');
+    } else if (delivery.attemptedDevices === 0) {
+      toast.success("Announcement saved to recipients' inboxes. Push was not attempted because no eligible device or preference allowed it.");
+    } else {
+      toast.success(`Announcement saved to recipients' inboxes. FCM accepted push on ${delivery.sentDevices} of ${delivery.attemptedDevices} attempted device(s).`);
+    }
     pushNotification(`Announcement: ${announcementForm.title}`);
     logAction('Created announcement', announcementForm.title);
     setAnnouncementForm({ title: '', content: '', target_type: 'all' });
