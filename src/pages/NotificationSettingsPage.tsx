@@ -55,15 +55,19 @@ export default function NotificationSettingsPage() {
     if (!user?.id || !prefs) return;
     const previous = prefs;
     const next = { ...prefs, [key]: value };
+    // Start the browser permission prompt from the user gesture before network awaits.
+    const registrationPromise = key === "enabled" && value
+      ? registerForPushNotifications(user.id, true)
+      : null;
     setPrefs(next);
     setSaving(true);
     try {
       await saveNotificationPreferences(user.id, next);
       if (key === "enabled") {
         if (value) {
-          const registered = await registerForPushNotifications(user.id);
+          const registered = await registrationPromise;
           await scheduleDailyLearningReminder(next);
-          if (!registered) toast.info("Preferences saved. Push permission or device registration is not available here yet; your in-app inbox remains available.");
+          if (!registered) toast.info("Preferences saved, but this device could not be registered for push. Check browser permission and Firebase web configuration; your in-app inbox remains available.");
         } else {
           await unregisterPushNotifications(user.id);
           await cancelDailyLearningReminder();
