@@ -38,7 +38,6 @@ async function authenticateAs(page: Page, email: string) {
     ({ key, session }) => window.localStorage.setItem(key, JSON.stringify(session)),
     { key: storageKey, session: data.session },
   );
-  await client.auth.signOut();
 }
 
 for (const portal of portals) {
