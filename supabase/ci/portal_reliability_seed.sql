@@ -68,8 +68,17 @@ begin
       now(),
       now()
     )
-    on conflict (id) do nothing;
+    on conflict (id) do update
+      set email = excluded.email,
+          encrypted_password = excluded.encrypted_password,
+          email_confirmed_at = excluded.email_confirmed_at,
+          raw_app_meta_data = excluded.raw_app_meta_data,
+          raw_user_meta_data = excluded.raw_user_meta_data,
+          updated_at = now();
 
+    -- Refreshing the password on conflict is intentional: local migrations
+    -- may already have provisioned these deterministic CI identities. The
+    -- test credentials must be identical on every clean or partially seeded run.
     -- Fresh local migrations may provision a bootstrap Extreme Admin. The
     -- CI fixture transfers that singleton role to its known test principal.
     if v_user.role = 'extreme_admin'::public.app_role then
