@@ -57,6 +57,7 @@ begin
     now(), now()
   );
 
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
   perform set_config('request.jwt.claim.sub', v_child_id::text, true);
   begin
     perform public.set_my_age_and_guardian(18, null);
