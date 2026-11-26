@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     const payload = await req.json() as Payload;
     if (!payload.kind || payload.kind.length > 100) return json({ error: "kind is required" }, 400);
 
-    const socialKinds = new Set(["friend_request", "direct_message", "study_call_invite", "multiplayer_invite"]);
+    const socialKinds = new Set(["friend_request", "direct_message", "group_message", "study_call_invite", "multiplayer_invite"]);
     let authorized: AuthorizedNotification[] = [];
 
     if (!socialKinds.has(payload.kind)) {
@@ -127,6 +127,39 @@ Deno.serve(async (req) => {
           notification_body: senderName + " invited you to a multiplayer match.",
           notification_data: { invite_id: event.id, room_id: event.room_id, route: "/multiplayer", action: "multiplayer_invite" },
         }];
+      } else if (payload.kind === "group_message") {
+        const { data: message, error: messageError } = await admin.from("group_messages")
+          .select("id,group_id,sender_id,content")
+          .eq("id", payload.event_id)
+          .eq("sender_id", callerId)
+          .maybeSingle();
+        if (messageError || !message) return json({ error: "Group message not found or not authorized" }, 403);
+        const { data: members, error: membersError } = await admin.from("chat_group_members")
+          .select("user_id")
+          .eq("group_id", message.group_id)
+          .neq("user_id", callerId);
+        if (membersError) return json({ error: "Could not resolve group recipients" }, 500);
+        const { data: group } = await admin.from("chat_groups").select("name").eq("id", message.group_id).maybeSingle();
+        const { data: profile } = await admin.from("profiles").select("name,username").eq("id", callerId).maybeSingle();
+        const senderName = profile?.name || profile?.username || "A student";
+        const preview = String(message.content ?? "").trim().slice(0, 160);
+        const title = (group?.name ? "New message in " + group.name : "New group message").slice(0, 180);
+        authorized = [];
+        for (const member of members ?? []) {
+          const { data: featureEnabled, error: featureError } = await admin.rpc("is_user_feature_enabled", {
+            p_user_id: member.user_id,
+            p_feature: "direct_messages",
+          });
+          if (featureError) return json({ error: "Could not verify group messaging permissions" }, 500);
+          if (!featureEnabled) continue;
+          authorized.push({
+            recipient_id: member.user_id,
+            notification_kind: payload.kind,
+            notification_title: title,
+            notification_body: (senderName + ": " + preview).slice(0, 1200),
+            notification_data: { group_id: message.group_id, message_id: message.id, route: "/chat", action: "group_message" },
+          });
+        }
       } else {
         const { data: event, error } = await admin.from("study_call_participants").select("room_id,user_id,invited_by,status").eq("room_id", payload.event_id).eq("invited_by", callerId).eq("status", "invited").maybeSingle();
         if (error || !event) return json({ error: "Call invitation not found or not authorized" }, 403);
