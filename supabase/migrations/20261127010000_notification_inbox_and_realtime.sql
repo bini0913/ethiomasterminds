@@ -61,7 +61,7 @@ $migration$;
 ALTER TABLE public.chat_group_members
   ADD COLUMN IF NOT EXISTS last_read_at timestamptz;
 UPDATE public.chat_group_members
-  SET last_read_at = joined_at
+  SET last_read_at = now()
   WHERE last_read_at IS NULL;
 ALTER TABLE public.chat_group_members
   ALTER COLUMN last_read_at SET DEFAULT now(),
