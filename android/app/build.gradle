@@ -66,6 +66,20 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
+// Never allow an unsigned release APK/AAB to be produced accidentally. CI
+// skips release packaging until all protected upload-key secrets are present.
+if (!hasReleaseSigning) {
+    tasks.configureEach { task ->
+        if (task.name in ['assembleRelease', 'bundleRelease']) {
+            task.doFirst {
+                throw new GradleException(
+                    "Android release signing is not configured. Provide the protected upload-key environment variables before building a release."
+                )
+            }
+        }
+    }
+}
+
 try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {
