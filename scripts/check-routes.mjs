@@ -52,13 +52,6 @@ for (const route of requiredRoutes) {
   if (!routes.includes(route)) failures.push(`Required portal route is not registered: ${route}`);
 }
 
-if (failures.length) {
-  console.error("Route registry check failed:");
-  for (const failure of failures) console.error(`- ${failure}`);
-  process.exitCode = 1;
-} else {
-  console.log(`Route registry check passed: ${routes.length} routes, ${localImports.size} local App dependencies, and all required portal routes.`);
-}
 
 const protectedRouteRoleContracts = new Map([
   ["/guardian-controls", ["parent"]],
@@ -109,4 +102,12 @@ for (const [route, expectedRoles] of protectedRouteRoleContracts) {
   if (actualRoles.length !== expectedSorted.length || actualRoles.some((role, index) => role !== expectedSorted[index])) {
     failures.push(`Role guard mismatch for ${route}: expected [${expectedSorted.join(", ")}], found [${actualRoles.join(", ")}]`);
   }
+}
+
+if (failures.length) {
+  console.error("Route registry and role-guard checks failed:");
+  for (const failure of failures) console.error(`- ${failure}`);
+  process.exitCode = 1;
+} else {
+  console.log(`Route registry and role-guard checks passed: ${routes.length} routes, ${localImports.size} local App dependencies, and ${protectedRouteRoleContracts.size} exact role-guard contracts.`);
 }
