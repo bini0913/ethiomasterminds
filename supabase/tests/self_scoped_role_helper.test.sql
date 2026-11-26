@@ -36,10 +36,25 @@ declare
   v_caller_id uuid := gen_random_uuid();
   v_target_id uuid := gen_random_uuid();
 begin
+  perform set_config('request.jwt.claim.sub', v_caller_id::text, true);
   insert into auth.users (id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
-  values
-    (v_caller_id, 'authenticated', 'authenticated', 'role-self-' || v_caller_id::text || '@example.test', '', '{"provider":"email","providers":["email"]}'::jsonb, jsonb_build_object('name','Role Self Test','username','roleself' || left(replace(v_caller_id::text,'-',''),10),'age','20'), now(), now()),
-    (v_target_id, 'authenticated', 'authenticated', 'role-target-' || v_target_id::text || '@example.test', '', '{"provider":"email","providers":["email"]}'::jsonb, jsonb_build_object('name','Role Target Test','username','roletarget' || left(replace(v_target_id::text,'-',''),10),'age','20'), now(), now());
+  values (
+    v_caller_id, 'authenticated', 'authenticated',
+    'role-self-' || v_caller_id::text || '@example.test', '',
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    jsonb_build_object('name','Role Self Test','username','roleself' || left(replace(v_caller_id::text,'-',''),10),'age','20'),
+    now(), now()
+  );
+
+  perform set_config('request.jwt.claim.sub', v_target_id::text, true);
+  insert into auth.users (id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+  values (
+    v_target_id, 'authenticated', 'authenticated',
+    'role-target-' || v_target_id::text || '@example.test', '',
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    jsonb_build_object('name','Role Target Test','username','roletarget' || left(replace(v_target_id::text,'-',''),10),'age','20'),
+    now(), now()
+  );
 
   insert into public.user_roles(user_id, role)
   values (v_target_id, 'admin'::public.app_role)
