@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(19);
+SELECT plan(20);
 
 SELECT has_column('public', 'notification_events', 'read_at', 'notification events have persistent read state');
 SELECT has_column('public', 'notification_events', 'archived_at', 'notification events have persistent archive state');
@@ -70,6 +70,11 @@ SELECT ok(
   has_function_privilege('authenticated', 'public.get_my_group_unread_counts()', 'execute')
     AND NOT has_function_privilege('anon', 'public.get_my_group_unread_counts()', 'execute'),
   'group unread count RPC is authenticated-only'
+);
+
+SELECT ok(
+  (SELECT NOT prosecdef FROM pg_proc WHERE oid = 'public.get_my_group_unread_counts()'::regprocedure),
+  'group unread count RPC runs with caller privileges'
 );
 
 SELECT * FROM finish();
