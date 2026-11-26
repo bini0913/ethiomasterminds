@@ -494,14 +494,18 @@ const TeacherPortal: React.FC = () => {
   };
 
   const fetchQuizQuestions = async (quizId: string) => {
-    const { data, error } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('quiz_id', quizId)
-      .order('order_index');
-    
-    if (!error && data) {
-      const formattedQuestions = data.map(q => ({
+    const { data, error } = await (supabase as any).rpc('get_question_authoring_bank', {
+      p_quiz_ids: [quizId],
+    });
+
+    if (error) {
+      console.error('Teacher question authoring bank failed:', error);
+      toast.error('Could not load questions for this quiz. Please retry.');
+      return;
+    }
+
+    if (data) {
+      const formattedQuestions = data.map((q: Question) => ({
         ...q,
         options: Array.isArray(q.options) ? q.options as string[] : []
       }));

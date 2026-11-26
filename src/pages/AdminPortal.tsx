@@ -375,14 +375,20 @@ const AdminPortal: React.FC = () => {
   const fetchContent = async () => {
     const [quizRes, questionRes, flashRes, postRes, bookRes, libraryRes] = await Promise.all([
       db.from('quizzes').select('*').order('created_at', { ascending: false }).limit(200),
-      db.from('questions').select('*').order('created_at', { ascending: false }).limit(200),
+      db.rpc('get_question_authoring_bank', { p_quiz_ids: null }),
       db.from('flashcards').select('*').order('created_at', { ascending: false }).limit(200),
       db.from('social_posts').select('*').order('created_at', { ascending: false }).limit(200),
       db.from('study_plans').select('*').order('created_at', { ascending: false }).limit(200),
       db.from('library_books').select('id,title,author,subject,status,uploader_id,created_at').order('created_at', { ascending: false }).limit(300),
     ]);
     setQuizzes(quizRes.data || []);
-    setQuestions(questionRes.data || []);
+    if (questionRes.error) {
+      console.error('Admin question authoring bank failed:', questionRes.error);
+      toast.error('Could not load the question bank. Please retry.');
+      setQuestions([]);
+    } else {
+      setQuestions(questionRes.data || []);
+    }
     setFlashcards(flashRes.data || []);
     setSocialPosts(postRes.data || []);
     setBooks(bookRes.data || []);
