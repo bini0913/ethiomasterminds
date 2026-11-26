@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.86.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const raw = Deno.env.get("FCM_SERVICE_ACCOUNT_JSON");
-    if (!url || !anonKey || !serviceRoleKey || !raw) return json({ error: "Push service configuration missing" }, 503);
+    if (!url || !anonKey || !serviceRoleKey) return json({ error: "Push service configuration missing" }, 503);
 
     const bearer = auth.replace(/^Bearer\s+/i, "");
     const userClient = createClient(url, anonKey, {
@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     const payload = await req.json() as Payload;
     if (!payload.kind || payload.kind.length > 100) return json({ error: "kind is required" }, 400);
 
-    const socialKinds = new Set(["friend_request", "direct_message", "study_call_invite"]);
+    const socialKinds = new Set(["friend_request", "direct_message", "group_message", "study_call_invite", "multiplayer_invite"]);
     let authorized: AuthorizedNotification[] = [];
 
     if (!socialKinds.has(payload.kind)) {
@@ -109,36 +109,129 @@ Deno.serve(async (req) => {
         const { data: profile } = await admin.from("profiles").select("name,username").eq("id", callerId).maybeSingle();
         const senderName = profile?.name || profile?.username || "Your friend";
         authorized = [{ recipient_id: event.receiver_id, notification_kind: payload.kind, notification_title: senderName, notification_body: String(event.content ?? "").slice(0, 180), notification_data: { message_id: event.id, sender_id: event.sender_id, route: "/friends", action: "reply" } }];
+      } else if (payload.kind === "multiplayer_invite") {
+        const { data: event, error } = await admin.from("multiplayer_invites")
+          .select("id,room_id,sender_id,receiver_id,status,expires_at")
+          .eq("id", payload.event_id)
+          .eq("sender_id", callerId)
+          .eq("status", "pending")
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle();
+        if (error || !event) return json({ error: "Multiplayer invitation not found or not authorized" }, 403);
+        const { data: profile } = await admin.from("profiles").select("name,username").eq("id", callerId).maybeSingle();
+        const senderName = profile?.name || profile?.username || "A student";
+        authorized = [{
+          recipient_id: event.receiver_id,
+          notification_kind: payload.kind,
+          notification_title: "Multiplayer invitation",
+          notification_body: senderName + " invited you to a multiplayer match.",
+          notification_data: { invite_id: event.id, room_id: event.room_id, route: "/multiplayer", action: "multiplayer_invite" },
+        }];
+      } else if (payload.kind === "group_message") {
+        const { data: message, error: messageError } = await admin.from("group_messages")
+          .select("id,group_id,sender_id,content")
+          .eq("id", payload.event_id)
+          .eq("sender_id", callerId)
+          .maybeSingle();
+        if (messageError || !message) return json({ error: "Group message not found or not authorized" }, 403);
+        const { data: members, error: membersError } = await admin.from("chat_group_members")
+          .select("user_id")
+          .eq("group_id", message.group_id)
+          .neq("user_id", callerId);
+        if (membersError) return json({ error: "Could not resolve group recipients" }, 500);
+        const { data: group } = await admin.from("chat_groups").select("name").eq("id", message.group_id).maybeSingle();
+        const { data: profile } = await admin.from("profiles").select("name,username").eq("id", callerId).maybeSingle();
+        const senderName = profile?.name || profile?.username || "A student";
+        const preview = String(message.content ?? "").trim().slice(0, 160);
+        const title = (group?.name ? "New message in " + group.name : "New group message").slice(0, 180);
+        authorized = [];
+        for (const member of members ?? []) {
+          const { data: featureEnabled, error: featureError } = await admin.rpc("is_user_feature_enabled", {
+            p_user_id: member.user_id,
+            p_feature: "direct_messages",
+          });
+          if (featureError) return json({ error: "Could not verify group messaging permissions" }, 500);
+          if (!featureEnabled) continue;
+          authorized.push({
+            recipient_id: member.user_id,
+            notification_kind: payload.kind,
+            notification_title: title,
+            notification_body: (senderName + ": " + preview).slice(0, 1200),
+            notification_data: { group_id: message.group_id, message_id: message.id, route: "/chat", action: "group_message" },
+          });
+        }
       } else {
         const { data: event, error } = await admin.from("study_call_participants").select("room_id,user_id,invited_by,status").eq("room_id", payload.event_id).eq("invited_by", callerId).eq("status", "invited").maybeSingle();
         if (error || !event) return json({ error: "Call invitation not found or not authorized" }, 403);
         authorized = [{ recipient_id: event.user_id, notification_kind: payload.kind, notification_title: "Incoming study call", notification_body: "Your friend invited you to a Study Mode call.", notification_data: { room_id: event.room_id, route: "/study-mode", action: "call_invite" } }];
       }
-      const recipientId = authorized[0]?.recipient_id;
-      const { data: blocked, error: blockCheckError } = await admin.rpc("are_users_blocked", { p_user_a: callerId, p_user_b: recipientId });
-      if (blockCheckError) return json({ error: "Could not verify social safety settings" }, 500);
-      if (blocked) return json({ skipped: true, reason: "users_blocked", sent: 0 }, 200);
+      // Filter every recipient before persisting inbox events. Group messages
+      // can target many members, so checking only the first recipient is unsafe.
+      const eligibleRecipients: typeof authorized = [];
+      for (const item of authorized) {
+        const { data: blocked, error: blockCheckError } = await admin.rpc("are_users_blocked", {
+          p_user_a: callerId,
+          p_user_b: item.recipient_id,
+        });
+        if (blockCheckError) return json({ error: "Could not verify social safety settings" }, 500);
+        if (!blocked) eligibleRecipients.push(item);
+      }
+      authorized = eligibleRecipients;
     }
 
     if (!authorized.length) return json({ sent: 0, attempted: 0, reason: "no_authorized_recipients" });
+    for (const item of authorized) {
+      if (!item.notification_title?.trim() || !item.notification_body?.trim() || item.notification_title.length > 180 || item.notification_body.length > 1200) {
+        return json({ error: "Invalid notification payload" }, 400);
+      }
+    }
+
+    // Persist every authorized notification before checking push preferences or
+    // device availability. The in-app inbox must work even when push is off.
+    const { data: inboxEvents, error: inboxError } = await admin.from("notification_events").insert(
+      authorized.map((item) => ({
+        user_id: item.recipient_id,
+        kind: item.notification_kind,
+        title: item.notification_title.trim(),
+        body: item.notification_body.trim(),
+        data: { ...(item.notification_data ?? {}), delivery_status: "not_attempted", sent: 0, attempted: 0, failure_count: 0 },
+      })),
+    ).select("id,user_id");
+    if (inboxError) return json({ error: "Could not record notification inbox event" }, 500);
+    const eventIdByRecipient = new Map((inboxEvents ?? []).map((event) => [event.user_id, event.id]));
+
+    if (!raw) {
+      return json({ error: "Push service configuration missing; inbox event was recorded", inbox_recorded: true, sent: 0, attempted: 0 }, 503);
+    }
     const serviceAccount = JSON.parse(raw) as ServiceAccount;
     const accessToken = await getGoogleAccessToken(serviceAccount);
     let sent = 0;
     let attempted = 0;
+    let skippedPreferences = 0;
+    let noEligibleDevices = 0;
     const failures: Array<{ device_id: string; status: number; token_invalid: boolean }> = [];
 
     for (const item of authorized) {
       const title = item.notification_title.trim();
       const body = item.notification_body.trim();
       if (!title || !body || title.length > 160 || body.length > 2000) return json({ error: "Notification payload is invalid" }, 400);
-      const { data: prefs, error: prefsError } = await admin.from("notification_preferences").select("enabled,social,game_invites").eq("user_id", item.recipient_id).maybeSingle();
+      const { data: prefs, error: prefsError } = await admin.from("notification_preferences").select("enabled,social,game_invites,new_content,study_reminders").eq("user_id", item.recipient_id).maybeSingle();
       if (prefsError) return json({ error: "Could not read notification preferences" }, 500);
-      if (prefs?.enabled === false) continue;
-      if (socialKinds.has(item.notification_kind) && prefs?.social === false) continue;
-      if (item.notification_kind === "study_call_invite" && prefs?.game_invites === false) continue;
-      const { data: devices, error: devicesError } = await admin.from("notification_devices").select("id,token").eq("user_id", item.recipient_id).eq("enabled", true);
+      const preferenceKey = ["study_call_invite", "multiplayer_invite"].includes(item.notification_kind)
+        ? "game_invites"
+        : socialKinds.has(item.notification_kind)
+          ? "social"
+          : item.notification_kind === "quiz_assignment"
+            ? "study_reminders"
+            : "new_content";
+      const preferenceDisabled = prefs?.enabled === false || prefs?.[preferenceKey] === false;
+      const { data: devices, error: devicesError } = preferenceDisabled
+        ? { data: [], error: null }
+        : await admin.from("notification_devices").select("id,token").eq("user_id", item.recipient_id).eq("enabled", true);
       if (devicesError) return json({ error: "Could not read notification devices" }, 500);
       const itemAttempted = devices?.length ?? 0;
+      if (preferenceDisabled) skippedPreferences += 1;
+      else if (itemAttempted === 0) noEligibleDevices += 1;
       const itemFailures: Array<{ device_id: string; status: number; token_invalid: boolean }> = [];
       let itemSent = 0;
       attempted += itemAttempted;
@@ -156,18 +249,30 @@ Deno.serve(async (req) => {
         failures.push(failure);
         itemFailures.push(failure);
       }
-      const { error: eventError } = await admin.from("notification_events").insert({
-        user_id: item.recipient_id,
-        kind: item.notification_kind,
-        title,
-        body,
-        data: { ...(item.notification_data ?? {}), delivery_status: itemSent > 0 ? "sent" : "failed", sent: itemSent, attempted: itemAttempted, failure_count: itemFailures.length },
+      const eventId = eventIdByRecipient.get(item.recipient_id);
+      if (!eventId) return json({ error: "Notification inbox event could not be resolved", sent, attempted, failures }, 500);
+      const deliveryStatus = preferenceDisabled
+        ? "skipped_preferences"
+        : itemSent > 0
+          ? "sent"
+          : itemAttempted === 0
+            ? "no_eligible_devices"
+            : "failed";
+      const { error: eventUpdateError } = await admin.from("notification_events").update({
+        data: {
+          ...(item.notification_data ?? {}),
+          delivery_status: deliveryStatus,
+          delivery_reason: preferenceDisabled ? "recipient_preference_disabled" : itemAttempted === 0 ? "no_enabled_device" : null,
+          sent: itemSent,
+          attempted: itemAttempted,
+          failure_count: itemFailures.length,
+        },
         delivered_at: itemSent > 0 ? new Date().toISOString() : null,
-      });
-      if (eventError) return json({ error: "Could not record notification delivery", sent, attempted, failures, event_recorded: false }, 500);
+      }).eq("id", eventId);
+      if (eventUpdateError) return json({ error: "Could not update notification delivery status", sent, attempted, failures, inbox_recorded: true }, 500);
     }
 
-    return json({ sent, attempted, failures, event_recorded: true });
+    return json({ sent, attempted, failures, event_recorded: true, skipped_preferences: skippedPreferences, no_eligible_devices: noEligibleDevices });
   } catch (error) {
     console.error("send-push-notification failed:", error instanceof Error ? error.message : "unknown error");
     return json({ error: "Notification delivery failed" }, 500);

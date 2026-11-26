@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bell, CheckCircle2, Clock3, Gamepad2, Gift, MessageCircle, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import {
   registerForPushNotifications,
   scheduleDailyLearningReminder,
   cancelDailyLearningReminder,
+  unregisterPushNotifications,
 } from "@/lib/notifications";
 import { toast } from "sonner";
 import { getUserTier } from "@/lib/getUserTier";
@@ -29,6 +31,7 @@ const items: Array<{ key: keyof NotificationPreferences; label: string; descript
 
 export default function NotificationSettingsPage() {
   const { user } = useUser();
+  const navigate = useNavigate();
   const upperStudent = getUserTier(user?.grade) === "upper";
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [saving, setSaving] = useState(false);
@@ -52,15 +55,22 @@ export default function NotificationSettingsPage() {
     if (!user?.id || !prefs) return;
     const previous = prefs;
     const next = { ...prefs, [key]: value };
+    // Start the browser permission prompt from the user gesture before network awaits.
+    const registrationPromise = key === "enabled" && value
+      ? registerForPushNotifications(user.id, true)
+      : null;
     setPrefs(next);
     setSaving(true);
+    let pushRegistrationUnavailable = false;
     try {
       await saveNotificationPreferences(user.id, next);
       if (key === "enabled") {
         if (value) {
-          await registerForPushNotifications(user.id);
+          const registered = await registrationPromise;
           await scheduleDailyLearningReminder(next);
+          if (!registered) pushRegistrationUnavailable = true;
         } else {
+          await unregisterPushNotifications(user.id);
           await cancelDailyLearningReminder();
         }
       }
@@ -68,7 +78,11 @@ export default function NotificationSettingsPage() {
         if (value && next.enabled) await scheduleDailyLearningReminder(next);
         else await cancelDailyLearningReminder();
       }
-      toast.success("Notification settings saved.");
+      if (pushRegistrationUnavailable) {
+        toast.info("Preferences saved, but this device could not be registered for push. Check notification permission and Firebase web configuration; your in-app inbox remains available.");
+      } else {
+        toast.success("Notification settings saved.");
+      }
     } catch {
       setPrefs(previous);
       toast.error("Could not save notification settings. Your previous choices were restored.");
@@ -98,6 +112,7 @@ export default function NotificationSettingsPage() {
             <h1 className="font-semibold">Notifications</h1>
             <p className="text-xs text-muted-foreground">Choose what Master Minds can send you</p>
           </div>
+          <Button variant="outline" size="sm" onClick={() => navigate("/notifications")}>View inbox</Button>
         </div>
       </header>
       <main className="mx-auto max-w-2xl space-y-4 p-4 pb-10">

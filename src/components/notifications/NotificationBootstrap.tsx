@@ -93,6 +93,32 @@ export default function NotificationBootstrap() {
   }, []);
 
   useEffect(() => {
+    const handleForegroundNotification = (event: Event) => {
+      const payload = (event as CustomEvent<Record<string, unknown>>).detail ?? {};
+      const data = payload.data && typeof payload.data === "object"
+        ? payload.data as Record<string, unknown>
+        : {};
+      const title = typeof data.title === "string" ? data.title : "Master Minds";
+      const body = typeof data.body === "string" ? data.body : "You have a new notification.";
+      const route = typeof data.route === "string" && data.route.startsWith("/") && !data.route.startsWith("//")
+        ? data.route
+        : null;
+      toast(title, {
+        description: body,
+        duration: 10000,
+        ...(route ? {
+          action: {
+            label: "Open",
+            onClick: () => window.location.assign(route),
+          },
+        } : {}),
+      });
+    };
+    window.addEventListener("master-minds-notification", handleForegroundNotification);
+    return () => window.removeEventListener("master-minds-notification", handleForegroundNotification);
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
 
     let cancelled = false;

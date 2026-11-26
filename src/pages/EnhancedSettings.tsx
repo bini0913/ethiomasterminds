@@ -50,7 +50,6 @@ const EnhancedSettings: React.FC = () => {
 
   const [settings, setSettings] = useState(() => {
     const defaults = {
-    notifications: true,
     soundEffects: mindForge.soundEnabled,
     autoSave: true,
     showAvatar: true,
@@ -66,7 +65,9 @@ const EnhancedSettings: React.FC = () => {
     try {
       const saved = safeStorage.getItem(SETTINGS_STORAGE_KEY);
       if (!saved) return defaults;
-      const restored = { ...defaults, ...JSON.parse(saved) };
+      const savedSettings = JSON.parse(saved);
+      delete savedSettings.notifications;
+      const restored = { ...defaults, ...savedSettings };
       if (!(['light', 'dark', 'pink', 'blue'] as string[]).includes(restored.theme)) restored.theme = theme;
       return restored;
     } catch {
@@ -357,16 +358,15 @@ const EnhancedSettings: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="space-y-2">
                 <div>
-                  <Label htmlFor="notifications">Push Notifications</Label>
-                  <p className="text-sm text-muted-foreground">Receive quiz reminders and updates</p>
+                  <Label>Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Your inbox and delivery preferences are managed in one place.</p>
                 </div>
-                <Switch
-                  id="notifications"
-                  checked={settings.notifications}
-                  onCheckedChange={(checked) => handleSettingChange('notifications', checked)}
-                />
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => navigate('/notifications')}>Open inbox</Button>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/notification-settings')}>Manage preferences</Button>
+                </div>
               </div>
 
               <Separator />
@@ -594,16 +594,15 @@ const EnhancedSettings: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="space-y-2">
                     <div>
-                      <Label htmlFor="notifications2">Push Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Receive quiz reminders and updates</p>
+                      <Label>Notifications</Label>
+                      <p className="text-sm text-muted-foreground">Your inbox and delivery preferences are managed in one place.</p>
                     </div>
-                    <Switch
-                      id="notifications2"
-                      checked={settings.notifications}
-                      onCheckedChange={(checked) => handleSettingChange('notifications', checked)}
-                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => navigate('/notifications')}>Open inbox</Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate('/notification-settings')}>Manage preferences</Button>
+                    </div>
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">

@@ -155,10 +155,13 @@ export default function StudyCallBar() {
         }
         setOutgoingRoomId(createdRoomId);
         setCallStatus("Ringing your friend…");
-        const { error: pushError } = await supabase.functions.invoke("send-push-notification", {
+        void supabase.functions.invoke("send-push-notification", {
           body: { kind: "study_call_invite", event_id: createdRoomId },
+        }).then(({ error: pushError }) => {
+          if (pushError) console.warn("Study call push could not be confirmed:", pushError.message);
+        }).catch((pushError) => {
+          console.warn("Study call push request failed:", pushError);
         });
-        if (pushError) console.warn("Study call push could not be sent:", pushError.message);
         await connect(createdRoomId, true);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not start call.");
