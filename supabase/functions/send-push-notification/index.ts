@@ -148,6 +148,8 @@ Deno.serve(async (req) => {
     const accessToken = await getGoogleAccessToken(serviceAccount);
     let sent = 0;
     let attempted = 0;
+    let skippedPreferences = 0;
+    let noEligibleDevices = 0;
     const failures: Array<{ device_id: string; status: number; token_invalid: boolean }> = [];
 
     for (const item of authorized) {
@@ -169,6 +171,8 @@ Deno.serve(async (req) => {
         : await admin.from("notification_devices").select("id,token").eq("user_id", item.recipient_id).eq("enabled", true);
       if (devicesError) return json({ error: "Could not read notification devices" }, 500);
       const itemAttempted = devices?.length ?? 0;
+      if (preferenceDisabled) skippedPreferences += 1;
+      else if (itemAttempted === 0) noEligibleDevices += 1;
       const itemFailures: Array<{ device_id: string; status: number; token_invalid: boolean }> = [];
       let itemSent = 0;
       attempted += itemAttempted;
@@ -209,7 +213,7 @@ Deno.serve(async (req) => {
       if (eventUpdateError) return json({ error: "Could not update notification delivery status", sent, attempted, failures, inbox_recorded: true }, 500);
     }
 
-    return json({ sent, attempted, failures, event_recorded: true });
+    return json({ sent, attempted, failures, event_recorded: true, skipped_preferences: skippedPreferences, no_eligible_devices: noEligibleDevices });
   } catch (error) {
     console.error("send-push-notification failed:", error instanceof Error ? error.message : "unknown error");
     return json({ error: "Notification delivery failed" }, 500);
