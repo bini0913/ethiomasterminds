@@ -62,3 +62,32 @@ test('student account is denied access to the Admin portal', async ({ page }) =>
   await page.waitForURL((url) => url.pathname === '/', { timeout: 25_000 });
   await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 15_000 });
 });
+
+
+const notificationRoles = [
+  { label: 'student', email: 'ci-student@masterminds.test' },
+  { label: 'teacher', email: 'ci-teacher@masterminds.test' },
+  { label: 'admin', email: 'ci-admin@masterminds.test' },
+  { label: 'finance', email: 'ci-finance@masterminds.test' },
+  { label: 'parent', email: 'ci-parent@masterminds.test' },
+  { label: 'Super Admin', email: 'ci-super-admin@masterminds.test' },
+  { label: 'Extreme Admin', email: 'ci-extreme-admin@masterminds.test' },
+] as const;
+
+for (const role of notificationRoles) {
+  test(`${role.label} can open the notification inbox and preferences`, async ({ page }) => {
+    test.setTimeout(45_000);
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await authenticateAs(page, role.email);
+    await page.goto('/notifications', { waitUntil: 'domcontentloaded' });
+    await page.waitForURL((url) => url.pathname === '/notifications', { timeout: 25_000 });
+    await expect(page.getByText('Notification inbox')).toBeVisible({ timeout: 25_000 });
+
+    await page.goto('/notification-settings', { waitUntil: 'domcontentloaded' });
+    await page.waitForURL((url) => url.pathname === '/notification-settings', { timeout: 25_000 });
+    await expect(page.getByText('Push notifications')).toBeVisible({ timeout: 25_000 });
+    expect(pageErrors, `Unexpected browser errors in ${role.label} notification flows`).toEqual([]);
+  });
+}
