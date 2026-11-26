@@ -3,6 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const appPath = path.join(root, "src", "App.tsx");
+const manifestPath = path.join(root, "public", "manus-routes.json");
 const app = fs.readFileSync(appPath, "utf8");
 const failures = [];
 
@@ -25,7 +26,7 @@ const resolveLocalImport = (specifier) => {
 };
 
 const localImports = new Set();
-const importPattern = /(?:from\s*|import\s*\()\s*["']([^"']+)["']/g;
+const importPattern = /(?:from\\s*|import\\s*\\()\\s*["']([^"']+)["']/g;
 for (const match of app.matchAll(importPattern)) {
   const specifier = match[1];
   if (specifier.startsWith("./") || specifier.startsWith("@/")) localImports.add(specifier);
@@ -34,9 +35,22 @@ for (const specifier of localImports) {
   if (!resolveLocalImport(specifier)) failures.push(`Missing local App dependency: ${specifier}`);
 }
 
-const routes = [...app.matchAll(/<Route\s+path=["']([^"']+)["']/g)].map((match) => match[1]);
+const routes = [...app.matchAll(/<Route\\s+path=["']([^"']+)["']/g)].map((match) => match[1]);
 const duplicateRoutes = routes.filter((route, index) => routes.indexOf(route) !== index);
 for (const route of new Set(duplicateRoutes)) failures.push(`Duplicate route registration: ${route}`);
+
+const routeManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+const manifestRoutes = routeManifest.routes.map((route) => route.path);
+const duplicateManifestRoutes = manifestRoutes.filter((route, index) => manifestRoutes.indexOf(route) !== index);
+for (const route of new Set(duplicateManifestRoutes)) failures.push(`Duplicate route manifest entry: ${route}`);
+
+const registeredConcreteRoutes = routes.filter((route) => route !== "*");
+for (const route of registeredConcreteRoutes) {
+  if (!manifestRoutes.includes(route)) failures.push(`Registered route is missing from public/manus-routes.json: ${route}`);
+}
+for (const route of manifestRoutes) {
+  if (!registeredConcreteRoutes.includes(route)) failures.push(`Stale route manifest entry is not registered in src/App.tsx: ${route}`);
+}
 
 const requiredRoutes = [
   "/school/manager",
@@ -51,7 +65,6 @@ const requiredRoutes = [
 for (const route of requiredRoutes) {
   if (!routes.includes(route)) failures.push(`Required portal route is not registered: ${route}`);
 }
-
 
 const protectedRouteRoleContracts = new Map([
   ["/guardian-controls", ["parent"]],
@@ -91,7 +104,7 @@ for (const [route, expectedRoles] of protectedRouteRoleContracts) {
     continue;
   }
 
-  const allowedRolesMatch = routeBlock.match(/allowedRoles=\{(\[[\s\S]*?\])\}/);
+  const allowedRolesMatch = routeBlock.match(/allowedRoles=\\{(\\[[\\s\\S]*?\\])\\}/);
   if (!allowedRolesMatch) {
     failures.push(`Protected route has no explicit allowedRoles: ${route}`);
     continue;
@@ -109,5 +122,5 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exitCode = 1;
 } else {
-  console.log(`Route registry and role-guard checks passed: ${routes.length} routes, ${localImports.size} local App dependencies, and ${protectedRouteRoleContracts.size} exact role-guard contracts.`);
+  console.log(`Route registry and role-guard checks passed: ${registeredConcreteRoutes.length} registered routes, ${manifestRoutes.length} manifest entries, ${localImports.size} local App dependencies, and ${protectedRouteRoleContracts.size} exact role-guard contracts.`);
 }
