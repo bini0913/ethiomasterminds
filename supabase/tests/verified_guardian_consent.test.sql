@@ -33,7 +33,7 @@ select ok(exists (select 1 from pg_trigger where tgrelid = 'public.room_players'
 select ok(exists (select 1 from pg_trigger where tgrelid = 'public.multiplayer_invites'::regclass and tgname = 'guardian_multiplayer_invite_guard' and not tgisinternal), 'multiplayer invitations require approved connections');
 select ok(exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'lobby_messages' and policyname = 'authenticated can view lobby' and qual like '%can_view_lobby_author%'), 'lobby message visibility is relationship-aware');
 select ok(not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'chat_group_members' and policyname = 'group admin manages members'), 'broad group-member access policy is removed');
-select ok(position('account_status' in pg_get_functiondef('public.has_role(uuid,public.app_role)'::regprocedure)) > 0, 'role checks deny suspended and banned accounts');
+select ok(position('account_status' in pg_get_functiondef('private.has_role_for_user(uuid,public.app_role)'::regprocedure)) > 0, 'role checks deny suspended and banned accounts through the trusted helper');
 
 select ok(position('A separate, valid parent or guardian email is required' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'existing learner age updates require a separate guardian email when under 18');
 select ok(position('guardian_consent_status' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'age updates explicitly reset guardian approval state');
