@@ -185,3 +185,61 @@ Replace the existing `/library` presentation and information architecture with a
 - **Typography:** existing Space Grotesk display and DM Sans body tokens, with generous reading line-height.
 - **Brand essence:** a calm Ethiopian learning library that helps students find, understand, and remember useful material.
 - **Brand voice:** direct and supportive — “Pick up where you left off.” and “Find the next useful resource.”
+
+
+# Active Plan — World-Class Community Redesign
+
+## Scope and preservation
+
+Upgrade the complete Connect experience across `/social`, `/social/community`, `/friends`, and `/chat`. Preserve the current React/Vite/Tailwind/shadcn architecture, route URLs, tier restrictions, CommunityTermsContext consent flow, FriendsContext actions and realtime subscriptions, SocialFeedView Supabase queries/mutations, direct/group messaging RPCs, report/block workflows, and all existing RLS contracts. This phase changes information architecture, presentation, responsive behavior, and visible async states; it does not introduce a second social backend or replace live data with demo content.
+
+## Community information architecture
+
+The canonical Connect model is **Hub → Community → Friends → Messages**. The hub is a calm launchpad with live network signals and three purposeful next actions. Community is a feed workspace with Explore, Following, Trending, Study, and Challenges as one persistent filter model. Friends is a two-pane relationship workspace: people and requests on the left, the selected conversation or discovery task on the right. Messages keeps group-chat behavior in its dedicated route and uses mobile list-to-conversation navigation. Deep links and existing query parameters remain valid.
+
+## Implementation approach
+
+- Add a shared `CommunityFrame` primitive for page heading, section eyebrow, route-level navigation, live network metrics, and responsive content width. Pages remain responsible for their own data and actions.
+- Recompose `SocialHub`, `EnhancedSocial`, and `Friends` around semantic sections instead of unrelated card collections. Use the existing `glass` surface system with opaque semantic fallbacks and theme-safe tokens.
+- Keep `SocialFeedView`, `FriendsContext`, `Chat`, `EnhancedChatSystem`, `CreatePostModal`, reports, blocks, and terms as behavior authorities. Improve their surrounding presentation and add safe local pending/error/retry states only where no backend contract changes are required.
+- Use a desktop workspace rail/pane pattern, tablet split layout, and mobile stacked/list-to-detail behavior. Never require horizontal scrolling for primary actions; secondary filters may scroll with visible focus and labels.
+- Make async states truthful: loading skeletons preserve layout, errors provide retry, empty states explain the next action, and pending buttons disable only the action in flight.
+
+## Design direction
+
+### Movement
+Quiet social learning studio — 0.06 probability: editorial community workspace with translucent glass layers, soft depth, and a single electric learning signal.
+
+### Core principles
+
+1. Make the next social learning action obvious.
+2. Keep people, content, and conversations distinct but connected.
+3. Show live state without overstating freshness or authority.
+4. Make every interaction comfortable on touch, keyboard, assistive technology, and reduced motion.
+
+### Color philosophy and signature elements
+
+Use the existing semantic theme roles. The canvas stays calm and low-contrast; primary blue/teal identifies movement and active state, violet marks messages, amber marks challenges, and success/destructive roles retain their meaning. Signature elements are a slim active-route signal, layered glass panels with crisp borders, and compact live-status pills rather than decorative gradients.
+
+### Layout paradigm
+
+Use a bounded responsive workspace rather than a centered marketing grid: contextual top bar, optional left navigation/list pane, focused content column, and a supporting rail that collapses into inline cards on smaller screens. Mobile uses a sticky action bar and list-to-detail transitions; desktop preserves simultaneous context.
+
+### Interaction, motion, and accessibility
+
+Use semantic links for navigation and buttons for actions, one `aria-current` route, visible focus rings, stable accessible names, minimum touch targets, Escape-safe dialogs, and reduced-motion fallbacks. Motion is short and state-based: list insertion, selection, and success feedback only; no perpetual decorative animation. Pending states belong to the exact action being submitted. Community terms and safety actions remain blocking and explicit.
+
+### Typography and voice
+
+Reuse Space Grotesk for display and DM Sans for body. Page titles are compact and confident; supporting copy explains what happens next. Voice examples: “Find your people and your next good idea.” and “Share something useful, then keep learning.”
+
+## Project structure
+
+- `src/components/community/CommunityFrame.tsx`: shared Connect heading, route switcher, live metrics, and responsive frame.
+- `src/pages/SocialHub.tsx`: network launchpad and live summary actions.
+- `src/pages/EnhancedSocial.tsx`: feed workspace and challenge discovery.
+- `src/components/social/SocialFeedView.tsx`: live post data and social mutations; presentation hardening only.
+- `src/pages/Friends.tsx`: friend discovery, requests, and direct conversation workspace using `FriendsContext`.
+- `src/pages/Chat.tsx`: group/public messaging workspace with existing realtime/RPC authority.
+- `src/context/FriendsContext.tsx` and `src/context/CommunityTermsContext.tsx`: behavior, permission, consent, and realtime owners; do not duplicate them in visual components.
+- `src/index.css`: shared semantic glass/responsive policies; avoid changing upper-tier-only contracts.

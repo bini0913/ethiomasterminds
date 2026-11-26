@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from '@/context/UserContext';
 import { toast } from 'sonner';
-import { Target, Flame, Trophy, Zap, CheckCircle2, Swords, Loader2 } from 'lucide-react';
+import { Target, Flame, Trophy, Zap, CheckCircle2, Swords, Loader2, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Mission {
@@ -32,8 +32,11 @@ const SocialChallenges: React.FC = () => {
   const navigate = useNavigate();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const loadMissions = useCallback(async () => {
+    setLoadError(false);
+    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('daily_missions')
@@ -55,6 +58,7 @@ const SocialChallenges: React.FC = () => {
       })));
     } catch (err) {
       console.error('Error loading missions:', err);
+      setLoadError(true);
     } finally {
       setIsLoading(false);
     }
@@ -62,22 +66,32 @@ const SocialChallenges: React.FC = () => {
 
   useEffect(() => { loadMissions(); }, [loadMissions]);
 
-  // Hardcoded daily challenges if none from DB
-  const defaultChallenges = [
-    { id: 'dc1', title: 'Answer 10 Questions', description: 'Complete 10 quiz questions today', icon: '🎯', targetValue: 10, rewardXp: 50, rewardCoins: 20, progress: 0, completed: false },
-    { id: 'dc2', title: 'Post 1 Update', description: 'Share something with the community', icon: '🔥', targetValue: 1, rewardXp: 25, rewardCoins: 10, progress: 0, completed: false },
-    { id: 'dc3', title: 'Win a Multiplayer Match', description: 'Challenge a friend and win', icon: '🏆', targetValue: 1, rewardXp: 100, rewardCoins: 50, progress: 0, completed: false },
-    { id: 'dc4', title: 'Study for 15 Minutes', description: 'Spend 15 minutes reading or practicing', icon: '⚡', targetValue: 15, rewardXp: 40, rewardCoins: 15, progress: 0, completed: false },
-  ];
-
-  const displayMissions = missions.length > 0 ? missions : defaultChallenges;
-
   if (isLoading) {
     return (
       <div className="px-4 py-6 space-y-4">
         {[1, 2, 3].map(i => (
           <Skeleton key={i} className="h-20 w-full rounded-xl" />
         ))}
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="px-4 py-16 text-center">
+        <p className="text-sm font-semibold">Daily challenges are unavailable right now.</p>
+        <p className="mt-1 text-xs text-muted-foreground">We could not verify the live challenge list.</p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => void loadMissions()}><RefreshCw className="mr-2 h-4 w-4" /> Try again</Button>
+      </div>
+    );
+  }
+
+  if (missions.length === 0) {
+    return (
+      <div className="px-4 py-16 text-center">
+        <Target className="mx-auto h-9 w-9 text-muted-foreground/60" />
+        <p className="mt-3 text-sm font-semibold">No active challenges yet.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Check back when a new community challenge is published.</p>
       </div>
     );
   }
@@ -95,7 +109,7 @@ const SocialChallenges: React.FC = () => {
 
       {/* Challenge Cards */}
       <div className="space-y-3">
-        {displayMissions.map((mission) => {
+        {missions.map((mission) => {
           const progressPercent = Math.min(100, (mission.progress / mission.targetValue) * 100);
           return (
             <div
