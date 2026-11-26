@@ -53,6 +53,16 @@ type DeletionRequest = {
   requested_at: string; reviewed_at: string | null; reviewed_by: string | null; resolution_note: string | null;
 };
 
+type DeletionPreflight = {
+  auth_account_exists: boolean;
+  blocking_foreign_keys: Array<{ table: string; constraint: string; delete_action: string; referencing_rows: number }>;
+  storage_objects_by_bucket: Array<{ bucket_id: string; objects: number }>;
+  storage_object_count: number;
+  technical_blockers_clear: boolean;
+  retention_review_required: boolean;
+  deletion_executed: boolean;
+};
+
 type FinanceOverview = {
   available?: boolean; accounts?: number; invoices?: number; payments?: number;
   transactions?: number; balance?: number;
@@ -69,6 +79,8 @@ const ExtremeAdminPortal: React.FC = () => {
   const [schools, setSchools] = useState<PortalSchool[]>([]);
   const [reports, setReports] = useState<PortalReport[]>([]);
   const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
+  const [deletionPreflights, setDeletionPreflights] = useState<Record<string, DeletionPreflight>>({});
+  const [deletionPreflightLoadingId, setDeletionPreflightLoadingId] = useState<string | null>(null);
   const [externalDeletionEmail, setExternalDeletionEmail] = useState('');
   const [externalDeletionUsername, setExternalDeletionUsername] = useState('');
   const [externalDeletionNote, setExternalDeletionNote] = useState('');
@@ -326,6 +338,18 @@ const ExtremeAdminPortal: React.FC = () => {
     setExternalDeletionNote('');
     toast.success('External deletion request recorded.');
     await refreshAll();
+  };
+
+  const preflightDeletionRequest = async (request: DeletionRequest) => {
+    setDeletionPreflightLoadingId(request.id);
+    const { data, error } = await supabase.rpc('extreme_admin_preflight_account_deletion' as any, {
+      p_request_id: request.id,
+    });
+    setDeletionPreflightLoadingId(null);
+    if (error) return toast.error(error.message || 'Deletion preflight could not be completed');
+    if (!data) return toast.error('Deletion preflight returned no result.');
+    setDeletionPreflights((current) => ({ ...current, [request.id]: data as DeletionPreflight }));
+    toast.success('Read-only deletion preflight completed. Manual retention review is still required.');
   };
 
   const updateDeletionRequest = async (request: DeletionRequest, nextStatus: 'in_review' | 'completed' | 'rejected') => {
@@ -666,9 +690,35 @@ const ExtremeAdminPortal: React.FC = () => {
                       <p className="mt-2 text-xs text-slate-500">{request.user_id ? 'Account still exists; verify identity, review record retention, and process deletion before completion.' : 'No linked Auth account remains. Verify the request outcome before closing it.'}</p>
                       {request.status !== 'completed' && request.status !== 'rejected' && (
                         <div className="mt-3 flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" disabled={deletionPreflightLoadingId === request.id} onClick={() => void preflightDeletionRequest(request)}>
+                            {deletionPreflightLoadingId === request.id ? 'Checking blockers…' : 'Check deletion blockers'}
+                          </Button>
                           {request.status === 'pending' && <Button size="sm" variant="outline" onClick={() => void updateDeletionRequest(request, 'in_review')}>Mark in review</Button>}
                           <Button size="sm" variant="destructive" onClick={() => void updateDeletionRequest(request, 'rejected')}>Reject request</Button>
                           <Button size="sm" disabled={!!request.user_id} onClick={() => void updateDeletionRequest(request, 'completed')}>Mark completed</Button>
+                        </div>
+                      )}
+                      {deletionPreflights[request.id] && (
+                        <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                          <p className="font-semibold text-slate-900">
+                            {deletionPreflights[request.id].technical_blockers_clear ? 'No technical FK or storage blockers detected' : 'Technical deletion blockers need review'}
+                          </p>
+                          {!deletionPreflights[request.id].auth_account_exists && <p className="text-slate-600">The linked Auth account is already absent. Verify the remaining data review before closing the request.</p>}
+                          {deletionPreflights[request.id].blocking_foreign_keys.length > 0 && (
+                            <ul className="list-disc space-y-1 pl-5 text-slate-700">
+                              {deletionPreflights[request.id].blocking_foreign_keys.map((item) => (
+                                <li key={item.constraint}>
+                                  <span className="font-medium">{item.table}</span> · {item.delete_action} · {item.referencing_rows} referencing row(s)
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {deletionPreflights[request.id].storage_objects_by_bucket.length > 0 && (
+                            <p className="text-slate-700">
+                              Owned storage objects: {deletionPreflights[request.id].storage_objects_by_bucket.map((item) => `${item.bucket_id}: ${item.objects}`).join(', ')}
+                            </p>
+                          )}
+                          <p className="text-xs text-slate-500">This check is read-only. School, academic, finance, safety and legal-retention review remains mandatory. It does not delete data or complete the request.</p>
                         </div>
                       )}
                       <p className="mt-2 break-all text-[11px] text-slate-400">Request ID: {request.id}</p>
