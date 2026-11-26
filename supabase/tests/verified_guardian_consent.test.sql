@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(33);
+select plan(37);
 
 select ok(to_regclass('public.guardian_consent_requests') is not null, 'guardian consent request records exist');
 select ok((select relrowsecurity from pg_class where oid = 'public.guardian_consent_requests'::regclass), 'guardian consent requests have RLS enabled');
@@ -37,6 +37,10 @@ select ok(position('account_status' in pg_get_functiondef('public.has_role(uuid,
 
 select ok(position('A separate, valid parent or guardian email is required' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'existing learner age updates require a separate guardian email when under 18');
 select ok(position('guardian_consent_status' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'age updates explicitly reset guardian approval state');
+select ok(position('v_existing_age < 18 and p_age >= 18' in pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure)) > 0, 'a learner recorded as under 18 cannot self-promote through the age RPC');
+select ok(position('for update' in lower(pg_get_functiondef('public.set_my_age_and_guardian(integer,text)'::regprocedure))) > 0, 'age classification is locked while the learner update is checked');
+select ok(position('old.age < 18' in pg_get_functiondef('public.validate_guardian_consent()'::regprocedure)) > 0 and position('auth.uid() = old.id' in pg_get_functiondef('public.validate_guardian_consent()'::regprocedure)) > 0, 'the profile trigger blocks direct self-service age escalation and age clearing');
+select ok(exists (select 1 from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'profiles_guardian_consent_guard' and not tgisinternal), 'the guardian and age-integrity trigger remains installed');
 
 select * from finish();
 rollback;
