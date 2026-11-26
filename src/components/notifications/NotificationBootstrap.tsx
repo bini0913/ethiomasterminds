@@ -109,7 +109,7 @@ export default function NotificationBootstrap() {
         ...(route ? {
           action: {
             label: "Open",
-            onClick: () => window.dispatchEvent(new CustomEvent("master-minds-notification-route", { detail: route })),
+            onClick: () => window.location.assign(route),
           },
         } : {}),
       });
