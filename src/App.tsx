@@ -93,6 +93,7 @@ import NativeBackHandler from "./components/mobile/NativeBackHandler";
 import NotificationBootstrap from "./components/notifications/NotificationBootstrap";
 import NotificationRouteHandler from "./components/notifications/NotificationRouteHandler";
 import SocialRealtimeNotifications from "./components/notifications/SocialRealtimeNotifications";
+import TactileFeedback from "./components/interaction/TactileFeedback";
 import StudentBottomNav from "./components/layout/StudentBottomNav";
 import MiddleTierShell from "./components/layout/MiddleTierShell";
 import UpperTierStudioShell from "./components/layout/UpperTierStudioShell";
@@ -338,6 +339,7 @@ const App = () => (
                           <TooltipProvider>
                           <Toaster />
                           <Sonner />
+                          <TactileFeedback />
                           <BrowserRouter>
                             <AppChrome>
                             <Suspense fallback={
