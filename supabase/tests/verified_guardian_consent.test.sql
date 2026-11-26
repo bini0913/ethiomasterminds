@@ -47,6 +47,7 @@ declare
   v_child_id uuid := gen_random_uuid();
   v_child_email text := 'age-guard-' || gen_random_uuid()::text || '@example.test';
 begin
+  perform set_config('request.jwt.claim.sub', v_child_id::text, true);
   insert into auth.users (id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
   values (
     v_child_id, 'authenticated', 'authenticated', v_child_email, '',
