@@ -34,7 +34,7 @@ const iconForKind = (kind: string) => {
   return Bell;
 };
 
-const labelForKind = (kind: string) => kind.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const labelForKind = (kind: string) => kind.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 export default function NotificationInboxPage() {
   const { user } = useUser();
