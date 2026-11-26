@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldAlert, AlertTriangle, UserCog, Coins, Shield, Lock, Building2, Crown, Users, FileText, Wallet, Search, BookOpen, MessageSquare } from 'lucide-react';
+import { ArrowRight, ShieldAlert, AlertTriangle, UserCog, Coins, Shield, Lock, Building2, Crown, Users, FileText, Wallet, Search, BookOpen, MessageSquare, Activity, CheckCircle2, Clock3, LayoutDashboard } from 'lucide-react';
 import { useUser, UserRole } from '@/context/UserContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -91,7 +91,7 @@ const ExtremeAdminPortal: React.FC = () => {
   const [userSearch, setUserSearch] = useState('');
   const [aiDailyLimit, setAiDailyLimit] = useState('50');
   const [superAdminUsers, setSuperAdminUsers] = useState<PortalUser[]>([]);
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState('overview');
 
   const [targetUserId, setTargetUserId] = useState('');
   const [targetRole, setTargetRole] = useState<UserRole>('student');
@@ -409,15 +409,16 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const overviewMetrics = [
-    { label: 'Accounts', value: dashboard.total_users ?? 0, Icon: Users },
-    { label: 'Schools', value: dashboard.schools ?? 0, Icon: Building2 },
-    { label: 'Students', value: dashboard.students ?? 0, Icon: Users },
-    { label: 'Teachers', value: dashboard.teachers ?? 0, Icon: UserCog },
-    { label: 'Super Admin', value: dashboard.super_admins ?? 0, Icon: Crown },
-    { label: 'Online now', value: dashboard.active_users_10m ?? 0, Icon: Shield },
+    { label: 'Accounts', value: dashboard.total_users ?? 0, Icon: Users, tone: 'blue' },
+    { label: 'Schools', value: dashboard.schools ?? 0, Icon: Building2, tone: 'indigo' },
+    { label: 'Students', value: dashboard.students ?? 0, Icon: Users, tone: 'cyan' },
+    { label: 'Teachers', value: dashboard.teachers ?? 0, Icon: UserCog, tone: 'violet' },
+    { label: 'Super Admin', value: dashboard.super_admins ?? 0, Icon: Crown, tone: 'amber' },
+    { label: 'Online now', value: dashboard.active_users_10m ?? 0, Icon: Activity, tone: 'emerald' },
   ];
 
   const navItems = [
+    { key: 'overview', label: 'Overview', description: 'Platform pulse and queues', icon: LayoutDashboard },
     { key: 'users', label: 'User management', description: 'Accounts and access', icon: UserCog },
     { key: 'super-admin', label: 'Super Admin', description: 'Owner-controlled authority', icon: Crown },
     { key: 'schools', label: 'Schools', description: 'Global school oversight', icon: Building2 },
@@ -454,22 +455,9 @@ const ExtremeAdminPortal: React.FC = () => {
   return (
     <AdminCommandCenterShell roleLabel="Extreme Admin" eyebrow="Master Minds platform control" title="Global platform control" description="Owner-only oversight of accounts, schools, moderation, economy, finance, settings, and audit history." activeKey={activeTab} navItems={navItems} onNavigate={setActiveTab} onRefresh={() => void refreshAll()} refreshing={loading}>
       <div className="mb-6 flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-cyan-300"><ShieldAlert className="h-5 w-5" /></div><div><p className="text-sm font-semibold text-slate-900">Owner-only platform authority</p><p className="mt-1 text-sm leading-relaxed text-slate-600">Sensitive changes are confirmed here, authorized by the backend, and written to the appropriate audit path.</p></div></div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          {overviewMetrics.map(({ label, value, Icon }) => (
-            <Card key={label} className="border-slate-200 bg-white">
-              <CardContent className="flex items-center justify-between gap-2 p-4">
-                <div>
-                  <p className="text-xs font-medium text-slate-500">{label}</p>
-                  <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{Number(value).toLocaleString()}</p>
-                </div>
-                <Icon className="h-5 w-5 text-blue-700" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="bg-white border border-slate-200 flex h-auto flex-wrap">
+          <TabsList className="flex h-auto w-full gap-1 overflow-x-auto border border-slate-200 bg-white p-1 lg:hidden">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="super-admin">Super Admin</TabsTrigger>
             <TabsTrigger value="schools">Schools</TabsTrigger>
@@ -482,6 +470,22 @@ const ExtremeAdminPortal: React.FC = () => {
             <TabsTrigger value="system">System Settings</TabsTrigger>
             <TabsTrigger value="logs">Audit Logs</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              {overviewMetrics.map(({ label, value, Icon, tone }) => {
+                const toneClass = { blue: 'bg-blue-50 text-blue-700', indigo: 'bg-indigo-50 text-indigo-700', cyan: 'bg-cyan-50 text-cyan-700', violet: 'bg-violet-50 text-violet-700', amber: 'bg-amber-50 text-amber-700', emerald: 'bg-emerald-50 text-emerald-700' }[tone];
+                return <Card key={label} className="overflow-hidden border-slate-200 bg-white shadow-sm"><CardContent className="relative p-5"><div className={`mb-5 flex h-10 w-10 items-center justify-center rounded-2xl ${toneClass}`}><Icon className="h-5 w-5" /></div><p className="text-xs font-bold uppercase tracking-[.14em] text-slate-500">{label}</p><p className="mt-1 font-display text-3xl font-bold tabular-nums text-slate-950">{Number(value).toLocaleString()}</p><div className="absolute right-0 top-0 h-20 w-20 rounded-bl-[2rem] bg-slate-50" /></CardContent></Card>;
+              })}
+            </section>
+
+            <section className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
+              <Card className="border-slate-200 bg-white shadow-sm"><CardHeader className="flex flex-row items-start justify-between gap-4"><div><CardTitle className="flex items-center gap-2"><Clock3 className="h-5 w-5 text-amber-600" />Attention queue</CardTitle><CardDescription>Priorities derived from the latest protected records.</CardDescription></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{reports.filter((item) => item.status === 'pending').length + deletionRequests.filter((item) => item.status === 'pending' || item.status === 'in_review').length} open items</span></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => setActiveTab('reports')} className="group rounded-2xl border border-slate-200 p-4 text-left transition hover:border-blue-300 hover:bg-blue-50/40"><div className="flex items-center justify-between"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 text-red-700"><FileText className="h-4 w-4" /></span><ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-1 group-hover:text-blue-700" /></div><p className="mt-4 text-2xl font-bold tabular-nums text-slate-950">{reports.filter((item) => item.status === 'pending').length}</p><p className="text-sm font-semibold text-slate-700">Pending reports</p><p className="mt-1 text-xs text-slate-500">Review, resolve, or escalate submitted reports.</p></button><button type="button" onClick={() => setActiveTab('deletion-requests')} className="group rounded-2xl border border-slate-200 p-4 text-left transition hover:border-blue-300 hover:bg-blue-50/40"><div className="flex items-center justify-between"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-700"><ShieldAlert className="h-4 w-4" /></span><ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-1 group-hover:text-blue-700" /></div><p className="mt-4 text-2xl font-bold tabular-nums text-slate-950">{deletionRequests.filter((item) => item.status === 'pending' || item.status === 'in_review').length}</p><p className="text-sm font-semibold text-slate-700">Privacy requests</p><p className="mt-1 text-xs text-slate-500">Verify ownership and retention before closing.</p></button></CardContent></Card>
+              <Card className="border-slate-200 bg-slate-950 text-white shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-white"><Shield className="h-5 w-5 text-cyan-300" />Control assurance</CardTitle><CardDescription className="text-slate-400">Protected operational indicators from the database.</CardDescription></CardHeader><CardContent className="space-y-3">{[['Audit events', securitySummary.audit_events ?? 0], ['Active platform admins', securitySummary.active_admins ?? 0], ['Suspended accounts', securitySummary.suspended_users ?? 0], ['Banned accounts', securitySummary.banned_users ?? 0]].map(([label, value]) => <div key={String(label)} className="flex items-center justify-between border-b border-white/10 pb-3 last:border-0 last:pb-0"><span className="text-sm text-slate-300">{label}</span><span className="font-semibold tabular-nums text-white">{Number(value).toLocaleString()}</span></div>)}<div className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-400/10 px-3 py-2 text-xs font-medium text-emerald-200"><CheckCircle2 className="h-4 w-4" />Metrics are sourced from protected admin functions.</div></CardContent></Card>
+            </section>
+
+            <section className="grid gap-5 lg:grid-cols-3"><button type="button" onClick={() => setActiveTab('users')} className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300"><p className="text-xs font-bold uppercase tracking-[.14em] text-blue-700">01 · Access</p><h3 className="mt-3 font-display text-xl font-bold text-slate-950">Manage a user</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">Search an account, review its current role, and apply a permitted access change.</p><span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-700">Open user control <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span></button><button type="button" onClick={() => setActiveTab('schools')} className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300"><p className="text-xs font-bold uppercase tracking-[.14em] text-indigo-700">02 · Network</p><h3 className="mt-3 font-display text-xl font-bold text-slate-950">Review schools</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">Inspect school membership counts and preserve data when changing access.</p><span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-700">Open school oversight <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span></button><button type="button" onClick={() => setActiveTab('logs')} className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300"><p className="text-xs font-bold uppercase tracking-[.14em] text-violet-700">03 · Traceability</p><h3 className="mt-3 font-display text-xl font-bold text-slate-950">Inspect audit history</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">Follow privileged actions through the existing audit history without fabricating events.</p><span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-700">Open audit logs <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span></button></section>
+          </TabsContent>
 
           <TabsContent value="super-admin" className="space-y-4">
             <Card className="bg-white border-slate-200">
