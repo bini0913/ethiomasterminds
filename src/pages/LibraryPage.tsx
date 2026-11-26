@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { safeStorage } from '@/lib/safeStorage';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useUser } from '@/context/UserContext';
 import { getUserTier } from '@/lib/getUserTier';
 import { toast } from 'sonner';
@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Bookmark, BookmarkCheck, BookOpen, Brain, Download, ExternalLink, FileText, Highlighter, Loader2, Search, Upload, User } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Bookmark, BookmarkCheck, BookOpen, BookMarked, Brain, Download, ExternalLink, FileText, Highlighter, LibraryBig, Loader2, MoreHorizontal, Search, SlidersHorizontal, Sparkles, StickyNote, Upload } from 'lucide-react';
 import {
   createBook,
   createHighlight,
@@ -25,6 +26,7 @@ import {
   invokeLibraryAI,
   isValidPublicUrl,
   LibraryBook,
+  ReadingProgressEntry,
   CurriculumTextbookCatalogEntry,
   listCurriculumTextbookCatalog,
   saveAIContent,
@@ -67,6 +69,7 @@ const LibraryPage: React.FC = () => {
   const [openUpload, setOpenUpload] = useState(false);
   const [bookmarkSet, setBookmarkSet] = useState<Set<string>>(new Set());
   const [downloadedSet, setDownloadedSet] = useState<Set<string>>(new Set());
+  const [readingProgress, setReadingProgress] = useState<ReadingProgressEntry[]>([]);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const [activeSection, setActiveSection] = useState<SectionKey>('community');
@@ -134,6 +137,7 @@ const LibraryPage: React.FC = () => {
       }
 
       const progress = await listReadingProgress(user.id).catch(() => []);
+      setReadingProgress(progress);
       if (selectedBook) {
         const row = progress.find((p) => p.book_id === selectedBook.id);
         if (row) setReaderProgress(row.completion_percent);
@@ -204,6 +208,13 @@ const LibraryPage: React.FC = () => {
   }, [books, search, subjectFilter, gradeFilter, activeSection, bookmarkSet, downloadedSet, user?.id, user?.role, studentGradeMin, studentGradeMax]);
 
   const visibleBooks = filteredBooks.slice(0, visibleCount);
+  const continueBook = useMemo(() => {
+    const candidates = readingProgress
+      .filter((entry) => entry.completion_percent > 0 && entry.completion_percent < 100)
+      .sort((a, b) => b.completion_percent - a.completion_percent);
+    const entry = candidates[0];
+    return entry ? { book: books.find((book) => book.id === entry.book_id), progress: entry.completion_percent } : undefined;
+  }, [books, readingProgress]);
 
   useEffect(() => {
     let cancelled = false;
@@ -553,514 +564,126 @@ const LibraryPage: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className={getUserTier(user?.grade) === "upper" ? "tier-upper min-h-screen relative overflow-hidden bg-background text-foreground" : "tier-middle min-h-screen relative overflow-hidden bg-background text-foreground"}>
-
-      <div className="relative z-10 p-4 md:p-6 max-w-7xl mx-auto space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          {userTier === 'upper' ? <BackButton /> : <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15"><BookOpen className="h-5 w-5" /></div>}
-          <div className="min-w-0 flex-1">
-            {userTier !== 'upper' && <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Learn studio</p>}
-            <h1 className="truncate font-display text-2xl font-bold md:text-3xl">Master Minds AI Library</h1>
-            <p className="mt-1 hidden text-sm text-muted-foreground sm:block">Read, save, and turn every book into a study advantage.</p>
+    <div className={`${userTier === 'upper' ? 'tier-upper' : 'tier-middle'} min-h-screen bg-background text-foreground`}>
+      <div className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pb-10">
+        <header className="mb-6 flex flex-col gap-5 border-b border-border/70 pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <BackButton />
+            <div className="min-w-0">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">Master Minds Library</p>
+              <h1 className="truncate text-3xl font-bold tracking-tight sm:text-4xl">Find your next useful resource.</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">A calm place to discover, read, save, and turn books into better study sessions.</p>
+            </div>
           </div>
-          {canUpload && (
-            <Dialog open={openUpload} onOpenChange={setOpenUpload}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm} className="gap-2">
-                  <Upload className="h-4 w-4" /> Upload Book
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>{editingBookId ? 'Edit Book Details' : 'Upload New Library Book'}</DialogTitle>
-                </DialogHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-xs text-muted-foreground sm:flex">
+              <BookOpen className="h-4 w-4 text-primary" />
+              <span><strong className="text-foreground">{books.length}</strong> resources</span>
+              <span className="text-border">•</span>
+              <span><strong className="text-foreground">{highlights.length}</strong> highlights</span>
+            </div>
+            {canUpload && (
+              <Dialog open={openUpload} onOpenChange={setOpenUpload}>
+                <DialogTrigger asChild>
+                  <Button onClick={resetForm} className="gap-2"><Upload className="h-4 w-4" /> Add a book</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>{editingBookId ? 'Edit book details' : 'Add a book to the library'}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div><Label htmlFor="library-title">Book title</Label><Input id="library-title" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} /></div>
+                    <div><Label htmlFor="library-author">Author</Label><Input id="library-author" value={form.author} onChange={(e) => setForm((p) => ({ ...p, author: e.target.value }))} /></div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><Label htmlFor="library-subject">Subject</Label><Input id="library-subject" value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))} /></div>
+                      <div><Label htmlFor="library-grade">Grade</Label><Input id="library-grade" type="number" min={user?.role === 'student' ? studentGradeMin : 1} max={user?.role === 'student' ? studentGradeMax : 12} value={form.gradeLevel} onChange={(e) => setForm((p) => ({ ...p, gradeLevel: e.target.value }))} /></div>
+                    </div>
+                    <div><Label>Reading experience</Label><Select value={form.bookCategory} onValueChange={(value: LibraryBook['book_category']) => setForm((p) => ({ ...p, bookCategory: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="academic">Academic study</SelectItem><SelectItem value="general">General reading</SelectItem></SelectContent></Select></div>
+                    <div><Label>Content type</Label><Select value={form.type} onValueChange={(value: LibraryBook['type']) => setForm((p) => ({ ...p, type: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="textbook">Textbook</SelectItem><SelectItem value="notes">Notes</SelectItem><SelectItem value="practice">Practice book</SelectItem><SelectItem value="reference">Reference</SelectItem></SelectContent></Select></div>
+                    <div><Label htmlFor="library-description">Short description</Label><Textarea id="library-description" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></div>
+                    {!editingBookId && <div><Label htmlFor="library-file">PDF file</Label><Input id="library-file" type="file" accept="application/pdf" onChange={(e) => setForm((p) => ({ ...p, file: e.target.files?.[0] || null }))} /></div>}
+                    <Button className="w-full" onClick={handleUploadOrEdit} disabled={uploading}>{uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editingBookId ? 'Save changes' : 'Add to library'}</Button>
+                    {uploading && <div className="space-y-2"><Progress value={uploadPhase === 'validating' ? 20 : uploadPhase === 'uploading' ? 55 : uploadPhase === 'saving' ? 85 : 100} /><p className="text-xs text-muted-foreground">{uploadPhase === 'uploading' ? 'Uploading PDF…' : uploadPhase === 'saving' ? 'Saving book details…' : 'Checking your upload…'}</p></div>}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </header>
 
-                <div className="space-y-3">
-                  <div>
-                    <Label>Book title</Label>
-                    <Input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label>Author</Label>
-                    <Input value={form.author} onChange={(e) => setForm((p) => ({ ...p, author: e.target.value }))} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label>Subject</Label>
-                      <Input value={form.subject} onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))} />
-                    </div>
-                    <div>
-                      <Label>Grade (1-12)</Label>
-                      <Input type="number" min={user?.role === 'student' ? studentGradeMin : 1} max={user?.role === 'student' ? studentGradeMax : 12} value={form.gradeLevel} onChange={(e) => setForm((p) => ({ ...p, gradeLevel: e.target.value }))} />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Book type</Label>
-                    <Select value={form.bookCategory} onValueChange={(value: LibraryBook['book_category']) => setForm((p) => ({ ...p, bookCategory: value }))}>
-                      <SelectTrigger><SelectValue placeholder="Choose reading experience" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="academic">Academic book — textbook and study tools</SelectItem>
-                        <SelectItem value="general">General book — distraction-free reading</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Content category</Label>
-                    <Select value={form.type} onValueChange={(value: LibraryBook['type']) => setForm((p) => ({ ...p, type: value }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="textbook">Textbook</SelectItem>
-                        <SelectItem value="notes">Notes</SelectItem>
-                        <SelectItem value="practice">Practice Book</SelectItem>
-                        <SelectItem value="reference">Reference</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Short description</Label>
-                    <Textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
-                  </div>
-                  {!editingBookId && (
-                    <div>
-                      <Label>PDF file</Label>
-                      <Input type="file" accept="application/pdf" onChange={(e) => setForm((p) => ({ ...p, file: e.target.files?.[0] || null }))} />
-                    </div>
-                  )}
-                  <Button className="w-full" onClick={handleUploadOrEdit} disabled={uploading}>
-                    {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    {editingBookId ? 'Save Changes' : 'Upload to Library'}
-                  </Button>
-                  {uploading && (
-                    <div className="space-y-1">
-                      <Progress value={uploadPhase === 'validating' ? 20 : uploadPhase === 'uploading' ? 55 : uploadPhase === 'saving' ? 85 : 100} />
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {uploadPhase === 'uploading' ? 'Uploading…' : uploadPhase === 'saving' ? 'Saving metadata…' : `${uploadPhase}...`}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
+        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="Library sections">
+          {([
+            ['community', 'Discover', Search], ['my-books', 'My books', LibraryBig], ['assigned', 'Assigned', BookMarked], ['saved', 'Saved', Bookmark], ['highlights', 'Notes', StickyNote],
+          ] as const).map(([key, label, Icon]) => (
+            <Button key={key} variant={activeSection === key ? 'default' : 'outline'} className="shrink-0 gap-2 rounded-full" onClick={() => setActiveSection(key)}><Icon className="h-4 w-4" />{label}{sectionCounts[key] !== undefined && <span className="ml-1 opacity-70">{sectionCounts[key]}</span>}</Button>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4">
-          <Card className="rounded-3xl border-border/80 bg-card shadow-sm">
-            <CardHeader><CardTitle className="text-base">Browse Library</CardTitle><p className="text-xs text-muted-foreground">Your resources, in one place</p></CardHeader>
-            <CardContent className="space-y-2">
-              {([
-                ['my-books', 'My Books'],
-                ['assigned', 'Assigned Books'],
-                ['community', 'Community Library'],
-                ['saved', 'Saved Resources'],
-                ['downloaded', 'Downloaded'],
-                ...(userTier === 'upper' || user?.role !== 'student' ? [['curriculum', 'Curriculum Textbooks'] as [SectionKey, string]] : []),
-                ['upload', 'Upload Book'],
-                ['highlights', 'Highlights'],
-                ['notes', 'Saved Notes'],
-              ] as [SectionKey, string][])
-                .map(([key, label]) => (
-                <Button key={key} variant={activeSection === key ? 'default' : 'ghost'} className="w-full justify-start" onClick={() => {
-                  setActiveSection(key);
-                  if (key === 'upload') setOpenUpload(true);
-                }}><span className="flex-1 text-left">{label}</span>{sectionCounts[key] !== undefined && <Badge variant={activeSection === key ? 'secondary' : 'outline'}>{sectionCounts[key]}</Badge>}</Button>
-              ))}
-            </CardContent>
-          </Card>
+        <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <aside className="hidden lg:block">
+            <div className="sticky top-20 rounded-2xl border border-border bg-card p-3 shadow-sm">
+              <p className="px-3 pb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Your library</p>
+              <nav className="space-y-1" aria-label="Library sections">
+                {([
+                  ['community', 'Discover', Search], ['my-books', 'My books', LibraryBig], ['assigned', 'Assigned', BookMarked], ['saved', 'Saved resources', Bookmark], ['downloaded', 'Downloaded', Download], ['curriculum', 'Curriculum', FileText], ['highlights', 'Highlights', Highlighter], ['notes', 'Saved notes', StickyNote],
+                ] as const).map(([key, label, Icon]) => (
+                  <button key={key} type="button" aria-current={activeSection === key ? 'page' : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm transition ${activeSection === key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => { setActiveSection(key); setVisibleCount(PAGE_SIZE); }}>
+                    <Icon className="h-4 w-4 shrink-0" /><span className="flex-1">{label}</span>{sectionCounts[key] !== undefined && <span className={`rounded-full px-2 py-0.5 text-xs ${activeSection === key ? 'bg-primary-foreground/15' : 'bg-muted'}`}>{sectionCounts[key]}</span>}
+                  </button>
+                ))}
+              </nav>
+              <div className="mt-4 border-t border-border pt-4"><p className="px-3 text-xs leading-5 text-muted-foreground">Read first. Save what matters. Come back when you are ready.</p></div>
+            </div>
+          </aside>
 
-          <div className="space-y-4">
-            {(activeSection === 'community' || activeSection === 'my-books' || activeSection === 'saved' || activeSection === 'downloaded') && (
-              <Card>
-                <CardContent className="p-4 grid gap-3 md:grid-cols-4">
-                  <div className="md:col-span-4 flex flex-wrap items-end justify-between gap-3 border-b border-border/60 pb-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Resource library</p><h2 className="mt-1 text-xl font-bold">{activeSection === 'community' ? 'Recommended for you' : sectionLabels[activeSection]}</h2><p className="mt-1 text-sm text-muted-foreground">{filteredBooks.length} resource{filteredBooks.length === 1 ? '' : 's'} available in this view.</p></div>{activeSection === 'community' && <Badge variant="outline">Grades {studentGradeMin}–{studentGradeMax}</Badge>}</div>
-                  <div className="md:col-span-2 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input className="pl-9" placeholder={"Search by title, author, subject, uploader"} value={search} onChange={(e) => setSearch(e.target.value)} />
-                  </div>
-                  <Select value={subjectFilter} onValueChange={setSubjectFilter}>
-                    <SelectTrigger><SelectValue placeholder="All subjects" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All subjects</SelectItem>
-                      {subjects.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={gradeFilter} onValueChange={setGradeFilter}>
-                    <SelectTrigger><SelectValue placeholder="All grades" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All grades</SelectItem>
-                      {Array.from({ length: user?.role === 'student' ? studentGradeMax - studentGradeMin + 1 : 12 }, (_, index) => {
-                        const grade = user?.role === 'student' ? studentGradeMin + index : index + 1;
-                        return <SelectItem key={grade} value={String(grade)}>Grade {grade}</SelectItem>;
-                      })}
-                    </SelectContent>
-                  </Select>
-                </CardContent>
-              </Card>
-            )}
+          <main className="min-w-0 space-y-5">
+            {(activeSection === 'community' || activeSection === 'my-books' || activeSection === 'saved' || activeSection === 'downloaded') && <>
+              <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{activeSection === 'community' ? 'Discover' : sectionLabels[activeSection]}</p><h2 className="mt-1 text-2xl font-bold">{activeSection === 'community' ? 'Explore your learning shelf' : sectionLabels[activeSection]}</h2><p className="mt-1 text-sm text-muted-foreground">{filteredBooks.length} resource{filteredBooks.length === 1 ? '' : 's'} in this view.</p></div>
+                  {activeSection === 'community' && <Badge variant="outline" className="w-fit rounded-full">Grades {studentGradeMin}–{studentGradeMax}</Badge>}
+                </div>
+                {activeSection === 'community' && continueBook?.book && <button type="button" className="mb-4 flex w-full flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-left transition hover:border-primary/40 hover:bg-primary/10 sm:flex-row sm:items-center sm:justify-between" onClick={() => openReader(continueBook.book!)}>
+                  <span className="min-w-0"><span className="block text-xs font-semibold uppercase tracking-[0.16em] text-primary">Continue reading</span><span className="mt-1 block truncate font-semibold">{continueBook.book.title}</span><span className="mt-1 block text-sm text-muted-foreground">You are {Math.round(continueBook.progress)}% through this resource.</span></span><span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-primary">Open book <BookOpen className="h-4 w-4" /></span>
+                </button>}
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_150px]">
+                  <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Search library" className="h-11 pl-9" placeholder="Search books, subjects, or authors" value={search} onChange={(e) => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }} /></div>
+                  <Select value={subjectFilter} onValueChange={(value) => { setSubjectFilter(value); setVisibleCount(PAGE_SIZE); }}><SelectTrigger className="h-11"><SlidersHorizontal className="mr-2 h-4 w-4 text-muted-foreground" /><SelectValue placeholder="All subjects" /></SelectTrigger><SelectContent><SelectItem value="all">All subjects</SelectItem>{subjects.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}</SelectContent></Select>
+                  <Select value={gradeFilter} onValueChange={(value) => { setGradeFilter(value); setVisibleCount(PAGE_SIZE); }}><SelectTrigger className="h-11"><SelectValue placeholder="All grades" /></SelectTrigger><SelectContent><SelectItem value="all">All grades</SelectItem>{Array.from({ length: user?.role === 'student' ? studentGradeMax - studentGradeMin + 1 : 12 }, (_, index) => { const grade = user?.role === 'student' ? studentGradeMin + index : index + 1; return <SelectItem key={grade} value={String(grade)}>Grade {grade}</SelectItem>; })}</SelectContent></Select>
+                </div>
+              </section>
 
-            {activeSection === 'curriculum' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5" /> Grade 9–12 Curriculum Textbooks</CardTitle>
-                  <p className="text-sm text-muted-foreground">Catalog grouped under the requested 2019 E.C. curriculum label. Entries link to the textbook index; individual editions and downloadable files are not yet independently verified.</p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {curriculumCatalogError && (
-                    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
-                      The textbook catalog could not be loaded. The database migration may not have been applied yet. Existing Library books are unaffected.
-                    </div>
-                  )}
-                  {!curriculumCatalogError && curriculumBooks.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No catalog entries are available yet.</p>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {curriculumBooks.filter((book) => {
-                      const query = search.trim().toLowerCase();
-                      const matchesQuery = !query || book.book_title.toLowerCase().includes(query) || book.subject.toLowerCase().includes(query);
-                      const matchesGrade = gradeFilter === 'all' || String(book.grade_level) === gradeFilter;
-                      const matchesSubject = subjectFilter === 'all' || book.subject === subjectFilter;
-                      return matchesQuery && matchesGrade && matchesSubject;
-                    }).map((book) => (
-                      <div key={book.id} className="rounded-lg border p-4 flex flex-col gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className="rounded-md bg-muted p-2"><FileText className="h-5 w-5" /></div>
-                          <div className="min-w-0">
-                            <h3 className="font-semibold">{book.book_title}</h3>
-                            <p className="text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level}</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline">2019 E.C. collection</Badge>
-                          <Badge variant="secondary">External reference</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{book.notes}</p>
-                        <div className="mt-auto">
-                          <Button asChild size="sm" variant="outline" className="gap-2">
-                            <a href={book.source_url} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4" /> Open textbook index
-                            </a>
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+              {loading ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-[360px] animate-pulse rounded-2xl border border-border bg-muted/50" />)}</div> : filteredBooks.length === 0 ? <Card className="border-dashed"><CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center"><div className="mb-4 rounded-2xl bg-primary/10 p-4 text-primary"><BookOpen className="h-8 w-8" /></div><h3 className="text-lg font-semibold">{activeSection === 'saved' ? 'Your shelf is ready for its first save' : activeSection === 'downloaded' ? 'Nothing downloaded yet' : 'No resources match these filters'}</h3><p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{activeSection === 'saved' ? 'Use the bookmark action on a resource you want to revisit.' : activeSection === 'downloaded' ? 'Download a PDF from Discover and it will appear here.' : 'Try a different subject, grade, or search phrase.'}</p></CardContent></Card> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{visibleBooks.map((book) => {
+                const thumbnailUrl = assetUrls[book.id]?.thumbnail || null;
+                const pdfUrl = assetUrls[book.id]?.pdf || '';
+                const hasValidPdfUrl = isValidPublicUrl(pdfUrl);
+                const isBookmarked = bookmarkSet.has(book.id);
+                return <motion.article key={book.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -3 }} transition={{ duration: 0.2 }} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+                  <div className="relative aspect-[16/10] overflow-hidden bg-muted">{thumbnailUrl ? <img src={thumbnailUrl} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" alt="" /> : <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground"><FileText className="h-8 w-8" /><span className="text-xs">PDF resource</span></div>}<div className="absolute left-3 top-3 flex gap-2"><Badge className="rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur">{book.subject}</Badge>{book.status !== 'approved' && <Badge variant="destructive" className="rounded-full">{book.status}</Badge>}</div><button type="button" aria-label={isBookmarked ? `Remove ${book.title} from saved resources` : `Save ${book.title}`} className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={async () => { try { const next = await toggleBookmark(book.id, user.id, isBookmarked); setBookmarkSet((prev) => { const set = new Set(prev); if (next) set.add(book.id); else set.delete(book.id); return set; }); toast.success(next ? 'Saved to your shelf.' : 'Removed from your shelf.'); } catch { toast.error('Could not update your shelf.'); } }}>{isBookmarked ? <BookmarkCheck className="h-4 w-4 fill-current" /> : <Bookmark className="h-4 w-4" />}</button></div>
+                  <div className="flex flex-1 flex-col p-4"><div className="mb-3 flex items-start justify-between gap-2"><div className="min-w-0"><h3 className="line-clamp-2 text-lg font-semibold leading-tight">{book.title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.author}</p></div><Badge variant="outline" className="shrink-0 rounded-full">Grade {book.grade_level || '—'}</Badge></div><p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{book.description}</p><div className="mt-auto flex items-center justify-between gap-3 pt-5"><Button className="gap-2" onClick={() => openReader(book)} disabled={!hasValidPdfUrl}><BookOpen className="h-4 w-4" />Read</Button><div className="flex items-center gap-1"><Button asChild size="icon" variant="ghost" disabled={!hasValidPdfUrl} aria-label={`Download ${book.title}`}><a href={pdfUrl} target="_blank" rel="noreferrer" onClick={() => markDownloaded(book.id)}><Download className="h-4 w-4" /></a></Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`More actions for ${book.title}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => { navigator.clipboard?.writeText(book.title); toast.success('Book title copied.'); }}>Copy title</DropdownMenuItem>{canManageBook(book) && <><DropdownMenuSeparator /><DropdownMenuItem onClick={() => { setEditingBookId(book.id); setForm({ title: book.title, author: book.author, subject: book.subject, description: book.description, gradeLevel: String(book.grade_level || 9), type: book.type, bookCategory: book.book_category || 'academic', file: null }); setOpenUpload(true); }}>Edit details</DropdownMenuItem>{book.status !== 'approved' && (user.role === 'teacher' || user.role === 'admin' || user.role === 'manager') && <><DropdownMenuItem onClick={async () => { await moderateBookUpload({ bookId: book.id, moderatorId: user.id, status: 'approved', note: 'Approved by moderator' }); toast.success('Book approved.'); await load(); }}>Approve</DropdownMenuItem><DropdownMenuItem onClick={async () => { await moderateBookUpload({ bookId: book.id, moderatorId: user.id, status: 'rejected', note: 'Rejected by moderator' }); toast.success('Book rejected.'); await load(); }}>Reject</DropdownMenuItem></>}<DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => { if (window.confirm(`Delete “${book.title}”?`)) void handleDelete(book.id); }}>Delete</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu></div></div></div>
+                </motion.article>;
+              })}</div>}
+              {!loading && visibleCount < filteredBooks.length && <div className="flex justify-center"><Button variant="outline" onClick={() => setVisibleCount((value) => value + PAGE_SIZE)}>Load more resources</Button></div>}
+            </>}
 
-            {activeSection === 'assigned' && (
-              <Card>
-                <CardHeader><CardTitle>Assigned Books</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  {assignedBooks.length === 0 && <p className="text-sm text-muted-foreground">No assigned books yet.</p>}
-                  {assignedBooks.map((book) => (
-                    <div key={book.id} className="flex items-center justify-between gap-2 border rounded-lg p-3">
-                      <div>
-                        <p className="font-medium">{book.title}</p>
-                        <p className="text-xs text-muted-foreground">{book.subject} • Grade {book.grade_level || '-'}</p>
-                      </div>
-                      <Button size="sm" onClick={() => openReader(book)}><BookOpen className="h-4 w-4 mr-2" />Read</Button>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+            {activeSection === 'assigned' && <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">For you</p><h2 className="mt-1 text-2xl font-bold">Assigned reading</h2><p className="mt-1 text-sm text-muted-foreground">Resources shared with you by a teacher or school.</p><div className="mt-6 space-y-3">{assignedBooks.length === 0 ? <div className="rounded-xl border border-dashed p-10 text-center"><BookMarked className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-medium">Nothing assigned yet</p><p className="mt-1 text-sm text-muted-foreground">Assigned books will appear here when they are ready.</p></div> : assignedBooks.map((book) => <div key={book.id} className="flex flex-col gap-4 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold">{book.title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level || '—'} · {book.author}</p></div><Button className="gap-2 sm:shrink-0" onClick={() => openReader(book)}><BookOpen className="h-4 w-4" />Read assignment</Button></div>)}</div></section>}
 
-            {(activeSection === 'highlights' || activeSection === 'notes') && (
-              <Card>
-                <CardHeader><CardTitle>{activeSection === 'highlights' ? 'My Highlights' : 'Saved Notes'}</CardTitle></CardHeader>
-                <CardContent className="space-y-3 max-h-[60vh] overflow-auto">
-                  {highlights.length === 0 && <p className="text-sm text-muted-foreground">Nothing saved yet.</p>}
-                  {highlights.map((item) => (
-                    <div key={item.id} className="rounded-lg border p-3">
-                      <Badge variant="secondary" className="mb-2">{item.highlight_color}</Badge>
-                      <p className="text-sm">{item.selected_text}</p>
-                      {item.note && <p className="text-xs text-muted-foreground mt-2">📝 {item.note}</p>}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+            {activeSection === 'curriculum' && <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Reference shelf</p><h2 className="mt-1 text-2xl font-bold">Curriculum textbooks</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">A curated index of Grade 9–12 curriculum references. External links open in a new tab so you can keep your library context.</p>{curriculumCatalogError && <div className="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">The curriculum catalog could not be loaded. Existing library resources are still available.</div>}<div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{curriculumBooks.filter((book) => { const query = search.trim().toLowerCase(); return (!query || book.book_title.toLowerCase().includes(query) || book.subject.toLowerCase().includes(query)) && (gradeFilter === 'all' || String(book.grade_level) === gradeFilter) && (subjectFilter === 'all' || book.subject === subjectFilter); }).map((book) => <article key={book.id} className="flex flex-col rounded-xl border border-border p-4"><div className="flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><FileText className="h-5 w-5" /></div><div><h3 className="font-semibold leading-tight">{book.book_title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level}</p></div></div><p className="mt-4 flex-1 text-sm leading-6 text-muted-foreground">{book.notes}</p><Button asChild variant="outline" className="mt-4 w-full gap-2"><a href={book.source_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" />Open textbook index</a></Button></article>)}</div></section>}
 
-            {(activeSection === 'community' || activeSection === 'my-books' || activeSection === 'saved' || activeSection === 'downloaded') && (
-              loading ? (
-                <div className="flex justify-center py-16"><Loader2 className="h-10 w-10 animate-spin" /></div>
-              ) : (
-                <>
-                  {filteredBooks.length === 0 && (
-                    <Card className="mb-4 border-dashed"><CardContent className="p-8 text-center"><BookOpen className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="font-semibold">{activeSection === 'saved' ? 'No saved resources yet' : activeSection === 'downloaded' ? 'No downloaded resources yet' : 'No resources match these filters'}</p><p className="mt-1 text-sm text-muted-foreground">{activeSection === 'saved' ? 'Use Save on a library card to keep it here.' : activeSection === 'downloaded' ? 'Download a PDF from the Community Library to track it here.' : 'Try a different search, subject, or grade.'}</p></CardContent></Card>
-                  )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <AnimatePresence>
-                      {visibleBooks.map((book) => {
-                        const thumbnailUrl = assetUrls[book.id]?.thumbnail || null;
-                        const pdfUrl = assetUrls[book.id]?.pdf || '';
-                        const hasValidPdfUrl = isValidPublicUrl(pdfUrl);
-                        const isBookmarked = bookmarkSet.has(book.id);
-
-                        return (
-                          <motion.div
-                            key={book.id}
-                            initial={{ opacity: 0, y: 12 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -12 }}
-                            whileHover={{ y: -4 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <Card className="h-full border-white/20 bg-card/90 backdrop-blur-sm">
-                              <CardContent className="p-4 space-y-3">
-                                <div className="aspect-[4/3] rounded-md overflow-hidden bg-muted flex items-center justify-center">
-                                  {thumbnailUrl ? (
-                                    <img src={thumbnailUrl} className="w-full h-full object-cover" alt={book.title} />
-                                  ) : (
-                                    <div className="text-sm text-muted-foreground px-3 text-center">Thumbnail unavailable</div>
-                                  )}
-                                </div>
-
-                                <div className="space-y-1">
-                                  <h3 className="font-semibold line-clamp-2">{book.title}</h3>
-                                  <p className="text-sm text-muted-foreground">{book.author}</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    <Badge>{book.subject}</Badge>
-                                    <Badge variant="outline">Grade {book.grade_level || '-'}</Badge>
-                                    <Badge variant="secondary" className="capitalize">{book.type}</Badge>
-                                    <Badge variant={book.status === 'approved' ? 'default' : 'destructive'}>{book.status}</Badge>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <User className="h-3 w-3" /> {book.profiles?.name || 'Unknown uploader'}
-                                  </div>
-                                </div>
-
-                                <p className="text-sm text-muted-foreground line-clamp-3">{book.description}</p>
-
-                                <div className="flex gap-2 flex-wrap">
-                                  <Button size="sm" className="gap-2" onClick={() => openReader(book)} disabled={!hasValidPdfUrl}>
-                                    <BookOpen className="h-4 w-4" /> Read
-                                  </Button>
-                                  <Button asChild size="sm" variant="outline" className="gap-2" disabled={!hasValidPdfUrl}>
-                                    <a href={pdfUrl} target="_blank" rel="noreferrer" onClick={() => markDownloaded(book.id)}>
-                                      <Download className="h-4 w-4" /> Download
-                                    </a>
-                                  </Button>
-                                  {!hasValidPdfUrl && <p className="text-xs text-destructive">Invalid file URL.</p>}
-
-                                  {user.role === 'student' && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="gap-2"
-                                      onClick={async () => {
-                                        try {
-                                          const next = await toggleBookmark(book.id, user.id, isBookmarked);
-                                          setBookmarkSet((prev) => {
-                                            const set = new Set(prev);
-                                            if (next) set.add(book.id);
-                                            else set.delete(book.id);
-                                            return set;
-                                          });
-                                        } catch {
-                                          toast.error('Bookmark action failed.');
-                                        }
-                                      }}
-                                    >
-                                      {isBookmarked ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-                                      {isBookmarked ? 'Saved' : 'Save'}
-                                    </Button>
-                                  )}
-
-                                  {canManageBook(book) && (
-                                    <>
-                                      <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() => {
-                                          setEditingBookId(book.id);
-                                          setForm({
-                                            title: book.title,
-                                            author: book.author,
-                                            subject: book.subject,
-                                            description: book.description,
-                                            gradeLevel: String(
-                                              book.grade_level && user?.role === 'student'
-                                                ? Math.min(studentGradeMax, Math.max(studentGradeMin, book.grade_level))
-                                                : book.grade_level || (user?.role === 'student' ? studentGradeMin : 9)
-                                            ),
-                                            type: book.type,
-                                            bookCategory: book.book_category || 'academic',
-                                            file: null,
-                                          });
-                                          setOpenUpload(true);
-                                        }}
-                                      >
-                                        Edit
-                                      </Button>
-                                      {book.status !== 'approved' && (user.role === 'teacher' || user.role === 'admin' || user.role === 'manager') && (
-                                        <>
-                                          <Button size="sm" onClick={async () => {
-                                            await moderateBookUpload({
-                                              bookId: book.id,
-                                              moderatorId: user.id,
-                                              status: 'approved',
-                                              note: 'Approved by moderator',
-                                            });
-                                            toast.success('Book approved.');
-                                            await load();
-                                          }}>
-                                            Approve
-                                          </Button>
-                                          <Button size="sm" variant="outline" onClick={async () => {
-                                            await moderateBookUpload({
-                                              bookId: book.id,
-                                              moderatorId: user.id,
-                                              status: 'rejected',
-                                              note: 'Rejected by moderator',
-                                            });
-                                            toast.success('Book rejected.');
-                                            await load();
-                                          }}>
-                                            Reject
-                                          </Button>
-                                        </>
-                                      )}
-                                      <Button size="sm" variant="destructive" onClick={() => handleDelete(book.id)}>
-                                        Delete
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-
-                  {visibleCount < filteredBooks.length && (
-                    <div className="flex justify-center py-3">
-                      <Button variant="outline" onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}>Load more</Button>
-                    </div>
-                  )}
-                </>
-              )
-            )}
-          </div>
+            {(activeSection === 'highlights' || activeSection === 'notes') && <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your study memory</p><h2 className="mt-1 text-2xl font-bold">{activeSection === 'highlights' ? 'Highlights' : 'Saved notes'}</h2><p className="mt-1 text-sm text-muted-foreground">Small pieces of reading you chose to keep close.</p><div className="mt-6 space-y-3">{highlights.filter((item) => activeSection === 'highlights' || Boolean(item.note)).length === 0 ? <div className="rounded-xl border border-dashed p-10 text-center"><Highlighter className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-medium">Nothing saved here yet</p><p className="mt-1 text-sm text-muted-foreground">Open a book, select an excerpt, and save it while you read.</p></div> : highlights.filter((item) => activeSection === 'highlights' || Boolean(item.note)).map((item) => <article key={item.id} className="rounded-xl border border-border p-4"><div className="flex items-center justify-between gap-3"><Badge variant="secondary" className="capitalize rounded-full">{item.highlight_color} highlight</Badge><span className="text-xs text-muted-foreground">Page {item.page_number}</span></div><p className="mt-3 text-sm leading-6">“{item.selected_text}”</p>{item.note && <p className="mt-3 border-l-2 border-primary/40 pl-3 text-sm leading-6 text-muted-foreground">{item.note}</p>}</article>)}</div></section>}
+          </main>
         </div>
       </div>
 
       <Dialog open={readerOpen} onOpenChange={setReaderOpen}>
-        <DialogContent className="fixed inset-0 left-0 top-0 translate-x-0 translate-y-0 w-screen max-w-none h-[100dvh] rounded-none p-0 overflow-hidden">
-          <div className={`h-full min-h-0 grid grid-cols-1 ${selectedBook?.book_category === "academic" && aiPanelOpen ? "lg:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1"}`}>
-            <div className="flex flex-col h-full border-r">
-              <div className="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-semibold">{selectedBook?.title || 'Reader'}</p>
-                  <p className="text-xs text-muted-foreground">Progress: {Math.round(readerProgress)}%</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedBook?.book_category === "academic" && <Button size="sm" variant="outline" onClick={() => setAiPanelOpen((open) => !open)}><Brain className="h-4 w-4 mr-1" />{aiPanelOpen ? "Hide AI tools" : "Study tools"}</Button>}
-                  <Button size="sm" variant="outline" onClick={() => markReaderProgress(Math.min(100, readerProgress + 10))}>+10%</Button>
-                  <Button size="sm" variant="outline" onClick={() => markReaderProgress(Math.max(0, readerProgress - 10))}>-10%</Button>
-                </div>
-              </div>
-
-              <div className="flex-1 bg-muted/30 p-2">
-                {selectedBook && readerUrl && (
-                  <div className="relative h-full">
-                    {readerLoading && (
-                      <div className="absolute inset-0 rounded-md border bg-background/90 z-10 p-4 space-y-3">
-                        <div className="h-5 w-1/3 rounded bg-muted animate-pulse" />
-                        <div className="h-4 w-full rounded bg-muted animate-pulse" />
-                        <div className="h-4 w-5/6 rounded bg-muted animate-pulse" />
-                        <div className="h-[70%] w-full rounded bg-muted animate-pulse" />
-                      </div>
-                    )}
-                    {readerError ? (
-                      <div className="h-full flex items-center justify-center">
-                        <div className="text-center space-y-2">
-                          <p className="text-sm text-destructive">{readerError}</p>
-                          <Button size="sm" onClick={() => {
-                            setReaderRetry((prev) => prev + 1);
-                            setReaderLoading(true);
-                            setReaderError(null);
-                          }}>Retry</Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <iframe
-                        key={`${selectedBook.id}-${readerRetry}`}
-                        title={selectedBook.title}
-                        src={readerUrl}
-                        className="w-full h-full rounded-md bg-white"
-                        onLoad={() => setReaderLoading(false)}
-                        onError={() => {
-                          setReaderLoading(false);
-                          setReaderError('Reader failed to load this file.');
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {selectedBook?.book_category === "academic" && <div className="p-3 border-t grid gap-2 md:grid-cols-2">
-                <Input placeholder="Paste selected text here for highlight/AI" value={selectedText} onChange={(e) => setSelectedText(e.target.value)} />
-                <Input placeholder="Paste current page text (for better AI output)" value={readerPageText} onChange={(e) => setReaderPageText(e.target.value)} />
-                <div className="flex flex-wrap gap-2 items-center">
-                  <Button size="sm" variant={highlightColor === 'yellow' ? 'default' : 'outline'} onClick={() => setHighlightColor('yellow')}><Highlighter className="h-4 w-4 mr-2" />Yellow</Button>
-                  <Button size="sm" variant={highlightColor === 'blue' ? 'default' : 'outline'} onClick={() => setHighlightColor('blue')}>Blue</Button>
-                  <Button size="sm" variant={highlightColor === 'red' ? 'default' : 'outline'} onClick={() => setHighlightColor('red')}>Red</Button>
-                </div>
-                <div className="flex gap-2">
-                  <Input placeholder="Add note" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
-                  <Button size="sm" onClick={saveHighlight}>Save</Button>
-                </div>
-              </div>}
-            </div>
-
-            {selectedBook?.book_category === "academic" && aiPanelOpen && <div className="h-full min-h-0 overflow-y-auto overscroll-contain p-3 space-y-3 border-l bg-background">
-              <p className="font-semibold flex items-center gap-2"><Brain className="h-4 w-4" />AI Tools</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button size="sm" variant="outline" onClick={() => runAi('summary')}>Summarize</Button>
-                <Button size="sm" variant="outline" onClick={() => runAi('simple')}>Explain Simply</Button>
-                <Button size="sm" variant="outline" onClick={() => runAi('questions')}>Generate Questions</Button>
-                <Button size="sm" variant="outline" onClick={() => runAi('flashcards')}>Create Flashcards</Button>
-                <Button size="sm" variant="outline" className="col-span-2" onClick={() => runAi('concepts')}>Find Key Concepts</Button>
-              </div>
-
-              <Card>
-                <CardHeader><CardTitle className="text-sm">AI Output</CardTitle></CardHeader>
-                <CardContent>
-                  <pre className="text-xs whitespace-pre-wrap font-sans">{aiOutput || 'Run an AI action from above.'}</pre>
-                </CardContent>
-              </Card>
-
-              {flashcards.length > 0 && (
-                <Card>
-                  <CardHeader><CardTitle className="text-sm">Generated Flashcards</CardTitle></CardHeader>
-                  <CardContent className="space-y-2">
-                    {flashcards.map((card, idx) => (
-                      <div key={idx} className="rounded border p-2">
-                        <p className="text-xs font-medium">Front: {card.front}</p>
-                        <p className="text-xs text-muted-foreground">Back: {card.back}</p>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Saved AI Questions</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                  {savedQuestions.slice(0, 10).map((q) => (
-                    <div key={q.id || `${q.question}-${q.answer}`} className="rounded border p-2">
-                      <p className="text-xs font-medium">Q: {q.question}</p>
-                      <p className="text-xs text-muted-foreground">A: {q.answer}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>}
+        <DialogContent className="fixed inset-0 left-0 top-0 h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none p-0">
+          <div className={`grid h-full min-h-0 grid-cols-1 ${selectedBook?.book_category === 'academic' && aiPanelOpen ? 'lg:grid-cols-[minmax(0,1fr)_360px]' : ''}`}>
+            <section className="flex min-h-0 flex-col bg-[#eef1f4]">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-3 sm:px-6"><div className="min-w-0"><p className="truncate font-semibold">{selectedBook?.title || 'Reader'}</p><p className="text-xs text-muted-foreground">{selectedBook?.author} · {Math.round(readerProgress)}% complete</p></div><div className="flex items-center gap-2">{selectedBook?.book_category === 'academic' && <Button size="sm" variant="outline" className="gap-2" onClick={() => setAiPanelOpen((open) => !open)}><Brain className="h-4 w-4" />{aiPanelOpen ? 'Hide tools' : 'Study tools'}</Button>}<Button size="sm" variant="outline" onClick={() => markReaderProgress(Math.min(100, readerProgress + 10))}>Mark +10%</Button></div></div>
+              <div className="min-h-0 flex-1 p-2 sm:p-4"><div className="relative h-full">{readerLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border bg-background/90"><div className="text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" /><p className="mt-3 text-sm text-muted-foreground">Opening your book…</p></div></div>}{readerError ? <div className="flex h-full items-center justify-center rounded-xl border bg-background"><div className="text-center"><p className="text-sm text-destructive">{readerError}</p><Button className="mt-3" size="sm" onClick={() => { setReaderRetry((value) => value + 1); setReaderLoading(true); setReaderError(null); }}>Try again</Button></div></div> : readerUrl && selectedBook && <iframe key={`${selectedBook.id}-${readerRetry}`} title={`Reading ${selectedBook.title}`} src={readerUrl} className="h-full w-full rounded-xl bg-white" onLoad={() => setReaderLoading(false)} onError={() => { setReaderLoading(false); setReaderError('The reader could not load this PDF.'); }} />}</div></div>
+              {selectedBook?.book_category === 'academic' && <div className="grid gap-2 border-t border-border bg-background p-3 sm:grid-cols-2"><div className="sm:col-span-2"><Label htmlFor="reader-selection" className="sr-only">Selected text</Label><Input id="reader-selection" placeholder="Paste selected text to highlight or study" value={selectedText} onChange={(e) => setSelectedText(e.target.value)} /></div><div className="flex flex-wrap gap-2"><Button size="sm" variant={highlightColor === 'yellow' ? 'default' : 'outline'} onClick={() => setHighlightColor('yellow')}><Highlighter className="mr-1 h-4 w-4" />Yellow</Button><Button size="sm" variant={highlightColor === 'blue' ? 'default' : 'outline'} onClick={() => setHighlightColor('blue')}>Blue</Button><Button size="sm" variant={highlightColor === 'red' ? 'default' : 'outline'} onClick={() => setHighlightColor('red')}>Red</Button></div><div className="flex gap-2"><Label htmlFor="reader-note" className="sr-only">Note</Label><Input id="reader-note" placeholder="Add a note" value={noteText} onChange={(e) => setNoteText(e.target.value)} /><Button size="sm" onClick={saveHighlight}>Save</Button></div></div>}
+            </section>
+            {selectedBook?.book_category === 'academic' && aiPanelOpen && <aside className="min-h-0 overflow-y-auto border-l border-border bg-background p-4 sm:p-5"><div className="mb-4"><p className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-primary" />Study tools</p><p className="mt-1 text-sm leading-5 text-muted-foreground">Use a short excerpt when you want help. The reader stays the source of truth.</p></div><div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" onClick={() => runAi('summary')}>Summarize</Button><Button size="sm" variant="outline" onClick={() => runAi('simple')}>Explain simply</Button><Button size="sm" variant="outline" onClick={() => runAi('questions')}>Practice questions</Button><Button size="sm" variant="outline" onClick={() => runAi('flashcards')}>Flashcards</Button><Button size="sm" variant="outline" className="col-span-2" onClick={() => runAi('concepts')}>Key concepts</Button></div><Card className="mt-4"><CardHeader><CardTitle className="text-sm">AI response</CardTitle></CardHeader><CardContent><pre className="whitespace-pre-wrap font-sans text-xs leading-5">{aiOutput || 'Choose a study tool after adding page text or a selection.'}</pre></CardContent></Card>{flashcards.length > 0 && <Card className="mt-3"><CardHeader><CardTitle className="text-sm">Generated flashcards</CardTitle></CardHeader><CardContent className="space-y-2">{flashcards.map((card, index) => <div key={index} className="rounded-lg border p-3"><p className="text-xs font-semibold">{card.front}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{card.back}</p></div>)}</CardContent></Card>}<Card className="mt-3"><CardHeader><CardTitle className="text-sm">Saved practice questions</CardTitle></CardHeader><CardContent className="space-y-2">{savedQuestions.length === 0 ? <p className="text-xs text-muted-foreground">Questions you save from this reader will appear here.</p> : savedQuestions.slice(0, 10).map((question) => <div key={question.id || question.question} className="rounded-lg border p-3"><p className="text-xs font-semibold">Q: {question.question}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">A: {question.answer}</p></div>)}</CardContent></Card></aside>}
           </div>
         </DialogContent>
       </Dialog>
