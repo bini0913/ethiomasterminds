@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { useUser } from '@/context/UserContext';
 import { getUserTier } from '@/lib/getUserTier';
 import { toast } from 'sonner';
-import BackButton from '@/components/ui/BackButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,7 +74,8 @@ const LibraryPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionKey>('community');
   const [selectedBook, setSelectedBook] = useState<LibraryBook | null>(null);
   const [readerOpen, setReaderOpen] = useState(false);
-  const [aiPanelOpen, setAiPanelOpen] = useState(true);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const [readerUrl, setReaderUrl] = useState<string | null>(null);
   const [readerRetry, setReaderRetry] = useState(0);
   const [readerLoading, setReaderLoading] = useState(false);
@@ -270,6 +270,8 @@ const LibraryPage: React.FC = () => {
     setEditingBookId(null);
   };
 
+  const canViewCurriculum = userTier === 'upper' || user?.role !== 'student';
+
   const canUpload = !!user && (
     user.role === 'teacher' ||
     user.role === 'admin' ||
@@ -399,6 +401,7 @@ const LibraryPage: React.FC = () => {
 
   const runAi = async (action: AiAction) => {
     if (!selectedBook || !user) return;
+    if (aiBusy) return;
     const baseText = (selectedText || readerPageText || '').trim();
     const limitedText = baseText.slice(0, MAX_AI_TEXT_LENGTH);
     if (!limitedText) {
@@ -407,6 +410,7 @@ const LibraryPage: React.FC = () => {
     }
     // Version the cache namespace so previously stored client-generated fallback text
     // is not mistaken for a response produced by the real library AI service.
+    setAiBusy(true);
     const cacheKey = shortHash(`server-ai-v2:${action}:${selectedBook.id}:${limitedText}`);
 
     let output = '';
@@ -431,6 +435,7 @@ const LibraryPage: React.FC = () => {
       } catch (error) {
         console.error("Library AI request failed:", error);
         toast.error(error instanceof Error ? error.message : "Library AI is temporarily unavailable. Please try again.");
+        setAiBusy(false);
         return;
       }
 
@@ -474,6 +479,8 @@ const LibraryPage: React.FC = () => {
       }));
       setFlashcards(cards);
     }
+
+    setAiBusy(false);
   };
 
   const saveHighlight = async () => {
@@ -568,7 +575,7 @@ const LibraryPage: React.FC = () => {
       <div className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pb-10">
         <header className="mb-6 flex flex-col gap-5 border-b border-border/70 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
-            <BackButton />
+            <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><BookOpen className="h-5 w-5" /></div>
             <div className="min-w-0">
               <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">Master Minds Library</p>
               <h1 className="truncate text-3xl font-bold tracking-tight sm:text-4xl">Find your next useful resource.</h1>
@@ -611,13 +618,14 @@ const LibraryPage: React.FC = () => {
           </div>
         </header>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="Library sections">
+        <nav className="mb-5 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="Library sections">
           {([
-            ['community', 'Discover', Search], ['my-books', 'My books', LibraryBig], ['assigned', 'Assigned', BookMarked], ['saved', 'Saved', Bookmark], ['highlights', 'Notes', StickyNote],
+            ['community', 'Discover', Search], ['my-books', 'My books', LibraryBig], ['assigned', 'Assigned', BookMarked], ['saved', 'Saved', Bookmark], ['downloaded', 'Downloaded', Download], ...(canViewCurriculum ? [['curriculum', 'Curriculum', FileText] as const] : []), ['highlights', 'Highlights', Highlighter], ['notes', 'Notes', StickyNote],
           ] as const).map(([key, label, Icon]) => (
-            <Button key={key} variant={activeSection === key ? 'default' : 'outline'} className="shrink-0 gap-2 rounded-full" onClick={() => setActiveSection(key)}><Icon className="h-4 w-4" />{label}{sectionCounts[key] !== undefined && <span className="ml-1 opacity-70">{sectionCounts[key]}</span>}</Button>
+            <Button key={key} variant={activeSection === key ? 'default' : 'outline'} aria-current={activeSection === key ? 'page' : undefined} className="shrink-0 gap-2 rounded-full" onClick={() => { setActiveSection(key); setVisibleCount(PAGE_SIZE); }}><Icon className="h-4 w-4" />{label}{sectionCounts[key] !== undefined && <span className="ml-1 opacity-70">{sectionCounts[key]}</span>}</Button>
           ))}
-        </div>
+          {canUpload && <Button variant="outline" className="shrink-0 gap-2 rounded-full" onClick={() => { resetForm(); setOpenUpload(true); }}><Upload className="h-4 w-4" />Add a book</Button>}
+        </nav>
 
         <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="hidden lg:block">
@@ -625,7 +633,7 @@ const LibraryPage: React.FC = () => {
               <p className="px-3 pb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Your library</p>
               <nav className="space-y-1" aria-label="Library sections">
                 {([
-                  ['community', 'Discover', Search], ['my-books', 'My books', LibraryBig], ['assigned', 'Assigned', BookMarked], ['saved', 'Saved resources', Bookmark], ['downloaded', 'Downloaded', Download], ['curriculum', 'Curriculum', FileText], ['highlights', 'Highlights', Highlighter], ['notes', 'Saved notes', StickyNote],
+                  ['community', 'Discover', Search], ['my-books', 'My books', LibraryBig], ['assigned', 'Assigned', BookMarked], ['saved', 'Saved resources', Bookmark], ['downloaded', 'Downloaded', Download], ...(canViewCurriculum ? [['curriculum', 'Curriculum', FileText] as const] : []), ['highlights', 'Highlights', Highlighter], ['notes', 'Saved notes', StickyNote],
                 ] as const).map(([key, label, Icon]) => (
                   <button key={key} type="button" aria-current={activeSection === key ? 'page' : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm transition ${activeSection === key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`} onClick={() => { setActiveSection(key); setVisibleCount(PAGE_SIZE); }}>
                     <Icon className="h-4 w-4 shrink-0" /><span className="flex-1">{label}</span>{sectionCounts[key] !== undefined && <span className={`rounded-full px-2 py-0.5 text-xs ${activeSection === key ? 'bg-primary-foreground/15' : 'bg-muted'}`}>{sectionCounts[key]}</span>}
@@ -668,7 +676,7 @@ const LibraryPage: React.FC = () => {
 
             {activeSection === 'assigned' && <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">For you</p><h2 className="mt-1 text-2xl font-bold">Assigned reading</h2><p className="mt-1 text-sm text-muted-foreground">Resources shared with you by a teacher or school.</p><div className="mt-6 space-y-3">{assignedBooks.length === 0 ? <div className="rounded-xl border border-dashed p-10 text-center"><BookMarked className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-medium">Nothing assigned yet</p><p className="mt-1 text-sm text-muted-foreground">Assigned books will appear here when they are ready.</p></div> : assignedBooks.map((book) => <div key={book.id} className="flex flex-col gap-4 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold">{book.title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level || '—'} · {book.author}</p></div><Button className="gap-2 sm:shrink-0" onClick={() => openReader(book)}><BookOpen className="h-4 w-4" />Read assignment</Button></div>)}</div></section>}
 
-            {activeSection === 'curriculum' && <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Reference shelf</p><h2 className="mt-1 text-2xl font-bold">Curriculum textbooks</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">A curated index of Grade 9–12 curriculum references. External links open in a new tab so you can keep your library context.</p>{curriculumCatalogError && <div className="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">The curriculum catalog could not be loaded. Existing library resources are still available.</div>}<div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{curriculumBooks.filter((book) => { const query = search.trim().toLowerCase(); return (!query || book.book_title.toLowerCase().includes(query) || book.subject.toLowerCase().includes(query)) && (gradeFilter === 'all' || String(book.grade_level) === gradeFilter) && (subjectFilter === 'all' || book.subject === subjectFilter); }).map((book) => <article key={book.id} className="flex flex-col rounded-xl border border-border p-4"><div className="flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><FileText className="h-5 w-5" /></div><div><h3 className="font-semibold leading-tight">{book.book_title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level}</p></div></div><p className="mt-4 flex-1 text-sm leading-6 text-muted-foreground">{book.notes}</p><Button asChild variant="outline" className="mt-4 w-full gap-2"><a href={book.source_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" />Open textbook index</a></Button></article>)}</div></section>}
+            {activeSection === 'curriculum' && canViewCurriculum && <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Reference shelf</p><h2 className="mt-1 text-2xl font-bold">Curriculum textbooks</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">A curated index of Grade 9–12 curriculum references. External links open in a new tab so you can keep your library context.</p>{curriculumCatalogError && <div className="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">The curriculum catalog could not be loaded. Existing library resources are still available.</div>}<div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{curriculumBooks.filter((book) => { const query = search.trim().toLowerCase(); return (!query || book.book_title.toLowerCase().includes(query) || book.subject.toLowerCase().includes(query)) && (gradeFilter === 'all' || String(book.grade_level) === gradeFilter) && (subjectFilter === 'all' || book.subject === subjectFilter); }).map((book) => <article key={book.id} className="flex flex-col rounded-xl border border-border p-4"><div className="flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><FileText className="h-5 w-5" /></div><div><h3 className="font-semibold leading-tight">{book.book_title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level}</p></div></div><p className="mt-4 flex-1 text-sm leading-6 text-muted-foreground">{book.notes}</p><Button asChild variant="outline" className="mt-4 w-full gap-2"><a href={book.source_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" />Open textbook index</a></Button></article>)}</div></section>}
 
             {(activeSection === 'highlights' || activeSection === 'notes') && <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your study memory</p><h2 className="mt-1 text-2xl font-bold">{activeSection === 'highlights' ? 'Highlights' : 'Saved notes'}</h2><p className="mt-1 text-sm text-muted-foreground">Small pieces of reading you chose to keep close.</p><div className="mt-6 space-y-3">{highlights.filter((item) => activeSection === 'highlights' || Boolean(item.note)).length === 0 ? <div className="rounded-xl border border-dashed p-10 text-center"><Highlighter className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-medium">Nothing saved here yet</p><p className="mt-1 text-sm text-muted-foreground">Open a book, select an excerpt, and save it while you read.</p></div> : highlights.filter((item) => activeSection === 'highlights' || Boolean(item.note)).map((item) => <article key={item.id} className="rounded-xl border border-border p-4"><div className="flex items-center justify-between gap-3"><Badge variant="secondary" className="capitalize rounded-full">{item.highlight_color} highlight</Badge><span className="text-xs text-muted-foreground">Page {item.page_number}</span></div><p className="mt-3 text-sm leading-6">“{item.selected_text}”</p>{item.note && <p className="mt-3 border-l-2 border-primary/40 pl-3 text-sm leading-6 text-muted-foreground">{item.note}</p>}</article>)}</div></section>}
           </main>
@@ -677,13 +685,13 @@ const LibraryPage: React.FC = () => {
 
       <Dialog open={readerOpen} onOpenChange={setReaderOpen}>
         <DialogContent className="fixed inset-0 left-0 top-0 h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none p-0">
-          <div className={`grid h-full min-h-0 grid-cols-1 ${selectedBook?.book_category === 'academic' && aiPanelOpen ? 'lg:grid-cols-[minmax(0,1fr)_360px]' : ''}`}>
+          <div className={`grid h-full min-h-0 grid-cols-1 ${selectedBook?.book_category === 'academic' && aiPanelOpen ? 'grid-rows-[minmax(0,1fr)_minmax(0,35dvh)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_360px]' : ''}`}>
             <section className="flex min-h-0 flex-col bg-[#eef1f4]">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-3 sm:px-6"><div className="min-w-0"><p className="truncate font-semibold">{selectedBook?.title || 'Reader'}</p><p className="text-xs text-muted-foreground">{selectedBook?.author} · {Math.round(readerProgress)}% complete</p></div><div className="flex items-center gap-2">{selectedBook?.book_category === 'academic' && <Button size="sm" variant="outline" className="gap-2" onClick={() => setAiPanelOpen((open) => !open)}><Brain className="h-4 w-4" />{aiPanelOpen ? 'Hide tools' : 'Study tools'}</Button>}<Button size="sm" variant="outline" onClick={() => markReaderProgress(Math.min(100, readerProgress + 10))}>Mark +10%</Button></div></div>
               <div className="min-h-0 flex-1 p-2 sm:p-4"><div className="relative h-full">{readerLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border bg-background/90"><div className="text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" /><p className="mt-3 text-sm text-muted-foreground">Opening your book…</p></div></div>}{readerError ? <div className="flex h-full items-center justify-center rounded-xl border bg-background"><div className="text-center"><p className="text-sm text-destructive">{readerError}</p><Button className="mt-3" size="sm" onClick={() => { setReaderRetry((value) => value + 1); setReaderLoading(true); setReaderError(null); }}>Try again</Button></div></div> : readerUrl && selectedBook && <iframe key={`${selectedBook.id}-${readerRetry}`} title={`Reading ${selectedBook.title}`} src={readerUrl} className="h-full w-full rounded-xl bg-white" onLoad={() => setReaderLoading(false)} onError={() => { setReaderLoading(false); setReaderError('The reader could not load this PDF.'); }} />}</div></div>
               {selectedBook?.book_category === 'academic' && <div className="grid gap-2 border-t border-border bg-background p-3 sm:grid-cols-2"><div className="sm:col-span-2"><Label htmlFor="reader-selection" className="sr-only">Selected text</Label><Input id="reader-selection" placeholder="Paste selected text to highlight or study" value={selectedText} onChange={(e) => setSelectedText(e.target.value)} /></div><div className="flex flex-wrap gap-2"><Button size="sm" variant={highlightColor === 'yellow' ? 'default' : 'outline'} onClick={() => setHighlightColor('yellow')}><Highlighter className="mr-1 h-4 w-4" />Yellow</Button><Button size="sm" variant={highlightColor === 'blue' ? 'default' : 'outline'} onClick={() => setHighlightColor('blue')}>Blue</Button><Button size="sm" variant={highlightColor === 'red' ? 'default' : 'outline'} onClick={() => setHighlightColor('red')}>Red</Button></div><div className="flex gap-2"><Label htmlFor="reader-note" className="sr-only">Note</Label><Input id="reader-note" placeholder="Add a note" value={noteText} onChange={(e) => setNoteText(e.target.value)} /><Button size="sm" onClick={saveHighlight}>Save</Button></div></div>}
             </section>
-            {selectedBook?.book_category === 'academic' && aiPanelOpen && <aside className="min-h-0 overflow-y-auto border-l border-border bg-background p-4 sm:p-5"><div className="mb-4"><p className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-primary" />Study tools</p><p className="mt-1 text-sm leading-5 text-muted-foreground">Use a short excerpt when you want help. The reader stays the source of truth.</p></div><div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" onClick={() => runAi('summary')}>Summarize</Button><Button size="sm" variant="outline" onClick={() => runAi('simple')}>Explain simply</Button><Button size="sm" variant="outline" onClick={() => runAi('questions')}>Practice questions</Button><Button size="sm" variant="outline" onClick={() => runAi('flashcards')}>Flashcards</Button><Button size="sm" variant="outline" className="col-span-2" onClick={() => runAi('concepts')}>Key concepts</Button></div><Card className="mt-4"><CardHeader><CardTitle className="text-sm">AI response</CardTitle></CardHeader><CardContent><pre className="whitespace-pre-wrap font-sans text-xs leading-5">{aiOutput || 'Choose a study tool after adding page text or a selection.'}</pre></CardContent></Card>{flashcards.length > 0 && <Card className="mt-3"><CardHeader><CardTitle className="text-sm">Generated flashcards</CardTitle></CardHeader><CardContent className="space-y-2">{flashcards.map((card, index) => <div key={index} className="rounded-lg border p-3"><p className="text-xs font-semibold">{card.front}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{card.back}</p></div>)}</CardContent></Card>}<Card className="mt-3"><CardHeader><CardTitle className="text-sm">Saved practice questions</CardTitle></CardHeader><CardContent className="space-y-2">{savedQuestions.length === 0 ? <p className="text-xs text-muted-foreground">Questions you save from this reader will appear here.</p> : savedQuestions.slice(0, 10).map((question) => <div key={question.id || question.question} className="rounded-lg border p-3"><p className="text-xs font-semibold">Q: {question.question}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">A: {question.answer}</p></div>)}</CardContent></Card></aside>}
+            {selectedBook?.book_category === 'academic' && aiPanelOpen && <aside className="min-h-0 overflow-y-auto border-l border-border bg-background p-4 sm:p-5"><div className="mb-4"><p className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-primary" />Study tools</p><p className="mt-1 text-sm leading-5 text-muted-foreground">Use a short excerpt when you want help. The reader stays the source of truth.</p></div><div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('summary')}>{aiBusy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Summarize</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('simple')}>Explain simply</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('questions')}>Practice questions</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('flashcards')}>Flashcards</Button><Button size="sm" variant="outline" disabled={aiBusy} className="col-span-2" onClick={() => runAi('concepts')}>Key concepts</Button></div><Card className="mt-4"><CardHeader><CardTitle className="text-sm">AI response</CardTitle></CardHeader><CardContent><pre className="whitespace-pre-wrap font-sans text-xs leading-5">{aiOutput || 'Choose a study tool after adding page text or a selection.'}</pre></CardContent></Card>{flashcards.length > 0 && <Card className="mt-3"><CardHeader><CardTitle className="text-sm">Generated flashcards</CardTitle></CardHeader><CardContent className="space-y-2">{flashcards.map((card, index) => <div key={index} className="rounded-lg border p-3"><p className="text-xs font-semibold">{card.front}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{card.back}</p></div>)}</CardContent></Card>}<Card className="mt-3"><CardHeader><CardTitle className="text-sm">Saved practice questions</CardTitle></CardHeader><CardContent className="space-y-2">{savedQuestions.filter((question) => question.book_id === selectedBook.id).length === 0 ? <p className="text-xs text-muted-foreground">Questions you save from this reader will appear here.</p> : savedQuestions.filter((question) => question.book_id === selectedBook.id).slice(0, 10).map((question) => <div key={question.id || question.question} className="rounded-lg border p-3"><p className="text-xs font-semibold">Q: {question.question}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">A: {question.answer}</p></div>)}</CardContent></Card></aside>}
           </div>
         </DialogContent>
       </Dialog>
