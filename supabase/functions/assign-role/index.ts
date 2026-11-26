@@ -21,15 +21,13 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const role = body?.role;
     const targetUserId = body?.target_user_id ?? null;
-
     if (!["student", "teacher", "admin", "manager"].includes(role)) {
       return json({ ok: false, error: "Invalid role" }, 400);
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !anonKey || !serviceKey) return json({ ok: false, error: "Server configuration missing" }, 503);
+    if (!supabaseUrl || !anonKey) return json({ ok: false, error: "Server configuration missing" }, 503);
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -38,48 +36,14 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await userClient.auth.getUser();
     if (authError || !authData.user) return json({ ok: false, error: "Invalid or expired token" }, 401);
 
-    const callerId = authData.user.id;
-    const adminClient = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    const { data: callerRoles, error: callerRoleError } = await adminClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", callerId);
-    const callerIsSuperAdmin = (callerRoles ?? []).some((entry: { role: string }) => entry.role === "extreme_admin");
-
-    // Self-assignment is only allowed for the normal student role.
-    // Use the service-role client for the final insert because clients must not
-    // write platform-wide role assignments directly.
-    if (!targetUserId || targetUserId === callerId) {
-      if (role !== "student") return json({ ok: false, error: "You cannot self-assign a privileged role" }, 403);
-
-      const { error } = await adminClient
-        .from("user_roles")
-        .upsert({ user_id: callerId, role: "student" }, { onConflict: "user_id,role" });
-      if (error) {
-        console.error("Error assigning student role:", error);
-        return json({ ok: false, error: "Failed to assign role" }, 500);
-      }
-      return json({ ok: true, role: "student" });
-    }
-
-    if (callerRoleError) {
-      console.error("Error resolving caller's global role:", callerRoleError);
-      return json({ ok: false, error: "Unable to verify permissions" }, 500);
-    }
-
-    // School roles are stored in school_memberships, not user_roles. Only the
-    // global Super Admin may grant platform-wide roles through this endpoint.
-    if (!callerIsSuperAdmin) {
-      return json({ ok: false, error: "Only the Super Admin can assign platform-wide roles" }, 403);
-    }
-
-    const { error } = await adminClient
-      .from("user_roles")
-      .upsert({ user_id: targetUserId, role }, { onConflict: "user_id,role" });
-
+    const { error } = await userClient.rpc("platform_assign_role", {
+      p_user_id: targetUserId || authData.user.id,
+      p_role: role,
+    });
     if (error) {
-      console.error("Error assigning role:", error);
-      return json({ ok: false, error: "Failed to assign role" }, 500);
+      const message = error.message || "Role assignment was denied";
+      const forbidden = /required|authorized|self-assign|top-level|cannot be changed/i.test(message);
+      return json({ ok: false, error: message }, forbidden ? 403 : 400);
     }
 
     return json({ ok: true, role });

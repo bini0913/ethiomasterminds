@@ -1,27 +1,18 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type RemoteNotification = {
-  userId: string;
-  kind: string;
-  title: string;
-  body: string;
+  sourceId: string;
+  kind: "teacher_announcement" | "admin_announcement" | "quiz_assignment";
   data?: Record<string, string>;
 };
 
 export async function sendRemoteNotification(notification: RemoteNotification): Promise<boolean> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
-  if (!token) return false;
-
   const { data, error } = await supabase.functions.invoke("send-push-notification", {
     body: {
-      user_id: notification.userId,
+      event_id: notification.sourceId,
       kind: notification.kind,
-      title: notification.title,
-      body: notification.body,
       data: notification.data ?? {},
     },
-    headers: { Authorization: `Bearer ${token}` },
   });
 
   if (error) {
