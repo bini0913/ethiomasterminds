@@ -1,4 +1,5 @@
 import type React from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Menu, RefreshCw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -46,6 +47,19 @@ const Navigation = ({ items, activeKey, onNavigate, compact = false }: { items: 
 
 export default function AdminCommandCenterShell({ roleLabel, eyebrow = "Master Minds administration", title, description, activeKey, navItems, onNavigate, onRefresh, refreshing, children }: AdminCommandCenterShellProps) {
   const handleNavigate = (key: string) => onNavigate(key);
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const activeItem = useMemo(() => navItems.find((item) => item.key === activeKey), [activeKey, navItems]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setNavigationOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950">
@@ -63,16 +77,16 @@ export default function AdminCommandCenterShell({ roleLabel, eyebrow = "Master M
         <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
           <div className="mx-auto flex min-h-[4.5rem] max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
-              <Sheet>
-                <SheetTrigger asChild><Button variant="outline" size="icon" className="h-10 w-10 lg:hidden" aria-label="Open administration navigation"><Menu className="h-4 w-4" /></Button></SheetTrigger>
+              <Sheet open={navigationOpen} onOpenChange={setNavigationOpen}>
+                <SheetTrigger asChild><Button variant="outline" size="icon" className="h-10 w-10 lg:hidden" aria-label="Open administration navigation" aria-keyshortcuts="Control+K Meta+K"><Menu className="h-4 w-4" /></Button></SheetTrigger>
                 <SheetContent side="left" className="w-[min(88vw,22rem)] bg-white p-0 text-slate-950">
                   <SheetHeader className="border-b border-slate-200 px-5 py-5 text-left"><SheetTitle>Administration</SheetTitle><SheetDescription>Choose a workspace section.</SheetDescription></SheetHeader>
-                  <div className="p-4"><Navigation items={navItems} activeKey={activeKey} onNavigate={handleNavigate} compact /><SheetClose className="sr-only">Close navigation</SheetClose></div>
+                  <div className="p-4"><Navigation items={navItems} activeKey={activeKey} onNavigate={(key) => { handleNavigate(key); setNavigationOpen(false); }} compact /><SheetClose className="sr-only">Close navigation</SheetClose></div>
                 </SheetContent>
               </Sheet>
-              <div className="min-w-0"><p className="hidden text-[11px] font-bold uppercase tracking-[.16em] text-primary sm:block">{eyebrow}</p><h1 className="truncate font-display text-xl font-bold sm:text-2xl">{title}</h1><p className="hidden max-w-2xl truncate text-sm text-slate-500 md:block">{description}</p></div>
+              <div className="min-w-0"><div className="flex min-w-0 items-center gap-2"><p className="hidden text-[11px] font-bold uppercase tracking-[.16em] text-primary sm:block">{eyebrow}</p><span className="hidden truncate rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 sm:inline-flex">{activeItem?.label || "Workspace"}</span></div><h1 className="truncate font-display text-xl font-bold sm:text-2xl">{title}</h1><p className="hidden max-w-2xl truncate text-sm text-slate-500 md:block">{activeItem?.description || description}</p></div>
             </div>
-            <div className="flex shrink-0 items-center gap-2"><span className="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 sm:inline-flex">{roleLabel}</span>{onRefresh && <Button variant="outline" onClick={onRefresh} disabled={refreshing} className="h-10"><RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} /><span className="hidden sm:inline">Refresh</span></Button>}</div>
+            <div className="flex shrink-0 items-center gap-2"><span className="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 sm:inline-flex">{roleLabel}</span><span className="hidden text-[11px] text-slate-400 md:inline">⌘K</span>{onRefresh && <Button variant="outline" onClick={onRefresh} disabled={refreshing} className="h-10"><RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} /><span className="hidden sm:inline">Refresh</span></Button>}</div>
           </div>
         </header>
         <main className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">{children}</main>
