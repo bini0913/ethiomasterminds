@@ -26,7 +26,7 @@ AS $$
       ORDER BY s.total_points DESC, s.wins DESC, s.updated_at ASC
     ) AS rank_position
   FROM public.multiplayer_ranked_stats s
-  JOIN public.profiles p ON p.id = s.user_id
+  LEFT JOIN public.profiles p ON p.id = s.user_id
   LEFT JOIN public.profile_privacy_settings privacy ON privacy.user_id = p.id
   WHERE auth.uid() IS NOT NULL
     AND coalesce(privacy.is_public, true)
