@@ -117,3 +117,6 @@ REVOKE ALL ON FUNCTION public.get_public_student_profiles(uuid[]) FROM PUBLIC, a
 GRANT EXECUTE ON FUNCTION public.get_public_student_profiles(uuid[]) TO authenticated;
 REVOKE ALL ON FUNCTION public.get_early_leaderboard(text,text,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_early_leaderboard(text,text,text) TO authenticated;
+
+-- The privacy migration replaces the function; re-apply the hardened path afterward.
+ALTER FUNCTION public.get_student_leaderboard() SET search_path = pg_catalog;
