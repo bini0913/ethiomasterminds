@@ -4,7 +4,7 @@ export type UserTier = 'early' | 'middle' | 'upper';
 export function getUserTier(grade: string | null | undefined): UserTier | null {
   if (!grade) return null;
   const normalized = grade.trim().toLowerCase();
-  if (/^(k|kindergarten|pre-?k)$/.test(normalized)) return 'early';
+  if (/^(k|kg|kindergarten|pre-?k|grade\s*0|0)$/.test(normalized)) return 'early';
   const match = /^(?:grade\s*)?(\d{1,2})\+?$/.exec(normalized);
   if (!match) return null;
   const value = Number(match[1]);

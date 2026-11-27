@@ -70,6 +70,7 @@ const UserProfilePage = () => {
   const { userId } = useParams();
   const { user: authUser, session } = useUser();
   const upperStudent = getUserTier(authUser?.grade) === "upper";
+  const privacyManagedByGuardian = getUserTier(authUser?.grade) === "early" || (authUser?.age != null && authUser.age < 18);
   const { coins, transferCoins, refreshCurrency } = useCurrency();
 
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
@@ -126,6 +127,13 @@ const UserProfilePage = () => {
       setUsers([]);
     }
 
+    const currentViewerId = session?.user?.id ?? authUser?.id;
+    if (currentViewerId !== userId) {
+      setProfileMissing(true);
+      setFallbackProfile(null);
+      return;
+    }
+
     const { data: fallback, error: fallbackError } = await supabase
       .from("profiles")
       .select("id,name,username,avatar,avatar_config,level,xp,grade")
@@ -133,8 +141,6 @@ const UserProfilePage = () => {
       .maybeSingle();
 
     let resolvedFallback = fallback;
-
-    const currentViewerId = session?.user?.id ?? authUser?.id;
 
     if (!resolvedFallback && currentViewerId === userId) {
       const fallbackName = authUser.name?.trim() || authUser.username?.trim() || "Student";
@@ -306,6 +312,23 @@ const UserProfilePage = () => {
     if (!userId) return;
 
     try {
+      const currentViewerId = session?.user?.id ?? authUser?.id ?? "";
+      const isOwnProfile = currentViewerId === userId;
+      if (!isOwnProfile) {
+        const { data: visibleProfiles, error: visibilityError } = await (supabase as any).rpc("get_public_student_profiles", {
+          p_user_ids: [userId],
+        });
+        if (visibilityError || !Array.isArray(visibleProfiles) || visibleProfiles.length === 0) {
+          setPrivacy({ isPublic: false, hideStats: true });
+          setStatsJson({});
+          setInsights({ strong: [], weak: [], recommended: [] });
+          setActivities([]);
+          setAchievements([]);
+          return;
+        }
+        setPrivacy({ isPublic: true, hideStats: false });
+      }
+
       // Auto-unlock achievements that the user has met (own profile only)
       if (authUser?.id && authUser.id === userId) {
         try {
@@ -316,7 +339,9 @@ const UserProfilePage = () => {
       }
 
       const [statsRes, analyticsRes, recentResultsRes, userAchievementsRes, achievementHistoryRes, seasonResultsRes, userTitlesRes, privacyRes, allStoreItemsRes, profileRes] = await Promise.all([
-        supabase.rpc("get_user_stats", { p_user_id: userId }),
+        isOwnProfile
+          ? supabase.rpc("get_user_stats", { p_user_id: userId })
+          : Promise.resolve({ data: null, error: null }),
         supabase.from("analytics").select("strong_topics,weak_topics").eq("user_id", userId),
         supabase
           .from("quiz_results")
@@ -349,7 +374,9 @@ const UserProfilePage = () => {
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
           .limit(12),
-        supabase.from("profile_privacy_settings" as never).select("is_public,hide_stats").eq("user_id", userId).maybeSingle(),
+        isOwnProfile
+          ? supabase.from("profile_privacy_settings" as never).select("is_public,hide_stats").eq("user_id", userId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
         (supabase as any).from("store_items").select("id,name,section,rarity,preview,price").eq("is_active", true),
         supabase.from("profiles").select("created_at").eq("id", userId).maybeSingle(),
       ]);
@@ -703,13 +730,20 @@ const UserProfilePage = () => {
   };
 
   const updatePrivacy = async (next: { isPublic: boolean; hideStats: boolean }) => {
-    if (!authUser?.id) return;
+    if (!authUser?.id || privacyManagedByGuardian) return;
+    const previous = privacy;
     setPrivacy(next);
-    await supabase.from("profile_privacy_settings" as never).upsert({
+    const { error } = await supabase.from("profile_privacy_settings" as never).upsert({
       user_id: authUser.id,
       is_public: next.isPublic,
       hide_stats: next.hideStats,
     } as never);
+    if (error) {
+      setPrivacy(previous);
+      toast.error("Profile privacy could not be saved. Please try again.");
+      return;
+    }
+    toast.success("Profile privacy saved.");
   };
 
   const onEquipCollectionItem = async (itemId: string, section: string) => {
@@ -1084,14 +1118,22 @@ const UserProfilePage = () => {
               <CardTitle>Profile Privacy</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Public profile</span>
-                <Switch checked={privacy.isPublic} onCheckedChange={(value) => updatePrivacy({ ...privacy, isPublic: value })} />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Hide stats</span>
-                <Switch checked={privacy.hideStats} onCheckedChange={(value) => updatePrivacy({ ...privacy, hideStats: value })} />
-              </div>
+              {privacyManagedByGuardian ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Profile visibility and social privacy are managed through the parent or guardian controls for this account.
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Public profile</span>
+                    <Switch checked={privacy.isPublic} onCheckedChange={(value) => void updatePrivacy({ ...privacy, isPublic: value })} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Hide stats</span>
+                    <Switch checked={privacy.hideStats} onCheckedChange={(value) => void updatePrivacy({ ...privacy, hideStats: value })} />
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )}

@@ -66,129 +66,42 @@ export async function fetchLeaderboardUsers(): Promise<LeaderboardUser[]> {
   // broad SELECT access to profiles, attempts, streaks, or multiplayer tables.
   const { data: leaderboardData, error: leaderboardError } = await db.rpc("get_student_leaderboard");
 
-  if (!leaderboardError && Array.isArray(leaderboardData)) {
-    return leaderboardData.map((row: any) => {
-      const totalXp = Number(row.total_xp ?? row.xp ?? 0);
-      const level = Math.max(Number(row.level ?? 1), Math.floor(totalXp / 100) + 1);
-      return {
-        id: row.id,
-        username: row.username ?? row.name ?? "user",
-        name: row.name ?? row.username ?? "Unknown User",
-        avatar: row.avatar ?? null,
-        avatarConfig: (row.avatar_config as Record<string, unknown> | null) ?? null,
-        grade: typeof row.grade === "number" ? row.grade : toGradeNumber(row.grade == null ? null : String(row.grade)),
-        xp: Number(row.xp ?? totalXp),
-        level,
-        rank: row.rank ?? (totalXp >= 10000 ? "Legend" : totalXp >= 5000 ? "Master" : totalXp >= 2000 ? "Diamond" : totalXp >= 1000 ? "Platinum" : totalXp >= 500 ? "Gold" : totalXp >= 200 ? "Silver" : "Bronze"),
-        badges: Array.isArray(row.badges) ? row.badges : [],
-        streak: Number(row.streak ?? 0),
-        accuracy: Number(row.accuracy ?? 0),
-        matchesPlayed: Number(row.matches_played ?? 0),
-        wins: Number(row.wins ?? 0),
-        losses: Number(row.losses ?? 0),
-        contributions: Number(row.contributions ?? 0),
-        weeklyScore: Number(row.weekly_score ?? 0),
-        monthlyScore: Number(row.monthly_score ?? 0),
-        totalXp,
-        seasonXp: Number(row.season_xp ?? totalXp),
-        coins: Number(row.coins ?? 0),
-        activeTitle: row.active_title ?? null,
-      } as LeaderboardUser;
-    });
-  }
-
   if (leaderboardError) {
-    console.warn("Secure leaderboard RPC unavailable; using legacy loader", leaderboardError);
+    console.error("Privacy-filtered leaderboard RPC failed; refusing an unfiltered fallback.", leaderboardError);
+    throw leaderboardError;
   }
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-  const [profilesRes, streakRes, attemptsRes, currencyRes, rankedStatsRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id,name,username,avatar,avatar_config,grade,xp,season_xp,level,rank,badges"),
-    db.from("user_streaks").select("user_id,current_streak"),
-    supabase
-      .from("question_attempts")
-      .select("user_id,is_correct,created_at")
-      .gte("created_at", monthAgo),
-    db.from("user_currency").select("user_id,coins"),
-    db.from("multiplayer_ranked_stats").select("user_id,total_points,matches_played,wins"),
-  ]);
-
-  if (profilesRes.error) {
-    console.error("fetchLeaderboardUsers profiles error", profilesRes.error);
-    throw profilesRes.error;
+  if (!Array.isArray(leaderboardData)) {
+    throw new Error("Privacy-filtered leaderboard RPC returned an invalid response.");
   }
 
-  const streakByUser = new Map<string, number>();
-  (streakRes.data ?? []).forEach((row) => streakByUser.set(row.user_id, row.current_streak));
-
-  const coinsByUser = new Map<string, number>();
-  (currencyRes.data ?? []).forEach((row) => coinsByUser.set(row.user_id, row.coins ?? 0));
-
-  if (streakRes.error) console.warn("Leaderboard streak data unavailable", streakRes.error);
-  if (attemptsRes.error) console.warn("Leaderboard quiz-attempt data unavailable", attemptsRes.error);
-  if (currencyRes.error) console.warn("Leaderboard currency data unavailable", currencyRes.error);
-  if (rankedStatsRes.error) console.warn("Leaderboard multiplayer stats unavailable", rankedStatsRes.error);
-
-  const rankedStatsByUser = new Map<string, { points: number; matches: number; wins: number }>();
-  (rankedStatsRes.data ?? []).forEach((row) => rankedStatsByUser.set(row.user_id, {
-    points: Number(row.total_points ?? 0),
-    matches: Number(row.matches_played ?? 0),
-    wins: Number(row.wins ?? 0),
-  }));
-
-  const weeklyByUser = new Map<string, { attempts: number; correct: number }>();
-  const monthlyByUser = new Map<string, { attempts: number; correct: number }>();
-  (attemptsRes.data ?? []).forEach((row) => {
-    const m = monthlyByUser.get(row.user_id) ?? { attempts: 0, correct: 0 };
-    m.attempts += 1;
-    if (row.is_correct) m.correct += 1;
-    monthlyByUser.set(row.user_id, m);
-    if (row.created_at >= weekAgo) {
-      const w = weeklyByUser.get(row.user_id) ?? { attempts: 0, correct: 0 };
-      w.attempts += 1;
-      if (row.is_correct) w.correct += 1;
-      weeklyByUser.set(row.user_id, w);
-    }
-  });
-
-  const users: LeaderboardUser[] = (profilesRes.data ?? []).map((profile) => {
-    const weekly = weeklyByUser.get(profile.id) ?? { attempts: 0, correct: 0 };
-    const monthly = monthlyByUser.get(profile.id) ?? { attempts: 0, correct: 0 };
-    const accuracy = monthly.attempts > 0 ? Number(((monthly.correct / monthly.attempts) * 100).toFixed(1)) : 0;
-    const rankedStats = rankedStatsByUser.get(profile.id) ?? { points: 0, matches: 0, wins: 0 };
-    const totalXp = Number(profile.xp ?? 0);
-    const computedLevel = Math.max(Number(profile.level ?? 1), Math.floor(totalXp / 100) + 1);
-    const computedRank = profile.rank ?? (totalXp >= 10000 ? "Legend" : totalXp >= 5000 ? "Master" : totalXp >= 2000 ? "Diamond" : totalXp >= 1000 ? "Platinum" : totalXp >= 500 ? "Gold" : totalXp >= 200 ? "Silver" : "Bronze");
+  return leaderboardData.map((row: any) => {
+    const totalXp = Number(row.total_xp ?? row.xp ?? 0);
+    const level = Math.max(Number(row.level ?? 1), Math.floor(totalXp / 100) + 1);
     return {
-      id: profile.id,
-      username: profile.username ?? profile.name ?? "user",
-      name: profile.name ?? profile.username ?? "Unknown User",
-      avatar: profile.avatar ?? null,
-      avatarConfig: (profile.avatar_config as Record<string, unknown> | null) ?? null,
-      grade: toGradeNumber(profile.grade),
-      xp: Number(profile.xp ?? 0),
-      level: computedLevel,
-      rank: computedRank,
-      badges: profile.badges ?? [],
-      streak: streakByUser.get(profile.id) ?? 0,
-      accuracy,
-      matchesPlayed: rankedStats.matches,
-      wins: rankedStats.wins,
-      losses: Math.max(0, rankedStats.matches - rankedStats.wins),
-      contributions: 0,
-      weeklyScore: weekly.attempts * 10 + weekly.correct * 5,
-      monthlyScore: monthly.attempts * 10 + monthly.correct * 5,
+      id: row.id,
+      username: row.username ?? row.name ?? "user",
+      name: row.name ?? row.username ?? "Unknown User",
+      avatar: row.avatar ?? null,
+      avatarConfig: (row.avatar_config as Record<string, unknown> | null) ?? null,
+      grade: typeof row.grade === "number" ? row.grade : toGradeNumber(row.grade == null ? null : String(row.grade)),
+      xp: Number(row.xp ?? totalXp),
+      level,
+      rank: row.rank ?? (totalXp >= 10000 ? "Legend" : totalXp >= 5000 ? "Master" : totalXp >= 2000 ? "Diamond" : totalXp >= 1000 ? "Platinum" : totalXp >= 500 ? "Gold" : totalXp >= 200 ? "Silver" : "Bronze"),
+      badges: Array.isArray(row.badges) ? row.badges : [],
+      streak: Number(row.streak ?? 0),
+      accuracy: Number(row.accuracy ?? 0),
+      matchesPlayed: Number(row.matches_played ?? 0),
+      wins: Number(row.wins ?? 0),
+      losses: Number(row.losses ?? 0),
+      contributions: Number(row.contributions ?? 0),
+      weeklyScore: Number(row.weekly_score ?? 0),
+      monthlyScore: Number(row.monthly_score ?? 0),
       totalXp,
-      seasonXp: Number((profile as any).season_xp ?? (rankedStats.points || totalXp)),
-      coins: coinsByUser.get(profile.id) ?? 0,
-      activeTitle: null,
+      seasonXp: Number(row.season_xp ?? totalXp),
+      coins: Number(row.coins ?? 0),
+      activeTitle: row.active_title ?? null,
     } as LeaderboardUser;
   });
-
-  return users;
 }
 
 export async function fetchFollowing(userId: string): Promise<string[]> {

@@ -70,6 +70,7 @@ const readSettingsPreferences = (): SettingsPreferences => {
 const Settings: React.FC = () => {
   const { user, logout, deleteAccount } = useUser();
   const upperStudent = getUserTier(user?.grade) === "upper";
+  const privacyManagedByGuardian = getUserTier(user?.grade) === "early" || (user?.age != null && user.age < 18);
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   const [initialPreferences] = useState(readSettingsPreferences);
@@ -106,7 +107,7 @@ const Settings: React.FC = () => {
   }, [user?.id]);
 
   const updatePrivacy = async (field: keyof typeof privacy, value: boolean) => {
-    if (!user?.id) return;
+    if (!user?.id || privacyManagedByGuardian) return;
     const previous = privacy;
     setPrivacy((current) => ({ ...current, [field]: value }));
     setSavingPrivacy(true);
@@ -386,19 +387,23 @@ const Settings: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {[
-                    { id: 'profile-public', field: 'is_public' as const, label: 'Public Profile', desc: 'Others can see your profile when enabled', value: privacy.is_public },
-                    { id: 'online-status', field: 'show_online_status' as const, label: 'Show Online Status', desc: 'Let friends see when you\'re online', value: privacy.show_online_status },
-                    { id: 'activity-history', field: 'activity_history_enabled' as const, label: 'Activity History', desc: 'Track your learning progress', value: privacy.activity_history_enabled },
-                  ].map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50">
-                      <div>
-                        <Label htmlFor={item.id} className="text-foreground">{item.label}</Label>
-                        <p className="text-sm text-muted-foreground">{item.desc}</p>
+                  {privacyManagedByGuardian ? (
+                    <p role="status" className="rounded-xl border border-border/50 bg-muted/40 p-4 text-sm text-muted-foreground">
+                      Profile visibility and social privacy are managed through the parent or guardian controls for this account.
+                    </p>
+                  ) : [
+                      { id: 'profile-public', field: 'is_public' as const, label: 'Public Profile', desc: 'Others can see your profile when enabled', value: privacy.is_public },
+                      { id: 'online-status', field: 'show_online_status' as const, label: 'Show Online Status', desc: 'Let friends see when you\'re online', value: privacy.show_online_status },
+                      { id: 'activity-history', field: 'activity_history_enabled' as const, label: 'Activity History', desc: 'Track your learning progress', value: privacy.activity_history_enabled },
+                    ].map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50">
+                        <div>
+                          <Label htmlFor={item.id} className="text-foreground">{item.label}</Label>
+                          <p className="text-sm text-muted-foreground">{item.desc}</p>
+                        </div>
+                        <Switch id={item.id} checked={item.value} disabled={savingPrivacy} onCheckedChange={(value) => void updatePrivacy(item.field, value)} />
                       </div>
-                      <Switch id={item.id} checked={item.value} disabled={savingPrivacy} onCheckedChange={(value) => void updatePrivacy(item.field, value)} />
-                    </div>
-                  ))}
+                    ))}
                 </CardContent>
               </Card>
 
