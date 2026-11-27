@@ -36,11 +36,11 @@ interface FriendsContextType {
   outgoingRequests: FriendRequest[];
   messages: Message[];
   loading: boolean;
-  sendFriendRequest: (userId: string) => Promise<void>;
+  sendFriendRequest: (userId: string) => Promise<boolean>;
   acceptFriendRequest: (requestId: string) => Promise<void>;
   declineFriendRequest: (requestId: string) => Promise<void>;
   removeFriend: (friendshipId: string) => Promise<void>;
-  sendMessage: (userId: string, content: string) => Promise<void>;
+  sendMessage: (userId: string, content: string) => Promise<boolean>;
   markMessageAsRead: (messageId: string) => void;
   getMessagesWithUser: (userId: string) => Message[];
   getFriendById: (userId: string) => UserProfile | undefined;
@@ -350,7 +350,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       const { data, error } = await db
-        .rpc('find_student_by_username', { search_username: query.trim() });
+        .rpc('find_student_by_username', { _username: query.trim() });
       
       if (error) throw error;
       
@@ -368,12 +368,13 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         } as UserProfile));
     } catch (err) {
       console.error('Error searching users:', err);
-      return [];
+      throw err;
     }
   };
 
-  const sendFriendRequest = async (targetUserId: string) => {
-    if (!user?.id) return;
+  const sendFriendRequest = async (targetUserId: string): Promise<boolean> => {
+    if (!user?.id || !targetUserId || targetUserId === user.id) return false;
+    let succeeded = false;
     await runWithCommunityTerms(async () => {
       try {
         const { error } = await db.rpc('send_friend_request', { p_target_user_id: targetUserId });
@@ -388,11 +389,13 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
           if (pushError) console.warn('Friend request push could not be sent:', pushError.message);
         }
         toast.success('Friend request sent!');
+        succeeded = true;
         await fetchFriends();
       } catch (err: any) {
         toast.error(err?.message?.includes('already') ? 'Friend request already exists' : err?.message || 'Failed to send friend request');
       }
     }, 'friend_requests');
+    return succeeded;
   };
 
   const acceptFriendRequest = async (requestId: string) => {
@@ -431,8 +434,9 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const sendMessage = async (receiverId: string, content: string) => {
-    if (!user?.id || !content.trim()) return;
+  const sendMessage = async (receiverId: string, content: string): Promise<boolean> => {
+    if (!user?.id || !receiverId || !content.trim()) return false;
+    let succeeded = false;
     await runWithCommunityTerms(async () => {
       try {
         const { data, error } = await db.rpc('send_direct_message', {
@@ -456,12 +460,16 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
             body: { kind: 'direct_message', event_id: data.id },
           });
           if (pushError) console.warn('Message push could not be sent:', pushError.message);
+          succeeded = true;
+        } else {
+          throw new Error('The message was not saved. Please try again.');
         }
       } catch (err: any) {
         console.error('Error sending message:', err);
         toast.error(err?.message || 'Failed to send message');
       }
     }, 'direct_messages');
+    return succeeded;
   };
 
   const markMessageAsRead = (messageId: string) => {
