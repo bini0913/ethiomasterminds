@@ -98,6 +98,7 @@ BEGIN
       'invoice_count', (SELECT count(*) FROM public.school_student_invoices i
         WHERE p_school_id IS NULL OR i.school_id = p_school_id),
       'confirmed_payment_count', (SELECT count(*) FROM public.school_fee_payments p
+        JOIN public.school_student_invoices i ON i.id = p.invoice_id AND i.school_id = p.school_id
         WHERE p.status = 'confirmed' AND (p_school_id IS NULL OR p.school_id = p_school_id)),
       'outstanding_invoice_count', (SELECT count(*) FROM public.school_student_invoices i
         WHERE i.balance > 0 AND (p_school_id IS NULL OR i.school_id = p_school_id)),
