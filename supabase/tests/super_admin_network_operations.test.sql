@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(26);
+SELECT plan(30);
 
 SELECT ok(to_regprocedure('public.super_admin_list_network_people(uuid,text,text,integer,integer)') IS NOT NULL, 'network people directory RPC exists');
 SELECT ok(to_regprocedure('public.super_admin_get_school_analytics(uuid)') IS NOT NULL, 'school analytics RPC exists');
@@ -31,6 +31,12 @@ SELECT ok(position('pending_followup_records' IN pg_get_functiondef('public.supe
 SELECT ok(position('overdue_by_currency' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'overdue balances remain currency-separated');
 SELECT ok(position('school_behavior_reports' IN pg_get_functiondef('public.super_admin_get_network_alerts()'::regprocedure)) > 0, 'network alerts include pending behavior review counts');
 SELECT ok(position('no active Manager' IN pg_get_functiondef('public.super_admin_get_network_alerts()'::regprocedure)) > 0, 'network alerts identify schools without active Managers');
+
+
+SELECT ok(to_regprocedure('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])') IS NOT NULL, 'network-scoped existing-account assignment RPC exists');
+SELECT ok(position('_is_super_admin' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment requires Super Admin');
+SELECT ok(position('school_network_id' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment is restricted to the current network');
+SELECT ok(position('admin_audit_logs' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignments create an audit event');
 
 SELECT * FROM finish();
 ROLLBACK;
