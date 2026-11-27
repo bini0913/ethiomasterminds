@@ -57,6 +57,8 @@ type ExecutiveMetrics = {
   registered_today?: number;
   registered_7d?: number;
   registered_30d?: number;
+  schools_created_7d?: number;
+  schools_created_30d?: number;
   daily_active_users?: number;
   weekly_active_users?: number;
   monthly_active_users?: number;
@@ -83,6 +85,8 @@ type ExecutiveMetrics = {
   school_invoices_total?: number;
   school_invoices_outstanding?: number;
   school_fee_collected_by_currency?: CurrencyTotal[];
+  school_fee_collected_month_by_currency?: CurrencyTotal[];
+  school_fee_collected_year_by_currency?: CurrencyTotal[];
   school_fee_outstanding_by_currency?: CurrencyTotal[];
   metrics_generated_at?: string;
 };
@@ -451,6 +455,8 @@ const ExtremeAdminPortal: React.FC = () => {
   };
 
   const collectedTotals = metrics.school_fee_collected_by_currency || [];
+  const monthlyCollectedTotals = metrics.school_fee_collected_month_by_currency || [];
+  const yearlyCollectedTotals = metrics.school_fee_collected_year_by_currency || [];
   const outstandingTotals = metrics.school_fee_outstanding_by_currency || [];
   const navItems = useMemo(() => [
     { key: "overview", label: "Executive overview", description: "Growth, usage and business pulse", section: "Executive", icon: Gauge },
@@ -664,6 +670,10 @@ const ExtremeAdminPortal: React.FC = () => {
         <div className="space-y-5">
           <SectionHeading eyebrow="Business intelligence" title="Money & growth" description="Financial figures are presented only where the source records establish collection or outstanding balances. Unpaid invoices and virtual coins are never counted as revenue." />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Confirmed school payments" value={metrics.school_fee_payments_confirmed} detail="Reversed payments excluded" icon={CheckCircle2} tone="green" /><MetricCard label="School invoices" value={metrics.school_invoices_total} detail="All invoice records" icon={FileText} tone="blue" /><MetricCard label="Outstanding invoices" value={metrics.school_invoices_outstanding} detail="Invoices with balance above zero" icon={Clock3} tone="amber" /><MetricCard label="Monthly active users" value={metrics.monthly_active_users} detail="Unique users seen in 30 days" icon={Activity} tone="navy" /></div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Confirmed collections · Month to date</CardTitle><CardDescription>Payments received since the start of the current Ethiopia calendar month.</CardDescription></CardHeader><CardContent>{monthlyCollectedTotals.length ? monthlyCollectedTotals.map((row) => <div key={row.currency} className="flex items-center justify-between border-b border-slate-100 py-3 last:border-0"><span className="text-sm text-slate-600">{row.currency}</span><strong className="text-lg tabular-nums text-slate-950">{formatMoney(row.collected, row.currency)}</strong></div>) : <p className="text-sm text-slate-500">No confirmed collections this month.</p>}</CardContent></Card>
+            <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Confirmed collections · Year to date</CardTitle><CardDescription>Payments received since the start of the current Ethiopia calendar year.</CardDescription></CardHeader><CardContent>{yearlyCollectedTotals.length ? yearlyCollectedTotals.map((row) => <div key={row.currency} className="flex items-center justify-between border-b border-slate-100 py-3 last:border-0"><span className="text-sm text-slate-600">{row.currency}</span><strong className="text-lg tabular-nums text-slate-950">{formatMoney(row.collected, row.currency)}</strong></div>) : <p className="text-sm text-slate-500">No confirmed collections this year.</p>}</CardContent></Card>
+          </div>
           <div className="grid gap-4 xl:grid-cols-2"><Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Confirmed collections</CardTitle><CardDescription>School fee payments with status = confirmed, grouped by currency.</CardDescription></CardHeader><CardContent>{collectedTotals.length ? collectedTotals.map((row) => <div key={row.currency} className="flex items-center justify-between border-b border-slate-100 py-3 last:border-0"><span className="text-sm text-slate-600">{row.currency}</span><strong className="text-lg tabular-nums text-slate-950">{formatMoney(row.collected, row.currency)}</strong></div>) : <p className="text-sm text-slate-500">No confirmed collections recorded.</p>}</CardContent></Card><Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Outstanding balances</CardTitle><CardDescription>Current positive invoice balances, grouped by currency.</CardDescription></CardHeader><CardContent>{outstandingTotals.length ? outstandingTotals.map((row) => <div key={row.currency} className="flex items-center justify-between border-b border-slate-100 py-3 last:border-0"><span className="text-sm text-slate-600">{row.currency}</span><strong className="text-lg tabular-nums text-slate-950">{formatMoney(row.outstanding, row.currency)}</strong></div>) : <p className="text-sm text-slate-500">No outstanding balances recorded.</p>}</CardContent></Card></div>
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Growth indicators</CardTitle><CardDescription>Account creation and product activity, measured separately.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-3">{[{ label: "New accounts · 7 days", value: metrics.registered_7d }, { label: "New accounts · 30 days", value: metrics.registered_30d }, { label: "Daily active users", value: metrics.daily_active_users }].map((item) => <div key={item.label} className="rounded-xl bg-slate-50 p-4"><p className="text-2xl font-bold tabular-nums text-slate-950">{formatNumber(item.value)}</p><p className="mt-1 text-xs text-slate-500">{item.label}</p></div>)}</CardContent></Card>
         </div>
