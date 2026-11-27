@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Download, RefreshCw, Wallet, Building2, FileText, Users, TrendingUp } from "lucide-react";
+import { Activity, Download, RefreshCw, Wallet, FileText, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,7 @@ const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: 
       s.outstanding_by_currency.forEach((r) => rows.push(["school receivables", s.school_name, "outstanding", r.currency, r.amount, s.school_code]));
     });
     data.school_finance.payment_methods.forEach((r) => rows.push(["school collections", "all time", "payment method", r.currency, r.collected, `${r.method}; ${r.payments} payments`]));
+    data.school_finance.daily_collections.forEach((r) => rows.push(["school collections", r.day, "daily confirmed collections", r.currency, r.collected, "Confirmed payments only"]));
     data.growth.registrations_by_day.forEach((r) => rows.push(["growth", r.day, "new registrations", "", r.registrations, "Profile creation date"]));
     data.growth.student_activity_by_day.forEach((r) => rows.push(["usage", r.day, "active students", "", r.active_students, `${r.questions} questions; ${r.quizzes} quizzes; ${r.xp} XP`]));
     data.growth.study_sessions_by_day.forEach((r) => rows.push(["usage", r.day, "study sessions", "", r.sessions, `${r.duration_units} recorded duration units`]));
@@ -142,6 +143,9 @@ const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: 
         <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">School</th><th className="px-3 py-2">Invoices</th><th className="px-3 py-2">Open invoices</th><th className="px-3 py-2">Confirmed collections</th><th className="px-3 py-2">Outstanding</th></tr></thead><tbody className="divide-y divide-slate-100">{data.school_finance.by_school.map((s) => <tr key={s.school_id}><td className="px-3 py-3"><p className="font-semibold">{s.school_name}</p><p className="text-xs text-slate-500">{s.school_code}</p></td><td className="px-3 py-3">{number(s.invoice_count)}</td><td className="px-3 py-3">{number(s.outstanding_invoice_count)}</td><td className="px-3 py-3">{s.collections_by_currency.length ? s.collections_by_currency.map((r) => <div key={r.currency}>{money(r.amount, r.currency)}</div>) : "—"}</td><td className="px-3 py-3">{s.outstanding_by_currency.length ? s.outstanding_by_currency.map((r) => <div key={r.currency}>{money(r.amount, r.currency)}</div>) : "—"}</td></tr>)}{!data.school_finance.by_school.length && <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-500">No schools in this filter.</td></tr>}</tbody></table></div>
       </Section>
       <div className="grid gap-4 xl:grid-cols-2">
+      <Section title={\`Daily confirmed collections · \${days} days\`} note="Daily totals are kept separate by currency and include confirmed payments only.">
+        {data.school_finance.daily_collections.length ? <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Currency</th><th className="px-3 py-2 text-right">Collected</th></tr></thead><tbody className="divide-y divide-slate-100">{data.school_finance.daily_collections.map((r) => <tr key={\`\${r.day}-\${r.currency}\`}><td className="px-3 py-2">{r.day}</td><td className="px-3 py-2">{r.currency}</td><td className="px-3 py-2 text-right font-semibold tabular-nums">{money(r.collected, r.currency)}</td></tr>)}</tbody></table></div> : <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No confirmed collections in this date window.</p>}
+      </Section>
         <Section title="Payment methods" note="Confirmed school payments, grouped by recorded method and currency.">
           {data.school_finance.payment_methods.length ? <div className="space-y-2">{data.school_finance.payment_methods.map((r) => <div key={r.method + r.currency} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{r.method} · {r.currency} <span className="text-xs text-slate-500">({number(r.payments)} payments)</span></span><strong>{money(r.collected, r.currency)}</strong></div>)}</div> : <p className="text-sm text-slate-500">No confirmed payment method records yet.</p>}
         </Section>
