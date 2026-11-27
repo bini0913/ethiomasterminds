@@ -348,7 +348,7 @@ const ExtremeAdminPortal: React.FC = () => {
       return toast.error("Student accounts require grade, age, and a valid section ID");
     }
     if (newAccountRole === "parent" && !parentStudentMembershipIds.trim()) {
-      return toast.error("Parent accounts must be linked to at least one enrolled student");
+      return toast.error("Parent accounts need a pa-prefixed username and at least one enrolled student");
     }
     const account: Record<string, unknown> = { name: newAccountName.trim() };
     if (newAccountRole === "student") {
@@ -616,7 +616,7 @@ const ExtremeAdminPortal: React.FC = () => {
                 <div className="space-y-1"><Label>School role</Label><Select value={newAccountRole} onValueChange={setNewAccountRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="manager">Manager</SelectItem><SelectItem value="finance">Finance</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="student">Student</SelectItem></SelectContent></Select></div>
                 <div className="space-y-1"><Label>Full name</Label><Input value={newAccountName} onChange={(event) => setNewAccountName(event.target.value)} placeholder="Account holder's full name" /></div>
                 {newAccountRole === "student" && <div className="grid gap-3 sm:grid-cols-3"><div className="space-y-1"><Label>Grade</Label><Input value={newAccountGrade} onChange={(event) => setNewAccountGrade(event.target.value)} placeholder="e.g. Grade 7" /></div><div className="space-y-1"><Label>Age</Label><Input type="number" min="3" max="120" value={newAccountAge} onChange={(event) => setNewAccountAge(event.target.value)} placeholder="Age" /></div><div className="space-y-1"><Label>Section ID</Label><Input value={newAccountSectionId} onChange={(event) => setNewAccountSectionId(event.target.value)} placeholder="Section UUID" /></div></div>}
-                {newAccountRole === "parent" && <div className="space-y-1"><Label>Student membership IDs (optional)</Label><Input value={parentStudentMembershipIds} onChange={(event) => setParentStudentMembershipIds(event.target.value)} placeholder="Comma-separated membership IDs" /></div>}
+                {newAccountRole === "parent" && <div className="space-y-1"><Label>Student membership IDs (required)</Label><Input value={parentStudentMembershipIds} onChange={(event) => setParentStudentMembershipIds(event.target.value)} placeholder="Comma-separated membership IDs" /></div>}
                 <Button className="w-full" onClick={() => void createSchoolAccount()} disabled={createAccountLoading || !selectedSchoolId || !newAccountName.trim()}>{createAccountLoading ? "Creating account…" : "Create school account"}</Button>
               </CardContent>
             </Card>
