@@ -16,7 +16,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   },
 });
 
-type ServiceCheck = { status: "healthy" | "degraded" | "not_configured"; checked_at: string; detail: string };
+type ServiceCheck = { status: "healthy" | "degraded" | "not_configured"; checked_at: string; detail: string; backup_count?: number; latest_backup_at?: string | null };
 
 function base64Url(value: Uint8Array | string) {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
@@ -153,6 +153,56 @@ async function checkLiveKit(): Promise<ServiceCheck> {
   }
 }
 
+
+async function checkSupabaseBackups(): Promise<ServiceCheck> {
+  const checked_at = new Date().toISOString();
+  const accessToken = Deno.env.get("SUPABASE_ACCESS_TOKEN");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  if (!accessToken || !supabaseUrl) {
+    return { status: "not_configured", checked_at, detail: "A project-scoped Supabase Management API read token is not configured for backup inventory." };
+  }
+
+  try {
+    const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+    if (!projectRef) return { status: "degraded", checked_at, detail: "Supabase project reference could not be resolved." };
+    const response = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/backups`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (response.status === 401 || response.status === 403) {
+      return { status: "degraded", checked_at, detail: "Supabase Management API rejected the backup-read token. Check its project scope and Database Backups read permission." };
+    }
+    if (response.status === 404 || response.status === 402) {
+      return { status: "not_configured", checked_at, detail: "Backup inventory is not available for this project or subscription through the Management API." };
+    }
+    if (!response.ok) {
+      return { status: "degraded", checked_at, detail: `Supabase backup inventory returned HTTP ${response.status}.` };
+    }
+    const payload = await response.json();
+    const backups = Array.isArray(payload) ? payload
+      : Array.isArray(payload?.backups) ? payload.backups
+      : Array.isArray(payload?.data) ? payload.data : null;
+    if (!backups) {
+      return { status: "degraded", checked_at, detail: "Supabase backup inventory responded, but its response format was not recognized." };
+    }
+    const timestamps = backups
+      .map((backup: Record<string, unknown>) => backup.inserted_at ?? backup.created_at ?? backup.backup_time ?? backup.date)
+      .filter((value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)))
+      .sort((a: string, b: string) => Date.parse(b) - Date.parse(a));
+    return {
+      status: backups.length > 0 ? "healthy" : "degraded",
+      checked_at,
+      backup_count: backups.length,
+      latest_backup_at: timestamps[0] ?? null,
+      detail: backups.length > 0
+        ? "Supabase Management API returned the project's available backup inventory. This check does not perform a restore test."
+        : "The backup inventory returned no available backups.",
+    };
+  } catch {
+    return { status: "degraded", checked_at, detail: "Supabase backup inventory request failed or timed out." };
+  }
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -179,12 +229,28 @@ Deno.serve(async (request) => {
     checked_at: new Date().toISOString(),
     detail: "The authenticated executive metrics RPC completed successfully.",
   };
-  const [firebase, livekit] = await Promise.all([checkFirebaseMessaging(), checkLiveKit()]);
-  return json({
-    checked_at: new Date().toISOString(),
+  const [firebase, livekit, backups] = await Promise.all([
+    checkFirebaseMessaging(),
+    checkLiveKit(),
+    checkSupabaseBackups(),
+  ]);
+  const checks = {
     database,
     firebase_messaging: firebase,
     livekit,
-    note: "Checks validate database access, FCM API authorization with an intentionally invalid token, and LiveKit RoomService reachability. They do not send a notification or create a call room.",
+    backups,
+  };
+  const { data: snapshotId, error: snapshotError } = await client.rpc(
+    "extreme_admin_record_platform_health_snapshot",
+    { p_checks: checks },
+  );
+  return json({
+    checked_at: new Date().toISOString(),
+    ...checks,
+    checks,
+    snapshot_recorded: !snapshotError,
+    snapshot_id: snapshotError ? null : snapshotId,
+    snapshot_error: snapshotError ? "Health snapshot could not be persisted." : null,
+    note: "Checks validate database access, FCM API authorization with an intentionally invalid token, LiveKit RoomService reachability, and backup inventory only when a project-scoped Management API token is configured. They do not send a notification, create a call room, or perform a restore test.",
   });
 });
