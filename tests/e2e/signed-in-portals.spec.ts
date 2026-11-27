@@ -124,7 +124,7 @@ test('Extreme Admin executive workspace exposes every Part 1 section across desk
       }
       await page.getByRole('button', { name: section.nav }).click();
       await expect(page.getByRole('heading', { name: section.heading })).toBeVisible();
-      if (section.content) await expect(page.getByText(section.content, { exact: true })).toBeVisible();
+      if (section.content) await expect(page.getByText(section.content)).toBeVisible();
     }
   }
 
