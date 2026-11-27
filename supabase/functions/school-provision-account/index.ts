@@ -175,6 +175,13 @@ Deno.serve(async (req) => {
         const username = await uniqueStaffUsername();
         const account = await createAuthAccount(managerName, username);
         const membershipId = await attachAccount(school.id, "manager", account.userId, username, { name: managerName });
+        const { error: managerAuditError } = await admin.from("admin_audit_logs").insert({
+          actor_id: actorId,
+          action: "school_manager_account_created",
+          target_type: "school_membership",
+          target_id: membershipId,
+          metadata: { school_id: school.id, user_id: account.userId, username },
+        });
         createdUserId = null;
         return json({
           school,
@@ -183,6 +190,8 @@ Deno.serve(async (req) => {
             username,
             initial_password: account.password,
             must_change_password: true,
+            audit_recorded: !managerAuditError,
+            ...(managerAuditError ? { audit_warning: "School Manager account created but its audit event could not be written." } : {}),
           },
         }, 201);
       } catch (error) {
