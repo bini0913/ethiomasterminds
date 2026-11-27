@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -425,10 +424,9 @@ export default function NetworkSuperAdminPortal() {
           <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Network-scoped access</Badge>
         </div>
 
-        <Tabs value={tab} onValueChange={setTab}>
-          <div className="hidden"><span>Workspace navigation is provided by the command-center sidebar and mobile drawer.</span></div>
+        <div className="space-y-6">
 
-          <TabsContent value="overview" className="mt-0 space-y-6">
+          {tab === "overview" && <section className="space-y-6">
             {coreError && <ErrorPanel message={coreError} onRetry={() => void loadCore()} />}
             <MetricGrid items={[
               ["Schools", dashboard.schools],
@@ -456,9 +454,9 @@ export default function NetworkSuperAdminPortal() {
                 <SchoolTable schools={filteredSchools} onAnalytics={(id) => { setTab("analytics"); void loadAnalytics(id); }} onStatus={requestSchoolStatus} />
               </CardContent>
             </Card>
-          </TabsContent>
+          </section>}
 
-          <TabsContent value="schools" className="mt-0 space-y-6">
+          {tab === "schools" && <section className="space-y-6">
             <div className="grid gap-5 xl:grid-cols-2">
               <Card>
                 <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Register a school</CardTitle><CardDescription>Creates a school in this network and provisions its initial School Manager through the secured account service.</CardDescription></CardHeader>
@@ -495,9 +493,9 @@ export default function NetworkSuperAdminPortal() {
                 <SchoolTable schools={filteredSchools} onAnalytics={(id) => { setTab("analytics"); void loadAnalytics(id); }} onStatus={requestSchoolStatus} />
               </CardContent>
             </Card>
-          </TabsContent>
+          </section>}
 
-          <TabsContent value="people" className="mt-0">
+          {tab === "people" && <section>
             <Card>
               <CardHeader>
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -515,9 +513,9 @@ export default function NetworkSuperAdminPortal() {
                 <div className="mt-4 flex items-center justify-between gap-3"><p className="text-xs text-slate-500">Page {page + 1} · 50 records per page</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page === 0 || peopleLoading} onClick={() => setPage((value) => Math.max(0, value - 1))}>Previous</Button><Button size="sm" variant="outline" disabled={people.length < 50 || peopleLoading} onClick={() => setPage((value) => value + 1)}>Next</Button></div></div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </section>}
 
-          <TabsContent value="analytics" className="mt-0 space-y-4">
+          {tab === "analytics" && <section className="space-y-4">
             <Card><CardHeader><CardTitle>School performance</CardTitle><CardDescription>Aggregated school-level academic and operational indicators. This is oversight, not a replacement for the school's academic workflows.</CardDescription></CardHeader><CardContent><Select value={analyticsSchoolId} onValueChange={(id) => void loadAnalytics(id)}><SelectTrigger className="max-w-xl"><SelectValue placeholder="Choose a school to inspect" /></SelectTrigger><SelectContent>{schools.map((item) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.school_code}</SelectItem>)}</SelectContent></Select><p className="mt-3 text-sm text-slate-500">{analyticsLoading ? "Loading school analytics…" : analyticsSchool ? `Showing live indicators for ${analyticsSchool.name}` : "Choose a school to view its analytics."}</p></CardContent></Card>
             {analyticsLoading ? <LoadingState label="Loading school performance…" /> : analyticsSchoolId && Object.keys(analytics).length > 0 ? <>
               <MetricGrid items={[
@@ -531,9 +529,9 @@ export default function NetworkSuperAdminPortal() {
               ]} />
               <Card><CardHeader><CardTitle>Outstanding balances by currency</CardTitle><CardDescription>Only invoice balances are shown. Different currencies are never combined.</CardDescription></CardHeader><CardContent className="space-y-2">{(analytics.outstanding_by_currency || []).length ? analytics.outstanding_by_currency.map((item: JsonRecord) => <div key={item.currency} className="flex items-center justify-between rounded-lg border p-3"><span className="font-medium">{item.currency}</span><span className="tabular-nums font-semibold">{money(item.outstanding_balance, item.currency)}</span></div>) : <EmptyState title="No outstanding balances" detail="No positive invoice balances are recorded for this school." />}</CardContent></Card>
             </> : <EmptyState title="Select a school" detail="School-level metrics appear here after a school is selected. Empty source data is shown as empty, never replaced with sample values." />}
-          </TabsContent>
+          </section>}
 
-          <TabsContent value="finance" className="mt-0 space-y-5">
+          {tab === "finance" && <section className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-900">Network finance oversight</h2><p className="text-sm text-slate-500">Read-only visibility. Invoice creation, payment confirmation, reversals, and follow-up resolution remain in school Finance workflows.</p></div><Button variant="outline" onClick={exportFinance}><Download className="mr-2 h-4 w-4" />Export finance CSV</Button></div>
             <MetricGrid items={[["School invoices", finance.invoice_count], ["Confirmed payments", finance.confirmed_payments], ["Pending follow-ups", finance.pending_followups], ["Overdue invoices", finance.overdue_invoice_count]]} />
             <Card><CardHeader><CardTitle>Network totals by currency</CardTitle><CardDescription>Invoice totals and confirmed invoice-linked payments are grouped by the invoice currency.</CardDescription></CardHeader><CardContent className="space-y-3">{(finance.currency_totals || []).length ? finance.currency_totals.map((item: JsonRecord) => <div key={item.currency} className="rounded-xl border p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">{item.currency}</h3><Badge variant="secondary">{item.invoice_count} invoices</Badge></div><div className="grid gap-3 sm:grid-cols-3"><FinanceMetric label="Invoiced" amount={item.invoiced_amount} currency={item.currency} /><FinanceMetric label="Confirmed paid" amount={item.paid_amount} currency={item.currency} /><FinanceMetric label="Outstanding" amount={item.outstanding_balance} currency={item.currency} /></div></div>) : <EmptyState title="No school invoices yet" detail="No school-fee invoices have been recorded in this network." />}</CardContent></Card>
@@ -543,23 +541,23 @@ export default function NetworkSuperAdminPortal() {
               <RecordTable title="Recent school payments" description="Payments linked to an invoice, including their recorded status." headers={["School / invoice", "Receipt", "Method / status", "Amount"]} rows={(finance.recent_payments || []).map((item: JsonRecord) => [<span className="font-medium">{item.school_name}<br /><span className="text-xs text-slate-500">{item.invoice_number}</span></span>, item.receipt_number, <span>{item.payment_method}<br /><span className="text-xs text-slate-500">{item.status} · {formatDate(item.received_at)}</span></span>, <span className="whitespace-nowrap text-right">{money(item.amount, item.currency)}</span>])} empty="No invoice-linked school payments are available." />
             </div>
             <Card><CardHeader><CardTitle>Pending finance follow-ups</CardTitle><CardDescription>Review queue visibility only. The school Finance team owns resolution and payment changes.</CardDescription></CardHeader><CardContent>{(finance.pending_followup_records || []).length ? <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b text-xs uppercase text-slate-500"><th className="p-2">School</th><th className="p-2">Invoice</th><th className="p-2">Created</th><th className="p-2">Status</th></tr></thead><tbody className="divide-y">{finance.pending_followup_records.map((item: JsonRecord) => <tr key={item.followup_id}><td className="p-2 font-medium">{item.school_name} · {item.school_code}</td><td className="p-2">{item.invoice_number}</td><td className="p-2 text-xs text-slate-500">{formatDate(item.created_at)}</td><td className="p-2"><Badge variant="secondary">{item.status}</Badge></td></tr>)}</tbody></table></div> : <EmptyState title="No pending finance follow-ups" detail="There are no network finance follow-up items awaiting school-level review." />}</CardContent></Card>
-          </TabsContent>
+          </section>}
 
-          <TabsContent value="audit" className="mt-0">
+          {tab === "audit" && <section>
             <Card><CardHeader><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><CardTitle>Network audit history</CardTitle><CardDescription>Recorded administrative changes affecting this network and its schools.</CardDescription></div><Button variant="outline" onClick={exportAudit} disabled={!filteredAudit.length}><FileDown className="mr-2 h-4 w-4" />Export visible page</Button></div></CardHeader><CardContent className="space-y-4">
               <div className="relative max-w-md"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input className="pl-9" placeholder="Filter this page by actor, action, target, or details" value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} /></div>
               {auditError && <ErrorPanel message={auditError} onRetry={() => void loadAudit()} />}
               {auditLoading ? <LoadingState label="Loading audit history…" /> : <AuditTable rows={filteredAudit} />}
               <div className="flex items-center justify-between gap-3"><p className="text-xs text-slate-500">Page {auditPage + 1} · 50 records per page</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={auditPage === 0 || auditLoading} onClick={() => setAuditPage((value) => Math.max(0, value - 1))}>Previous</Button><Button size="sm" variant="outline" disabled={audit.length < 50 || auditLoading} onClick={() => setAuditPage((value) => value + 1)}>Next</Button></div></div>
             </CardContent></Card>
-          </TabsContent>
+          </section>}
 
-          <TabsContent value="settings" className="mt-0 grid gap-5 xl:grid-cols-2">
+          {tab === "settings" && <section className="grid gap-5 xl:grid-cols-2">
             <Card><CardHeader><CardTitle>Network identity</CardTitle><CardDescription>Updates the singleton network display name. The change is recorded in the administrative audit history.</CardDescription></CardHeader><CardContent><form className="space-y-3" onSubmit={saveNetworkName}><label className="block text-sm font-medium text-slate-700">Network name<Input className="mt-1" value={networkName} onChange={(event) => setNetworkName(event.target.value)} minLength={2} maxLength={160} required /></label><Button disabled={saving}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save network name</Button></form></CardContent></Card>
             <Card><CardHeader><CardTitle>School Manager onboarding</CardTitle><CardDescription>Provision a Manager for an existing active school. Other day-to-day school roles remain under the school's management workflow.</CardDescription></CardHeader><CardContent><form className="space-y-3" onSubmit={createManager}><label className="block text-sm font-medium text-slate-700">Active school<Select value={managerSchoolId} onValueChange={setManagerSchoolId}><SelectTrigger className="mt-1"><SelectValue placeholder="Choose a school" /></SelectTrigger><SelectContent>{schools.filter((item) => item.status === "active").map((item) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.school_code}</SelectItem>)}</SelectContent></Select></label><label className="block text-sm font-medium text-slate-700">Manager full name<Input className="mt-1" placeholder="Enter full name" value={managerName} onChange={(event) => setManagerName(event.target.value)} required minLength={2} maxLength={160} /></label><Button disabled={saving || !managerSchoolId}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}Provision School Manager</Button></form>{credentials && <CredentialBox credentials={credentials} onDismiss={() => setCredentials(null)} />}</CardContent></Card>
             <Card className="xl:col-span-2"><CardHeader><CardTitle>Authority boundaries</CardTitle><CardDescription>These boundaries keep network administration safe and prevent overlap with platform-owner and school-level responsibilities.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><Boundary title="Network authority" detail="Manage network identity, school registration and status, school leadership assignments, network reporting, and network audit visibility." /><Boundary title="School-owned workflows" detail="Daily teaching, attendance entry, student enrollment, academic calendars, invoices, payment confirmation, and school-level follow-up resolution remain in their respective school portals." /><Boundary title="Extreme Admin authority" detail="Platform-wide accounts, global security controls, platform finance, infrastructure health, and cross-network operations remain with Extreme Admin." /></CardContent></Card>
-          </TabsContent>
-        </Tabs>
+          </section>}
+        </div>
       </AdminCommandCenterShell>
 
       <Dialog open={Boolean(pendingChange)} onOpenChange={(open) => { if (!open && !changeSaving) { setPendingChange(null); setChangeReason(""); } }}>
