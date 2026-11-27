@@ -103,7 +103,9 @@ const Friends: React.FC = () => {
       } catch (err) {
         console.error('Search error:', err);
         setSearchResults([]);
-        setSearchError('We could not search for students. Please try again.');
+        setSearchError(err instanceof Error && err.message
+          ? err.message
+          : 'We could not search for students. Please try again.');
       } finally {
         setSearching(false);
       }
