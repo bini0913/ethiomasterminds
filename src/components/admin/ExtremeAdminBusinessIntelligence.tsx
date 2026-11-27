@@ -31,6 +31,7 @@ type BIData = {
   };
   growth: {
     registrations_by_day: { day: string; registrations: number }[];
+    schools_created_by_day: { day: string; schools: number }[];
     student_activity_by_day: { day: string; active_students: number; questions: number; correct: number; quizzes: number; xp: number }[];
     study_sessions_by_day: { day: string; sessions: number; duration_units: number }[];
     activity_summary: { active_students: number; repeat_active_students: number; active_days_total: number; questions: number; correct: number; quizzes: number; xp: number };
@@ -90,6 +91,7 @@ const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: 
     data.school_finance.payment_methods.forEach((r) => rows.push(["school collections", "all time", "payment method", r.currency, r.collected, `${r.method}; ${r.payments} payments`]));
     data.school_finance.daily_collections.forEach((r) => rows.push(["school collections", r.day, "daily confirmed collections", r.currency, r.collected, "Confirmed payments only"]));
     data.growth.registrations_by_day.forEach((r) => rows.push(["growth", r.day, "new registrations", "", r.registrations, "Profile creation date"]));
+    data.growth.schools_created_by_day.forEach((r) => rows.push(["growth", r.day, "new schools", "", r.schools, "School creation date"]));
     data.growth.student_activity_by_day.forEach((r) => rows.push(["usage", r.day, "active students", "", r.active_students, `${r.questions} questions; ${r.quizzes} quizzes; ${r.xp} XP`]));
     data.growth.study_sessions_by_day.forEach((r) => rows.push(["usage", r.day, "study sessions", "", r.sessions, `${r.duration_units} recorded duration units`]));
     return rows;
@@ -127,6 +129,10 @@ const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: 
             {data.platform_finance.account_balances.length ? data.platform_finance.account_balances.map((r) => <div key={r.currency} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{r.currency}</span><strong>{money(r.balance, r.currency)}</strong></div>) : <p className="text-sm text-slate-500">No active platform finance accounts.</p>}
             <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Platform receivables</p>
             {data.platform_finance.receivables_by_currency.length ? data.platform_finance.receivables_by_currency.map((r) => <div key={r.currency} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{r.currency}</span><strong>{money(r.outstanding, r.currency)}</strong></div>) : <p className="text-sm text-slate-500">No unpaid platform finance invoices.</p>}
+            <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Recorded platform invoice payments</p>
+            {data.platform_finance.paid_amount_by_currency.length ? data.platform_finance.paid_amount_by_currency.map((r) => <div key={r.currency} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{r.currency}</span><strong>{money(r.paid, r.currency)}</strong></div>) : <p className="text-sm text-slate-500">No platform invoice payments with a recorded paid timestamp.</p>}
+            <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Ledger records by status</p>
+            {data.platform_finance.ledger_statuses.length ? data.platform_finance.ledger_statuses.map((r) => <div key={r.status + r.direction} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{r.status} · {r.direction}</span><strong>{number(r.records)}</strong></div>) : <p className="text-sm text-slate-500">No platform ledger transactions recorded.</p>}
             <p className="pt-2 text-xs text-slate-500">{number(data.platform_finance.invoice_count)} invoices · {number(data.platform_finance.payment_records)} payment records. No platform revenue is inferred from balances.</p>
           </div>
         </Section>
@@ -151,6 +157,14 @@ const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: 
         </Section>
         <Section title="Growth & engagement" note="Historical student learning activity is sourced from the daily activity ledger, not inferred from current presence snapshots.">
           <div className="grid grid-cols-2 gap-3"><div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Repeat-active students</p><p className="mt-1 text-xl font-bold">{number(data.growth.activity_summary.repeat_active_students)}</p><p className="text-xs text-slate-500">2+ active days in period</p></div><div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Repeat-active share</p><p className="mt-1 text-xl font-bold">{repeatRate === null ? "—" : `${repeatRate.toFixed(1)}%`}</p><p className="text-xs text-slate-500">Of active students; not cohort retention</p></div><div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Questions answered</p><p className="mt-1 text-xl font-bold">{number(data.growth.activity_summary.questions)}</p></div><div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Quizzes completed</p><p className="mt-1 text-xl font-bold">{number(data.growth.activity_summary.quizzes)}</p></div></div>
+        </Section>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Section title="School growth" note="New school records created during the selected activity window.">
+          {data.growth.schools_created_by_day.length ? <div className="space-y-2">{data.growth.schools_created_by_day.map((r) => <div key={r.day} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{r.day}</span><strong>{number(r.schools)} new schools</strong></div>)}</div> : <p className="text-sm text-slate-500">No new schools were created in this date window.</p>}
+        </Section>
+        <Section title="Learning activity totals" note="Counts from the existing upper-student daily activity ledger.">
+          <div className="grid grid-cols-2 gap-3"><div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Correct answers</p><p className="mt-1 text-xl font-bold">{number(data.growth.activity_summary.correct)}</p></div><div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">XP earned</p><p className="mt-1 text-xl font-bold">{number(data.growth.activity_summary.xp)}</p></div></div>
         </Section>
       </div>
       <Section title={`Daily growth & learning · ${days} days`} note="Missing dates are displayed as zero only for chart context; no activity is fabricated.">
