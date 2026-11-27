@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(11);
+select plan(12);
 
 select ok(
   exists (
@@ -132,6 +132,21 @@ select ok(
       and coalesce(with_check, '') like '%thumbnail_path%'
   ),
   'ordinary uploaders can register only storage paths in their own folder'
+);
+
+
+select ok(
+  exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'library_books'
+      and policyname = 'uploader manages own book'
+      and cmd = 'ALL'
+      and coalesce(with_check, '') like '%split_part%'
+      and coalesce(with_check, '') like '%pdf_path%'
+      and coalesce(with_check, '') like '%thumbnail_path%'
+  ),
+  'permissive book ownership policy cannot bypass uploader-folder binding'
 );
 
 select * from finish();
