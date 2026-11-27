@@ -80,6 +80,11 @@ SELECT ok(
   'support status is stored separately from user-editable social post metadata'
 );
 SELECT ok(
+  position('updated_at' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0
+  AND position('reason' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0,
+  'support status changes retain timestamps and require an auditable reason'
+);
+SELECT ok(
   position('reviewed_at' in pg_get_functiondef('public.extreme_admin_resolve_report(uuid,text,text)'::regprocedure)) > 0
   AND position('reviewed_by' in pg_get_functiondef('public.extreme_admin_resolve_report(uuid,text,text)'::regprocedure)) > 0,
   'report review records the reviewer and review timestamp'
