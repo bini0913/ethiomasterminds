@@ -954,7 +954,7 @@ const ExtremeAdminPortal: React.FC = () => {
         </div>
       )}
 
-      {activeTab === "finance" && <ExtremeAdminBusinessIntelligence />}
+      {activeTab === "finance" && <ExtremeAdminBusinessIntelligence schools={schools} />}
 
       {activeTab === "operations" && (
         <div className="space-y-5">
