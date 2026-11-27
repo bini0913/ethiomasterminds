@@ -13,7 +13,7 @@ RETURNS TABLE(
   content text,
   created_at timestamp with time zone,
   status text,
-  status_updated_at timestamp with time zone
+  updated_at timestamp with time zone
 )
 LANGUAGE plpgsql
 STABLE
@@ -36,14 +36,22 @@ BEGIN
     COALESCE(profile.name, 'Unknown'),
     post.content,
     post.created_at,
-    COALESCE(NULLIF(post.metadata ->> 'support_status', ''), 'open'),
-    NULLIF(post.metadata ->> 'support_updated_at', '')::timestamptz
+    CASE
+      WHEN post.metadata ->> 'support_status' IN ('open', 'in_review', 'resolved', 'dismissed')
+        THEN post.metadata ->> 'support_status'
+      ELSE 'open'
+    END,
+    post.updated_at
   FROM public.social_posts AS post
   LEFT JOIN public.profiles AS profile ON profile.id = post.author_id
   WHERE post.post_type = 'support_request'
     AND (
       p_status IS NULL
-      OR COALESCE(NULLIF(post.metadata ->> 'support_status', ''), 'open') = p_status
+      OR CASE
+        WHEN post.metadata ->> 'support_status' IN ('open', 'in_review', 'resolved', 'dismissed')
+          THEN post.metadata ->> 'support_status'
+        ELSE 'open'
+      END = p_status
     )
   ORDER BY post.created_at DESC
   LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 100), 500))
@@ -66,7 +74,7 @@ BEGIN
     RAISE EXCEPTION 'Extreme Admin access required';
   END IF;
 
-  IF p_post_id IS NULL OR p_status NOT IN ('open', 'in_review', 'resolved', 'dismissed') THEN
+  IF p_post_id IS NULL OR p_status IS NULL OR p_status NOT IN ('open', 'in_review', 'resolved', 'dismissed') THEN
     RAISE EXCEPTION 'A valid support request and status are required';
   END IF;
 
