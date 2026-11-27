@@ -1,6 +1,6 @@
 -- Forward production-compatible copy of Part 1 Extreme Admin executive controls.
 -- Production uses profiles.account_status as its canonical account status field.
--- This migration intentionally avoids the absent user_account_controls relation.
+-- This migration uses the existing profile status field without adding a parallel status store.
 -- Part 1: Executive metrics for the Extreme Admin.
 -- Production account status is stored on public.profiles.account_status.
 
