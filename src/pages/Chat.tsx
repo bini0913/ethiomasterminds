@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useUser } from '@/context/UserContext';
+import { useCommunityTerms } from '@/context/CommunityTermsContext';
 import { getUserTier } from '@/lib/getUserTier';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -72,6 +73,7 @@ const BANNED_PATTERNS = ['kill yourself', 'hate you'];
 
 const Chat: React.FC = () => {
   const { user, isLoading } = useUser();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -322,33 +324,35 @@ const Chat: React.FC = () => {
     }
     setSending(true);
     try {
-      const { data: message, error } = await supabase.rpc('send_group_message', {
-        p_group_id: activeRoom.id,
-        p_content: text,
-        p_message_type: 'text',
-        p_reply_to_id: replyTo?.id || null,
-      });
-      if (error) throw error;
-      if (!message?.id) throw new Error('The message was not saved. Please try again.');
+      await runWithCommunityTerms(async () => {
+        const { data: message, error } = await supabase.rpc('send_group_message', {
+          p_group_id: activeRoom.id,
+          p_content: text,
+          p_message_type: 'text',
+          p_reply_to_id: replyTo?.id || null,
+        });
+        if (error) throw error;
+        if (!message?.id) throw new Error('The message was not saved. Please try again.');
 
-      // Push is best-effort; the persisted group message remains available in the chat.
-      void supabase.functions.invoke('send-push-notification', {
-        body: { kind: 'group_message', event_id: message.id },
-      }).then(({ error: pushError }) => {
-        if (pushError) console.warn('Group message push could not be confirmed:', pushError.message);
-      }).catch((pushError) => {
-        console.warn('Group message push request failed:', pushError);
-      });
+        // Push is best-effort; the persisted group message remains available in the chat.
+        void supabase.functions.invoke('send-push-notification', {
+          body: { kind: 'group_message', event_id: message.id },
+        }).then(({ error: pushError }) => {
+          if (pushError) console.warn('Group message push could not be confirmed:', pushError.message);
+        }).catch((pushError) => {
+          console.warn('Group message push request failed:', pushError);
+        });
 
-      setDraft('');
-      setReplyTo(null);
+        setDraft('');
+        setReplyTo(null);
+      }, 'direct_messages');
     } catch (error) {
       console.error('Error sending group message:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to send message');
     } finally {
       setSending(false);
     }
-  }, [user?.id, activeRoom, draft, sending, replyTo]);
+  }, [user?.id, activeRoom, draft, sending, replyTo, runWithCommunityTerms]);
 
   // Broadcast typing
   const handleDraftChange = (val: string) => {
