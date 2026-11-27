@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CheckCheck, Archive, MessageCircle, Trophy, Gamepad2, BookOpen, Users, Clock3, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -45,29 +45,36 @@ export default function NotificationInboxPage() {
   const [loadError, setLoadError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const loadSequence = useRef(0);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
+    const sequence = ++loadSequence.current;
     setLoading(true);
     setLoadError(false);
-    const { data, error } = await db
-      .from("notification_events" as any)
-      .select("id,user_id,kind,title,body,data,delivered_at,created_at,read_at,archived_at")
-      .eq("user_id", user.id)
-      .is("archived_at", null)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    if (error) {
+    try {
+      const { data, error } = await db
+        .from("notification_events" as any)
+        .select("id,user_id,kind,title,body,data,delivered_at,created_at,read_at,archived_at")
+        .eq("user_id", user.id)
+        .is("archived_at", null)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (sequence !== loadSequence.current) return;
+      if (error) throw error;
+      setItems((data ?? []) as NotificationEvent[]);
+    } catch (error) {
+      if (sequence !== loadSequence.current) return;
+      console.error("[Notifications] Inbox refresh failed:", error);
       setLoadError(true);
-      setLoading(false);
-      return;
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false);
     }
-    setItems((data ?? []) as NotificationEvent[]);
-    setLoading(false);
   }, [user?.id]);
 
   useEffect(() => {
     if (user?.id) void load();
+    return () => { loadSequence.current += 1; };
   }, [load, user?.id]);
 
   useEffect(() => {
