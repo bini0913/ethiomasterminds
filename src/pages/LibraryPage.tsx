@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { safeStorage } from '@/lib/safeStorage';
 import { motion } from 'framer-motion';
 import { useUser } from '@/context/UserContext';
+import { supabase } from '@/integrations/supabase/client';
 import { getUserTier } from '@/lib/getUserTier';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -158,8 +159,38 @@ const LibraryPage: React.FC = () => {
     }
   };
 
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
   useEffect(() => {
     load();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let refreshTimer: number | null = null;
+    const refresh = () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        void loadRef.current();
+      }, 250);
+    };
+    const channel = supabase
+      .channel(`library-live-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "library_books" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "book_uploads" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "book_permissions", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "library_bookmarks", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "highlights", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ai_generated_questions", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reading_progress", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "curriculum_textbook_catalog" }, refresh)
+      .subscribe();
+
+    return () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
+    };
   }, [user?.id]);
   useEffect(() => {
     if (!user?.id) return;
