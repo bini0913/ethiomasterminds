@@ -68,7 +68,30 @@ async function checkFirebaseMessaging(): Promise<ServiceCheck> {
     }
     const token = await response.json();
     if (!token.access_token) return { status: "degraded", checked_at, detail: "Google OAuth did not return an access token." };
-    return { status: "healthy", checked_at, detail: "Google OAuth accepted the Firebase service account credentials." };
+
+    // The deliberately invalid registration token cannot target a real device.
+    // FCM should reject it with INVALID_ARGUMENT or UNREGISTERED if the API and
+    // project authorization are reachable; no notification is delivered.
+    const fcmResponse = await fetch(
+      `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: {
+            token: "master-minds-health-check-invalid-registration-token",
+            data: { health_check: "true" },
+          },
+        }),
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    const fcmBody = await fcmResponse.text();
+    const expectedInvalidToken = fcmBody.includes("INVALID_ARGUMENT") || fcmBody.includes("UNREGISTERED");
+    if ((fcmResponse.status === 400 || fcmResponse.status === 404) && expectedInvalidToken) {
+      return { status: "healthy", checked_at, detail: "FCM API and project authorization responded as expected to a deliberately invalid token; no push was delivered." };
+    }
+    return { status: "degraded", checked_at, detail: `FCM API health probe returned HTTP ${fcmResponse.status} or an unexpected response.` };
   } catch {
     return { status: "degraded", checked_at, detail: "Firebase Messaging credential or OAuth check failed." };
   }
@@ -138,6 +161,6 @@ Deno.serve(async (request) => {
     database,
     firebase_messaging: firebase,
     livekit,
-    note: "Checks validate database access, Google OAuth credentials and LiveKit RoomService reachability. They do not send a test notification or create a call room.",
+    note: "Checks validate database access, FCM API authorization with an intentionally invalid token, and LiveKit RoomService reachability. They do not send a notification or create a call room.",
   });
 });
