@@ -42,7 +42,7 @@ const statusTone = (status?: string) => status === "healthy" || status === "reso
   : status === "degraded" || status === "critical" || status === "high" || status === "open" || status === "investigating"
     ? "bg-amber-50 text-amber-800"
     : "bg-slate-100 text-slate-700";
-const pretty = (value: string) => value.replaceAll("_", " ");
+const pretty = (value: string) => value.replace(/_/g, " ");
 
 const ExtremeAdminPlatformHealth: React.FC = () => {
   const [report, setReport] = useState<HealthReport | null>(null);
