@@ -165,6 +165,14 @@ BEGIN
           WHERE created_at >= (v_start_date::timestamp AT TIME ZONE 'Africa/Addis_Ababa')
           GROUP BY (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date) x
       ), '[]'::jsonb),
+      'schools_created_by_day', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object('day', day, 'schools', schools) ORDER BY day)
+        FROM (SELECT (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date day, count(*) schools
+          FROM public.schools
+          WHERE created_at >= (v_start_date::timestamp AT TIME ZONE 'Africa/Addis_Ababa')
+            AND (p_school_id IS NULL OR id = p_school_id)
+          GROUP BY (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date) x
+      ), '[]'::jsonb),
       'student_activity_by_day', COALESCE((
         SELECT jsonb_agg(jsonb_build_object('day', day, 'active_students', active_students,
           'questions', questions, 'correct', correct, 'quizzes', quizzes, 'xp', xp) ORDER BY day)
