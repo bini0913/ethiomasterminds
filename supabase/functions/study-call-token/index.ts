@@ -44,6 +44,14 @@ Deno.serve(async (req) => {
     return json({ error: "Invalid study call room" }, 400);
   }
 
+  const { data: activeRoom, error: roomError } = await supabase
+    .from("study_call_rooms")
+    .select("id")
+    .eq("id", roomName)
+    .is("ended_at", null)
+    .maybeSingle();
+  if (roomError || !activeRoom) return json({ error: "This study call has ended or is unavailable." }, 403);
+
   const { data: membership, error: membershipError } = await supabase
     .from("study_call_participants")
     .select("room_id")
