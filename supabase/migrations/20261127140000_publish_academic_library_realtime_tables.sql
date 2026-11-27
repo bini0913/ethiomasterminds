@@ -8,6 +8,7 @@ begin
   foreach target_table in array array[
     'library_books',
     'book_uploads',
+    'book_permissions',
     'library_bookmarks',
     'highlights',
     'ai_generated_questions',
