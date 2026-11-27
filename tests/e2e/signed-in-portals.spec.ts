@@ -91,3 +91,28 @@ for (const role of notificationRoles) {
     expect(pageErrors, `Unexpected browser errors in ${role.label} notification flows`).toEqual([]);
   });
 }
+
+test('Extreme Admin executive workspace exposes the Part 1 control sections', async ({ page }) => {
+  test.setTimeout(45_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await authenticateAs(page, 'ci-extreme-admin@masterminds.test');
+  await page.goto('/root-control-portal-9xA7', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: 'Executive control center' })).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByText('All registered users')).toBeVisible({ timeout: 25_000 });
+
+  if ((page.viewportSize()?.width ?? 1280) < 1024) {
+    await page.getByRole('button', { name: 'Open administration navigation' }).click();
+  }
+  await page.getByRole('button', { name: /Accounts & access/ }).click();
+  await expect(page.getByRole('heading', { name: 'Accounts and access' })).toBeVisible();
+  await expect(page.getByText('Create and assign a school account')).toBeVisible();
+
+  if ((page.viewportSize()?.width ?? 1280) < 1024) {
+    await page.getByRole('button', { name: 'Open administration navigation' }).click();
+  }
+  await page.getByRole('button', { name: /Money & growth/ }).click();
+  await expect(page.getByRole('heading', { name: 'Money & growth' })).toBeVisible();
+  expect(pageErrors, 'Unexpected browser errors in Extreme Admin executive workspace').toEqual([]);
+});
