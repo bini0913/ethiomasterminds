@@ -164,7 +164,7 @@ test('Super Admin network workspace exposes its live workflows across desktop, t
         await page.getByRole('button', { name: 'Open administration navigation' }).click();
       }
       await page.getByRole('button', { name: section.label }).click();
-      await expect(page.getByText(section.content, { exact: false })).toBeVisible();
+      await expect(page.getByRole('heading', { name: section.content, exact: false }).first()).toBeVisible();
     }
 
     if (viewport.width < 1024) {
