@@ -79,6 +79,7 @@ export default function NetworkSuperAdminPortal() {
   const [page, setPage] = useState(0);
   const [schoolName, setSchoolName] = useState("");
   const [schoolCode, setSchoolCode] = useState("");
+  const [initialManagerName, setInitialManagerName] = useState("");
   const [managerName, setManagerName] = useState("");
   const [credentials, setCredentials] = useState<Credentials | null>(null);
   const [credentialContext, setCredentialContext] = useState<"registration" | "manager" | null>(null);
@@ -293,7 +294,7 @@ export default function NetworkSuperAdminPortal() {
         body: {
           action: "create_school",
           school: { name: schoolName.trim(), school_code: schoolCode.trim().toUpperCase() },
-          manager: { name: managerName.trim() },
+          manager: { name: initialManagerName.trim() },
         },
       });
       if (response.error || response.data?.error) {
@@ -314,7 +315,7 @@ export default function NetworkSuperAdminPortal() {
       setCredentialContext("registration");
       setSchoolName("");
       setSchoolCode("");
-      setManagerName("");
+      setInitialManagerName("");
       toast.success("School registered and its initial Manager was provisioned.");
       if (manager.audit_warning || response.data?.school?.audit_warning) toast.warning("The account was created, but an audit warning needs review.");
       await Promise.all([loadCore(), loadAudit()]);
@@ -511,7 +512,7 @@ export default function NetworkSuperAdminPortal() {
                   <form className="space-y-3" onSubmit={registerSchool}>
                     <label className="block text-sm font-medium text-slate-700">School name<Input className="mt-1" placeholder="Enter registered school name" value={schoolName} onChange={(event) => setSchoolName(event.target.value)} required minLength={2} maxLength={160} /></label>
                     <label className="block text-sm font-medium text-slate-700">School code<Input className="mt-1 uppercase" placeholder="e.g. MM01" value={schoolCode} onChange={(event) => setSchoolCode(event.target.value.toUpperCase())} required pattern="[A-Z0-9]{2,8}" /></label>
-                    <label className="block text-sm font-medium text-slate-700">Initial Manager full name<Input className="mt-1" placeholder="Enter Manager's full name" value={managerName} onChange={(event) => setManagerName(event.target.value)} required minLength={2} maxLength={160} /></label>
+                    <label className="block text-sm font-medium text-slate-700">Initial Manager full name<Input className="mt-1" placeholder="Enter Manager's full name" value={initialManagerName} onChange={(event) => setInitialManagerName(event.target.value)} required minLength={2} maxLength={160} /></label>
                     <Button className="w-full" disabled={saving}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}Register school and provision Manager</Button>
                   </form>
                   {credentials && credentialContext === "registration" && <CredentialBox credentials={credentials} onDismiss={() => { setCredentials(null); setCredentialContext(null); }} />}
