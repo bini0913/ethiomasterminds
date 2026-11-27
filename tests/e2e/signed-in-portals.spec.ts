@@ -93,15 +93,11 @@ for (const role of notificationRoles) {
 }
 
 test('Extreme Admin executive workspace exposes every Part 1 section on desktop and mobile', async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await authenticateAs(page, 'ci-extreme-admin@masterminds.test');
-  await page.goto('/root-control-portal-9xA7', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Executive control center' })).toBeVisible({ timeout: 25_000 });
-  await expect(page.getByText('All registered users')).toBeVisible({ timeout: 25_000 });
-
   const sections = [
     { nav: /Accounts & access/, heading: 'Accounts and access', content: 'Create and assign a school account' },
     { nav: /Super Admin/, heading: 'Single Super Admin' },
@@ -115,16 +111,23 @@ test('Extreme Admin executive workspace exposes every Part 1 section on desktop 
     { nav: /Audit history/, heading: 'Audit history' },
   ];
 
-  for (const section of sections) {
-    if ((page.viewportSize()?.width ?? 1280) < 1024) {
-      await page.getByRole('button', { name: 'Open administration navigation' }).click();
+  for (const viewport of [{ name: 'desktop', width: 1440, height: 1000 }, { name: 'mobile', width: 390, height: 844 }]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/root-control-portal-9xA7', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'Executive control center' })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText('All registered users')).toBeVisible({ timeout: 25_000 });
+
+    for (const section of sections) {
+      if (viewport.width < 1024) {
+        await page.getByRole('button', { name: 'Open administration navigation' }).click();
+      }
+      await page.getByRole('button', { name: section.nav }).click();
+      await expect(page.getByRole('heading', { name: section.heading })).toBeVisible();
+      if (section.content) await expect(page.getByText(section.content, { exact: true })).toBeVisible();
     }
-    await page.getByRole('button', { name: section.nav }).click();
-    await expect(page.getByRole('heading', { name: section.heading })).toBeVisible();
-    if (section.content) await expect(page.getByText(section.content, { exact: true })).toBeVisible();
   }
 
-  expect(pageErrors, 'Unexpected browser errors in Extreme Admin executive workspace').toEqual([]);
+  expect(pageErrors, 'Unexpected browser errors in Extreme Admin desktop/mobile workspace').toEqual([]);
 });
 
 test('Super Admin is denied access to the Extreme Admin owner route', async ({ page }) => {
