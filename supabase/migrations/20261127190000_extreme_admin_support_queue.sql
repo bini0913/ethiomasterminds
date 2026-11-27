@@ -128,3 +128,55 @@ REVOKE ALL ON FUNCTION public.extreme_admin_list_support_requests(text, integer,
 REVOKE ALL ON FUNCTION public.extreme_admin_set_support_request_status(uuid, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.extreme_admin_list_support_requests(text, integer, integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.extreme_admin_set_support_request_status(uuid, text, text) TO authenticated;
+
+
+-- Keep report review metadata and required reasons authoritative at the database boundary.
+CREATE OR REPLACE FUNCTION public.extreme_admin_resolve_report(
+  p_report_id uuid,
+  p_status text,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public'
+AS $function$
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+
+  IF p_report_id IS NULL OR p_status IS NULL OR p_status NOT IN ('pending', 'reviewed', 'resolved', 'dismissed') THEN
+    RAISE EXCEPTION 'A valid report and status are required';
+  END IF;
+
+  IF NULLIF(trim(COALESCE(p_reason, '')), '') IS NULL OR length(trim(p_reason)) > 500 THEN
+    RAISE EXCEPTION 'A report review reason of 1–500 characters is required';
+  END IF;
+
+  UPDATE public.reports
+  SET
+    status = p_status,
+    reviewed_at = CASE WHEN p_status = 'pending' THEN NULL ELSE now() END,
+    reviewed_by = CASE WHEN p_status = 'pending' THEN NULL ELSE auth.uid() END
+  WHERE id = p_report_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Report not found';
+  END IF;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(),
+    'root_resolve_report',
+    'report',
+    p_report_id,
+    jsonb_build_object('status', p_status, 'reason', trim(p_reason))
+  );
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.extreme_admin_resolve_report(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_resolve_report(uuid, text, text) TO authenticated;
