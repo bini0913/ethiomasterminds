@@ -132,20 +132,20 @@ test('Extreme Admin executive workspace exposes Part 1 and Part 3 sections acros
   expect(pageErrors, 'Unexpected browser errors in Extreme Admin desktop/tablet/mobile workspace').toEqual([]);
 });
 
-test('Super Admin network workspace exposes its live operational sections across desktop, tablet and mobile', async ({ page }) => {
+test('Super Admin network workspace exposes its live workflows across desktop, tablet and mobile', async ({ page }) => {
   test.setTimeout(120_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await authenticateAs(page, 'ci-super-admin@masterminds.test');
   const sections = [
-    { tab: /Overview/, content: 'Network school comparison' },
-    { tab: /Schools/, content: 'Register school' },
-    { tab: /People/, content: 'Network people and staff' },
-    { tab: /Analytics/, content: 'School performance and academic analytics' },
-    { tab: /Finance/, content: 'Financial oversight by currency' },
-    { tab: /Audit/, content: 'Network audit history' },
-    { tab: /Settings/, content: 'Network configuration' },
+    { label: /Overview Network pulse/, content: 'Network school directory' },
+    { label: /Schools Register and oversee/, content: 'Register a school' },
+    { label: /People Staff and memberships/, content: 'People and school memberships' },
+    { label: /Analytics School performance/, content: 'School performance' },
+    { label: /Finance Read-only oversight/, content: 'Network finance oversight' },
+    { label: /Audit history Recorded changes/, content: 'Network audit history' },
+    { label: /Settings Network identity/, content: 'Network identity' },
   ];
 
   for (const viewport of [
@@ -156,15 +156,37 @@ test('Super Admin network workspace exposes its live operational sections across
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/super-admin', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('Network command center')).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText('Network-scoped access')).toBeVisible();
+    await expect(page.getByText('Owner access')).toHaveCount(0);
 
     for (const section of sections) {
-      await page.getByRole('tab', { name: section.tab }).click();
+      if (viewport.width < 1024) {
+        await page.getByRole('button', { name: 'Open administration navigation' }).click();
+      }
+      await page.getByRole('button', { name: section.label }).click();
       await expect(page.getByText(section.content, { exact: false })).toBeVisible();
     }
 
-    await page.getByRole('tab', { name: /People/ }).click();
+    if (viewport.width < 1024) {
+      await page.getByRole('button', { name: 'Open administration navigation' }).click();
+    }
+    await page.getByRole('button', { name: /People Staff and memberships/ }).click();
     await page.getByRole('button', { name: 'All schools' }).click();
-    await expect(page.getByText('Network people and staff')).toBeVisible();
+    await expect(page.getByText('People and school memberships')).toBeVisible();
+    await expect(page.getByText('Global account status is separate')).toBeVisible();
+
+    if (viewport.width < 1024) {
+      await page.getByRole('button', { name: 'Open administration navigation' }).click();
+    }
+    await page.getByRole('button', { name: /Schools Register and oversee/ }).click();
+    await expect(page.getByText('Assign an existing account')).toBeVisible();
+
+    if (viewport.width < 1024) {
+      await page.getByRole('button', { name: 'Open administration navigation' }).click();
+    }
+    await page.getByRole('button', { name: /Finance Read-only oversight/ }).click();
+    await expect(page.getByText('Recent school invoices')).toBeVisible();
+    await expect(page.getByText('Pending finance follow-ups')).toBeVisible();
   }
 
   expect(pageErrors, 'Unexpected browser errors in Super Admin desktop/tablet/mobile workspace').toEqual([]);
