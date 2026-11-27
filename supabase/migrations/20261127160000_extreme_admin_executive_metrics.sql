@@ -109,6 +109,36 @@ BEGIN
       FROM public.user_presence presence
       WHERE presence.last_seen >= now() - interval '7 days'
     ),
+    'daily_active_students', (
+      SELECT count(DISTINCT presence.user_id)
+      FROM public.user_presence presence
+      JOIN (
+        SELECT user_id FROM public.user_roles WHERE role = 'student'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'student' AND status = 'active'
+      ) student_accounts ON student_accounts.user_id = presence.user_id
+      WHERE presence.last_seen >= (date_trunc('day', now() AT TIME ZONE 'Africa/Addis_Ababa') AT TIME ZONE 'Africa/Addis_Ababa')
+    ),
+    'weekly_active_students', (
+      SELECT count(DISTINCT presence.user_id)
+      FROM public.user_presence presence
+      JOIN (
+        SELECT user_id FROM public.user_roles WHERE role = 'student'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'student' AND status = 'active'
+      ) student_accounts ON student_accounts.user_id = presence.user_id
+      WHERE presence.last_seen >= now() - interval '7 days'
+    ),
+    'monthly_active_students', (
+      SELECT count(DISTINCT presence.user_id)
+      FROM public.user_presence presence
+      JOIN (
+        SELECT user_id FROM public.user_roles WHERE role = 'student'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'student' AND status = 'active'
+      ) student_accounts ON student_accounts.user_id = presence.user_id
+      WHERE presence.last_seen >= now() - interval '30 days'
+    ),
     'monthly_active_users', (
       SELECT count(DISTINCT presence.user_id)
       FROM public.user_presence presence
