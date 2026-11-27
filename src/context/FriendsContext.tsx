@@ -345,32 +345,38 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
            friendRequests.some(r => r.sender.id === userId);
   };
 
-  const searchUsers = async (query: string): Promise<UserProfile[]> => {
-    if (!query.trim()) return [];
-    
+  const searchUsers = useCallback(async (query: string): Promise<UserProfile[]> => {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery.length < 2) return [];
+
+    let results: UserProfile[] = [];
     try {
-      const { data, error } = await db
-        .rpc('find_student_by_username', { _username: query.trim() });
-      
-      if (error) throw error;
-      
-      return (data || [])
-        .filter((u: any) => u.id !== user?.id)
-        .map((u: any) => ({
-          id: u.id,
-          name: getDisplayName(u, u.id),
-          username: u.username || '',
-          email: '',
-          role: 'student',
-          avatar: u.avatar || 'avatar-1',
-          level: u.level || 1,
-          xp: u.xp || 0
-        } as UserProfile));
+      const allowed = await runWithCommunityTerms(async () => {
+        const { data, error } = await db
+          .rpc('find_student_by_username', { _username: normalizedQuery });
+
+        if (error) throw error;
+
+        results = (data || [])
+          .filter((u: any) => u.id !== user?.id)
+          .map((u: any) => ({
+            id: u.id,
+            name: getDisplayName(u, u.id),
+            username: u.username || '',
+            email: '',
+            role: 'student',
+            avatar: u.avatar || 'avatar-1',
+            level: u.level || 1,
+            xp: u.xp || 0
+          } as UserProfile));
+      }, 'friend_requests');
+
+      return allowed ? results : [];
     } catch (err) {
       console.error('Error searching users:', err);
       throw err;
     }
-  };
+  }, [user?.id, runWithCommunityTerms]);
 
   const sendFriendRequest = async (targetUserId: string): Promise<boolean> => {
     if (!user?.id || !targetUserId || targetUserId === user.id) return false;
