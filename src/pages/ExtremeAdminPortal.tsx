@@ -287,7 +287,7 @@ const ExtremeAdminPortal: React.FC = () => {
 
   const updateUserStatus = async () => {
     if (!targetUserId) return toast.error("Select an account first");
-    if (selectedUser?.role === "extreme_admin") return toast.error("The Extreme Admin owner account cannot be suspended here");
+    if (selectedUser?.role === "extreme_admin" || selectedUser?.role === "super_admin") return toast.error("Top-level platform authority accounts must be changed through their dedicated authority controls");
     if (!statusReason.trim()) return toast.error("Enter a reason for the account status change");
     const { error } = await supabase.rpc("extreme_admin_set_user_status" as any, {
       p_user_id: targetUserId,
