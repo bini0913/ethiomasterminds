@@ -21,6 +21,7 @@ type BIData = {
   };
   school_finance: {
     invoice_count: number;
+    confirmed_payment_count: number;
     outstanding_invoice_count: number;
     collections_by_currency: MoneyRow[];
     outstanding_by_currency: MoneyRow[];
@@ -31,7 +32,7 @@ type BIData = {
   growth: {
     registrations_by_day: { day: string; registrations: number }[];
     student_activity_by_day: { day: string; active_students: number; questions: number; correct: number; quizzes: number; xp: number }[];
-    study_sessions_by_day: { day: string; sessions: number; minutes: number }[];
+    study_sessions_by_day: { day: string; sessions: number; duration_units: number }[];
     activity_summary: { active_students: number; repeat_active_students: number; active_days_total: number; questions: number; correct: number; quizzes: number; xp: number };
   };
 };
@@ -58,24 +59,18 @@ const downloadCsv = (rows: unknown[][], filename: string) => {
   const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); URL.revokeObjectURL(url);
 };
 
-const ExtremeAdminBusinessIntelligence: React.FC = () => {
+const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: string; school_code: string }[] }> = ({ schools }) => {
   const [days, setDays] = useState("30");
   const [schoolId, setSchoolId] = useState("all");
-  const [schools, setSchools] = useState<{ id: string; name: string; school_code: string }[]>([]);
   const [data, setData] = useState<BIData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    const [report, schoolRows] = await Promise.all([
-      supabase.rpc("extreme_admin_get_business_intelligence" as any, { p_days: Number(days), p_school_id: schoolId === "all" ? null : schoolId }),
-      supabase.from("schools").select("id,name,school_code").order("name"),
-    ]);
+    const report = await supabase.rpc("extreme_admin_get_business_intelligence" as any, { p_days: Number(days), p_school_id: schoolId === "all" ? null : schoolId });
     if (report.error) { setData(null); setError(report.error.message || "Business intelligence could not be loaded"); setLoading(false); return; }
-    if (schoolRows.error) { setError(schoolRows.error.message || "School filter could not be loaded"); setLoading(false); return; }
     setData(report.data as BIData);
-    setSchools((schoolRows.data || []) as typeof schools);
     setLoading(false);
   }, [days, schoolId]);
 
@@ -95,7 +90,7 @@ const ExtremeAdminBusinessIntelligence: React.FC = () => {
     data.school_finance.payment_methods.forEach((r) => rows.push(["school collections", "all time", "payment method", r.currency, r.collected, `${r.method}; ${r.payments} payments`]));
     data.growth.registrations_by_day.forEach((r) => rows.push(["growth", r.day, "new registrations", "", r.registrations, "Profile creation date"]));
     data.growth.student_activity_by_day.forEach((r) => rows.push(["usage", r.day, "active students", "", r.active_students, `${r.questions} questions; ${r.quizzes} quizzes; ${r.xp} XP`]));
-    data.growth.study_sessions_by_day.forEach((r) => rows.push(["usage", r.day, "study sessions", "", r.sessions, `${r.minutes} recorded minutes`]));
+    data.growth.study_sessions_by_day.forEach((r) => rows.push(["usage", r.day, "study sessions", "", r.sessions, `${r.duration_units} recorded duration units`]));
     return rows;
   }, [data]);
 
@@ -118,7 +113,7 @@ const ExtremeAdminBusinessIntelligence: React.FC = () => {
     {loading && !data && <div className="rounded-xl border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading verified business data…</div>}
     {data && <>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric title="Confirmed school receipts" value={data.school_finance.collections_by_currency.reduce((n, r) => n + Number(r.collected || 0), 0)} detail="Displayed sum across currencies; use currency breakdown below" icon={Wallet} />
+        <Metric title="Confirmed school payments" value={data.school_finance.confirmed_payment_count} detail="Verified payment records · not a cross-currency sum" icon={Wallet} />
         <Metric title="Outstanding school invoices" value={data.school_finance.outstanding_invoice_count} detail={`${number(data.school_finance.invoice_count)} invoices in scope`} icon={FileText} />
         <Metric title="New registrations" value={data.growth.registrations_by_day.reduce((n, r) => n + Number(r.registrations), 0)} detail={`Last ${days} days · profile creation`} icon={Users} />
         <Metric title="Active students" value={data.growth.activity_summary.active_students} detail={`Last ${days} days · recorded daily learning activity`} icon={Activity} />
