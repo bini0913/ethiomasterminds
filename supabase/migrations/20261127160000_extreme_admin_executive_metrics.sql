@@ -158,7 +158,8 @@ BEGIN
     ),
     'super_admins', (SELECT count(*) FROM public.user_roles WHERE role = 'super_admin'::public.app_role),
     'extreme_admins', (SELECT count(*) FROM public.user_roles WHERE role = 'extreme_admin'::public.app_role),
-    'audit_events_24h', (SELECT count(*) FROM public.admin_audit_logs WHERE created_at >= now() - interval '24 hours'),
+    'audit_events_total', (SELECT count(*) FROM public.admin_audit_logs) + (SELECT count(*) FROM public.extreme_admin_audit_logs),
+    'audit_events_24h', (SELECT count(*) FROM public.admin_audit_logs WHERE created_at >= now() - interval '24 hours') + (SELECT count(*) FROM public.extreme_admin_audit_logs WHERE created_at >= now() - interval '24 hours'),
     'school_fee_payments_confirmed', (SELECT count(*) FROM public.school_fee_payments WHERE status = 'confirmed'),
     'notification_devices_enabled', (SELECT count(*) FROM public.notification_devices WHERE enabled = true),
     'notification_inbox_events_24h', (SELECT count(*) FROM public.notification_events WHERE created_at >= now() - interval '24 hours'),
@@ -245,3 +246,42 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.extreme_admin_list_users(text, public.app_role, integer, integer) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.extreme_admin_list_users(text, public.app_role, integer, integer) TO authenticated;
+
+-- Merge the two historical audit stores into one read-only owner timeline.
+-- Existing callers keep the same result columns and limit contract.
+CREATE OR REPLACE FUNCTION public.extreme_admin_get_audit_logs(p_limit integer DEFAULT 200)
+RETURNS TABLE (
+  id uuid,
+  actor_id uuid,
+  actor_name text,
+  action text,
+  target_type text,
+  target_id text,
+  details jsonb,
+  created_at timestamptz
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+  SELECT event.id, event.actor_id, profile.name, event.action,
+         event.target_type, event.target_id, event.details, event.created_at
+  FROM (
+    SELECT legacy.id, legacy.actor_id, legacy.action, legacy.target_type,
+           legacy.target_id, legacy.details, legacy.created_at
+    FROM public.extreme_admin_audit_logs legacy
+    UNION ALL
+    SELECT current_log.id, current_log.actor_id, current_log.action,
+           current_log.target_type, current_log.target_id::text,
+           current_log.metadata, current_log.created_at
+    FROM public.admin_audit_logs current_log
+  ) event
+  LEFT JOIN public.profiles profile ON profile.id = event.actor_id
+  WHERE public._is_extreme_admin()
+  ORDER BY event.created_at DESC
+  LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 200), 1000));
+$function$;
+
+REVOKE ALL ON FUNCTION public.extreme_admin_get_audit_logs(integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_get_audit_logs(integer) TO authenticated;
