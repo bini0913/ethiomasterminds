@@ -1,0 +1,131 @@
+-- Part 1: Executive metrics for the Extreme Admin.
+-- All counts are derived from durable platform records. Finance figures are
+-- explicitly limited to confirmed school-fee receipts and outstanding invoices.
+
+CREATE OR REPLACE FUNCTION public.extreme_admin_get_executive_metrics()
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+DECLARE
+  v_metrics jsonb;
+  v_collected_by_currency jsonb := '[]'::jsonb;
+  v_outstanding_by_currency jsonb := '[]'::jsonb;
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+
+  SELECT COALESCE(
+    jsonb_agg(
+      jsonb_build_object('currency', totals.currency, 'collected', totals.collected)
+      ORDER BY totals.currency
+    ),
+    '[]'::jsonb
+  )
+  INTO v_collected_by_currency
+  FROM (
+    SELECT COALESCE(NULLIF(payment.currency, ''), 'ETB') AS currency,
+           SUM(payment.amount)::numeric(14,2) AS collected
+    FROM public.school_fee_payments payment
+    WHERE payment.status = 'confirmed'
+    GROUP BY COALESCE(NULLIF(payment.currency, ''), 'ETB')
+  ) totals;
+
+  SELECT COALESCE(
+    jsonb_agg(
+      jsonb_build_object('currency', totals.currency, 'outstanding', totals.outstanding)
+      ORDER BY totals.currency
+    ),
+    '[]'::jsonb
+  )
+  INTO v_outstanding_by_currency
+  FROM (
+    SELECT COALESCE(NULLIF(invoice.currency, ''), 'ETB') AS currency,
+           SUM(invoice.balance)::numeric(14,2) AS outstanding
+    FROM public.school_student_invoices invoice
+    WHERE invoice.balance > 0
+    GROUP BY COALESCE(NULLIF(invoice.currency, ''), 'ETB')
+  ) totals;
+
+  SELECT jsonb_build_object(
+    'registered_users', (SELECT count(*) FROM public.profiles),
+    'registered_today', (SELECT count(*) FROM public.profiles WHERE created_at >= date_trunc('day', now())),
+    'registered_7d', (SELECT count(*) FROM public.profiles WHERE created_at >= now() - interval '7 days'),
+    'registered_30d', (SELECT count(*) FROM public.profiles WHERE created_at >= now() - interval '30 days'),
+    'daily_active_users', (
+      SELECT count(DISTINCT presence.user_id)
+      FROM public.user_presence presence
+      WHERE presence.last_seen >= date_trunc('day', now())
+    ),
+    'weekly_active_users', (
+      SELECT count(DISTINCT presence.user_id)
+      FROM public.user_presence presence
+      WHERE presence.last_seen >= now() - interval '7 days'
+    ),
+    'monthly_active_users', (
+      SELECT count(DISTINCT presence.user_id)
+      FROM public.user_presence presence
+      WHERE presence.last_seen >= now() - interval '30 days'
+    ),
+    'online_now', (
+      SELECT count(DISTINCT presence.user_id)
+      FROM public.user_presence presence
+      WHERE presence.last_seen >= now() - interval '10 minutes'
+    ),
+    'schools_total', (SELECT count(*) FROM public.schools),
+    'schools_active', (SELECT count(*) FROM public.schools WHERE status = 'active'),
+    'schools_suspended', (SELECT count(*) FROM public.schools WHERE status = 'suspended'),
+    'schools_closed', (SELECT count(*) FROM public.schools WHERE status = 'closed'),
+    'students', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles WHERE role = 'student'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'student' AND status = 'active'
+      ) student_accounts
+    ),
+    'teachers', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles WHERE role = 'teacher'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'teacher' AND status = 'active'
+      ) teacher_accounts
+    ),
+    'parents', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles WHERE role = 'parent'::public.app_role
+        UNION
+        SELECT user_id FROM public.school_memberships WHERE school_role = 'parent' AND status = 'active'
+      ) parent_accounts
+    ),
+    'staff', (
+      SELECT count(*) FROM (
+        SELECT user_id FROM public.user_roles
+        WHERE role IN (
+          'teacher'::public.app_role, 'manager'::public.app_role,
+          'admin'::public.app_role, 'finance'::public.app_role
+        )
+        UNION
+        SELECT user_id FROM public.school_memberships
+        WHERE school_role IN ('teacher', 'manager', 'admin', 'finance') AND status = 'active'
+      ) staff_accounts
+    ),
+    'super_admins', (SELECT count(*) FROM public.user_roles WHERE role = 'super_admin'::public.app_role),
+    'audit_events_24h', (SELECT count(*) FROM public.admin_audit_logs WHERE created_at >= now() - interval '24 hours'),
+    'school_fee_payments_confirmed', (SELECT count(*) FROM public.school_fee_payments WHERE status = 'confirmed'),
+    'school_invoices_total', (SELECT count(*) FROM public.school_student_invoices),
+    'school_invoices_outstanding', (SELECT count(*) FROM public.school_student_invoices WHERE balance > 0),
+    'school_fee_collected_by_currency', v_collected_by_currency,
+    'school_fee_outstanding_by_currency', v_outstanding_by_currency,
+    'metrics_generated_at', now()
+  )
+  INTO v_metrics;
+
+  RETURN v_metrics;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.extreme_admin_get_executive_metrics() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_get_executive_metrics() TO authenticated;
