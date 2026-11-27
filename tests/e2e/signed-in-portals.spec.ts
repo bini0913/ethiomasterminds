@@ -200,6 +200,13 @@ test('Super Admin network workspace exposes its live workflows across desktop, t
     await page.getByRole('combobox').nth(1).click();
     await page.getByRole('option', { name: 'Parent' }).click();
     await expect(page.getByText('Enrolled student usernames')).toBeVisible();
+    const schoolSuspend = page.getByRole('button', { name: 'Suspend', exact: true }).first();
+    if (await schoolSuspend.count()) {
+      await schoolSuspend.click();
+      await expect(page.getByRole('heading', { name: 'Confirm school status change' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Confirm change' })).toBeDisabled();
+      await page.getByRole('button', { name: 'Cancel' }).click();
+    }
 
     if (viewport.width < 1024) {
       await page.getByRole('button', { name: 'Open administration navigation' }).click();
