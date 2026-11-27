@@ -584,7 +584,7 @@ const ExtremeAdminPortal: React.FC = () => {
         <div className="space-y-6">
           <SectionHeading eyebrow="Executive · People & access" title="Accounts and access" description="Search the complete account directory, provision school accounts through the existing secure provisioning service, and apply audited role or status changes." />
           <Card className="border-slate-200 bg-white shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Search className="h-4 w-4 text-blue-700" />Account directory</CardTitle><CardDescription>Search runs on the protected server function and supports pagination. Top-level platform roles cannot be changed here.</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Search className="h-4 w-4 text-blue-700" />Account directory</CardTitle><CardDescription>Search by name, username or UUID using the protected paginated directory. The displayed role is the effective role resolved from platform authority and active school membership.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
                 <Input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadUsers(true); }} placeholder="Search name, username or account ID" />
@@ -610,12 +610,12 @@ const ExtremeAdminPortal: React.FC = () => {
               <CardContent className="space-y-3">
                 <div className="space-y-1"><Label>Selected account ID</Label><Input value={targetUserId} onChange={(event) => setTargetUserId(event.target.value)} placeholder="Select from the directory" /></div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1"><Label>Platform role</Label><Select value={targetRole} onValueChange={(value) => setTargetRole(value as UserRole)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLE_OPTIONS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="space-y-1"><Label>Global role</Label><Select value={targetRole} onValueChange={(value) => setTargetRole(value as UserRole)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{ROLE_OPTIONS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent></Select></div>
                   <div className="space-y-1"><Label>Account status</Label><Select value={targetStatus} onValueChange={(value) => setTargetStatus(value as AccountStatus)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="suspended">Suspended</SelectItem><SelectItem value="banned">Banned</SelectItem></SelectContent></Select></div>
                 </div>
                 <div className="space-y-1"><Label>Required audit reason</Label><Textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} placeholder="Explain why this access change is necessary" rows={3} /></div>
                 <div className="flex flex-wrap gap-2"><Button onClick={() => void updateUserRole()} disabled={!targetUserId || !statusReason.trim()}>Update role</Button><Button variant="outline" onClick={() => void updateUserStatus()} disabled={!targetUserId || !statusReason.trim()}>Update status</Button></div>
-                <p className="text-xs text-slate-500">Extreme Admin and Super Admin authority is protected in a separate control.</p>
+                <p className="text-xs text-slate-500">This changes the account's global role only. Active school membership continues to determine the school portal role; use the School Manager's dedicated workflows for school staff and learner role changes. Extreme Admin and Super Admin authority is protected separately.</p>
               </CardContent>
             </Card>
 
@@ -632,7 +632,7 @@ const ExtremeAdminPortal: React.FC = () => {
             </Card>
           </div>
           <Card className="border-slate-200 bg-white shadow-sm">
-            <CardHeader><CardTitle className="text-base">Assign an existing account</CardTitle><CardDescription>Attach an existing platform account as Finance or Parent. Parent accounts must be linked to at least one enrolled student; student enrollment and teacher assignment follow their dedicated school workflows.</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="text-base">Assign an existing account</CardTitle><CardDescription>Attach an existing platform account as Finance or Parent. Parent usernames must begin with pa and be linked to at least one enrolled student; student enrollment and teacher assignment follow their dedicated school workflows.</CardDescription></CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
               <div className="space-y-1"><Label>Existing username</Label><Input value={existingAccountUsername} onChange={(event) => setExistingAccountUsername(event.target.value)} placeholder="Exact username" /></div>
               <div className="space-y-1"><Label>School role</Label><Select value={existingAccountRole} onValueChange={setExistingAccountRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="finance">Finance</SelectItem><SelectItem value="parent">Parent</SelectItem></SelectContent></Select></div>
