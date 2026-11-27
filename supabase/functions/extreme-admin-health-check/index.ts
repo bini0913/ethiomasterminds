@@ -85,10 +85,10 @@ async function checkLiveKit(): Promise<ServiceCheck> {
 
   try {
     const parsed = new URL(livekitUrl);
-    const protocol = parsed.protocol === "wss:" ? "https:" : parsed.protocol === "ws:" ? "http:" : parsed.protocol;
-    if (protocol !== "https:" && protocol !== "http:") {
-      return { status: "degraded", checked_at, detail: "LiveKit URL uses an unsupported protocol." };
+    if (parsed.protocol !== "wss:" && parsed.protocol !== "https:") {
+      return { status: "degraded", checked_at, detail: "LiveKit must use a secure wss:// or https:// URL." };
     }
+    const protocol = "https:";
     const endpoint = `${protocol}//${parsed.host}/twirp/livekit.RoomService/ListRooms`;
     const authorization = btoa(`${apiKey}:${apiSecret}`);
     const response = await fetch(endpoint, {
