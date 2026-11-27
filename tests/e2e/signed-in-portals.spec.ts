@@ -123,3 +123,12 @@ test('Extreme Admin executive workspace exposes every Part 1 section on desktop 
 
   expect(pageErrors, 'Unexpected browser errors in Extreme Admin executive workspace').toEqual([]);
 });
+
+test('Super Admin is denied access to the Extreme Admin owner route', async ({ page }) => {
+  test.setTimeout(45_000);
+  await authenticateAs(page, 'ci-super-admin@masterminds.test');
+  await page.goto('/root-control-portal-9xA7', { waitUntil: 'domcontentloaded' });
+  await page.waitForURL((url) => url.pathname === '/', { timeout: 25_000 });
+  await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Executive control center' })).toHaveCount(0);
+});
