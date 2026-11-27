@@ -49,6 +49,9 @@ export default function NetworkSuperAdminPortal() {
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [coreError, setCoreError] = useState("");
+  const [schoolDirectoryError, setSchoolDirectoryError] = useState("");
+  const [financeError, setFinanceError] = useState("");
+  const [alertsError, setAlertsError] = useState("");
   const [dashboard, setDashboard] = useState<JsonRecord>({});
   const [schools, setSchools] = useState<School[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -63,6 +66,7 @@ export default function NetworkSuperAdminPortal() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [analytics, setAnalytics] = useState<JsonRecord>({});
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
   const analyticsRequest = useRef(0);
   const [analyticsSchoolId, setAnalyticsSchoolId] = useState("");
   const [peopleSchoolId, setPeopleSchoolId] = useState("");
@@ -90,6 +94,9 @@ export default function NetworkSuperAdminPortal() {
   const loadCore = useCallback(async () => {
     setLoading(true);
     setCoreError("");
+    setSchoolDirectoryError("");
+    setFinanceError("");
+    setAlertsError("");
     try {
       const [summary, directory, financeRes, settings, alertsRes] = await Promise.all([
         rpc("super_admin_get_network_dashboard"),
@@ -98,24 +105,36 @@ export default function NetworkSuperAdminPortal() {
         rpc("super_admin_get_network_settings"),
         rpc("super_admin_get_network_alerts"),
       ]);
-      const failures = [summary, directory, financeRes, settings, alertsRes].filter((result) => result.error);
-      if (summary.error) setCoreError(summary.error.message || "Network overview could not be loaded.");
-      else setDashboard((summary.data || {}) as JsonRecord);
-      if (directory.error) toast.error(`School directory: ${directory.error.message}`);
-      else setSchools((directory.data || []) as School[]);
-      if (financeRes.error) toast.error(`Network finance: ${financeRes.error.message}`);
-      else setFinance((financeRes.data || {}) as JsonRecord);
-      if (settings.error) toast.error(`Network settings: ${settings.error.message}`);
-      else {
+      if (summary.error) {
+        setCoreError(summary.error.message || "Network overview could not be loaded.");
+        setDashboard({});
+      } else setDashboard((summary.data || {}) as JsonRecord);
+      if (directory.error) {
+        setSchoolDirectoryError(directory.error.message || "School directory could not be loaded.");
+        setSchools([]);
+      } else setSchools((directory.data || []) as School[]);
+      if (financeRes.error) {
+        setFinanceError(financeRes.error.message || "Network finance could not be loaded.");
+        setFinance({});
+      } else setFinance((financeRes.data || {}) as JsonRecord);
+      if (settings.error) {
+        toast.error(`Network settings: ${settings.error.message}`);
+        setNetworkName("");
+      } else {
         const setting = (settings.data || [])[0];
         if (setting) setNetworkName(setting.name || "");
       }
-      if (alertsRes.error) toast.error(`Network alerts: ${alertsRes.error.message}`);
-      else setAlerts((alertsRes.data || []) as Alert[]);
-      if (failures.length === 0) setCoreError("");
+      if (alertsRes.error) {
+        setAlertsError(alertsRes.error.message || "Network alerts could not be loaded.");
+        setAlerts([]);
+      } else setAlerts((alertsRes.data || []) as Alert[]);
     } catch (error: unknown) {
       console.error("[Master Minds] NetworkSuperAdminPortal.tsx data load failed", error);
       setCoreError(error instanceof Error ? error.message : "This workspace could not load its records. Please retry.");
+      setDashboard({});
+      setSchools([]);
+      setFinance({});
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -189,15 +208,16 @@ export default function NetworkSuperAdminPortal() {
     const requestId = ++analyticsRequest.current;
     setAnalyticsSchoolId(schoolId);
     setAnalytics({});
-    if (!schoolId) return;
+    setAnalyticsError("");
+    if (!schoolId) { setAnalyticsLoading(false); return; }
     setAnalyticsLoading(true);
     try {
       const response = await rpc("super_admin_get_school_analytics", { p_school_id: schoolId });
       if (requestId !== analyticsRequest.current) return;
-      if (response.error) toast.error(response.error.message);
+      if (response.error) setAnalyticsError(response.error.message || "School analytics could not be loaded.");
       else setAnalytics((response.data || {}) as JsonRecord);
     } catch (error: unknown) {
-      if (requestId === analyticsRequest.current) toast.error(error instanceof Error ? error.message : "School analytics could not be loaded.");
+      if (requestId === analyticsRequest.current) setAnalyticsError(error instanceof Error ? error.message : "School analytics could not be loaded.");
     } finally {
       if (requestId === analyticsRequest.current) setAnalyticsLoading(false);
     }
@@ -438,7 +458,7 @@ export default function NetworkSuperAdminPortal() {
             <Card>
               <CardHeader><CardTitle>Network alerts</CardTitle><CardDescription>School-level operational signals. Student identities and private report details are not exposed here.</CardDescription></CardHeader>
               <CardContent className="space-y-3">
-                {alerts.length ? alerts.map((alert) => (
+                {alertsError ? <ErrorPanel message={alertsError} onRetry={() => void loadCore()} /> : alerts.length ? alerts.map((alert) => (
                   <div key={`${alert.kind}-${alert.school_id}-${alert.created_at}`} className="flex gap-3 rounded-xl border border-slate-200 p-3">
                     <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${alert.severity === "warning" ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700"}`}><AlertTriangle className="h-4 w-4" /></div>
                     <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{alert.title}</p><Badge variant={alert.severity === "warning" ? "destructive" : "secondary"}>{alert.severity}</Badge></div><p className="mt-1 text-sm text-slate-600">{alert.detail}</p><p className="mt-1 text-xs text-slate-400">{formatDate(alert.created_at)}</p></div>
@@ -451,7 +471,7 @@ export default function NetworkSuperAdminPortal() {
               <CardHeader><CardTitle>Network school directory</CardTitle><CardDescription>Compare enrollment and school leadership, inspect analytics, or review a school's access status.</CardDescription></CardHeader>
               <CardContent className="space-y-4">
                 <div className="relative max-w-sm"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input className="pl-9" placeholder="Search schools by name or code" value={schoolSearch} onChange={(event) => setSchoolSearch(event.target.value)} /></div>
-                <SchoolTable schools={filteredSchools} onAnalytics={(id) => { setTab("analytics"); void loadAnalytics(id); }} onStatus={requestSchoolStatus} />
+                {schoolDirectoryError ? <ErrorPanel message={schoolDirectoryError} onRetry={() => void loadCore()} /> : <SchoolTable schools={filteredSchools} onAnalytics={(id) => { setTab("analytics"); void loadAnalytics(id); }} onStatus={requestSchoolStatus} />}
               </CardContent>
             </Card>
           </section>}
@@ -517,6 +537,7 @@ export default function NetworkSuperAdminPortal() {
 
           {tab === "analytics" && <section className="space-y-4">
             <Card><CardHeader><CardTitle>School performance</CardTitle><CardDescription>Aggregated school-level academic and operational indicators. This is oversight, not a replacement for the school's academic workflows.</CardDescription></CardHeader><CardContent><Select value={analyticsSchoolId} onValueChange={(id) => void loadAnalytics(id)}><SelectTrigger className="max-w-xl"><SelectValue placeholder="Choose a school to inspect" /></SelectTrigger><SelectContent>{schools.map((item) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.school_code}</SelectItem>)}</SelectContent></Select><p className="mt-3 text-sm text-slate-500">{analyticsLoading ? "Loading school analytics…" : analyticsSchool ? `Showing live indicators for ${analyticsSchool.name}` : "Choose a school to view its analytics."}</p></CardContent></Card>
+            {analyticsError && <ErrorPanel message={analyticsError} onRetry={() => void loadAnalytics(analyticsSchoolId)} />}
             {analyticsLoading ? <LoadingState label="Loading school performance…" /> : analyticsSchoolId && Object.keys(analytics).length > 0 ? <>
               <MetricGrid items={[
                 ["Students enrolled", analytics.students], ["Active teachers", analytics.teachers], ["Active Managers", analytics.managers],
@@ -532,7 +553,8 @@ export default function NetworkSuperAdminPortal() {
           </section>}
 
           {tab === "finance" && <section className="space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-900">Network finance oversight</h2><p className="text-sm text-slate-500">Read-only visibility. Invoice creation, payment confirmation, reversals, and follow-up resolution remain in school Finance workflows.</p></div><Button variant="outline" onClick={exportFinance}><Download className="mr-2 h-4 w-4" />Export finance CSV</Button></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-900">Network finance oversight</h2><p className="text-sm text-slate-500">Read-only visibility. Invoice creation, payment confirmation, reversals, and follow-up resolution remain in school Finance workflows.</p></div><Button variant="outline" onClick={exportFinance} disabled={Boolean(financeError)}><Download className="mr-2 h-4 w-4" />Export finance CSV</Button></div>
+            {financeError ? <ErrorPanel message={financeError} onRetry={() => void loadCore()} /> : <>
             <MetricGrid items={[["School invoices", finance.invoice_count], ["Confirmed payments", finance.confirmed_payments], ["Pending follow-ups", finance.pending_followups], ["Overdue invoices", finance.overdue_invoice_count]]} />
             <Card><CardHeader><CardTitle>Network totals by currency</CardTitle><CardDescription>Invoice totals and confirmed invoice-linked payments are grouped by the invoice currency.</CardDescription></CardHeader><CardContent className="space-y-3">{(finance.currency_totals || []).length ? finance.currency_totals.map((item: JsonRecord) => <div key={item.currency} className="rounded-xl border p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">{item.currency}</h3><Badge variant="secondary">{item.invoice_count} invoices</Badge></div><div className="grid gap-3 sm:grid-cols-3"><FinanceMetric label="Invoiced" amount={item.invoiced_amount} currency={item.currency} /><FinanceMetric label="Confirmed paid" amount={item.paid_amount} currency={item.currency} /><FinanceMetric label="Outstanding" amount={item.outstanding_balance} currency={item.currency} /></div></div>) : <EmptyState title="No school invoices yet" detail="No school-fee invoices have been recorded in this network." />}</CardContent></Card>
             <Card><CardHeader><CardTitle>Overdue invoices by currency</CardTitle><CardDescription>Positive invoice balances past their due date, based on the recorded invoice due date.</CardDescription></CardHeader><CardContent>{(finance.overdue_by_currency || []).length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{finance.overdue_by_currency.map((item: JsonRecord) => <div key={item.currency} className="rounded-lg border p-3"><p className="text-xs text-slate-500">{item.currency} · {item.invoice_count} invoices</p><p className="mt-1 text-lg font-semibold tabular-nums">{money(item.outstanding_balance, item.currency)}</p></div>)}</div> : <EmptyState title="No overdue balances" detail="There are no positive invoice balances past their due dates." />}</CardContent></Card>
@@ -541,6 +563,7 @@ export default function NetworkSuperAdminPortal() {
               <RecordTable title="Recent school payments" description="Payments linked to an invoice, including their recorded status." headers={["School / invoice", "Receipt", "Method / status", "Amount"]} rows={(finance.recent_payments || []).map((item: JsonRecord) => [<span className="font-medium">{item.school_name}<br /><span className="text-xs text-slate-500">{item.invoice_number}</span></span>, item.receipt_number, <span>{item.payment_method}<br /><span className="text-xs text-slate-500">{item.status} · {formatDate(item.received_at)}</span></span>, <span className="whitespace-nowrap text-right">{money(item.amount, item.currency)}</span>])} empty="No invoice-linked school payments are available." />
             </div>
             <Card><CardHeader><CardTitle>Pending finance follow-ups</CardTitle><CardDescription>Review queue visibility only. The school Finance team owns resolution and payment changes.</CardDescription></CardHeader><CardContent>{(finance.pending_followup_records || []).length ? <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b text-xs uppercase text-slate-500"><th className="p-2">School</th><th className="p-2">Invoice</th><th className="p-2">Created</th><th className="p-2">Status</th></tr></thead><tbody className="divide-y">{finance.pending_followup_records.map((item: JsonRecord) => <tr key={item.followup_id}><td className="p-2 font-medium">{item.school_name} · {item.school_code}</td><td className="p-2">{item.invoice_number}</td><td className="p-2 text-xs text-slate-500">{formatDate(item.created_at)}</td><td className="p-2"><Badge variant="secondary">{item.status}</Badge></td></tr>)}</tbody></table></div> : <EmptyState title="No pending finance follow-ups" detail="There are no network finance follow-up items awaiting school-level review." />}</CardContent></Card>
+            </>}
           </section>}
 
           {tab === "audit" && <section>
