@@ -76,7 +76,7 @@ jobs:
           set -euo pipefail
 
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            changed_functions="$(for dir in supabase/functions/*; do [[ -d "$dir" ]] && basename "$dir"; done | sort -u)"
+            changed_functions="$(for dir in supabase/functions/*; do [[ -f "$dir/index.ts" ]] && basename "$dir"; done | sort -u)"
           else
             test -n "${GITHUB_EVENT_BEFORE:-}" || {
               echo "::error::Push event is missing its base SHA; refusing to skip function deployment detection."
@@ -86,7 +86,12 @@ jobs:
               echo "::error::Push base commit is unavailable; refusing to skip function deployment detection."
               exit 1
             }
-            changed_functions="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA" -- supabase/functions | awk -F/ 'NF >= 3 { print $3 }' | sort -u)"
+            changed_paths="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA" -- supabase/functions)"
+            changed_functions="$(awk -F/ 'NF >= 3 { print $3 }' <<< "$changed_paths" | sort -u)"
+            if grep -qx "_shared" <<< "$changed_functions"; then
+              echo "Shared Edge Function code changed; deploying all deployable functions."
+              changed_functions="$(for dir in supabase/functions/*; do [[ -f "$dir/index.ts" ]] && basename "$dir"; done | sort -u)"
+            fi
           fi
 
           if [[ -z "$changed_functions" ]]; then
