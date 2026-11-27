@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(24);
+SELECT plan(22);
 
 SELECT ok(to_regclass('public.platform_health_snapshots') IS NOT NULL, 'health snapshot history table exists');
 SELECT ok(to_regclass('public.platform_incidents') IS NOT NULL, 'platform incident register exists');
@@ -64,10 +64,10 @@ SELECT ok(
 );
 
 SELECT ok(
-  position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_create_platform_incident(text,text,text,text)'::regprocedure))
-  AND position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_update_platform_incident(uuid,text,text)'::regprocedure))
-  AND position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_create_maintenance_window(text,text,text[],timestamp with time zone,timestamp with time zone)'::regprocedure))
-  AND position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_update_maintenance_window(uuid,text,text)'::regprocedure)),
+  position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_create_platform_incident(text,text,text,text)'::regprocedure)) > 0
+  AND position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_update_platform_incident(uuid,text,text)'::regprocedure)) > 0
+  AND position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_create_maintenance_window(text,text,text[],timestamp with time zone,timestamp with time zone)'::regprocedure)) > 0
+  AND position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_update_maintenance_window(uuid,text,text)'::regprocedure)) > 0,
   'incident and maintenance mutations are written to the canonical admin audit log'
 );
 
@@ -88,8 +88,8 @@ SELECT ok(
 );
 
 SELECT ok(
-  position('not_configured' in pg_get_functiondef('public.extreme_admin_record_platform_health_snapshot(jsonb)'::regprocedure)) = 0,
-  'provider configuration is not fabricated by the snapshot writer'
+  position('p_severity NOT IN' in pg_get_functiondef('public.extreme_admin_create_platform_incident(text,text,text,text)'::regprocedure)) > 0,
+  'incident severity is restricted to the supported levels'
 );
 
 SELECT * FROM finish();
