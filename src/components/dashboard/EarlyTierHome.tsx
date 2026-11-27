@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Gamepad2, Lightbulb, LogOut, MessageCircle, PlayCircle, Settings, Sparkles, Store, Trophy, UserRound, Users } from "lucide-react";
+import { Gamepad2, Lightbulb, LogOut, PlayCircle, Settings, Sparkles, Store, Trophy, UserRound } from "lucide-react";
 import AvatarRenderer from "@/components/avatar/AvatarRenderer";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import { useUser } from "@/context/UserContext";
@@ -20,8 +20,6 @@ const EarlyTierHome: React.FC = () => {
   const gradeLabel = !user?.grade || /^k|kindergarten|pre/i.test(user.grade) ? "Early learner" : `Grade ${user.grade}`;
 
   const quick = [
-    { to:"/friends", label:"Friends", description:"Chat and study together", icon:<Users className="h-7 w-7"/>, tone:"bg-primary/10 text-primary" },
-    { to:"/social", label:"Social", description:"Share your learning journey", icon:<MessageCircle className="h-7 w-7"/>, tone:"bg-accent/15 text-accent" },
     { to:"/early-games", label:"Games", description:"Play & practise", icon:<Gamepad2 className="h-7 w-7"/>, tone:"bg-primary/10 text-primary" },
     { to:"/early-quiz", label:"Quiz", description:"Show what you know", icon:<Sparkles className="h-7 w-7"/>, tone:"bg-warning/15 text-warning" },
     { to:"/early-videos", label:"Videos", description:"Watch & discover", icon:<PlayCircle className="h-7 w-7"/>, tone:"bg-accent/15 text-accent" },

@@ -15,8 +15,8 @@ SELECT ok(
   'ranked multiplayer leaderboard reads profile privacy settings'
 );
 SELECT ok(
-  position('is_public' IN pg_get_functiondef('public.multiplayer_ranked_leaderboard(integer)'::regprocedure)) > 0,
-  'ranked multiplayer leaderboard respects public-profile opt-out'
+  position('is_profile_public' IN pg_get_functiondef('public.multiplayer_ranked_leaderboard(integer)'::regprocedure)) > 0,
+  'ranked multiplayer leaderboard enforces public-profile visibility through the shared guardian-aware helper'
 );
 SELECT ok(
   position('hide_stats' IN pg_get_functiondef('public.multiplayer_ranked_leaderboard(integer)'::regprocedure)) > 0,

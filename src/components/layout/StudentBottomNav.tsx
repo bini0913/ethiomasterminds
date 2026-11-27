@@ -17,8 +17,8 @@ const StudentBottomNav: React.FC = () => {
   const earlyItems = [
     { icon: Home, label: "Home", path: "/", match: ["/"] },
     { icon: Gamepad2, label: "Play", path: "/early-games", match: ["/early-games", "/early-quiz"] },
-    { icon: Globe2, label: "Discover", path: "/early-discover", match: ["/early-discover", "/early-videos", "/early-explore"] },
-    { icon: MessageCircle, label: "Social", path: "/social", match: ["/social", "/friends", "/chat"] },
+    { icon: Globe2, label: "Discover", path: "/early-discover", match: ["/early-discover"] },
+    { icon: BrainCircuit, label: "Explore", path: "/early-explore", match: ["/early-explore", "/early-videos"] },
     { icon: Gift, label: "Rewards", path: "/store", match: ["/store"] },
   ];
   const upperItems = [
