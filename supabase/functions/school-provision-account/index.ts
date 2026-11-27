@@ -20,6 +20,7 @@ type AccountInput = {
   section_id?: string;
   parent_membership_ids?: string[];
   student_membership_ids?: string[];
+  student_usernames?: string[];
   assignments?: Array<{ section_id: string; subject_name: string; assignment_kind?: "subject" | "homeroom" }>;
   leadership_position?: string;
   division_scope?: string | null;
@@ -140,6 +141,33 @@ Deno.serve(async (req) => {
       });
       if (error || !data) throw new Error(error?.message || "Could not attach the account to the school");
       return data as string;
+    };
+
+    const resolveStudentMembershipIds = async (schoolId: string, rawUsernames: unknown): Promise<string[]> => {
+      const usernames = Array.isArray(rawUsernames)
+        ? [...new Set(rawUsernames.map((value: unknown) => normalize(value).toLowerCase()).filter(Boolean))]
+        : [];
+      if (usernames.length === 0) throw new Error("A parent account must be linked to at least one enrolled student username");
+      const { data: studentProfiles, error: profilesError } = await admin
+        .from("profiles")
+        .select("id,username")
+        .in("username", usernames);
+      if (profilesError) throw new Error("Could not verify the linked student usernames");
+      if ((studentProfiles ?? []).length !== usernames.length) {
+        throw new Error("Every linked username must belong to an existing student in the selected school");
+      }
+      const { data: studentMemberships, error: membershipsError } = await admin
+        .from("school_memberships")
+        .select("id,user_id")
+        .eq("school_id", schoolId)
+        .eq("school_role", "student")
+        .eq("status", "active")
+        .in("user_id", (studentProfiles ?? []).map((profile: { id: string }) => profile.id));
+      if (membershipsError) throw new Error("Could not verify active student enrollments");
+      if ((studentMemberships ?? []).length !== usernames.length) {
+        throw new Error("Every linked username must be actively enrolled as a student in the selected school");
+      }
+      return (studentMemberships ?? []).map((membership: { id: string }) => membership.id);
     };
 
     if (action === "create_school") {
@@ -339,11 +367,13 @@ Deno.serve(async (req) => {
       const role = normalize(payload?.role) as SchoolRole;
       const reason = normalize(payload?.reason);
       const assignableRoles: SchoolRole[] = ["manager", "finance", "parent"];
-      const studentMembershipIds = Array.isArray(payload?.student_membership_ids)
-        ? [...new Set(payload.student_membership_ids.map((id: unknown) => normalize(id)).filter(Boolean))]
-        : [];
-      if (role === "parent" && studentMembershipIds.length === 0) {
-        return json({ error: "A parent account must be linked to at least one enrolled student in this school" }, 400);
+      let studentMembershipIds: string[] = [];
+      if (role === "parent") {
+        try {
+          studentMembershipIds = await resolveStudentMembershipIds(schoolId, payload?.student_usernames);
+        } catch (error) {
+          return json({ error: error instanceof Error ? error.message : "Could not verify linked students" }, 400);
+        }
       }
       if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64 || !assignableRoles.includes(role) || !reason) {
         return json({ error: "Provide an active school, existing username, and supported school role" }, 400);
@@ -478,7 +508,11 @@ Deno.serve(async (req) => {
           }
 
           const account = await createAuthAccount(name, username, role === "student" ? normalize(input.grade_label) : undefined, role === "student" ? Number(input.age) : undefined);
-          const membershipId = await attachAccount(schoolId, role, account.userId, username, input, studentNumber);
+          const accountInput: AccountInput = { ...input };
+          if (role === "parent") {
+            accountInput.student_membership_ids = await resolveStudentMembershipIds(schoolId, input.student_usernames);
+          }
+          const membershipId = await attachAccount(schoolId, role, account.userId, username, accountInput, studentNumber);
           const { error: auditError } = await admin.from("admin_audit_logs").insert({
             actor_id: actorId,
             action: "school_account_created",
