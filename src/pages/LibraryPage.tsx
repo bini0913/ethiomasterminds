@@ -462,13 +462,17 @@ const LibraryPage: React.FC = () => {
     try {
       const extracted = await extractBookText(selectedBook.pdf_path, { maxPages: 30, maxChars: 12_000 });
       setReaderPageText(extracted.text);
-      toast.success(
-        extracted.ocrUsed
-          ? `OCR read ${extracted.pagesRead} scanned pages. Please review the extracted text for recognition errors.`
-          : extracted.truncated
-            ? `Extracted text from ${extracted.pagesRead} of ${extracted.pageCount} pages. You can edit the excerpt below.`
-            : `Extracted readable text from ${extracted.pagesRead} pages.`,
-      );
+      if (extracted.ocrIncomplete) {
+        toast.warning("Some scanned pages could not be fully read. Review the excerpt and retry with a clearer scan if needed.");
+      } else {
+        toast.success(
+          extracted.ocrUsed
+            ? `OCR read ${extracted.pagesRead} scanned pages. Please review the extracted text for recognition errors.`
+            : extracted.truncated
+              ? `Extracted text from ${extracted.pagesRead} of ${extracted.pageCount} pages. You can edit the excerpt below.`
+              : `Extracted readable text from ${extracted.pagesRead} pages.`,
+        );
+      }
     } catch (error) {
       console.error("Book text extraction failed:", error);
       toast.error(error instanceof Error ? error.message : "Could not extract text from this PDF.");
