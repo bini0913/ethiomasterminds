@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(7);
+SELECT plan(10);
 
 SELECT ok(NOT has_function_privilege('anon', 'public.find_student_by_username(text)', 'EXECUTE'),
   'anonymous users cannot search student profiles');
@@ -16,6 +16,13 @@ SELECT ok(position('has_role_for_user(p.id' in pg_get_functiondef('public.find_s
   'search results are restricted to student accounts');
 SELECT ok(position('are_users_blocked' in pg_get_functiondef('public.find_student_by_username(text)'::regprocedure)) > 0,
   'blocked accounts are excluded from student discovery');
+
+SELECT ok(position('has_role_for_user(v_uid' in pg_get_functiondef('public.find_student_by_username(text)'::regprocedure)) > 0,
+  'only student accounts can search for other students');
+SELECT ok(position('has_role_for_user(v_uid' in pg_get_functiondef('public.send_friend_request(uuid)'::regprocedure)) > 0,
+  'friend request RPC restricts the sender to student accounts');
+SELECT ok(position('has_role_for_user(p_target_user_id' in pg_get_functiondef('public.send_friend_request(uuid)'::regprocedure)) > 0,
+  'friend request RPC restricts the recipient to student accounts');
 
 SELECT * FROM finish();
 ROLLBACK;
