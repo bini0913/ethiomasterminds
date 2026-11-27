@@ -76,7 +76,6 @@ const Chat: React.FC = () => {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // State
@@ -804,21 +803,16 @@ const Chat: React.FC = () => {
                   </PopoverContent>
                 </Popover>
 
-                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileInputRef.current?.click()}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  aria-label="File attachments unavailable"
+                  title="File attachments are not available in group chat yet"
+                  onClick={() => toast.info("File attachments are not available in group chat yet. You can still send text messages.")}
+                >
                   <Paperclip className="h-4 w-4" />
                 </Button>
-                <input ref={fileInputRef} type="file" className="hidden" onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file || !activeRoom || !user?.id) return;
-                  await sendMessage();
-                  const msg = `📎 ${file.name}`;
-                  await supabase.rpc('send_group_message', {
-                    p_group_id: activeRoom.id,
-                    p_content: msg,
-                    p_message_type: 'text',
-                  });
-                  e.target.value = '';
-                }} />
 
                 <Textarea ref={inputRef}
                   value={draft}
