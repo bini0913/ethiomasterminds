@@ -89,7 +89,7 @@ const GuardianApprovalCard: React.FC = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" />Parent or guardian approval</CardTitle>
-        <CardDescription>Community features stay off until a parent or legal guardian verifies their email, approves the request and chooses the controls.</CardDescription>
+        <CardDescription>Learning tools remain available. A verified parent or legal guardian manages community access, including friends, messaging, multiplayer, and Study Mode calls.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {verified ? (
@@ -101,7 +101,7 @@ const GuardianApprovalCard: React.FC = () => {
           <>
             <div className="flex items-start gap-2 rounded-lg bg-muted/60 p-3 text-sm text-muted-foreground">
               <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>{needsAge ? "Your age information is missing. Complete it to apply the correct safety settings; community features remain off until then." : user.guardianConsentStatus === "rejected" ? "The previous request was declined. You can send a new request." : "Approval is pending. Learning features remain available, but social features are disabled."}</p>
+              <p>{needsAge ? "Your age information is missing. Complete it to apply the correct safety settings; community features remain off until then." : user.guardianConsentStatus === "rejected" ? "The previous request was declined. You can send a new request." : "Approval is pending. Lessons, quizzes, textbooks, and study tools remain available; community features stay off until a verified guardian chooses to enable them."}</p>
             </div>
             {needsAge && (
               <div className="space-y-2">
