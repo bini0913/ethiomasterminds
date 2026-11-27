@@ -649,7 +649,17 @@ const ExtremeAdminPortal: React.FC = () => {
       return toast.error("Announcement was saved, but its audit record failed. No push was sent.");
     }
 
-    const delivery = await sendRemoteNotifications([{ sourceId: created.id, kind: "admin_announcement" }]);
+    let delivery;
+    try {
+      delivery = await sendRemoteNotifications([{ sourceId: created.id, kind: "admin_announcement" }]);
+    } catch (deliveryError) {
+      setAnnouncementLoading(false);
+      setAnnouncementTitle("");
+      setAnnouncementContent("");
+      await Promise.all([loadAnnouncements(), refreshAll()]);
+      console.error("Announcement push delivery failed after the announcement was audited:", deliveryError);
+      return toast.error("Announcement saved and audited, but push delivery could not be confirmed. Check notification delivery logs.");
+    }
     setAnnouncementLoading(false);
     setAnnouncementTitle("");
     setAnnouncementContent("");
