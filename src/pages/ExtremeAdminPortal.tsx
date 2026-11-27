@@ -9,6 +9,7 @@ import { useUser, UserRole } from "@/context/UserContext";
 import { supabase } from "@/integrations/supabase/client";
 import AdminCommandCenterShell from "@/components/admin/AdminCommandCenterShell";
 import ExtremeAdminBusinessIntelligence from "@/components/admin/ExtremeAdminBusinessIntelligence";
+import ExtremeAdminPlatformHealth from "@/components/admin/ExtremeAdminPlatformHealth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -196,8 +197,6 @@ const ExtremeAdminPortal: React.FC = () => {
   const [superAdminUsers, setSuperAdminUsers] = useState<PortalUser[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [settings, setSettings] = useState<Record<string, boolean | number>>({});
-  const [serviceHealth, setServiceHealth] = useState<any>(null);
-  const [healthLoading, setHealthLoading] = useState(false);
   const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
   const [statusReason, setStatusReason] = useState("");
   const [schoolActionReason, setSchoolActionReason] = useState("");
@@ -677,14 +676,7 @@ const ExtremeAdminPortal: React.FC = () => {
     }
   };
 
-  const runServiceHealthChecks = async () => {
-    setHealthLoading(true);
-    const { data, error } = await supabase.functions.invoke("extreme-admin-health-check", { body: {} });
-    setHealthLoading(false);
-    if (error || data?.error) return toast.error(data?.error || error?.message || "Service health checks could not run");
-    setServiceHealth(data);
-    toast.success("Service connectivity checks completed");
-  };
+
 
   const createExternalDeletionRequest = async () => {
     if (!externalDeletionEmail.trim()) return toast.error("Enter the account email from the request");
@@ -735,6 +727,7 @@ const ExtremeAdminPortal: React.FC = () => {
     { key: "super-admin", label: "Super Admin", description: "Single network authority", section: "Executive", icon: Crown },
     { key: "schools", label: "School network", description: "School inventory and ownership", section: "Executive", icon: Building2 },
     { key: "finance", label: "Money & growth", description: "Verified collections and balances", section: "Business intelligence", icon: Wallet },
+    { key: "health", label: "System health", description: "Services, storage, incidents & resilience", section: "Platform operations", icon: Activity },
     { key: "operations", label: "Platform controls", description: "Global settings and security", section: "Platform operations", icon: Settings2 },
     { key: "reports", label: "Reports & flags", description: "Moderation and safety queue", section: "Trust & communications", icon: Flag },
     { key: "support", label: "Support & escalations", description: "Student support request queue", section: "Trust & communications", icon: MessageSquare },
@@ -956,14 +949,14 @@ const ExtremeAdminPortal: React.FC = () => {
 
       {activeTab === "finance" && <ExtremeAdminBusinessIntelligence schools={schools} />}
 
+      {activeTab === "health" && <ExtremeAdminPlatformHealth />}
+
       {activeTab === "operations" && (
         <div className="space-y-5">
           <SectionHeading eyebrow="Platform operations" title="Global controls & security" description="Manage existing platform feature switches, review security indicators, and set the AI request limit. Each change is sent to the existing protected settings RPC." />
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Platform feature controls</CardTitle><CardDescription>These settings affect platform-wide behavior where the consuming feature already honors the setting.</CardDescription></CardHeader><CardContent className="divide-y divide-slate-100">{[{ key: "feature_social_enabled", label: "Social features", description: "Allow the social feature surface." }, { key: "feature_ai_enabled", label: "AI features", description: "Allow AI-powered learning features." }, { key: "feature_xp_enabled", label: "XP and progression", description: "Enable XP progression." }, { key: "leaderboard_enabled", label: "Leaderboards", description: "Enable ranking surfaces." }, { key: "grades_enabled", label: "Grade experiences", description: "Enable grade-based learning experiences." }].map((setting) => <div key={setting.key} className="flex items-center justify-between gap-4 py-4"><div><p className="text-sm font-semibold text-slate-900">{setting.label}</p><p className="mt-0.5 text-xs text-slate-500">{setting.description}</p></div><Switch checked={settings[setting.key] === true} onCheckedChange={(checked) => void updateSetting(setting.key, checked)} /></div>)}</CardContent></Card>
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">AI daily request limit</CardTitle><CardDescription>Existing per-user daily limit, constrained to 0–300 requests.</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end"><div className="w-full max-w-xs space-y-1"><Label>Maximum requests per user per day</Label><Input type="number" min="0" max="300" value={aiDailyLimit} onChange={(event) => setAiDailyLimit(event.target.value)} /></div><Button onClick={() => void updateAiLimit()}>Save limit</Button></CardContent></Card>
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Shield className="h-4 w-4 text-blue-700" />Security snapshot</CardTitle><CardDescription>Only database-backed indicators are shown. This is not a claim that client-side IP or 2FA settings enforce access.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[["Audit events · all time", metrics.audit_events_total ?? 0], ["Active top-level authorities", metrics.active_platform_authorities ?? 0], ["Active school managers", metrics.active_managers ?? 0], ["Suspended accounts", metrics.suspended_users ?? 0], ["Banned accounts", metrics.banned_users ?? 0]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{formatNumber(value)}</p></div>)}</CardContent></Card>
-          <Card className="border-slate-200 bg-white shadow-sm"><CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-blue-700" />External service connectivity</CardTitle><CardDescription>Server-side checks for Supabase access, Firebase Messaging credentials and LiveKit RoomService reachability. No test push or call is sent.</CardDescription></div><Button variant="outline" onClick={() => void runServiceHealthChecks()} disabled={healthLoading}>{healthLoading ? "Checking…" : "Run health checks"}</Button></CardHeader><CardContent>{serviceHealth ? <div className="space-y-3">{[["Supabase database", serviceHealth.database], ["Firebase Messaging", serviceHealth.firebase_messaging], ["LiveKit", serviceHealth.livekit]].map(([label, check]: [string, any]) => <div key={label} className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-slate-900">{label}</p><p className="mt-1 text-xs text-slate-500">{check?.detail || "No status returned"}</p></div><span className={check?.status === "healthy" ? "w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800" : check?.status === "degraded" ? "w-fit rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800" : "w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"}>{check?.status || "unknown"}</span></div>)}<p className="text-[11px] text-slate-400">Checked {serviceHealth.checked_at ? new Date(serviceHealth.checked_at).toLocaleString() : "just now"}</p></div> : <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Run a server-side check to see whether these integrations are configured and reachable. Results are not inferred from frontend settings.</p>}</CardContent></Card>
-          <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-blue-700" />Platform operations signals</CardTitle><CardDescription>Database-backed configuration and activity indicators from the current platform.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[["Enabled push devices", metrics.notification_devices_enabled], ["FCM accepted events · 24h", metrics.notification_fcm_accepted_24h], ["Push failures · 24h", metrics.notification_failed_24h], ["Push skipped · 24h", metrics.notification_skipped_24h], ["Inbox events · 24h", metrics.notification_inbox_events_24h], ["Study call rooms · 24h", metrics.study_call_rooms_24h], ["Storage buckets", metrics.storage_buckets_configured], ["Database metrics RPC", metrics.metrics_generated_at ? "Available" : "Unknown"]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-950">{typeof value === "string" ? value : formatNumber(value)}</p></div>)}</CardContent><div className="border-t border-slate-100 px-6 py-3 text-xs text-amber-800">FCM acceptance means Firebase accepted at least one send for that inbox event; it does not guarantee device display. LiveKit room counts are activity records, not a provider reachability test. External uptime probes remain a separate Part 1 task.</div></Card>
         </div>
       )}
 

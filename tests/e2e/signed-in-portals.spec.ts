@@ -92,7 +92,7 @@ for (const role of notificationRoles) {
   });
 }
 
-test('Extreme Admin executive workspace exposes every Part 1 section across desktop, tablet and mobile', async ({ page }) => {
+test('Extreme Admin executive workspace exposes Part 1 and Part 3 sections across desktop, tablet and mobile', async ({ page }) => {
   test.setTimeout(120_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -103,7 +103,8 @@ test('Extreme Admin executive workspace exposes every Part 1 section across desk
     { nav: /Super Admin/, heading: 'Single Super Admin' },
     { nav: /School network/, heading: 'School network' },
     { nav: /Money & growth/, heading: 'Business performance', content: 'Separate platform finance from school-fee collections.' },
-    { nav: /Platform controls/, heading: 'Global controls & security', content: 'External service connectivity' },
+    { nav: /Platform controls/, heading: 'Global controls & security' },
+    { nav: /System health/, heading: 'System health & resilience', content: 'Live connectivity checks' },
     { nav: /Reports & flags/, heading: 'Reports & flags' },
     { nav: /Support & escalations/, heading: 'Support & escalations' },
     { nav: /Announcements/, heading: 'Platform announcements', content: 'Create announcement' },
