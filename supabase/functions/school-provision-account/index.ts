@@ -343,9 +343,10 @@ Deno.serve(async (req) => {
       if (schoolError || !school || school.status !== "active") return json({ error: "School is unavailable" }, 404);
 
       const { data: targetProfile, error: profileError } = await admin
-        .from("profiles").select("id,username").ilike("username", targetUsername).maybeSingle();
+        .from("profiles").select("id,username,account_status").ilike("username", targetUsername).maybeSingle();
       if (profileError) return json({ error: "Unable to look up the existing account" }, 503);
       if (!targetProfile?.id || !targetProfile.username) return json({ error: "No existing account was found for that username" }, 404);
+      if (targetProfile.account_status !== "active") return json({ error: "Only active accounts can be assigned to a school" }, 409);
 
       const { data: targetRoles, error: targetRolesError } = await admin
         .from("user_roles").select("role").eq("user_id", targetProfile.id);
