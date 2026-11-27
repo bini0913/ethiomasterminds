@@ -150,11 +150,14 @@ Deno.serve(async (req) => {
       if (usernames.length === 0) throw new Error("A parent account must be linked to at least one enrolled student username");
       const { data: studentProfiles, error: profilesError } = await admin
         .from("profiles")
-        .select("id,username")
+        .select("id,username,account_status")
         .in("username", usernames);
       if (profilesError) throw new Error("Could not verify the linked student usernames");
       if ((studentProfiles ?? []).length !== usernames.length) {
         throw new Error("Every linked username must belong to an existing student in the selected school");
+      }
+      if ((studentProfiles ?? []).some((profile: { account_status?: string }) => (profile.account_status ?? "active") !== "active")) {
+        throw new Error("Only active student accounts can be linked to a parent");
       }
       const { data: studentMemberships, error: membershipsError } = await admin
         .from("school_memberships")
@@ -367,6 +370,9 @@ Deno.serve(async (req) => {
       const role = normalize(payload?.role) as SchoolRole;
       const reason = normalize(payload?.reason);
       const assignableRoles: SchoolRole[] = ["manager", "finance", "parent"];
+      if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64 || !assignableRoles.includes(role) || !reason) {
+        return json({ error: "Provide an active school, existing username, supported school role, and assignment reason" }, 400);
+      }
       let studentMembershipIds: string[] = [];
       if (role === "parent") {
         try {
@@ -374,9 +380,6 @@ Deno.serve(async (req) => {
         } catch (error) {
           return json({ error: error instanceof Error ? error.message : "Could not verify linked students" }, 400);
         }
-      }
-      if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64 || !assignableRoles.includes(role) || !reason) {
-        return json({ error: "Provide an active school, existing username, and supported school role" }, 400);
       }
       const { data: school, error: schoolError } = await admin
         .from("schools").select("id,status").eq("id", schoolId).maybeSingle();
