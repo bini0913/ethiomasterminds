@@ -59,6 +59,7 @@ const EntranceExamPapersPage: React.FC = () => {
     const loadCatalog = async () => {
       setLoading(true);
       setError("");
+      setPracticeSubjects([]);
       try {
         const { data, error: queryError } = await db
           .from("entrance_exam_papers")
