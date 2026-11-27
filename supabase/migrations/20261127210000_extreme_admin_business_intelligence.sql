@@ -60,6 +60,15 @@ BEGIN
           COALESCE(direction, 'unspecified') direction, count(*) records
           FROM public.finance_transactions GROUP BY status, direction) x
       ), '[]'::jsonb),
+      'ledger_movements', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object('currency', currency, 'status', status,
+          'direction', direction, 'amount', amount, 'records', records) ORDER BY currency, status, direction)
+        FROM (SELECT COALESCE(NULLIF(currency, ''), 'ETB') currency,
+          COALESCE(status, 'unspecified') status, COALESCE(direction, 'unspecified') direction,
+          sum(amount)::numeric(14,2) amount, count(*) records
+          FROM public.finance_transactions
+          GROUP BY COALESCE(NULLIF(currency, ''), 'ETB'), COALESCE(status, 'unspecified'), COALESCE(direction, 'unspecified')) x
+      ), '[]'::jsonb),
       'receivables_by_currency', COALESCE((
         SELECT jsonb_agg(jsonb_build_object('currency', currency, 'outstanding', outstanding)
           ORDER BY currency)
