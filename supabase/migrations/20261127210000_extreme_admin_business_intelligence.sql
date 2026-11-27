@@ -73,6 +73,8 @@ BEGIN
     'school_finance', jsonb_build_object(
       'invoice_count', (SELECT count(*) FROM public.school_student_invoices i
         WHERE p_school_id IS NULL OR i.school_id = p_school_id),
+      'confirmed_payment_count', (SELECT count(*) FROM public.school_fee_payments p
+        WHERE p.status = 'confirmed' AND (p_school_id IS NULL OR p.school_id = p_school_id)),
       'outstanding_invoice_count', (SELECT count(*) FROM public.school_student_invoices i
         WHERE i.balance > 0 AND (p_school_id IS NULL OR i.school_id = p_school_id)),
       'collections_by_currency', COALESCE((
@@ -104,14 +106,17 @@ BEGIN
         ) ORDER BY s.name)
         FROM public.schools s
         LEFT JOIN LATERAL (
-          SELECT count(*) invoice_count,
-            count(*) FILTER (WHERE balance > 0) outstanding_invoice_count,
-            COALESCE(jsonb_agg(jsonb_build_object('currency', currency, 'amount', amount)
-              ORDER BY currency) FILTER (WHERE amount > 0), '[]'::jsonb) outstanding_by_currency
-          FROM (SELECT COALESCE(NULLIF(i.currency, ''), 'ETB') currency,
-              sum(i.balance)::numeric(14,2) amount
-            FROM public.school_student_invoices i
-            WHERE i.school_id = s.id AND i.balance > 0 GROUP BY COALESCE(NULLIF(i.currency, ''), 'ETB')) z
+          SELECT
+            (SELECT count(*) FROM public.school_student_invoices i WHERE i.school_id = s.id) invoice_count,
+            (SELECT count(*) FROM public.school_student_invoices i WHERE i.school_id = s.id AND i.balance > 0) outstanding_invoice_count,
+            COALESCE((
+              SELECT jsonb_agg(jsonb_build_object('currency', currency, 'amount', amount) ORDER BY currency)
+              FROM (SELECT COALESCE(NULLIF(i.currency, ''), 'ETB') currency,
+                sum(i.balance)::numeric(14,2) amount
+                FROM public.school_student_invoices i
+                WHERE i.school_id = s.id AND i.balance > 0
+                GROUP BY COALESCE(NULLIF(i.currency, ''), 'ETB')) balances
+            ), '[]'::jsonb) outstanding_by_currency
         ) inv ON true
         LEFT JOIN LATERAL (
           SELECT COALESCE(jsonb_agg(jsonb_build_object('currency', currency, 'amount', amount)
