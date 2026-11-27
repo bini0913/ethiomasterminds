@@ -230,8 +230,12 @@ export default function NetworkSuperAdminPortal() {
   };
 
   const requestMembershipStatus = (person: Person, status: string) => {
+    if (person.school_role === "admin") {
+      toast.error("Legacy School Admin memberships are retired. Use the School Manager leadership appointment workflow.");
+      return;
+    }
     if (!staffRoles.has(person.school_role)) {
-      toast.error("Only school staff memberships can be managed from this network workspace.");
+      toast.error("Only active Manager, Teacher, and Finance memberships can be managed from this network workspace.");
       return;
     }
     setChangeReason("");
