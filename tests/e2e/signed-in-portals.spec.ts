@@ -102,7 +102,7 @@ test('Extreme Admin executive workspace exposes every Part 1 section across desk
     { nav: /Accounts & access/, heading: 'Accounts and access', content: 'Create and assign a school account' },
     { nav: /Super Admin/, heading: 'Single Super Admin' },
     { nav: /School network/, heading: 'School network' },
-    { nav: /Money & growth/, heading: 'Money & growth' },
+    { nav: /Money & growth/, heading: 'Business performance', content: 'Separate platform finance from school-fee collections.' },
     { nav: /Platform controls/, heading: 'Global controls & security', content: 'External service connectivity' },
     { nav: /Reports & flags/, heading: 'Reports & flags' },
     { nav: /Support & escalations/, heading: 'Support & escalations' },
