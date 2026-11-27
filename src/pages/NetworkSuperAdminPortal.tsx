@@ -452,8 +452,15 @@ export default function NetworkSuperAdminPortal() {
               ["Schools", dashboard.schools],
               ["Active schools", dashboard.active_schools],
               ["Suspended schools", dashboard.suspended_schools],
+              ["Schools without an active Manager", dashboard.schools_without_active_manager],
               ["School Managers", dashboard.managers],
+              ["School Admins", dashboard.admins],
+              ["Teachers", dashboard.teachers],
+              ["Finance staff", dashboard.finance_staff],
+              ["Parents", dashboard.parents],
+              ["Active students", dashboard.active_students],
               ["Enrolled students", dashboard.enrolled_students],
+              ["Active school staff", dashboard.active_staff],
             ]} />
             <Card>
               <CardHeader><CardTitle>Network alerts</CardTitle><CardDescription>School-level operational signals. Student identities and private report details are not exposed here.</CardDescription></CardHeader>
