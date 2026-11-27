@@ -30,6 +30,28 @@ function b64(value: Uint8Array | string) {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+function extractFcmProviderCode(details: string): string | undefined {
+  try {
+    const parsed = JSON.parse(details) as {
+      error?: {
+        status?: unknown;
+        details?: Array<{ errorCode?: unknown }>;
+      };
+    };
+    const detailCode = parsed.error?.details?.find(
+      (detail) => typeof detail.errorCode === "string",
+    )?.errorCode;
+    const candidate = typeof detailCode === "string"
+      ? detailCode
+      : parsed.error?.status;
+    return typeof candidate === "string" && /^[A-Z0-9_]{1,64}$/.test(candidate)
+      ? candidate
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function getGoogleAccessToken(sa: ServiceAccount) {
   const now = Math.floor(Date.now() / 1000);
   const unsigned = b64(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." +
@@ -209,7 +231,7 @@ Deno.serve(async (req) => {
     let attempted = 0;
     let skippedPreferences = 0;
     let noEligibleDevices = 0;
-    const failures: Array<{ device_id: string; status: number; token_invalid: boolean }> = [];
+    const failures: Array<{ device_id: string; status: number; token_invalid: boolean; provider_code?: string }> = [];
 
     for (const item of authorized) {
       const title = item.notification_title.trim();
@@ -232,7 +254,7 @@ Deno.serve(async (req) => {
       const itemAttempted = devices?.length ?? 0;
       if (preferenceDisabled) skippedPreferences += 1;
       else if (itemAttempted === 0) noEligibleDevices += 1;
-      const itemFailures: Array<{ device_id: string; status: number; token_invalid: boolean }> = [];
+      const itemFailures: Array<{ device_id: string; status: number; token_invalid: boolean; provider_code?: string }> = [];
       let itemSent = 0;
       attempted += itemAttempted;
       for (const device of devices ?? []) {
@@ -243,9 +265,25 @@ Deno.serve(async (req) => {
         });
         if (response.ok) { sent++; itemSent++; continue; }
         const details = await response.text();
-        const invalid = response.status === 404 && (details.includes("UNREGISTERED") || details.includes("registration-token-not-registered"));
+        const providerCode = extractFcmProviderCode(details);
+        const invalid = response.status === 404 && (
+          providerCode === "UNREGISTERED" ||
+          details.includes("UNREGISTERED") ||
+          details.includes("registration-token-not-registered")
+        );
         if (invalid) await admin.from("notification_devices").update({ enabled: false }).eq("id", device.id);
-        const failure = { device_id: device.id, status: response.status, token_invalid: invalid };
+        const failure = {
+          device_id: device.id,
+          status: response.status,
+          token_invalid: invalid,
+          ...(providerCode ? { provider_code: providerCode } : {}),
+        };
+        console.warn("FCM delivery rejected", JSON.stringify({
+          notification_kind: item.notification_kind,
+          status: response.status,
+          provider_code: providerCode ?? null,
+          token_invalid: invalid,
+        }));
         failures.push(failure);
         itemFailures.push(failure);
       }
