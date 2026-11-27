@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(30);
+SELECT plan(32);
 
 SELECT ok(to_regprocedure('public.super_admin_list_network_people(uuid,text,text,integer,integer)') IS NOT NULL, 'network people directory RPC exists');
 SELECT ok(to_regprocedure('public.super_admin_get_school_analytics(uuid)') IS NOT NULL, 'school analytics RPC exists');
@@ -37,6 +37,10 @@ SELECT ok(to_regprocedure('public.super_admin_attach_existing_account(uuid,uuid,
 SELECT ok(position('_is_super_admin' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment requires Super Admin');
 SELECT ok(position('school_network_id' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment is restricted to the current network');
 SELECT ok(position('admin_audit_logs' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignments create an audit event');
+
+
+SELECT ok(NOT has_function_privilege('anon', 'public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])', 'execute'), 'anonymous role cannot assign existing school accounts');
+SELECT ok(position('Only active accounts' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment rejects inactive global accounts');
 
 SELECT * FROM finish();
 ROLLBACK;
