@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(14);
+SELECT plan(15);
 
 SELECT ok(
   to_regprocedure('public.extreme_admin_get_executive_metrics()') IS NOT NULL,
@@ -53,8 +53,8 @@ SELECT ok(
 
 SELECT ok(
   position('Revoke Super Admin authority before suspending or banning' in pg_get_functiondef('public.extreme_admin_set_user_status(uuid,text,text)'::regprocedure)) > 0
-  AND position('extreme_admin_log' in pg_get_functiondef('public.extreme_admin_set_user_status(uuid,text,text)'::regprocedure)) > 0,
-  'top-level authority protection and legacy audit history remain enforced'
+  AND position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_set_user_status(uuid,text,text)'::regprocedure)) > 0,
+  'top-level authority protection and production audit logging remain enforced'
 );
 
 SELECT ok(
@@ -76,6 +76,12 @@ SELECT ok(
 SELECT ok(
   has_function_privilege('authenticated', 'public.extreme_admin_set_user_status(uuid,text,text)', 'EXECUTE'),
   'authenticated callers can reach account status controls and are checked by the owner guard'
+);
+
+SELECT ok(
+  position('public.admin_audit_logs' in pg_get_functiondef('public.extreme_admin_get_audit_logs(integer)'::regprocedure)) > 0
+  AND position('extreme_admin_audit_logs' in pg_get_functiondef('public.extreme_admin_get_audit_logs(integer)'::regprocedure)) = 0,
+  'the audit timeline reads the production canonical audit table'
 );
 
 SELECT * FROM finish();
