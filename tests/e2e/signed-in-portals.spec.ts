@@ -174,6 +174,14 @@ test('Super Admin network workspace exposes its live workflows across desktop, t
     await page.getByRole('button', { name: 'All schools' }).click();
     await expect(page.getByText('People and school memberships')).toBeVisible();
     await expect(page.getByText('Global account status is separate')).toBeVisible();
+    await expect(page.getByText('Managed in school portal').first()).toBeVisible();
+    const staffSuspend = page.getByRole('button', { name: 'Suspend', exact: true }).first();
+    if (await staffSuspend.count()) {
+      await staffSuspend.click();
+      await expect(page.getByRole('heading', { name: 'Confirm staff membership status change' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Confirm change' })).toBeDisabled();
+      await page.getByRole('button', { name: 'Cancel' }).click();
+    }
 
     if (viewport.width < 1024) {
       await page.getByRole('button', { name: 'Open administration navigation' }).click();
