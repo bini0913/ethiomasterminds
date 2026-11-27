@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
           notification_kind: payload.kind,
           notification_title: "Multiplayer invitation",
           notification_body: senderName + " invited you to a multiplayer match.",
-          notification_data: { invite_id: event.id, room_id: event.room_id, route: "/multiplayer", action: "multiplayer_invite" },
+          notification_data: { invite_id: event.id, room_id: event.room_id, route: "/lobby", action: "multiplayer_invite" },
         }];
       } else if (payload.kind === "group_message") {
         const { data: message, error: messageError } = await admin.from("group_messages")
