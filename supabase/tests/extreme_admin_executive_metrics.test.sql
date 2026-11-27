@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(12);
+SELECT plan(14);
 
 SELECT ok(
   to_regprocedure('public.extreme_admin_get_executive_metrics()') IS NOT NULL,
@@ -65,6 +65,16 @@ SELECT ok(
   position('audit reason is required for Super Admin authority changes' in pg_get_functiondef('public.extreme_admin_set_super_admin(uuid,boolean,text)'::regprocedure)) > 0
   AND position('audit reason is required for school status changes' in pg_get_functiondef('public.extreme_admin_set_school_status(uuid,text,text)'::regprocedure)) > 0,
   'Super Admin and school status changes reject missing audit reasons'
+);
+
+SELECT ok(
+  NOT has_function_privilege('anon', 'public.extreme_admin_set_user_status(uuid,text,text)', 'EXECUTE'),
+  'anonymous users cannot call account status controls'
+);
+
+SELECT ok(
+  has_function_privilege('authenticated', 'public.extreme_admin_set_user_status(uuid,text,text)', 'EXECUTE'),
+  'authenticated callers can reach account status controls and are checked by the owner guard'
 );
 
 SELECT * FROM finish();
