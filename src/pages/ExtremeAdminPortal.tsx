@@ -158,6 +158,7 @@ const ExtremeAdminPortal: React.FC = () => {
   const [healthLoading, setHealthLoading] = useState(false);
   const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
   const [statusReason, setStatusReason] = useState("");
+  const [schoolActionReason, setSchoolActionReason] = useState("");
   const [targetUserId, setTargetUserId] = useState("");
   const [targetRole, setTargetRole] = useState<UserRole>("student");
   const [targetStatus, setTargetStatus] = useState<AccountStatus>("active");
@@ -312,14 +313,14 @@ const ExtremeAdminPortal: React.FC = () => {
   const changeSchoolStatus = async (school: PortalSchool) => {
     if (school.status === "closed") return toast.error("Closed schools require a separate reopening review.");
     const nextStatus = school.status === "active" ? "suspended" : "active";
-    if (!statusReason.trim()) return toast.error("Enter a reason for this school status change");
+    if (!schoolActionReason.trim()) return toast.error("Enter a reason for this school status change");
     if (!window.confirm(`${nextStatus === "suspended" ? "Suspend" : "Reactivate"} ${school.name}? School records will be preserved.`)) return;
     const { error } = await supabase.rpc("extreme_admin_set_school_status" as any, {
-      p_school_id: school.id, p_status: nextStatus, p_reason: statusReason.trim(),
+      p_school_id: school.id, p_status: nextStatus, p_reason: schoolActionReason.trim(),
     });
     if (error) return toast.error(error.message || "School status could not be changed");
     toast.success(`${school.name} is now ${nextStatus}`);
-    setStatusReason("");
+    setSchoolActionReason("");
     await refreshAll();
   };
 
@@ -664,6 +665,7 @@ const ExtremeAdminPortal: React.FC = () => {
           <SectionHeading eyebrow="Executive · Network oversight" title="School network" description="Global school inventory, school status controls and secure provisioning. The current architecture intentionally has one school network and one Super Admin." />
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3"><div className="flex items-center gap-2 text-sm text-blue-900"><Building2 className="h-4 w-4" />All schools currently belong to the single Master Minds network.</div><Button onClick={() => setCreateSchoolOpen((open) => !open)}><Plus className="mr-2 h-4 w-4" />Register school</Button></div>
           {createSchoolOpen && <Card className="border-blue-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Register a school and provision its Manager</CardTitle><CardDescription>The existing provisioning service creates the school, generates the Manager account, and rolls back the school if account provisioning fails.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><div className="space-y-1"><Label>School name</Label><Input value={schoolName} onChange={(event) => setSchoolName(event.target.value)} placeholder="School name" /></div><div className="space-y-1"><Label>School code</Label><Input value={schoolCode} onChange={(event) => setSchoolCode(event.target.value.toUpperCase())} placeholder="2–8 letters or numbers" maxLength={8} /></div><div className="space-y-1"><Label>Initial Manager name</Label><Input value={managerName} onChange={(event) => setManagerName(event.target.value)} placeholder="Manager full name" /></div><div className="flex gap-2 md:col-span-3"><Button onClick={() => void createSchool()} disabled={createSchoolLoading}>{createSchoolLoading ? "Registering…" : "Create school & Manager"}</Button><Button variant="outline" onClick={() => setCreateSchoolOpen(false)}>Cancel</Button></div></CardContent></Card>}
+          <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">School status change reason</CardTitle><CardDescription>A reason is required and recorded whenever a school is suspended or reactivated.</CardDescription></CardHeader><CardContent><Textarea value={schoolActionReason} onChange={(event) => setSchoolActionReason(event.target.value)} placeholder="Explain the operational reason for this school status change" rows={2} /></CardContent></Card>
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Registered schools ({formatNumber(schools.length)})</CardTitle><CardDescription>Membership totals include active memberships only. School suspension preserves records.</CardDescription></CardHeader><CardContent className="space-y-3">{schools.map((school) => <div key={school.id} className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 p-4 md:flex-row md:items-center"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-950">{school.name}</p><span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">{school.school_code}</span><span className={school.status === "active" ? "rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800" : "rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800"}>{school.status}</span></div><p className="mt-2 text-xs text-slate-500">{formatNumber(school.students)} students · {formatNumber(school.teachers)} teachers · {formatNumber(school.managers)} managers · {formatNumber(school.parents)} parents · {formatNumber(school.finance_staff)} finance</p><p className="mt-1 text-[11px] text-slate-400">Registered {new Date(school.created_at).toLocaleDateString()} · {school.id}</p></div><Button size="sm" variant={school.status === "active" ? "destructive" : "outline"} onClick={() => void changeSchoolStatus(school)} disabled={school.status === "closed"}>{school.status === "active" ? "Suspend school" : school.status === "suspended" ? "Reactivate school" : "Closed · review required"}</Button></div>)}{!schools.length && <p className="py-8 text-center text-sm text-slate-500">No schools registered.</p>}</CardContent></Card>
           <p className="text-xs text-slate-500">Network transfers are not exposed as a button because the database currently enforces exactly one network row. A cross-network transfer would require a deliberate multi-network architecture change; this control center will not pretend a transfer is possible.</p>
         </div>
