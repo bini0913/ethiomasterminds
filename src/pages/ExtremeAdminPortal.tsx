@@ -551,6 +551,8 @@ const ExtremeAdminPortal: React.FC = () => {
                   { label: "Today", value: metrics.registered_today, icon: ArrowUpRight },
                   { label: "Last 7 days", value: metrics.registered_7d, icon: Activity },
                   { label: "Last 30 days", value: metrics.registered_30d, icon: ArrowUpRight },
+                  { label: "New schools · 7 days", value: metrics.schools_created_7d, icon: Building2 },
+                  { label: "New schools · 30 days", value: metrics.schools_created_30d, icon: Building2 },
                 ].map((item) => <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><item.icon className="h-4 w-4 text-blue-700" /><p className="mt-3 text-xl font-bold tabular-nums text-slate-950">{formatNumber(item.value)}</p><p className="mt-1 text-xs text-slate-500">{item.label}</p></div>)}
               </CardContent>
             </Card>
