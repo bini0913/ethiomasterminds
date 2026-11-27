@@ -80,6 +80,7 @@ export default function NetworkSuperAdminPortal() {
   const [schoolCode, setSchoolCode] = useState("");
   const [managerName, setManagerName] = useState("");
   const [credentials, setCredentials] = useState<Credentials | null>(null);
+  const [credentialContext, setCredentialContext] = useState<"registration" | "manager" | null>(null);
   const [networkName, setNetworkName] = useState("");
   const [saving, setSaving] = useState(false);
   const [assignmentUsername, setAssignmentUsername] = useState("");
@@ -273,6 +274,7 @@ export default function NetworkSuperAdminPortal() {
     event.preventDefault();
     setSaving(true);
     setCredentials(null);
+    setCredentialContext(null);
     try {
       const response = await supabase.functions.invoke("school-provision-account", {
         body: {
@@ -296,6 +298,7 @@ export default function NetworkSuperAdminPortal() {
         password: manager.initial_password,
         warning: manager.audit_warning || response.data?.school?.audit_warning,
       });
+      setCredentialContext("registration");
       setSchoolName("");
       setSchoolCode("");
       setManagerName("");
@@ -314,6 +317,7 @@ export default function NetworkSuperAdminPortal() {
     if (!managerSchoolId) return toast.error("Choose a school first.");
     setSaving(true);
     setCredentials(null);
+    setCredentialContext(null);
     try {
       const response = await supabase.functions.invoke("school-provision-account", {
         body: { action: "create_accounts", school_id: managerSchoolId, role: "manager", accounts: [{ name: managerName.trim() }] },
@@ -324,6 +328,7 @@ export default function NetworkSuperAdminPortal() {
       }
       const created = response.data.created[0];
       setCredentials({ username: created.username, password: created.initial_password, warning: created.audit_warning });
+      setCredentialContext("manager");
       setManagerName("");
       toast.success("School Manager account provisioned.");
       if (created.audit_warning) toast.warning(created.audit_warning);
@@ -494,7 +499,7 @@ export default function NetworkSuperAdminPortal() {
                     <label className="block text-sm font-medium text-slate-700">Initial Manager full name<Input className="mt-1" placeholder="Enter Manager's full name" value={managerName} onChange={(event) => setManagerName(event.target.value)} required minLength={2} maxLength={160} /></label>
                     <Button className="w-full" disabled={saving}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}Register school and provision Manager</Button>
                   </form>
-                  {credentials && <CredentialBox credentials={credentials} onDismiss={() => setCredentials(null)} />}
+                  {credentials && credentialContext === "registration" && <CredentialBox credentials={credentials} onDismiss={() => { setCredentials(null); setCredentialContext(null); }} />}
                 </CardContent>
               </Card>
 
@@ -534,7 +539,7 @@ export default function NetworkSuperAdminPortal() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="mb-4 flex flex-wrap gap-2"><Button size="sm" variant={peopleSchoolId ? "outline" : "secondary"} onClick={() => { setPeopleSchoolId(""); setPage(0); }}>All schools</Button>{schools.map((item) => <Button key={item.id} size="sm" variant={peopleSchoolId === item.id ? "secondary" : "outline"} onClick={() => { setPeopleSchoolId(item.id); setPage(0); }}>{item.school_code}</Button>)}</div>
+                <div className="mb-4 max-w-sm"><Select value={peopleSchoolId || "all"} onValueChange={(value) => { setPeopleSchoolId(value === "all" ? "" : value); setPage(0); }}><SelectTrigger aria-label="Filter people by school"><SelectValue placeholder="All schools" /></SelectTrigger><SelectContent><SelectItem value="all">All schools</SelectItem>{schools.map((item) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.school_code}</SelectItem>)}</SelectContent></Select></div>
                 {peopleError ? <ErrorPanel message={peopleError} onRetry={() => void loadPeople()} /> : peopleLoading ? <LoadingState label="Loading network memberships…" /> : <PeopleTable people={people} onStatus={requestMembershipStatus} />}
                 <div className="mt-4 flex items-center justify-between gap-3"><p className="text-xs text-slate-500">Page {page + 1} · 50 records per page</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page === 0 || peopleLoading} onClick={() => setPage((value) => Math.max(0, value - 1))}>Previous</Button><Button size="sm" variant="outline" disabled={people.length < 50 || peopleLoading} onClick={() => setPage((value) => value + 1)}>Next</Button></div></div>
               </CardContent>
@@ -559,7 +564,7 @@ export default function NetworkSuperAdminPortal() {
           </section>}
 
           {tab === "finance" && <section className="space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-900">Network finance oversight</h2><p className="text-sm text-slate-500">Read-only visibility. Invoice creation, payment confirmation, reversals, and follow-up resolution remain in school Finance workflows.</p></div><Button variant="outline" onClick={exportFinance} disabled={Boolean(financeError)}><Download className="mr-2 h-4 w-4" />Export finance CSV</Button></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-900">Network finance oversight</h2><p className="text-sm text-slate-500">Read-only visibility. Invoice creation, payment confirmation, reversals, and follow-up resolution remain in school Finance workflows.</p></div><Button variant="outline" onClick={exportFinance} disabled={Boolean(financeError)}><Download className="mr-2 h-4 w-4" />Export recent finance CSV</Button></div>
             {financeError ? <ErrorPanel message={financeError} onRetry={() => void loadCore()} /> : <>
             <MetricGrid items={[["School invoices", finance.invoice_count], ["Confirmed payments", finance.confirmed_payments], ["Pending follow-ups", finance.pending_followups], ["Overdue invoices", finance.overdue_invoice_count]]} />
             <Card><CardHeader><CardTitle>Network totals by currency</CardTitle><CardDescription>Invoice totals and confirmed invoice-linked payments are grouped by the invoice currency.</CardDescription></CardHeader><CardContent className="space-y-3">{(finance.currency_totals || []).length ? finance.currency_totals.map((item: JsonRecord) => <div key={item.currency} className="rounded-xl border p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">{item.currency}</h3><Badge variant="secondary">{item.invoice_count} invoices</Badge></div><div className="grid gap-3 sm:grid-cols-3"><FinanceMetric label="Invoiced" amount={item.invoiced_amount} currency={item.currency} /><FinanceMetric label="Confirmed paid" amount={item.paid_amount} currency={item.currency} /><FinanceMetric label="Outstanding" amount={item.outstanding_balance} currency={item.currency} /></div></div>) : <EmptyState title="No school invoices yet" detail="No school-fee invoices have been recorded in this network." />}</CardContent></Card>
@@ -582,7 +587,7 @@ export default function NetworkSuperAdminPortal() {
 
           {tab === "settings" && <section className="grid gap-5 xl:grid-cols-2">
             <Card><CardHeader><CardTitle>Network identity</CardTitle><CardDescription>Updates the singleton network display name. The change is recorded in the administrative audit history.</CardDescription></CardHeader><CardContent><form className="space-y-3" onSubmit={saveNetworkName}><label className="block text-sm font-medium text-slate-700">Network name<Input className="mt-1" value={networkName} onChange={(event) => setNetworkName(event.target.value)} minLength={2} maxLength={160} required /></label><Button disabled={saving}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save network name</Button></form></CardContent></Card>
-            <Card><CardHeader><CardTitle>School Manager onboarding</CardTitle><CardDescription>Provision a Manager for an existing active school. Other day-to-day school roles remain under the school's management workflow.</CardDescription></CardHeader><CardContent><form className="space-y-3" onSubmit={createManager}><label className="block text-sm font-medium text-slate-700">Active school<Select value={managerSchoolId} onValueChange={setManagerSchoolId}><SelectTrigger className="mt-1"><SelectValue placeholder="Choose a school" /></SelectTrigger><SelectContent>{schools.filter((item) => item.status === "active").map((item) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.school_code}</SelectItem>)}</SelectContent></Select></label><label className="block text-sm font-medium text-slate-700">Manager full name<Input className="mt-1" placeholder="Enter full name" value={managerName} onChange={(event) => setManagerName(event.target.value)} required minLength={2} maxLength={160} /></label><Button disabled={saving || !managerSchoolId}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}Provision School Manager</Button></form>{credentials && <CredentialBox credentials={credentials} onDismiss={() => setCredentials(null)} />}</CardContent></Card>
+            <Card><CardHeader><CardTitle>School Manager onboarding</CardTitle><CardDescription>Provision a Manager for an existing active school. Other day-to-day school roles remain under the school's management workflow.</CardDescription></CardHeader><CardContent><form className="space-y-3" onSubmit={createManager}><label className="block text-sm font-medium text-slate-700">Active school<Select value={managerSchoolId} onValueChange={setManagerSchoolId}><SelectTrigger className="mt-1"><SelectValue placeholder="Choose a school" /></SelectTrigger><SelectContent>{schools.filter((item) => item.status === "active").map((item) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.school_code}</SelectItem>)}</SelectContent></Select></label><label className="block text-sm font-medium text-slate-700">Manager full name<Input className="mt-1" placeholder="Enter full name" value={managerName} onChange={(event) => setManagerName(event.target.value)} required minLength={2} maxLength={160} /></label><Button disabled={saving || !managerSchoolId}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}Provision School Manager</Button></form>{credentials && credentialContext === "manager" && <CredentialBox credentials={credentials} onDismiss={() => { setCredentials(null); setCredentialContext(null); }} />}</CardContent></Card>
             <Card className="xl:col-span-2"><CardHeader><CardTitle>Authority boundaries</CardTitle><CardDescription>These boundaries keep network administration safe and prevent overlap with platform-owner and school-level responsibilities.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><Boundary title="Network authority" detail="Manage network identity, school registration and status, school leadership assignments, network reporting, and network audit visibility." /><Boundary title="School-owned workflows" detail="Daily teaching, attendance entry, student enrollment, academic calendars, invoices, payment confirmation, and school-level follow-up resolution remain in their respective school portals." /><Boundary title="Extreme Admin authority" detail="Platform-wide accounts, global security controls, platform finance, infrastructure health, and cross-network operations remain with Extreme Admin." /></CardContent></Card>
           </section>}
         </div>
