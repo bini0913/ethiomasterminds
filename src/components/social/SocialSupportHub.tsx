@@ -14,9 +14,11 @@ import { AlertTriangle, ArrowBigUp, Loader2, Lightbulb, Search, Sparkles, Trendi
 
 type BoardPost = {
   id: string;
+  authorId: string;
   content: string;
   createdAt: string;
   authorName: string;
+  supportStatus: 'open' | 'in_review' | 'resolved' | 'dismissed' | null;
   votes: number;
   hasVoted: boolean;
   postType: 'support_request' | 'feature_request';
@@ -38,6 +40,10 @@ const SocialSupportHub: React.FC = () => {
   const [featureSearch, setFeatureSearch] = useState('');
 
   const loadBoard = useCallback(async () => {
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const { data: postsData, error } = await supabase
@@ -50,11 +56,15 @@ const SocialSupportHub: React.FC = () => {
       if (error) throw error;
 
       const authorIds = [...new Set((postsData || []).map((p: any) => p.author_id))];
-      const [{ data: profiles }, { data: likesData }] = await Promise.all([
+      const supportIds = (postsData || []).filter((post: any) => post.post_type === 'support_request').map((post: any) => post.id);
+      const [{ data: profiles }, { data: likesData }, { data: supportStatuses }] = await Promise.all([
         authorIds.length
           ? supabase.from('profiles').select('id, name').in('id', authorIds)
           : Promise.resolve({ data: [] as any[] }),
         supabase.from('social_post_likes').select('post_id, user_id').in('post_id', (postsData || []).map((p: any) => p.id)),
+        supportIds.length
+          ? supabase.from('support_request_statuses' as any).select('post_id,status').eq('user_id', user.id).in('post_id', supportIds)
+          : Promise.resolve({ data: [] as any[] }),
       ]);
 
       const profileMap: Record<string, string> = {};
@@ -71,11 +81,16 @@ const SocialSupportHub: React.FC = () => {
         }
       });
 
+      const supportStatusMap = new Map((supportStatuses || []).map((status: any) => [status.post_id, status.status]));
       const mappedPosts: BoardPost[] = (postsData || []).map((post: any) => ({
         id: post.id,
+        authorId: post.author_id,
         content: post.content,
         createdAt: post.created_at,
         authorName: profileMap[post.author_id] || 'Student',
+        supportStatus: post.post_type === 'support_request' && post.author_id === user.id
+          ? (supportStatusMap.get(post.id) as BoardPost['supportStatus']) || 'open'
+          : null,
         votes: likesByPost[post.id]?.count || 0,
         hasVoted: likesByPost[post.id]?.hasVoted || false,
         postType: post.post_type,
@@ -106,6 +121,7 @@ const SocialSupportHub: React.FC = () => {
       .channel('social-support-board-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_posts' }, loadBoard)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'social_post_likes' }, loadBoard)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_request_statuses' }, loadBoard)
       .subscribe();
 
     return () => {
@@ -300,11 +316,11 @@ const SocialSupportHub: React.FC = () => {
                         <span className="text-sm font-medium">{post.authorName}</span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={['resolved', 'dismissed'].includes(String(post.metadata?.support_status)) ? 'secondary' : 'outline'}>
-                          {['open', 'in_review', 'resolved', 'dismissed'].includes(String(post.metadata?.support_status))
-                            ? String(post.metadata?.support_status).replace('_', ' ')
-                            : 'open'}
-                        </Badge>
+                        {post.authorId === user?.id && post.supportStatus && (
+                          <Badge variant={['resolved', 'dismissed'].includes(post.supportStatus) ? 'secondary' : 'outline'}>
+                            {post.supportStatus.replace('_', ' ')}
+                          </Badge>
+                        )}
                         <Badge variant="outline">{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</Badge>
                       </div>
                     </div>
