@@ -61,3 +61,30 @@ with check (
     or split_part(thumbnail_path, '/', 1) = (select auth.uid())::text
   )
 );
+
+-- The existing ALL policy is permissive and also applies to INSERT/UPDATE.
+-- Keep its current ownership/manager rules while enforcing uploader-folder
+-- binding for ordinary owners, so it cannot bypass the narrower INSERT policy.
+alter policy "uploader manages own book"
+on public.library_books
+with check (
+  (
+    (school_id is null)
+    and (
+      (
+        uploader_id = (select auth.uid())
+        and split_part(pdf_path, '/', 1) = (select auth.uid())::text
+        and (
+          thumbnail_path is null
+          or split_part(thumbnail_path, '/', 1) = (select auth.uid())::text
+        )
+      )
+      or has_role((select auth.uid()), 'admin'::app_role)
+      or has_role((select auth.uid()), 'manager'::app_role)
+    )
+  )
+  or (
+    school_id is not null
+    and school_can_manage_library_book(id)
+  )
+);
