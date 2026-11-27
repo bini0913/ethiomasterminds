@@ -62,7 +62,7 @@ type ExecutiveMetrics = {
   daily_active_users?: number;
   weekly_active_users?: number;
   monthly_active_users?: number;
-  online_now?: number;
+  recently_active_10m?: number;
   schools_total?: number;
   schools_active?: number;
   schools_suspended?: number;
@@ -508,8 +508,8 @@ const ExtremeAdminPortal: React.FC = () => {
                 <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">A decision-ready view of registered accounts, real activity, school growth, verified school-fee collections and platform controls.</p>
               </div>
               <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-                <p className="text-xs text-slate-300">Current online · last 10 minutes</p>
-                <p className="mt-1 flex items-center gap-2 text-2xl font-bold tabular-nums"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />{formatNumber(metrics.online_now)}</p>
+                <p className="text-xs text-slate-300">Recently active · last 10 minutes</p>
+                <p className="mt-1 flex items-center gap-2 text-2xl font-bold tabular-nums"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />{formatNumber(metrics.recently_active_10m)}</p>
               </div>
             </div>
           </div>
