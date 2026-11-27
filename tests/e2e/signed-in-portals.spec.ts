@@ -110,7 +110,7 @@ test('Extreme Admin executive workspace exposes every Part 1 section on desktop 
     { nav: /Platform controls/, heading: 'Global controls & security', content: 'External service connectivity' },
     { nav: /Reports & flags/, heading: 'Reports & flags' },
     { nav: /Support & escalations/, heading: 'Support & escalations' },
-    { nav: /Announcements/, heading: 'Platform announcements', content: 'All students and teachers' },
+    { nav: /Announcements/, heading: 'Platform announcements', content: 'Create announcement' },
     { nav: /Privacy requests/, heading: 'Privacy & account requests' },
     { nav: /Audit history/, heading: 'Audit history' },
   ];
@@ -121,7 +121,7 @@ test('Extreme Admin executive workspace exposes every Part 1 section on desktop 
     }
     await page.getByRole('button', { name: section.nav }).click();
     await expect(page.getByRole('heading', { name: section.heading })).toBeVisible();
-    if (section.content) await expect(page.getByText(section.content)).toBeVisible();
+    if (section.content) await expect(page.getByText(section.content, { exact: true })).toBeVisible();
   }
 
   expect(pageErrors, 'Unexpected browser errors in Extreme Admin executive workspace').toEqual([]);
