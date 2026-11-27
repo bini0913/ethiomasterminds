@@ -272,6 +272,7 @@ const ExtremeAdminPortal: React.FC = () => {
 
   useEffect(() => {
     if (!selectedSchoolId || !isExtremeAdmin) {
+      setSectionsLoading(false);
       setSchoolSections([]);
       setNewAccountGrade("");
       setNewAccountSectionId("");
