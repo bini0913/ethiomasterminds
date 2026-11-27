@@ -14,7 +14,7 @@ import { ArrowLeft, Calendar, Plus, Check, X, Sparkles, Brain, Loader2, Wand2, B
 import { toast } from "sonner";
 import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { getAcademicProfile, normalizeGrade, normalizeSubject, resolveAcademicGrade } from "@/lib/academicProfile";
-import { getPdfPublicUrl } from "@/lib/libraryApi";
+import { analyzeBookPdf } from "@/lib/libraryApi";
 import { loadBookAnalyses, saveBookAnalyses } from "@/lib/bookAnalysis";
 
 interface StudyPlan {
@@ -70,6 +70,52 @@ const StudyPlannerPage: React.FC = () => {
   }, [user]);
 
   useEffect(() => { if (user) fetchPlans(); }, [fetchPlans, user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let refreshTimer: number | null = null;
+    const refresh = () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        void fetchPlans();
+        void loadBookAnalyses(user.id)
+          .then(setBookAnalysis)
+          .catch((error) => console.warn("Live textbook analysis refresh failed:", error));
+        void supabase
+          .from("library_books")
+          .select("id,title,author,subject,pdf_path")
+          .limit(500)
+          .then(({ data, error }) => {
+            if (error) {
+              console.warn("Live Library book refresh failed:", error);
+              return;
+            }
+            const normalized = (data || []).map((book: any) => ({
+              id: String(book.id),
+              title: String(book.title || "Untitled book"),
+              subject: normalizeSubject(String(book.subject || "general")),
+              pdf_path: String(book.pdf_path || ""),
+            }));
+            setAvailableBooks(normalized);
+            const byId = new Map(normalized.map((book) => [book.id, book]));
+            setSelectedBooks((current) => current.flatMap((book) => {
+              const latest = byId.get(book.id);
+              return latest ? [{ ...book, ...latest }] : [];
+            }));
+          });
+      }, 250);
+    };
+    const channel = supabase
+      .channel(`study-planner-live-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_plans", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "academic_book_analyses", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "library_books" }, refresh)
+      .subscribe();
+    return () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id, fetchPlans]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -174,60 +220,35 @@ const StudyPlannerPage: React.FC = () => {
   };
 
   const analyzeSelectedBookPdfs = async () => {
-    if (!selectedBooks.length) { toast.error("Select books in Academic Prep first."); return; }
+    if (!selectedBooks.length) {
+      toast.error("Select books in Academic Prep first.");
+      return;
+    }
     setIsAnalyzingBooks(true);
     try {
-      const pdfjs = await import(/* @vite-ignore */ "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs" as any);
-      (pdfjs as any).GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs";
       const next: typeof bookAnalysis = {};
       for (const book of selectedBooks) {
         if (!book.pdf_path) {
-          next[book.id] = { units: [], pageCount: 0, method: "estimated", message: "No PDF file is attached to this library record." };
+          next[book.id] = {
+            units: [],
+            pageCount: 0,
+            method: "estimated",
+            message: "No PDF file is attached to this library record.",
+          };
           continue;
         }
         try {
-          const response = await fetch(await getPdfPublicUrl(book.pdf_path));
-          if (!response.ok) throw new Error("PDF download failed (" + response.status + ").");
-          const bytes = await response.arrayBuffer();
-          const pdf = await (pdfjs as any).getDocument({ data: bytes }).promise;
-          const headings: string[] = [];
-          const pagesToInspect = Math.min(Number(pdf.numPages) || 0, 120);
-          for (let pageNo = 1; pageNo <= pagesToInspect; pageNo++) {
-            const page = await pdf.getPage(pageNo);
-            const textContent = await page.getTextContent();
-            const lines = (textContent.items || []).map((item: any) => String(item.str || "").trim()).filter(Boolean);
-            for (const line of lines) {
-              const normalized = line.replace(/\s+/g, " ").trim();
-              if (normalized.length < 4 || normalized.length > 110) continue;
-              const looksLikeHeading = /^(chapter|unit|lesson|module|topic|section)\s+([0-9ivxlcdm]+|[a-z])([.:\s-]|$)/i.test(normalized) ||
-                /^\d+(?:\.\d+){0,2}[.)]?\s+[A-Z][^.!?]{3,90}$/.test(normalized);
-              const isFragment = /^(section|chapter|unit|lesson|module)\s+\d+(?:\.\d+)*$/i.test(normalized) ||
-                /^\d+(?:\.\d+){1,3}[.)]?$/i.test(normalized) ||
-                /^(contents|table of contents|learning objectives|review questions|references|bibliography|answer key)$/i.test(normalized);
-              if (looksLikeHeading && !isFragment) {
-                const heading = normalized.replace(/\s+/g, " ");
-                if (!headings.some((existing) => existing.toLowerCase() === heading.toLowerCase())) headings.push(heading);
-              }
-            }
-          }
-          if (headings.length >= 3) {
-            next[book.id] = { units: headings.slice(0, 200), pageCount: Number(pdf.numPages) || pagesToInspect, method: "headings" };
-          } else if (Number(pdf.numPages) > 0) {
-            const pageCount = Number(pdf.numPages);
-            const chunkSize = Math.max(1, Math.ceil(pageCount / Math.min(40, Math.max(1, planSettings.unitsPerBook))));
-            const ranges: string[] = [];
-            for (let start = 1; start <= pageCount && ranges.length < 200; start += chunkSize) {
-              ranges.push("Pages " + start + "–" + Math.min(pageCount, start + chunkSize - 1));
-            }
-            next[book.id] = { units: ranges, pageCount, method: "page-ranges", message: "No reliable chapter headings found in the text layer; page ranges are used instead." };
-          } else {
-            next[book.id] = { units: [], pageCount: 0, method: "estimated", message: "This PDF has no readable pages." };
-          }
-          if (typeof pdf.destroy === "function") await pdf.destroy();
+          next[book.id] = await analyzeBookPdf(book.pdf_path, planSettings.unitsPerBook);
         } catch (error) {
-          next[book.id] = { units: [], pageCount: 0, method: "estimated", message: error instanceof Error ? error.message : "Could not read this PDF." };
+          next[book.id] = {
+            units: [],
+            pageCount: 0,
+            method: "estimated",
+            message: error instanceof Error ? error.message : "Could not read this PDF.",
+          };
         }
       }
+
       const merged = { ...bookAnalysis, ...next };
       setBookAnalysis(merged);
       if (user?.id) {
@@ -237,14 +258,19 @@ const StudyPlannerPage: React.FC = () => {
         } catch (persistError) {
           console.error("Textbook analysis was cached locally but could not be synced to the account.", persistError);
           toast.error("Analysis is saved on this device, but account sync failed. Please retry after checking your connection.");
+          return;
         }
       }
       const headingCount = Object.values(next).filter((item) => item.method === "headings").length;
       const rangeCount = Object.values(next).filter((item) => item.method === "page-ranges").length;
-      toast.success("Analyzed " + selectedBooks.length + " books: " + headingCount + " with extracted headings, " + rangeCount + " using page ranges.");
+      const failedCount = Object.values(next).filter((item) => item.method === "estimated").length;
+      toast.success(
+        "Analyzed " + selectedBooks.length + " books: " + headingCount +
+        " with extracted headings, " + rangeCount + " using page ranges, " + failedCount + " needing attention.",
+      );
     } catch (error) {
       console.error("Selected book PDF analysis failed:", error);
-      toast.error("PDF analysis could not start. Check the connection and try again.");
+      toast.error(error instanceof Error ? error.message : "PDF analysis could not start. Check the connection and try again.");
     } finally {
       setIsAnalyzingBooks(false);
     }

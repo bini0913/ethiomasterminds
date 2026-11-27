@@ -90,11 +90,27 @@ const TopicCoveragePage: React.FC = () => {
     const refresh = () => setRefreshKey((value) => value + 1);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
+
+    if (!user?.id) {
+      return () => {
+        window.removeEventListener("focus", refresh);
+        document.removeEventListener("visibilitychange", refresh);
+      };
+    }
+
+    const channel = supabase
+      .channel(`topic-coverage-live-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: upperStudent ? "upper_student_topic_progress" : "topic_progress", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "academic_book_analyses", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "library_books" }, refresh)
+      .subscribe();
+
     return () => {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
+      void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user?.id, upperStudent]);
 
   const subjects = useMemo(() => {
     const fromProfile = profileSubjects;

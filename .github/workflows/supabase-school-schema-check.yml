@@ -76,6 +76,8 @@ jobs:
         run: deno check --node-modules-dir=auto supabase/functions/public-account-deletion-request/index.ts
       - name: Type-check study call token function
         run: deno check --node-modules-dir=auto supabase/functions/study-call-token/index.ts
+      - name: Type-check library AI study tools
+        run: deno check --node-modules-dir=auto supabase/functions/library-ai/index.ts
 
   migration-deploy-dry-run:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository

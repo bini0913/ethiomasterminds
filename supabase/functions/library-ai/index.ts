@@ -20,8 +20,32 @@ const MAX_TEXT_CHARS = 3500;
 function buildPrompt(payload: RequestBody) {
   const grade = payload.grade || 9;
   const style = grade <= 4 ? "simple vocabulary" : "exam-ready concise academic tone";
+  const actionInstructions: Record<Action, string> = {
+    summary: "Write a concise, structured summary with the main ideas and important terms.",
+    simple: "Explain the excerpt in clear steps using age-appropriate language. Define difficult terms.",
+    questions: "Create exactly 5 useful question-and-answer pairs. Each pair must be a separate block with exactly two lines: Q1: question text, then A1: answer text. Continue numbering. Do not omit answers.",
+    flashcards: "Create exactly 8 study flashcards. Each card must be a separate block with exactly two lines: Front: a clear recall question or term, then Back: a concise accurate answer. Do not use generic labels such as Concept 1.",
+    concepts: "List the key concepts, each with a short definition and why it matters for this subject.",
+  };
 
-  return `You are a reading assistant for students.\nAction: ${payload.action}\nSubject: ${payload.subject || "General"}\nGrade: ${grade}\nStyle: ${style}\n\nRules:\n- Keep response grounded in the provided excerpt only.\n- If details are missing, say what is missing.\n- Output plain text only.\n\nExcerpt:\n${payload.text.slice(0, MAX_TEXT_CHARS)}`;
+  return `You are a careful reading and study assistant for students.
+Action: ${payload.action}
+Subject: ${payload.subject || "General"}
+Grade: ${grade}
+Style: ${style}
+
+Task:
+${actionInstructions[payload.action]}
+
+Rules:
+- Use only information supported by the provided excerpt.
+- Do not invent facts, formulas, page references, or citations.
+- If the excerpt does not contain enough information, say so clearly.
+- Use language appropriate for the student's grade.
+- Output plain text only and follow the requested format exactly.
+
+Excerpt:
+${payload.text.slice(0, MAX_TEXT_CHARS)}`;
 }
 
 Deno.serve(async (req) => {

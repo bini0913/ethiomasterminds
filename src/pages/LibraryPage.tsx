@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { safeStorage } from '@/lib/safeStorage';
 import { motion } from 'framer-motion';
 import { useUser } from '@/context/UserContext';
+import { supabase } from '@/integrations/supabase/client';
 import { getUserTier } from '@/lib/getUserTier';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,9 @@ import { Bookmark, BookmarkCheck, BookOpen, BookMarked, Brain, Download, Externa
 import {
   createBook,
   createHighlight,
+  downloadBookPdf,
+  extractBookText,
+  saveBookFlashcards,
   deleteBook,
   findCachedAIContent,
   getPdfPublicUrl,
@@ -64,6 +68,7 @@ const LibraryPage: React.FC = () => {
   const [curriculumCatalogError, setCurriculumCatalogError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [downloadingBookId, setDownloadingBookId] = useState<string | null>(null);
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'validating' | 'uploading' | 'saving' | 'done'>('idle');
   const [openUpload, setOpenUpload] = useState(false);
   const [bookmarkSet, setBookmarkSet] = useState<Set<string>>(new Set());
@@ -76,11 +81,12 @@ const LibraryPage: React.FC = () => {
   const [readerOpen, setReaderOpen] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [extractingBookText, setExtractingBookText] = useState(false);
   const [readerUrl, setReaderUrl] = useState<string | null>(null);
   const [readerRetry, setReaderRetry] = useState(0);
   const [readerLoading, setReaderLoading] = useState(false);
   const [readerError, setReaderError] = useState<string | null>(null);
-  const [assetUrls, setAssetUrls] = useState<Record<string, { pdf: string; thumbnail: string | null }>>({});
+  const [assetUrls, setAssetUrls] = useState<Record<string, { thumbnail: string | null }>>({});
   const [readerProgress, setReaderProgress] = useState(0);
   const [readerPageText, setReaderPageText] = useState('');
   const [selectedText, setSelectedText] = useState('');
@@ -90,7 +96,10 @@ const LibraryPage: React.FC = () => {
   const [savedQuestions, setSavedQuestions] = useState<any[]>([]);
   const [aiOutput, setAiOutput] = useState('');
   const [flashcards, setFlashcards] = useState<GeneratedCard[]>([]);
+  const [savingFlashcards, setSavingFlashcards] = useState(false);
+  const [flashcardsSaved, setFlashcardsSaved] = useState(false);
   const highlightAutoSaveRef = useRef<number | null>(null);
+  const readerSessionStartedAtRef = useRef<number | null>(null);
 
   const [search, setSearch] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('all');
@@ -150,8 +159,38 @@ const LibraryPage: React.FC = () => {
     }
   };
 
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
   useEffect(() => {
     load();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let refreshTimer: number | null = null;
+    const refresh = () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        void loadRef.current();
+      }, 250);
+    };
+    const channel = supabase
+      .channel(`library-live-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "library_books" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "book_uploads" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "book_permissions", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "library_bookmarks", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "highlights", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ai_generated_questions", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reading_progress", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "curriculum_textbook_catalog" }, refresh)
+      .subscribe();
+
+    return () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
+    };
   }, [user?.id]);
   useEffect(() => {
     if (!user?.id) return;
@@ -221,13 +260,10 @@ const LibraryPage: React.FC = () => {
     (async () => {
       const entries = await Promise.all(visibleBooks.map(async (book) => {
         try {
-          const [pdf, thumbnail] = await Promise.all([
-            getPdfPublicUrl(book.pdf_path),
-            getThumbnailPublicUrl(book.thumbnail_path),
-          ]);
-          return [book.id, { pdf, thumbnail }] as const;
+          const thumbnail = await getThumbnailPublicUrl(book.thumbnail_path);
+          return [book.id, { thumbnail }] as const;
         } catch {
-          return [book.id, { pdf: '', thumbnail: null }] as const;
+          return [book.id, { thumbnail: null }] as const;
         }
       }));
       if (!cancelled) setAssetUrls((current) => ({ ...current, ...Object.fromEntries(entries) }));
@@ -241,6 +277,21 @@ const LibraryPage: React.FC = () => {
       if (user?.id) safeStorage.setItem(`masterminds-library-downloads-${user.id}`, JSON.stringify([...next]));
       return next;
     });
+  };
+
+  const handleDownload = async (book: LibraryBook) => {
+    if (downloadingBookId) return;
+    setDownloadingBookId(book.id);
+    try {
+      await downloadBookPdf(book.pdf_path, book.title);
+      markDownloaded(book.id);
+      toast.success("PDF download started. Check your device's Downloads folder.");
+    } catch (error) {
+      console.error("Library PDF download failed:", error);
+      toast.error(error instanceof Error ? error.message : "Could not download this book. Please retry.");
+    } finally {
+      setDownloadingBookId(null);
+    }
   };
 
   const subjects = useMemo(() => Array.from(new Set([...books.map((b) => b.subject), ...curriculumBooks.map((b) => b.subject)])).sort(), [books, curriculumBooks]);
@@ -371,9 +422,11 @@ const LibraryPage: React.FC = () => {
   };
 
   const openReader = async (book: LibraryBook) => {
-    let url = assetUrls[book.id]?.pdf;
+    let url = "";
     try {
-      url = url || await getPdfPublicUrl(book.pdf_path);
+      // Always request a fresh signed URL; cached URLs expire and can otherwise
+      // make a book that was previously readable fail after a long session.
+      url = await getPdfPublicUrl(book.pdf_path);
     } catch {
       toast.error('Book file could not be opened. Please retry.');
       return;
@@ -392,17 +445,40 @@ const LibraryPage: React.FC = () => {
     setReaderUrl(url);
     setReaderLoading(true);
     setReaderError(null);
+    const savedProgress = readingProgress.find((entry) => entry.book_id === book.id);
+    setReaderProgress(savedProgress?.completion_percent ?? 0);
     setReaderOpen(true);
+    readerSessionStartedAtRef.current = Date.now();
     setReaderPageText('');
     setSelectedText('');
     setAiOutput('');
     setFlashcards([]);
+    setFlashcardsSaved(false);
+  };
+
+  const handleExtractBookText = async () => {
+    if (!selectedBook || extractingBookText) return;
+    setExtractingBookText(true);
+    try {
+      const extracted = await extractBookText(selectedBook.pdf_path, { maxPages: 30, maxChars: 12_000 });
+      setReaderPageText(extracted.text);
+      toast.success(
+        extracted.truncated
+          ? `Extracted text from ${extracted.pagesRead} of ${extracted.pageCount} pages. You can edit the excerpt below.`
+          : `Extracted readable text from ${extracted.pagesRead} pages.`,
+      );
+    } catch (error) {
+      console.error("Book text extraction failed:", error);
+      toast.error(error instanceof Error ? error.message : "Could not extract text from this PDF.");
+    } finally {
+      setExtractingBookText(false);
+    }
   };
 
   const runAi = async (action: AiAction) => {
     if (!selectedBook || !user) return;
     if (aiBusy) return;
-    const baseText = (selectedText || readerPageText || '').trim();
+    const baseText = (selectedText.trim() || readerPageText.trim()).trim();
     const limitedText = baseText.slice(0, MAX_AI_TEXT_LENGTH);
     if (!limitedText) {
       toast.error('Select text or add page text first.');
@@ -411,7 +487,7 @@ const LibraryPage: React.FC = () => {
     // Version the cache namespace so previously stored client-generated fallback text
     // is not mistaken for a response produced by the real library AI service.
     setAiBusy(true);
-    const cacheKey = shortHash(`server-ai-v2:${action}:${selectedBook.id}:${limitedText}`);
+    const cacheKey = shortHash(`server-ai-v3:${action}:${selectedBook.id}:${limitedText}`);
 
     let output = '';
     const cached = await findCachedAIContent({
@@ -428,7 +504,7 @@ const LibraryPage: React.FC = () => {
         output = await invokeLibraryAI({
           action,
           text: limitedText,
-          grade: Number(user.grade || 9),
+          grade: Number(String(user.grade || '').match(/\d{1,2}/)?.[0] || 9),
           subject: selectedBook.subject,
         });
         if (!output.trim()) throw new Error("The AI service returned an empty response. Please try again.");
@@ -460,7 +536,7 @@ const LibraryPage: React.FC = () => {
         return {
           user_id: user.id,
           book_id: selectedBook.id,
-          page_number: Math.max(1, Math.round((readerProgress / 100) * 100)),
+          page_number: Number(limitedText.match(/^Page\s+(\d+):/m)?.[1] || 1),
           question: lines[0]?.replace(/^Q\d+:\s*/, '') || `Question ${idx + 1}`,
           answer: lines[1]?.replace(/^A\d+:\s*/, '') || 'See excerpt',
           difficulty: (idx % 3 === 0 ? 'easy' : idx % 3 === 1 ? 'medium' : 'hard') as 'easy' | 'medium' | 'hard',
@@ -468,19 +544,69 @@ const LibraryPage: React.FC = () => {
         };
       });
 
-      await saveGeneratedQuestions(questions).catch(() => undefined);
-      setSavedQuestions((prev) => [...questions, ...prev]);
+      try {
+        const saved = await saveGeneratedQuestions(questions);
+        setSavedQuestions((prev) => [...saved, ...prev]);
+        toast.success(`${saved.length} practice questions saved to this book.`);
+      } catch (error) {
+        console.error("Generated book questions could not be saved:", error);
+        toast.error("Questions were generated, but could not be saved. Please retry while online.");
+      }
     }
 
     if (action === 'flashcards') {
-      const cards = output.split('\n').filter(Boolean).map((line, idx) => ({
-        front: `Concept ${idx + 1}`,
-        back: line.replace(/^Card\s\d+:\s*/, ''),
-      }));
-      setFlashcards(cards);
+      const cards = output
+        .split(/\n\s*\n/)
+        .map((block) => {
+          const frontMatch = block.match(/(?:front|question)\s*:\s*(.+)/i);
+          const backMatch = block.match(/(?:back|answer)\s*:\s*(.+)/i);
+          if (frontMatch?.[1] && backMatch?.[1]) {
+            return { front: frontMatch[1].trim(), back: backMatch[1].trim() };
+          }
+          const line = block.trim().replace(/^Card\s*\d+\s*[:.)-]\s*/i, "");
+          const separator = line.match(/^(.+?)\s(?:\||->|—|–)\s(.+)$/);
+          if (separator) return { front: separator[1].trim(), back: separator[2].trim() };
+          const lines = block.split('\n').map((item) => item.trim()).filter(Boolean);
+          if (lines.length >= 2) {
+            return {
+              front: lines[0].replace(/^(?:Q|Front)\s*\d*\s*:\s*/i, ""),
+              back: lines.slice(1).join(" ").replace(/^(?:A|Back)\s*\d*\s*:\s*/i, ""),
+            };
+          }
+          return null;
+        })
+        .filter((card): card is GeneratedCard => Boolean(card?.front && card?.back));
+      if (!cards.length) {
+        toast.error("The AI response did not contain complete flashcard pairs. Try generating them again.");
+      } else {
+        setFlashcards(cards);
+        setFlashcardsSaved(false);
+      }
     }
 
     setAiBusy(false);
+  };
+
+  const handleSaveFlashcards = async () => {
+    if (!user || !selectedBook || !flashcards.length || savingFlashcards || flashcardsSaved) return;
+    setSavingFlashcards(true);
+    try {
+      const grade = Number(String(user.grade || "").match(/\d{1,2}/)?.[0] || 9);
+      const saved = await saveBookFlashcards({
+        userId: user.id,
+        grade,
+        subject: selectedBook.subject,
+        bookTitle: selectedBook.title,
+        cards: flashcards,
+      });
+      setFlashcardsSaved(true);
+      toast.success(`${saved.length} flashcards saved to your Flashcards study deck.`);
+    } catch (error) {
+      console.error("Book flashcards could not be saved:", error);
+      toast.error(error instanceof Error ? error.message : "Could not save flashcards. Please retry.");
+    } finally {
+      setSavingFlashcards(false);
+    }
   };
 
   const saveHighlight = async () => {
@@ -544,16 +670,64 @@ const LibraryPage: React.FC = () => {
     };
   }, [selectedText, selectedBook?.id, user?.id, readerOpen, highlights, readerProgress, highlightColor, noteText, selectedBook, user]);
 
+  const saveReaderSessionProgress = async () => {
+    if (!selectedBook || !user || readerSessionStartedAtRef.current === null) return;
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - readerSessionStartedAtRef.current) / 1000));
+    readerSessionStartedAtRef.current = null;
+    if (elapsedSeconds < 1) return;
+
+    const previous = readingProgress.find((entry) => entry.book_id === selectedBook.id);
+    try {
+      const saved = await upsertReadingProgress({
+        user_id: user.id,
+        book_id: selectedBook.id,
+        last_page: Math.max(0, Math.round(readerProgress)),
+        completion_percent: Math.round(readerProgress),
+        time_spent_seconds: Math.max(0, Number(previous?.time_spent_seconds) || 0) + elapsedSeconds,
+      });
+      setReadingProgress((current) => [...current.filter((entry) => entry.book_id !== selectedBook.id), saved]);
+    } catch (error) {
+      console.error("Reading session progress could not be saved:", error);
+      toast.error("Your reading time could not sync. Please check your connection and retry.");
+    }
+  };
+
+  useEffect(() => {
+    if (!readerOpen) return;
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        void saveReaderSessionProgress();
+      } else if (readerSessionStartedAtRef.current === null) {
+        readerSessionStartedAtRef.current = Date.now();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [readerOpen, selectedBook?.id, readerProgress, readingProgress, user?.id]);
+
   const markReaderProgress = async (next: number) => {
-    setReaderProgress(next);
     if (!selectedBook || !user) return;
-    await upsertReadingProgress({
-      user_id: user.id,
-      book_id: selectedBook.id,
-      last_page: Math.max(1, Math.round((next / 100) * 100)),
-      completion_percent: next,
-      time_spent_seconds: Math.max(60, Math.round((next / 100) * 1800)),
-    }).catch(() => undefined);
+    const previousPercent = readerProgress;
+    const previous = readingProgress.find((entry) => entry.book_id === selectedBook.id);
+    const elapsedSeconds = readerSessionStartedAtRef.current === null
+      ? 0
+      : Math.max(0, Math.floor((Date.now() - readerSessionStartedAtRef.current) / 1000));
+    setReaderProgress(next);
+    try {
+      const saved = await upsertReadingProgress({
+        user_id: user.id,
+        book_id: selectedBook.id,
+        last_page: Math.max(0, Math.round(next)),
+        completion_percent: Math.round(next),
+        time_spent_seconds: Math.max(0, Number(previous?.time_spent_seconds) || 0) + elapsedSeconds,
+      });
+      setReadingProgress((current) => [...current.filter((entry) => entry.book_id !== selectedBook.id), saved]);
+      readerSessionStartedAtRef.current = Date.now();
+    } catch (error) {
+      console.error("Reading progress could not be saved:", error);
+      setReaderProgress(previousPercent);
+      toast.error("Reading progress could not be saved. Please retry.");
+    }
   };
 
   useEffect(() => {
@@ -663,27 +837,26 @@ const LibraryPage: React.FC = () => {
 
               {loading ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-[360px] animate-pulse rounded-2xl border border-border bg-muted/50" />)}</div> : filteredBooks.length === 0 ? <Card className="border-dashed"><CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center"><div className="mb-4 rounded-2xl bg-primary/10 p-4 text-primary"><BookOpen className="h-8 w-8" /></div><h3 className="text-lg font-semibold">{activeSection === 'saved' ? 'Your shelf is ready for its first save' : activeSection === 'downloaded' ? 'Nothing downloaded yet' : 'No resources match these filters'}</h3><p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{activeSection === 'saved' ? 'Use the bookmark action on a resource you want to revisit.' : activeSection === 'downloaded' ? 'Download a PDF from Discover and it will appear here.' : 'Try a different subject, grade, or search phrase.'}</p></CardContent></Card> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{visibleBooks.map((book) => {
                 const thumbnailUrl = assetUrls[book.id]?.thumbnail || null;
-                const pdfUrl = assetUrls[book.id]?.pdf || '';
-                const hasValidPdfUrl = isValidPublicUrl(pdfUrl);
+                const hasPdfPath = Boolean(book.pdf_path);
                 const isBookmarked = bookmarkSet.has(book.id);
                 return <motion.article key={book.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -3 }} transition={{ duration: 0.2 }} className="glass group flex h-full flex-col overflow-hidden rounded-2xl transition-shadow hover:shadow-md">
                   <div className="relative aspect-[16/10] overflow-hidden bg-muted">{thumbnailUrl ? <img src={thumbnailUrl} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" alt="" /> : <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground"><FileText className="h-8 w-8" /><span className="text-xs">PDF resource</span></div>}<div className="absolute left-3 top-3 flex gap-2"><Badge className="rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur">{book.subject}</Badge>{book.status !== 'approved' && <Badge variant="destructive" className="rounded-full">{book.status}</Badge>}</div><button type="button" aria-label={isBookmarked ? `Remove ${book.title} from saved resources` : `Save ${book.title}`} className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={async () => { try { const next = await toggleBookmark(book.id, user.id, isBookmarked); setBookmarkSet((prev) => { const set = new Set(prev); if (next) set.add(book.id); else set.delete(book.id); return set; }); toast.success(next ? 'Saved to your shelf.' : 'Removed from your shelf.'); } catch { toast.error('Could not update your shelf.'); } }}>{isBookmarked ? <BookmarkCheck className="h-4 w-4 fill-current" /> : <Bookmark className="h-4 w-4" />}</button></div>
-                  <div className="flex flex-1 flex-col p-4"><div className="mb-3 flex items-start justify-between gap-2"><div className="min-w-0"><h3 className="line-clamp-2 text-lg font-semibold leading-tight">{book.title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.author}</p></div><Badge variant="outline" className="shrink-0 rounded-full">Grade {book.grade_level || '—'}</Badge></div><p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{book.description}</p><div className="mt-auto flex items-center justify-between gap-3 pt-5"><Button className="gap-2" onClick={() => openReader(book)} disabled={!hasValidPdfUrl}><BookOpen className="h-4 w-4" />Read</Button><div className="flex items-center gap-1"><Button asChild size="icon" variant="ghost" disabled={!hasValidPdfUrl} aria-label={`Download ${book.title}`}><a href={pdfUrl} target="_blank" rel="noreferrer" onClick={() => markDownloaded(book.id)}><Download className="h-4 w-4" /></a></Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`More actions for ${book.title}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => { navigator.clipboard?.writeText(book.title); toast.success('Book title copied.'); }}>Copy title</DropdownMenuItem>{canManageBook(book) && <><DropdownMenuSeparator /><DropdownMenuItem onClick={() => { setEditingBookId(book.id); setForm({ title: book.title, author: book.author, subject: book.subject, description: book.description, gradeLevel: String(book.grade_level || 9), type: book.type, bookCategory: book.book_category || 'academic', file: null }); setOpenUpload(true); }}>Edit details</DropdownMenuItem>{book.status !== 'approved' && (user.role === 'teacher' || user.role === 'admin' || user.role === 'manager') && <><DropdownMenuItem onClick={async () => { await moderateBookUpload({ bookId: book.id, moderatorId: user.id, status: 'approved', note: 'Approved by moderator' }); toast.success('Book approved.'); await load(); }}>Approve</DropdownMenuItem><DropdownMenuItem onClick={async () => { await moderateBookUpload({ bookId: book.id, moderatorId: user.id, status: 'rejected', note: 'Rejected by moderator' }); toast.success('Book rejected.'); await load(); }}>Reject</DropdownMenuItem></>}<DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => { if (window.confirm(`Delete “${book.title}”?`)) void handleDelete(book.id); }}>Delete</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu></div></div></div>
+                  <div className="flex flex-1 flex-col p-4"><div className="mb-3 flex items-start justify-between gap-2"><div className="min-w-0"><h3 className="line-clamp-2 text-lg font-semibold leading-tight">{book.title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.author}</p></div><Badge variant="outline" className="shrink-0 rounded-full">Grade {book.grade_level || '—'}</Badge></div><p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{book.description}</p><div className="mt-auto flex items-center justify-between gap-3 pt-5"><Button className="gap-2" onClick={() => openReader(book)} disabled={!hasPdfPath}><BookOpen className="h-4 w-4" />Read</Button><div className="flex items-center gap-1"><Button size="icon" variant="ghost" disabled={!hasPdfPath || downloadingBookId === book.id} aria-label={`Download ${book.title}`} title="Download PDF" onClick={() => void handleDownload(book)}>{downloadingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`More actions for ${book.title}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => { navigator.clipboard?.writeText(book.title); toast.success('Book title copied.'); }}>Copy title</DropdownMenuItem>{canManageBook(book) && <><DropdownMenuSeparator /><DropdownMenuItem onClick={() => { setEditingBookId(book.id); setForm({ title: book.title, author: book.author, subject: book.subject, description: book.description, gradeLevel: String(book.grade_level || 9), type: book.type, bookCategory: book.book_category || 'academic', file: null }); setOpenUpload(true); }}>Edit details</DropdownMenuItem>{book.status !== 'approved' && (user.role === 'teacher' || user.role === 'admin' || user.role === 'manager') && <><DropdownMenuItem onClick={async () => { await moderateBookUpload({ bookId: book.id, moderatorId: user.id, status: 'approved', note: 'Approved by moderator' }); toast.success('Book approved.'); await load(); }}>Approve</DropdownMenuItem><DropdownMenuItem onClick={async () => { await moderateBookUpload({ bookId: book.id, moderatorId: user.id, status: 'rejected', note: 'Rejected by moderator' }); toast.success('Book rejected.'); await load(); }}>Reject</DropdownMenuItem></>}<DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => { if (window.confirm(`Delete “${book.title}”?`)) void handleDelete(book.id); }}>Delete</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu></div></div></div>
                 </motion.article>;
               })}</div>}
               {!loading && visibleCount < filteredBooks.length && <div className="flex justify-center"><Button variant="outline" onClick={() => setVisibleCount((value) => value + PAGE_SIZE)}>Load more resources</Button></div>}
             </>}
 
-            {activeSection === 'assigned' && <section className="glass rounded-2xl p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">For you</p><h2 className="mt-1 text-2xl font-bold">Assigned reading</h2><p className="mt-1 text-sm text-muted-foreground">Resources shared with you by a teacher or school.</p><div className="mt-6 space-y-3">{assignedBooks.length === 0 ? <div className="rounded-xl border border-dashed p-10 text-center"><BookMarked className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-medium">Nothing assigned yet</p><p className="mt-1 text-sm text-muted-foreground">Assigned books will appear here when they are ready.</p></div> : assignedBooks.map((book) => <div key={book.id} className="glass flex flex-col gap-4 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold">{book.title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level || '—'} · {book.author}</p></div><Button className="gap-2 sm:shrink-0" onClick={() => openReader(book)}><BookOpen className="h-4 w-4" />Read assignment</Button></div>)}</div></section>}
+            {activeSection === 'assigned' && <section className="glass rounded-2xl p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">For you</p><h2 className="mt-1 text-2xl font-bold">Assigned reading</h2><p className="mt-1 text-sm text-muted-foreground">Resources shared with you by a teacher or school.</p><div className="mt-6 space-y-3">{assignedBooks.length === 0 ? <div className="rounded-xl border border-dashed p-10 text-center"><BookMarked className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-medium">Nothing assigned yet</p><p className="mt-1 text-sm text-muted-foreground">Assigned books will appear here when they are ready.</p></div> : assignedBooks.map((book) => <div key={book.id} className="glass flex flex-col gap-4 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold">{book.title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level || '—'} · {book.author}</p></div><div className="flex flex-wrap gap-2 sm:shrink-0"><Button className="gap-2" disabled={!book.pdf_path} onClick={() => openReader(book)}><BookOpen className="h-4 w-4" />Read assignment</Button><Button variant="outline" className="gap-2" disabled={!book.pdf_path || downloadingBookId === book.id} onClick={() => void handleDownload(book)}>{downloadingBookId === book.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}Download</Button></div></div>)}</div></section>}
 
-            {activeSection === 'curriculum' && canViewCurriculum && <section className="glass rounded-2xl p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Reference shelf</p><h2 className="mt-1 text-2xl font-bold">Curriculum textbooks</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">A curated index of Grade 9–12 curriculum references. External links open in a new tab so you can keep your library context.</p>{curriculumCatalogError && <div className="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">The curriculum catalog could not be loaded. Existing library resources are still available.</div>}<div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{curriculumBooks.filter((book) => { const query = search.trim().toLowerCase(); return (!query || book.book_title.toLowerCase().includes(query) || book.subject.toLowerCase().includes(query)) && (gradeFilter === 'all' || String(book.grade_level) === gradeFilter) && (subjectFilter === 'all' || book.subject === subjectFilter); }).map((book) => <article key={book.id} className="glass flex flex-col rounded-xl p-4"><div className="flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><FileText className="h-5 w-5" /></div><div><h3 className="font-semibold leading-tight">{book.book_title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level}</p></div></div><p className="mt-4 flex-1 text-sm leading-6 text-muted-foreground">{book.notes}</p><Button asChild variant="outline" className="mt-4 w-full gap-2"><a href={book.source_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" />Open textbook index</a></Button></article>)}</div></section>}
+            {activeSection === 'curriculum' && canViewCurriculum && <section className="glass rounded-2xl p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Reference shelf</p><h2 className="mt-1 text-2xl font-bold">Curriculum textbooks</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">Grade 9–12 textbook references with clear source labels. External index entries are not files hosted by Master Minds; check the Ministry portal for current editions.</p>{curriculumCatalogError && <div className="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">The curriculum catalog could not be loaded. Existing library resources are still available.</div>}<div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{curriculumBooks.filter((book) => { const query = search.trim().toLowerCase(); return (!query || book.book_title.toLowerCase().includes(query) || book.subject.toLowerCase().includes(query)) && (gradeFilter === 'all' || String(book.grade_level) === gradeFilter) && (subjectFilter === 'all' || book.subject === subjectFilter); }).map((book) => <article key={book.id} className="glass flex flex-col rounded-xl p-4"><div className="flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><FileText className="h-5 w-5" /></div><div><h3 className="font-semibold leading-tight">{book.book_title}</h3><p className="mt-1 text-sm text-muted-foreground">{book.subject} · Grade {book.grade_level}</p><Badge variant="outline" className="mt-2 w-fit">{book.source_status === 'verified_official' ? 'Official source verified' : book.source_status === 'needs_review' ? 'Needs review' : 'External reference · not verified'}</Badge></div></div><p className="mt-4 flex-1 text-sm leading-6 text-muted-foreground">{book.notes}</p><p className="text-xs text-muted-foreground">{book.source_name}</p><Button asChild variant="outline" className="mt-4 w-full gap-2"><a href={book.source_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" />Open textbook index</a></Button>{book.official_portal_url && <a href={book.official_portal_url} target="_blank" rel="noopener noreferrer" className="mt-2 text-center text-sm font-medium text-primary underline-offset-4 hover:underline">Open official Ministry digital library</a>}</article>)}</div></section>}
 
             {(activeSection === 'highlights' || activeSection === 'notes') && <section className="glass rounded-2xl p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your study memory</p><h2 className="mt-1 text-2xl font-bold">{activeSection === 'highlights' ? 'Highlights' : 'Saved notes'}</h2><p className="mt-1 text-sm text-muted-foreground">Small pieces of reading you chose to keep close.</p><div className="mt-6 space-y-3">{highlights.filter((item) => activeSection === 'highlights' || Boolean(item.note)).length === 0 ? <div className="rounded-xl border border-dashed p-10 text-center"><Highlighter className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-medium">Nothing saved here yet</p><p className="mt-1 text-sm text-muted-foreground">Open a book, select an excerpt, and save it while you read.</p></div> : highlights.filter((item) => activeSection === 'highlights' || Boolean(item.note)).map((item) => <article key={item.id} className="glass rounded-xl p-4"><div className="flex items-center justify-between gap-3"><Badge variant="secondary" className="capitalize rounded-full">{item.highlight_color} highlight</Badge><span className="text-xs text-muted-foreground">Page {item.page_number}</span></div><p className="mt-3 text-sm leading-6">“{item.selected_text}”</p>{item.note && <p className="mt-3 border-l-2 border-primary/40 pl-3 text-sm leading-6 text-muted-foreground">{item.note}</p>}</article>)}</div></section>}
           </main>
         </div>
       </div>
 
-      <Dialog open={readerOpen} onOpenChange={setReaderOpen}>
+      <Dialog open={readerOpen} onOpenChange={(open) => { setReaderOpen(open); if (!open) void saveReaderSessionProgress(); }}>
         <DialogContent className="glass-panel fixed inset-0 left-0 top-0 h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none p-0">
           <div className={`grid h-full min-h-0 grid-cols-1 ${selectedBook?.book_category === 'academic' && aiPanelOpen ? 'grid-rows-[minmax(0,1fr)_minmax(0,35dvh)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_360px]' : ''}`}>
             <section className="flex min-h-0 flex-col bg-[#eef1f4]">
@@ -691,7 +864,7 @@ const LibraryPage: React.FC = () => {
               <div className="min-h-0 flex-1 p-2 sm:p-4"><div className="relative h-full">{readerLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border bg-background/90"><div className="text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" /><p className="mt-3 text-sm text-muted-foreground">Opening your book…</p></div></div>}{readerError ? <div className="flex h-full items-center justify-center rounded-xl border bg-background"><div className="text-center"><p className="text-sm text-destructive">{readerError}</p><Button className="mt-3" size="sm" onClick={() => { setReaderRetry((value) => value + 1); setReaderLoading(true); setReaderError(null); }}>Try again</Button></div></div> : readerUrl && selectedBook && <iframe key={`${selectedBook.id}-${readerRetry}`} title={`Reading ${selectedBook.title}`} src={readerUrl} className="h-full w-full rounded-xl bg-white" onLoad={() => setReaderLoading(false)} onError={() => { setReaderLoading(false); setReaderError('The reader could not load this PDF.'); }} />}</div></div>
               {selectedBook?.book_category === 'academic' && <div className="grid gap-2 glass-panel border-t border-border p-3 sm:grid-cols-2"><div className="sm:col-span-2"><Label htmlFor="reader-selection" className="sr-only">Selected text</Label><Input id="reader-selection" placeholder="Paste selected text to highlight or study" value={selectedText} onChange={(e) => setSelectedText(e.target.value)} /></div><div className="flex flex-wrap gap-2"><Button size="sm" variant={highlightColor === 'yellow' ? 'default' : 'outline'} onClick={() => setHighlightColor('yellow')}><Highlighter className="mr-1 h-4 w-4" />Yellow</Button><Button size="sm" variant={highlightColor === 'blue' ? 'default' : 'outline'} onClick={() => setHighlightColor('blue')}>Blue</Button><Button size="sm" variant={highlightColor === 'red' ? 'default' : 'outline'} onClick={() => setHighlightColor('red')}>Red</Button></div><div className="flex gap-2"><Label htmlFor="reader-note" className="sr-only">Note</Label><Input id="reader-note" placeholder="Add a note" value={noteText} onChange={(e) => setNoteText(e.target.value)} /><Button size="sm" onClick={saveHighlight}>Save</Button></div></div>}
             </section>
-            {selectedBook?.book_category === 'academic' && aiPanelOpen && <aside className="min-h-0 overflow-y-auto border-l border-border bg-background p-4 sm:p-5"><div className="mb-4"><p className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-primary" />Study tools</p><p className="mt-1 text-sm leading-5 text-muted-foreground">Use a short excerpt when you want help. The reader stays the source of truth.</p></div><div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('summary')}>{aiBusy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Summarize</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('simple')}>Explain simply</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('questions')}>Practice questions</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('flashcards')}>Flashcards</Button><Button size="sm" variant="outline" disabled={aiBusy} className="col-span-2" onClick={() => runAi('concepts')}>Key concepts</Button></div><Card className="mt-4"><CardHeader><CardTitle className="text-sm">AI response</CardTitle></CardHeader><CardContent><pre className="whitespace-pre-wrap font-sans text-xs leading-5">{aiOutput || 'Choose a study tool after adding page text or a selection.'}</pre></CardContent></Card>{flashcards.length > 0 && <Card className="mt-3"><CardHeader><CardTitle className="text-sm">Generated flashcards</CardTitle></CardHeader><CardContent className="space-y-2">{flashcards.map((card, index) => <div key={index} className="rounded-lg border p-3"><p className="text-xs font-semibold">{card.front}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{card.back}</p></div>)}</CardContent></Card>}<Card className="mt-3"><CardHeader><CardTitle className="text-sm">Saved practice questions</CardTitle></CardHeader><CardContent className="space-y-2">{savedQuestions.filter((question) => question.book_id === selectedBook.id).length === 0 ? <p className="text-xs text-muted-foreground">Questions you save from this reader will appear here.</p> : savedQuestions.filter((question) => question.book_id === selectedBook.id).slice(0, 10).map((question) => <div key={question.id || question.question} className="rounded-lg border p-3"><p className="text-xs font-semibold">Q: {question.question}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">A: {question.answer}</p></div>)}</CardContent></Card></aside>}
+            {selectedBook?.book_category === 'academic' && aiPanelOpen && <aside className="min-h-0 overflow-y-auto border-l border-border bg-background p-4 sm:p-5"><div className="mb-4"><p className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-primary" />Study tools</p><p className="mt-1 text-sm leading-5 text-muted-foreground">Use a short excerpt when you want help. The reader stays the source of truth.</p></div><Button size="sm" variant="outline" className="mb-3 w-full gap-2" disabled={extractingBookText} onClick={() => void handleExtractBookText()}>{extractingBookText ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}Extract text from this PDF</Button><Textarea rows={6} value={readerPageText} onChange={(event) => setReaderPageText(event.target.value)} placeholder="Extracted PDF text appears here. You can edit it or paste a passage before using AI tools." className="mb-3 text-xs leading-5" /><div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" disabled={aiBusy || (!readerPageText.trim() && !selectedText.trim())} onClick={() => runAi('summary')}>{aiBusy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Summarize</Button><Button size="sm" variant="outline" disabled={aiBusy || (!readerPageText.trim() && !selectedText.trim())} onClick={() => runAi('simple')}>Explain simply</Button><Button size="sm" variant="outline" disabled={aiBusy || (!readerPageText.trim() && !selectedText.trim())} onClick={() => runAi('questions')}>Practice questions</Button><Button size="sm" variant="outline" disabled={aiBusy || (!readerPageText.trim() && !selectedText.trim())} onClick={() => runAi('flashcards')}>Flashcards</Button><Button size="sm" variant="outline" disabled={aiBusy || (!readerPageText.trim() && !selectedText.trim())} className="col-span-2" onClick={() => runAi('concepts')}>Key concepts</Button></div><Card className="mt-4"><CardHeader><CardTitle className="text-sm">AI response</CardTitle></CardHeader><CardContent><pre className="whitespace-pre-wrap font-sans text-xs leading-5">{aiOutput || 'Choose a study tool after adding page text or a selection.'}</pre></CardContent></Card>{flashcards.length > 0 && <Card className="mt-3"><CardHeader><CardTitle className="text-sm">Generated flashcards</CardTitle></CardHeader><CardContent className="space-y-2">{flashcards.map((card, index) => <div key={index} className="rounded-lg border p-3"><p className="text-xs font-semibold">{card.front}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{card.back}</p></div>)}<Button size="sm" className="w-full" disabled={savingFlashcards || flashcardsSaved} onClick={() => void handleSaveFlashcards()}>{savingFlashcards ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{flashcardsSaved ? "Saved to Flashcards" : "Save to my Flashcards"}</Button></CardContent></Card>}<Card className="mt-3"><CardHeader><CardTitle className="text-sm">Saved practice questions</CardTitle></CardHeader><CardContent className="space-y-2">{savedQuestions.filter((question) => question.book_id === selectedBook.id).length === 0 ? <p className="text-xs text-muted-foreground">Questions you save from this reader will appear here.</p> : savedQuestions.filter((question) => question.book_id === selectedBook.id).slice(0, 10).map((question) => <div key={question.id || question.question} className="rounded-lg border p-3"><p className="text-xs font-semibold">Q: {question.question}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">A: {question.answer}</p></div>)}</CardContent></Card></aside>}
           </div>
         </DialogContent>
       </Dialog>

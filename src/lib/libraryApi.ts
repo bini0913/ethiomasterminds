@@ -150,16 +150,14 @@ async function cleanupUploadedAssets(pdfPath: string, thumbnailPath: string | nu
   ];
 
   const results = await Promise.allSettled(cleanupTasks);
-  results.forEach((result) => {
-    if (result.status === 'rejected') {
-      console.warn('Library upload cleanup failed:', result.reason);
-      return;
-    }
-
-    if (result.value.error) {
-      console.warn('Library upload cleanup failed:', result.value.error);
-    }
+  const failures = results.flatMap((result) => {
+    if (result.status === "rejected") return [result.reason];
+    return result.value.error ? [result.value.error] : [];
   });
+  if (failures.length) {
+    console.error("Library upload cleanup failed:", failures);
+    throw new Error("The uploaded file could not be fully removed during rollback. Please contact support before retrying.");
+  }
 }
 
 function getErrorCode(error: unknown): string | undefined {
@@ -230,14 +228,39 @@ async function generatePdfThumbnail(pdfFile: File): Promise<Blob | null> {
   }
 }
 
+async function rollbackCreatedBook(
+  bookId: string,
+  uploaderId: string,
+  pdfPath: string,
+  thumbnailPath: string | null,
+) {
+  const { error: uploadRecordError } = await db
+    .from("book_uploads")
+    .delete()
+    .eq("book_id", bookId)
+    .eq("uploader_id", uploaderId);
+  if (uploadRecordError) throw uploadRecordError;
+
+  const { error: bookRecordError } = await db
+    .from("library_books")
+    .delete()
+    .eq("id", bookId);
+  if (bookRecordError) throw bookRecordError;
+
+  await cleanupUploadedAssets(pdfPath, thumbnailPath);
+}
+
 export async function createBook(payload: CreateBookPayload) {
   payload.onProgress?.('validating');
   if (!payload.pdfFile) {
     throw new Error('No file selected.');
   }
 
-  if (payload.pdfFile.type !== 'application/pdf') {
-    throw new Error('Only PDF files are supported.');
+  const hasPdfMime = payload.pdfFile.type === "application/pdf";
+  const hasPdfExtension = /\.pdf$/i.test(payload.pdfFile.name);
+  const pdfHeader = await payload.pdfFile.slice(0, 1024).text();
+  if ((!hasPdfMime && !hasPdfExtension) || !pdfHeader.includes("%PDF-")) {
+    throw new Error("Choose a valid PDF file. The file content must contain a PDF header.");
   }
 
   const maxPdfSizeBytes = 50 * 1024 * 1024;
@@ -245,9 +268,8 @@ export async function createBook(payload: CreateBookPayload) {
     throw new Error('File too large. Please upload a PDF smaller than 50MB.');
   }
 
-  const ext = payload.pdfFile.name.split('.').pop()?.toLowerCase() || 'pdf';
   const baseName = `${Date.now()}-${crypto.randomUUID()}`;
-  const pdfPath = `${payload.uploaderId}/${baseName}.${ext}`;
+  const pdfPath = `${payload.uploaderId}/${baseName}.pdf`;
 
   payload.onProgress?.('uploading');
   const { error: uploadError } = await supabase.storage
@@ -303,41 +325,57 @@ export async function createBook(payload: CreateBookPayload) {
     .single();
 
   if (error) {
-    await cleanupUploadedAssets(pdfPath, thumbnailPath);
+    try {
+      await cleanupUploadedAssets(pdfPath, thumbnailPath);
+    } catch (cleanupError) {
+      console.error("Library file cleanup failed after book record creation failed:", cleanupError);
+      throw new Error("The book record could not be saved and the uploaded file could not be fully cleaned up. Please contact support.");
+    }
     throw error;
   }
 
   const createdBook = await withUploaderProfile(data as LibraryBook);
 
   try {
-    const { error: insertUploadError } = await db.from('book_uploads').insert({
+    const { error: insertUploadError } = await db.from("book_uploads").insert({
       book_id: createdBook.id,
       uploader_id: payload.uploaderId,
       status,
-      moderated_at: status === 'approved' ? new Date().toISOString() : null,
-      moderation_note: status === 'approved' ? 'Auto-approved by role policy' : 'Awaiting teacher/admin moderation',
+      moderated_at: status === "approved" ? new Date().toISOString() : null,
+      moderation_note: status === "approved" ? "Auto-approved by role policy" : "Awaiting teacher/admin moderation",
     });
 
     if (insertUploadError) {
       const code = getErrorCode(insertUploadError);
-
-      if (code === '23505') {
+      if (code === "23505") {
         const { error: updateUploadError } = await db
-          .from('book_uploads')
+          .from("book_uploads")
           .update({
             status,
-            moderated_at: status === 'approved' ? new Date().toISOString() : null,
-            moderation_note: status === 'approved' ? 'Auto-approved by role policy' : 'Awaiting teacher/admin moderation',
+            moderated_at: status === "approved" ? new Date().toISOString() : null,
+            moderation_note: status === "approved" ? "Auto-approved by role policy" : "Awaiting teacher/admin moderation",
           })
-          .eq('book_id', createdBook.id);
+          .eq("book_id", createdBook.id);
         if (updateUploadError) throw updateUploadError;
       } else {
-        // Do not block successful book upload if audit table isn't ready yet.
-        console.warn('book_uploads sync skipped:', insertUploadError);
+        throw insertUploadError;
       }
     }
   } catch (uploadAuditError) {
-    console.warn('book_uploads sync failed:', uploadAuditError);
+    let rollbackError: unknown = null;
+    try {
+      await rollbackCreatedBook(createdBook.id, payload.uploaderId, pdfPath, thumbnailPath);
+    } catch (error) {
+      rollbackError = error;
+      console.error("Library upload rollback failed; preserving the book file for recovery.", error);
+    }
+    throw new Error(
+      rollbackError
+        ? "The upload could not be finalized or safely rolled back. Please contact support before retrying."
+        : uploadAuditError instanceof Error
+          ? `The upload audit record could not be saved: ${uploadAuditError.message}`
+          : "The upload audit record could not be saved.",
+    );
   }
 
   if (payload.schoolSubmission) {
@@ -346,14 +384,32 @@ export async function createBook(payload: CreateBookPayload) {
       p_section_id: payload.schoolSubmission.sectionId,
     });
     if (schoolSubmitError) {
-      throw new Error(`File uploaded but could not be submitted to the school review queue: ${schoolSubmitError.message}`);
+      let rollbackError: unknown = null;
+      try {
+        await rollbackCreatedBook(createdBook.id, payload.uploaderId, pdfPath, thumbnailPath);
+      } catch (error) {
+        rollbackError = error;
+        console.error("School submission rollback failed; preserving the book file for recovery.", error);
+      }
+      throw new Error(
+        rollbackError
+          ? "School submission failed and the upload could not be safely rolled back. Please contact support."
+          : `File upload was rolled back because school submission failed: ${schoolSubmitError.message}`,
+      );
     }
     const { data: schoolBook, error: schoolBookError } = await db
       .from('library_books')
       .select('*')
       .eq('id', createdBook.id)
       .single();
-    if (schoolBookError) throw schoolBookError;
+    if (schoolBookError) {
+      try {
+        await rollbackCreatedBook(createdBook.id, payload.uploaderId, pdfPath, thumbnailPath);
+      } catch (rollbackError) {
+        console.error("School book readback rollback failed; preserving the book file for recovery.", rollbackError);
+      }
+      throw schoolBookError;
+    }
     payload.onProgress?.('done');
     return await withUploaderProfile(schoolBook as LibraryBook);
   }
@@ -538,6 +594,213 @@ export async function invokeLibraryAI(payload: {
   return data.response as string;
 }
 
+export async function downloadBookPdf(path: string, fileName: string): Promise<void> {
+  if (!path) throw new Error("This book does not have a downloadable PDF.");
+
+  let file: Blob;
+  if (/^https?:\/\//i.test(path)) {
+    let response: Response;
+    try {
+      response = await fetch(path);
+    } catch {
+      throw new Error("This PDF is hosted externally and does not allow direct downloads from Master Minds. Open it in the reader and use the source provider's download control.");
+    }
+    if (!response.ok) {
+      throw new Error("The external PDF source did not provide a downloadable file. Open the source provider's page instead.");
+    }
+    file = await response.blob();
+  } else {
+    const normalizedPath = path.replace(/^\/+/, "");
+    const { data, error } = await supabase.storage.from("library-files").download(normalizedPath);
+    if (error) throw new Error(error.message || "Could not download this PDF.");
+    if (!data) throw new Error("The storage service returned an empty file.");
+    file = data;
+  }
+
+  if (!file.size) throw new Error("The downloaded PDF is empty.");
+  const header = await file.slice(0, 1024).text();
+  if (!header.includes("%PDF-")) throw new Error("The stored file is not a readable PDF.");
+
+  const safeBaseName = fileName
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\.pdf$/i, "")
+    .slice(0, 120) || "master-minds-book";
+  const objectUrl = URL.createObjectURL(file);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = `${safeBaseName}.pdf`;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
+
+async function loadPdfJs() {
+  const sources = [
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs",
+    "https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.min.mjs",
+  ];
+  let pdfjs: any = null;
+  let workerSource = "";
+  for (const source of sources) {
+    try {
+      pdfjs = await import(/* @vite-ignore */ source);
+      workerSource = source.replace("pdf.min.mjs", "pdf.worker.min.mjs");
+      break;
+    } catch (error) {
+      console.warn("PDF.js source unavailable; trying fallback:", error);
+    }
+  }
+  if (!pdfjs) throw new Error("PDF reading tools could not load. Check your connection and retry.");
+  pdfjs.GlobalWorkerOptions.workerSrc = workerSource;
+  return pdfjs;
+}
+
+export async function extractBookText(
+  path: string,
+  options?: { maxPages?: number; maxChars?: number },
+): Promise<{ text: string; pageCount: number; pagesRead: number; truncated: boolean }> {
+  if (!path) throw new Error("This book does not have a readable PDF file.");
+  let file: Blob;
+  if (/^https?:\/\//i.test(path)) {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Could not retrieve the PDF (${response.status}).`);
+    file = await response.blob();
+  } else {
+    const { data, error } = await supabase.storage.from("library-files").download(path.replace(/^\/+/, ""));
+    if (error) throw new Error(error.message || "Could not retrieve the PDF.");
+    if (!data) throw new Error("The PDF file is empty.");
+    file = data;
+  }
+  if (!file.size) throw new Error("The PDF file is empty.");
+  const header = await file.slice(0, 1024).text();
+  if (!header.includes("%PDF-")) throw new Error("The stored file is not a valid PDF.");
+
+  const pdfjs = await loadPdfJs();
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pageCount = Number(pdf.numPages) || 0;
+  const maxPages = Math.max(1, Math.min(120, Math.floor(options?.maxPages ?? 20)));
+  const maxChars = Math.max(500, Math.min(20_000, Math.floor(options?.maxChars ?? 12_000)));
+  const pagesToRead = Math.min(pageCount, maxPages);
+  const chunks: string[] = [];
+  let length = 0;
+  let pagesRead = 0;
+  try {
+    for (let pageNo = 1; pageNo <= pagesToRead && length < maxChars; pageNo += 1) {
+      const page = await pdf.getPage(pageNo);
+      const content = await page.getTextContent();
+      const pageText = (content.items || [])
+        .map((item: any) => String(item.str || "").trim())
+        .filter(Boolean)
+        .join(" ");
+      if (pageText) {
+        chunks.push(`Page ${pageNo}: ${pageText}`);
+        length += pageText.length;
+      }
+      pagesRead = pageNo;
+    }
+  } finally {
+    if (typeof pdf.destroy === "function") await pdf.destroy();
+  }
+  const text = chunks.join("\n\n").slice(0, maxChars).trim();
+  if (!text) throw new Error("No selectable text was found. This PDF may be scanned; OCR is needed before AI study tools can read it.");
+  return { text, pageCount, pagesRead, truncated: pageCount > pagesRead || length > maxChars };
+}
+
+export async function analyzeBookPdf(
+  path: string,
+  unitsPerBook = 12,
+): Promise<{ units: string[]; pageCount: number; method: "headings" | "page-ranges" | "estimated"; message?: string }> {
+  if (!path) throw new Error("This book does not have a readable PDF file.");
+  let file: Blob;
+  if (/^https?:\/\//i.test(path)) {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Could not retrieve the PDF (${response.status}).`);
+    file = await response.blob();
+  } else {
+    const { data, error } = await supabase.storage.from("library-files").download(path.replace(/^\/+/, ""));
+    if (error) throw new Error(error.message || "Could not retrieve the PDF.");
+    if (!data) throw new Error("The PDF file is empty.");
+    file = data;
+  }
+  if (!file.size) throw new Error("The PDF file is empty.");
+  const header = await file.slice(0, 1024).text();
+  if (!header.includes("%PDF-")) throw new Error("The stored file is not a valid PDF.");
+
+  const pdfjs = await loadPdfJs();
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pageCount = Number(pdf.numPages) || 0;
+  const headings: string[] = [];
+  try {
+    const pagesToInspect = Math.min(pageCount, 120);
+    for (let pageNo = 1; pageNo <= pagesToInspect; pageNo += 1) {
+      const page = await pdf.getPage(pageNo);
+      const textContent = await page.getTextContent();
+      const lines = (textContent.items || []).map((item: any) => String(item.str || "").trim()).filter(Boolean);
+      for (const line of lines) {
+        const normalized = line.replace(/\s+/g, " ").trim();
+        if (normalized.length < 4 || normalized.length > 110) continue;
+        const looksLikeHeading = /^(chapter|unit|lesson|module|topic|section)\s+([0-9ivxlcdm]+|[a-z])([. :\s-]|$)/i.test(normalized) ||
+          /^\d+(?:\.\d+){0,2}[.)]?\s+[A-Z][^.!?]{3,90}$/.test(normalized);
+        const isFragment = /^(section|chapter|unit|lesson|module)\s+\d+(?:\.\d+)*$/i.test(normalized) ||
+          /^\d+(?:\.\d+){1,3}[.)]?$/i.test(normalized) ||
+          /^(contents|table of contents|learning objectives|review questions|references|bibliography|answer key)$/i.test(normalized);
+        if (looksLikeHeading && !isFragment && !headings.some((existing) => existing.toLowerCase() === normalized.toLowerCase())) {
+          headings.push(normalized);
+        }
+      }
+    }
+  } finally {
+    if (typeof pdf.destroy === "function") await pdf.destroy();
+  }
+  if (headings.length >= 3) {
+    return { units: headings.slice(0, 200), pageCount, method: "headings" };
+  }
+  if (pageCount > 0) {
+    const safeUnits = Math.min(40, Math.max(1, Math.floor(unitsPerBook) || 12));
+    const chunkSize = Math.max(1, Math.ceil(pageCount / safeUnits));
+    const ranges: string[] = [];
+    for (let start = 1; start <= pageCount && ranges.length < 200; start += chunkSize) {
+      ranges.push(`Pages ${start}–${Math.min(pageCount, start + chunkSize - 1)}`);
+    }
+    return { units: ranges, pageCount, method: "page-ranges", message: "No reliable chapter headings were found in the PDF text layer; page ranges are used instead." };
+  }
+  return { units: [], pageCount: 0, method: "estimated", message: "This PDF has no readable pages." };
+}
+
+export async function saveBookFlashcards(payload: {
+  userId: string;
+  grade: number;
+  subject: string;
+  bookTitle: string;
+  cards: Array<{ front: string; back: string }>;
+}) {
+  const rows = payload.cards
+    .map((card) => ({
+      user_id: payload.userId,
+      created_by: payload.userId,
+      grade_level: Math.max(1, Math.min(12, Math.floor(payload.grade) || 9)),
+      subject: payload.subject.trim() || "General",
+      topic: payload.bookTitle.trim() || "Book study",
+      question: card.front.trim(),
+      answer: card.back.trim(),
+      difficulty: "medium",
+      is_public: false,
+    }))
+    .filter((card) => card.question && card.answer);
+
+  if (!rows.length) throw new Error("There are no complete flashcards to save.");
+  const { data, error } = await db
+    .from("flashcards")
+    .insert(rows)
+    .select("id,question,answer,subject,topic,difficulty,grade_level");
+  if (error) throw error;
+  return data || [];
+}
+
 export async function getPdfPublicUrl(path: string) {
   if (!path) return '';
 
@@ -588,6 +851,7 @@ export interface CurriculumTextbookCatalogEntry {
   resource_type: 'student_textbook' | 'teacher_guide' | 'supplementary';
   source_name: string;
   source_url: string;
+  official_portal_url: string | null;
   source_status: 'verified_official' | 'external_reference' | 'needs_review';
   notes: string;
 }
@@ -595,7 +859,7 @@ export interface CurriculumTextbookCatalogEntry {
 export async function listCurriculumTextbookCatalog(options?: { minGrade?: number; maxGrade?: number }) {
   let query = db
     .from('curriculum_textbook_catalog')
-    .select('id, grade_level, curriculum_year_ec, subject, book_title, resource_type, source_name, source_url, source_status, notes')
+    .select('id, grade_level, curriculum_year_ec, subject, book_title, resource_type, source_name, source_url, official_portal_url, source_status, notes')
     .order('grade_level', { ascending: true })
     .order('subject', { ascending: true });
   if (options?.minGrade != null) query = query.gte('grade_level', options.minGrade);
