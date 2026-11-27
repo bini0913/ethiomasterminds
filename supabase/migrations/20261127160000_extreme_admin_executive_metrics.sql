@@ -115,6 +115,7 @@ BEGIN
       ) staff_accounts
     ),
     'super_admins', (SELECT count(*) FROM public.user_roles WHERE role = 'super_admin'::public.app_role),
+    'extreme_admins', (SELECT count(*) FROM public.user_roles WHERE role = 'extreme_admin'::public.app_role),
     'audit_events_24h', (SELECT count(*) FROM public.admin_audit_logs WHERE created_at >= now() - interval '24 hours'),
     'school_fee_payments_confirmed', (SELECT count(*) FROM public.school_fee_payments WHERE status = 'confirmed'),
     'notification_devices_enabled', (SELECT count(*) FROM public.notification_devices WHERE enabled = true),
@@ -138,3 +139,65 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.extreme_admin_get_executive_metrics() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.extreme_admin_get_executive_metrics() TO authenticated;
+
+-- Extend the existing protected account directory search to include UUIDs.
+-- Keep the established result contract and server-side pagination unchanged.
+CREATE OR REPLACE FUNCTION public.extreme_admin_list_users(
+  p_search text DEFAULT NULL,
+  p_role public.app_role DEFAULT NULL,
+  p_limit integer DEFAULT 300,
+  p_offset integer DEFAULT 0
+)
+RETURNS TABLE(
+  id uuid,
+  name text,
+  username text,
+  grade text,
+  xp integer,
+  level integer,
+  role public.app_role,
+  account_status text,
+  coins integer,
+  created_at timestamptz
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT
+    profile.id,
+    profile.name,
+    profile.username,
+    profile.grade,
+    profile.xp,
+    profile.level,
+    COALESCE(public.get_user_role(profile.id), 'student'::public.app_role),
+    profile.account_status,
+    COALESCE(currency.coins, 0),
+    profile.created_at
+  FROM public.profiles profile
+  LEFT JOIN LATERAL (
+    SELECT user_currency.coins
+    FROM public.user_currency
+    WHERE user_currency.user_id = profile.id
+    LIMIT 1
+  ) currency ON true
+  WHERE public._is_extreme_admin()
+    AND (
+      nullif(trim(p_search), '') IS NULL
+      OR profile.name ILIKE '%' || trim(p_search) || '%'
+      OR profile.username ILIKE '%' || trim(p_search) || '%'
+      OR profile.id::text ILIKE '%' || trim(p_search) || '%'
+    )
+    AND (
+      p_role IS NULL
+      OR COALESCE(public.get_user_role(profile.id), 'student'::public.app_role) = p_role
+    )
+  ORDER BY profile.created_at DESC
+  LIMIT GREATEST(1, LEAST(p_limit, 500))
+  OFFSET GREATEST(0, p_offset);
+$function$;
+
+REVOKE ALL ON FUNCTION public.extreme_admin_list_users(text, public.app_role, integer, integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_list_users(text, public.app_role, integer, integer) TO authenticated;
