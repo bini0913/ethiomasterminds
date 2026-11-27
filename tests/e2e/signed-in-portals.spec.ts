@@ -92,8 +92,8 @@ for (const role of notificationRoles) {
   });
 }
 
-test('Extreme Admin executive workspace exposes the Part 1 control sections', async ({ page }) => {
-  test.setTimeout(45_000);
+test('Extreme Admin executive workspace exposes every Part 1 section on desktop and mobile', async ({ page }) => {
+  test.setTimeout(60_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
@@ -102,17 +102,24 @@ test('Extreme Admin executive workspace exposes the Part 1 control sections', as
   await expect(page.getByRole('heading', { name: 'Executive control center' })).toBeVisible({ timeout: 25_000 });
   await expect(page.getByText('All registered users')).toBeVisible({ timeout: 25_000 });
 
-  if ((page.viewportSize()?.width ?? 1280) < 1024) {
-    await page.getByRole('button', { name: 'Open administration navigation' }).click();
-  }
-  await page.getByRole('button', { name: /Accounts & access/ }).click();
-  await expect(page.getByRole('heading', { name: 'Accounts and access' })).toBeVisible();
-  await expect(page.getByText('Create and assign a school account')).toBeVisible();
+  const sections = [
+    { nav: /Accounts & access/, heading: 'Accounts and access', content: 'Create and assign a school account' },
+    { nav: /Super Admin/, heading: 'Single Super Admin' },
+    { nav: /School network/, heading: 'School network' },
+    { nav: /Money & growth/, heading: 'Money & growth' },
+    { nav: /Platform controls/, heading: 'Global controls & security', content: 'External service connectivity' },
+    { nav: /Privacy requests/, heading: 'Privacy & account requests' },
+    { nav: /Audit history/, heading: 'Audit history' },
+  ];
 
-  if ((page.viewportSize()?.width ?? 1280) < 1024) {
-    await page.getByRole('button', { name: 'Open administration navigation' }).click();
+  for (const section of sections) {
+    if ((page.viewportSize()?.width ?? 1280) < 1024) {
+      await page.getByRole('button', { name: 'Open administration navigation' }).click();
+    }
+    await page.getByRole('button', { name: section.nav }).click();
+    await expect(page.getByRole('heading', { name: section.heading })).toBeVisible();
+    if (section.content) await expect(page.getByText(section.content)).toBeVisible();
   }
-  await page.getByRole('button', { name: /Money & growth/ }).click();
-  await expect(page.getByRole('heading', { name: 'Money & growth' })).toBeVisible();
+
   expect(pageErrors, 'Unexpected browser errors in Extreme Admin executive workspace').toEqual([]);
 });
