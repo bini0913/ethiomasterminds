@@ -45,6 +45,7 @@ const Friends: React.FC = () => {
   const [addFriendSearch, setAddFriendSearch] = useState<string>("");
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [pendingSentRequests, setPendingSentRequests] = useState<Set<string>>(new Set());
   const [messageReactions, setMessageReactions] = useState<Record<string, string>>({});
   
@@ -85,12 +86,15 @@ const Friends: React.FC = () => {
 
     if (addFriendSearch.trim().length < 2) {
       setSearchResults([]);
+      setSearchError(null);
+      setSearching(false);
       return;
     }
 
     setSearching(true);
     searchTimeoutRef.current = setTimeout(async () => {
       try {
+        setSearchError(null);
         const results = await searchUsers(addFriendSearch);
         // Filter out existing friends
         const friendIds = new Set(friends.map(f => f.id));
@@ -98,6 +102,8 @@ const Friends: React.FC = () => {
         setSearchResults(filteredResults);
       } catch (err) {
         console.error('Search error:', err);
+        setSearchResults([]);
+        setSearchError('We could not search for students. Please try again.');
       } finally {
         setSearching(false);
       }
@@ -139,11 +145,11 @@ const Friends: React.FC = () => {
     req => req.status === "pending" && req.sender.id === user?.id
   );
   
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedFriend && messageInput.trim()) {
-      sendMessage(selectedFriend.id, messageInput);
-      setMessageInput("");
+      const sent = await sendMessage(selectedFriend.id, messageInput);
+      if (sent) setMessageInput("");
     }
   };
   
@@ -169,8 +175,8 @@ const Friends: React.FC = () => {
 
   const handleSendFriendRequest = async (targetUser: UserProfile) => {
     try {
-      await sendFriendRequest(targetUser.id);
-      setPendingSentRequests(prev => new Set([...prev, targetUser.id]));
+      const sent = await sendFriendRequest(targetUser.id);
+      if (sent) setPendingSentRequests(prev => new Set([...prev, targetUser.id]));
     } catch (err) {
       console.error('Error sending friend request:', err);
     }
@@ -357,6 +363,8 @@ const Friends: React.FC = () => {
                       <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                       <p className="text-sm text-muted-foreground mt-2">Searching...</p>
                     </div>
+                  ) : searchError ? (
+                    <div className="p-4 text-center text-sm text-destructive">{searchError}</div>
                   ) : searchResults.length > 0 ? (
                     searchResults.map((resultUser) => (
                       <motion.div

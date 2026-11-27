@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useUser } from '@/context/UserContext';
+import { useCommunityTerms } from '@/context/CommunityTermsContext';
 import { getUserTier } from '@/lib/getUserTier';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -72,11 +73,11 @@ const BANNED_PATTERNS = ['kill yourself', 'hate you'];
 
 const Chat: React.FC = () => {
   const { user, isLoading } = useUser();
+  const { runWithCommunityTerms } = useCommunityTerms();
   const upperStudent = getUserTier(user?.grade) === "upper";
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // State
@@ -322,15 +323,36 @@ const Chat: React.FC = () => {
       return;
     }
     setSending(true);
-    const { error } = await supabase.rpc('send_group_message', {
-      p_group_id: activeRoom.id,
-      p_content: text,
-      p_message_type: 'text',
-      p_reply_to_id: replyTo?.id || null,
-    });
-    if (error) { toast.error('Failed to send'); setSending(false); return; }
-    setDraft(''); setReplyTo(null); setSending(false);
-  }, [user?.id, activeRoom, draft, sending, replyTo]);
+    try {
+      await runWithCommunityTerms(async () => {
+        const { data: message, error } = await supabase.rpc('send_group_message', {
+          p_group_id: activeRoom.id,
+          p_content: text,
+          p_message_type: 'text',
+          p_reply_to_id: replyTo?.id || null,
+        });
+        if (error) throw error;
+        if (!message?.id) throw new Error('The message was not saved. Please try again.');
+
+        // Push is best-effort; the persisted group message remains available in the chat.
+        void supabase.functions.invoke('send-push-notification', {
+          body: { kind: 'group_message', event_id: message.id },
+        }).then(({ error: pushError }) => {
+          if (pushError) console.warn('Group message push could not be confirmed:', pushError.message);
+        }).catch((pushError) => {
+          console.warn('Group message push request failed:', pushError);
+        });
+
+        setDraft('');
+        setReplyTo(null);
+      }, 'direct_messages');
+    } catch (error) {
+      console.error('Error sending group message:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  }, [user?.id, activeRoom, draft, sending, replyTo, runWithCommunityTerms]);
 
   // Broadcast typing
   const handleDraftChange = (val: string) => {
@@ -346,16 +368,21 @@ const Chat: React.FC = () => {
   // Create group
   const createGroup = async () => {
     if (!user?.id || !newGroupName.trim()) return;
-    try {
-      const { error } = await supabase.rpc('create_chat_group', {
-        p_name: newGroupName.trim(),
-        p_group_type: newGroupType,
-      });
-      if (error) throw error;
-      toast.success('Chat created!');
-      setNewGroupName(''); setShowCreateDialog(false);
-      loadRooms();
-    } catch { toast.error('Failed to create chat'); }
+    await runWithCommunityTerms(async () => {
+      try {
+        const { error } = await supabase.rpc('create_chat_group', {
+          p_name: newGroupName.trim(),
+          p_group_type: newGroupType,
+        });
+        if (error) throw error;
+        toast.success('Chat created!');
+        setNewGroupName(''); setShowCreateDialog(false);
+        await loadRooms();
+      } catch (error) {
+        console.error('Failed to create chat:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to create chat');
+      }
+    }, 'social');
   };
 
   // Search groups
@@ -374,11 +401,16 @@ const Chat: React.FC = () => {
   // Join group
   const joinGroup = async (groupId: string) => {
     if (!user?.id) return;
-    const { error } = await supabase.rpc('join_chat_group', { p_group_id: groupId });
-    if (error) { toast.error('Failed to join'); return; }
-    toast.success('Joined!');
-    loadRooms();
-    setShowSearch(false);
+    await runWithCommunityTerms(async () => {
+      const { error } = await supabase.rpc('join_chat_group', { p_group_id: groupId });
+      if (error) {
+        toast.error(error.message || 'Failed to join chat');
+        return;
+      }
+      toast.success('Joined!');
+      await loadRooms();
+      setShowSearch(false);
+    }, 'social');
   };
 
   // Challenge from chat
@@ -785,21 +817,16 @@ const Chat: React.FC = () => {
                   </PopoverContent>
                 </Popover>
 
-                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileInputRef.current?.click()}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  aria-label="File attachments unavailable"
+                  title="File attachments are not available in group chat yet"
+                  onClick={() => toast.info("File attachments are not available in group chat yet. You can still send text messages.")}
+                >
                   <Paperclip className="h-4 w-4" />
                 </Button>
-                <input ref={fileInputRef} type="file" className="hidden" onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file || !activeRoom || !user?.id) return;
-                  await sendMessage();
-                  const msg = `📎 ${file.name}`;
-                  await supabase.rpc('send_group_message', {
-                    p_group_id: activeRoom.id,
-                    p_content: msg,
-                    p_message_type: 'text',
-                  });
-                  e.target.value = '';
-                }} />
 
                 <Textarea ref={inputRef}
                   value={draft}
