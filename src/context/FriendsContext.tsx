@@ -351,6 +351,17 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
 
     let results: UserProfile[] = [];
     try {
+      // Check guardian eligibility separately so a disabled feature is never
+      // presented as though the searched username does not exist.
+      const { data: featureEnabled, error: featureError } = await (supabase as any).rpc(
+        'is_current_user_feature_enabled',
+        { p_feature: 'friend_requests' }
+      );
+      if (featureError) throw featureError;
+      if (featureEnabled !== true) {
+        throw new Error('Friend search is disabled by Parent Controls. Ask your parent or guardian to enable Social and Friend Requests for this account.');
+      }
+
       const allowed = await runWithCommunityTerms(async () => {
         // Student discovery uses its own guardian-safe RPC. Keep the existing
         // staff-scoped lookup for teacher/admin workflows unchanged.
@@ -376,7 +387,8 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
           } as UserProfile));
       }, 'friend_requests');
 
-      return allowed ? results : [];
+      if (!allowed) return [];
+      return results;
     } catch (err) {
       console.error('Error searching users:', err);
       throw err;
