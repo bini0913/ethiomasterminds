@@ -671,6 +671,67 @@ export async function extractBookText(
   return { text, pageCount, pagesRead, truncated: pageCount > pagesRead || length > maxChars };
 }
 
+export async function analyzeBookPdf(
+  path: string,
+  unitsPerBook = 12,
+): Promise<{ units: string[]; pageCount: number; method: "headings" | "page-ranges" | "estimated"; message?: string }> {
+  if (!path) throw new Error("This book does not have a readable PDF file.");
+  let file: Blob;
+  if (/^https?:\/\//i.test(path)) {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Could not retrieve the PDF (${response.status}).`);
+    file = await response.blob();
+  } else {
+    const { data, error } = await supabase.storage.from("library-files").download(path.replace(/^\/+/, ""));
+    if (error) throw new Error(error.message || "Could not retrieve the PDF.");
+    if (!data) throw new Error("The PDF file is empty.");
+    file = data;
+  }
+  if (!file.size) throw new Error("The PDF file is empty.");
+  const header = await file.slice(0, 1024).text();
+  if (!header.includes("%PDF-")) throw new Error("The stored file is not a valid PDF.");
+
+  const pdfjs = await loadPdfJs();
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pageCount = Number(pdf.numPages) || 0;
+  const headings: string[] = [];
+  try {
+    const pagesToInspect = Math.min(pageCount, 120);
+    for (let pageNo = 1; pageNo <= pagesToInspect; pageNo += 1) {
+      const page = await pdf.getPage(pageNo);
+      const textContent = await page.getTextContent();
+      const lines = (textContent.items || []).map((item: any) => String(item.str || "").trim()).filter(Boolean);
+      for (const line of lines) {
+        const normalized = line.replace(/\\s+/g, " ").trim();
+        if (normalized.length < 4 || normalized.length > 110) continue;
+        const looksLikeHeading = /^(chapter|unit|lesson|module|topic|section)\\s+([0-9ivxlcdm]+|[a-z])([. :\\s-]|$)/i.test(normalized) ||
+          /^\\d+(?:\\.\\d+){0,2}[.)]?\\s+[A-Z][^.!?]{3,90}$/.test(normalized);
+        const isFragment = /^(section|chapter|unit|lesson|module)\\s+\\d+(?:\\.\\d+)*$/i.test(normalized) ||
+          /^\\d+(?:\\.\\d+){1,3}[.)]?$/i.test(normalized) ||
+          /^(contents|table of contents|learning objectives|review questions|references|bibliography|answer key)$/i.test(normalized);
+        if (looksLikeHeading && !isFragment && !headings.some((existing) => existing.toLowerCase() === normalized.toLowerCase())) {
+          headings.push(normalized);
+        }
+      }
+    }
+  } finally {
+    if (typeof pdf.destroy === "function") await pdf.destroy();
+  }
+  if (headings.length >= 3) {
+    return { units: headings.slice(0, 200), pageCount, method: "headings" };
+  }
+  if (pageCount > 0) {
+    const safeUnits = Math.min(40, Math.max(1, Math.floor(unitsPerBook) || 12));
+    const chunkSize = Math.max(1, Math.ceil(pageCount / safeUnits));
+    const ranges: string[] = [];
+    for (let start = 1; start <= pageCount && ranges.length < 200; start += chunkSize) {
+      ranges.push(`Pages ${start}–${Math.min(pageCount, start + chunkSize - 1)}`);
+    }
+    return { units: ranges, pageCount, method: "page-ranges", message: "No reliable chapter headings were found in the PDF text layer; page ranges are used instead." };
+  }
+  return { units: [], pageCount: 0, method: "estimated", message: "This PDF has no readable pages." };
+}
+
 export async function getPdfPublicUrl(path: string) {
   if (!path) return '';
 
