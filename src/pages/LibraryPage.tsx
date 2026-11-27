@@ -463,9 +463,11 @@ const LibraryPage: React.FC = () => {
       const extracted = await extractBookText(selectedBook.pdf_path, { maxPages: 30, maxChars: 12_000 });
       setReaderPageText(extracted.text);
       toast.success(
-        extracted.truncated
-          ? `Extracted text from ${extracted.pagesRead} of ${extracted.pageCount} pages. You can edit the excerpt below.`
-          : `Extracted readable text from ${extracted.pagesRead} pages.`,
+        extracted.ocrUsed
+          ? `OCR read ${extracted.pagesRead} scanned pages. Please review the extracted text for recognition errors.`
+          : extracted.truncated
+            ? `Extracted text from ${extracted.pagesRead} of ${extracted.pageCount} pages. You can edit the excerpt below.`
+            : `Extracted readable text from ${extracted.pagesRead} pages.`,
       );
     } catch (error) {
       console.error("Book text extraction failed:", error);
