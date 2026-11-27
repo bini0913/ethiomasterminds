@@ -534,7 +534,7 @@ const LibraryPage: React.FC = () => {
         return {
           user_id: user.id,
           book_id: selectedBook.id,
-          page_number: Number(limitedText.match(/^Page\\s+(\\d+):/m)?.[1] || 1),
+          page_number: Number(limitedText.match(/^Page\s+(\d+):/m)?.[1] || 1),
           question: lines[0]?.replace(/^Q\d+:\s*/, '') || `Question ${idx + 1}`,
           answer: lines[1]?.replace(/^A\d+:\s*/, '') || 'See excerpt',
           difficulty: (idx % 3 === 0 ? 'easy' : idx % 3 === 1 ? 'medium' : 'hard') as 'easy' | 'medium' | 'hard',
