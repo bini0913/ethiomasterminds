@@ -18,19 +18,7 @@ CREATE POLICY "support request authors read their own statuses"
   FOR SELECT TO authenticated
   USING (user_id = (SELECT auth.uid()));
 
-DO $
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
-     AND NOT EXISTS (
-       SELECT 1 FROM pg_publication_tables
-       WHERE pubname = 'supabase_realtime'
-         AND schemaname = 'public'
-         AND tablename = 'support_request_statuses'
-     ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.support_request_statuses;
-  END IF;
-END;
-$;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.support_request_statuses;
 
 INSERT INTO public.support_request_statuses(post_id, user_id, status, updated_at)
 SELECT post.id, post.author_id, 'open', post.updated_at
