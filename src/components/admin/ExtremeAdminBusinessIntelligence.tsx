@@ -17,6 +17,7 @@ type BIData = {
     paid_amount_by_currency: { currency: string; paid: number }[];
     transaction_records: number;
     ledger_statuses: { status: string; direction: string; records: number }[];
+    ledger_movements: { currency: string; status: string; direction: string; amount: number; records: number }[];
     receivables_by_currency: MoneyRow[];
   };
   school_finance: {
@@ -84,6 +85,7 @@ const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: 
     data.school_finance.outstanding_by_currency.forEach((r) => rows.push(["school receivables", "current", "outstanding invoice balance", r.currency, r.outstanding, "Positive invoice balance"]));
     data.platform_finance.account_balances.forEach((r) => rows.push(["platform finance", "current", "account balance", r.currency, r.balance, "Existing finance account balance; not revenue"]));
     data.platform_finance.paid_amount_by_currency.forEach((r) => rows.push(["platform finance", "all time", "recorded invoice payments", r.currency, r.paid, "Payment records with paid_at"]));
+    data.platform_finance.ledger_movements.forEach((r) => rows.push(["platform ledger", "all time", r.direction, r.currency, r.amount, `${r.status}; ${r.records} records`]));
     data.school_finance.by_school.forEach((s) => {
       s.collections_by_currency.forEach((r) => rows.push(["school collections", s.school_name, "confirmed collections", r.currency, r.amount, s.school_code]));
       s.outstanding_by_currency.forEach((r) => rows.push(["school receivables", s.school_name, "outstanding", r.currency, r.amount, s.school_code]));
@@ -131,6 +133,8 @@ const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: 
             {data.platform_finance.receivables_by_currency.length ? data.platform_finance.receivables_by_currency.map((r) => <div key={r.currency} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{r.currency}</span><strong>{money(r.outstanding, r.currency)}</strong></div>) : <p className="text-sm text-slate-500">No unpaid platform finance invoices.</p>}
             <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Recorded platform invoice payments</p>
             {data.platform_finance.paid_amount_by_currency.length ? data.platform_finance.paid_amount_by_currency.map((r) => <div key={r.currency} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{r.currency}</span><strong>{money(r.paid, r.currency)}</strong></div>) : <p className="text-sm text-slate-500">No platform invoice payments with a recorded paid timestamp.</p>}
+            <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Recorded ledger movements</p>
+            {data.platform_finance.ledger_movements.length ? data.platform_finance.ledger_movements.map((r) => <div key={r.currency + r.status + r.direction} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{r.direction} · {r.status} · {r.currency} <span className="text-xs text-slate-500">({number(r.records)})</span></span><strong>{money(r.amount, r.currency)}</strong></div>) : <p className="text-sm text-slate-500">No platform ledger movement records.</p>}
             <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Ledger records by status</p>
             {data.platform_finance.ledger_statuses.length ? data.platform_finance.ledger_statuses.map((r) => <div key={r.status + r.direction} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{r.status} · {r.direction}</span><strong>{number(r.records)}</strong></div>) : <p className="text-sm text-slate-500">No platform ledger transactions recorded.</p>}
             <p className="pt-2 text-xs text-slate-500">{number(data.platform_finance.invoice_count)} invoices · {number(data.platform_finance.payment_records)} payment records. No platform revenue is inferred from balances.</p>
