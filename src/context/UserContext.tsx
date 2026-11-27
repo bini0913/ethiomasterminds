@@ -75,6 +75,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [previousLevel, setPreviousLevel] = useState<number>(1);
   // Prevent an in-flight session read/auth callback from restoring a session after logout.
   const signingOutRef = useRef(false);
+  // Prevent delayed profile reads from an older account from winning a switch.
+  const authGenerationRef = useRef(0);
+  const authUserIdRef = useRef<string | null>(null);
 
   const calculateLevel = (xp: number) => {
     return Math.floor(xp / 100) + 1;
@@ -185,6 +188,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
+        const generation = ++authGenerationRef.current;
+        const callbackUserId = newSession?.user?.id ?? null;
+        authUserIdRef.current = callbackUserId;
         if (signingOutRef.current) {
           setSession(null);
           setUser(null);
@@ -196,11 +202,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         
         if (newSession?.user) {
           // Use setTimeout to prevent deadlock
-          const callbackUserId = newSession.user.id;
           setTimeout(() => {
-            if (signingOutRef.current) return;
+            if (signingOutRef.current || authGenerationRef.current !== generation || authUserIdRef.current !== callbackUserId) return;
             fetchUserProfile(callbackUserId, newSession.user).then(profile => {
-              if (signingOutRef.current) return;
+              if (signingOutRef.current || authGenerationRef.current !== generation || authUserIdRef.current !== callbackUserId) return;
               setUser(profile);
               setIsLoading(false);
             });
@@ -224,14 +229,22 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
+        const observedUserId = authUserIdRef.current;
+        const existingUserId = existingSession?.user?.id ?? null;
+        if (observedUserId !== null && observedUserId !== existingUserId) return;
+
         setSession(existingSession);
         if (existingSession?.user) {
-          fetchUserProfile(existingSession.user.id, existingSession.user).then(profile => {
-            if (signingOutRef.current) return;
+          const generation = ++authGenerationRef.current;
+          authUserIdRef.current = existingUserId;
+          fetchUserProfile(existingUserId, existingSession.user).then(profile => {
+            if (signingOutRef.current || authGenerationRef.current !== generation || authUserIdRef.current !== existingUserId) return;
             setUser(profile);
             setIsLoading(false);
           });
         } else {
+          ++authGenerationRef.current;
+          authUserIdRef.current = null;
           setIsLoading(false);
         }
       })

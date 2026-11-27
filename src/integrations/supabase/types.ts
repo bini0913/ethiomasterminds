@@ -1102,7 +1102,7 @@ export type Database = {
           id: string
           link_code: string
           linked_at: string | null
-          parent_id: string
+          parent_id: string | null
           status: string
           student_id: string
         }
@@ -1111,7 +1111,7 @@ export type Database = {
           id?: string
           link_code: string
           linked_at?: string | null
-          parent_id: string
+          parent_id?: string | null
           status?: string
           student_id: string
         }
@@ -1120,7 +1120,7 @@ export type Database = {
           id?: string
           link_code?: string
           linked_at?: string | null
-          parent_id?: string
+          parent_id?: string | null
           status?: string
           student_id?: string
         }
@@ -2766,6 +2766,7 @@ export type Database = {
         Returns: boolean
       }
       calculate_rank: { Args: { p_xp: number }; Returns: string }
+      claim_parent_link_code: { Args: { p_code: string }; Returns: Json }
       check_achievements: { Args: { p_user_id: string }; Returns: Json }
       complete_study_session: {
         Args: {
@@ -2776,6 +2777,7 @@ export type Database = {
         }
         Returns: Json
       }
+      create_parent_link_code: { Args: never; Returns: string }
       create_multiplayer_invite: {
         Args: {
           p_difficulty?: string

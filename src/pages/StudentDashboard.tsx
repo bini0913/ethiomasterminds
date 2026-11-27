@@ -31,7 +31,9 @@ import {
   CheckCircle,
   Gift,
   Bot,
-  GraduationCap
+  GraduationCap,
+  Copy,
+  UserCheck
 } from 'lucide-react';
 import AnimatedBackground from '@/components/ui/AnimatedBackground';
 import CurrencyDisplay from '@/components/currency/CurrencyDisplay';
@@ -82,6 +84,8 @@ const StudentDashboard: React.FC = () => {
   const [onlineFriends, setOnlineFriends] = useState<OnlineFriend[]>([]);
   const [loading, setLoading] = useState(true);
   const [assignedLearning, setAssignedLearning] = useState<any[]>([]);
+  const [parentLinkCode, setParentLinkCode] = useState<string | null>(null);
+  const [parentLinkLoading, setParentLinkLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -121,6 +125,18 @@ const StudentDashboard: React.FC = () => {
     const { data, error } = await query;
     if (error) { console.error("Could not load teacher assignments:", error); return; }
     setAssignedLearning((data ?? []) as any[]);
+  };
+
+  const generateParentLinkCode = async () => {
+    setParentLinkLoading(true);
+    const { data, error } = await db.rpc("create_parent_link_code");
+    setParentLinkLoading(false);
+    if (error) {
+      toast.error(error.message || "Could not create a parent link code.");
+      return;
+    }
+    setParentLinkCode(data as string);
+    toast.success("Parent link code ready to share.");
   };
 
   const fetchTodayStats = async () => {
@@ -387,6 +403,22 @@ const StudentDashboard: React.FC = () => {
                     <Button size="sm" onClick={() => navigate(item.quizzes?.subject ? `/quiz?subject=${encodeURIComponent(item.quizzes.subject)}` : "/quiz")}>Open Quiz Center</Button>
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Card className="border-violet-200/70 bg-white/90 shadow-sm dark:border-violet-900/50 dark:bg-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg"><UserCheck className="h-5 w-5 text-violet-600" /> Connect a parent or guardian</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="max-w-2xl text-sm text-muted-foreground">Generate a one-time code and share it with your parent or guardian so they can view your learning progress.</p>
+                <div className="flex shrink-0 items-center gap-2">
+                  {parentLinkCode && <code className="rounded-lg border bg-muted px-3 py-2 text-sm font-semibold tracking-wider">{parentLinkCode}</code>}
+                  {parentLinkCode && <Button variant="outline" size="icon" aria-label="Copy parent link code" onClick={() => { void navigator.clipboard?.writeText(parentLinkCode); toast.success("Code copied."); }}><Copy className="h-4 w-4" /></Button>}
+                  <Button onClick={generateParentLinkCode} disabled={parentLinkLoading}>{parentLinkLoading ? "Generating…" : parentLinkCode ? "Regenerate code" : "Generate code"}</Button>
+                </div>
               </CardContent>
             </Card>
           </motion.div>

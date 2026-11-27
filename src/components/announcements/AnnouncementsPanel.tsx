@@ -43,7 +43,7 @@ const AnnouncementsPanel: React.FC<AnnouncementsPanelProps> = ({
   useEffect(() => {
     if (user) {
       fetchAnnouncements();
-      setupRealtime();
+      return setupRealtime();
     }
   }, [user, userRole, classIds]);
 
