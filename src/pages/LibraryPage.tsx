@@ -445,6 +445,8 @@ const LibraryPage: React.FC = () => {
     setReaderUrl(url);
     setReaderLoading(true);
     setReaderError(null);
+    const savedProgress = readingProgress.find((entry) => entry.book_id === book.id);
+    setReaderProgress(savedProgress?.completion_percent ?? 0);
     setReaderOpen(true);
     readerSessionStartedAtRef.current = Date.now();
     setReaderPageText('');
@@ -689,6 +691,19 @@ const LibraryPage: React.FC = () => {
       toast.error("Your reading time could not sync. Please check your connection and retry.");
     }
   };
+
+  useEffect(() => {
+    if (!readerOpen) return;
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        void saveReaderSessionProgress();
+      } else if (readerSessionStartedAtRef.current === null) {
+        readerSessionStartedAtRef.current = Date.now();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [readerOpen, selectedBook?.id, readerProgress, readingProgress, user?.id]);
 
   const markReaderProgress = async (next: number) => {
     if (!selectedBook || !user) return;
