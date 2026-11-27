@@ -73,6 +73,29 @@ const StudyPlannerPage: React.FC = () => {
 
   useEffect(() => {
     if (!user?.id) return;
+    let refreshTimer: number | null = null;
+    const refresh = () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        void fetchPlans();
+        void loadBookAnalyses(user.id)
+          .then(setBookAnalysis)
+          .catch((error) => console.warn("Live textbook analysis refresh failed:", error));
+      }, 250);
+    };
+    const channel = supabase
+      .channel(`study-planner-live-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_plans", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "academic_book_analyses", filter: `user_id=eq.${user.id}` }, refresh)
+      .subscribe();
+    return () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id, fetchPlans]);
+
+  useEffect(() => {
+    if (!user?.id) return;
     let cancelled = false;
     (async () => {
       try {
