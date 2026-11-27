@@ -97,7 +97,7 @@ const GuardianConsentPage: React.FC = () => {
                 </div>
               </div>
               <div className="rounded-xl border p-4">
-                <p className="text-sm leading-6">Approval does not automatically turn on every social feature. You will choose separately whether this learner can use social posts, friend requests, direct messages, multiplayer invitations, Study Mode calls, and a public profile.</p>
+                <p className="text-sm leading-6">Lessons, quizzes, textbooks, study tools, and academic progress remain available without this approval. Approval creates your verified parent link and opens the community controls. From there, you can enable friend requests, messaging, multiplayer, and Study Mode calls together or manage each separately. Public profile visibility always remains a separate choice.</p>
                 <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-6">
                   <Checkbox checked={attested} onCheckedChange={(value) => setAttested(value === true)} />
                   <span>I confirm that I am this learner’s parent or legal guardian, I am at least 18 years old, and I approve the learner’s use of the Master Minds community features subject to the controls I choose.</span>
