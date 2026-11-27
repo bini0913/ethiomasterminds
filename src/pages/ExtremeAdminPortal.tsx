@@ -54,6 +54,7 @@ type DeletionRequest = {
 type CurrencyTotal = { currency: string; collected?: number; outstanding?: number };
 type ExecutiveMetrics = {
   registered_users?: number;
+  active_accounts?: number;
   registered_today?: number;
   registered_7d?: number;
   registered_30d?: number;
@@ -549,6 +550,7 @@ const ExtremeAdminPortal: React.FC = () => {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="All registered users" value={metrics.registered_users} detail={`+${formatNumber(metrics.registered_today)} today`} icon={Users} tone="blue" />
+              <MetricCard label="Active accounts" value={metrics.active_accounts} detail="Accounts currently marked active" icon={CheckCircle2} tone="green" />
               <MetricCard label="Daily active users" value={metrics.daily_active_users} detail="Unique accounts seen since Ethiopia day start" icon={Activity} tone="green" />
               <MetricCard label="Weekly active users" value={metrics.weekly_active_users} detail="Unique accounts seen in 7 days" icon={Activity} tone="blue" />
               <MetricCard label="Monthly active users" value={metrics.monthly_active_users} detail="Unique accounts seen in 30 days" icon={Activity} tone="navy" />
