@@ -64,9 +64,9 @@ BEGIN
         SELECT jsonb_agg(jsonb_build_object('currency', currency, 'outstanding', outstanding)
           ORDER BY currency)
         FROM (SELECT COALESCE(NULLIF(currency, ''), 'ETB') currency,
-          sum(GREATEST(total - amount_paid, 0))::numeric(14,2) outstanding
+          sum(GREATEST(total - COALESCE(amount_paid, 0), 0))::numeric(14,2) outstanding
           FROM public.finance_invoices
-          WHERE total > amount_paid
+          WHERE total > COALESCE(amount_paid, 0)
           GROUP BY COALESCE(NULLIF(currency, ''), 'ETB')) x
       ), '[]'::jsonb)
     ),
@@ -176,9 +176,9 @@ BEGIN
           GROUP BY activity_date) x
       ), '[]'::jsonb),
       'study_sessions_by_day', COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('day', day, 'sessions', sessions, 'minutes', minutes) ORDER BY day)
+        SELECT jsonb_agg(jsonb_build_object('day', day, 'sessions', sessions, 'duration_units', duration_units) ORDER BY day)
         FROM (SELECT (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date day,
-          count(*) sessions, sum(COALESCE(duration, 0))::bigint minutes
+          count(*) sessions, sum(COALESCE(duration, 0))::bigint duration_units
           FROM public.study_sessions
           WHERE created_at >= (v_start_date::timestamp AT TIME ZONE 'Africa/Addis_Ababa')
           GROUP BY (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date) x
