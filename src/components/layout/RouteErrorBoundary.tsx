@@ -41,7 +41,10 @@ class RouteErrorBoundaryInstance extends React.Component<BoundaryProps, Boundary
   }
 
   private retry = () => {
-    this.setState({ hasError: false, errorMessage: null });
+    // React.lazy caches a rejected import promise. Resetting only this boundary
+    // would immediately replay the same rejection; a full reload retries the
+    // current route against the latest deployed asset manifest.
+    window.location.reload();
   };
 
   render() {
