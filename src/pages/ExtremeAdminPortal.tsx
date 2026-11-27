@@ -167,10 +167,10 @@ const ExtremeAdminPortal: React.FC = () => {
 
   const currentSuperAdmin = superAdminUsers[0] || null;
 
-  const loadUsers = useCallback(async (reset = true) => {
+  const loadUsers = useCallback(async (reset = true, offsetOverride = 0) => {
     if (!isExtremeAdmin) return;
     setUsersLoading(true);
-    const offset = reset ? 0 : users.length;
+    const offset = reset ? 0 : offsetOverride;
     const { data, error } = await supabase.rpc("extreme_admin_list_users" as any, {
       p_search: userSearch.trim() || null,
       p_role: userRoleFilter === "all" ? null : userRoleFilter,
@@ -185,7 +185,7 @@ const ExtremeAdminPortal: React.FC = () => {
     const rows = (data as PortalUser[]) || [];
     setUsers((current) => reset ? rows : [...current, ...rows]);
     setHasMoreUsers(rows.length === PAGE_SIZE);
-  }, [isExtremeAdmin, userSearch, userRoleFilter, users.length]);
+  }, [isExtremeAdmin, userSearch, userRoleFilter]);
 
   const refreshAll = useCallback(async () => {
     if (!isExtremeAdmin) return;
@@ -519,7 +519,7 @@ const ExtremeAdminPortal: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-slate-500">{formatNumber(users.length)} accounts loaded in this result set.</p>{hasMoreUsers && <Button variant="outline" onClick={() => void loadUsers(false)} disabled={usersLoading}>{usersLoading ? "Loading…" : "Load more accounts"}</Button>}</div>
+              <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-slate-500">{formatNumber(users.length)} accounts loaded in this result set.</p>{hasMoreUsers && <Button variant="outline" onClick={() => void loadUsers(false, users.length)} disabled={usersLoading}>{usersLoading ? "Loading…" : "Load more accounts"}</Button>}</div>
             </CardContent>
           </Card>
 
