@@ -46,3 +46,18 @@ using (
   bucket_id = 'library-thumbnails'
   and (storage.foldername(name))[1] = (select auth.jwt()->>'sub')
 );
+
+-- Prevent ordinary uploaders from registering another user's storage path on a
+-- library_books row. The storage read policy also verifies this folder binding.
+drop policy if exists "authenticated can upload books" on public.library_books;
+create policy "authenticated can upload books"
+on public.library_books for insert
+to authenticated
+with check (
+  uploader_id = (select auth.uid())
+  and split_part(pdf_path, '/', 1) = (select auth.uid())::text
+  and (
+    thumbnail_path is null
+    or split_part(thumbnail_path, '/', 1) = (select auth.uid())::text
+  )
+);
