@@ -962,6 +962,31 @@ const Lobby: React.FC = () => {
         });
         if (inviteError) throw inviteError;
 
+        // The invite RPC owns the invitation row. Resolve its ID and let the
+        // authenticated Edge Function create the recipient's inbox event and
+        // attempt FCM delivery; never make room creation depend on push latency.
+        const { data: inviteRecord, error: inviteLookupError } = await db
+          .from("multiplayer_invites")
+          .select("id")
+          .eq("sender_id", user.id)
+          .eq("receiver_id", playerId)
+          .eq("room_id", room.id)
+          .eq("status", "pending")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (inviteLookupError || !inviteRecord?.id) {
+          console.warn("Multiplayer invite was created, but its notification source could not be resolved:", inviteLookupError);
+        } else {
+          void supabase.functions.invoke("send-push-notification", {
+            body: { kind: "multiplayer_invite", event_id: inviteRecord.id },
+          }).then(({ error: pushError }) => {
+            if (pushError) console.warn("Multiplayer invite push could not be confirmed:", pushError.message);
+          }).catch((pushError) => {
+            console.warn("Multiplayer invite push request failed:", pushError);
+          });
+        }
+
         toast.success(`Invite sent to ${playerName}`);
         pushActivity(`${playerName} was invited to a multiplayer challenge`);
         navigate(`/multiplayer?room=${room.id}`);
