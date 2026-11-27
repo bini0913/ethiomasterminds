@@ -48,16 +48,17 @@ BEGIN
             upper(COALESCE(NULLIF(trim(i.currency), ''), 'ETB')) AS currency,
             count(*)::integer AS invoice_count,
             COALESCE(sum(i.amount), 0) AS invoiced_amount,
-            COALESCE((
-              SELECT sum(p.amount)
-              FROM public.school_fee_payments p
-              WHERE p.invoice_id = i.id
-                AND p.school_id = i.school_id
-                AND p.status = 'confirmed'
-            ), 0) AS paid_amount,
+            COALESCE(sum(payment_totals.paid_amount), 0) AS paid_amount,
             COALESCE(sum(i.balance), 0) AS outstanding_balance
           FROM public.school_student_invoices i
           JOIN public.schools s ON s.id = i.school_id
+          LEFT JOIN LATERAL (
+            SELECT COALESCE(sum(p.amount), 0) AS paid_amount
+            FROM public.school_fee_payments p
+            WHERE p.invoice_id = i.id
+              AND p.school_id = i.school_id
+              AND p.status = 'confirmed'
+          ) AS payment_totals ON true
           WHERE s.network_id = public.school_network_id()
           GROUP BY upper(COALESCE(NULLIF(trim(i.currency), ''), 'ETB'))
         ) AS totals
