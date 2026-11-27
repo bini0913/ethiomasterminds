@@ -185,6 +185,9 @@ const ExtremeAdminPortal: React.FC = () => {
   const [provisioningResult, setProvisioningResult] = useState<any>(null);
 
   const [privacyNote, setPrivacyNote] = useState("");
+  const [externalDeletionEmail, setExternalDeletionEmail] = useState("");
+  const [externalDeletionUsername, setExternalDeletionUsername] = useState("");
+  const [externalDeletionNote, setExternalDeletionNote] = useState("");
   const [privacyPreflight, setPrivacyPreflight] = useState<Record<string, any>>({});
   const [privacyLoadingId, setPrivacyLoadingId] = useState<string | null>(null);
 
@@ -435,6 +438,22 @@ const ExtremeAdminPortal: React.FC = () => {
     if (error || data?.error) return toast.error(data?.error || error?.message || "Service health checks could not run");
     setServiceHealth(data);
     toast.success("Service connectivity checks completed");
+  };
+
+  const createExternalDeletionRequest = async () => {
+    if (!externalDeletionEmail.trim()) return toast.error("Enter the account email from the request");
+    if (!externalDeletionNote.trim()) return toast.error("Record how the external request was received and verified");
+    const { error } = await supabase.rpc("extreme_admin_create_external_deletion_request" as any, {
+      p_email: externalDeletionEmail.trim(),
+      p_username: externalDeletionUsername.trim() || null,
+      p_note: externalDeletionNote.trim(),
+    });
+    if (error) return toast.error(error.message || "External deletion request could not be recorded");
+    setExternalDeletionEmail("");
+    setExternalDeletionUsername("");
+    setExternalDeletionNote("");
+    toast.success("External deletion request recorded");
+    await refreshAll();
   };
 
   const runDeletionPreflight = async (request: DeletionRequest) => {
@@ -703,6 +722,7 @@ const ExtremeAdminPortal: React.FC = () => {
       {activeTab === "privacy" && (
         <div className="space-y-5">
           <SectionHeading eyebrow="Platform operations" title="Privacy & account requests" description="Review account deletion requests with an explicit preflight. The portal does not bypass the supported Auth deletion and retention workflow." />
+          <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Record an external deletion request</CardTitle><CardDescription>For requests received outside the app. Record the account email and verification context before adding it to the protected queue.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><div className="space-y-1"><Label>Account email</Label><Input type="email" value={externalDeletionEmail} onChange={(event) => setExternalDeletionEmail(event.target.value)} placeholder="Account email" /></div><div className="space-y-1"><Label>Username (optional)</Label><Input value={externalDeletionUsername} onChange={(event) => setExternalDeletionUsername(event.target.value)} placeholder="Account username" /></div><div className="space-y-1"><Label>Verification note</Label><Input value={externalDeletionNote} onChange={(event) => setExternalDeletionNote(event.target.value)} placeholder="How was the request verified?" /></div><div className="md:col-span-3"><Button onClick={() => void createExternalDeletionRequest()} disabled={!externalDeletionEmail.trim() || !externalDeletionNote.trim()}>Record request</Button></div></CardContent></Card>
           <div className="space-y-3">{deletionRequests.map((request) => <Card key={request.id} className="border-slate-200 bg-white shadow-sm"><CardContent className="space-y-3 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold text-slate-950">{request.requested_email}</p><p className="mt-1 text-xs text-slate-500">@{request.requested_username || "no-username"} · {request.source} · {new Date(request.requested_at).toLocaleString()}</p></div><span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">{request.status}</span></div>{request.requester_note && <p className="text-sm text-slate-600">{request.requester_note}</p>}<div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void runDeletionPreflight(request)} disabled={privacyLoadingId === request.id}>{privacyLoadingId === request.id ? "Checking…" : "Run read-only preflight"}</Button>{request.status !== "completed" && request.status !== "rejected" && <><Button size="sm" variant="outline" onClick={() => void updateDeletionRequest(request, "in_review")}>Mark in review</Button><Button size="sm" variant="destructive" onClick={() => void updateDeletionRequest(request, "rejected")}>Reject</Button>{!request.user_id && <Button size="sm" onClick={() => void updateDeletionRequest(request, "completed")}>Mark completed</Button>}</>}</div>{privacyPreflight[request.id] && <pre className="max-h-48 overflow-auto rounded-lg bg-slate-950 p-3 text-[11px] text-slate-100">{JSON.stringify(privacyPreflight[request.id], null, 2)}</pre>}</CardContent></Card>)}{!deletionRequests.length && <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">No account deletion requests are currently listed.</div>}</div>
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Review note</CardTitle><CardDescription>A documented reason is required before changing a request's status.</CardDescription></CardHeader><CardContent><Textarea value={privacyNote} onChange={(event) => setPrivacyNote(event.target.value)} placeholder="Record identity verification, guardian authority where relevant, retention review and resolution" rows={3} /></CardContent></Card>
         </div>
