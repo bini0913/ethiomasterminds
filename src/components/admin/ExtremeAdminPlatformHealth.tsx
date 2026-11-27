@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, BellRing, CalendarClock, CheckCircle2, Database, HardDrive, Plus, RefreshCw, ShieldAlert } from "lucide-react";
+import { Activity, BellRing, CalendarClock, Database, HardDrive, Plus, RefreshCw, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,7 @@ type HealthReport = {
   generated_at: string;
   storage_buckets: Array<{ bucket_id: string; bucket_name: string; object_count: number; bytes_used: number }>;
   notification_delivery_24h: Array<{ kind: string; delivery_status: string; delivery_reason: string | null; events: number; attempted: number; accepted: number; failures: number }>;
+  provider_failure_codes_24h: Array<{ code: string; failures: number }>;
   recent_snapshots: Array<{ id: number; checked_at: string; overall_status: string; checks: Record<string, ServiceCheck> }>;
   incidents: Incident[];
   incident_summary: { active: number; critical_active: number };
@@ -200,7 +201,7 @@ const ExtremeAdminPlatformHealth: React.FC = () => {
         </Card>
         <Card className="border-slate-200 bg-white shadow-sm">
           <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BellRing className="h-4 w-4 text-blue-700" />Notification delivery · last 24 hours</CardTitle><CardDescription>Aggregated from existing inbox delivery metadata; accepted sends do not guarantee device display.</CardDescription></CardHeader>
-          <CardContent className="space-y-2">{(report?.notification_delivery_24h || []).map((item, index) => <div key={`${item.kind}-${item.delivery_status}-${index}`} className="rounded-xl border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-900">{pretty(item.kind)} · {pretty(item.delivery_status)}</p><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${statusTone(item.delivery_status === "failed" ? "degraded" : item.delivery_status)}`}>{numberLabel(item.events)} events</span></div><p className="mt-1 text-xs text-slate-500">{numberLabel(item.accepted)} accepted / {numberLabel(item.attempted)} attempted · {numberLabel(item.failures)} failures{item.delivery_reason ? ` · ${pretty(item.delivery_reason)}` : ""}</p></div>)}{!report?.notification_delivery_24h?.length && <p className="text-sm text-slate-500">No notification delivery events in the last 24 hours.</p>}</CardContent>
+          <CardContent className="space-y-2">{(report?.notification_delivery_24h || []).map((item, index) => <div key={`${item.kind}-${item.delivery_status}-${index}`} className="rounded-xl border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-900">{pretty(item.kind)} · {pretty(item.delivery_status)}</p><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${statusTone(item.delivery_status === "failed" ? "degraded" : item.delivery_status)}`}>{numberLabel(item.events)} events</span></div><p className="mt-1 text-xs text-slate-500">{numberLabel(item.accepted)} accepted / {numberLabel(item.attempted)} attempted · {numberLabel(item.failures)} failures{item.delivery_reason ? ` · ${pretty(item.delivery_reason)}` : ""}</p></div>)}{report?.provider_failure_codes_24h?.length ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-3"><p className="text-xs font-semibold text-amber-900">Provider rejection codes · last 24 hours</p><p className="mt-1 text-xs text-amber-800">{report.provider_failure_codes_24h.map((item) => `${item.code} (${numberLabel(item.failures)})`).join(" · ")}</p></div> : null}{!report?.notification_delivery_24h?.length && <p className="text-sm text-slate-500">No notification delivery events in the last 24 hours.</p>}</CardContent>
         </Card>
       </div>
 
