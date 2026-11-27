@@ -1,7 +1,8 @@
 import { db } from "@/integrations/untypedClient";
+import { supabase } from "@/integrations/supabase/client";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink, FileText, Search, ShieldCheck, Sparkles, SlidersHorizontal, ArrowUpRight, CalendarDays, Target, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Search, ShieldCheck, Sparkles, SlidersHorizontal, ArrowUpRight, CalendarDays, Target, CheckCircle2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,11 +51,14 @@ const EntranceExamPapersPage: React.FC = () => {
   const [stream, setStream] = useState("all");
   const [ecYear, setEcYear] = useState("all");
   const [practiceSubjects, setPracticeSubjects] = useState<string[]>([]);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     let active = true;
 
     const loadCatalog = async () => {
+      setLoading(true);
+      setError("");
       try {
         const { data, error: queryError } = await db
           .from("entrance_exam_papers")
@@ -119,6 +123,18 @@ const EntranceExamPapersPage: React.FC = () => {
     return () => {
       active = false;
     };
+  }, [refreshToken]);
+
+  useEffect(() => {
+    const refresh = () => setRefreshToken((value) => value + 1);
+    const channel = supabase
+      .channel("entrance-archive-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "entrance_exam_papers" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "quizzes" }, refresh)
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const subjects = useMemo(() => [...new Set(papers.map((paper) => paper.subject).filter(Boolean))].sort(), [papers]);
@@ -157,7 +173,7 @@ const EntranceExamPapersPage: React.FC = () => {
     <div className="relative mx-auto w-full max-w-7xl space-y-6 px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
       <header className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3"><Button variant="ghost" size="icon" className="shrink-0 rounded-xl text-white/70 hover:bg-white/10 hover:text-white" aria-label="Back to Academic Mode" onClick={() => navigate("/academic")}><ArrowLeft className="h-5 w-5" /></Button><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300/80">Academic Prep / Archive</p><h1 className="truncate text-2xl font-black tracking-tight sm:text-3xl">Entrance exam vault</h1></div></div>
-        <Button variant="outline" className="hidden rounded-xl border-white/15 bg-white/5 text-white hover:bg-white/10 sm:flex" onClick={() => navigate("/academic/exam", { state: { subject: subject !== "all" ? subject : undefined } })}><Target className="mr-2 h-4 w-4 text-cyan-300" />Practice mode</Button>
+        <div className="flex items-center gap-2"><Button size="sm" variant="outline" className="rounded-xl border-white/15 bg-white/5 text-white hover:bg-white/10" onClick={() => setRefreshToken((value) => value + 1)} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</Button><Button variant="outline" className="hidden rounded-xl border-white/15 bg-white/5 text-white hover:bg-white/10 sm:flex" onClick={() => navigate("/academic/exam", { state: { subject: subject !== "all" ? subject : undefined } })}><Target className="mr-2 h-4 w-4 text-cyan-300" />Practice mode</Button></div>
       </header>
 
       <section className="relative overflow-hidden rounded-[2rem] border border-cyan-300/15 bg-gradient-to-br from-cyan-500/15 via-white/[0.045] to-indigo-500/15 p-5 shadow-2xl shadow-cyan-950/30 sm:p-8">
