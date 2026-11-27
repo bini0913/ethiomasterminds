@@ -19,6 +19,8 @@ type BIData = {
     ledger_statuses: { status: string; direction: string; records: number }[];
     ledger_movements: { currency: string; status: string; direction: string; amount: number; records: number }[];
     receivables_by_currency: MoneyRow[];
+    recent_payments: { payment_id: string; invoice_number: string | null; amount: number; currency: string; method: string | null; paid_at: string | null }[];
+    recent_invoices: { invoice_id: string; invoice_number: string; description: string | null; currency: string; total: number; amount_paid: number; outstanding: number; status: string; due_date: string | null; created_at: string }[];
   };
   school_finance: {
     invoice_count: number;
@@ -29,6 +31,8 @@ type BIData = {
     by_school: { school_id: string; school_name: string; school_code: string; invoice_count: number; outstanding_invoice_count: number; outstanding_by_currency: { currency: string; amount: number }[]; collections_by_currency: { currency: string; amount: number }[] }[];
     payment_methods: { method: string; currency: string; collected: number; payments: number }[];
     daily_collections: { day: string; currency: string; collected: number }[];
+    recent_payments: { payment_id: string; school_id: string; school_name: string; invoice_number: string; receipt_number: string | null; amount: number; currency: string; method: string; status: string; received_at: string | null }[];
+    recent_invoices: { invoice_id: string; school_id: string; school_name: string; invoice_number: string; description: string | null; amount: number; paid_amount: number; balance: number; currency: string; status: string; due_date: string | null; created_at: string }[];
   };
   growth: {
     registrations_by_day: { day: string; registrations: number }[];
@@ -86,12 +90,16 @@ const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: 
     data.platform_finance.account_balances.forEach((r) => rows.push(["platform finance", "current", "account balance", r.currency, r.balance, "Existing finance account balance; not revenue"]));
     data.platform_finance.paid_amount_by_currency.forEach((r) => rows.push(["platform finance", "all time", "recorded invoice payments", r.currency, r.paid, "Payment records with paid_at"]));
     data.platform_finance.ledger_movements.forEach((r) => rows.push(["platform ledger", "all time", r.direction, r.currency, r.amount, `${r.status}; ${r.records} records`]));
+    data.platform_finance.recent_payments.forEach((r) => rows.push(["platform finance", r.paid_at || "", "invoice payment", r.currency, r.amount, `${r.invoice_number || "Invoice"} · ${r.method || "Unspecified"}`]));
+    data.platform_finance.recent_invoices.forEach((r) => rows.push(["platform finance", r.invoice_number, "invoice", r.currency, r.total, `${r.status}; outstanding ${r.outstanding}`]));
     data.school_finance.by_school.forEach((s) => {
       s.collections_by_currency.forEach((r) => rows.push(["school collections", s.school_name, "confirmed collections", r.currency, r.amount, s.school_code]));
       s.outstanding_by_currency.forEach((r) => rows.push(["school receivables", s.school_name, "outstanding", r.currency, r.amount, s.school_code]));
     });
     data.school_finance.payment_methods.forEach((r) => rows.push(["school collections", "all time", "payment method", r.currency, r.collected, `${r.method}; ${r.payments} payments`]));
     data.school_finance.daily_collections.forEach((r) => rows.push(["school collections", r.day, "daily confirmed collections", r.currency, r.collected, "Confirmed payments only"]));
+    data.school_finance.recent_payments.forEach((r) => rows.push(["school finance", r.received_at || "", "payment", r.currency, r.amount, `${r.school_name}; ${r.invoice_number}; ${r.receipt_number || ""}; ${r.method}; ${r.status}`]));
+    data.school_finance.recent_invoices.forEach((r) => rows.push(["school finance", r.invoice_number, "invoice", r.currency, r.amount, `${r.school_name}; ${r.status}; paid ${r.paid_amount}; balance ${r.balance}; due ${r.due_date || ""}`]));
     data.growth.registrations_by_day.forEach((r) => rows.push(["growth", r.day, "new registrations", "", r.registrations, "Profile creation date"]));
     data.growth.schools_created_by_day.forEach((r) => rows.push(["growth", r.day, "new schools", "", r.schools, "School creation date"]));
     data.growth.student_activity_by_day.forEach((r) => rows.push(["usage", r.day, "active students", "", r.active_students, `${r.questions} questions; ${r.quizzes} quizzes; ${r.xp} XP`]));
@@ -147,6 +155,14 @@ const ExtremeAdminBusinessIntelligence: React.FC<{ schools: { id: string; name: 
             <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Outstanding by currency</p>
             {data.school_finance.outstanding_by_currency.length ? data.school_finance.outstanding_by_currency.map((r) => <div key={r.currency} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{r.currency}</span><strong>{money(r.outstanding, r.currency)}</strong></div>) : <p className="text-sm text-slate-500">No outstanding balances.</p>}
           </div>
+        </Section>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Section title="Recent school-fee payments" note="Latest 100 invoice-linked records, including their current recorded status. Only confirmed records count as collections above.">
+          {data.school_finance.recent_payments.length ? <div className="max-h-[420px] overflow-auto"><table className="w-full min-w-[560px] text-left text-xs"><thead className="sticky top-0 bg-slate-50 text-slate-500"><tr><th className="px-2 py-2">Date</th><th className="px-2 py-2">School / invoice</th><th className="px-2 py-2">Method / status</th><th className="px-2 py-2 text-right">Amount</th></tr></thead><tbody className="divide-y divide-slate-100">{data.school_finance.recent_payments.map((r) => <tr key={r.payment_id}><td className="px-2 py-2 whitespace-nowrap">{r.received_at ? new Date(r.received_at).toLocaleDateString() : "—"}</td><td className="px-2 py-2"><p className="font-medium">{r.school_name}</p><p className="text-slate-500">{r.invoice_number} · {r.receipt_number || "No receipt"}</p></td><td className="px-2 py-2">{r.method} · {r.status}</td><td className="px-2 py-2 text-right font-semibold whitespace-nowrap">{money(r.amount, r.currency)}</td></tr>)}</tbody></table></div> : <p className="text-sm text-slate-500">No school-fee payment records are available.</p>}
+        </Section>
+        <Section title="Recent school invoices" note="Latest 100 school invoices. Amounts and balances are shown in each invoice currency.">
+          {data.school_finance.recent_invoices.length ? <div className="max-h-[420px] overflow-auto"><table className="w-full min-w-[560px] text-left text-xs"><thead className="sticky top-0 bg-slate-50 text-slate-500"><tr><th className="px-2 py-2">Invoice</th><th className="px-2 py-2">School</th><th className="px-2 py-2">Status / due</th><th className="px-2 py-2 text-right">Balance</th></tr></thead><tbody className="divide-y divide-slate-100">{data.school_finance.recent_invoices.map((r) => <tr key={r.invoice_id}><td className="px-2 py-2 font-medium">{r.invoice_number}</td><td className="px-2 py-2">{r.school_name}</td><td className="px-2 py-2">{r.status} · {r.due_date || "No due date"}</td><td className="px-2 py-2 text-right font-semibold whitespace-nowrap">{money(r.balance, r.currency)}</td></tr>)}</tbody></table></div> : <p className="text-sm text-slate-500">No school invoices are available.</p>}
         </Section>
       </div>
       <Section title="Collections by school" note="Each school's collection and outstanding balance is shown separately by currency.">
