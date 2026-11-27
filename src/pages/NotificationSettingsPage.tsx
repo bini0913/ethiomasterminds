@@ -52,6 +52,28 @@ export default function NotificationSettingsPage() {
     if (user?.id) void load();
   }, [load, user?.id]);
 
+  // Keep this screen current when preferences are changed from another device
+  // or another signed-in session. The user_id filter and RLS both scope updates.
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    const channel = supabase
+      .channel(`notification-preferences-page-${user.id}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "notification_preferences",
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        if (active) void load();
+      })
+      .subscribe();
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [load, user?.id]);
+
   const update = async (key: keyof NotificationPreferences, value: boolean) => {
     if (!user?.id || !prefs) return;
     const previous = prefs;
