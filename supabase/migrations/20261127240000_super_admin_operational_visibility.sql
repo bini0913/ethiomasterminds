@@ -246,6 +246,7 @@ BEGIN
   END IF;
 
   IF p_school_id IS NULL OR p_user_id IS NULL
+     OR p_school_role IS NULL
      OR p_school_role NOT IN ('manager', 'finance', 'parent')
      OR nullif(trim(p_school_username), '') IS NULL
      OR length(trim(coalesce(p_reason, ''))) < 8 THEN
