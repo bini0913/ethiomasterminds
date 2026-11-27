@@ -19,7 +19,9 @@ begin
     'flashcards',
     'user_flashcard_progress',
     'academic_book_analyses',
-    'study_plans'
+    'study_plans',
+    'topic_progress',
+    'upper_student_topic_progress'
   ]
   loop
     if to_regclass(format('public.%I', target_table)) is not null
