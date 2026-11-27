@@ -23,6 +23,14 @@ type AuthorizedNotification = {
   notification_data: Record<string, unknown>;
 };
 
+function fcmData(data: Record<string, unknown>, extra: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries({ ...data, ...extra })
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, typeof value === "string" ? value : JSON.stringify(value)]),
+  );
+}
+
 function b64(value: Uint8Array | string) {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
   let binary = "";
@@ -122,6 +130,14 @@ Deno.serve(async (req) => {
 
     if (!authorized.length) return json({ sent: 0, attempted: 0, reason: "no_authorized_recipients" });
 
+    for (const item of authorized) {
+      const title = item.notification_title.trim();
+      const body = item.notification_body.trim();
+      if (!title || !body || title.length > 160 || body.length > 2000) {
+        return json({ error: "Notification payload is invalid" }, 400);
+      }
+    }
+
     // Persist every authorized notification before checking push preferences or
     // device availability. The in-app inbox must work even when push is off.
     const { data: inboxEvents, error: inboxError } = await admin.from("notification_events").insert(
@@ -148,7 +164,6 @@ Deno.serve(async (req) => {
     for (const item of authorized) {
       const title = item.notification_title.trim();
       const body = item.notification_body.trim();
-      if (!title || !body || title.length > 160 || body.length > 2000) return json({ error: "Notification payload is invalid" }, 400);
       const { data: prefs, error: prefsError } = await admin.from("notification_preferences").select("enabled,social,game_invites,new_content,study_reminders").eq("user_id", item.recipient_id).maybeSingle();
       if (prefsError) return json({ error: "Could not read notification preferences" }, 500);
       const preferenceKey = item.notification_kind === "study_call_invite"
@@ -171,7 +186,7 @@ Deno.serve(async (req) => {
         const response = await fetch("https://fcm.googleapis.com/v1/projects/" + serviceAccount.project_id + "/messages:send", {
           method: "POST",
           headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
-          body: JSON.stringify({ message: { token: device.token, data: { ...(item.notification_data ?? {}), kind: item.notification_kind, title, body }, android: { priority: "HIGH" } } }),
+          body: JSON.stringify({ message: { token: device.token, data: fcmData(item.notification_data ?? {}, { kind: item.notification_kind, title, body }), android: { priority: "HIGH" } } }),
         });
         if (response.ok) { sent++; itemSent++; continue; }
         const details = await response.text();

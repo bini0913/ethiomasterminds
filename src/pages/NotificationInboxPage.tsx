@@ -75,7 +75,7 @@ export default function NotificationInboxPage() {
     const channel = supabase
       .channel(`notification-inbox-${user.id}`)
       .on("postgres_changes", {
-        event: "INSERT",
+        event: "*",
         schema: "public",
         table: "notification_events",
         filter: `user_id=eq.${user.id}`,

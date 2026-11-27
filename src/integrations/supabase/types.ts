@@ -425,6 +425,7 @@ export type Database = {
           group_id: string
           id: string
           joined_at: string
+          last_read_at: string
           role: string
           user_id: string
         }
@@ -432,6 +433,7 @@ export type Database = {
           group_id: string
           id?: string
           joined_at?: string
+          last_read_at?: string
           role?: string
           user_id: string
         }
@@ -439,6 +441,7 @@ export type Database = {
           group_id?: string
           id?: string
           joined_at?: string
+          last_read_at?: string
           role?: string
           user_id?: string
         }
@@ -2700,6 +2703,13 @@ export type Database = {
         Returns: string
       }
       add_xp: { Args: { p_amount: number; p_user_id: string }; Returns: Json }
+      get_my_group_unread_counts: {
+        Args: never
+        Returns: {
+          group_id: string
+          unread_count: number
+        }[]
+      }
       admin_adjust_coins: {
         Args: { p_amount: number; p_user_identifier: string }
         Returns: Json

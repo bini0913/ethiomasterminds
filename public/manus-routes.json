@@ -109,6 +109,10 @@
       "title": "Notifications"
     },
     {
+      "path": "/notification-settings",
+      "title": "Notification Settings"
+    },
+    {
       "path": "/chat",
       "title": "Chat"
     },
