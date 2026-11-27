@@ -549,7 +549,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.super_admin_set_school_status(
   p_school_id uuid,
   p_status text,
-  p_reason text
+  p_reason text DEFAULT NULL::text
 )
 RETURNS boolean
 LANGUAGE plpgsql
