@@ -12,6 +12,8 @@ AS $function$
 DECLARE
   v_metrics jsonb;
   v_collected_by_currency jsonb := '[]'::jsonb;
+  v_collected_month_by_currency jsonb := '[]'::jsonb;
+  v_collected_year_by_currency jsonb := '[]'::jsonb;
   v_outstanding_by_currency jsonb := '[]'::jsonb;
 BEGIN
   IF NOT public._is_extreme_admin() THEN
@@ -38,6 +40,44 @@ BEGIN
 
   SELECT COALESCE(
     jsonb_agg(
+      jsonb_build_object('currency', totals.currency, 'collected', totals.collected)
+      ORDER BY totals.currency
+    ),
+    '[]'::jsonb
+  )
+  INTO v_collected_month_by_currency
+  FROM (
+    SELECT COALESCE(NULLIF(invoice.currency, ''), 'ETB') AS currency,
+           SUM(payment.amount)::numeric(14,2) AS collected
+    FROM public.school_fee_payments payment
+    JOIN public.school_student_invoices invoice
+      ON invoice.id = payment.invoice_id AND invoice.school_id = payment.school_id
+    WHERE payment.status = 'confirmed'
+      AND payment.received_at >= (date_trunc('month', now() AT TIME ZONE 'Africa/Addis_Ababa') AT TIME ZONE 'Africa/Addis_Ababa')
+    GROUP BY COALESCE(NULLIF(invoice.currency, ''), 'ETB')
+  ) totals;
+
+  SELECT COALESCE(
+    jsonb_agg(
+      jsonb_build_object('currency', totals.currency, 'collected', totals.collected)
+      ORDER BY totals.currency
+    ),
+    '[]'::jsonb
+  )
+  INTO v_collected_year_by_currency
+  FROM (
+    SELECT COALESCE(NULLIF(invoice.currency, ''), 'ETB') AS currency,
+           SUM(payment.amount)::numeric(14,2) AS collected
+    FROM public.school_fee_payments payment
+    JOIN public.school_student_invoices invoice
+      ON invoice.id = payment.invoice_id AND invoice.school_id = payment.school_id
+    WHERE payment.status = 'confirmed'
+      AND payment.received_at >= (date_trunc('year', now() AT TIME ZONE 'Africa/Addis_Ababa') AT TIME ZONE 'Africa/Addis_Ababa')
+    GROUP BY COALESCE(NULLIF(invoice.currency, ''), 'ETB')
+  ) totals;
+
+  SELECT COALESCE(
+    jsonb_agg(
       jsonb_build_object('currency', totals.currency, 'outstanding', totals.outstanding)
       ORDER BY totals.currency
     ),
@@ -57,6 +97,8 @@ BEGIN
     'registered_today', (SELECT count(*) FROM public.profiles WHERE created_at >= (date_trunc('day', now() AT TIME ZONE 'Africa/Addis_Ababa') AT TIME ZONE 'Africa/Addis_Ababa')),
     'registered_7d', (SELECT count(*) FROM public.profiles WHERE created_at >= now() - interval '7 days'),
     'registered_30d', (SELECT count(*) FROM public.profiles WHERE created_at >= now() - interval '30 days'),
+    'schools_created_7d', (SELECT count(*) FROM public.schools WHERE created_at >= now() - interval '7 days'),
+    'schools_created_30d', (SELECT count(*) FROM public.schools WHERE created_at >= now() - interval '30 days'),
     'daily_active_users', (
       SELECT count(DISTINCT presence.user_id)
       FROM public.user_presence presence
@@ -128,6 +170,8 @@ BEGIN
     'school_invoices_total', (SELECT count(*) FROM public.school_student_invoices),
     'school_invoices_outstanding', (SELECT count(*) FROM public.school_student_invoices WHERE balance > 0),
     'school_fee_collected_by_currency', v_collected_by_currency,
+    'school_fee_collected_month_by_currency', v_collected_month_by_currency,
+    'school_fee_collected_year_by_currency', v_collected_year_by_currency,
     'school_fee_outstanding_by_currency', v_outstanding_by_currency,
     'metrics_generated_at', now()
   )
