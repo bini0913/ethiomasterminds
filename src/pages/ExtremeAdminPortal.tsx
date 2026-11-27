@@ -62,6 +62,9 @@ type ExecutiveMetrics = {
   daily_active_users?: number;
   weekly_active_users?: number;
   monthly_active_users?: number;
+  daily_active_students?: number;
+  weekly_active_students?: number;
+  monthly_active_students?: number;
   recently_active_10m?: number;
   schools_total?: number;
   schools_active?: number;
@@ -547,6 +550,15 @@ const ExtremeAdminPortal: React.FC = () => {
               <MetricCard label="Daily active users" value={metrics.daily_active_users} detail="Unique accounts seen since Ethiopia day start" icon={Activity} tone="green" />
               <MetricCard label="Weekly active users" value={metrics.weekly_active_users} detail="Unique accounts seen in 7 days" icon={Activity} tone="blue" />
               <MetricCard label="Monthly active users" value={metrics.monthly_active_users} detail="Unique accounts seen in 30 days" icon={Activity} tone="navy" />
+            </div>
+          </section>
+
+          <section>
+            <div className="mb-3"><h3 className="text-sm font-bold text-slate-900">Student activity</h3><p className="text-xs text-slate-500">Unique student accounts with a recorded last-seen timestamp in each period.</p></div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <MetricCard label="Students active today" value={metrics.daily_active_students} detail="Ethiopia calendar day" icon={Activity} tone="green" />
+              <MetricCard label="Students active · 7 days" value={metrics.weekly_active_students} detail="Rolling seven-day window" icon={Activity} tone="blue" />
+              <MetricCard label="Students active · 30 days" value={metrics.monthly_active_students} detail="Rolling 30-day window" icon={Activity} tone="navy" />
             </div>
           </section>
 
