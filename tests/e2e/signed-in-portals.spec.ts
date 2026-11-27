@@ -188,6 +188,9 @@ test('Super Admin network workspace exposes its live workflows across desktop, t
     }
     await page.getByRole('button', { name: /Schools Register and oversee/ }).click();
     await expect(page.getByText('Assign an existing account')).toBeVisible();
+    await page.getByRole('combobox').nth(1).click();
+    await page.getByRole('option', { name: 'Parent' }).click();
+    await expect(page.getByText('Enrolled student usernames')).toBeVisible();
 
     if (viewport.width < 1024) {
       await page.getByRole('button', { name: 'Open administration navigation' }).click();
