@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, CheckCircle2, Clock3, Gamepad2, Gift, MessageCircle, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,14 +38,18 @@ export default function NotificationSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [registeringDevice, setRegisteringDevice] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const preferenceLoadSequence = useRef(0);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
+    const sequence = ++preferenceLoadSequence.current;
     setLoadError(false);
     try {
-      setPrefs(await loadNotificationPreferences(user.id));
+      const loaded = await loadNotificationPreferences(user.id);
+      if (sequence !== preferenceLoadSequence.current) return;
+      setPrefs(loaded);
     } catch {
-      setLoadError(true);
+      if (sequence === preferenceLoadSequence.current) setLoadError(true);
     }
   }, [user?.id]);
 
