@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(34);
+SELECT plan(36);
 
 SELECT ok(to_regprocedure('public.super_admin_list_network_people(uuid,text,text,integer,integer)') IS NOT NULL, 'network people directory RPC exists');
 SELECT ok(to_regprocedure('public.super_admin_get_school_analytics(uuid)') IS NOT NULL, 'school analytics RPC exists');
@@ -45,6 +45,10 @@ SELECT ok(position('Only active accounts' IN pg_get_functiondef('public.super_ad
 
 SELECT ok(position('school_role <> p_school_role' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment prevents conflicting active school roles');
 SELECT ok(position('ur.role::text NOT IN' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment preserves the existing global school role');
+
+
+SELECT ok(position('schools_without_active_manager' IN pg_get_functiondef('public.super_admin_get_network_dashboard()'::regprocedure)) > 0, 'network dashboard identifies schools without active Managers');
+SELECT ok(position('active_staff' IN pg_get_functiondef('public.super_admin_get_network_dashboard()'::regprocedure)) > 0, 'network dashboard includes all active school staff');
 
 SELECT * FROM finish();
 ROLLBACK;
