@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, AlertTriangle, Ban, BarChart3, Building2, CheckCircle2, ClipboardCopy,
+  Activity, AlertTriangle, BarChart3, Building2, CheckCircle2, ClipboardCopy,
   DollarSign, Download, FileClock, FileDown, Loader2, Plus, RefreshCw, RotateCcw,
   Search, Settings2, ShieldCheck, Users, UserPlus, X,
 } from "lucide-react";
