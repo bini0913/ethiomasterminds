@@ -27,11 +27,13 @@ BEGIN
   )
   INTO v_collected_by_currency
   FROM (
-    SELECT COALESCE(NULLIF(payment.currency, ''), 'ETB') AS currency,
+    SELECT COALESCE(NULLIF(invoice.currency, ''), 'ETB') AS currency,
            SUM(payment.amount)::numeric(14,2) AS collected
     FROM public.school_fee_payments payment
+    JOIN public.school_student_invoices invoice
+      ON invoice.id = payment.invoice_id AND invoice.school_id = payment.school_id
     WHERE payment.status = 'confirmed'
-    GROUP BY COALESCE(NULLIF(payment.currency, ''), 'ETB')
+    GROUP BY COALESCE(NULLIF(invoice.currency, ''), 'ETB')
   ) totals;
 
   SELECT COALESCE(
