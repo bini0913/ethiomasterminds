@@ -223,8 +223,8 @@ BEGIN
     ),
     'suspended_users', (SELECT count(*) FROM public.profiles WHERE account_status = 'suspended'),
     'banned_users', (SELECT count(*) FROM public.profiles WHERE account_status = 'banned'),
-    'audit_events_total', (SELECT count(*) FROM public.admin_audit_logs) + (SELECT count(*) FROM public.extreme_admin_audit_logs),
-    'audit_events_24h', (SELECT count(*) FROM public.admin_audit_logs WHERE created_at >= now() - interval '24 hours') + (SELECT count(*) FROM public.extreme_admin_audit_logs WHERE created_at >= now() - interval '24 hours'),
+    'audit_events_total', (SELECT count(*) FROM public.admin_audit_logs),
+    'audit_events_24h', (SELECT count(*) FROM public.admin_audit_logs WHERE created_at >= now() - interval '24 hours'),
     'school_fee_payments_confirmed', (SELECT count(*) FROM public.school_fee_payments WHERE status = 'confirmed'),
     'notification_devices_enabled', (SELECT count(*) FROM public.notification_devices WHERE enabled = true),
     'notification_inbox_events_24h', (SELECT count(*) FROM public.notification_events WHERE created_at >= now() - interval '24 hours'),
@@ -312,9 +312,8 @@ $function$;
 REVOKE ALL ON FUNCTION public.extreme_admin_list_users(text, public.app_role, integer, integer) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.extreme_admin_list_users(text, public.app_role, integer, integer) TO authenticated;
 
--- Merge the two historical audit stores into one read-only owner timeline.
--- The existing function has a different OUT-row definition, so drop this RPC
--- before recreating its stable frontend result contract.
+-- Keep the production audit RPC's established return contract. Production has
+-- one canonical audit store: public.admin_audit_logs.
 DROP FUNCTION IF EXISTS public.extreme_admin_get_audit_logs(integer);
 CREATE FUNCTION public.extreme_admin_get_audit_logs(p_limit integer DEFAULT 200)
 RETURNS TABLE (
@@ -323,8 +322,8 @@ RETURNS TABLE (
   actor_name text,
   action text,
   target_type text,
-  target_id text,
-  details jsonb,
+  target_id uuid,
+  metadata jsonb,
   created_at timestamptz
 )
 LANGUAGE sql
@@ -332,22 +331,13 @@ STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $function$
-  SELECT event.id, event.actor_id, profile.name, event.action,
-         event.target_type, event.target_id, event.details, event.created_at
-  FROM (
-    SELECT legacy.id, legacy.actor_id, legacy.action, legacy.target_type,
-           legacy.target_id, legacy.details, legacy.created_at
-    FROM public.extreme_admin_audit_logs legacy
-    UNION ALL
-    SELECT current_log.id, current_log.actor_id, current_log.action,
-           current_log.target_type, current_log.target_id::text,
-           current_log.metadata, current_log.created_at
-    FROM public.admin_audit_logs current_log
-  ) event
-  LEFT JOIN public.profiles profile ON profile.id = event.actor_id
+  SELECT log.id, log.actor_id, profile.name, log.action,
+         log.target_type, log.target_id, log.metadata, log.created_at
+  FROM public.admin_audit_logs log
+  LEFT JOIN public.profiles profile ON profile.id = log.actor_id
   WHERE public._is_extreme_admin()
-  ORDER BY event.created_at DESC
-  LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 200), 1000));
+  ORDER BY log.created_at DESC
+  LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 100), 500));
 $function$;
 
 REVOKE ALL ON FUNCTION public.extreme_admin_get_audit_logs(integer) FROM PUBLIC, anon;
@@ -403,13 +393,6 @@ BEGIN
   UPDATE public.profiles
   SET account_status = p_status, updated_at = now()
   WHERE id = p_user_id;
-
-  PERFORM public.extreme_admin_log(
-    'set_user_status',
-    'user',
-    p_user_id::text,
-    jsonb_build_object('status', p_status, 'reason', p_reason)
-  );
 
   INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
   VALUES (
