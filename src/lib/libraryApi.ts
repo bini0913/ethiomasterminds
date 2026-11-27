@@ -782,6 +782,7 @@ export interface CurriculumTextbookCatalogEntry {
   resource_type: 'student_textbook' | 'teacher_guide' | 'supplementary';
   source_name: string;
   source_url: string;
+  official_portal_url: string | null;
   source_status: 'verified_official' | 'external_reference' | 'needs_review';
   notes: string;
 }
@@ -789,7 +790,7 @@ export interface CurriculumTextbookCatalogEntry {
 export async function listCurriculumTextbookCatalog(options?: { minGrade?: number; maxGrade?: number }) {
   let query = db
     .from('curriculum_textbook_catalog')
-    .select('id, grade_level, curriculum_year_ec, subject, book_title, resource_type, source_name, source_url, source_status, notes')
+    .select('id, grade_level, curriculum_year_ec, subject, book_title, resource_type, source_name, source_url, official_portal_url, source_status, notes')
     .order('grade_level', { ascending: true })
     .order('subject', { ascending: true });
   if (options?.minGrade != null) query = query.gte('grade_level', options.minGrade);
