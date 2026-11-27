@@ -381,7 +381,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       console.error('Error searching users:', err);
       throw err;
     }
-  }, [user?.id, runWithCommunityTerms]);
+  }, [user?.id, user?.role, runWithCommunityTerms]);
 
   const sendFriendRequest = async (targetUserId: string): Promise<boolean> => {
     if (!user?.id || !targetUserId || targetUserId === user.id) return false;
