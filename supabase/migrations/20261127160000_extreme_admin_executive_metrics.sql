@@ -60,7 +60,7 @@ BEGIN
     'daily_active_users', (
       SELECT count(DISTINCT presence.user_id)
       FROM public.user_presence presence
-      WHERE presence.last_seen >= date_trunc('day', now())
+      WHERE presence.last_seen >= (date_trunc('day', now() AT TIME ZONE 'Africa/Addis_Ababa') AT TIME ZONE 'Africa/Addis_Ababa')
     ),
     'weekly_active_users', (
       SELECT count(DISTINCT presence.user_id)
