@@ -388,7 +388,8 @@ const ExtremeAdminPortal: React.FC = () => {
     if (error || data?.error) return toast.error(data?.error || error?.message || "Existing account could not be assigned");
     setProvisioningResult({ kind: "assigned", data });
     setExistingAccountUsername("");
-    toast.success("Existing account assigned to the school");
+    if (data?.audit_recorded === false) toast.error(data.warning || "Account assigned, but audit review is required");
+    else toast.success("Existing account assigned to the school");
     await refreshAll();
     await loadUsers(true);
   };
