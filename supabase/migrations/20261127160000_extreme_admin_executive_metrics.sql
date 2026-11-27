@@ -248,8 +248,10 @@ REVOKE ALL ON FUNCTION public.extreme_admin_list_users(text, public.app_role, in
 GRANT EXECUTE ON FUNCTION public.extreme_admin_list_users(text, public.app_role, integer, integer) TO authenticated;
 
 -- Merge the two historical audit stores into one read-only owner timeline.
--- Existing callers keep the same result columns and limit contract.
-CREATE OR REPLACE FUNCTION public.extreme_admin_get_audit_logs(p_limit integer DEFAULT 200)
+-- The existing function has a different OUT-row definition, so drop this RPC
+-- before recreating its stable frontend result contract.
+DROP FUNCTION IF EXISTS public.extreme_admin_get_audit_logs(integer);
+CREATE FUNCTION public.extreme_admin_get_audit_logs(p_limit integer DEFAULT 200)
 RETURNS TABLE (
   id uuid,
   actor_id uuid,
