@@ -81,12 +81,35 @@ const StudyPlannerPage: React.FC = () => {
         void loadBookAnalyses(user.id)
           .then(setBookAnalysis)
           .catch((error) => console.warn("Live textbook analysis refresh failed:", error));
+        void supabase
+          .from("library_books")
+          .select("id,title,author,subject,pdf_path")
+          .limit(500)
+          .then(({ data, error }) => {
+            if (error) {
+              console.warn("Live Library book refresh failed:", error);
+              return;
+            }
+            const normalized = (data || []).map((book: any) => ({
+              id: String(book.id),
+              title: String(book.title || "Untitled book"),
+              subject: normalizeSubject(String(book.subject || "general")),
+              pdf_path: String(book.pdf_path || ""),
+            }));
+            setAvailableBooks(normalized);
+            const byId = new Map(normalized.map((book) => [book.id, book]));
+            setSelectedBooks((current) => current.flatMap((book) => {
+              const latest = byId.get(book.id);
+              return latest ? [{ ...book, ...latest }] : [];
+            }));
+          });
       }, 250);
     };
     const channel = supabase
       .channel(`study-planner-live-${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "study_plans", filter: `user_id=eq.${user.id}` }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "academic_book_analyses", filter: `user_id=eq.${user.id}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "library_books" }, refresh)
       .subscribe();
     return () => {
       if (refreshTimer !== null) window.clearTimeout(refreshTimer);
