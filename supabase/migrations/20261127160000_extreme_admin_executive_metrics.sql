@@ -94,6 +94,7 @@ BEGIN
 
   SELECT jsonb_build_object(
     'registered_users', (SELECT count(*) FROM public.profiles),
+    'active_accounts', (SELECT count(*) FROM public.profiles WHERE COALESCE(account_status, 'active') = 'active'),
     'registered_today', (SELECT count(*) FROM public.profiles WHERE created_at >= (date_trunc('day', now() AT TIME ZONE 'Africa/Addis_Ababa') AT TIME ZONE 'Africa/Addis_Ababa')),
     'registered_7d', (SELECT count(*) FROM public.profiles WHERE created_at >= now() - interval '7 days'),
     'registered_30d', (SELECT count(*) FROM public.profiles WHERE created_at >= now() - interval '30 days'),
