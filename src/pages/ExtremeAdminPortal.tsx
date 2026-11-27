@@ -72,6 +72,10 @@ type ExecutiveMetrics = {
   super_admins?: number;
   audit_events_24h?: number;
   school_fee_payments_confirmed?: number;
+  notification_devices_enabled?: number;
+  notification_inbox_events_24h?: number;
+  study_call_rooms_24h?: number;
+  storage_buckets_configured?: number;
   school_invoices_total?: number;
   school_invoices_outstanding?: number;
   school_fee_collected_by_currency?: CurrencyTotal[];
@@ -224,13 +228,17 @@ const ExtremeAdminPortal: React.FC = () => {
     } finally {
       setLoading(false);
     }
-    await loadUsers(true);
-  }, [isExtremeAdmin, loadUsers]);
+  }, [isExtremeAdmin]);
 
   useEffect(() => {
     if (!isExtremeAdmin) return;
     void refreshAll();
   }, [isExtremeAdmin, user?.id, refreshAll]);
+
+  useEffect(() => {
+    if (!isExtremeAdmin) return;
+    void loadUsers(true);
+  }, [isExtremeAdmin, user?.id, userSearch, userRoleFilter, loadUsers]);
 
   const selectedUser = users.find((item) => item.id === targetUserId);
 
@@ -248,6 +256,7 @@ const ExtremeAdminPortal: React.FC = () => {
     toast.success("Account role updated");
     setStatusReason("");
     await refreshAll();
+    await loadUsers(true);
   };
 
   const updateUserStatus = async () => {
@@ -263,6 +272,7 @@ const ExtremeAdminPortal: React.FC = () => {
     toast.success("Account status updated");
     setStatusReason("");
     await refreshAll();
+    await loadUsers(true);
   };
 
   const setSuperAdminAccount = async (enabled: boolean, userId = targetUserId) => {
@@ -279,6 +289,7 @@ const ExtremeAdminPortal: React.FC = () => {
     toast.success(enabled ? "Super Admin assigned" : "Super Admin revoked");
     setStatusReason("");
     await refreshAll();
+    await loadUsers(true);
   };
 
   const changeSchoolStatus = async (school: PortalSchool) => {
@@ -346,6 +357,7 @@ const ExtremeAdminPortal: React.FC = () => {
     if ((data?.created || []).length) toast.success("School account created");
     if ((data?.failed || []).length) toast.error(data.failed[0]?.message || "Account creation was partially unsuccessful");
     await refreshAll();
+    await loadUsers(true);
   };
 
   const updateSetting = async (key: string, value: boolean) => {
@@ -594,6 +606,7 @@ const ExtremeAdminPortal: React.FC = () => {
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Platform feature controls</CardTitle><CardDescription>These settings affect platform-wide behavior where the consuming feature already honors the setting.</CardDescription></CardHeader><CardContent className="divide-y divide-slate-100">{[{ key: "feature_social_enabled", label: "Social features", description: "Allow the social feature surface." }, { key: "feature_ai_enabled", label: "AI features", description: "Allow AI-powered learning features." }, { key: "feature_xp_enabled", label: "XP and progression", description: "Enable XP progression." }, { key: "leaderboard_enabled", label: "Leaderboards", description: "Enable ranking surfaces." }, { key: "grades_enabled", label: "Grade experiences", description: "Enable grade-based learning experiences." }].map((setting) => <div key={setting.key} className="flex items-center justify-between gap-4 py-4"><div><p className="text-sm font-semibold text-slate-900">{setting.label}</p><p className="mt-0.5 text-xs text-slate-500">{setting.description}</p></div><Switch checked={settings[setting.key] === true} onCheckedChange={(checked) => void updateSetting(setting.key, checked)} /></div>)}</CardContent></Card>
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="text-base">AI daily request limit</CardTitle><CardDescription>Existing per-user daily limit, constrained to 0–300 requests.</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end"><div className="w-full max-w-xs space-y-1"><Label>Maximum requests per user per day</Label><Input type="number" min="0" max="300" value={aiDailyLimit} onChange={(event) => setAiDailyLimit(event.target.value)} /></div><Button onClick={() => void updateAiLimit()}>Save limit</Button></CardContent></Card>
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Shield className="h-4 w-4 text-blue-700" />Security snapshot</CardTitle><CardDescription>Only database-backed indicators are shown. This is not a claim that client-side IP or 2FA settings enforce access.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[["Audit events", securitySummary.audit_events ?? metrics.audit_events_24h ?? 0], ["Active platform admins", securitySummary.active_admins ?? 0], ["Active managers", securitySummary.active_managers ?? 0], ["Suspended accounts", securitySummary.suspended_users ?? 0], ["Banned accounts", securitySummary.banned_users ?? 0]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{formatNumber(value)}</p></div>)}</CardContent></Card>
+          <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-blue-700" />Platform operations signals</CardTitle><CardDescription>These are database-backed configuration and activity indicators, not claims of third-party service uptime.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[["Enabled push devices", metrics.notification_devices_enabled], ["Notification events · 24h", metrics.notification_inbox_events_24h], ["Study call rooms · 24h", metrics.study_call_rooms_24h], ["Storage buckets configured", metrics.storage_buckets_configured]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{formatNumber(value)}</p></div>)}</CardContent><div className="border-t border-slate-100 px-6 py-3 text-xs text-amber-800">Firebase push delivery and LiveKit provider reachability are not confirmed by these counters. A separate service-side probe is required before displaying them as healthy.</div></Card>
         </div>
       )}
 
