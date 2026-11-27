@@ -382,6 +382,9 @@ BEGIN
   IF p_status NOT IN ('active', 'suspended', 'banned') THEN
     RAISE EXCEPTION 'Invalid account status';
   END IF;
+  IF nullif(trim(coalesce(p_reason, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'An audit reason is required for account status changes';
+  END IF;
 
   SELECT role INTO v_target_role
   FROM public.user_roles
@@ -431,3 +434,148 @@ BEGIN
   RETURN true;
 END;
 $function$;
+
+
+-- Enforce audit reasons in the database, not only in the browser form.
+CREATE OR REPLACE FUNCTION public.extreme_admin_set_role(
+  p_user_id uuid,
+  p_role public.app_role,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+  IF nullif(trim(coalesce(p_reason, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'An audit reason is required for role changes';
+  END IF;
+  IF p_role IN ('extreme_admin'::public.app_role, 'super_admin'::public.app_role) THEN
+    RAISE EXCEPTION 'Use the dedicated top-level account controls';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = p_user_id
+      AND role IN ('extreme_admin'::public.app_role, 'super_admin'::public.app_role)
+  ) THEN
+    RAISE EXCEPTION 'Top-level account roles cannot be changed here';
+  END IF;
+  DELETE FROM public.user_roles WHERE user_id = p_user_id;
+  INSERT INTO public.user_roles(user_id, role) VALUES (p_user_id, p_role);
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (auth.uid(), 'root_set_role', 'user', p_user_id,
+    jsonb_build_object('role', p_role, 'reason', trim(p_reason)));
+  RETURN true;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.extreme_admin_set_role(uuid, public.app_role, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_set_role(uuid, public.app_role, text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.extreme_admin_set_super_admin(
+  p_user_id uuid,
+  p_enabled boolean,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+DECLARE
+  v_previous_user_id uuid;
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+  IF nullif(trim(coalesce(p_reason, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'An audit reason is required for Super Admin authority changes';
+  END IF;
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'A target account is required';
+  END IF;
+  IF p_user_id = auth.uid() THEN
+    RAISE EXCEPTION 'The Extreme Admin cannot also be the Super Admin';
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtext('master_minds.super_admin.singleton')::bigint);
+  IF p_enabled THEN
+    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = p_user_id) THEN
+      RAISE EXCEPTION 'Target account does not exist';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = p_user_id AND coalesce(account_status, 'active') = 'active'
+    ) THEN
+      RAISE EXCEPTION 'The Super Admin account must have an active profile';
+    END IF;
+    IF public.has_role(p_user_id, 'extreme_admin'::public.app_role) THEN
+      RAISE EXCEPTION 'The Extreme Admin account cannot become Super Admin';
+    END IF;
+    SELECT user_id INTO v_previous_user_id
+    FROM public.user_roles
+    WHERE role = 'super_admin'::public.app_role
+    FOR UPDATE;
+    IF v_previous_user_id IS NOT NULL AND v_previous_user_id <> p_user_id THEN
+      DELETE FROM public.user_roles
+      WHERE user_id = v_previous_user_id
+        AND role = 'super_admin'::public.app_role;
+    END IF;
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (p_user_id, 'super_admin'::public.app_role)
+    ON CONFLICT (user_id, role) DO NOTHING;
+  ELSE
+    DELETE FROM public.user_roles
+    WHERE user_id = p_user_id
+      AND role = 'super_admin'::public.app_role;
+  END IF;
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(),
+    CASE WHEN p_enabled THEN 'set_super_admin' ELSE 'revoke_super_admin' END,
+    'user',
+    p_user_id,
+    jsonb_build_object('enabled', p_enabled, 'reason', trim(p_reason), 'replaced_user_id', v_previous_user_id)
+  );
+  RETURN true;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.extreme_admin_set_super_admin(uuid, boolean, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_set_super_admin(uuid, boolean, text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.extreme_admin_set_school_status(
+  p_school_id uuid,
+  p_status text,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+  IF nullif(trim(coalesce(p_reason, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'An audit reason is required for school status changes';
+  END IF;
+  IF p_school_id IS NULL OR p_status NOT IN ('active', 'suspended', 'closed') THEN
+    RAISE EXCEPTION 'A valid school and status are required';
+  END IF;
+  UPDATE public.schools SET status = p_status, updated_at = now() WHERE id = p_school_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'School not found';
+  END IF;
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(), 'root_set_school_status', 'school', p_school_id,
+    jsonb_build_object('status', p_status, 'reason', trim(p_reason))
+  );
+  RETURN true;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.extreme_admin_set_school_status(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_set_school_status(uuid, text, text) TO authenticated;
