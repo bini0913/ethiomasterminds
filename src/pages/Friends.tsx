@@ -51,6 +51,7 @@ const Friends: React.FC = () => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestSequenceRef = useRef(0);
   
   // Auto-scroll to bottom of messages
   useEffect(() => {
@@ -78,10 +79,13 @@ const Friends: React.FC = () => {
       .forEach((message) => markMessageAsRead(message.id));
   }, [searchParams, friends, getMessagesWithUser, markMessageAsRead]);
   
-  // Handle add friend search with debounce
+  // Handle add friend search with debounce and stale-request protection.
+  // A slow previous query must never overwrite the results for the current input.
   useEffect(() => {
+    const requestSequence = ++searchRequestSequenceRef.current;
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
     }
 
     if (addFriendSearch.trim().length < 2) {
@@ -96,24 +100,33 @@ const Friends: React.FC = () => {
       try {
         setSearchError(null);
         const results = await searchUsers(addFriendSearch);
+        if (requestSequence !== searchRequestSequenceRef.current) return;
         // Filter out existing friends
         const friendIds = new Set(friends.map(f => f.id));
         const filteredResults = results.filter(u => !friendIds.has(u.id));
         setSearchResults(filteredResults);
       } catch (err) {
+        if (requestSequence !== searchRequestSequenceRef.current) return;
         console.error('Search error:', err);
         setSearchResults([]);
         setSearchError(err instanceof Error && err.message
           ? err.message
           : 'We could not search for students. Please try again.');
       } finally {
-        setSearching(false);
+        if (requestSequence === searchRequestSequenceRef.current) {
+          setSearching(false);
+        }
       }
     }, 500);
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+      // Invalidate any in-flight search when the input changes or page unmounts.
+      if (requestSequence === searchRequestSequenceRef.current) {
+        searchRequestSequenceRef.current += 1;
       }
     };
   }, [addFriendSearch, searchUsers, friends]);
