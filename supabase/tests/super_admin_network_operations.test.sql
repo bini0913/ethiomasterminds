@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(18);
+SELECT plan(20);
 
 SELECT ok(to_regprocedure('public.super_admin_list_network_people(uuid,text,text,integer,integer)') IS NOT NULL, 'network people directory RPC exists');
 SELECT ok(to_regprocedure('public.super_admin_get_school_analytics(uuid)') IS NOT NULL, 'school analytics RPC exists');
@@ -20,6 +20,8 @@ SELECT ok(position('admin_audit_logs' IN pg_get_functiondef('public.super_admin_
 SELECT ok(position('school_role NOT IN' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'staff status mutation rejects non-staff memberships');
 SELECT ok(position('network_key = true' IN pg_get_functiondef('public.super_admin_get_network_settings()'::regprocedure)) > 0, 'settings read is limited to the singleton network');
 SELECT ok(position('admin_audit_logs' IN pg_get_functiondef('public.super_admin_update_network_name(text)'::regprocedure)) > 0, 'settings mutation persists audit records');
+SELECT ok(position('currency_totals' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'network finance returns currency-separated totals');
+SELECT ok(position('outstanding_by_currency' IN pg_get_functiondef('public.super_admin_get_school_analytics(uuid)'::regprocedure)) > 0, 'school analytics returns currency-separated outstanding balances');
 
 SELECT * FROM finish();
 ROLLBACK;
