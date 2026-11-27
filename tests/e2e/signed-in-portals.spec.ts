@@ -108,6 +108,9 @@ test('Extreme Admin executive workspace exposes every Part 1 section on desktop 
     { nav: /School network/, heading: 'School network' },
     { nav: /Money & growth/, heading: 'Money & growth' },
     { nav: /Platform controls/, heading: 'Global controls & security', content: 'External service connectivity' },
+    { nav: /Reports & flags/, heading: 'Reports & flags' },
+    { nav: /Support & escalations/, heading: 'Support & escalations' },
+    { nav: /Announcements/, heading: 'Platform announcements', content: 'All students and teachers' },
     { nav: /Privacy requests/, heading: 'Privacy & account requests' },
     { nav: /Audit history/, heading: 'Audit history' },
   ];
