@@ -376,7 +376,7 @@ Deno.serve(async (req) => {
 
       const { error: auditError } = await admin.from("admin_audit_logs").insert({
         actor_id: actorId,
-        action: "extreme_admin_assigned_existing_school_account",
+        action: "school_network_existing_account_assigned",
         target_type: "school_membership",
         target_id: membershipId,
         metadata: { school_id: schoolId, user_id: targetProfile.id, school_role: role, reason },
