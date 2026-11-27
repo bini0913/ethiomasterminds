@@ -510,7 +510,7 @@ export default function NetworkSuperAdminPortal() {
               <CardHeader><CardTitle>School directory and access</CardTitle><CardDescription>Suspension pauses school access. Closure is a separate status and must be deliberately reopened.</CardDescription></CardHeader>
               <CardContent className="space-y-4">
                 <div className="relative max-w-sm"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input className="pl-9" placeholder="Search schools by name or code" value={schoolSearch} onChange={(event) => setSchoolSearch(event.target.value)} /></div>
-                <SchoolTable schools={filteredSchools} onAnalytics={(id) => { setTab("analytics"); void loadAnalytics(id); }} onStatus={requestSchoolStatus} />
+                {schoolDirectoryError ? <ErrorPanel message={schoolDirectoryError} onRetry={() => void loadCore()} /> : <SchoolTable schools={filteredSchools} onAnalytics={(id) => { setTab("analytics"); void loadAnalytics(id); }} onStatus={requestSchoolStatus} />}
               </CardContent>
             </Card>
           </section>}
