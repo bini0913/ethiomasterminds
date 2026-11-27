@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(39);
+SELECT plan(41);
 
 SELECT ok(to_regprocedure('public.super_admin_list_network_people(uuid,text,text,integer,integer)') IS NOT NULL, 'network people directory RPC exists');
 SELECT ok(to_regprocedure('public.super_admin_get_school_analytics(uuid)') IS NOT NULL, 'school analytics RPC exists');
@@ -54,6 +54,10 @@ SELECT ok(position('active_staff' IN pg_get_functiondef('public.super_admin_get_
 SELECT ok(position('Network authority may only suspend or restore Parent and Student access' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'network-level Parent and Student changes are limited to suspend and restore');
 SELECT ok(position('A reason of at least 8 characters is required' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'membership status changes require an audited reason server-side');
 SELECT ok(position('Legacy School Admin memberships are retired' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'retired School Admin memberships cannot be reactivated through the network workflow');
+
+
+SELECT ok(position('A reason of at least 8 characters is required' IN pg_get_functiondef('public.super_admin_set_school_status(uuid,text,text)'::regprocedure)) > 0, 'school status changes require a reason server-side');
+SELECT ok(NOT has_function_privilege('authenticated', 'public.super_admin_set_school_status(uuid,text)', 'execute'), 'legacy reason-free school status RPC is unavailable to authenticated clients');
 
 SELECT * FROM finish();
 ROLLBACK;
