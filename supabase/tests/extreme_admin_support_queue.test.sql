@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(16);
+SELECT plan(19);
 
 SELECT ok(
   to_regclass('public.support_request_statuses') IS NOT NULL,
@@ -80,9 +80,18 @@ SELECT ok(
   'support status is stored separately from user-editable social post metadata'
 );
 SELECT ok(
-  position('updated_at' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0
-  AND position('reason' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0,
-  'support status changes retain timestamps and require an auditable reason'
+  position('reviewed_at' in pg_get_functiondef('public.extreme_admin_resolve_report(uuid,text,text)'::regprocedure)) > 0
+  AND position('reviewed_by' in pg_get_functiondef('public.extreme_admin_resolve_report(uuid,text,text)'::regprocedure)) > 0,
+  'report review records the reviewer and review timestamp'
+);
+SELECT ok(
+  position('Extreme Admin access required' in pg_get_functiondef('public.extreme_admin_resolve_report(uuid,text,text)'::regprocedure)) > 0
+  AND position('report review reason' in pg_get_functiondef('public.extreme_admin_resolve_report(uuid,text,text)'::regprocedure)) > 0,
+  'report review is Extreme Admin-only and requires a reason at the database boundary'
+);
+SELECT ok(
+  position('admin_audit_logs' in pg_get_functiondef('public.extreme_admin_resolve_report(uuid,text,text)'::regprocedure)) > 0,
+  'report review writes to the canonical admin audit log'
 );
 
 SELECT * FROM finish();
