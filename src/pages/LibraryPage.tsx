@@ -475,7 +475,7 @@ const LibraryPage: React.FC = () => {
   const runAi = async (action: AiAction) => {
     if (!selectedBook || !user) return;
     if (aiBusy) return;
-    const baseText = (selectedText || readerPageText || '').trim();
+    const baseText = (selectedText.trim() || readerPageText.trim()).trim();
     const limitedText = baseText.slice(0, MAX_AI_TEXT_LENGTH);
     if (!limitedText) {
       toast.error('Select text or add page text first.');
@@ -484,7 +484,7 @@ const LibraryPage: React.FC = () => {
     // Version the cache namespace so previously stored client-generated fallback text
     // is not mistaken for a response produced by the real library AI service.
     setAiBusy(true);
-    const cacheKey = shortHash(`server-ai-v2:${action}:${selectedBook.id}:${limitedText}`);
+    const cacheKey = shortHash(`server-ai-v3:${action}:${selectedBook.id}:${limitedText}`);
 
     let output = '';
     const cached = await findCachedAIContent({
@@ -501,7 +501,7 @@ const LibraryPage: React.FC = () => {
         output = await invokeLibraryAI({
           action,
           text: limitedText,
-          grade: Number(user.grade || 9),
+          grade: Number(String(user.grade || '').match(/\d{1,2}/)?.[0] || 9),
           subject: selectedBook.subject,
         });
         if (!output.trim()) throw new Error("The AI service returned an empty response. Please try again.");
