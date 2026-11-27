@@ -26,7 +26,7 @@ type PendingChange =
   | { kind: "school"; target: School; status: string }
   | { kind: "membership"; target: Person; status: string };
 const rpc = (name: string, args?: Record<string, unknown>) => (supabase as any).rpc(name, args);
-const staffRoles = new Set(["manager", "admin", "teacher", "finance"]);
+const staffRoles = new Set(["manager", "teacher", "finance"]);
 
 function downloadCsv(filename: string, headers: string[], rows: unknown[][]) {
   const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
@@ -461,7 +461,7 @@ export default function NetworkSuperAdminPortal() {
               ["Suspended schools", dashboard.suspended_schools],
               ["Schools without an active Manager", dashboard.schools_without_active_manager],
               ["Manager memberships", dashboard.managers],
-              ["Admin memberships", dashboard.admins],
+              ["Legacy Admin memberships", dashboard.admins],
               ["Teacher memberships", dashboard.teachers],
               ["Finance memberships", dashboard.finance_staff],
               ["Parent memberships", dashboard.parents],
@@ -554,7 +554,7 @@ export default function NetworkSuperAdminPortal() {
             {analyticsLoading ? <LoadingState label="Loading school performance…" /> : analyticsError ? null : analyticsSchoolId && Object.keys(analytics).length > 0 ? <>
               <MetricGrid items={[
                 ["Student memberships", analytics.students], ["Teacher memberships", analytics.teachers], ["Manager memberships", analytics.managers],
-                ["Admin memberships", analytics.admins], ["Finance memberships", analytics.finance_staff], ["Parent memberships", analytics.parents],
+                ["Legacy Admin memberships", analytics.admins], ["Finance memberships", analytics.finance_staff], ["Parent memberships", analytics.parents],
                 ["Average term score", analytics.average_score == null ? "—" : `${analytics.average_score}%`],
                 ["Attendance rate", analytics.attendance_rate == null ? "—" : `${analytics.attendance_rate}%`],
                 ["Attendance records", analytics.attendance_records], ["Published results", analytics.published_results],
@@ -650,7 +650,7 @@ function SchoolTable({ schools, onAnalytics, onStatus }: { schools: School[]; on
 
 function PeopleTable({ people, onStatus }: { people: Person[]; onStatus: (person: Person, status: string) => void }) {
   if (!people.length) return <EmptyState title="No network memberships found" detail="Try another school, role, or search term. The current filters do not match any network membership." />;
-  return <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[940px] text-left text-sm"><thead className="bg-slate-50"><tr className="border-b text-xs uppercase text-slate-500"><th className="p-3">Person</th><th className="p-3">School</th><th className="p-3">Role</th><th className="p-3">Account</th><th className="p-3">Membership</th><th className="p-3 text-right">Staff actions</th></tr></thead><tbody className="divide-y divide-slate-100">{people.map((item) => <tr key={item.id} className="hover:bg-slate-50/70"><td className="p-3"><p className="font-medium">{item.name}</p><p className="text-xs text-slate-500">@{item.username || "—"}</p></td><td className="p-3">{item.school_name}<p className="text-xs text-slate-500">{item.school_code}</p></td><td className="p-3 capitalize">{item.school_role}</td><td className="p-3"><Badge variant={item.account_status === "active" ? "secondary" : "destructive"}>{item.account_status || "unknown"}</Badge></td><td className="p-3"><Badge variant={item.membership_status === "active" ? "secondary" : item.membership_status === "suspended" ? "destructive" : "outline"}>{item.membership_status}</Badge></td><td className="p-3 text-right">{staffRoles.has(item.school_role) ? <div className="flex justify-end gap-1">{item.membership_status === "active" && <><Button size="sm" variant="outline" onClick={() => onStatus(item, "suspended")}>Suspend</Button><Button size="sm" variant="outline" onClick={() => onStatus(item, "deactivated")}>Deactivate</Button></>}{item.membership_status === "suspended" && <><Button size="sm" variant="outline" onClick={() => onStatus(item, "active")}>Restore</Button><Button size="sm" variant="outline" onClick={() => onStatus(item, "deactivated")}>Deactivate</Button></>}{item.membership_status === "deactivated" && <Button size="sm" variant="outline" onClick={() => onStatus(item, "active")}>Reactivate</Button>}</div> : <span className="text-xs text-slate-400">Managed in school portal</span>}</td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[940px] text-left text-sm"><thead className="bg-slate-50"><tr className="border-b text-xs uppercase text-slate-500"><th className="p-3">Person</th><th className="p-3">School</th><th className="p-3">Role</th><th className="p-3">Account</th><th className="p-3">Membership</th><th className="p-3 text-right">Staff actions</th></tr></thead><tbody className="divide-y divide-slate-100">{people.map((item) => <tr key={item.id} className="hover:bg-slate-50/70"><td className="p-3"><p className="font-medium">{item.name}</p><p className="text-xs text-slate-500">@{item.username || "—"}</p></td><td className="p-3">{item.school_name}<p className="text-xs text-slate-500">{item.school_code}</p></td><td className="p-3 capitalize">{item.school_role}</td><td className="p-3"><Badge variant={item.account_status === "active" ? "secondary" : "destructive"}>{item.account_status || "unknown"}</Badge></td><td className="p-3"><Badge variant={item.membership_status === "active" ? "secondary" : item.membership_status === "suspended" ? "destructive" : "outline"}>{item.membership_status}</Badge></td><td className="p-3 text-right">{item.school_role === "admin" ? <span className="text-xs text-slate-400">Legacy Admin role — use School Manager leadership workflow</span> : staffRoles.has(item.school_role) ? <div className="flex justify-end gap-1">{item.membership_status === "active" && <><Button size="sm" variant="outline" onClick={() => onStatus(item, "suspended")}>Suspend</Button><Button size="sm" variant="outline" onClick={() => onStatus(item, "deactivated")}>Deactivate</Button></>}{item.membership_status === "suspended" && <><Button size="sm" variant="outline" onClick={() => onStatus(item, "active")}>Restore</Button><Button size="sm" variant="outline" onClick={() => onStatus(item, "deactivated")}>Deactivate</Button></>}{item.membership_status === "deactivated" && <Button size="sm" variant="outline" onClick={() => onStatus(item, "active")}>Reactivate</Button>}</div> : <span className="text-xs text-slate-400">Managed in school portal</span>}</td></tr>)}</tbody></table></div>;
 }
 
 function AuditTable({ rows }: { rows: Audit[] }) {
