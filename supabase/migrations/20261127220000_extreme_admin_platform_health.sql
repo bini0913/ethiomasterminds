@@ -162,7 +162,7 @@ BEGIN
         CROSS JOIN LATERAL jsonb_array_elements(
           CASE WHEN jsonb_typeof(event.data->'provider_failure_codes') = 'array'
             THEN event.data->'provider_failure_codes' ELSE '[]'::jsonb END
-        ) AS item
+        ) AS failure_items(item)
         WHERE event.created_at >= now() - interval '24 hours'
         GROUP BY item->>'code'
       ) provider_codes
