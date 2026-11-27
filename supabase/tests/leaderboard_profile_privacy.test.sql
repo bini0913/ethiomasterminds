@@ -5,7 +5,7 @@ select plan(13);
 select ok(has_function_privilege('authenticated','public.get_student_leaderboard()','execute'),'signed-in leaderboard RPC remains available');
 select ok(not has_function_privilege('anon','public.get_student_leaderboard()','execute'),'anonymous users cannot call the leaderboard RPC');
 select ok(position('profile_privacy_settings' in pg_get_functiondef('public.get_student_leaderboard()'::regprocedure)) > 0,'student leaderboard reads profile privacy settings');
-select ok(position('is_public' in pg_get_functiondef('public.get_student_leaderboard()'::regprocedure)) > 0,'student leaderboard respects public-profile opt-out');
+select ok(position('is_profile_public' in pg_get_functiondef('public.get_student_leaderboard()'::regprocedure)) > 0,'student leaderboard enforces public-profile visibility through the shared guardian-aware helper');
 select ok(position('hide_stats' in pg_get_functiondef('public.get_student_leaderboard()'::regprocedure)) > 0,'student leaderboard respects hidden statistics');
 select ok((select p.proconfig @> array['search_path=pg_catalog'] from pg_proc p where p.oid='public.get_student_leaderboard()'::regprocedure),'student leaderboard uses a pg_catalog-only search path');
 
