@@ -132,6 +132,44 @@ test('Extreme Admin executive workspace exposes Part 1 and Part 3 sections acros
   expect(pageErrors, 'Unexpected browser errors in Extreme Admin desktop/tablet/mobile workspace').toEqual([]);
 });
 
+test('Super Admin network workspace exposes its live operational sections across desktop, tablet and mobile', async ({ page }) => {
+  test.setTimeout(120_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await authenticateAs(page, 'ci-super-admin@masterminds.test');
+  const sections = [
+    { tab: /Overview/, content: 'Network school comparison' },
+    { tab: /Schools/, content: 'Register school' },
+    { tab: /People/, content: 'Network people and staff' },
+    { tab: /Analytics/, content: 'School performance and academic analytics' },
+    { tab: /Finance/, content: 'Financial oversight by currency' },
+    { tab: /Audit/, content: 'Network audit history' },
+    { tab: /Settings/, content: 'Network configuration' },
+  ];
+
+  for (const viewport of [
+    { name: 'desktop', width: 1440, height: 1000 },
+    { name: 'tablet', width: 768, height: 1024 },
+    { name: 'mobile', width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/super-admin', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('Network command center')).toBeVisible({ timeout: 25_000 });
+
+    for (const section of sections) {
+      await page.getByRole('tab', { name: section.tab }).click();
+      await expect(page.getByText(section.content, { exact: false })).toBeVisible();
+    }
+
+    await page.getByRole('tab', { name: /People/ }).click();
+    await page.getByRole('button', { name: 'All schools' }).click();
+    await expect(page.getByText('Network people and staff')).toBeVisible();
+  }
+
+  expect(pageErrors, 'Unexpected browser errors in Super Admin desktop/tablet/mobile workspace').toEqual([]);
+});
+
 test('Super Admin is denied access to the Extreme Admin owner route', async ({ page }) => {
   test.setTimeout(45_000);
   await authenticateAs(page, 'ci-super-admin@masterminds.test');
