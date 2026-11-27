@@ -268,8 +268,10 @@ const SocialSupportHub: React.FC = () => {
                   value={supportText}
                   onChange={(e) => setSupportText(e.target.value)}
                   className="min-h-28"
+                  maxLength={500}
                 />
                 <p className="text-xs text-muted-foreground">{supportText.length}/500 characters</p>
+                <p className="text-xs text-muted-foreground">Support requests are visible on the student support board. Do not include passwords, phone numbers, or other private information.</p>
                 <Button onClick={submitSupportRequest} disabled={isSubmittingSupport || !supportText.trim()}>
                   {isSubmittingSupport ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Send to support team
@@ -292,12 +294,19 @@ const SocialSupportHub: React.FC = () => {
               {filteredSupportPosts.map((post) => (
                 <Card key={post.id}>
                   <CardContent className="pt-5 space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Avatar className="h-7 w-7"><AvatarFallback>{post.authorName.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
                         <span className="text-sm font-medium">{post.authorName}</span>
                       </div>
-                      <Badge variant="outline">{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={['resolved', 'dismissed'].includes(String(post.metadata?.support_status)) ? 'secondary' : 'outline'}>
+                          {['open', 'in_review', 'resolved', 'dismissed'].includes(String(post.metadata?.support_status))
+                            ? String(post.metadata?.support_status).replace('_', ' ')
+                            : 'open'}
+                        </Badge>
+                        <Badge variant="outline">{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</Badge>
+                      </div>
                     </div>
                     <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
                   </CardContent>
