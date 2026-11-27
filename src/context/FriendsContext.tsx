@@ -353,7 +353,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     try {
       const allowed = await runWithCommunityTerms(async () => {
         const { data, error } = await db
-          .rpc('find_student_by_username', { _username: normalizedQuery });
+          .rpc('search_students_for_friend_requests', { _username: normalizedQuery });
 
         if (error) throw error;
 
