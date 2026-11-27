@@ -383,13 +383,30 @@ BEGIN
     RAISE EXCEPTION 'Revoke Super Admin authority before suspending or banning that account';
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id) THEN
+    RAISE EXCEPTION 'Account not found';
+  END IF;
+
+  -- Keep the original account-control record in sync: existing auth and
+  -- session guards consume user_account_controls, not only profiles.
+  INSERT INTO public.user_account_controls(user_id, status, reason, updated_by, updated_at)
+  VALUES (p_user_id, p_status, p_reason, auth.uid(), now())
+  ON CONFLICT (user_id) DO UPDATE
+  SET status = EXCLUDED.status,
+      reason = EXCLUDED.reason,
+      updated_by = EXCLUDED.updated_by,
+      updated_at = EXCLUDED.updated_at;
+
   UPDATE public.profiles
   SET account_status = p_status, updated_at = now()
   WHERE id = p_user_id;
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Account not found';
-  END IF;
+  PERFORM public.extreme_admin_log(
+    'set_user_status',
+    'user',
+    p_user_id::text,
+    jsonb_build_object('status', p_status, 'reason', p_reason)
+  );
 
   INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
   VALUES (
