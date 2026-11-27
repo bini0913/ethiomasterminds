@@ -23,8 +23,7 @@ SELECT ok(position('admin_audit_logs' IN pg_get_functiondef('public.super_admin_
 SELECT ok(position('currency_totals' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'network finance returns currency-separated totals');
 SELECT ok(position('outstanding_by_currency' IN pg_get_functiondef('public.super_admin_get_school_analytics(uuid)'::regprocedure)) > 0, 'school analytics returns currency-separated outstanding balances');
 
-SELECT * FROM finish();
-ROLLBACK;
+
 
 SELECT ok(position('recent_invoices' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'network finance exposes recent invoice detail');
 SELECT ok(position('recent_payments' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'network finance exposes recent payment detail');
