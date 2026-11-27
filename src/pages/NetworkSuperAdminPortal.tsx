@@ -252,8 +252,8 @@ export default function NetworkSuperAdminPortal() {
             p_status: pendingChange.status,
             p_reason: changeReason.trim(),
           });
-      if (response.error) {
-        toast.error(response.error.message || "The status change was rejected.");
+      if (response.error || response.data !== true) {
+        toast.error(response.error?.message || "The status change was rejected.");
         return;
       }
       toast.success(pendingChange.kind === "school" ? "School status updated." : "Staff membership updated.");
@@ -538,7 +538,7 @@ export default function NetworkSuperAdminPortal() {
           {tab === "analytics" && <section className="space-y-4">
             <Card><CardHeader><CardTitle>School performance</CardTitle><CardDescription>Aggregated school-level academic and operational indicators. This is oversight, not a replacement for the school's academic workflows.</CardDescription></CardHeader><CardContent><Select value={analyticsSchoolId} onValueChange={(id) => void loadAnalytics(id)}><SelectTrigger className="max-w-xl"><SelectValue placeholder="Choose a school to inspect" /></SelectTrigger><SelectContent>{schools.map((item) => <SelectItem key={item.id} value={item.id}>{item.name} · {item.school_code}</SelectItem>)}</SelectContent></Select><p className="mt-3 text-sm text-slate-500">{analyticsLoading ? "Loading school analytics…" : analyticsSchool ? `Showing live indicators for ${analyticsSchool.name}` : "Choose a school to view its analytics."}</p></CardContent></Card>
             {analyticsError && <ErrorPanel message={analyticsError} onRetry={() => void loadAnalytics(analyticsSchoolId)} />}
-            {analyticsLoading ? <LoadingState label="Loading school performance…" /> : analyticsSchoolId && Object.keys(analytics).length > 0 ? <>
+            {analyticsLoading ? <LoadingState label="Loading school performance…" /> : analyticsError ? null : analyticsSchoolId && Object.keys(analytics).length > 0 ? <>
               <MetricGrid items={[
                 ["Students enrolled", analytics.students], ["Active teachers", analytics.teachers], ["Active Managers", analytics.managers],
                 ["School admins", analytics.admins], ["Finance staff", analytics.finance_staff], ["Parents", analytics.parents],
