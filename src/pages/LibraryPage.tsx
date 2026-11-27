@@ -19,6 +19,7 @@ import {
   createBook,
   createHighlight,
   downloadBookPdf,
+  extractBookText,
   deleteBook,
   findCachedAIContent,
   getPdfPublicUrl,
@@ -78,6 +79,7 @@ const LibraryPage: React.FC = () => {
   const [readerOpen, setReaderOpen] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [extractingBookText, setExtractingBookText] = useState(false);
   const [readerUrl, setReaderUrl] = useState<string | null>(null);
   const [readerRetry, setReaderRetry] = useState(0);
   const [readerLoading, setReaderLoading] = useState(false);
@@ -418,6 +420,25 @@ const LibraryPage: React.FC = () => {
     setFlashcards([]);
   };
 
+  const handleExtractBookText = async () => {
+    if (!selectedBook || extractingBookText) return;
+    setExtractingBookText(true);
+    try {
+      const extracted = await extractBookText(selectedBook.pdf_path, { maxPages: 30, maxChars: 12_000 });
+      setReaderPageText(extracted.text);
+      toast.success(
+        extracted.truncated
+          ? `Extracted text from ${extracted.pagesRead} of ${extracted.pageCount} pages. You can edit the excerpt below.`
+          : `Extracted readable text from ${extracted.pagesRead} pages.`,
+      );
+    } catch (error) {
+      console.error("Book text extraction failed:", error);
+      toast.error(error instanceof Error ? error.message : "Could not extract text from this PDF.");
+    } finally {
+      setExtractingBookText(false);
+    }
+  };
+
   const runAi = async (action: AiAction) => {
     if (!selectedBook || !user) return;
     if (aiBusy) return;
@@ -710,7 +731,7 @@ const LibraryPage: React.FC = () => {
               <div className="min-h-0 flex-1 p-2 sm:p-4"><div className="relative h-full">{readerLoading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border bg-background/90"><div className="text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" /><p className="mt-3 text-sm text-muted-foreground">Opening your book…</p></div></div>}{readerError ? <div className="flex h-full items-center justify-center rounded-xl border bg-background"><div className="text-center"><p className="text-sm text-destructive">{readerError}</p><Button className="mt-3" size="sm" onClick={() => { setReaderRetry((value) => value + 1); setReaderLoading(true); setReaderError(null); }}>Try again</Button></div></div> : readerUrl && selectedBook && <iframe key={`${selectedBook.id}-${readerRetry}`} title={`Reading ${selectedBook.title}`} src={readerUrl} className="h-full w-full rounded-xl bg-white" onLoad={() => setReaderLoading(false)} onError={() => { setReaderLoading(false); setReaderError('The reader could not load this PDF.'); }} />}</div></div>
               {selectedBook?.book_category === 'academic' && <div className="grid gap-2 glass-panel border-t border-border p-3 sm:grid-cols-2"><div className="sm:col-span-2"><Label htmlFor="reader-selection" className="sr-only">Selected text</Label><Input id="reader-selection" placeholder="Paste selected text to highlight or study" value={selectedText} onChange={(e) => setSelectedText(e.target.value)} /></div><div className="flex flex-wrap gap-2"><Button size="sm" variant={highlightColor === 'yellow' ? 'default' : 'outline'} onClick={() => setHighlightColor('yellow')}><Highlighter className="mr-1 h-4 w-4" />Yellow</Button><Button size="sm" variant={highlightColor === 'blue' ? 'default' : 'outline'} onClick={() => setHighlightColor('blue')}>Blue</Button><Button size="sm" variant={highlightColor === 'red' ? 'default' : 'outline'} onClick={() => setHighlightColor('red')}>Red</Button></div><div className="flex gap-2"><Label htmlFor="reader-note" className="sr-only">Note</Label><Input id="reader-note" placeholder="Add a note" value={noteText} onChange={(e) => setNoteText(e.target.value)} /><Button size="sm" onClick={saveHighlight}>Save</Button></div></div>}
             </section>
-            {selectedBook?.book_category === 'academic' && aiPanelOpen && <aside className="min-h-0 overflow-y-auto border-l border-border bg-background p-4 sm:p-5"><div className="mb-4"><p className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-primary" />Study tools</p><p className="mt-1 text-sm leading-5 text-muted-foreground">Use a short excerpt when you want help. The reader stays the source of truth.</p></div><div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('summary')}>{aiBusy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Summarize</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('simple')}>Explain simply</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('questions')}>Practice questions</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('flashcards')}>Flashcards</Button><Button size="sm" variant="outline" disabled={aiBusy} className="col-span-2" onClick={() => runAi('concepts')}>Key concepts</Button></div><Card className="mt-4"><CardHeader><CardTitle className="text-sm">AI response</CardTitle></CardHeader><CardContent><pre className="whitespace-pre-wrap font-sans text-xs leading-5">{aiOutput || 'Choose a study tool after adding page text or a selection.'}</pre></CardContent></Card>{flashcards.length > 0 && <Card className="mt-3"><CardHeader><CardTitle className="text-sm">Generated flashcards</CardTitle></CardHeader><CardContent className="space-y-2">{flashcards.map((card, index) => <div key={index} className="rounded-lg border p-3"><p className="text-xs font-semibold">{card.front}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{card.back}</p></div>)}</CardContent></Card>}<Card className="mt-3"><CardHeader><CardTitle className="text-sm">Saved practice questions</CardTitle></CardHeader><CardContent className="space-y-2">{savedQuestions.filter((question) => question.book_id === selectedBook.id).length === 0 ? <p className="text-xs text-muted-foreground">Questions you save from this reader will appear here.</p> : savedQuestions.filter((question) => question.book_id === selectedBook.id).slice(0, 10).map((question) => <div key={question.id || question.question} className="rounded-lg border p-3"><p className="text-xs font-semibold">Q: {question.question}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">A: {question.answer}</p></div>)}</CardContent></Card></aside>}
+            {selectedBook?.book_category === 'academic' && aiPanelOpen && <aside className="min-h-0 overflow-y-auto border-l border-border bg-background p-4 sm:p-5"><div className="mb-4"><p className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-primary" />Study tools</p><p className="mt-1 text-sm leading-5 text-muted-foreground">Use a short excerpt when you want help. The reader stays the source of truth.</p></div><Button size="sm" variant="outline" className="mb-3 w-full gap-2" disabled={extractingBookText} onClick={() => void handleExtractBookText()}>{extractingBookText ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}Extract text from this PDF</Button><Textarea rows={6} value={readerPageText} onChange={(event) => setReaderPageText(event.target.value)} placeholder="Extracted PDF text appears here. You can edit it or paste a passage before using AI tools." className="mb-3 text-xs leading-5" /><div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" disabled={aiBusy || (!readerPageText.trim() && !selectedText.trim())} onClick={() => runAi('summary')}>{aiBusy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Summarize</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('simple')}>Explain simply</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('questions')}>Practice questions</Button><Button size="sm" variant="outline" disabled={aiBusy} onClick={() => runAi('flashcards')}>Flashcards</Button><Button size="sm" variant="outline" disabled={aiBusy} className="col-span-2" onClick={() => runAi('concepts')}>Key concepts</Button></div><Card className="mt-4"><CardHeader><CardTitle className="text-sm">AI response</CardTitle></CardHeader><CardContent><pre className="whitespace-pre-wrap font-sans text-xs leading-5">{aiOutput || 'Choose a study tool after adding page text or a selection.'}</pre></CardContent></Card>{flashcards.length > 0 && <Card className="mt-3"><CardHeader><CardTitle className="text-sm">Generated flashcards</CardTitle></CardHeader><CardContent className="space-y-2">{flashcards.map((card, index) => <div key={index} className="rounded-lg border p-3"><p className="text-xs font-semibold">{card.front}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{card.back}</p></div>)}</CardContent></Card>}<Card className="mt-3"><CardHeader><CardTitle className="text-sm">Saved practice questions</CardTitle></CardHeader><CardContent className="space-y-2">{savedQuestions.filter((question) => question.book_id === selectedBook.id).length === 0 ? <p className="text-xs text-muted-foreground">Questions you save from this reader will appear here.</p> : savedQuestions.filter((question) => question.book_id === selectedBook.id).slice(0, 10).map((question) => <div key={question.id || question.question} className="rounded-lg border p-3"><p className="text-xs font-semibold">Q: {question.question}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">A: {question.answer}</p></div>)}</CardContent></Card></aside>}
           </div>
         </DialogContent>
       </Dialog>
