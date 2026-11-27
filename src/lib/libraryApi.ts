@@ -727,7 +727,7 @@ async function extractScannedPdfText(
 export async function extractBookText(
   path: string,
   options?: { maxPages?: number; maxChars?: number; maxOcrPages?: number; ocrLanguages?: string },
-): Promise<{ text: string; pageCount: number; pagesRead: number; truncated: boolean; ocrUsed: boolean }> {
+): Promise<{ text: string; pageCount: number; pagesRead: number; truncated: boolean; ocrUsed: boolean; ocrIncomplete: boolean }> {
   if (!path) throw new Error("This book does not have a readable PDF file.");
   let file: Blob;
   if (/^https?:\/\//i.test(path)) {
@@ -755,6 +755,7 @@ export async function extractBookText(
   let length = 0;
   let pagesRead = 0;
   let ocrUsed = false;
+  let ocrIncomplete = false;
   try {
     for (let pageNo = 1; pageNo <= pagesToRead && length < maxChars; pageNo += 1) {
       const page = await pdf.getPage(pageNo);
@@ -783,6 +784,7 @@ export async function extractBookText(
         }
       } catch (error) {
         console.warn("Scanned PDF OCR failed:", error);
+        ocrIncomplete = true;
         if (!chunks.length) {
           throw new Error("This PDF has no selectable text and OCR could not start. Check your connection and retry; if it still fails, upload a clearer PDF.");
         }
@@ -794,7 +796,7 @@ export async function extractBookText(
   }
   const text = chunks.join("\n\n").slice(0, maxChars).trim();
   if (!text) throw new Error("No readable text was found in this PDF. Try a clearer scan or paste the passage into the study tools.");
-  return { text, pageCount, pagesRead, truncated: pageCount > pagesRead || length > maxChars || pagesNeedingOcr.length > Math.max(1, Math.min(12, Math.floor(options?.maxOcrPages ?? 6))), ocrUsed };
+  return { text, pageCount, pagesRead, truncated: pageCount > pagesRead || length > maxChars || pagesNeedingOcr.length > Math.max(1, Math.min(12, Math.floor(options?.maxOcrPages ?? 6))) || ocrIncomplete, ocrUsed, ocrIncomplete };
 }
 
 export async function analyzeBookPdf(
