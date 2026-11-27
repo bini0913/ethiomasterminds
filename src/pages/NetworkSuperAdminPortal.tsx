@@ -27,6 +27,7 @@ type PendingChange =
   | { kind: "membership"; target: Person; status: string };
 const rpc = (name: string, args?: Record<string, unknown>) => (supabase as any).rpc(name, args);
 const staffRoles = new Set(["manager", "teacher", "finance"]);
+const accessHoldRoles = new Set(["parent", "student"]);
 
 function downloadCsv(filename: string, headers: string[], rows: unknown[][]) {
   const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
@@ -234,8 +235,16 @@ export default function NetworkSuperAdminPortal() {
       toast.error("Legacy School Admin memberships are retired. Use the School Manager leadership appointment workflow.");
       return;
     }
-    if (!staffRoles.has(person.school_role)) {
-      toast.error("Only active Manager, Teacher, and Finance memberships can be managed from this network workspace.");
+    if (!staffRoles.has(person.school_role) && !accessHoldRoles.has(person.school_role)) {
+      toast.error("This membership is managed through the school's leadership or enrollment workflow.");
+      return;
+    }
+    if (accessHoldRoles.has(person.school_role) && !["active", "suspended"].includes(person.membership_status)) {
+      toast.error("Transferred, graduated, or deactivated memberships must be handled through school enrollment workflows.");
+      return;
+    }
+    if (accessHoldRoles.has(person.school_role) && !["active", "suspended"].includes(status)) {
+      toast.error("Network authority may only suspend or restore Parent and Student access.");
       return;
     }
     setChangeReason("");
@@ -601,7 +610,7 @@ export default function NetworkSuperAdminPortal() {
 
       <Dialog open={Boolean(pendingChange)} onOpenChange={(open) => { if (!open && !changeSaving) { setPendingChange(null); setChangeReason(""); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Confirm {pendingChange?.kind === "school" ? "school" : "staff membership"} status change</DialogTitle><DialogDescription>{pendingChange ? `Change ${pendingChange.kind === "school" ? (pendingChange.target as School).name : (pendingChange.target as Person).name} to “${pendingChange.status}”. This action is network-scoped and will be written to the audit history.` : ""}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Confirm {pendingChange?.kind === "school" ? "school" : "membership"} status change</DialogTitle><DialogDescription>{pendingChange ? `Change ${pendingChange.kind === "school" ? (pendingChange.target as School).name : (pendingChange.target as Person).name} to “${pendingChange.status}”. This action is network-scoped, requires a reason, and will be written to the audit history.` : ""}</DialogDescription></DialogHeader>
           <label className="block text-sm font-medium text-slate-700">Reason for this change<Textarea className="mt-1" value={changeReason} onChange={(event) => setChangeReason(event.target.value)} placeholder="Explain the operational reason (minimum 8 characters)" rows={4} minLength={8} required /></label>
           <DialogFooter><Button variant="outline" disabled={changeSaving} onClick={() => setPendingChange(null)}>Cancel</Button><Button disabled={changeSaving || changeReason.trim().length < 8} onClick={() => void confirmStatusChange()}>{changeSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}Confirm change</Button></DialogFooter>
         </DialogContent>
@@ -654,7 +663,7 @@ function SchoolTable({ schools, onAnalytics, onStatus }: { schools: School[]; on
 
 function PeopleTable({ people, onStatus }: { people: Person[]; onStatus: (person: Person, status: string) => void }) {
   if (!people.length) return <EmptyState title="No network memberships found" detail="Try another school, role, or search term. The current filters do not match any network membership." />;
-  return <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[940px] text-left text-sm"><thead className="bg-slate-50"><tr className="border-b text-xs uppercase text-slate-500"><th className="p-3">Person</th><th className="p-3">School</th><th className="p-3">Role</th><th className="p-3">Account</th><th className="p-3">Membership</th><th className="p-3 text-right">Staff actions</th></tr></thead><tbody className="divide-y divide-slate-100">{people.map((item) => <tr key={item.id} className="hover:bg-slate-50/70"><td className="p-3"><p className="font-medium">{item.name}</p><p className="text-xs text-slate-500">@{item.username || "—"}</p></td><td className="p-3">{item.school_name}<p className="text-xs text-slate-500">{item.school_code}</p></td><td className="p-3 capitalize">{item.school_role}</td><td className="p-3"><Badge variant={item.account_status === "active" ? "secondary" : "destructive"}>{item.account_status || "unknown"}</Badge></td><td className="p-3"><Badge variant={item.membership_status === "active" ? "secondary" : item.membership_status === "suspended" ? "destructive" : "outline"}>{item.membership_status}</Badge></td><td className="p-3 text-right">{item.school_role === "admin" ? <span className="text-xs text-slate-400">Legacy Admin role — use School Manager leadership workflow</span> : staffRoles.has(item.school_role) ? <div className="flex justify-end gap-1">{item.membership_status === "active" && <><Button size="sm" variant="outline" onClick={() => onStatus(item, "suspended")}>Suspend</Button><Button size="sm" variant="outline" onClick={() => onStatus(item, "deactivated")}>Deactivate</Button></>}{item.membership_status === "suspended" && <><Button size="sm" variant="outline" onClick={() => onStatus(item, "active")}>Restore</Button><Button size="sm" variant="outline" onClick={() => onStatus(item, "deactivated")}>Deactivate</Button></>}{item.membership_status === "deactivated" && <Button size="sm" variant="outline" onClick={() => onStatus(item, "active")}>Reactivate</Button>}</div> : <span className="text-xs text-slate-400">Managed in school portal</span>}</td></tr>)}</tbody></table></div>;
+  return <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[940px] text-left text-sm"><thead className="bg-slate-50"><tr className="border-b text-xs uppercase text-slate-500"><th className="p-3">Person</th><th className="p-3">School</th><th className="p-3">Role</th><th className="p-3">Account</th><th className="p-3">Membership</th><th className="p-3 text-right">Membership actions</th></tr></thead><tbody className="divide-y divide-slate-100">{people.map((item) => <tr key={item.id} className="hover:bg-slate-50/70"><td className="p-3"><p className="font-medium">{item.name}</p><p className="text-xs text-slate-500">@{item.username || "—"}</p></td><td className="p-3">{item.school_name}<p className="text-xs text-slate-500">{item.school_code}</p></td><td className="p-3 capitalize">{item.school_role}</td><td className="p-3"><Badge variant={item.account_status === "active" ? "secondary" : "destructive"}>{item.account_status || "unknown"}</Badge></td><td className="p-3"><Badge variant={item.membership_status === "active" ? "secondary" : item.membership_status === "suspended" ? "destructive" : "outline"}>{item.membership_status}</Badge></td><td className="p-3 text-right">{item.school_role === "admin" ? <span className="text-xs text-slate-400">Legacy Admin role — use School Manager leadership workflow</span> : staffRoles.has(item.school_role) ? <div className="flex justify-end gap-1">{item.membership_status === "active" && <><Button size="sm" variant="outline" onClick={() => onStatus(item, "suspended")}>Suspend</Button><Button size="sm" variant="outline" onClick={() => onStatus(item, "deactivated")}>Deactivate</Button></>}{item.membership_status === "suspended" && <><Button size="sm" variant="outline" onClick={() => onStatus(item, "active")}>Restore</Button><Button size="sm" variant="outline" onClick={() => onStatus(item, "deactivated")}>Deactivate</Button></>}{item.membership_status === "deactivated" && <Button size="sm" variant="outline" onClick={() => onStatus(item, "active")}>Reactivate</Button>}</div> : accessHoldRoles.has(item.school_role) && item.membership_status === "active" ? <Button size="sm" variant="outline" onClick={() => onStatus(item, "suspended")}>Suspend access</Button> : accessHoldRoles.has(item.school_role) && item.membership_status === "suspended" ? <Button size="sm" variant="outline" onClick={() => onStatus(item, "active")}>Restore access</Button> : <span className="text-xs text-slate-400">School-owned enrollment status</span>}</td></tr>)}</tbody></table></div>;
 }
 
 function AuditTable({ rows }: { rows: Audit[] }) {
