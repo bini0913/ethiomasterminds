@@ -84,7 +84,7 @@ BEGIN
 
   UPDATE public.social_posts
   SET
-    metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+    metadata = (CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END) || jsonb_build_object(
       'support_status', p_status,
       'support_updated_at', now()
     ),
