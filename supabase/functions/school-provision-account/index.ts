@@ -447,16 +447,44 @@ Deno.serve(async (req) => {
         return json({ error: "Platform authority accounts cannot be assigned to a school portal" }, 409);
       }
 
-      const { data: membershipId, error: attachError } = await userClient.rpc("super_admin_attach_existing_account", {
-        p_school_id: schoolId,
-        p_user_id: targetProfile.id,
-        p_school_role: role,
-        p_school_username: targetProfile.username,
-        p_reason: reason,
-        p_student_membership_ids: studentMembershipIds,
-      });
-      if (attachError || !membershipId) {
-        return json({ error: attachError?.message || "The existing account could not be assigned to this school" }, 400);
+      let membershipId: string | null = null;
+      let auditRecorded = true;
+      if (isExtremeAdmin) {
+        const { data, error } = await admin.rpc("school_attach_account", {
+          p_actor_id: actorId,
+          p_school_id: schoolId,
+          p_user_id: targetProfile.id,
+          p_school_role: role,
+          p_school_username: targetProfile.username,
+          p_grade_label: null,
+          p_age_at_enrollment: null,
+          p_section_id: null,
+          p_student_number: null,
+          p_parent_membership_ids: [],
+          p_student_membership_ids: studentMembershipIds,
+          p_teacher_assignments: [],
+        });
+        if (error || !data) return json({ error: error?.message || "The existing account could not be assigned to this school" }, 400);
+        membershipId = data as string;
+        const { error: auditError } = await admin.from("admin_audit_logs").insert({
+          actor_id: actorId,
+          action: "school_network_existing_account_assigned",
+          target_type: "school_membership",
+          target_id: membershipId,
+          metadata: { school_id: schoolId, user_id: targetProfile.id, school_role: role, reason },
+        });
+        auditRecorded = !auditError;
+      } else {
+        const { data, error } = await userClient.rpc("super_admin_attach_existing_account", {
+          p_school_id: schoolId,
+          p_user_id: targetProfile.id,
+          p_school_role: role,
+          p_school_username: targetProfile.username,
+          p_reason: reason,
+          p_student_membership_ids: studentMembershipIds,
+        });
+        if (error || !data) return json({ error: error?.message || "The existing account could not be assigned to this school" }, 400);
+        membershipId = data as string;
       }
 
       return json({
@@ -464,7 +492,8 @@ Deno.serve(async (req) => {
         user_id: targetProfile.id,
         username: targetProfile.username,
         role,
-        audit_recorded: true,
+        audit_recorded: auditRecorded,
+        ...(!auditRecorded ? { warning: "The account was assigned, but the audit event could not be written. Review the audit log before repeating this action." } : {}),
       }, 201);
     }
 
