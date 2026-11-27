@@ -1,7 +1,36 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(12);
+SELECT plan(16);
 
+SELECT ok(
+  to_regclass('public.support_request_statuses') IS NOT NULL,
+  'the private support status table exists'
+);
+SELECT ok(
+  (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.support_request_statuses'::regclass),
+  'support status rows have RLS enabled'
+);
+SELECT ok(
+  has_table_privilege('authenticated', 'public.support_request_statuses', 'SELECT'),
+  'authenticated users can read support status rows subject to RLS'
+);
+SELECT ok(
+  NOT has_table_privilege('authenticated', 'public.support_request_statuses', 'INSERT')
+  AND NOT has_table_privilege('authenticated', 'public.support_request_statuses', 'UPDATE')
+  AND NOT has_table_privilege('authenticated', 'public.support_request_statuses', 'DELETE'),
+  'students cannot write or change their own support status directly'
+);
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'support_request_statuses'
+      AND cmd = 'SELECT'
+      AND qual ILIKE '%user_id%'
+      AND qual ILIKE '%auth.uid%'
+  ),
+  'students can only read status rows belonging to their own requests'
+);
 SELECT ok(
   to_regprocedure('public.extreme_admin_list_support_requests(text,integer,integer)') IS NOT NULL,
   'the guarded support queue RPC exists'
@@ -46,17 +75,14 @@ SELECT ok(
   'support status changes are recorded in the canonical admin audit log'
 );
 SELECT ok(
-  position('support_status' in pg_get_functiondef('public.extreme_admin_list_support_requests(text,integer,integer)'::regprocedure)) > 0
-  AND position('support_status' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0,
-  'support status is persisted on the existing support post rather than fabricated in the UI'
+  position('support_request_statuses' in pg_get_functiondef('public.extreme_admin_list_support_requests(text,integer,integer)'::regprocedure)) > 0
+  AND position('support_request_statuses' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0,
+  'support status is stored separately from user-editable social post metadata'
 );
 SELECT ok(
-  position('support_updated_at' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0,
-  'support updates retain their timestamp'
-);
-SELECT ok(
-  position('reason' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0,
-  'support status changes require an auditable reason'
+  position('updated_at' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0
+  AND position('reason' in pg_get_functiondef('public.extreme_admin_set_support_request_status(uuid,text,text)'::regprocedure)) > 0,
+  'support status changes retain timestamps and require an auditable reason'
 );
 
 SELECT * FROM finish();
