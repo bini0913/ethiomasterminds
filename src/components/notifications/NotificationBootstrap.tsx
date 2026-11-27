@@ -3,7 +3,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/context/UserContext";
 import {
-  getStoredNotificationPreferences,
   loadNotificationPreferences,
   registerForPushNotifications,
   scheduleDailyLearningReminder,
@@ -141,6 +140,38 @@ export default function NotificationBootstrap() {
     };
   }, [isAuthenticated, user?.id]);
 
-  void getStoredNotificationPreferences;
+  // Preference rows are shared across a user's devices. React to remote changes
+  // without prompting for permissions or registering another device.
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+    let active = true;
+    const channel = supabase
+      .channel(`notification-preferences-bootstrap-${user.id}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "notification_preferences",
+        filter: `user_id=eq.${user.id}`,
+      }, async () => {
+        try {
+          const preferences = await loadNotificationPreferences(user.id);
+          if (!active) return;
+          if (preferences.enabled && preferences.dailyReminders) {
+            await scheduleDailyLearningReminder(preferences);
+          } else {
+            const { cancelDailyLearningReminder } = await import("@/lib/notifications");
+            await cancelDailyLearningReminder();
+          }
+        } catch (error) {
+          console.warn("Could not synchronize notification preferences:", error);
+        }
+      })
+      .subscribe();
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, user?.id]);
+
   return null;
 }

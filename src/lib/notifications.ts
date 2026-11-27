@@ -6,6 +6,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { supabase } from "@/integrations/supabase/client";
 
 const PREF_KEY = "master_minds_notification_preferences_v1";
+const preferenceCacheKey = (userId: string) => `${PREF_KEY}:${userId}`;
 const DAILY_REMINDER_ID = 7101;
 
 export type NotificationPreferences = {
@@ -59,9 +60,10 @@ function normalizePreferences(value: Partial<NotificationPreferences> | null | u
   return merged;
 }
 
-export function getStoredNotificationPreferences(): NotificationPreferences {
+export function getStoredNotificationPreferences(userId?: string): NotificationPreferences {
+  if (!userId) return defaults;
   try {
-    const raw = safeStorage.getItem(PREF_KEY);
+    const raw = safeStorage.getItem(preferenceCacheKey(userId));
     return normalizePreferences(raw ? JSON.parse(raw) : defaults);
   } catch {
     return defaults;
@@ -91,7 +93,7 @@ export async function loadNotificationPreferences(userId: string): Promise<Notif
     reminderHour: data.reminder_hour,
   } : defaults);
 
-  safeStorage.setItem(PREF_KEY, JSON.stringify(mapped));
+  safeStorage.setItem(preferenceCacheKey(userId), JSON.stringify(mapped));
   return mapped;
 }
 
@@ -119,7 +121,7 @@ export async function saveNotificationPreferences(
   if (error) throw new Error("Your notification settings could not be saved. Please try again.");
 
   // Update local state only after the server confirms persistence.
-  safeStorage.setItem(PREF_KEY, JSON.stringify(safe));
+  safeStorage.setItem(preferenceCacheKey(userId), JSON.stringify(safe));
   await scheduleDailyLearningReminder(safe);
 }
 
