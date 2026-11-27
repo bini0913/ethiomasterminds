@@ -35,8 +35,9 @@ SELECT ok(
 
 SELECT ok(
   position('active_accounts' in pg_get_functiondef('public.extreme_admin_get_executive_metrics()'::regprocedure)) > 0
-  AND position('user_account_controls' in pg_get_functiondef('public.extreme_admin_get_executive_metrics()'::regprocedure)) > 0,
-  'active-account metrics respect the existing canonical account controls'
+  AND position('profiles' in pg_get_functiondef('public.extreme_admin_get_executive_metrics()'::regprocedure)) > 0
+  AND position('account_status' in pg_get_functiondef('public.extreme_admin_get_executive_metrics()'::regprocedure)) > 0,
+  'active-account metrics use the production canonical profiles.account_status field'
 );
 
 SELECT ok(
@@ -45,9 +46,9 @@ SELECT ok(
 );
 
 SELECT ok(
-  position('user_account_controls' in pg_get_functiondef('public.extreme_admin_set_user_status(uuid,text,text)'::regprocedure)) > 0
-  AND position('profiles' in pg_get_functiondef('public.extreme_admin_set_user_status(uuid,text,text)'::regprocedure)) > 0,
-  'account status changes synchronize canonical controls and profile-facing status'
+  position('UPDATE public.profiles' in pg_get_functiondef('public.extreme_admin_set_user_status(uuid,text,text)'::regprocedure)) > 0
+  AND position('account_status' in pg_get_functiondef('public.extreme_admin_set_user_status(uuid,text,text)'::regprocedure)) > 0,
+  'account status changes update the production canonical profiles.account_status field'
 );
 
 SELECT ok(
