@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(10);
+select plan(11);
 
 select ok(
   exists (
@@ -117,6 +117,21 @@ select ok(
       and coalesce(qual, '') like '%auth.jwt%'
   ),
   'uploaders can clean up only their own thumbnail folder'
+);
+
+
+select ok(
+  exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'library_books'
+      and policyname = 'authenticated can upload books'
+      and cmd = 'INSERT'
+      and coalesce(with_check, '') like '%split_part%'
+      and coalesce(with_check, '') like '%pdf_path%'
+      and coalesce(with_check, '') like '%thumbnail_path%'
+  ),
+  'ordinary uploaders can register only storage paths in their own folder'
 );
 
 select * from finish();
