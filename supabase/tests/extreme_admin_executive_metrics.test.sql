@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(10);
+SELECT plan(12);
 
 SELECT ok(
   to_regprocedure('public.extreme_admin_get_executive_metrics()') IS NOT NULL,
@@ -54,6 +54,17 @@ SELECT ok(
   position('Revoke Super Admin authority before suspending or banning' in pg_get_functiondef('public.extreme_admin_set_user_status(uuid,text,text)'::regprocedure)) > 0
   AND position('extreme_admin_log' in pg_get_functiondef('public.extreme_admin_set_user_status(uuid,text,text)'::regprocedure)) > 0,
   'top-level authority protection and legacy audit history remain enforced'
+);
+
+SELECT ok(
+  position('audit reason is required for role changes' in pg_get_functiondef('public.extreme_admin_set_role(uuid,public.app_role,text)'::regprocedure)) > 0,
+  'role changes reject missing audit reasons at the database boundary'
+);
+
+SELECT ok(
+  position('audit reason is required for Super Admin authority changes' in pg_get_functiondef('public.extreme_admin_set_super_admin(uuid,boolean,text)'::regprocedure)) > 0
+  AND position('audit reason is required for school status changes' in pg_get_functiondef('public.extreme_admin_set_school_status(uuid,text,text)'::regprocedure)) > 0,
+  'Super Admin and school status changes reject missing audit reasons'
 );
 
 SELECT * FROM finish();
