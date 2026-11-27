@@ -75,6 +75,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [previousLevel, setPreviousLevel] = useState<number>(1);
   // Prevent an in-flight session read/auth callback from restoring a session after logout.
   const signingOutRef = useRef(false);
+  // Prevent overlapping session/profile resolutions from restoring an outdated account.
+  const profileResolutionSequence = useRef(0);
 
   const calculateLevel = (xp: number) => {
     return Math.floor(xp / 100) + 1;
@@ -193,14 +195,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         }
 
         setSession(newSession);
-        
+        const sequence = ++profileResolutionSequence.current;
         if (newSession?.user) {
-          // Use setTimeout to prevent deadlock
+          // Use setTimeout to prevent deadlock; sequence-guard against stale account events.
           const callbackUserId = newSession.user.id;
           setTimeout(() => {
-            if (signingOutRef.current) return;
+            if (signingOutRef.current || sequence !== profileResolutionSequence.current) return;
             fetchUserProfile(callbackUserId, newSession.user).then(profile => {
-              if (signingOutRef.current) return;
+              if (signingOutRef.current || sequence !== profileResolutionSequence.current) return;
               setUser(profile);
               setIsLoading(false);
             });
@@ -225,9 +227,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         }
 
         setSession(existingSession);
+        const sequence = ++profileResolutionSequence.current;
         if (existingSession?.user) {
           fetchUserProfile(existingSession.user.id, existingSession.user).then(profile => {
-            if (signingOutRef.current) return;
+            if (signingOutRef.current || sequence !== profileResolutionSequence.current) return;
             setUser(profile);
             setIsLoading(false);
           });
@@ -241,6 +244,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         // sign-in event and repopulate the context.
         console.error("Could not restore the saved authentication session:", error);
         if (signingOutRef.current) return;
+        ++profileResolutionSequence.current;
         setSession(null);
         setUser(null);
         setIsLoading(false);
@@ -538,6 +542,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     signingOutRef.current = true;
+    ++profileResolutionSequence.current;
     safeStorage.removeItem("masterminds_login_mode");
     setShowLevelUp(false);
     setUser(null);
