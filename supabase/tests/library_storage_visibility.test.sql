@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(8);
+select plan(10);
 
 select ok(
   exists (
@@ -86,6 +86,33 @@ select ok(
       and public = true
   ),
   'no library bucket is made public to solve signed-read access'
+);
+
+
+select ok(
+  exists (
+    select 1 from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'Authenticated users can delete own library files'
+      and cmd = 'DELETE'
+      and coalesce(qual, '') like '%library-files%'
+      and coalesce(qual, '') like '%auth.jwt%'
+  ),
+  'uploaders can clean up only their own PDF folder'
+);
+
+select ok(
+  exists (
+    select 1 from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'Authenticated users can delete own library thumbnails'
+      and cmd = 'DELETE'
+      and coalesce(qual, '') like '%library-thumbnails%'
+      and coalesce(qual, '') like '%auth.jwt%'
+  ),
+  'uploaders can clean up only their own thumbnail folder'
 );
 
 select * from finish();
