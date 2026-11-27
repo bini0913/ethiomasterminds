@@ -402,11 +402,17 @@ export async function scheduleDailyLearningReminder(
 
   const safe = normalizePreferences(preferences);
   let hour = safe.reminderHour;
+  let minute = 0;
   if (safe.quietHoursEnabled) {
     const start = minuteOfDay(safe.quietStart);
     const end = minuteOfDay(safe.quietEnd);
     const target = hour * 60;
-    if (isWithinQuietHours(target, start, end)) hour = Math.floor(end / 60);
+    // Equal quiet-hours boundaries represent a full-day quiet window.
+    if (start === end) return;
+    if (isWithinQuietHours(target, start, end)) {
+      hour = Math.floor(end / 60);
+      minute = end % 60;
+    }
   }
 
   const copy = reminderCopy(context);
@@ -415,7 +421,7 @@ export async function scheduleDailyLearningReminder(
       id: DAILY_REMINDER_ID,
       title: copy.title,
       body: copy.body,
-      schedule: { on: { hour, minute: 0 }, repeats: true, allowWhileIdle: true },
+      schedule: { on: { hour, minute }, repeats: true, allowWhileIdle: true },
       extra: { route: "/", kind: "daily_learning_reminder" },
       channelId: "master_minds_default",
       smallIcon: "ic_stat_master_minds",
