@@ -328,6 +328,7 @@ Deno.serve(async (req) => {
       const schoolId = normalize(payload?.school_id);
       const targetUsername = normalize(payload?.username).toLowerCase();
       const role = normalize(payload?.role) as SchoolRole;
+      const reason = normalize(payload?.reason);
       const assignableRoles: SchoolRole[] = ["manager", "finance", "parent"];
       const studentMembershipIds = Array.isArray(payload?.student_membership_ids)
         ? [...new Set(payload.student_membership_ids.map((id: unknown) => normalize(id)).filter(Boolean))]
@@ -335,7 +336,7 @@ Deno.serve(async (req) => {
       if (role === "parent" && studentMembershipIds.length === 0) {
         return json({ error: "A parent account must be linked to at least one enrolled student in this school" }, 400);
       }
-      if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64 || !assignableRoles.includes(role)) {
+      if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64 || !assignableRoles.includes(role) || !reason) {
         return json({ error: "Provide an active school, existing username, and supported school role" }, 400);
       }
       const { data: school, error: schoolError } = await admin
@@ -378,7 +379,7 @@ Deno.serve(async (req) => {
         action: "extreme_admin_assigned_existing_school_account",
         target_type: "school_membership",
         target_id: membershipId,
-        metadata: { school_id: schoolId, user_id: targetProfile.id, school_role: role },
+        metadata: { school_id: schoolId, user_id: targetProfile.id, school_role: role, reason },
       });
 
       return json({
