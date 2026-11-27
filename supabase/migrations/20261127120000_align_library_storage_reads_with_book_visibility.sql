@@ -11,6 +11,7 @@ using (
     select 1
     from public.library_books b
     where b.pdf_path = name
+      and (storage.foldername(name))[1] = b.uploader_id::text
   )
 );
 
@@ -24,6 +25,7 @@ using (
     select 1
     from public.library_books b
     where b.thumbnail_path = name
+      and (storage.foldername(name))[1] = b.uploader_id::text
   )
 );
 
