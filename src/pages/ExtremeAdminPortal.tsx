@@ -52,6 +52,7 @@ type DeletionRequest = {
   resolution_note: string | null;
 };
 type CurrencyTotal = { currency: string; collected?: number; outstanding?: number };
+type SchoolSectionOption = { id: string; grade_label: string; section_name: string; academic_year_id: string | null };
 type ExecutiveMetrics = {
   registered_users?: number;
   active_accounts?: number;
@@ -177,6 +178,8 @@ const ExtremeAdminPortal: React.FC = () => {
   const [createSchoolOpen, setCreateSchoolOpen] = useState(false);
   const [createSchoolLoading, setCreateSchoolLoading] = useState(false);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [schoolSections, setSchoolSections] = useState<SchoolSectionOption[]>([]);
+  const [sectionsLoading, setSectionsLoading] = useState(false);
   const [newAccountName, setNewAccountName] = useState("");
   const [newAccountRole, setNewAccountRole] = useState("finance");
   const [newAccountGrade, setNewAccountGrade] = useState("");
@@ -266,6 +269,42 @@ const ExtremeAdminPortal: React.FC = () => {
     if (!isExtremeAdmin) return;
     void loadUsers(true);
   }, [isExtremeAdmin, user?.id, directorySearch, directoryRoleFilter, loadUsers]);
+
+  useEffect(() => {
+    if (!selectedSchoolId || !isExtremeAdmin) {
+      setSchoolSections([]);
+      setNewAccountGrade("");
+      setNewAccountSectionId("");
+      return;
+    }
+    let cancelled = false;
+    const loadSchoolSections = async () => {
+      setSectionsLoading(true);
+      const [sectionsResult, yearsResult] = await Promise.all([
+        supabase.from("school_sections").select("id,academic_year_id,grade_label,section_name").eq("school_id", selectedSchoolId).order("grade_label").order("section_name"),
+        supabase.from("school_academic_years").select("id,is_current").eq("school_id", selectedSchoolId),
+      ]);
+      if (cancelled) return;
+      if (sectionsResult.error || yearsResult.error) {
+        setSchoolSections([]);
+        setNewAccountGrade("");
+        setNewAccountSectionId("");
+        toast.error(sectionsResult.error?.message || yearsResult.error?.message || "Could not load this school's sections");
+      } else {
+        const currentYearIds = new Set((yearsResult.data || []).filter((year) => year.is_current).map((year) => year.id));
+        const allSections = (sectionsResult.data || []) as SchoolSectionOption[];
+        const currentSections = currentYearIds.size
+          ? allSections.filter((section) => currentYearIds.has(section.academic_year_id || ""))
+          : allSections;
+        setSchoolSections(currentSections);
+        setNewAccountGrade((current) => currentSections.some((section) => section.grade_label === current) ? current : "");
+        setNewAccountSectionId((current) => currentSections.some((section) => section.id === current) ? current : "");
+      }
+      setSectionsLoading(false);
+    };
+    void loadSchoolSections();
+    return () => { cancelled = true; };
+  }, [selectedSchoolId, isExtremeAdmin]);
 
   const selectedUser = users.find((item) => item.id === targetUserId);
 
@@ -666,7 +705,7 @@ const ExtremeAdminPortal: React.FC = () => {
                 <div className="space-y-1"><Label>School</Label><Select value={selectedSchoolId} onValueChange={setSelectedSchoolId}><SelectTrigger><SelectValue placeholder="Choose a school" /></SelectTrigger><SelectContent>{schools.filter((school) => school.status === "active").map((school) => <SelectItem key={school.id} value={school.id}>{school.name} · {school.school_code}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-1"><Label>School role</Label><Select value={newAccountRole} onValueChange={setNewAccountRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="finance">Finance</SelectItem><SelectItem value="parent">Parent</SelectItem><SelectItem value="student">Student</SelectItem></SelectContent></Select></div>
                 <div className="space-y-1"><Label>Full name</Label><Input value={newAccountName} onChange={(event) => setNewAccountName(event.target.value)} placeholder="Account holder's full name" /></div>
-                {newAccountRole === "student" && <div className="grid gap-3 sm:grid-cols-3"><div className="space-y-1"><Label>Grade</Label><Input value={newAccountGrade} onChange={(event) => setNewAccountGrade(event.target.value)} placeholder="e.g. Grade 7" /></div><div className="space-y-1"><Label>Age</Label><Input type="number" min="3" max="120" value={newAccountAge} onChange={(event) => setNewAccountAge(event.target.value)} placeholder="Age" /></div><div className="space-y-1"><Label>Section ID</Label><Input value={newAccountSectionId} onChange={(event) => setNewAccountSectionId(event.target.value)} placeholder="Section UUID" /></div></div>}
+                {newAccountRole === "student" && <div className="grid gap-3 sm:grid-cols-3"><div className="space-y-1"><Label>Grade</Label><Select value={newAccountGrade} onValueChange={(value) => { setNewAccountGrade(value); setNewAccountSectionId(""); }} disabled={sectionsLoading || schoolSections.length === 0}><SelectTrigger><SelectValue placeholder={sectionsLoading ? "Loading grades…" : "Choose grade"} /></SelectTrigger><SelectContent>{Array.from(new Set(schoolSections.map((section) => section.grade_label))).map((grade) => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent></Select></div><div className="space-y-1"><Label>Age</Label><Input type="number" min="3" max="120" value={newAccountAge} onChange={(event) => setNewAccountAge(event.target.value)} placeholder="Age" /></div><div className="space-y-1"><Label>Section</Label><Select value={newAccountSectionId} onValueChange={setNewAccountSectionId} disabled={sectionsLoading || !newAccountGrade}><SelectTrigger><SelectValue placeholder={sectionsLoading ? "Loading sections…" : "Choose section"} /></SelectTrigger><SelectContent>{schoolSections.filter((section) => section.grade_label === newAccountGrade).map((section) => <SelectItem key={section.id} value={section.id}>{section.section_name}</SelectItem>)}</SelectContent></Select></div>{!sectionsLoading && schoolSections.length === 0 && <p className="sm:col-span-3 text-xs text-amber-700">No sections are configured for the selected school and current academic year. Create its academic year and sections in School Manager first.</p>}</div>}
                 {newAccountRole === "parent" && <div className="space-y-1"><Label>Student usernames (required)</Label><Input value={parentStudentUsernames} onChange={(event) => setParentStudentUsernames(event.target.value)} placeholder="Comma-separated student usernames" /></div>}
                 <Button className="w-full" onClick={() => void createSchoolAccount()} disabled={createAccountLoading || !selectedSchoolId || !newAccountName.trim()}>{createAccountLoading ? "Creating account…" : "Create school account"}</Button>
               </CardContent>
