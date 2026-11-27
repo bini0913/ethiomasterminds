@@ -35,6 +35,7 @@ export default function NotificationSettingsPage() {
   const upperStudent = getUserTier(user?.grade) === "upper";
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [saving, setSaving] = useState(false);
+  const [registeringDevice, setRegisteringDevice] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
@@ -91,6 +92,23 @@ export default function NotificationSettingsPage() {
     }
   };
 
+  const registerThisDevice = async () => {
+    if (!user?.id || !prefs.enabled || registeringDevice) return;
+    setRegisteringDevice(true);
+    try {
+      const registered = await registerForPushNotifications(user.id, true);
+      if (registered) {
+        toast.success("This device is registered for notifications.");
+      } else {
+        toast.info("Your in-app inbox is available, but this device could not be registered for push. Check notification permission and Firebase web configuration.");
+      }
+    } catch {
+      toast.error("Could not register this device for push notifications.");
+    } finally {
+      setRegisteringDevice(false);
+    }
+  };
+
   if (!prefs) {
     return (
       <main className="flex min-h-[50vh] flex-col items-center justify-center gap-3 bg-background p-6 text-center" role="status" aria-live="polite">
@@ -125,7 +143,16 @@ export default function NotificationSettingsPage() {
               <div><Label htmlFor="all-notifications">Enable notifications</Label><p className="text-sm text-muted-foreground">Allow Master Minds to send alerts to this device.</p></div>
               <Switch id="all-notifications" checked={prefs.enabled} onCheckedChange={(v) => void update("enabled", v)} disabled={saving} />
             </div>
-            {!prefs.enabled && <p className="text-sm text-muted-foreground">Notifications are paused. You can turn them back on anytime.</p>}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">This device</p>
+                <p className="text-sm text-muted-foreground">Register this browser or Android device to receive push alerts.</p>
+              </div>
+              <Button type="button" variant="outline" onClick={() => void registerThisDevice()} disabled={!prefs.enabled || saving || registeringDevice}>
+                <Bell className="mr-2 h-4 w-4" />{registeringDevice ? "Registering…" : "Set up this device"}
+              </Button>
+            </div>
+            {!prefs.enabled && <p className="text-sm text-muted-foreground">Notifications are paused. Turn them on before registering this device.</p>}
           </CardContent>
         </Card>
 
