@@ -230,6 +230,28 @@ async function generatePdfThumbnail(pdfFile: File): Promise<Blob | null> {
   }
 }
 
+async function rollbackCreatedBook(
+  bookId: string,
+  uploaderId: string,
+  pdfPath: string,
+  thumbnailPath: string | null,
+) {
+  const { error: uploadRecordError } = await db
+    .from("book_uploads")
+    .delete()
+    .eq("book_id", bookId)
+    .eq("uploader_id", uploaderId);
+  if (uploadRecordError) throw uploadRecordError;
+
+  const { error: bookRecordError } = await db
+    .from("library_books")
+    .delete()
+    .eq("id", bookId);
+  if (bookRecordError) throw bookRecordError;
+
+  await cleanupUploadedAssets(pdfPath, thumbnailPath);
+}
+
 export async function createBook(payload: CreateBookPayload) {
   payload.onProgress?.('validating');
   if (!payload.pdfFile) {
@@ -337,11 +359,12 @@ export async function createBook(payload: CreateBookPayload) {
       }
     }
   } catch (uploadAuditError) {
-    const { error: rollbackError } = await db.from("library_books").delete().eq("id", createdBook.id);
-    if (!rollbackError) {
-      await cleanupUploadedAssets(pdfPath, thumbnailPath);
-    } else {
-      console.error("Library upload rollback failed; preserving file to avoid a broken book record.", rollbackError);
+    let rollbackError: unknown = null;
+    try {
+      await rollbackCreatedBook(createdBook.id, payload.uploaderId, pdfPath, thumbnailPath);
+    } catch (error) {
+      rollbackError = error;
+      console.error("Library upload rollback failed; preserving the book file for recovery.", error);
     }
     throw new Error(
       rollbackError
@@ -358,9 +381,13 @@ export async function createBook(payload: CreateBookPayload) {
       p_section_id: payload.schoolSubmission.sectionId,
     });
     if (schoolSubmitError) {
-      const { error: rollbackError } = await db.from("library_books").delete().eq("id", createdBook.id);
-      if (!rollbackError) await cleanupUploadedAssets(pdfPath, thumbnailPath);
-      else console.error("School submission rollback failed; preserving file to avoid a broken book record.", rollbackError);
+      let rollbackError: unknown = null;
+      try {
+        await rollbackCreatedBook(createdBook.id, payload.uploaderId, pdfPath, thumbnailPath);
+      } catch (error) {
+        rollbackError = error;
+        console.error("School submission rollback failed; preserving the book file for recovery.", error);
+      }
       throw new Error(
         rollbackError
           ? "School submission failed and the upload could not be safely rolled back. Please contact support."
@@ -373,9 +400,11 @@ export async function createBook(payload: CreateBookPayload) {
       .eq('id', createdBook.id)
       .single();
     if (schoolBookError) {
-      const { error: rollbackError } = await db.from("library_books").delete().eq("id", createdBook.id);
-      if (!rollbackError) await cleanupUploadedAssets(pdfPath, thumbnailPath);
-      else console.error("School book readback rollback failed; preserving file to avoid a broken book record.", rollbackError);
+      try {
+        await rollbackCreatedBook(createdBook.id, payload.uploaderId, pdfPath, thumbnailPath);
+      } catch (rollbackError) {
+        console.error("School book readback rollback failed; preserving the book file for recovery.", rollbackError);
+      }
       throw schoolBookError;
     }
     payload.onProgress?.('done');
