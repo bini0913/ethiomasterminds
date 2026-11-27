@@ -150,16 +150,14 @@ async function cleanupUploadedAssets(pdfPath: string, thumbnailPath: string | nu
   ];
 
   const results = await Promise.allSettled(cleanupTasks);
-  results.forEach((result) => {
-    if (result.status === 'rejected') {
-      console.warn('Library upload cleanup failed:', result.reason);
-      return;
-    }
-
-    if (result.value.error) {
-      console.warn('Library upload cleanup failed:', result.value.error);
-    }
+  const failures = results.flatMap((result) => {
+    if (result.status === "rejected") return [result.reason];
+    return result.value.error ? [result.value.error] : [];
   });
+  if (failures.length) {
+    console.error("Library upload cleanup failed:", failures);
+    throw new Error("The uploaded file could not be fully removed during rollback. Please contact support before retrying.");
+  }
 }
 
 function getErrorCode(error: unknown): string | undefined {
@@ -327,7 +325,12 @@ export async function createBook(payload: CreateBookPayload) {
     .single();
 
   if (error) {
-    await cleanupUploadedAssets(pdfPath, thumbnailPath);
+    try {
+      await cleanupUploadedAssets(pdfPath, thumbnailPath);
+    } catch (cleanupError) {
+      console.error("Library file cleanup failed after book record creation failed:", cleanupError);
+      throw new Error("The book record could not be saved and the uploaded file could not be fully cleaned up. Please contact support.");
+    }
     throw error;
   }
 
