@@ -98,6 +98,7 @@ const LibraryPage: React.FC = () => {
   const [savingFlashcards, setSavingFlashcards] = useState(false);
   const [flashcardsSaved, setFlashcardsSaved] = useState(false);
   const highlightAutoSaveRef = useRef<number | null>(null);
+  const readerSessionStartedAtRef = useRef<number | null>(null);
 
   const [search, setSearch] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('all');
@@ -417,6 +418,7 @@ const LibraryPage: React.FC = () => {
     setReaderLoading(true);
     setReaderError(null);
     setReaderOpen(true);
+    readerSessionStartedAtRef.current = Date.now();
     setReaderPageText('');
     setSelectedText('');
     setAiOutput('');
@@ -637,16 +639,51 @@ const LibraryPage: React.FC = () => {
     };
   }, [selectedText, selectedBook?.id, user?.id, readerOpen, highlights, readerProgress, highlightColor, noteText, selectedBook, user]);
 
+  const saveReaderSessionProgress = async () => {
+    if (!selectedBook || !user || readerSessionStartedAtRef.current === null) return;
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - readerSessionStartedAtRef.current) / 1000));
+    readerSessionStartedAtRef.current = null;
+    if (elapsedSeconds < 1) return;
+
+    const previous = readingProgress.find((entry) => entry.book_id === selectedBook.id);
+    try {
+      const saved = await upsertReadingProgress({
+        user_id: user.id,
+        book_id: selectedBook.id,
+        last_page: Math.max(0, Math.round(readerProgress)),
+        completion_percent: Math.round(readerProgress),
+        time_spent_seconds: Math.max(0, Number(previous?.time_spent_seconds) || 0) + elapsedSeconds,
+      });
+      setReadingProgress((current) => [...current.filter((entry) => entry.book_id !== selectedBook.id), saved]);
+    } catch (error) {
+      console.error("Reading session progress could not be saved:", error);
+      toast.error("Your reading time could not sync. Please check your connection and retry.");
+    }
+  };
+
   const markReaderProgress = async (next: number) => {
-    setReaderProgress(next);
     if (!selectedBook || !user) return;
-    await upsertReadingProgress({
-      user_id: user.id,
-      book_id: selectedBook.id,
-      last_page: Math.max(1, Math.round((next / 100) * 100)),
-      completion_percent: next,
-      time_spent_seconds: Math.max(60, Math.round((next / 100) * 1800)),
-    }).catch(() => undefined);
+    const previousPercent = readerProgress;
+    const previous = readingProgress.find((entry) => entry.book_id === selectedBook.id);
+    const elapsedSeconds = readerSessionStartedAtRef.current === null
+      ? 0
+      : Math.max(0, Math.floor((Date.now() - readerSessionStartedAtRef.current) / 1000));
+    setReaderProgress(next);
+    try {
+      const saved = await upsertReadingProgress({
+        user_id: user.id,
+        book_id: selectedBook.id,
+        last_page: Math.max(0, Math.round(next)),
+        completion_percent: Math.round(next),
+        time_spent_seconds: Math.max(0, Number(previous?.time_spent_seconds) || 0) + elapsedSeconds,
+      });
+      setReadingProgress((current) => [...current.filter((entry) => entry.book_id !== selectedBook.id), saved]);
+      readerSessionStartedAtRef.current = Date.now();
+    } catch (error) {
+      console.error("Reading progress could not be saved:", error);
+      setReaderProgress(previousPercent);
+      toast.error("Reading progress could not be saved. Please retry.");
+    }
   };
 
   useEffect(() => {
@@ -776,7 +813,7 @@ const LibraryPage: React.FC = () => {
         </div>
       </div>
 
-      <Dialog open={readerOpen} onOpenChange={setReaderOpen}>
+      <Dialog open={readerOpen} onOpenChange={(open) => { setReaderOpen(open); if (!open) void saveReaderSessionProgress(); }}>
         <DialogContent className="glass-panel fixed inset-0 left-0 top-0 h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none p-0">
           <div className={`grid h-full min-h-0 grid-cols-1 ${selectedBook?.book_category === 'academic' && aiPanelOpen ? 'grid-rows-[minmax(0,1fr)_minmax(0,35dvh)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_360px]' : ''}`}>
             <section className="flex min-h-0 flex-col bg-[#eef1f4]">
