@@ -13,6 +13,8 @@ select ok(
       and cmd = 'SELECT'
       and coalesce(qual, '') like '%library_books%'
       and coalesce(qual, '') like '%pdf_path%'
+      and coalesce(qual, '') like '%uploader_id%'
+      and coalesce(qual, '') like '%foldername%'
   ),
   'signed PDF reads follow library_books row visibility'
 );
@@ -26,6 +28,8 @@ select ok(
       and cmd = 'SELECT'
       and coalesce(qual, '') like '%library_books%'
       and coalesce(qual, '') like '%thumbnail_path%'
+      and coalesce(qual, '') like '%uploader_id%'
+      and coalesce(qual, '') like '%foldername%'
   ),
   'signed thumbnail reads follow library_books row visibility'
 );
