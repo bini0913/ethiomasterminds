@@ -191,9 +191,9 @@ BEGIN
             COALESCE(NULLIF(i.currency, ''), 'ETB')) x
       ), '[]'::jsonb),
       'daily_collections', COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('day', day, 'currency', currency, 'collected', collected)
-          ORDER BY day, currency)
-        FROM (SELECT (p.received_at AT TIME ZONE 'Africa/Addis_Ababa')::date day,
+        SELECT jsonb_agg(jsonb_build_object('day', report_day, 'currency', currency, 'collected', collected)
+          ORDER BY report_day, currency)
+        FROM (SELECT (p.received_at AT TIME ZONE 'Africa/Addis_Ababa')::date report_day,
           COALESCE(NULLIF(i.currency, ''), 'ETB') currency,
           sum(p.amount)::numeric(14,2) collected
           FROM public.school_fee_payments p
@@ -207,24 +207,24 @@ BEGIN
     ),
     'growth', jsonb_build_object(
       'registrations_by_day', COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('day', day, 'registrations', registrations) ORDER BY day)
-        FROM (SELECT (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date day, count(*) registrations
+        SELECT jsonb_agg(jsonb_build_object('day', report_day, 'registrations', registrations) ORDER BY report_day)
+        FROM (SELECT (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date report_day, count(*) registrations
           FROM public.profiles
           WHERE created_at >= (v_start_date::timestamp AT TIME ZONE 'Africa/Addis_Ababa')
           GROUP BY (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date) x
       ), '[]'::jsonb),
       'schools_created_by_day', COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('day', day, 'schools', schools) ORDER BY day)
-        FROM (SELECT (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date day, count(*) schools
+        SELECT jsonb_agg(jsonb_build_object('day', report_day, 'schools', schools) ORDER BY report_day)
+        FROM (SELECT (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date report_day, count(*) schools
           FROM public.schools
           WHERE created_at >= (v_start_date::timestamp AT TIME ZONE 'Africa/Addis_Ababa')
             AND (p_school_id IS NULL OR id = p_school_id)
           GROUP BY (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date) x
       ), '[]'::jsonb),
       'student_activity_by_day', COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('day', day, 'active_students', active_students,
-          'questions', questions, 'correct', correct, 'quizzes', quizzes, 'xp', xp) ORDER BY day)
-        FROM (SELECT activity_date day, count(DISTINCT user_id) active_students,
+        SELECT jsonb_agg(jsonb_build_object('day', report_day, 'active_students', active_students,
+          'questions', questions, 'correct', correct, 'quizzes', quizzes, 'xp', xp) ORDER BY report_day)
+        FROM (SELECT activity_date report_day, count(DISTINCT user_id) active_students,
           sum(question_count)::bigint questions, sum(correct_count)::bigint correct,
           sum(quiz_count)::bigint quizzes, sum(xp_earned)::bigint xp
           FROM public.upper_student_daily_activity
@@ -232,8 +232,8 @@ BEGIN
           GROUP BY activity_date) x
       ), '[]'::jsonb),
       'study_sessions_by_day', COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('day', day, 'sessions', sessions, 'duration_units', duration_units) ORDER BY day)
-        FROM (SELECT (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date day,
+        SELECT jsonb_agg(jsonb_build_object('day', report_day, 'sessions', sessions, 'duration_units', duration_units) ORDER BY report_day)
+        FROM (SELECT (created_at AT TIME ZONE 'Africa/Addis_Ababa')::date report_day,
           count(*) sessions, sum(COALESCE(duration, 0))::bigint duration_units
           FROM public.study_sessions
           WHERE created_at >= (v_start_date::timestamp AT TIME ZONE 'Africa/Addis_Ababa')
