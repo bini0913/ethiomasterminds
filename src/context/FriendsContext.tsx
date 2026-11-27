@@ -1,5 +1,5 @@
 import { db } from "@/integrations/untypedClient";
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser, UserProfile } from './UserContext';
 import { toast } from 'sonner';
@@ -73,12 +73,17 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([]);
   const [friendPresence, setFriendPresence] = useState<Record<string, FriendPresence>>({});
+  const fetchFriendsSequence = useRef(0);
 
   const fetchFriends = useCallback(async () => {
-    if (!user?.id) {
+    const sequence = ++fetchFriendsSequence.current;
+    const requestedUserId = user?.id;
+    if (!requestedUserId) {
       setFriends([]);
       setFriendRequests([]);
       setOutgoingRequests([]);
+      setMessages([]);
+      setOnlineFriends([]);
       setFriendPresence({});
       setLoading(false);
       return;
@@ -92,6 +97,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
 
       if (friendshipsError) throw friendshipsError;
+      if (sequence !== fetchFriendsSequence.current || user?.id !== requestedUserId) return;
 
       // Separate accepted, incoming pending, and outgoing pending
       const acceptedFriendships = (allFriendships || []).filter(f => f.status === 'accepted');
@@ -115,6 +121,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         const { data: profiles } = await (supabase as any)
           .rpc('get_friend_profiles', { _user_ids: allUserIds });
 
+        if (sequence !== fetchFriendsSequence.current || user?.id !== requestedUserId) return;
         profiles?.forEach(p => profilesMap.set(p.id, p));
 
         // Fetch presence
@@ -123,6 +130,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
           .select('user_id, status, last_seen')
           .in('user_id', friendIdsFromAccepted);
 
+        if (sequence !== fetchFriendsSequence.current || user?.id !== requestedUserId) return;
         presenceData?.forEach(p => {
           presenceMap.set(p.user_id, {
             status: p.status || 'offline',
@@ -148,6 +156,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         } as UserProfile & { friendshipId?: string };
       });
 
+      if (sequence !== fetchFriendsSequence.current || user?.id !== requestedUserId) return;
       setFriends(mappedFriends);
       const now = Date.now();
       setOnlineFriends(mappedFriends.filter(f => {
@@ -212,6 +221,7 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
         .limit(500);
 
       if (messagesError) throw messagesError;
+      if (sequence !== fetchFriendsSequence.current || user?.id !== requestedUserId) return;
 
       setMessages((messagesData || []).map(m => ({
         id: m.id,
@@ -223,9 +233,9 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
       })));
 
     } catch (err) {
-      console.error('Error fetching friends:', err);
+      if (sequence === fetchFriendsSequence.current) console.error('Error fetching friends:', err);
     } finally {
-      setLoading(false);
+      if (sequence === fetchFriendsSequence.current) setLoading(false);
     }
   }, [user?.id, user]);
 

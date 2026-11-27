@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUser } from './UserContext';
 import { toast } from 'sonner';
@@ -69,10 +69,18 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const groupFetchSequence = useRef(0);
+  const messageFetchSequence = useRef(0);
+  const memberFetchSequence = useRef(0);
 
   const fetchGroups = useCallback(async () => {
-    if (!user?.id) {
+    const sequence = ++groupFetchSequence.current;
+    const requestedUserId = user?.id;
+    if (!requestedUserId) {
       setGroups([]);
+      setCurrentGroup(null);
+      setMessages([]);
+      setMembers([]);
       setLoading(false);
       return;
     }
@@ -84,10 +92,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .eq('user_id', user.id);
 
       if (memberError) throw memberError;
+      if (sequence !== groupFetchSequence.current || user?.id !== requestedUserId) return;
 
       const groupIds = memberData?.map(m => m.group_id) || [];
 
       if (groupIds.length === 0) {
+        if (sequence !== groupFetchSequence.current || user?.id !== requestedUserId) return;
         setGroups([]);
         setLoading(false);
         return;
@@ -100,6 +110,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .order('updated_at', { ascending: false });
 
       if (groupsError) throw groupsError;
+      if (sequence !== groupFetchSequence.current || user?.id !== requestedUserId) return;
 
       // Get member counts
       const { data: countData } = await supabase
@@ -114,6 +125,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       const { data: unreadRows, error: unreadError } = await (supabase.rpc as any)('get_my_group_unread_counts');
       if (unreadError) throw unreadError;
+      if (sequence !== groupFetchSequence.current || user?.id !== requestedUserId) return;
       const unreadMap = new Map<string, number>(
         (unreadRows || []).map((row: { group_id: string; unread_count: number | string }) => [
           row.group_id,
@@ -128,15 +140,22 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         unread_count: unreadMap.get(g.id) || 0,
       }));
 
-      setGroups(enrichedGroups);
+      if (sequence === groupFetchSequence.current && user?.id === requestedUserId) setGroups(enrichedGroups);
     } catch (err) {
-      console.error('Error fetching groups:', err);
+      if (sequence === groupFetchSequence.current) console.error('Error fetching groups:', err);
     } finally {
-      setLoading(false);
+      if (sequence === groupFetchSequence.current) setLoading(false);
     }
   }, [user?.id]);
 
   const fetchMessages = useCallback(async (groupId: string) => {
+    const sequence = ++messageFetchSequence.current;
+    const requestedUserId = user?.id;
+    if (!requestedUserId) {
+      setMessages([]);
+      setLoadingMessages(false);
+      return;
+    }
     setLoadingMessages(true);
     try {
       const { data, error } = await supabase
@@ -147,6 +166,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .limit(100);
 
       if (error) throw error;
+      if (sequence !== messageFetchSequence.current || user?.id !== requestedUserId) return;
 
       // Get sender profiles
       const latestFirstMessages = [...(data || [])].reverse();
@@ -156,6 +176,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .select('id, name, avatar')
         .in('id', senderIds);
 
+      if (sequence !== messageFetchSequence.current || user?.id !== requestedUserId) return;
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
       const enrichedMessages: GroupMessage[] = latestFirstMessages.map(m => ({
@@ -165,13 +186,15 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         sender_avatar: profileMap.get(m.sender_id)?.avatar
       }));
 
+      if (sequence !== messageFetchSequence.current || user?.id !== requestedUserId) return;
       setMessages(enrichedMessages);
-      if (user?.id) {
+      if (user?.id === requestedUserId) {
         const readAt = new Date().toISOString();
         const { error: cursorError } = await (supabase.from('chat_group_members') as any)
           .update({ last_read_at: readAt })
           .eq('group_id', groupId)
           .eq('user_id', user.id);
+        if (sequence !== messageFetchSequence.current || user?.id !== requestedUserId) return;
         if (cursorError) {
           console.warn('Could not update group read cursor:', cursorError);
         } else {
@@ -181,13 +204,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     } catch (err) {
-      console.error('Error fetching messages:', err);
+      if (sequence === messageFetchSequence.current) console.error('Error fetching messages:', err);
     } finally {
-      setLoadingMessages(false);
+      if (sequence === messageFetchSequence.current) setLoadingMessages(false);
     }
   }, [user?.id]);
 
   const fetchMembers = useCallback(async (groupId: string) => {
+    const sequence = ++memberFetchSequence.current;
     try {
       const { data, error } = await supabase
         .from('chat_group_members')
@@ -195,6 +219,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .eq('group_id', groupId);
 
       if (error) throw error;
+      if (sequence !== memberFetchSequence.current) return;
 
       const userIds = (data || []).map(m => m.user_id);
       const { data: profiles } = await supabase
@@ -202,6 +227,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .select('id, name, avatar, level')
         .in('id', userIds);
 
+      if (sequence !== memberFetchSequence.current) return;
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
       const enrichedMembers: GroupMember[] = (data || []).map(m => ({
@@ -212,9 +238,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         user_level: profileMap.get(m.user_id)?.level
       }));
 
-      setMembers(enrichedMembers);
+      if (sequence === memberFetchSequence.current) setMembers(enrichedMembers);
     } catch (err) {
-      console.error('Error fetching members:', err);
+      if (sequence === memberFetchSequence.current) console.error('Error fetching members:', err);
     }
   }, []);
 
@@ -284,9 +310,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .subscribe();
 
       return () => {
-        supabase.removeChannel(channel);
+        ++messageFetchSequence.current;
+        ++memberFetchSequence.current;
+        void supabase.removeChannel(channel);
       };
     }
+    ++messageFetchSequence.current;
+    ++memberFetchSequence.current;
+    setMessages([]);
+    setMembers([]);
+    setLoadingMessages(false);
   }, [currentGroup, fetchMessages, fetchMembers]);
 
   const createGroup = async (name: string, description?: string, type: string = 'private'): Promise<ChatGroup | null> => {
