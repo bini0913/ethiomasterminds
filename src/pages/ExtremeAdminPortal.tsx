@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, ArrowUpRight, Building2, CheckCircle2, Clock3,
-  Crown, FileText, Gauge, Lock, Plus, Search,
+  Crown, FileText, Flag, Gauge, Lock, Megaphone, MessageSquare, Plus, Search, Send,
   Settings2, Shield, ShieldAlert, Users, UserCog, Wallet, XCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { sendRemoteNotifications } from "@/lib/staffNotifications";
 
 type AccountStatus = "active" | "suspended" | "banned" | "purged";
 type PortalUser = {
@@ -52,6 +53,38 @@ type DeletionRequest = {
   resolution_note: string | null;
 };
 type CurrencyTotal = { currency: string; collected?: number; outstanding?: number };
+type AdminReport = {
+  id: string;
+  reporter_id: string;
+  reporter_name: string | null;
+  reported_id: string;
+  reported_name: string | null;
+  reported_type: string;
+  reason: string;
+  description: string | null;
+  status: "pending" | "reviewed" | "resolved" | "dismissed";
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+};
+type SupportRequest = {
+  id: string;
+  author_id: string;
+  author_name: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  status: "open" | "in_review" | "resolved" | "dismissed";
+};
+type PlatformAnnouncement = {
+  id: string;
+  title: string;
+  content: string;
+  author_id: string;
+  target_type: string;
+  target_id: string | null;
+  created_at: string;
+};
 type SchoolSectionOption = { id: string; grade_label: string; section_name: string; academic_year_id: string | null };
 type ExecutiveMetrics = {
   registered_users?: number;
@@ -201,7 +234,88 @@ const ExtremeAdminPortal: React.FC = () => {
   const [privacyPreflight, setPrivacyPreflight] = useState<Record<string, any>>({});
   const [privacyLoadingId, setPrivacyLoadingId] = useState<string | null>(null);
 
+  const [reports, setReports] = useState<AdminReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [reportFilter, setReportFilter] = useState("pending");
+  const [reportReasons, setReportReasons] = useState<Record<string, string>>({});
+  const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([]);
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [supportError, setSupportError] = useState<string | null>(null);
+  const [supportFilter, setSupportFilter] = useState("open");
+  const [supportReasons, setSupportReasons] = useState<Record<string, string>>({});
+  const [announcements, setAnnouncements] = useState<PlatformAnnouncement[]>([]);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(false);
+  const [announcementsError, setAnnouncementsError] = useState<string | null>(null);
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementContent, setAnnouncementContent] = useState("");
+  const [announcementTarget, setAnnouncementTarget] = useState("all");
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
+
   const currentSuperAdmin = superAdminUsers[0] || null;
+
+  const loadReports = useCallback(async () => {
+    if (!isExtremeAdmin) return;
+    setReportsLoading(true);
+    setReportsError(null);
+    const { data, error } = await supabase.rpc("extreme_admin_list_reports" as any, {
+      p_status: reportFilter === "all" ? null : reportFilter,
+      p_limit: 200,
+      p_offset: 0,
+    });
+    setReportsLoading(false);
+    if (error) {
+      setReportsError(error.message || "Moderation reports could not be loaded");
+      return;
+    }
+    setReports((data as AdminReport[]) || []);
+  }, [isExtremeAdmin, reportFilter]);
+
+  const loadSupportRequests = useCallback(async () => {
+    if (!isExtremeAdmin) return;
+    setSupportLoading(true);
+    setSupportError(null);
+    const { data, error } = await supabase.rpc("extreme_admin_list_support_requests" as any, {
+      p_status: supportFilter === "all" ? null : supportFilter,
+      p_limit: 200,
+      p_offset: 0,
+    });
+    setSupportLoading(false);
+    if (error) {
+      setSupportError(error.message || "Support requests could not be loaded");
+      return;
+    }
+    setSupportRequests((data as SupportRequest[]) || []);
+  }, [isExtremeAdmin, supportFilter]);
+
+  const loadAnnouncements = useCallback(async () => {
+    if (!isExtremeAdmin) return;
+    setAnnouncementsLoading(true);
+    setAnnouncementsError(null);
+    const { data, error } = await supabase
+      .from("announcements")
+      .select("id,title,content,author_id,target_type,target_id,created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    setAnnouncementsLoading(false);
+    if (error) {
+      setAnnouncementsError(error.message || "Announcements could not be loaded");
+      return;
+    }
+    setAnnouncements((data as PlatformAnnouncement[]) || []);
+  }, [isExtremeAdmin]);
+
+  useEffect(() => {
+    if (activeTab === "reports") void loadReports();
+  }, [activeTab, loadReports]);
+
+  useEffect(() => {
+    if (activeTab === "support") void loadSupportRequests();
+  }, [activeTab, loadSupportRequests]);
+
+  useEffect(() => {
+    if (activeTab === "announcements") void loadAnnouncements();
+  }, [activeTab, loadAnnouncements]);
 
   const loadUsers = useCallback(async (reset = true, offsetOverride = 0) => {
     if (!isExtremeAdmin) return;
@@ -474,6 +588,94 @@ const ExtremeAdminPortal: React.FC = () => {
     toast.success("AI request limit updated");
   };
 
+  const updateReportStatus = async (report: AdminReport, status: AdminReport["status"]) => {
+    const reason = (reportReasons[report.id] || "").trim();
+    if (!reason) return toast.error("Enter a review reason before changing this report");
+    const { error } = await supabase.rpc("extreme_admin_resolve_report" as any, {
+      p_report_id: report.id,
+      p_status: status,
+      p_reason: reason,
+    });
+    if (error) return toast.error(error.message || "Report status could not be updated");
+    setReportReasons((current) => ({ ...current, [report.id]: "" }));
+    toast.success(`Report marked ${status}`);
+    await Promise.all([loadReports(), refreshAll()]);
+  };
+
+  const updateSupportStatus = async (request: SupportRequest, status: SupportRequest["status"]) => {
+    const reason = (supportReasons[request.id] || "").trim();
+    if (!reason) return toast.error("Enter a support review or resolution note first");
+    const { error } = await supabase.rpc("extreme_admin_set_support_request_status" as any, {
+      p_post_id: request.id,
+      p_status: status,
+      p_reason: reason,
+    });
+    if (error) return toast.error(error.message || "Support request could not be updated");
+    setSupportReasons((current) => ({ ...current, [request.id]: "" }));
+    toast.success(`Support request marked ${status.replace("_", " ")}`);
+    await Promise.all([loadSupportRequests(), refreshAll()]);
+  };
+
+  const createPlatformAnnouncement = async () => {
+    if (!user?.id) return toast.error("An authenticated Extreme Admin session is required");
+    if (announcementTitle.trim().length < 3 || announcementContent.trim().length < 5) {
+      return toast.error("Enter an announcement title and a clear message");
+    }
+    setAnnouncementLoading(true);
+    const { data: created, error } = await supabase
+      .from("announcements")
+      .insert({
+        author_id: user.id,
+        title: announcementTitle.trim(),
+        content: announcementContent.trim(),
+        target_type: announcementTarget,
+      })
+      .select("id,title,target_type")
+      .single();
+    if (error || !created) {
+      setAnnouncementLoading(false);
+      return toast.error(error?.message || "Announcement could not be saved");
+    }
+
+    const { error: auditError } = await supabase.rpc("admin_write_audit_log" as any, {
+      p_action: "root_create_announcement",
+      p_target_type: "announcement",
+      p_target_id: created.id,
+      p_metadata: { title: created.title, target_type: created.target_type },
+    });
+    if (auditError) {
+      setAnnouncementLoading(false);
+      await loadAnnouncements();
+      return toast.error("Announcement was saved, but its audit record failed. No push was sent.");
+    }
+
+    let delivery;
+    try {
+      delivery = await sendRemoteNotifications([{ sourceId: created.id, kind: "admin_announcement" }]);
+    } catch (deliveryError) {
+      setAnnouncementLoading(false);
+      setAnnouncementTitle("");
+      setAnnouncementContent("");
+      await Promise.all([loadAnnouncements(), refreshAll()]);
+      console.error("Announcement push delivery failed after the announcement was audited:", deliveryError);
+      return toast.error("Announcement saved and audited, but push delivery could not be confirmed. Check notification delivery logs.");
+    }
+    setAnnouncementLoading(false);
+    setAnnouncementTitle("");
+    setAnnouncementContent("");
+    await Promise.all([loadAnnouncements(), refreshAll()]);
+
+    if (!delivery.inboxRecorded) {
+      toast.error("Announcement saved and audited, but inbox delivery could not be confirmed.");
+    } else if (delivery.failedDevices > 0) {
+      toast.warning(`Announcement saved. Inbox recorded; FCM accepted ${delivery.sentDevices}/${delivery.attemptedDevices} attempted device sends (${delivery.failedDevices} failed).`);
+    } else if (delivery.attemptedDevices === 0) {
+      toast.success("Announcement saved and added to recipients' inboxes. No eligible push device was available.");
+    } else {
+      toast.success(`Announcement saved. FCM accepted ${delivery.sentDevices}/${delivery.attemptedDevices} attempted device sends.`);
+    }
+  };
+
   const runServiceHealthChecks = async () => {
     setHealthLoading(true);
     const { data, error } = await supabase.functions.invoke("extreme-admin-health-check", { body: {} });
@@ -533,6 +735,9 @@ const ExtremeAdminPortal: React.FC = () => {
     { key: "schools", label: "School network", description: "School inventory and ownership", section: "Executive", icon: Building2 },
     { key: "finance", label: "Money & growth", description: "Verified collections and balances", section: "Business intelligence", icon: Wallet },
     { key: "operations", label: "Platform controls", description: "Global settings and security", section: "Platform operations", icon: Settings2 },
+    { key: "reports", label: "Reports & flags", description: "Moderation and safety queue", section: "Trust & communications", icon: Flag },
+    { key: "support", label: "Support & escalations", description: "Student support request queue", section: "Trust & communications", icon: MessageSquare },
+    { key: "announcements", label: "Announcements", description: "Platform notices and push delivery", section: "Trust & communications", icon: Megaphone },
     { key: "privacy", label: "Privacy requests", description: "Account deletion oversight", section: "Platform operations", icon: ShieldAlert },
     { key: "audit", label: "Audit history", description: "Privileged action traceability", section: "Platform operations", icon: FileText },
   ], []);
@@ -769,6 +974,117 @@ const ExtremeAdminPortal: React.FC = () => {
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Shield className="h-4 w-4 text-blue-700" />Security snapshot</CardTitle><CardDescription>Only database-backed indicators are shown. This is not a claim that client-side IP or 2FA settings enforce access.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[["Audit events", metrics.audit_events_total ?? 0], ["Active top-level authorities", metrics.active_platform_authorities ?? 0], ["Active school managers", metrics.active_managers ?? 0], ["Suspended accounts", metrics.suspended_users ?? 0], ["Banned accounts", metrics.banned_users ?? 0]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{formatNumber(value)}</p></div>)}</CardContent></Card>
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-blue-700" />External service connectivity</CardTitle><CardDescription>Server-side checks for Supabase access, Firebase Messaging credentials and LiveKit RoomService reachability. No test push or call is sent.</CardDescription></div><Button variant="outline" onClick={() => void runServiceHealthChecks()} disabled={healthLoading}>{healthLoading ? "Checking…" : "Run health checks"}</Button></CardHeader><CardContent>{serviceHealth ? <div className="space-y-3">{[["Supabase database", serviceHealth.database], ["Firebase Messaging", serviceHealth.firebase_messaging], ["LiveKit", serviceHealth.livekit]].map(([label, check]: [string, any]) => <div key={label} className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-slate-900">{label}</p><p className="mt-1 text-xs text-slate-500">{check?.detail || "No status returned"}</p></div><span className={check?.status === "healthy" ? "w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800" : check?.status === "degraded" ? "w-fit rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800" : "w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"}>{check?.status || "unknown"}</span></div>)}<p className="text-[11px] text-slate-400">Checked {serviceHealth.checked_at ? new Date(serviceHealth.checked_at).toLocaleString() : "just now"}</p></div> : <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Run a server-side check to see whether these integrations are configured and reachable. Results are not inferred from frontend settings.</p>}</CardContent></Card>
           <Card className="border-slate-200 bg-white shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4 text-blue-700" />Platform operations signals</CardTitle><CardDescription>Database-backed configuration and activity indicators from the current platform.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[["Enabled push devices", metrics.notification_devices_enabled], ["FCM accepted events · 24h", metrics.notification_fcm_accepted_24h], ["Push failures · 24h", metrics.notification_failed_24h], ["Push skipped · 24h", metrics.notification_skipped_24h], ["Inbox events · 24h", metrics.notification_inbox_events_24h], ["Study call rooms · 24h", metrics.study_call_rooms_24h], ["Storage buckets", metrics.storage_buckets_configured], ["Database metrics RPC", metrics.metrics_generated_at ? "Available" : "Unknown"]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold tabular-nums text-slate-950">{typeof value === "string" ? value : formatNumber(value)}</p></div>)}</CardContent><div className="border-t border-slate-100 px-6 py-3 text-xs text-amber-800">FCM acceptance means Firebase accepted at least one send for that inbox event; it does not guarantee device display. LiveKit room counts are activity records, not a provider reachability test. External uptime probes remain a separate Part 1 task.</div></Card>
+        </div>
+      )}
+
+      {activeTab === "reports" && (
+        <div className="space-y-5">
+          <SectionHeading eyebrow="Trust & safety" title="Reports & flags" description="Review user-submitted reports through the Extreme Admin-only queue. Every status change requires a reason and is recorded in the canonical audit log." />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">Reported accounts and content · newest first</p>
+            <Select value={reportFilter} onValueChange={setReportFilter}>
+              <SelectTrigger className="w-full sm:w-52"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="reviewed">Reviewed</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="dismissed">Dismissed</SelectItem>
+                <SelectItem value="all">All reports</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {reportsLoading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading moderation reports…</p> : reportsError ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{reportsError}</p> : reports.length ? (
+            <div className="space-y-3">
+              {reports.map((report) => (
+                <Card key={report.id} className="border-slate-200 bg-white shadow-sm">
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={report.status === "pending" ? "rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"}>{report.status}</span>
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">{report.reported_type}</span>
+                      <time className="text-xs text-slate-500">{new Date(report.created_at).toLocaleString()}</time>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">Reported: {report.reported_name || "Unknown account"}</p>
+                      <p className="mt-1 text-sm text-slate-700">{report.reason}</p>
+                      {report.description && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{report.description}</p>}
+                      <p className="mt-2 text-xs text-slate-500">Reporter: {report.reporter_name || "Unknown"}</p>
+                    </div>
+                    {report.status !== "resolved" && report.status !== "dismissed" && (
+                      <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+                        <Input value={reportReasons[report.id] || ""} onChange={(event) => setReportReasons((current) => ({ ...current, [report.id]: event.target.value }))} placeholder="Required review reason" aria-label={`Review reason for report ${report.id}`} />
+                        <Button size="sm" variant="outline" onClick={() => void updateReportStatus(report, "reviewed")}>Mark reviewed</Button>
+                        <Button size="sm" onClick={() => void updateReportStatus(report, "resolved")}>Resolve</Button>
+                        <Button size="sm" variant="outline" onClick={() => void updateReportStatus(report, "dismissed")}>Dismiss</Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">No reports match this filter.</p>}
+        </div>
+      )}
+
+      {activeTab === "support" && (
+        <div className="space-y-5">
+          <SectionHeading eyebrow="Trust & safety" title="Support & escalations" description="Manage student support requests already submitted through the support board. Status changes are visible to the requester and recorded in the admin audit log." />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-500">Existing support_request posts · newest first</p>
+            <Select value={supportFilter} onValueChange={setSupportFilter}>
+              <SelectTrigger className="w-full sm:w-52"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="in_review">In review</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="dismissed">Dismissed</SelectItem>
+                <SelectItem value="all">All requests</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {supportLoading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading support requests…</p> : supportError ? <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{supportError}</p> : supportRequests.length ? (
+            <div className="space-y-3">
+              {supportRequests.map((request) => (
+                <Card key={request.id} className="border-slate-200 bg-white shadow-sm">
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div><p className="text-sm font-semibold text-slate-950">{request.author_name}</p><time className="text-xs text-slate-500">{new Date(request.created_at).toLocaleString()}</time></div>
+                      <span className={request.status === "open" ? "rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"}>{request.status.replace("_", " ")}</span>
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm text-slate-700">{request.content}</p>
+                    <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+                      <Input value={supportReasons[request.id] || ""} onChange={(event) => setSupportReasons((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="Required review or resolution note" aria-label={`Review note for support request ${request.id}`} />
+                      <Button size="sm" variant="outline" onClick={() => void updateSupportStatus(request, "in_review")}>In review</Button>
+                      <Button size="sm" onClick={() => void updateSupportStatus(request, "resolved")}>Resolve</Button>
+                      <Button size="sm" variant="outline" onClick={() => void updateSupportStatus(request, "dismissed")}>Dismiss</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">No support requests match this filter.</p>}
+        </div>
+      )}
+
+      {activeTab === "announcements" && (
+        <div className="space-y-5">
+          <SectionHeading eyebrow="Trust & communications" title="Platform announcements" description="Publish a notice to all students and teachers, students only, or teachers only. Each announcement is audited before push delivery is attempted." />
+          <Card className="border-slate-200 bg-white shadow-sm">
+            <CardHeader><CardTitle className="text-base">Create announcement</CardTitle><CardDescription>The “All students and teachers” target does not include parents or staff accounts.</CardDescription></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1"><Label>Title</Label><Input value={announcementTitle} onChange={(event) => setAnnouncementTitle(event.target.value)} placeholder="Announcement title" maxLength={120} /></div>
+              <div className="space-y-1"><Label>Message</Label><Textarea value={announcementContent} onChange={(event) => setAnnouncementContent(event.target.value)} placeholder="Write the platform announcement…" rows={4} maxLength={2000} /></div>
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div className="space-y-1"><Label>Recipients</Label><Select value={announcementTarget} onValueChange={setAnnouncementTarget}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All students and teachers</SelectItem><SelectItem value="students">Students only</SelectItem><SelectItem value="teachers">Teachers only</SelectItem></SelectContent></Select></div>
+                <Button onClick={() => void createPlatformAnnouncement()} disabled={announcementLoading || announcementTitle.trim().length < 3 || announcementContent.trim().length < 5}><Send className="mr-2 h-4 w-4" />{announcementLoading ? "Publishing…" : "Publish announcement"}</Button>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-200 bg-white shadow-sm">
+            <CardHeader><CardTitle className="text-base">Recent announcements</CardTitle><CardDescription>Latest 100 records from the existing announcements table.</CardDescription></CardHeader>
+            <CardContent className="space-y-3">
+              {announcementsLoading ? <p className="text-sm text-slate-500">Loading announcements…</p> : announcementsError ? <p role="alert" className="text-sm text-red-700">{announcementsError}</p> : announcements.length ? announcements.map((announcement) => <div key={announcement.id} className="rounded-xl border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-950">{announcement.title}</p><span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">{announcement.target_type === "all" ? "Students + teachers" : announcement.target_type}</span></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{announcement.content}</p><time className="mt-2 block text-xs text-slate-400">{new Date(announcement.created_at).toLocaleString()}</time></div>) : <p className="text-sm text-slate-500">No announcements have been published yet.</p>}
+            </CardContent>
+          </Card>
         </div>
       )}
 

@@ -9,7 +9,11 @@ const corsHeaders = {
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
-  headers: { ...corsHeaders, "Content-Type": "application/json" },
+  headers: {
+    ...corsHeaders,
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+  },
 });
 
 type ServiceCheck = { status: "healthy" | "degraded" | "not_configured"; checked_at: string; detail: string };
