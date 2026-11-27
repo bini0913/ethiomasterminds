@@ -70,12 +70,13 @@ jobs:
           bash scripts/ci/sync-supabase-migration-history.sh "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA"
           supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --yes
 
-      - name: Deploy Edge Functions
+      - name: Deploy changed Edge Functions
         shell: bash
         run: |
           set -euo pipefail
+
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            changed_files=""
+            changed_functions="$(find supabase/functions -mindepth 1 -maxdepth 1 -type d -printf '%f\\n' | sort -u)"
           else
             test -n "${GITHUB_EVENT_BEFORE:-}" || {
               echo "::error::Push event is missing its base SHA; refusing to skip function deployment detection."
@@ -85,20 +86,26 @@ jobs:
               echo "::error::Push base commit is unavailable; refusing to skip function deployment detection."
               exit 1
             }
-            changed_files="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA")"
+            changed_functions="$(git diff --name-only "$GITHUB_EVENT_BEFORE" "$GITHUB_SHA" -- supabase/functions | awk -F/ 'NF >= 3 { print $3 }' | sort -u)"
           fi
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || grep -q '^supabase/functions/' <<< "$changed_files"; then
-            test -n "$SUPABASE_ACCESS_TOKEN" || {
-              echo "::error::SUPABASE_ACCESS_TOKEN is required to deploy Edge Functions."
-              exit 1
-            }
-            for dir in supabase/functions/*; do
-              if [ -d "$dir" ] && [ -f "$dir/index.ts" ]; then
-                name="$(basename "$dir")"
-                echo "Deploying $name"
-                supabase functions deploy "$name" --project-ref "$SUPABASE_PROJECT_ID" --yes
-              fi
-            done
-          else
+
+          if [[ -z "$changed_functions" ]]; then
             echo "No Edge Function changed; skipping function deployment."
+            exit 0
           fi
+
+          test -n "$SUPABASE_ACCESS_TOKEN" || {
+            echo "::error::SUPABASE_ACCESS_TOKEN is required to deploy Edge Functions."
+            exit 1
+          }
+
+          while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
+            dir="supabase/functions/$name"
+            if [[ ! -f "$dir/index.ts" ]]; then
+              echo "::error::Changed Edge Function $name has no index.ts entrypoint."
+              exit 1
+            fi
+            echo "Deploying changed Edge Function: $name"
+            supabase functions deploy "$name" --project-ref "$SUPABASE_PROJECT_ID" --yes
+          done <<< "$changed_functions"
