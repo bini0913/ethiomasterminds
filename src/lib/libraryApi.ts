@@ -568,7 +568,7 @@ export async function downloadBookPdf(path: string, fileName: string): Promise<v
   let file: Blob;
   if (/^https?:\/\//i.test(path)) {
     const response = await fetch(path);
-    if (!response.ok) throw new Error(\`Download failed (\${response.status}).\`);
+    if (!response.ok) throw new Error(`Download failed (${response.status}).`);
     file = await response.blob();
   } else {
     const normalizedPath = path.replace(/^\/+/, "");
@@ -590,12 +590,85 @@ export async function downloadBookPdf(path: string, fileName: string): Promise<v
   const objectUrl = URL.createObjectURL(file);
   const anchor = document.createElement("a");
   anchor.href = objectUrl;
-  anchor.download = \`\${safeBaseName}.pdf\`;
+  anchor.download = `${safeBaseName}.pdf`;
   anchor.rel = "noopener";
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
+
+async function loadPdfJs() {
+  const sources = [
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs",
+    "https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.min.mjs",
+  ];
+  let pdfjs: any = null;
+  let workerSource = "";
+  for (const source of sources) {
+    try {
+      pdfjs = await import(/* @vite-ignore */ source);
+      workerSource = source.replace("pdf.min.mjs", "pdf.worker.min.mjs");
+      break;
+    } catch (error) {
+      console.warn("PDF.js source unavailable; trying fallback:", error);
+    }
+  }
+  if (!pdfjs) throw new Error("PDF reading tools could not load. Check your connection and retry.");
+  pdfjs.GlobalWorkerOptions.workerSrc = workerSource;
+  return pdfjs;
+}
+
+export async function extractBookText(
+  path: string,
+  options?: { maxPages?: number; maxChars?: number },
+): Promise<{ text: string; pageCount: number; pagesRead: number; truncated: boolean }> {
+  if (!path) throw new Error("This book does not have a readable PDF file.");
+  let file: Blob;
+  if (/^https?:\/\//i.test(path)) {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Could not retrieve the PDF (${response.status}).`);
+    file = await response.blob();
+  } else {
+    const { data, error } = await supabase.storage.from("library-files").download(path.replace(/^\/+/, ""));
+    if (error) throw new Error(error.message || "Could not retrieve the PDF.");
+    if (!data) throw new Error("The PDF file is empty.");
+    file = data;
+  }
+  if (!file.size) throw new Error("The PDF file is empty.");
+  const header = await file.slice(0, 1024).text();
+  if (!header.includes("%PDF-")) throw new Error("The stored file is not a valid PDF.");
+
+  const pdfjs = await loadPdfJs();
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pageCount = Number(pdf.numPages) || 0;
+  const maxPages = Math.max(1, Math.min(120, Math.floor(options?.maxPages ?? 20)));
+  const maxChars = Math.max(500, Math.min(20_000, Math.floor(options?.maxChars ?? 12_000)));
+  const pagesToRead = Math.min(pageCount, maxPages);
+  const chunks: string[] = [];
+  let length = 0;
+  let pagesRead = 0;
+  try {
+    for (let pageNo = 1; pageNo <= pagesToRead && length < maxChars; pageNo += 1) {
+      const page = await pdf.getPage(pageNo);
+      const content = await page.getTextContent();
+      const pageText = (content.items || [])
+        .map((item: any) => String(item.str || "").trim())
+        .filter(Boolean)
+        .join(" ");
+      if (pageText) {
+        chunks.push(`Page ${pageNo}: ${pageText}`);
+        length += pageText.length;
+      }
+      pagesRead = pageNo;
+    }
+  } finally {
+    if (typeof pdf.destroy === "function") await pdf.destroy();
+  }
+  const text = chunks.join("\n\n").slice(0, maxChars).trim();
+  if (!text) throw new Error("No selectable text was found. This PDF may be scanned; OCR is needed before AI study tools can read it.");
+  return { text, pageCount, pagesRead, truncated: pageCount > pagesRead || length > maxChars };
 }
 
 export async function getPdfPublicUrl(path: string) {
