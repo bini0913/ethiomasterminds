@@ -250,30 +250,68 @@ async function registerWebPushNotifications(requestPermission: boolean): Promise
   }
 }
 
-export async function registerForPushNotifications(userId: string, requestBrowserPermission = false): Promise<boolean> {
-  if (!isNative()) return registerWebPushNotifications(requestBrowserPermission);
+// Keep delivery/action listeners for the lifetime of the app. The registration
+// event is short-lived, but pushNotificationReceived and
+// pushNotificationActionPerformed must remain attached after a token is saved.
+let nativePushEventListenersReady: Promise<void> | null = null;
+let nativeRegistrationInFlight: Promise<boolean> | null = null;
+
+async function ensureNativePushEventListeners(): Promise<void> {
+  if (!nativePushEventListenersReady) {
+    nativePushEventListenersReady = (async () => {
+      await PushNotifications.addListener("pushNotificationReceived", (notification: PushNotificationSchema) => {
+        window.dispatchEvent(new CustomEvent("master-minds-notification", { detail: notification }));
+      });
+      await PushNotifications.addListener("pushNotificationActionPerformed", (action: ActionPerformed) => {
+        const route = typeof action.notification.data?.route === "string" ? action.notification.data.route : null;
+        if (route) window.dispatchEvent(new CustomEvent("master-minds-notification-route", { detail: route }));
+      });
+    })().catch((error) => {
+      nativePushEventListenersReady = null;
+      throw error;
+    });
+  }
+  await nativePushEventListenersReady;
+}
+
+async function registerNativePushNotifications(userId: string): Promise<boolean> {
   await ensureNotificationChannel();
   if (!(await requestNotificationPermission())) return false;
 
+  // Device registration is user-scoped by auth.uid() in the existing RPC.
+  // Confirm the active session matches the caller before registering a token.
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || authData.user?.id !== userId) return false;
+
+  try {
+    await ensureNativePushEventListeners();
+  } catch {
+    return false;
+  }
+
   return new Promise((resolve) => {
     let settled = false;
-    const listeners: Array<{ remove: () => Promise<void> }> = [];
+    let registrationListener: { remove: () => Promise<void> } | null = null;
+    let registrationErrorListener: { remove: () => Promise<void> } | null = null;
     const finish = (value: boolean) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timeout);
-      void Promise.all(listeners.map((listener) => listener.remove().catch(() => undefined)));
+      void Promise.all([
+        registrationListener?.remove().catch(() => undefined),
+        registrationErrorListener?.remove().catch(() => undefined),
+      ]);
       resolve(value);
     };
 
-    const timeout = window.setTimeout(() => finish(false), 15000);
+    const timeout = window.setTimeout(() => finish(false), 20000);
     void (async () => {
       try {
-        listeners.push(await PushNotifications.addListener("registration", async (token: Token) => {
+        registrationListener = await PushNotifications.addListener("registration", async (token: Token) => {
           try {
             const { error } = await db.rpc("upsert_notification_device" as any, {
               p_token: token.value,
-              p_platform: Capacitor.getPlatform(),
+              p_platform: "android",
               p_app_version: "1.0.0",
               p_enabled: true,
             });
@@ -281,21 +319,26 @@ export async function registerForPushNotifications(userId: string, requestBrowse
           } catch {
             finish(false);
           }
-        }));
-        listeners.push(await PushNotifications.addListener("registrationError", () => finish(false)));
-        listeners.push(await PushNotifications.addListener("pushNotificationReceived", (notification: PushNotificationSchema) => {
-          window.dispatchEvent(new CustomEvent("master-minds-notification", { detail: notification }));
-        }));
-        listeners.push(await PushNotifications.addListener("pushNotificationActionPerformed", (action: ActionPerformed) => {
-          const route = typeof action.notification.data?.route === "string" ? action.notification.data.route : null;
-          if (route) window.dispatchEvent(new CustomEvent("master-minds-notification-route", { detail: route }));
-        }));
+        });
+        registrationErrorListener = await PushNotifications.addListener("registrationError", () => finish(false));
         await PushNotifications.register();
       } catch {
         finish(false);
       }
     })();
   });
+}
+
+export async function registerForPushNotifications(userId: string, requestBrowserPermission = false): Promise<boolean> {
+  if (!isNative()) return registerWebPushNotifications(requestBrowserPermission);
+  if (nativeRegistrationInFlight) return nativeRegistrationInFlight;
+
+  nativeRegistrationInFlight = registerNativePushNotifications(userId);
+  try {
+    return await nativeRegistrationInFlight;
+  } finally {
+    nativeRegistrationInFlight = null;
+  }
 }
 
 export async function unregisterPushNotifications(userId: string): Promise<void> {
