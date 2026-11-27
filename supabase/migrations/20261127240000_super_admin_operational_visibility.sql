@@ -240,6 +240,7 @@ DECLARE
   v_account_status text;
   v_profile_username text;
   v_student_ids uuid[];
+  v_school_status text;
 BEGIN
   IF NOT public._is_super_admin() THEN
     RAISE EXCEPTION 'Super Admin access required';
@@ -257,13 +258,13 @@ BEGIN
     RAISE EXCEPTION 'You cannot assign your own account to a school';
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM public.schools s
-    WHERE s.id = p_school_id
-      AND s.network_id = public.school_network_id()
-      AND s.status = 'active'
-    FOR UPDATE
-  ) THEN
+  SELECT s.status INTO v_school_status
+  FROM public.schools s
+  WHERE s.id = p_school_id
+    AND s.network_id = public.school_network_id()
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_school_status <> 'active' THEN
     RAISE EXCEPTION 'School is not active in the current network';
   END IF;
 
