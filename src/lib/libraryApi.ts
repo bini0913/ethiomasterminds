@@ -702,12 +702,12 @@ export async function analyzeBookPdf(
       const textContent = await page.getTextContent();
       const lines = (textContent.items || []).map((item: any) => String(item.str || "").trim()).filter(Boolean);
       for (const line of lines) {
-        const normalized = line.replace(/\\s+/g, " ").trim();
+        const normalized = line.replace(/\s+/g, " ").trim();
         if (normalized.length < 4 || normalized.length > 110) continue;
-        const looksLikeHeading = /^(chapter|unit|lesson|module|topic|section)\\s+([0-9ivxlcdm]+|[a-z])([. :\\s-]|$)/i.test(normalized) ||
-          /^\\d+(?:\\.\\d+){0,2}[.)]?\\s+[A-Z][^.!?]{3,90}$/.test(normalized);
-        const isFragment = /^(section|chapter|unit|lesson|module)\\s+\\d+(?:\\.\\d+)*$/i.test(normalized) ||
-          /^\\d+(?:\\.\\d+){1,3}[.)]?$/i.test(normalized) ||
+        const looksLikeHeading = /^(chapter|unit|lesson|module|topic|section)\s+([0-9ivxlcdm]+|[a-z])([. :\s-]|$)/i.test(normalized) ||
+          /^\d+(?:\.\d+){0,2}[.)]?\s+[A-Z][^.!?]{3,90}$/.test(normalized);
+        const isFragment = /^(section|chapter|unit|lesson|module)\s+\d+(?:\.\d+)*$/i.test(normalized) ||
+          /^\d+(?:\.\d+){1,3}[.)]?$/i.test(normalized) ||
           /^(contents|table of contents|learning objectives|review questions|references|bibliography|answer key)$/i.test(normalized);
         if (looksLikeHeading && !isFragment && !headings.some((existing) => existing.toLowerCase() === normalized.toLowerCase())) {
           headings.push(normalized);
