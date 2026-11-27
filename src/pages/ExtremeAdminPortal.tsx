@@ -137,6 +137,8 @@ const ExtremeAdminPortal: React.FC = () => {
   const [usersLoading, setUsersLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [directorySearch, setDirectorySearch] = useState("");
+  const [directoryRoleFilter, setDirectoryRoleFilter] = useState("all");
   const [hasMoreUsers, setHasMoreUsers] = useState(false);
   const [schools, setSchools] = useState<PortalSchool[]>([]);
   const [superAdminUsers, setSuperAdminUsers] = useState<PortalUser[]>([]);
@@ -176,8 +178,8 @@ const ExtremeAdminPortal: React.FC = () => {
     setUsersLoading(true);
     const offset = reset ? 0 : offsetOverride;
     const { data, error } = await supabase.rpc("extreme_admin_list_users" as any, {
-      p_search: userSearch.trim() || null,
-      p_role: userRoleFilter === "all" ? null : userRoleFilter,
+      p_search: directorySearch.trim() || null,
+      p_role: directoryRoleFilter === "all" ? null : directoryRoleFilter,
       p_limit: PAGE_SIZE,
       p_offset: offset,
     });
@@ -189,7 +191,7 @@ const ExtremeAdminPortal: React.FC = () => {
     const rows = (data as PortalUser[]) || [];
     setUsers((current) => reset ? rows : [...current, ...rows]);
     setHasMoreUsers(rows.length === PAGE_SIZE);
-  }, [isExtremeAdmin, userSearch, userRoleFilter]);
+  }, [isExtremeAdmin, directorySearch, directoryRoleFilter]);
 
   const refreshAll = useCallback(async () => {
     if (!isExtremeAdmin) return;
@@ -238,7 +240,7 @@ const ExtremeAdminPortal: React.FC = () => {
   useEffect(() => {
     if (!isExtremeAdmin) return;
     void loadUsers(true);
-  }, [isExtremeAdmin, user?.id, userSearch, userRoleFilter, loadUsers]);
+  }, [isExtremeAdmin, user?.id, directorySearch, directoryRoleFilter, loadUsers]);
 
   const selectedUser = users.find((item) => item.id === targetUserId);
 
@@ -326,6 +328,7 @@ const ExtremeAdminPortal: React.FC = () => {
     setCreateSchoolOpen(false);
     toast.success("School and initial Manager account created");
     await refreshAll();
+    await loadUsers(true);
   };
 
   const createSchoolAccount = async () => {
@@ -462,7 +465,7 @@ const ExtremeAdminPortal: React.FC = () => {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="All registered users" value={metrics.registered_users} detail={`+${formatNumber(metrics.registered_today)} today`} icon={Users} tone="blue" />
-              <MetricCard label="Daily active users" value={metrics.daily_active_users} detail="Seen since local database day start" icon={Activity} tone="green" />
+              <MetricCard label="Daily active users" value={metrics.daily_active_users} detail="Unique accounts seen since Ethiopia day start" icon={Activity} tone="green" />
               <MetricCard label="Weekly active users" value={metrics.weekly_active_users} detail="Unique accounts seen in 7 days" icon={Activity} tone="blue" />
               <MetricCard label="Monthly active users" value={metrics.monthly_active_users} detail="Unique accounts seen in 30 days" icon={Activity} tone="navy" />
             </div>
@@ -520,7 +523,7 @@ const ExtremeAdminPortal: React.FC = () => {
               <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
                 <Input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadUsers(true); }} placeholder="Search name or username" />
                 <Select value={userRoleFilter} onValueChange={setUserRoleFilter}><SelectTrigger><SelectValue placeholder="All roles" /></SelectTrigger><SelectContent><SelectItem value="all">All roles</SelectItem>{ROLE_OPTIONS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}<SelectItem value="super_admin">Super Admin</SelectItem></SelectContent></Select>
-                <Button onClick={() => void loadUsers(true)} disabled={usersLoading}><Search className="mr-2 h-4 w-4" />Search accounts</Button>
+                <Button onClick={() => { setDirectorySearch(userSearch.trim()); setDirectoryRoleFilter(userRoleFilter); if (directorySearch === userSearch.trim() && directoryRoleFilter === userRoleFilter) void loadUsers(true); }} disabled={usersLoading}><Search className="mr-2 h-4 w-4" />Search accounts</Button>
               </div>
               <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full min-w-[680px] text-left text-sm">
