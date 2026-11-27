@@ -188,6 +188,31 @@ BEGIN
     ),
     'super_admins', (SELECT count(*) FROM public.user_roles WHERE role = 'super_admin'::public.app_role),
     'extreme_admins', (SELECT count(*) FROM public.user_roles WHERE role = 'extreme_admin'::public.app_role),
+    'active_platform_authorities', (
+      SELECT count(DISTINCT roles.user_id)
+      FROM public.user_roles roles
+      JOIN public.profiles profile ON profile.id = roles.user_id
+      WHERE roles.role IN ('extreme_admin'::public.app_role, 'super_admin'::public.app_role)
+        AND COALESCE(profile.account_status, 'active') = 'active'
+    ),
+    'active_managers', (
+      SELECT count(*) FROM (
+        SELECT roles.user_id
+        FROM public.user_roles roles
+        JOIN public.profiles profile ON profile.id = roles.user_id
+        WHERE roles.role = 'manager'::public.app_role
+          AND COALESCE(profile.account_status, 'active') = 'active'
+        UNION
+        SELECT membership.user_id
+        FROM public.school_memberships membership
+        JOIN public.profiles profile ON profile.id = membership.user_id
+        WHERE membership.school_role = 'manager'
+          AND membership.status = 'active'
+          AND COALESCE(profile.account_status, 'active') = 'active'
+      ) active_manager_accounts
+    ),
+    'suspended_users', (SELECT count(*) FROM public.profiles WHERE account_status = 'suspended'),
+    'banned_users', (SELECT count(*) FROM public.profiles WHERE account_status = 'banned'),
     'audit_events_total', (SELECT count(*) FROM public.admin_audit_logs) + (SELECT count(*) FROM public.extreme_admin_audit_logs),
     'audit_events_24h', (SELECT count(*) FROM public.admin_audit_logs WHERE created_at >= now() - interval '24 hours') + (SELECT count(*) FROM public.extreme_admin_audit_logs WHERE created_at >= now() - interval '24 hours'),
     'school_fee_payments_confirmed', (SELECT count(*) FROM public.school_fee_payments WHERE status = 'confirmed'),
