@@ -535,8 +535,7 @@ export default function NetworkSuperAdminPortal() {
               </CardHeader>
               <CardContent>
                 <div className="mb-4 flex flex-wrap gap-2"><Button size="sm" variant={peopleSchoolId ? "outline" : "secondary"} onClick={() => { setPeopleSchoolId(""); setPage(0); }}>All schools</Button>{schools.map((item) => <Button key={item.id} size="sm" variant={peopleSchoolId === item.id ? "secondary" : "outline"} onClick={() => { setPeopleSchoolId(item.id); setPage(0); }}>{item.school_code}</Button>)}</div>
-                {peopleError && <ErrorPanel message={peopleError} onRetry={() => void loadPeople()} />}
-                {peopleLoading ? <LoadingState label="Loading network memberships…" /> : <PeopleTable people={people} onStatus={requestMembershipStatus} />}
+                {peopleError ? <ErrorPanel message={peopleError} onRetry={() => void loadPeople()} /> : peopleLoading ? <LoadingState label="Loading network memberships…" /> : <PeopleTable people={people} onStatus={requestMembershipStatus} />}
                 <div className="mt-4 flex items-center justify-between gap-3"><p className="text-xs text-slate-500">Page {page + 1} · 50 records per page</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page === 0 || peopleLoading} onClick={() => setPage((value) => Math.max(0, value - 1))}>Previous</Button><Button size="sm" variant="outline" disabled={people.length < 50 || peopleLoading} onClick={() => setPage((value) => value + 1)}>Next</Button></div></div>
               </CardContent>
             </Card>
@@ -576,8 +575,7 @@ export default function NetworkSuperAdminPortal() {
           {tab === "audit" && <section>
             <Card><CardHeader><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><CardTitle>Network audit history</CardTitle><CardDescription>Recorded administrative changes affecting this network and its schools.</CardDescription></div><Button variant="outline" onClick={exportAudit} disabled={!filteredAudit.length}><FileDown className="mr-2 h-4 w-4" />Export visible page</Button></div></CardHeader><CardContent className="space-y-4">
               <div className="relative max-w-md"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input className="pl-9" placeholder="Filter this page by actor, action, target, or details" value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} /></div>
-              {auditError && <ErrorPanel message={auditError} onRetry={() => void loadAudit()} />}
-              {auditLoading ? <LoadingState label="Loading audit history…" /> : <AuditTable rows={filteredAudit} />}
+              {auditError ? <ErrorPanel message={auditError} onRetry={() => void loadAudit()} /> : auditLoading ? <LoadingState label="Loading audit history…" /> : <AuditTable rows={filteredAudit} />}
               <div className="flex items-center justify-between gap-3"><p className="text-xs text-slate-500">Page {auditPage + 1} · 50 records per page</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={auditPage === 0 || auditLoading} onClick={() => setAuditPage((value) => Math.max(0, value - 1))}>Previous</Button><Button size="sm" variant="outline" disabled={audit.length < 50 || auditLoading} onClick={() => setAuditPage((value) => value + 1)}>Next</Button></div></div>
             </CardContent></Card>
           </section>}
