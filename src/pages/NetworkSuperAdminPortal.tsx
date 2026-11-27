@@ -453,14 +453,14 @@ export default function NetworkSuperAdminPortal() {
               ["Active schools", dashboard.active_schools],
               ["Suspended schools", dashboard.suspended_schools],
               ["Schools without an active Manager", dashboard.schools_without_active_manager],
-              ["School Managers", dashboard.managers],
-              ["School Admins", dashboard.admins],
-              ["Teachers", dashboard.teachers],
-              ["Finance staff", dashboard.finance_staff],
-              ["Parents", dashboard.parents],
-              ["Active students", dashboard.active_students],
-              ["Enrolled students", dashboard.enrolled_students],
-              ["Active school staff", dashboard.active_staff],
+              ["Manager memberships", dashboard.managers],
+              ["Admin memberships", dashboard.admins],
+              ["Teacher memberships", dashboard.teachers],
+              ["Finance memberships", dashboard.finance_staff],
+              ["Parent memberships", dashboard.parents],
+              ["Active student memberships", dashboard.active_students],
+              ["Enrolled student memberships", dashboard.enrolled_students],
+              ["Active staff memberships", dashboard.active_staff],
             ]} />
             <Card>
               <CardHeader><CardTitle>Network alerts</CardTitle><CardDescription>School-level operational signals. Student identities and private report details are not exposed here.</CardDescription></CardHeader>
@@ -547,8 +547,8 @@ export default function NetworkSuperAdminPortal() {
             {analyticsError && <ErrorPanel message={analyticsError} onRetry={() => void loadAnalytics(analyticsSchoolId)} />}
             {analyticsLoading ? <LoadingState label="Loading school performance…" /> : analyticsError ? null : analyticsSchoolId && Object.keys(analytics).length > 0 ? <>
               <MetricGrid items={[
-                ["Students enrolled", analytics.students], ["Active teachers", analytics.teachers], ["Active Managers", analytics.managers],
-                ["School admins", analytics.admins], ["Finance staff", analytics.finance_staff], ["Parents", analytics.parents],
+                ["Student memberships", analytics.students], ["Teacher memberships", analytics.teachers], ["Manager memberships", analytics.managers],
+                ["Admin memberships", analytics.admins], ["Finance memberships", analytics.finance_staff], ["Parent memberships", analytics.parents],
                 ["Average term score", analytics.average_score == null ? "—" : `${analytics.average_score}%`],
                 ["Attendance rate", analytics.attendance_rate == null ? "—" : `${analytics.attendance_rate}%`],
                 ["Attendance records", analytics.attendance_records], ["Published results", analytics.published_results],
