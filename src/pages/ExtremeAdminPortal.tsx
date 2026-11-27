@@ -180,6 +180,7 @@ const ExtremeAdminPortal: React.FC = () => {
   const [existingAccountUsername, setExistingAccountUsername] = useState("");
   const [existingAccountRole, setExistingAccountRole] = useState("finance");
   const [existingParentStudentMembershipIds, setExistingParentStudentMembershipIds] = useState("");
+  const [existingAccountReason, setExistingAccountReason] = useState("");
   const [assignExistingLoading, setAssignExistingLoading] = useState(false);
   const [provisioningResult, setProvisioningResult] = useState<any>(null);
 
@@ -386,6 +387,7 @@ const ExtremeAdminPortal: React.FC = () => {
 
   const assignExistingAccount = async () => {
     if (!selectedSchoolId || !existingAccountUsername.trim()) return toast.error("Choose a school and enter the existing username");
+    if (!existingAccountReason.trim()) return toast.error("Enter a reason for assigning this account");
     if (existingAccountRole === "parent" && !existingParentStudentMembershipIds.trim()) return toast.error("A parent must be linked to at least one enrolled student");
     setAssignExistingLoading(true);
     const { data, error } = await supabase.functions.invoke("school-provision-account", {
@@ -394,6 +396,7 @@ const ExtremeAdminPortal: React.FC = () => {
         school_id: selectedSchoolId,
         username: existingAccountUsername.trim(),
         role: existingAccountRole,
+        reason: existingAccountReason.trim(),
         student_membership_ids: existingAccountRole === "parent"
           ? existingParentStudentMembershipIds.split(",").map((id) => id.trim()).filter(Boolean)
           : [],
@@ -638,8 +641,9 @@ const ExtremeAdminPortal: React.FC = () => {
               <div className="space-y-1"><Label>Existing username</Label><Input value={existingAccountUsername} onChange={(event) => setExistingAccountUsername(event.target.value)} placeholder="Exact username" /></div>
               <div className="space-y-1"><Label>School role</Label><Select value={existingAccountRole} onValueChange={setExistingAccountRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="finance">Finance</SelectItem><SelectItem value="parent">Parent</SelectItem></SelectContent></Select></div>
               {existingAccountRole === "parent" && <div className="space-y-1 md:col-span-4"><Label>Student membership IDs (required for Parent)</Label><Input value={existingParentStudentMembershipIds} onChange={(event) => setExistingParentStudentMembershipIds(event.target.value)} placeholder="Comma-separated enrolled student membership IDs" /></div>}
+              <div className="space-y-1"><Label>Assignment reason</Label><Input value={existingAccountReason} onChange={(event) => setExistingAccountReason(event.target.value)} placeholder="Required audit reason" /></div>
               <div className="space-y-1"><Label>Selected school</Label><p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{schools.find((school) => school.id === selectedSchoolId)?.name || "Choose a school above"}</p></div>
-              <Button onClick={() => void assignExistingAccount()} disabled={assignExistingLoading || !selectedSchoolId || !existingAccountUsername.trim()}>{assignExistingLoading ? "Assigning…" : "Assign account"}</Button>
+              <Button onClick={() => void assignExistingAccount()} disabled={assignExistingLoading || !selectedSchoolId || !existingAccountUsername.trim() || !existingAccountReason.trim()}>{assignExistingLoading ? "Assigning…" : "Assign account"}</Button>
             </CardContent>
           </Card>
         </div>
