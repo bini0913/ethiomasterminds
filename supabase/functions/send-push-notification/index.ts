@@ -255,6 +255,8 @@ Deno.serve(async (req) => {
       if (preferenceDisabled) skippedPreferences += 1;
       else if (itemAttempted === 0) noEligibleDevices += 1;
       const itemFailures: Array<{ device_id: string; status: number; token_invalid: boolean; provider_code?: string }> = [];
+      const providerFailureCounts: Record<string, number> = {};
+      const providerHttpStatusCounts: Record<string, number> = {};
       let itemSent = 0;
       attempted += itemAttempted;
       for (const device of devices ?? []) {
@@ -266,6 +268,9 @@ Deno.serve(async (req) => {
         if (response.ok) { sent++; itemSent++; continue; }
         const details = await response.text();
         const providerCode = extractFcmProviderCode(details);
+        const httpStatusKey = String(response.status);
+        providerHttpStatusCounts[httpStatusKey] = (providerHttpStatusCounts[httpStatusKey] ?? 0) + 1;
+        if (providerCode) providerFailureCounts[providerCode] = (providerFailureCounts[providerCode] ?? 0) + 1;
         const invalid = response.status === 404 && (
           providerCode === "UNREGISTERED" ||
           details.includes("UNREGISTERED") ||
@@ -304,6 +309,8 @@ Deno.serve(async (req) => {
           sent: itemSent,
           attempted: itemAttempted,
           failure_count: itemFailures.length,
+          provider_failure_codes: Object.entries(providerFailureCounts).map(([code, count]) => ({ code, count })),
+          provider_http_statuses: Object.entries(providerHttpStatusCounts).map(([status, count]) => ({ status: Number(status), count })),
         },
         delivered_at: itemSent > 0 ? new Date().toISOString() : null,
       }).eq("id", eventId);
