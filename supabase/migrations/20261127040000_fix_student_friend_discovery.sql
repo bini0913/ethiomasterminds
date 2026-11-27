@@ -21,7 +21,8 @@ BEGIN
 
   IF NOT public.has_accepted_policy('community_terms', '2026-11-24')
      OR NOT public.is_user_feature_enabled(v_uid, 'social')
-     OR NOT public.is_user_feature_enabled(v_uid, 'friend_requests') THEN
+     OR NOT public.is_user_feature_enabled(v_uid, 'friend_requests')
+     OR NOT private.has_role_for_user(v_uid, 'student'::public.app_role) THEN
     RAISE EXCEPTION 'Student discovery is disabled by parent or guardian settings';
   END IF;
 
@@ -43,5 +44,52 @@ BEGIN
     lower(coalesce(p.username, '')),
     p.id
   LIMIT 20;
+END;
+$function$;
+
+-- Prevent bypassing the student-only discovery flow by calling the request RPC with
+-- arbitrary account IDs. Friend requests are a student-to-student feature.
+CREATE OR REPLACE FUNCTION public.send_friend_request(p_target_user_id uuid)
+RETURNS public.friends
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog'
+AS $function$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_friend public.friends%rowtype;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
+  IF p_target_user_id IS NULL OR p_target_user_id = v_uid THEN
+    RAISE EXCEPTION 'Invalid friend target';
+  END IF;
+  IF NOT private.has_role_for_user(v_uid, 'student'::public.app_role)
+     OR NOT private.has_role_for_user(p_target_user_id, 'student'::public.app_role) THEN
+    RAISE EXCEPTION 'Friend requests are only available between student accounts';
+  END IF;
+  IF NOT public.has_accepted_policy('community_terms', '2026-11-24') THEN
+    RAISE EXCEPTION 'Please accept the current Terms of Use';
+  END IF;
+  IF NOT public.is_user_feature_enabled(v_uid, 'friend_requests')
+     OR NOT public.is_user_feature_enabled(p_target_user_id, 'friend_requests') THEN
+    RAISE EXCEPTION 'Friend requests are disabled by the parent or guardian settings';
+  END IF;
+  IF public.are_users_blocked(v_uid, p_target_user_id) THEN
+    RAISE EXCEPTION 'This user cannot be contacted';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.friends f
+    WHERE (f.user_id = v_uid AND f.friend_id = p_target_user_id)
+       OR (f.user_id = p_target_user_id AND f.friend_id = v_uid)
+  ) THEN
+    RAISE EXCEPTION 'A friend request or friendship already exists';
+  END IF;
+
+  INSERT INTO public.friends(user_id, friend_id, status)
+  VALUES (v_uid, p_target_user_id, 'pending')
+  RETURNING * INTO v_friend;
+  RETURN v_friend;
 END;
 $function$;
