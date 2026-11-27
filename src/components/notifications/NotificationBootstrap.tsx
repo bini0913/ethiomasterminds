@@ -40,13 +40,21 @@ export default function NotificationBootstrap() {
       } catch {
         return true;
       }
-      const actionId = action.actionId || [action.action, action.request_id, action.message_id, action.room_id].join(":");
+      const actionId = typeof action.actionId === "string" && action.actionId
+        ? action.actionId
+        : [action.action, action.request_id, action.message_id, action.room_id].join(":");
       if (handledActionIds.has(actionId)) return true;
+      // Bound this process-local replay guard so a long-lived app cannot grow
+      // the Set indefinitely while still suppressing recent duplicate taps.
+      if (handledActionIds.size >= 500) {
+        const oldest = handledActionIds.values().next().value;
+        if (oldest) handledActionIds.delete(oldest);
+      }
       handledActionIds.add(actionId);
 
       void (async () => {
         if (action.action === "open") {
-          if (action.route?.startsWith("/")) {
+          if (typeof action.route === "string" && action.route.startsWith("/") && !action.route.startsWith("//")) {
             window.dispatchEvent(new CustomEvent("master-minds-notification-route", { detail: action.route }));
           }
           return;
