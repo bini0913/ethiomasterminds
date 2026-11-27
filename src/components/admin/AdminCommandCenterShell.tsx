@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, LogOut, Menu, RefreshCw } from "lucide-react";
+import { ChevronRight, LogOut, Menu, RefreshCw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
