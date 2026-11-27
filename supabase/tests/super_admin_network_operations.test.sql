@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(36);
+SELECT plan(39);
 
 SELECT ok(to_regprocedure('public.super_admin_list_network_people(uuid,text,text,integer,integer)') IS NOT NULL, 'network people directory RPC exists');
 SELECT ok(to_regprocedure('public.super_admin_get_school_analytics(uuid)') IS NOT NULL, 'school analytics RPC exists');
@@ -49,6 +49,11 @@ SELECT ok(position('ur.role::text NOT IN' IN pg_get_functiondef('public.super_ad
 
 SELECT ok(position('schools_without_active_manager' IN pg_get_functiondef('public.super_admin_get_network_dashboard()'::regprocedure)) > 0, 'network dashboard identifies schools without active Managers');
 SELECT ok(position('active_staff' IN pg_get_functiondef('public.super_admin_get_network_dashboard()'::regprocedure)) > 0, 'network dashboard includes all active school staff');
+
+
+SELECT ok(position('Network authority may only suspend or restore Parent and Student access' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'network-level Parent and Student changes are limited to suspend and restore');
+SELECT ok(position('A reason of at least 8 characters is required' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'membership status changes require an audited reason server-side');
+SELECT ok(position('Legacy School Admin memberships are retired' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'retired School Admin memberships cannot be reactivated through the network workflow');
 
 SELECT * FROM finish();
 ROLLBACK;
