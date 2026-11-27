@@ -1,4 +1,13 @@
 -- Part 1: Executive metrics for the Extreme Admin.
+-- Backfill the profile-facing status field from the existing canonical account
+-- controls so legacy suspensions are reflected consistently in the new UI.
+UPDATE public.profiles profile
+SET account_status = controls.status,
+    updated_at = now()
+FROM public.user_account_controls controls
+WHERE controls.user_id = profile.id
+  AND profile.account_status IS DISTINCT FROM controls.status;
+
 -- All counts are derived from durable platform records. Finance figures are
 -- explicitly limited to confirmed school-fee receipts and outstanding invoices.
 
@@ -94,7 +103,12 @@ BEGIN
 
   SELECT jsonb_build_object(
     'registered_users', (SELECT count(*) FROM public.profiles),
-    'active_accounts', (SELECT count(*) FROM public.profiles WHERE COALESCE(account_status, 'active') = 'active'),
+    'active_accounts', (
+      SELECT count(*)
+      FROM public.profiles profile
+      LEFT JOIN public.user_account_controls controls ON controls.user_id = profile.id
+      WHERE COALESCE(controls.status, profile.account_status, 'active') = 'active'
+    ),
     'registered_today', (SELECT count(*) FROM public.profiles WHERE created_at >= (date_trunc('day', now() AT TIME ZONE 'Africa/Addis_Ababa') AT TIME ZONE 'Africa/Addis_Ababa')),
     'registered_7d', (SELECT count(*) FROM public.profiles WHERE created_at >= now() - interval '7 days'),
     'registered_30d', (SELECT count(*) FROM public.profiles WHERE created_at >= now() - interval '30 days'),
