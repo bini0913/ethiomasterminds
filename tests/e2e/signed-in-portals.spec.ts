@@ -92,8 +92,8 @@ for (const role of notificationRoles) {
   });
 }
 
-test('Extreme Admin executive workspace exposes every Part 1 section on desktop and mobile', async ({ page }) => {
-  test.setTimeout(90_000);
+test('Extreme Admin executive workspace exposes every Part 1 section across desktop, tablet and mobile', async ({ page }) => {
+  test.setTimeout(120_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
@@ -111,11 +111,12 @@ test('Extreme Admin executive workspace exposes every Part 1 section on desktop 
     { nav: /Audit history/, heading: 'Audit history' },
   ];
 
-  for (const viewport of [{ name: 'desktop', width: 1440, height: 1000 }, { name: 'mobile', width: 390, height: 844 }]) {
+  for (const viewport of [{ name: 'desktop', width: 1440, height: 1000 }, { name: 'tablet', width: 768, height: 1024 }, { name: 'mobile', width: 390, height: 844 }]) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/root-control-portal-9xA7', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Executive control center' })).toBeVisible({ timeout: 25_000 });
     await expect(page.getByText('All registered users')).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText('Student accounts', { exact: true })).toBeVisible();
 
     for (const section of sections) {
       if (viewport.width < 1024) {
@@ -127,7 +128,7 @@ test('Extreme Admin executive workspace exposes every Part 1 section on desktop 
     }
   }
 
-  expect(pageErrors, 'Unexpected browser errors in Extreme Admin desktop/mobile workspace').toEqual([]);
+  expect(pageErrors, 'Unexpected browser errors in Extreme Admin desktop/tablet/mobile workspace').toEqual([]);
 });
 
 test('Super Admin is denied access to the Extreme Admin owner route', async ({ page }) => {
