@@ -659,10 +659,75 @@ async function loadPdfJs() {
   return pdfjs;
 }
 
+async function createBrowserOcrWorker(languages: string) {
+  const sources = [
+    "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.esm.min.js",
+    "https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.esm.min.js",
+  ];
+  let lastError: unknown;
+  for (const source of sources) {
+    try {
+      const tesseract = await import(/* @vite-ignore */ source);
+      return await tesseract.createWorker(languages, 1, {
+        workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+        langPath: "https://tessdata.projectnaptha.com/4.0.0",
+        corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1",
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("OCR engine could not be loaded.");
+}
+
+async function extractScannedPdfText(
+  pdf: any,
+  pageNumbers: number[],
+  options?: { maxOcrPages?: number; ocrLanguages?: string },
+): Promise<{ text: string; pagesRead: number }> {
+  const maxOcrPages = Math.max(1, Math.min(12, Math.floor(options?.maxOcrPages ?? 6)));
+  const pagesToRead = pageNumbers.slice(0, maxOcrPages);
+  if (!pagesToRead.length) return { text: "", pagesRead: 0 };
+
+  let worker: any;
+  try {
+    try {
+      worker = await createBrowserOcrWorker(options?.ocrLanguages || "eng+amh");
+    } catch {
+      worker = await createBrowserOcrWorker("eng");
+    }
+
+    const chunks: string[] = [];
+    let pagesRead = 0;
+    for (const pageNo of pagesToRead) {
+      const page = await pdf.getPage(pageNo);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Your device could not prepare a page for OCR.");
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      try {
+        await page.render({ canvasContext: context, viewport }).promise;
+        const result = await worker.recognize(canvas);
+        const pageText = String(result?.data?.text || "").trim();
+        if (pageText) chunks.push(`Page ${pageNo}: ${pageText}`);
+        pagesRead = Math.max(pagesRead, pageNo);
+      } finally {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    }
+    return { text: chunks.join("\n\n"), pagesRead };
+  } finally {
+    if (worker && typeof worker.terminate === "function") await worker.terminate();
+  }
+}
+
 export async function extractBookText(
   path: string,
-  options?: { maxPages?: number; maxChars?: number },
-): Promise<{ text: string; pageCount: number; pagesRead: number; truncated: boolean }> {
+  options?: { maxPages?: number; maxChars?: number; maxOcrPages?: number; ocrLanguages?: string },
+): Promise<{ text: string; pageCount: number; pagesRead: number; truncated: boolean; ocrUsed: boolean; ocrIncomplete: boolean }> {
   if (!path) throw new Error("This book does not have a readable PDF file.");
   let file: Blob;
   if (/^https?:\/\//i.test(path)) {
@@ -686,8 +751,11 @@ export async function extractBookText(
   const maxChars = Math.max(500, Math.min(20_000, Math.floor(options?.maxChars ?? 12_000)));
   const pagesToRead = Math.min(pageCount, maxPages);
   const chunks: string[] = [];
+  const pagesNeedingOcr: number[] = [];
   let length = 0;
   let pagesRead = 0;
+  let ocrUsed = false;
+  let ocrIncomplete = false;
   try {
     for (let pageNo = 1; pageNo <= pagesToRead && length < maxChars; pageNo += 1) {
       const page = await pdf.getPage(pageNo);
@@ -699,15 +767,36 @@ export async function extractBookText(
       if (pageText) {
         chunks.push(`Page ${pageNo}: ${pageText}`);
         length += pageText.length;
+      } else {
+        pagesNeedingOcr.push(pageNo);
       }
       pagesRead = pageNo;
+    }
+
+    if (pagesNeedingOcr.length) {
+      try {
+        const ocr = await extractScannedPdfText(pdf, pagesNeedingOcr, options);
+        if (ocr.text) {
+          chunks.push(ocr.text);
+          length += ocr.text.length;
+          pagesRead = Math.max(pagesRead, ocr.pagesRead);
+          ocrUsed = true;
+        }
+      } catch (error) {
+        console.warn("Scanned PDF OCR failed:", error);
+        ocrIncomplete = true;
+        if (!chunks.length) {
+          throw new Error("This PDF has no selectable text and OCR could not start. Check your connection and retry; if it still fails, upload a clearer PDF.");
+        }
+        console.warn("Some scanned pages could not be read; selectable text remains available.", error);
+      }
     }
   } finally {
     if (typeof pdf.destroy === "function") await pdf.destroy();
   }
   const text = chunks.join("\n\n").slice(0, maxChars).trim();
-  if (!text) throw new Error("No selectable text was found. This PDF may be scanned; OCR is needed before AI study tools can read it.");
-  return { text, pageCount, pagesRead, truncated: pageCount > pagesRead || length > maxChars };
+  if (!text) throw new Error("No readable text was found in this PDF. Try a clearer scan or paste the passage into the study tools.");
+  return { text, pageCount, pagesRead, truncated: pageCount > pagesRead || length > maxChars || pagesNeedingOcr.length > Math.max(1, Math.min(12, Math.floor(options?.maxOcrPages ?? 6))) || ocrIncomplete, ocrUsed, ocrIncomplete };
 }
 
 export async function analyzeBookPdf(
