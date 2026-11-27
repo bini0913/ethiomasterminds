@@ -173,6 +173,28 @@ Deno.serve(async (req) => {
       return (studentMemberships ?? []).map((membership: { id: string }) => membership.id);
     };
 
+    if (action === "list_school_sections") {
+      if (!canProvisionNetwork) return json({ error: "Only the Super Admin or Extreme Admin can list school provisioning sections" }, 403);
+      const schoolId = normalize(payload?.school_id);
+      if (!schoolId) return json({ error: "A school is required" }, 400);
+      const { data: school, error: schoolError } = await admin
+        .from("schools")
+        .select("id,status")
+        .eq("id", schoolId)
+        .maybeSingle();
+      if (schoolError || !school || school.status !== "active") return json({ error: "School is unavailable" }, 404);
+      const [yearsResult, sectionsResult] = await Promise.all([
+        admin.from("school_academic_years").select("id,is_current").eq("school_id", schoolId),
+        admin.from("school_sections").select("id,academic_year_id,grade_label,section_name").eq("school_id", schoolId).order("grade_label").order("section_name"),
+      ]);
+      if (yearsResult.error || sectionsResult.error) return json({ error: "Could not load the school's current sections" }, 503);
+      const currentYearIds = new Set((yearsResult.data ?? []).filter((year: { is_current: boolean }) => year.is_current).map((year: { id: string }) => year.id));
+      const sections = currentYearIds.size
+        ? (sectionsResult.data ?? []).filter((section: { academic_year_id: string | null }) => currentYearIds.has(section.academic_year_id || ""))
+        : [];
+      return json({ sections, requires_current_academic_year: true });
+    }
+
     if (action === "create_school") {
       if (!canProvisionNetwork) return json({ error: "Only the Super Admin or Extreme Admin can create schools and Managers" }, 403);
       const name = normalize(payload?.school?.name);
