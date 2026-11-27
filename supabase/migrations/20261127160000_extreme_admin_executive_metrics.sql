@@ -511,7 +511,7 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'The Super Admin account must have an active profile';
     END IF;
-    IF public.has_role(p_user_id, 'extreme_admin'::public.app_role) THEN
+    IF private.has_role_for_user(p_user_id, 'extreme_admin'::public.app_role) THEN
       RAISE EXCEPTION 'The Extreme Admin account cannot become Super Admin';
     END IF;
     SELECT user_id INTO v_previous_user_id
