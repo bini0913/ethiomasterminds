@@ -236,8 +236,11 @@ export async function createBook(payload: CreateBookPayload) {
     throw new Error('No file selected.');
   }
 
-  if (payload.pdfFile.type !== 'application/pdf') {
-    throw new Error('Only PDF files are supported.');
+  const hasPdfMime = payload.pdfFile.type === "application/pdf";
+  const hasPdfExtension = /\\.pdf$/i.test(payload.pdfFile.name);
+  const pdfHeader = await payload.pdfFile.slice(0, 1024).text();
+  if ((!hasPdfMime && !hasPdfExtension) || !pdfHeader.includes("%PDF-")) {
+    throw new Error("Choose a valid PDF file. The file content must contain a PDF header.");
   }
 
   const maxPdfSizeBytes = 50 * 1024 * 1024;
@@ -245,9 +248,8 @@ export async function createBook(payload: CreateBookPayload) {
     throw new Error('File too large. Please upload a PDF smaller than 50MB.');
   }
 
-  const ext = payload.pdfFile.name.split('.').pop()?.toLowerCase() || 'pdf';
   const baseName = `${Date.now()}-${crypto.randomUUID()}`;
-  const pdfPath = `${payload.uploaderId}/${baseName}.${ext}`;
+  const pdfPath = `${payload.uploaderId}/${baseName}.pdf`;
 
   payload.onProgress?.('uploading');
   const { error: uploadError } = await supabase.storage
@@ -310,34 +312,44 @@ export async function createBook(payload: CreateBookPayload) {
   const createdBook = await withUploaderProfile(data as LibraryBook);
 
   try {
-    const { error: insertUploadError } = await db.from('book_uploads').insert({
+    const { error: insertUploadError } = await db.from("book_uploads").insert({
       book_id: createdBook.id,
       uploader_id: payload.uploaderId,
       status,
-      moderated_at: status === 'approved' ? new Date().toISOString() : null,
-      moderation_note: status === 'approved' ? 'Auto-approved by role policy' : 'Awaiting teacher/admin moderation',
+      moderated_at: status === "approved" ? new Date().toISOString() : null,
+      moderation_note: status === "approved" ? "Auto-approved by role policy" : "Awaiting teacher/admin moderation",
     });
 
     if (insertUploadError) {
       const code = getErrorCode(insertUploadError);
-
-      if (code === '23505') {
+      if (code === "23505") {
         const { error: updateUploadError } = await db
-          .from('book_uploads')
+          .from("book_uploads")
           .update({
             status,
-            moderated_at: status === 'approved' ? new Date().toISOString() : null,
-            moderation_note: status === 'approved' ? 'Auto-approved by role policy' : 'Awaiting teacher/admin moderation',
+            moderated_at: status === "approved" ? new Date().toISOString() : null,
+            moderation_note: status === "approved" ? "Auto-approved by role policy" : "Awaiting teacher/admin moderation",
           })
-          .eq('book_id', createdBook.id);
+          .eq("book_id", createdBook.id);
         if (updateUploadError) throw updateUploadError;
       } else {
-        // Do not block successful book upload if audit table isn't ready yet.
-        console.warn('book_uploads sync skipped:', insertUploadError);
+        throw insertUploadError;
       }
     }
   } catch (uploadAuditError) {
-    console.warn('book_uploads sync failed:', uploadAuditError);
+    const { error: rollbackError } = await db.from("library_books").delete().eq("id", createdBook.id);
+    if (!rollbackError) {
+      await cleanupUploadedAssets(pdfPath, thumbnailPath);
+    } else {
+      console.error("Library upload rollback failed; preserving file to avoid a broken book record.", rollbackError);
+    }
+    throw new Error(
+      rollbackError
+        ? "The upload could not be finalized or safely rolled back. Please contact support before retrying."
+        : uploadAuditError instanceof Error
+          ? `The upload audit record could not be saved: ${uploadAuditError.message}`
+          : "The upload audit record could not be saved.",
+    );
   }
 
   if (payload.schoolSubmission) {
@@ -346,14 +358,26 @@ export async function createBook(payload: CreateBookPayload) {
       p_section_id: payload.schoolSubmission.sectionId,
     });
     if (schoolSubmitError) {
-      throw new Error(`File uploaded but could not be submitted to the school review queue: ${schoolSubmitError.message}`);
+      const { error: rollbackError } = await db.from("library_books").delete().eq("id", createdBook.id);
+      if (!rollbackError) await cleanupUploadedAssets(pdfPath, thumbnailPath);
+      else console.error("School submission rollback failed; preserving file to avoid a broken book record.", rollbackError);
+      throw new Error(
+        rollbackError
+          ? "School submission failed and the upload could not be safely rolled back. Please contact support."
+          : `File upload was rolled back because school submission failed: ${schoolSubmitError.message}`,
+      );
     }
     const { data: schoolBook, error: schoolBookError } = await db
       .from('library_books')
       .select('*')
       .eq('id', createdBook.id)
       .single();
-    if (schoolBookError) throw schoolBookError;
+    if (schoolBookError) {
+      const { error: rollbackError } = await db.from("library_books").delete().eq("id", createdBook.id);
+      if (!rollbackError) await cleanupUploadedAssets(pdfPath, thumbnailPath);
+      else console.error("School book readback rollback failed; preserving file to avoid a broken book record.", rollbackError);
+      throw schoolBookError;
+    }
     payload.onProgress?.('done');
     return await withUploaderProfile(schoolBook as LibraryBook);
   }
@@ -536,6 +560,42 @@ export async function invokeLibraryAI(payload: {
   if (error) throw new Error(error.message || 'AI request failed.');
   if (!data?.response) throw new Error('AI returned no response.');
   return data.response as string;
+}
+
+export async function downloadBookPdf(path: string, fileName: string): Promise<void> {
+  if (!path) throw new Error("This book does not have a downloadable PDF.");
+
+  let file: Blob;
+  if (/^https?:\\/\\//i.test(path)) {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Download failed (${response.status}).`);
+    file = await response.blob();
+  } else {
+    const normalizedPath = path.replace(/^\\/+/, "");
+    const { data, error } = await supabase.storage.from("library-files").download(normalizedPath);
+    if (error) throw new Error(error.message || "Could not download this PDF.");
+    if (!data) throw new Error("The storage service returned an empty file.");
+    file = data;
+  }
+
+  if (!file.size) throw new Error("The downloaded PDF is empty.");
+  const header = await file.slice(0, 1024).text();
+  if (!header.includes("%PDF-")) throw new Error("The stored file is not a readable PDF.");
+
+  const safeBaseName = fileName
+    .trim()
+    .replace(/[\\\\/:*?"<>|]+/g, "-")
+    .replace(/\\.pdf$/i, "")
+    .slice(0, 120) || "master-minds-book";
+  const objectUrl = URL.createObjectURL(file);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = `${safeBaseName}.pdf`;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 }
 
 export async function getPdfPublicUrl(path: string) {
