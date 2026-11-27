@@ -314,6 +314,60 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (action === "attach_existing_account") {
+      if (!canProvisionNetwork) return json({ error: "Only the Super Admin or Extreme Admin can assign existing accounts to the school network" }, 403);
+      const schoolId = normalize(payload?.school_id);
+      const targetUsername = normalize(payload?.username).toLowerCase();
+      const role = normalize(payload?.role) as SchoolRole;
+      const assignableRoles: SchoolRole[] = ["manager", "finance", "parent"];
+      if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64 || !assignableRoles.includes(role)) {
+        return json({ error: "Provide an active school, existing username, and supported school role" }, 400);
+      }
+      const { data: school, error: schoolError } = await admin
+        .from("schools").select("id,status").eq("id", schoolId).maybeSingle();
+      if (schoolError || !school || school.status !== "active") return json({ error: "School is unavailable" }, 404);
+
+      const { data: targetProfile, error: profileError } = await admin
+        .from("profiles").select("id,username").ilike("username", targetUsername).maybeSingle();
+      if (profileError) return json({ error: "Unable to look up the existing account" }, 503);
+      if (!targetProfile?.id || !targetProfile.username) return json({ error: "No existing account was found for that username" }, 404);
+
+      const { data: targetRoles, error: targetRolesError } = await admin
+        .from("user_roles").select("role").eq("user_id", targetProfile.id);
+      if (targetRolesError) return json({ error: "Unable to verify the target account's platform authority" }, 503);
+      if ((targetRoles ?? []).some((row: { role: string }) => row.role === "extreme_admin" || row.role === "super_admin")) {
+        return json({ error: "Platform authority accounts cannot be assigned to a school portal" }, 409);
+      }
+
+      const { data: membershipId, error: attachError } = await admin.rpc("school_attach_account", {
+        p_actor_id: actorId,
+        p_school_id: schoolId,
+        p_user_id: targetProfile.id,
+        p_school_role: role,
+        p_school_username: targetProfile.username,
+        p_grade_label: null,
+        p_age_at_enrollment: null,
+        p_section_id: null,
+        p_student_number: null,
+        p_parent_membership_ids: [],
+        p_student_membership_ids: [],
+        p_teacher_assignments: [],
+      });
+      if (attachError || !membershipId) {
+        return json({ error: attachError?.message || "The existing account could not be assigned to this school" }, 400);
+      }
+
+      await admin.from("admin_audit_logs").insert({
+        actor_id: actorId,
+        action: "extreme_admin_assigned_existing_school_account",
+        target_type: "school_membership",
+        target_id: membershipId,
+        metadata: { school_id: schoolId, user_id: targetProfile.id, school_role: role },
+      });
+
+      return json({ membership_id: membershipId, user_id: targetProfile.id, username: targetProfile.username, role }, 201);
+    }
+
     if (action === "create_accounts") {
       const schoolId = normalize(payload?.school_id);
       const role = normalize(payload?.role) as SchoolRole;
