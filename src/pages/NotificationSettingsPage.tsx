@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import BackButton from "@/components/ui/BackButton";
 import { useUser } from "@/context/UserContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   type NotificationPreferences,
   loadNotificationPreferences,
