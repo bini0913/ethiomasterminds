@@ -114,7 +114,7 @@ BEGIN
       FROM public.user_presence presence
       WHERE presence.last_seen >= now() - interval '30 days'
     ),
-    'online_now', (
+    'recently_active_10m', (
       SELECT count(DISTINCT presence.user_id)
       FROM public.user_presence presence
       WHERE presence.last_seen >= now() - interval '10 minutes'
