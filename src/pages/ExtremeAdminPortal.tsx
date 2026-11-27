@@ -242,7 +242,6 @@ const ExtremeAdminPortal: React.FC = () => {
       setSchools((schoolsResult.data as PortalSchool[]) || []);
       setSuperAdminUsers((superAdminResult.data as PortalUser[]) || []);
       setLogs((logsResult.data as any[]) || []);
-      setSecuritySummary((securityResult.data as Record<string, number>) || {});
       setDeletionRequests((deletionResult.data as DeletionRequest[]) || []);
       const mapped = ((settingsResult.data as any[]) || []).reduce((result, row) => {
         result[row.setting_key] = typeof row.setting_value === "number" ? row.setting_value : row.setting_value === true;
