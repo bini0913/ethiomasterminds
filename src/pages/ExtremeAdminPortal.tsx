@@ -170,6 +170,9 @@ const ExtremeAdminPortal: React.FC = () => {
   const [newAccountSectionId, setNewAccountSectionId] = useState("");
   const [parentStudentMembershipIds, setParentStudentMembershipIds] = useState("");
   const [createAccountLoading, setCreateAccountLoading] = useState(false);
+  const [existingAccountUsername, setExistingAccountUsername] = useState("");
+  const [existingAccountRole, setExistingAccountRole] = useState("finance");
+  const [assignExistingLoading, setAssignExistingLoading] = useState(false);
   const [provisioningResult, setProvisioningResult] = useState<any>(null);
 
   const [privacyNote, setPrivacyNote] = useState("");
@@ -364,6 +367,26 @@ const ExtremeAdminPortal: React.FC = () => {
     setParentStudentMembershipIds("");
     if ((data?.created || []).length) toast.success("School account created");
     if ((data?.failed || []).length) toast.error(data.failed[0]?.message || "Account creation was partially unsuccessful");
+    await refreshAll();
+    await loadUsers(true);
+  };
+
+  const assignExistingAccount = async () => {
+    if (!selectedSchoolId || !existingAccountUsername.trim()) return toast.error("Choose a school and enter the existing username");
+    setAssignExistingLoading(true);
+    const { data, error } = await supabase.functions.invoke("school-provision-account", {
+      body: {
+        action: "attach_existing_account",
+        school_id: selectedSchoolId,
+        username: existingAccountUsername.trim(),
+        role: existingAccountRole,
+      },
+    });
+    setAssignExistingLoading(false);
+    if (error || data?.error) return toast.error(data?.error || error?.message || "Existing account could not be assigned");
+    setProvisioningResult({ kind: "assigned", data });
+    setExistingAccountUsername("");
+    toast.success("Existing account assigned to the school");
     await refreshAll();
     await loadUsers(true);
   };
@@ -579,6 +602,15 @@ const ExtremeAdminPortal: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+          <Card className="border-slate-200 bg-white shadow-sm">
+            <CardHeader><CardTitle className="text-base">Assign an existing account</CardTitle><CardDescription>Attach an existing platform account as a school Finance or Parent member using the trusted provisioning service. Student enrollment and teacher assignment follow their dedicated school workflows.</CardDescription></CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+              <div className="space-y-1"><Label>Existing username</Label><Input value={existingAccountUsername} onChange={(event) => setExistingAccountUsername(event.target.value)} placeholder="Exact username" /></div>
+              <div className="space-y-1"><Label>School role</Label><Select value={existingAccountRole} onValueChange={setExistingAccountRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="finance">Finance</SelectItem><SelectItem value="parent">Parent</SelectItem></SelectContent></Select></div>
+              <div className="space-y-1"><Label>Selected school</Label><p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{schools.find((school) => school.id === selectedSchoolId)?.name || "Choose a school above"}</p></div>
+              <Button onClick={() => void assignExistingAccount()} disabled={assignExistingLoading || !selectedSchoolId || !existingAccountUsername.trim()}>{assignExistingLoading ? "Assigning…" : "Assign account"}</Button>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -646,7 +678,7 @@ const ExtremeAdminPortal: React.FC = () => {
       {provisioningResult && (
         <div className="fixed inset-x-4 bottom-4 z-[70] mx-auto max-w-2xl rounded-2xl border border-emerald-200 bg-white p-4 shadow-2xl sm:inset-x-auto sm:right-6">
           <div className="flex items-start justify-between gap-3"><div><p className="flex items-center gap-2 text-sm font-bold text-emerald-800"><CheckCircle2 className="h-4 w-4" />Provisioning result</p><p className="mt-1 text-xs text-slate-500">Initial credentials are shown once here. Share them securely with the account holder and require a password change.</p></div><Button size="icon" variant="ghost" onClick={() => setProvisioningResult(null)} aria-label="Dismiss credentials"><XCircle className="h-4 w-4" /></Button></div>
-          {provisioningResult.kind === "school" ? <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-700"><p>School: <strong>{provisioningResult.data?.school?.name}</strong></p><p>Manager username: <strong>{provisioningResult.data?.manager?.username}</strong></p><p>Initial password: <strong className="select-all font-mono">{provisioningResult.data?.manager?.initial_password}</strong></p></div> : <div className="mt-3 space-y-2">{(provisioningResult.data?.created || []).map((account: any, index: number) => <div key={account.membership_id || index} className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700"><p>Username: <strong>{account.username}</strong> · Role: {account.role}</p><p>Initial password: <strong className="select-all font-mono">{account.initial_password}</strong></p></div>)}{(provisioningResult.data?.failed || []).map((failure: any) => <p key={failure.index} className="text-xs text-red-700">Account {failure.index + 1}: {failure.message}</p>)}</div>}
+          {provisioningResult.kind === "school" ? <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-700"><p>School: <strong>{provisioningResult.data?.school?.name}</strong></p><p>Manager username: <strong>{provisioningResult.data?.manager?.username}</strong></p><p>Initial password: <strong className="select-all font-mono">{provisioningResult.data?.manager?.initial_password}</strong></p></div> : provisioningResult.kind === "assigned" ? <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-700"><p>Username: <strong>{provisioningResult.data?.username}</strong></p><p>School role: <strong>{provisioningResult.data?.role}</strong></p><p>Membership ID: <strong className="font-mono">{provisioningResult.data?.membership_id}</strong></p></div> : <div className="mt-3 space-y-2">{(provisioningResult.data?.created || []).map((account: any, index: number) => <div key={account.membership_id || index} className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700"><p>Username: <strong>{account.username}</strong> · Role: {account.role}</p><p>Initial password: <strong className="select-all font-mono">{account.initial_password}</strong></p></div>)}{(provisioningResult.data?.failed || []).map((failure: any) => <p key={failure.index} className="text-xs text-red-700">Account {failure.index + 1}: {failure.message}</p>)}</div>}
         </div>
       )}
     </AdminCommandCenterShell>
