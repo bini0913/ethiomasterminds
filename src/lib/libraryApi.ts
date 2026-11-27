@@ -599,8 +599,15 @@ export async function downloadBookPdf(path: string, fileName: string): Promise<v
 
   let file: Blob;
   if (/^https?:\/\//i.test(path)) {
-    const response = await fetch(path);
-    if (!response.ok) throw new Error(`Download failed (${response.status}).`);
+    let response: Response;
+    try {
+      response = await fetch(path);
+    } catch {
+      throw new Error("This PDF is hosted externally and does not allow direct downloads from Master Minds. Open it in the reader and use the source provider's download control.");
+    }
+    if (!response.ok) {
+      throw new Error("The external PDF source did not provide a downloadable file. Open the source provider's page instead.");
+    }
     file = await response.blob();
   } else {
     const normalizedPath = path.replace(/^\/+/, "");
