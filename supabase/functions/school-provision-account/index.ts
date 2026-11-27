@@ -453,12 +453,21 @@ Deno.serve(async (req) => {
 
           const account = await createAuthAccount(name, username, role === "student" ? normalize(input.grade_label) : undefined, role === "student" ? Number(input.age) : undefined);
           const membershipId = await attachAccount(schoolId, role, account.userId, username, input, studentNumber);
+          const { error: auditError } = await admin.from("admin_audit_logs").insert({
+            actor_id: actorId,
+            action: "school_account_created",
+            target_type: "school_membership",
+            target_id: membershipId,
+            metadata: { school_id: schoolId, user_id: account.userId, school_role: role, username },
+          });
           created.push({
             index,
             membership_id: membershipId,
             username,
             initial_password: account.password,
             role,
+            audit_recorded: !auditError,
+            ...(auditError ? { audit_warning: "Account created but its audit event could not be written." } : {}),
             ...(studentNumber ? { student_id: studentNumber } : {}),
             ...(role === "student" ? { grade: input.grade_label, age_at_enrollment: input.age } : {}),
           });
