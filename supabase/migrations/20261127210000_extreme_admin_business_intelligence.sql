@@ -60,6 +60,21 @@ BEGIN
           COALESCE(direction, 'unspecified') direction, count(*) records
           FROM public.finance_transactions GROUP BY status, direction) x
       ), '[]'::jsonb),
+      'recent_payments', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object('payment_id', p.id, 'invoice_number', i.invoice_number,
+          'amount', p.amount, 'currency', COALESCE(NULLIF(i.currency, ''), 'ETB'),
+          'method', p.method, 'paid_at', p.paid_at) ORDER BY p.paid_at DESC NULLS LAST)
+        FROM (SELECT * FROM public.finance_payments ORDER BY paid_at DESC NULLS LAST LIMIT 100) p
+        LEFT JOIN public.finance_invoices i ON i.id = p.invoice_id
+      ), '[]'::jsonb),
+      'recent_invoices', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object('invoice_id', id, 'invoice_number', invoice_number,
+          'description', description, 'currency', COALESCE(NULLIF(currency, ''), 'ETB'),
+          'total', total, 'amount_paid', COALESCE(amount_paid, 0),
+          'outstanding', GREATEST(total - COALESCE(amount_paid, 0), 0),
+          'status', status, 'due_date', due_date, 'created_at', created_at) ORDER BY created_at DESC)
+        FROM (SELECT * FROM public.finance_invoices ORDER BY created_at DESC LIMIT 100) i
+      ), '[]'::jsonb),
       'ledger_movements', COALESCE((
         SELECT jsonb_agg(jsonb_build_object('currency', currency, 'status', status,
           'direction', direction, 'amount', amount, 'records', records) ORDER BY currency, status, direction)
@@ -138,6 +153,29 @@ BEGIN
             GROUP BY COALESCE(NULLIF(i.currency, ''), 'ETB')) z
         ) col ON true
         WHERE p_school_id IS NULL OR s.id = p_school_id
+      ), '[]'::jsonb),
+      'recent_payments', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object('payment_id', p.id, 'school_id', p.school_id,
+          'school_name', s.name, 'invoice_number', i.invoice_number, 'receipt_number', p.receipt_number,
+          'amount', p.amount, 'currency', COALESCE(NULLIF(i.currency, ''), 'ETB'),
+          'method', COALESCE(NULLIF(p.payment_method, ''), 'Unspecified'),
+          'status', p.status, 'received_at', p.received_at) ORDER BY p.received_at DESC NULLS LAST)
+        FROM (SELECT * FROM public.school_fee_payments
+          WHERE p_school_id IS NULL OR school_id = p_school_id
+          ORDER BY received_at DESC NULLS LAST LIMIT 100) p
+        JOIN public.school_student_invoices i ON i.id = p.invoice_id AND i.school_id = p.school_id
+        JOIN public.schools s ON s.id = p.school_id
+      ), '[]'::jsonb),
+      'recent_invoices', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object('invoice_id', i.id, 'school_id', i.school_id,
+          'school_name', s.name, 'invoice_number', i.invoice_number, 'description', i.description,
+          'amount', i.amount, 'paid_amount', i.paid_amount, 'balance', i.balance,
+          'currency', COALESCE(NULLIF(i.currency, ''), 'ETB'), 'status', i.status,
+          'due_date', i.due_date, 'created_at', i.created_at) ORDER BY i.created_at DESC)
+        FROM (SELECT * FROM public.school_student_invoices
+          WHERE p_school_id IS NULL OR school_id = p_school_id
+          ORDER BY created_at DESC LIMIT 100) i
+        JOIN public.schools s ON s.id = i.school_id
       ), '[]'::jsonb),
       'payment_methods', COALESCE((
         SELECT jsonb_agg(jsonb_build_object('method', method, 'currency', currency,
