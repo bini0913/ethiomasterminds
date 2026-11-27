@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,7 @@ const StudyModePage: React.FC = () => {
   const upperStudent = getUserTier(user?.grade) === "upper";
 
   const [loading, setLoading] = useState(true);
+  const loadRequestId = useRef(0);
   const [loadError, setLoadError] = useState(false);
   const [tasks, setTasks] = useState<StudyTask[]>([]);
   const [competitions, setCompetitions] = useState<StudyCompetition[]>([]);
@@ -160,123 +161,161 @@ const StudyModePage: React.FC = () => {
   };
 
   const loadData = async () => {
-    if (!user) { setLoading(false); return; }
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    const requestId = ++loadRequestId.current;
     setLoading(true);
     setLoadError(false);
+
     try {
+      // Competition expiry is maintenance work, not a prerequisite for rendering
+      // the study workspace. A failure here must never block the page.
       try {
         const { error: expiryError } = await db.rpc("expire_study_competitions");
-        if (expiryError) console.error("Could not expire old study competitions", expiryError);
+        if (expiryError) console.warn("Could not expire old study competitions:", expiryError.message);
       } catch (error) {
         console.warn("Study competition expiry check failed:", error);
       }
 
       const [sessionsRes, tasksRes, competitionsRes, participantsRes, liveRes, settingsRes, statsRes] = await Promise.all([
-      db.from("study_sessions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100),
-      db.from("study_tasks").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-      db.from("study_competitions").select("*").order("created_at", { ascending: false }).limit(50),
-      db.from("study_participants").select("*").order("total_study_time", { ascending: false }),
-      db.from("study_live_status").select("*").eq("is_studying", true).gte("updated_at", new Date(Date.now() - 90_000).toISOString()),
-      db.from("study_settings").select("*").eq("user_id", user.id).maybeSingle(),
-      db.rpc("get_study_mode_stats", { p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }),
-    ]);
+        db.from("study_sessions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100),
+        db.from("study_tasks").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        db.from("study_competitions").select("*").order("created_at", { ascending: false }).limit(50),
+        db.from("study_participants").select("*").order("total_study_time", { ascending: false }),
+        db.from("study_live_status").select("*").eq("is_studying", true).gte("updated_at", new Date(Date.now() - 90_000).toISOString()),
+        db.from("study_settings").select("*").eq("user_id", user.id).maybeSingle(),
+        db.rpc("get_study_mode_stats", { p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }),
+      ]);
 
-    const queryErrors = [sessionsRes.error, tasksRes.error, competitionsRes.error, participantsRes.error, liveRes.error, settingsRes.error].filter(Boolean);
-    if (queryErrors.length) {
-      console.error("Some Study Mode data sources failed:", queryErrors);
-      setLoadError(true);
-    }
-    if (statsRes.error) console.error("Study statistics load failed", statsRes.error);
-    if (!statsRes.error && statsRes.data) {
-      setStudyStats({
-        today_minutes: Number(statsRes.data.today_minutes) || 0,
-        week_minutes: Number(statsRes.data.week_minutes) || 0,
-        streak_days: Number(statsRes.data.streak_days) || 0,
-        pomodoros_today: Number(statsRes.data.pomodoros_today) || 0,
-      });
-    }
+      // Realtime bursts can overlap requests. Only the newest response may
+      // commit state, preventing stale responses from clearing newer data.
+      if (requestId !== loadRequestId.current) return;
 
-    const nextSessions = (sessionsRes.data ?? []) as StudySession[];
-    const currentActive = nextSessions.find((session) => session.status === "active") ?? null;
-
-    setTasks((tasksRes.data ?? []) as StudyTask[]);
-    setCompetitions((competitionsRes.data ?? []) as StudyCompetition[]);
-    setParticipants((participantsRes.data ?? []) as StudyParticipant[]);
-    setLiveStatuses((liveRes.data ?? []) as StudyLiveStatus[]);
-    setSettings((settingsRes.data as StudySettings | null) ?? null);
-
-    if (settingsRes.data) {
-      setStudyMinutes(settingsRes.data.default_study_time ?? 25);
-      setBreakMinutes(settingsRes.data.default_break_time ?? 5);
-      setSessionTargetSeconds((settingsRes.data.default_study_time ?? 25) * 60);
-      setBreakTargetSeconds((settingsRes.data.default_break_time ?? 5) * 60);
-      if (!currentActive && timerState === "idle") {
-        setCountdownSeconds((settingsRes.data.default_study_time ?? 25) * 60);
+      const sourceErrors = [
+        sessionsRes.error, tasksRes.error, competitionsRes.error,
+        participantsRes.error, liveRes.error, settingsRes.error, statsRes.error,
+      ].filter(Boolean);
+      if (sourceErrors.length) {
+        console.warn("Some Study Mode sources could not be refreshed:", sourceErrors);
+        setLoadError(true);
       }
-    }
 
-    setActiveSession(currentActive);
-    if (currentActive) {
-      const isPaused = Boolean(currentActive.paused_at);
-      setTimerState(isPaused ? "paused" : "running");
-      setMode((currentActive.mode as StudyMode) ?? "pomodoro");
-      const planned = (currentActive.planned_duration ?? 25) * 60;
-      const wallElapsed = Math.max(0, (Date.now() - new Date(currentActive.start_time).getTime()) / 1000);
-      const currentPause = currentActive.paused_at ? Math.max(0, (Date.now() - new Date(currentActive.paused_at).getTime()) / 1000) : 0;
-      const pausedSeconds = Math.max(0, Number(currentActive.paused_seconds) || 0) + currentPause;
-      const elapsed = Math.max(0, Math.floor(wallElapsed - pausedSeconds));
-      setSessionTargetSeconds(planned);
-      setCountdownSeconds(Math.max(0, planned - elapsed));
-    }
+      if (!sessionsRes.error) {
+        const nextSessions = (sessionsRes.data ?? []) as StudySession[];
+        const currentActive = nextSessions.find((session) => session.status === "active") ?? null;
+        setActiveSession(currentActive);
+        if (currentActive) {
+          const isPaused = Boolean(currentActive.paused_at);
+          setTimerState(isPaused ? "paused" : "running");
+          setMode((currentActive.mode as StudyMode) ?? "pomodoro");
+          const planned = Math.max(1, Number(currentActive.planned_duration) || 25) * 60;
+          const wallElapsed = Math.max(0, (Date.now() - new Date(currentActive.start_time).getTime()) / 1000);
+          const currentPause = currentActive.paused_at
+            ? Math.max(0, (Date.now() - new Date(currentActive.paused_at).getTime()) / 1000)
+            : 0;
+          const pausedSeconds = Math.max(0, Number(currentActive.paused_seconds) || 0) + currentPause;
+          setSessionTargetSeconds(planned);
+          setCountdownSeconds(Math.max(0, planned - Math.floor(wallElapsed - pausedSeconds)));
+        } else {
+          setTimerState((current) => current === "running" || current === "paused" ? "idle" : current);
+        }
+      }
 
-    const idsToLoad = [
-      ...((participantsRes.data ?? []) as StudyParticipant[]).map((entry) => entry.user_id),
-      ...((liveRes.data ?? []) as StudyLiveStatus[]).map((entry) => entry.user_id),
-      user.id,
-    ];
+      if (!tasksRes.error) setTasks((tasksRes.data ?? []) as StudyTask[]);
+      if (!competitionsRes.error) setCompetitions((competitionsRes.data ?? []) as StudyCompetition[]);
+      if (!participantsRes.error) setParticipants((participantsRes.data ?? []) as StudyParticipant[]);
+      if (!liveRes.error) setLiveStatuses((liveRes.data ?? []) as StudyLiveStatus[]);
 
-    await loadNames(idsToLoad);
+      if (!settingsRes.error) {
+        const nextSettings = (settingsRes.data as StudySettings | null) ?? null;
+        setSettings(nextSettings);
+        if (nextSettings) {
+          const nextStudy = clampMinutes(Number(nextSettings.default_study_time) || 25, 5, 180);
+          const nextBreak = clampMinutes(Number(nextSettings.default_break_time) || 5, 1, 30);
+          setStudyMinutes(nextStudy);
+          setBreakMinutes(nextBreak);
+          setSessionTargetSeconds((current) => activeSession ? current : nextStudy * 60);
+          setBreakTargetSeconds(nextBreak * 60);
+          setCountdownSeconds((current) => !activeSession && timerState === "idle" ? nextStudy * 60 : current);
+        }
+      }
 
-    const availableCompetitions = ((competitionsRes.data ?? []) as StudyCompetition[]).filter(
-      (competition) => competition.status === "active" && (!competition.end_time || new Date(competition.end_time).getTime() > Date.now())
-    );
-    setSelectedCompetitionId((current) =>
-      current && availableCompetitions.some((competition) => competition.id === current)
-        ? current
-        : availableCompetitions[0]?.id ?? ""
-    );
+      if (!statsRes.error && statsRes.data) {
+        setStudyStats({
+          today_minutes: Number(statsRes.data.today_minutes) || 0,
+          week_minutes: Number(statsRes.data.week_minutes) || 0,
+          streak_days: Number(statsRes.data.streak_days) || 0,
+          pomodoros_today: Number(statsRes.data.pomodoros_today) || 0,
+        });
+      }
 
+      const idsToLoad = [
+        ...(!participantsRes.error ? ((participantsRes.data ?? []) as StudyParticipant[]).map((entry) => entry.user_id) : []),
+        ...(!liveRes.error ? ((liveRes.data ?? []) as StudyLiveStatus[]).map((entry) => entry.user_id) : []),
+        user.id,
+      ];
+      await loadNames(idsToLoad);
+      if (requestId !== loadRequestId.current) return;
+
+      if (!competitionsRes.error) {
+        const availableCompetitions = ((competitionsRes.data ?? []) as StudyCompetition[]).filter(
+          (competition) => competition.status === "active" &&
+            (!competition.end_time || new Date(competition.end_time).getTime() > Date.now()),
+        );
+        setSelectedCompetitionId((current) =>
+          current && availableCompetitions.some((competition) => competition.id === current)
+            ? current
+            : availableCompetitions[0]?.id ?? "",
+        );
+      }
     } catch (error) {
-      console.error("Study Mode data load failed:", error);
+      if (requestId !== loadRequestId.current) return;
+      console.error("[Study Mode] Data refresh failed:", error);
       setLoadError(true);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestId.current) setLoading(false);
     }
   };
-
   useEffect(() => {
     if (!user) return;
     void loadData();
+    return () => { loadRequestId.current += 1; };
   }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
+    let refreshTimer: number | null = null;
+    const refresh = () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      // Coalesce bursts (e.g. session + presence writes) into one refresh.
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        void loadData();
+      }, 250);
+    };
 
     const channel = supabase
       .channel(`study-mode-full-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "study_sessions" }, () => void loadData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "study_tasks" }, () => void loadData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "study_competitions" }, () => void loadData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "study_participants" }, () => void loadData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "study_live_status" }, () => void loadData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "study_settings" }, () => void loadData())
-      .subscribe();
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_sessions" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_tasks" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_competitions" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_participants" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_live_status" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_settings" }, refresh)
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("[Study Mode] Realtime subscription status:", status);
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
     };
   }, [user?.id]);
-
   useEffect(() => {
     if (timerState === "break") {
       if (breakDeadlineMs === null) return;
