@@ -317,3 +317,60 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.extreme_admin_get_audit_logs(integer) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.extreme_admin_get_audit_logs(integer) TO authenticated;
+
+
+-- Keep top-level platform authority accounts out of general suspension/ban
+-- controls. A Super Admin may be reactivated, but must be revoked through the
+-- singleton authority workflow before it can be suspended or banned.
+CREATE OR REPLACE FUNCTION public.extreme_admin_set_user_status(
+  p_user_id uuid,
+  p_status text,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+DECLARE
+  v_target_role public.app_role;
+BEGIN
+  IF NOT public._is_extreme_admin() THEN
+    RAISE EXCEPTION 'Extreme Admin access required';
+  END IF;
+
+  IF p_status NOT IN ('active', 'suspended', 'banned') THEN
+    RAISE EXCEPTION 'Invalid account status';
+  END IF;
+
+  SELECT role INTO v_target_role
+  FROM public.user_roles
+  WHERE user_id = p_user_id
+    AND role IN ('extreme_admin'::public.app_role, 'super_admin'::public.app_role)
+  LIMIT 1;
+
+  IF v_target_role = 'extreme_admin'::public.app_role THEN
+    RAISE EXCEPTION 'The Extreme Admin owner account cannot be changed through general account status controls';
+  END IF;
+
+  IF v_target_role = 'super_admin'::public.app_role AND p_status <> 'active' THEN
+    RAISE EXCEPTION 'Revoke Super Admin authority before suspending or banning that account';
+  END IF;
+
+  UPDATE public.profiles
+  SET account_status = p_status, updated_at = now()
+  WHERE id = p_user_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Account not found';
+  END IF;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(), 'set_user_status', 'user', p_user_id,
+    jsonb_build_object('status', p_status, 'reason', p_reason)
+  );
+
+  RETURN true;
+END;
+$function$;
