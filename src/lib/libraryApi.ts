@@ -237,7 +237,7 @@ export async function createBook(payload: CreateBookPayload) {
   }
 
   const hasPdfMime = payload.pdfFile.type === "application/pdf";
-  const hasPdfExtension = /\\.pdf$/i.test(payload.pdfFile.name);
+  const hasPdfExtension = /\.pdf$/i.test(payload.pdfFile.name);
   const pdfHeader = await payload.pdfFile.slice(0, 1024).text();
   if ((!hasPdfMime && !hasPdfExtension) || !pdfHeader.includes("%PDF-")) {
     throw new Error("Choose a valid PDF file. The file content must contain a PDF header.");
@@ -566,12 +566,12 @@ export async function downloadBookPdf(path: string, fileName: string): Promise<v
   if (!path) throw new Error("This book does not have a downloadable PDF.");
 
   let file: Blob;
-  if (/^https?:\\/\\//i.test(path)) {
+  if (/^https?:\/\//i.test(path)) {
     const response = await fetch(path);
-    if (!response.ok) throw new Error(`Download failed (${response.status}).`);
+    if (!response.ok) throw new Error(\`Download failed (\${response.status}).\`);
     file = await response.blob();
   } else {
-    const normalizedPath = path.replace(/^\\/+/, "");
+    const normalizedPath = path.replace(/^\/+/, "");
     const { data, error } = await supabase.storage.from("library-files").download(normalizedPath);
     if (error) throw new Error(error.message || "Could not download this PDF.");
     if (!data) throw new Error("The storage service returned an empty file.");
@@ -584,13 +584,13 @@ export async function downloadBookPdf(path: string, fileName: string): Promise<v
 
   const safeBaseName = fileName
     .trim()
-    .replace(/[\\\\/:*?"<>|]+/g, "-")
-    .replace(/\\.pdf$/i, "")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\.pdf$/i, "")
     .slice(0, 120) || "master-minds-book";
   const objectUrl = URL.createObjectURL(file);
   const anchor = document.createElement("a");
   anchor.href = objectUrl;
-  anchor.download = `${safeBaseName}.pdf`;
+  anchor.download = \`\${safeBaseName}.pdf\`;
   anchor.rel = "noopener";
   document.body.appendChild(anchor);
   anchor.click();
