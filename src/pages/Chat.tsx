@@ -368,16 +368,21 @@ const Chat: React.FC = () => {
   // Create group
   const createGroup = async () => {
     if (!user?.id || !newGroupName.trim()) return;
-    try {
-      const { error } = await supabase.rpc('create_chat_group', {
-        p_name: newGroupName.trim(),
-        p_group_type: newGroupType,
-      });
-      if (error) throw error;
-      toast.success('Chat created!');
-      setNewGroupName(''); setShowCreateDialog(false);
-      loadRooms();
-    } catch { toast.error('Failed to create chat'); }
+    await runWithCommunityTerms(async () => {
+      try {
+        const { error } = await supabase.rpc('create_chat_group', {
+          p_name: newGroupName.trim(),
+          p_group_type: newGroupType,
+        });
+        if (error) throw error;
+        toast.success('Chat created!');
+        setNewGroupName(''); setShowCreateDialog(false);
+        await loadRooms();
+      } catch (error) {
+        console.error('Failed to create chat:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to create chat');
+      }
+    }, 'social');
   };
 
   // Search groups
@@ -396,11 +401,16 @@ const Chat: React.FC = () => {
   // Join group
   const joinGroup = async (groupId: string) => {
     if (!user?.id) return;
-    const { error } = await supabase.rpc('join_chat_group', { p_group_id: groupId });
-    if (error) { toast.error('Failed to join'); return; }
-    toast.success('Joined!');
-    loadRooms();
-    setShowSearch(false);
+    await runWithCommunityTerms(async () => {
+      const { error } = await supabase.rpc('join_chat_group', { p_group_id: groupId });
+      if (error) {
+        toast.error(error.message || 'Failed to join chat');
+        return;
+      }
+      toast.success('Joined!');
+      await loadRooms();
+      setShowSearch(false);
+    }, 'social');
   };
 
   // Challenge from chat
