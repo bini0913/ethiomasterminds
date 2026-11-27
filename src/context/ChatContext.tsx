@@ -177,7 +177,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .in('id', senderIds);
 
       if (sequence !== messageFetchSequence.current || user?.id !== requestedUserId) return;
-      if (sequence !== memberFetchSequence.current) return;
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
       const enrichedMessages: GroupMessage[] = latestFirstMessages.map(m => ({
@@ -228,6 +227,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .select('id, name, avatar, level')
         .in('id', userIds);
 
+      if (sequence !== memberFetchSequence.current) return;
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
       const enrichedMembers: GroupMember[] = (data || []).map(m => ({
