@@ -4,6 +4,8 @@ buildscript {
     
     repositories {
         google()
+        // Use Google's mirror first to keep CI resilient to Maven Central rate limits.
+        maven { url "https://maven-central.storage-download.googleapis.com/maven2" }
         mavenCentral()
     }
     dependencies {
@@ -20,6 +22,8 @@ apply from: "variables.gradle"
 allprojects {
     repositories {
         google()
+        // Keep project and plugin dependency resolution on the same Central mirror.
+        maven { url "https://maven-central.storage-download.googleapis.com/maven2" }
         mavenCentral()
     }
 }

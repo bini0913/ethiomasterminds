@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -84,6 +84,17 @@ const formatTime = (value?: string | Date) => {
     : date.toLocaleDateString([], { month: "short", day: "numeric" });
 };
 
+const formatLastSeen = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Last active status unavailable";
+  const elapsed = Math.max(0, Date.now() - date.getTime());
+  if (elapsed < 60_000) return "Last active just now";
+  if (elapsed < 3_600_000) return `Last active ${Math.floor(elapsed / 60_000)}m ago`;
+  if (elapsed < 86_400_000) return `Last active ${Math.floor(elapsed / 3_600_000)}h ago`;
+  if (elapsed < 172_800_000) return "Last active yesterday";
+  return `Last active ${date.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+};
+
 const Chat: React.FC = () => {
   const { user, isLoading } = useUser();
   const upperStudent = getUserTier(user?.grade) === "upper";
@@ -120,12 +131,16 @@ const Chat: React.FC = () => {
   const [newGroupType, setNewGroupType] = useState("group");
   const [groupQuery, setGroupQuery] = useState("");
   const [groupResults, setGroupResults] = useState<ChatRoom[]>([]);
+  const [roomLoadError, setRoomLoadError] = useState(false);
+  const [groupMessagesError, setGroupMessagesError] = useState(false);
   const [replyTo, setReplyTo] = useState<GroupMessage | null>(null);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const [profileCache, setProfileCache] = useState<Record<string, ProfileSummary>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const conversationListReturnFocusRef = useRef<HTMLButtonElement>(null);
+  const conversationSearchRef = useRef<HTMLInputElement>(null);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimersRef = useRef<Record<string, number>>({});
   const profileCacheRef = useRef(profileCache);
@@ -183,8 +198,12 @@ const Chat: React.FC = () => {
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(search.trim().toLowerCase()),
   );
+  const filteredNewMessageFriends = friends.filter((friend) =>
+    `${friend.name} ${friend.username || ""}`.toLowerCase().includes(newMessageSearch.trim().toLowerCase()),
+  );
 
   const loadRooms = useCallback(async () => {
+    setRoomLoadError(false);
     if (!user?.id) {
       setRooms([]);
       setLoadingRooms(false);
@@ -236,7 +255,7 @@ const Chat: React.FC = () => {
       setRooms(roomList);
     } catch (error) {
       console.error("Error loading chat rooms:", error);
-      toast.error("Could not load your group chats");
+      setRoomLoadError(true);
     } finally {
       setLoadingRooms(false);
     }
@@ -270,6 +289,7 @@ const Chat: React.FC = () => {
 
   const loadGroupMessages = useCallback(async (roomId: string) => {
     setLoadingMessages(true);
+    setGroupMessagesError(false);
     try {
       const { data, error } = await supabase
         .from("group_messages")
@@ -314,7 +334,7 @@ const Chat: React.FC = () => {
       }));
     } catch (error) {
       console.error("Error loading messages:", error);
-      toast.error("Could not load this conversation");
+      setGroupMessagesError(true);
       setGroupMessages([]);
     } finally {
       setLoadingMessages(false);
@@ -486,6 +506,22 @@ const Chat: React.FC = () => {
     }
   }, [selectedFriendId, activeRoom]);
 
+  useLayoutEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    textarea.style.height = "44px";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 176)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > 176 ? "auto" : "hidden";
+  }, [draft]);
+
+  useEffect(() => {
+    if (!mobileChatOpen && (selectedFriendId || activeRoom)) {
+      const selectedConversation = conversationListReturnFocusRef.current;
+      if (selectedConversation?.isConnected) selectedConversation.focus();
+      else conversationSearchRef.current?.focus();
+    }
+  }, [activeRoom, mobileChatOpen, selectedFriendId]);
+
   const handleDraftChange = (value: string) => {
     setDraft(value);
     if (value.trim() && typingChannelRef.current && user) {
@@ -633,8 +669,8 @@ const Chat: React.FC = () => {
   const activeGroupTitle = activeRoom?.name || "Group chat";
   const activeDirectPresence = selectedFriend ? friendPresence[selectedFriend.id] : undefined;
   const lastSeenLabel = activeDirectPresence?.lastSeen
-    ? `Active ${formatTime(activeDirectPresence.lastSeen)}`
-    : "Student";
+    ? formatLastSeen(activeDirectPresence.lastSeen)
+    : "Last active status unavailable";
   const pageHeight = upperStudent
     ? "h-[calc(100dvh-8.25rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-4.25rem)]"
     : "h-[calc(100dvh-10.5rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-6rem)]";
@@ -670,17 +706,17 @@ const Chat: React.FC = () => {
                 </Button>
               </div>
             </div>
-            <div className="mt-4 flex rounded-xl bg-muted/70 p-1" role="tablist" aria-label="Conversation type">
-              <button type="button" role="tab" aria-selected={section === "direct"} onClick={() => { setSection("direct"); setSearch(""); }} className={cn("min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold transition-colors", section === "direct" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+            <div className="mt-4 flex rounded-xl bg-muted/70 p-1" role="group" aria-label="Conversation type">
+              <button type="button" aria-pressed={section === "direct"} onClick={() => { setSection("direct"); setSearch(""); }} className={cn("min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", section === "direct" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
                 Direct
               </button>
-              <button type="button" role="tab" aria-selected={section === "groups"} onClick={() => { setSection("groups"); setSearch(""); }} className={cn("min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold transition-colors", section === "groups" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+              <button type="button" aria-pressed={section === "groups"} onClick={() => { setSection("groups"); setSearch(""); }} className={cn("min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", section === "groups" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
                 Groups
               </button>
             </div>
             <label className="relative mt-3 block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={section === "direct" ? "Search people" : "Search groups"} aria-label={section === "direct" ? "Search direct messages" : "Search groups"} className="h-10 rounded-xl border-0 bg-muted/60 pl-9 focus-visible:ring-1" />
+              <Input ref={conversationSearchRef} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={section === "direct" ? "Search people" : "Search groups"} aria-label={section === "direct" ? "Search direct messages" : "Search groups"} className="h-10 rounded-xl border-0 bg-muted/60 pl-9 focus-visible:ring-1" />
             </label>
           </div>
 
@@ -694,10 +730,10 @@ const Chat: React.FC = () => {
                     const selected = selectedFriendId === friend.id;
                     const online = isOnline(friend.id);
                     return (
-                      <button key={friend.id} type="button" onClick={() => selectFriend(friend)} aria-current={selected ? "true" : undefined} className={cn("flex min-h-[76px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", selected && "bg-primary/10 hover:bg-primary/10")}>
+                      <button key={friend.id} ref={selected ? conversationListReturnFocusRef : undefined} type="button" onClick={() => selectFriend(friend)} aria-current={selected ? "true" : undefined} className={cn("flex min-h-[76px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", selected && "bg-primary/10 hover:bg-primary/10")}>
                         <span className="relative shrink-0">
                           <AvatarRenderer avatar={friend.avatar} size="md" className="h-12 w-12" />
-                          {online && <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500" aria-label="Online" />}
+                          {online && <><span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500" aria-hidden="true" /><span className="sr-only">Online</span></>}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center justify-between gap-2">
@@ -718,12 +754,18 @@ const Chat: React.FC = () => {
               ) : (
                 <EmptyInbox title={search ? "No people found" : "No conversations yet"} description={search ? "Try another name or username." : "Choose a friend and send a message to get started."} actionLabel={search ? undefined : "New message"} onAction={search ? undefined : () => setShowNewMessage(true)} />
               )
+            ) : roomLoadError ? (
+              <div role="alert" className="m-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-center">
+                <p className="text-sm font-semibold">Group chats couldn’t load</p>
+                <p className="mt-1 text-xs text-muted-foreground">Your groups are still here. Check your connection and try again.</p>
+                <Button type="button" variant="outline" size="sm" className="mt-3 rounded-full" onClick={() => void loadRooms()}>Try again</Button>
+              </div>
             ) : filteredRooms.length > 0 ? (
               <div className="p-2">
                 {filteredRooms.map((room) => {
                   const selected = activeRoom?.id === room.id;
                   return (
-                    <button key={room.id} type="button" onClick={() => selectRoom(room)} aria-current={selected ? "true" : undefined} className={cn("flex min-h-[76px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", selected && "bg-primary/10 hover:bg-primary/10")}>
+                  <button key={room.id} ref={selected ? conversationListReturnFocusRef : undefined} type="button" onClick={() => selectRoom(room)} aria-current={selected ? "true" : undefined} className={cn("flex min-h-[76px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", selected && "bg-primary/10 hover:bg-primary/10")}>
                       <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-muted-foreground">
                         {room.avatar_url ? <img src={room.avatar_url} alt="" className="h-full w-full object-cover" /> : <Users className="h-5 w-5" />}
                       </span>
@@ -774,6 +816,12 @@ const Chat: React.FC = () => {
                     ))
                   ) : loadingMessages ? (
                     <div className="flex flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading messages" /></div>
+                  ) : groupMessagesError ? (
+                    <div role="alert" className="m-auto max-w-sm rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-center">
+                      <p className="text-sm font-semibold">Messages couldn’t load</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Your conversation hasn’t been cleared. Try loading it again.</p>
+                      <Button type="button" variant="outline" size="sm" className="mt-3 rounded-full" onClick={() => activeRoom && void loadGroupMessages(activeRoom.id)}>Try again</Button>
+                    </div>
                   ) : groupMessages.length === 0 ? (
                     <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
                       <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground"><Users className="h-7 w-7" /></span>
@@ -785,7 +833,7 @@ const Chat: React.FC = () => {
                       <GroupMessageBubble key={message.id} message={message} isMine={message.sender_id === user?.id} onReply={() => setReplyTo(message)} />
                     ))
                   )}
-                  {activeRoom && activeGroupTypingText && <p className="px-3 py-1 text-xs text-muted-foreground">{activeGroupTypingText}</p>}
+                  {activeRoom && activeGroupTypingText && <p role="status" aria-live="polite" className="px-3 py-1 text-xs text-muted-foreground">{activeGroupTypingText}</p>}
                   <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
@@ -798,28 +846,24 @@ const Chat: React.FC = () => {
 
               <form className="border-t border-border bg-background px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-5" onSubmit={(event) => { event.preventDefault(); void sendCurrentMessage(); }}>
                 <div className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-[1.5rem] border border-border bg-muted/40 p-1.5 pl-3 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
-                  <Button type="button" variant="ghost" size="icon" className="mb-0.5 h-9 w-9 shrink-0 rounded-full text-muted-foreground" aria-label="Add emoji" title="Add emoji" onClick={() => { setDraft((value) => `${value}${value ? " " : ""}🙂`); inputRef.current?.focus(); }}><Smile className="h-5 w-5" /></Button>
+                  <Button type="button" variant="ghost" size="icon" className="mb-0.5 h-9 w-9 shrink-0 rounded-full text-muted-foreground" aria-label="Insert smiley" title="Insert smiley" disabled={sending} onClick={() => { setDraft((value) => `${value}${value ? " " : ""}🙂`); inputRef.current?.focus(); }}><Smile className="h-5 w-5" /></Button>
                   <Textarea
                     ref={inputRef}
                     value={draft}
+                    disabled={sending}
                     onChange={(event) => handleDraftChange(event.target.value)}
                     onKeyDown={handleComposerKeyDown}
-                    onInput={(event) => {
-                      const target = event.currentTarget;
-                      target.style.height = "44px";
-                      target.style.height = `${Math.min(target.scrollHeight, 176)}px`;
-                      target.style.overflowY = target.scrollHeight > 176 ? "auto" : "hidden";
-                    }}
                     rows={1}
                     placeholder="Message…"
                     aria-label="Write a message"
+                    aria-describedby="message-composer-hint"
                     className="max-h-44 min-h-11 flex-1 resize-none border-0 bg-transparent px-1 py-3 text-sm leading-5 shadow-none focus-visible:ring-0"
                   />
-                  <Button type="submit" disabled={!draft.trim() || sending} className="mb-0.5 h-10 shrink-0 rounded-full px-4 font-semibold">
+                  <Button type="submit" aria-label={sending ? "Sending message" : "Send message"} disabled={!draft.trim() || sending} className="mb-0.5 h-10 shrink-0 rounded-full px-4 font-semibold">
                     {sending ? <Loader2 className="h-4 w-4 animate-spin" aria-label="Sending" /> : <><span className="hidden sm:inline">Send</span><Send className="h-4 w-4 sm:hidden" /></>}
                   </Button>
                 </div>
-                <p className="mx-auto mt-1.5 max-w-3xl px-2 text-[10px] text-muted-foreground">Enter to send · Shift + Enter for a new line</p>
+                <p id="message-composer-hint" className="mx-auto mt-1.5 max-w-3xl px-2 text-[10px] text-muted-foreground">Enter to send · Shift + Enter for a new line</p>
               </form>
             </>
           ) : (
@@ -838,9 +882,9 @@ const Chat: React.FC = () => {
           <DialogHeader className="border-b border-border px-5 py-4 text-left"><DialogTitle>New message</DialogTitle></DialogHeader>
           <div className="p-4"><Input autoFocus value={newMessageSearch} onChange={(event) => setNewMessageSearch(event.target.value)} placeholder="Search your friends" aria-label="Search friends for a new message" className="rounded-xl bg-muted/50" /></div>
           <ScrollArea className="max-h-[55dvh] px-2 pb-3">
-            {friends.length === 0 ? <EmptyInbox title="No friends to message" description="Add friends first, then start a conversation here." actionLabel="Find friends" onAction={() => { setShowNewMessage(false); navigate("/friends"); }} /> : (
+            {friendsLoading ? <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading friends…</div> : friends.length === 0 ? <EmptyInbox title="No friends to message" description="Add friends first, then start a conversation here." actionLabel="Find friends" onAction={() => { setShowNewMessage(false); navigate("/friends"); }} /> : filteredNewMessageFriends.length === 0 ? <EmptyInbox title="No friends match that search" description="Try another name or username." /> : (
               <div className="space-y-1">
-                {friends.filter((friend) => `${friend.name} ${friend.username || ""}`.toLowerCase().includes(newMessageSearch.trim().toLowerCase())).map((friend) => (
+                {filteredNewMessageFriends.map((friend) => (
                   <button key={friend.id} type="button" onClick={() => selectDirectFromModal(friend)} className="flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <AvatarRenderer avatar={friend.avatar} size="sm" className="h-10 w-10" />
                     <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{friend.name}</span><span className="block truncate text-xs text-muted-foreground">{friend.username ? `@${friend.username}` : "Friend"}</span></span>
