@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(16);
+select plan(17);
 
 select ok(exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='library_books'), 'library book changes are published');
 select ok(exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='book_uploads'), 'book moderation changes are published');
@@ -20,6 +20,8 @@ select ok(exists(select 1 from pg_publication_tables where pubname='supabase_rea
 select ok(exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='study_plans'), 'study plan changes are published');
 select ok(exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='topic_progress'), 'early and middle student topic progress is published');
 select ok(exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='upper_student_topic_progress'), 'upper student topic progress is published');
+
+select ok(not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='questions'), 'raw question rows with answer keys are not published');
 
 select * from finish();
 rollback;
