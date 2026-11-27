@@ -483,7 +483,7 @@ BEGIN
   IF NOT public._is_super_admin() THEN
     RAISE EXCEPTION 'Super Admin access required';
   END IF;
-  IF p_status NOT IN ('active', 'suspended', 'deactivated') THEN
+  IF p_status IS NULL OR p_status NOT IN ('active', 'suspended', 'deactivated') THEN
     RAISE EXCEPTION 'Invalid membership status';
   END IF;
   IF length(trim(coalesce(p_reason, ''))) < 8 THEN
