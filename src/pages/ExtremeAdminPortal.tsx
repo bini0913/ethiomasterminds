@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, ArrowDownRight, ArrowUpRight, Building2, CheckCircle2, Clock3,
-  Crown, DollarSign, FileText, Gauge, Lock, Plus, RefreshCw, Search,
+  Activity, ArrowUpRight, Building2, CheckCircle2, Clock3,
+  Crown, FileText, Gauge, Lock, Plus, Search,
   Settings2, Shield, ShieldAlert, Users, UserCog, Wallet, XCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
