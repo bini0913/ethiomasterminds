@@ -163,14 +163,6 @@ Deno.serve(async (req) => {
         .select("id,name,school_code")
         .single();
       if (schoolError || !school) return json({ error: "Could not create the school" }, 409);
-      await admin.from("admin_audit_logs").insert({
-        actor_id: actorId,
-        action: "school_registered",
-        target_type: "school",
-        target_id: school.id,
-        metadata: { school_code: schoolCode, network_id: network.id, manager_provisioned: true },
-      });
-
       try {
         const username = await uniqueStaffUsername();
         const account = await createAuthAccount(managerName, username);
@@ -182,9 +174,26 @@ Deno.serve(async (req) => {
           target_id: membershipId,
           metadata: { school_id: school.id, user_id: account.userId, username },
         });
+        const { error: schoolAuditError } = await admin.from("admin_audit_logs").insert({
+          actor_id: actorId,
+          action: "school_registered",
+          target_type: "school",
+          target_id: school.id,
+          metadata: {
+            school_code: schoolCode,
+            network_id: network.id,
+            manager_provisioned: true,
+            manager_user_id: account.userId,
+            manager_membership_id: membershipId,
+          },
+        });
         createdUserId = null;
         return json({
-          school,
+          school: {
+            ...school,
+            audit_recorded: !schoolAuditError,
+            ...(schoolAuditError ? { audit_warning: "School created but its registration audit event could not be written." } : {}),
+          },
           manager: {
             membership_id: membershipId,
             username,
