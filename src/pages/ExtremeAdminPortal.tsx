@@ -70,6 +70,7 @@ type ExecutiveMetrics = {
   parents?: number;
   staff?: number;
   super_admins?: number;
+  extreme_admins?: number;
   audit_events_24h?: number;
   school_fee_payments_confirmed?: number;
   notification_devices_enabled?: number;
@@ -558,7 +559,7 @@ const ExtremeAdminPortal: React.FC = () => {
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Search className="h-4 w-4 text-blue-700" />Account directory</CardTitle><CardDescription>Search runs on the protected server function and supports pagination. Top-level platform roles cannot be changed here.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
-                <Input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadUsers(true); }} placeholder="Search name or username" />
+                <Input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void loadUsers(true); }} placeholder="Search name, username or account ID" />
                 <Select value={userRoleFilter} onValueChange={setUserRoleFilter}><SelectTrigger><SelectValue placeholder="All roles" /></SelectTrigger><SelectContent><SelectItem value="all">All roles</SelectItem>{ROLE_OPTIONS.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}<SelectItem value="super_admin">Super Admin</SelectItem></SelectContent></Select>
                 <Button onClick={() => { setDirectorySearch(userSearch.trim()); setDirectoryRoleFilter(userRoleFilter); if (directorySearch === userSearch.trim() && directoryRoleFilter === userRoleFilter) void loadUsers(true); }} disabled={usersLoading}><Search className="mr-2 h-4 w-4" />Search accounts</Button>
               </div>
