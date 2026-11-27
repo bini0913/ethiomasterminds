@@ -579,3 +579,7 @@ END;
 $function$;
 REVOKE ALL ON FUNCTION public.extreme_admin_set_school_status(uuid, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.extreme_admin_set_school_status(uuid, text, text) TO authenticated;
+
+
+REVOKE ALL ON FUNCTION public.extreme_admin_set_user_status(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.extreme_admin_set_user_status(uuid, text, text) TO authenticated;
