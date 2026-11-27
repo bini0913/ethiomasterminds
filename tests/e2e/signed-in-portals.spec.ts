@@ -176,6 +176,8 @@ test('Super Admin network workspace exposes its live workflows across desktop, t
     await expect(page.getByText('People and school memberships')).toBeVisible();
     await expect(page.getByText('Global account status is separate')).toBeVisible();
     await expect(page.getByText('Managed in school portal').first()).toBeVisible();
+    const legacyAdminRow = page.getByRole('row').filter({ hasText: /Legacy Admin role/ });
+    if (await legacyAdminRow.count()) await expect(legacyAdminRow.getByRole('button')).toHaveCount(0);
     const staffSuspend = page.getByRole('button', { name: 'Suspend', exact: true }).first();
     if (await staffSuspend.count()) {
       await staffSuspend.click();
