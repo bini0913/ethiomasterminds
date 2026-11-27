@@ -111,12 +111,32 @@ async function checkLiveKit(): Promise<ServiceCheck> {
     if (parsed.protocol !== "wss:" && parsed.protocol !== "https:") {
       return { status: "degraded", checked_at, detail: "LiveKit must use a secure wss:// or https:// URL." };
     }
-    const protocol = "https:";
-    const endpoint = `${protocol}//${parsed.host}/twirp/livekit.RoomService/ListRooms`;
-    const authorization = btoa(`${apiKey}:${apiSecret}`);
+    const now = Math.floor(Date.now() / 1000);
+    const header = base64Url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+    const claims = base64Url(JSON.stringify({
+      iss: apiKey,
+      nbf: now - 5,
+      exp: now + 60,
+      video: { roomList: true },
+    }));
+    const unsigned = `${header}.${claims}`;
+    const signingKey = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(apiSecret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const signature = new Uint8Array(await crypto.subtle.sign(
+      "HMAC",
+      signingKey,
+      new TextEncoder().encode(unsigned),
+    ));
+    const authorization = `${unsigned}.${base64Url(signature)}`;
+    const endpoint = `https://${parsed.host}/twirp/livekit.RoomService/ListRooms`;
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { Authorization: `Basic ${authorization}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${authorization}`, "Content-Type": "application/json" },
       body: "{}",
       signal: AbortSignal.timeout(8000),
     });
