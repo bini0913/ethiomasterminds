@@ -76,7 +76,7 @@ jobs:
           set -euo pipefail
 
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            changed_functions="$(find supabase/functions -mindepth 1 -maxdepth 1 -type d -printf '%f\\n' | sort -u)"
+            changed_functions="$(for dir in supabase/functions/*; do [[ -d "$dir" ]] && basename "$dir"; done | sort -u)"
           else
             test -n "${GITHUB_EVENT_BEFORE:-}" || {
               echo "::error::Push event is missing its base SHA; refusing to skip function deployment detection."
