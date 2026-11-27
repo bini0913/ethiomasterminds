@@ -62,9 +62,9 @@ const Navigation = ({
                 onClick={() => onNavigate(key)}
                 className={cn(
                   "group flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                  activeKey === key ? "bg-primary text-primary-foreground shadow-sm" : "text-slate-300 hover:bg-white/10 hover:text-white",
+                  activeKey === key ? "bg-[#2f63df] text-white shadow-md shadow-blue-950/20" : "text-slate-300 hover:bg-white/10 hover:text-white",
                   compact && "min-h-12 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-950",
-                  compact && activeKey === key && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                  compact && activeKey === key && "bg-[#2f63df] text-white hover:bg-[#2f63df] hover:text-white",
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -133,7 +133,7 @@ export default function AdminCommandCenterShell({
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-950">
+    <div className="min-h-screen bg-[#f3f6fb] text-slate-950">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col bg-[#081a33] px-4 py-5 text-white shadow-xl lg:flex">
         <div className="mb-7 flex items-center gap-3 px-2">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/20 ring-1 ring-blue-300/30">

@@ -47,3 +47,6 @@ verify_jwt = true
 
 [functions.public-account-deletion-request]
 verify_jwt = false
+
+[functions.extreme-admin-health-check]
+verify_jwt = true

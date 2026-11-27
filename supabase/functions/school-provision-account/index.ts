@@ -20,6 +20,7 @@ type AccountInput = {
   section_id?: string;
   parent_membership_ids?: string[];
   student_membership_ids?: string[];
+  student_usernames?: string[];
   assignments?: Array<{ section_id: string; subject_name: string; assignment_kind?: "subject" | "homeroom" }>;
   leadership_position?: string;
   division_scope?: string | null;
@@ -142,6 +143,58 @@ Deno.serve(async (req) => {
       return data as string;
     };
 
+    const resolveStudentMembershipIds = async (schoolId: string, rawUsernames: unknown): Promise<string[]> => {
+      const usernames = Array.isArray(rawUsernames)
+        ? [...new Set(rawUsernames.map((value: unknown) => normalize(value).toLowerCase()).filter(Boolean))]
+        : [];
+      if (usernames.length === 0) throw new Error("A parent account must be linked to at least one enrolled student username");
+      const { data: studentProfiles, error: profilesError } = await admin
+        .from("profiles")
+        .select("id,username,account_status")
+        .in("username", usernames);
+      if (profilesError) throw new Error("Could not verify the linked student usernames");
+      if ((studentProfiles ?? []).length !== usernames.length) {
+        throw new Error("Every linked username must belong to an existing student in the selected school");
+      }
+      if ((studentProfiles ?? []).some((profile: { account_status?: string }) => (profile.account_status ?? "active") !== "active")) {
+        throw new Error("Only active student accounts can be linked to a parent");
+      }
+      const { data: studentMemberships, error: membershipsError } = await admin
+        .from("school_memberships")
+        .select("id,user_id")
+        .eq("school_id", schoolId)
+        .eq("school_role", "student")
+        .eq("status", "active")
+        .in("user_id", (studentProfiles ?? []).map((profile: { id: string }) => profile.id));
+      if (membershipsError) throw new Error("Could not verify active student enrollments");
+      if ((studentMemberships ?? []).length !== usernames.length) {
+        throw new Error("Every linked username must be actively enrolled as a student in the selected school");
+      }
+      return (studentMemberships ?? []).map((membership: { id: string }) => membership.id);
+    };
+
+    if (action === "list_school_sections") {
+      if (!canProvisionNetwork) return json({ error: "Only the Super Admin or Extreme Admin can list school provisioning sections" }, 403);
+      const schoolId = normalize(payload?.school_id);
+      if (!schoolId) return json({ error: "A school is required" }, 400);
+      const { data: school, error: schoolError } = await admin
+        .from("schools")
+        .select("id,status")
+        .eq("id", schoolId)
+        .maybeSingle();
+      if (schoolError || !school || school.status !== "active") return json({ error: "School is unavailable" }, 404);
+      const [yearsResult, sectionsResult] = await Promise.all([
+        admin.from("school_academic_years").select("id,is_current").eq("school_id", schoolId),
+        admin.from("school_sections").select("id,academic_year_id,grade_label,section_name").eq("school_id", schoolId).order("grade_label").order("section_name"),
+      ]);
+      if (yearsResult.error || sectionsResult.error) return json({ error: "Could not load the school's current sections" }, 503);
+      const currentYearIds = new Set((yearsResult.data ?? []).filter((year: { is_current: boolean }) => year.is_current).map((year: { id: string }) => year.id));
+      const sections = currentYearIds.size
+        ? (sectionsResult.data ?? []).filter((section: { academic_year_id: string | null }) => currentYearIds.has(section.academic_year_id || ""))
+        : [];
+      return json({ sections, requires_current_academic_year: true });
+    }
+
     if (action === "create_school") {
       if (!canProvisionNetwork) return json({ error: "Only the Super Admin or Extreme Admin can create schools and Managers" }, 403);
       const name = normalize(payload?.school?.name);
@@ -163,26 +216,44 @@ Deno.serve(async (req) => {
         .select("id,name,school_code")
         .single();
       if (schoolError || !school) return json({ error: "Could not create the school" }, 409);
-      await admin.from("admin_audit_logs").insert({
-        actor_id: actorId,
-        action: "school_registered",
-        target_type: "school",
-        target_id: school.id,
-        metadata: { school_code: schoolCode, network_id: network.id, manager_provisioned: true },
-      });
-
       try {
         const username = await uniqueStaffUsername();
         const account = await createAuthAccount(managerName, username);
         const membershipId = await attachAccount(school.id, "manager", account.userId, username, { name: managerName });
+        const { error: managerAuditError } = await admin.from("admin_audit_logs").insert({
+          actor_id: actorId,
+          action: "school_manager_account_created",
+          target_type: "school_membership",
+          target_id: membershipId,
+          metadata: { school_id: school.id, user_id: account.userId, username },
+        });
+        const { error: schoolAuditError } = await admin.from("admin_audit_logs").insert({
+          actor_id: actorId,
+          action: "school_registered",
+          target_type: "school",
+          target_id: school.id,
+          metadata: {
+            school_code: schoolCode,
+            network_id: network.id,
+            manager_provisioned: true,
+            manager_user_id: account.userId,
+            manager_membership_id: membershipId,
+          },
+        });
         createdUserId = null;
         return json({
-          school,
+          school: {
+            ...school,
+            audit_recorded: !schoolAuditError,
+            ...(schoolAuditError ? { audit_warning: "School created but its registration audit event could not be written." } : {}),
+          },
           manager: {
             membership_id: membershipId,
             username,
             initial_password: account.password,
             must_change_password: true,
+            audit_recorded: !managerAuditError,
+            ...(managerAuditError ? { audit_warning: "School Manager account created but its audit event could not be written." } : {}),
           },
         }, 201);
       } catch (error) {
@@ -314,6 +385,77 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (action === "attach_existing_account") {
+      if (!canProvisionNetwork) return json({ error: "Only the Super Admin or Extreme Admin can assign existing accounts to the school network" }, 403);
+      const schoolId = normalize(payload?.school_id);
+      const targetUsername = normalize(payload?.username).toLowerCase();
+      const role = normalize(payload?.role) as SchoolRole;
+      const reason = normalize(payload?.reason);
+      const assignableRoles: SchoolRole[] = ["manager", "finance", "parent"];
+      if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64 || !assignableRoles.includes(role) || !reason) {
+        return json({ error: "Provide an active school, existing username, supported school role, and assignment reason" }, 400);
+      }
+      let studentMembershipIds: string[] = [];
+      if (role === "parent") {
+        try {
+          studentMembershipIds = await resolveStudentMembershipIds(schoolId, payload?.student_usernames);
+        } catch (error) {
+          return json({ error: error instanceof Error ? error.message : "Could not verify linked students" }, 400);
+        }
+      }
+      const { data: school, error: schoolError } = await admin
+        .from("schools").select("id,status").eq("id", schoolId).maybeSingle();
+      if (schoolError || !school || school.status !== "active") return json({ error: "School is unavailable" }, 404);
+
+      const { data: targetProfile, error: profileError } = await admin
+        .from("profiles").select("id,username,account_status").ilike("username", targetUsername).maybeSingle();
+      if (profileError) return json({ error: "Unable to look up the existing account" }, 503);
+      if (!targetProfile?.id || !targetProfile.username) return json({ error: "No existing account was found for that username" }, 404);
+      if (targetProfile.account_status !== "active") return json({ error: "Only active accounts can be assigned to a school" }, 409);
+
+      const { data: targetRoles, error: targetRolesError } = await admin
+        .from("user_roles").select("role").eq("user_id", targetProfile.id);
+      if (targetRolesError) return json({ error: "Unable to verify the target account's platform authority" }, 503);
+      if ((targetRoles ?? []).some((row: { role: string }) => row.role === "extreme_admin" || row.role === "super_admin")) {
+        return json({ error: "Platform authority accounts cannot be assigned to a school portal" }, 409);
+      }
+
+      const { data: membershipId, error: attachError } = await admin.rpc("school_attach_account", {
+        p_actor_id: actorId,
+        p_school_id: schoolId,
+        p_user_id: targetProfile.id,
+        p_school_role: role,
+        p_school_username: targetProfile.username,
+        p_grade_label: null,
+        p_age_at_enrollment: null,
+        p_section_id: null,
+        p_student_number: null,
+        p_parent_membership_ids: [],
+        p_student_membership_ids: studentMembershipIds,
+        p_teacher_assignments: [],
+      });
+      if (attachError || !membershipId) {
+        return json({ error: attachError?.message || "The existing account could not be assigned to this school" }, 400);
+      }
+
+      const { error: auditError } = await admin.from("admin_audit_logs").insert({
+        actor_id: actorId,
+        action: "school_network_existing_account_assigned",
+        target_type: "school_membership",
+        target_id: membershipId,
+        metadata: { school_id: schoolId, user_id: targetProfile.id, school_role: role, reason },
+      });
+
+      return json({
+        membership_id: membershipId,
+        user_id: targetProfile.id,
+        username: targetProfile.username,
+        role,
+        audit_recorded: !auditError,
+        ...(auditError ? { warning: "The account was assigned, but the audit event could not be written. Review the audit log before repeating this action." } : {}),
+      }, 201);
+    }
+
     if (action === "create_accounts") {
       const schoolId = normalize(payload?.school_id);
       const role = normalize(payload?.role) as SchoolRole;
@@ -391,13 +533,26 @@ Deno.serve(async (req) => {
           }
 
           const account = await createAuthAccount(name, username, role === "student" ? normalize(input.grade_label) : undefined, role === "student" ? Number(input.age) : undefined);
-          const membershipId = await attachAccount(schoolId, role, account.userId, username, input, studentNumber);
+          const accountInput: AccountInput = { ...input };
+          if (role === "parent") {
+            accountInput.student_membership_ids = await resolveStudentMembershipIds(schoolId, input.student_usernames);
+          }
+          const membershipId = await attachAccount(schoolId, role, account.userId, username, accountInput, studentNumber);
+          const { error: auditError } = await admin.from("admin_audit_logs").insert({
+            actor_id: actorId,
+            action: "school_account_created",
+            target_type: "school_membership",
+            target_id: membershipId,
+            metadata: { school_id: schoolId, user_id: account.userId, school_role: role, username },
+          });
           created.push({
             index,
             membership_id: membershipId,
             username,
             initial_password: account.password,
             role,
+            audit_recorded: !auditError,
+            ...(auditError ? { audit_warning: "Account created but its audit event could not be written." } : {}),
             ...(studentNumber ? { student_id: studentNumber } : {}),
             ...(role === "student" ? { grade: input.grade_label, age_at_enrollment: input.age } : {}),
           });
