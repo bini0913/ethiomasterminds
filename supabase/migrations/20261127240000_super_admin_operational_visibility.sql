@@ -543,3 +543,66 @@ BEGIN
 END;
 $$;
 
+
+-- Close the legacy two-argument status path so every client-side school status
+-- change must supply an auditable reason through the network-scoped overload.
+CREATE OR REPLACE FUNCTION public.super_admin_set_school_status(
+  p_school_id uuid,
+  p_status text,
+  p_reason text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_previous_status text;
+BEGIN
+  IF NOT public._is_super_admin() THEN
+    RAISE EXCEPTION 'Super Admin access required';
+  END IF;
+  IF p_school_id IS NULL OR p_status IS NULL
+     OR p_status NOT IN ('active', 'suspended', 'closed') THEN
+    RAISE EXCEPTION 'A valid school and status are required';
+  END IF;
+  IF length(trim(coalesce(p_reason, ''))) < 8 THEN
+    RAISE EXCEPTION 'A reason of at least 8 characters is required';
+  END IF;
+
+  SELECT s.status INTO v_previous_status
+  FROM public.schools s
+  WHERE s.id = p_school_id
+    AND s.network_id = public.school_network_id()
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'School not found in the current network';
+  END IF;
+
+  UPDATE public.schools
+  SET status = p_status, updated_at = now()
+  WHERE id = p_school_id;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(),
+    'super_admin_set_school_status',
+    'school',
+    p_school_id,
+    jsonb_build_object(
+      'previous_status', v_previous_status,
+      'status', p_status,
+      'reason', trim(p_reason)
+    )
+  );
+
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.super_admin_set_school_status(uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.super_admin_set_school_status(uuid, text) TO service_role;
+REVOKE ALL ON FUNCTION public.super_admin_set_school_status(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.super_admin_set_school_status(uuid, text, text) TO authenticated;
+
