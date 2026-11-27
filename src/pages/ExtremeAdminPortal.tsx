@@ -280,22 +280,17 @@ const ExtremeAdminPortal: React.FC = () => {
     let cancelled = false;
     const loadSchoolSections = async () => {
       setSectionsLoading(true);
-      const [sectionsResult, yearsResult] = await Promise.all([
-        supabase.from("school_sections").select("id,academic_year_id,grade_label,section_name").eq("school_id", selectedSchoolId).order("grade_label").order("section_name"),
-        supabase.from("school_academic_years").select("id,is_current").eq("school_id", selectedSchoolId),
-      ]);
+      const { data, error } = await supabase.functions.invoke("school-provision-account", {
+        body: { action: "list_school_sections", school_id: selectedSchoolId },
+      });
       if (cancelled) return;
-      if (sectionsResult.error || yearsResult.error) {
+      if (error || data?.error) {
         setSchoolSections([]);
         setNewAccountGrade("");
         setNewAccountSectionId("");
-        toast.error(sectionsResult.error?.message || yearsResult.error?.message || "Could not load this school's sections");
+        toast.error(data?.error || error?.message || "Could not load this school's current sections");
       } else {
-        const currentYearIds = new Set((yearsResult.data || []).filter((year) => year.is_current).map((year) => year.id));
-        const allSections = (sectionsResult.data || []) as SchoolSectionOption[];
-        const currentSections = currentYearIds.size
-          ? allSections.filter((section) => currentYearIds.has(section.academic_year_id || ""))
-          : allSections;
+        const currentSections = (data?.sections || []) as SchoolSectionOption[];
         setSchoolSections(currentSections);
         setNewAccountGrade((current) => currentSections.some((section) => section.grade_label === current) ? current : "");
         setNewAccountSectionId((current) => currentSections.some((section) => section.id === current) ? current : "");
