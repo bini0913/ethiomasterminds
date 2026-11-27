@@ -26,7 +26,7 @@ export default function NetworkSuperAdminPortal() {
   const [schools, setSchools] = useState<School[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [audit, setAudit] = useState<Audit[]>([]);
-  const [finance, setFinance] = useState<JsonRecord>({});
+  const [finance, setFinance] = useState<Record<string, any>>({});
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, any>>({});
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -56,7 +56,7 @@ export default function NetworkSuperAdminPortal() {
     else {
       setDashboard((summary.data || {}) as JsonRecord);
       setSchools((directory.data || []) as School[]);
-      setFinance((financeRes.data || {}) as JsonRecord);
+      setFinance((financeRes.data || {}) as Record<string, any>);
       setAlerts((alertsRes.data || []) as Alert[]);
       const setting = (settings.data || [])[0];
       if (setting) { setNetworkName(setting.name || ""); }
