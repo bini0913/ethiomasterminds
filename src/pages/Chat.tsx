@@ -322,14 +322,33 @@ const Chat: React.FC = () => {
       return;
     }
     setSending(true);
-    const { error } = await supabase.rpc('send_group_message', {
-      p_group_id: activeRoom.id,
-      p_content: text,
-      p_message_type: 'text',
-      p_reply_to_id: replyTo?.id || null,
-    });
-    if (error) { toast.error('Failed to send'); setSending(false); return; }
-    setDraft(''); setReplyTo(null); setSending(false);
+    try {
+      const { data: message, error } = await supabase.rpc('send_group_message', {
+        p_group_id: activeRoom.id,
+        p_content: text,
+        p_message_type: 'text',
+        p_reply_to_id: replyTo?.id || null,
+      });
+      if (error) throw error;
+      if (!message?.id) throw new Error('The message was not saved. Please try again.');
+
+      // Push is best-effort; the persisted group message remains available in the chat.
+      void supabase.functions.invoke('send-push-notification', {
+        body: { kind: 'group_message', event_id: message.id },
+      }).then(({ error: pushError }) => {
+        if (pushError) console.warn('Group message push could not be confirmed:', pushError.message);
+      }).catch((pushError) => {
+        console.warn('Group message push request failed:', pushError);
+      });
+
+      setDraft('');
+      setReplyTo(null);
+    } catch (error) {
+      console.error('Error sending group message:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
   }, [user?.id, activeRoom, draft, sending, replyTo]);
 
   // Broadcast typing
