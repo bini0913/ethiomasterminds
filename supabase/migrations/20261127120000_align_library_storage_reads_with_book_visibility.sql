@@ -26,3 +26,23 @@ using (
     where b.thumbnail_path = name
   )
 );
+
+-- Failed uploads and uploader-initiated book deletion must be able to clean up
+-- objects in the caller's own folder. These policies do not grant cross-user deletes.
+drop policy if exists "Authenticated users can delete own library files" on storage.objects;
+create policy "Authenticated users can delete own library files"
+on storage.objects for delete
+to authenticated
+using (
+  bucket_id = 'library-files'
+  and (storage.foldername(name))[1] = (select auth.jwt()->>'sub')
+);
+
+drop policy if exists "Authenticated users can delete own library thumbnails" on storage.objects;
+create policy "Authenticated users can delete own library thumbnails"
+on storage.objects for delete
+to authenticated
+using (
+  bucket_id = 'library-thumbnails'
+  and (storage.foldername(name))[1] = (select auth.jwt()->>'sub')
+);
