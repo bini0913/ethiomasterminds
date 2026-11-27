@@ -51,6 +51,16 @@ interface FriendsContextType {
   isPendingRequest: (userId: string) => boolean;
 }
 
+const getDisplayName = (profile: { name?: string | null; username?: string | null } | undefined, userId: string) => {
+  const trimmedName = profile?.name?.trim();
+  if (trimmedName) return trimmedName;
+
+  const trimmedUsername = profile?.username?.trim();
+  if (trimmedUsername) return trimmedUsername;
+
+  return `User ${userId.slice(0, 8)}`;
+};
+
 const FriendsContext = createContext<FriendsContextType | undefined>(undefined);
 
 export const FriendsProvider = ({ children }: { children: ReactNode }) => {
@@ -63,16 +73,6 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [onlineFriends, setOnlineFriends] = useState<UserProfile[]>([]);
   const [friendPresence, setFriendPresence] = useState<Record<string, FriendPresence>>({});
-
-  const getDisplayName = (profile: { name?: string | null; username?: string | null } | undefined, userId: string) => {
-    const trimmedName = profile?.name?.trim();
-    if (trimmedName) return trimmedName;
-
-    const trimmedUsername = profile?.username?.trim();
-    if (trimmedUsername) return trimmedUsername;
-
-    return `User ${userId.slice(0, 8)}`;
-  };
 
   const fetchFriends = useCallback(async () => {
     if (!user?.id) {
