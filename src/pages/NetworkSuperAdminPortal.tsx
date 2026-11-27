@@ -347,6 +347,8 @@ export default function NetworkSuperAdminPortal() {
     const studentUsernames = parentStudentUsernames.split(/[\n,;]+/).map((value) => value.trim().toLowerCase()).filter(Boolean);
     if (assignmentRole === "parent" && studentUsernames.length === 0) return toast.error("Add at least one enrolled student username for the Parent account.");
     setAssignmentSaving(true);
+    setCredentials(null);
+    setCredentialContext(null);
     try {
       const response = await supabase.functions.invoke("school-provision-account", {
         body: {
