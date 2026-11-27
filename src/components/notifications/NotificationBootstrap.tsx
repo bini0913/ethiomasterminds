@@ -173,6 +173,5 @@ export default function NotificationBootstrap() {
     };
   }, [isAuthenticated, user?.id]);
 
-  void getStoredNotificationPreferences;
   return null;
 }
