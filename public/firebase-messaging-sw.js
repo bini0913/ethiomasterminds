@@ -32,17 +32,32 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.messagin
   });
 }
 
+function isSafeInternalRoute(route) {
+  return typeof route === "string"
+    && route.length > 0
+    && route.length <= 2048
+    && route.startsWith("/")
+    && !route.startsWith("//")
+    && !route.includes("\\")
+    && !Array.from(route).some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 0x1f || code === 0x7f;
+    });
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const route = event.notification.data && event.notification.data.route;
-  if (typeof route !== "string" || !route.startsWith("/") || route.startsWith("//")) return;
-  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-    for (const client of windows) {
-      if ("focus" in client) {
-        client.navigate(route);
-        return client.focus();
-      }
+  if (!isSafeInternalRoute(route)) return;
+
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const existingClient = windows.find((client) => "focus" in client && "navigate" in client);
+    if (existingClient) {
+      await existingClient.navigate(route);
+      await existingClient.focus();
+      return;
     }
-    return self.clients.openWindow(route);
-  }));
+    await self.clients.openWindow(route);
+  })());
 });
