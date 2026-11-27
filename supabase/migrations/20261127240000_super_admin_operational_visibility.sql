@@ -1,3 +1,84 @@
+-- Complete the network-level people and school health summary.
+CREATE OR REPLACE FUNCTION public.super_admin_get_network_dashboard()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_network uuid;
+  v_result jsonb;
+BEGIN
+  IF NOT public._is_network_authority() THEN
+    RAISE EXCEPTION 'Network authority required';
+  END IF;
+
+  v_network := public.school_network_id();
+
+  SELECT jsonb_build_object(
+    'network_id', v_network,
+    'network_name', (SELECT n.name FROM public.school_networks n WHERE n.id = v_network),
+    'schools', (SELECT count(*) FROM public.schools s WHERE s.network_id = v_network),
+    'active_schools', (SELECT count(*) FROM public.schools s WHERE s.network_id = v_network AND s.status = 'active'),
+    'suspended_schools', (SELECT count(*) FROM public.schools s WHERE s.network_id = v_network AND s.status = 'suspended'),
+    'closed_schools', (SELECT count(*) FROM public.schools s WHERE s.network_id = v_network AND s.status = 'closed'),
+    'schools_without_active_manager', (
+      SELECT count(*) FROM public.schools s
+      WHERE s.network_id = v_network AND s.status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 FROM public.school_memberships sm
+          WHERE sm.school_id = s.id AND sm.school_role = 'manager' AND sm.status = 'active'
+        )
+    ),
+    'managers', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'manager' AND sm.status = 'active'
+    ),
+    'admins', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'admin' AND sm.status = 'active'
+    ),
+    'teachers', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'teacher' AND sm.status = 'active'
+    ),
+    'finance_staff', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'finance' AND sm.status = 'active'
+    ),
+    'parents', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'parent' AND sm.status = 'active'
+    ),
+    'active_staff', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network
+        AND sm.school_role IN ('manager', 'admin', 'teacher', 'finance')
+        AND sm.status = 'active'
+    ),
+    'active_students', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'student' AND sm.status = 'active'
+    ),
+    'enrolled_students', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'student'
+        AND sm.status IN ('active', 'suspended')
+    )
+  ) INTO v_result;
+
+  RETURN v_result;
+END;
+$$;
+
 -- Expand Super Admin network visibility with safe operational alerts and finance detail.
 -- This remains read-only and scoped to the authenticated Super Admin's singleton network.
 CREATE OR REPLACE FUNCTION public.super_admin_get_network_finance()
