@@ -357,7 +357,7 @@ Deno.serve(async (req) => {
         return json({ error: attachError?.message || "The existing account could not be assigned to this school" }, 400);
       }
 
-      await admin.from("admin_audit_logs").insert({
+      const { error: auditError } = await admin.from("admin_audit_logs").insert({
         actor_id: actorId,
         action: "extreme_admin_assigned_existing_school_account",
         target_type: "school_membership",
@@ -365,7 +365,14 @@ Deno.serve(async (req) => {
         metadata: { school_id: schoolId, user_id: targetProfile.id, school_role: role },
       });
 
-      return json({ membership_id: membershipId, user_id: targetProfile.id, username: targetProfile.username, role }, 201);
+      return json({
+        membership_id: membershipId,
+        user_id: targetProfile.id,
+        username: targetProfile.username,
+        role,
+        audit_recorded: !auditError,
+        ...(auditError ? { warning: "The account was assigned, but the audit event could not be written. Review the audit log before repeating this action." } : {}),
+      }, 201);
     }
 
     if (action === "create_accounts") {
