@@ -465,3 +465,81 @@ $$;
 
 REVOKE ALL ON FUNCTION public.super_admin_attach_existing_account(uuid, uuid, text, text, text, uuid[]) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.super_admin_attach_existing_account(uuid, uuid, text, text, text, uuid[]) TO authenticated;
+-- Network-level access holds for parent/student memberships are limited to
+-- suspend/restore. Enrollment exit, transfer, and graduation remain school-owned.
+CREATE OR REPLACE FUNCTION public.super_admin_set_school_membership_status(
+  p_membership_id uuid,
+  p_status text,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_membership public.school_memberships%ROWTYPE;
+BEGIN
+  IF NOT public._is_super_admin() THEN
+    RAISE EXCEPTION 'Super Admin access required';
+  END IF;
+  IF p_status NOT IN ('active', 'suspended', 'deactivated') THEN
+    RAISE EXCEPTION 'Invalid membership status';
+  END IF;
+  IF length(trim(coalesce(p_reason, ''))) < 8 THEN
+    RAISE EXCEPTION 'A reason of at least 8 characters is required';
+  END IF;
+
+  SELECT sm.* INTO v_membership
+  FROM public.school_memberships sm
+  JOIN public.schools s ON s.id = sm.school_id
+  WHERE sm.id = p_membership_id
+    AND s.network_id = public.school_network_id()
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Membership is outside the current network';
+  END IF;
+
+  IF v_membership.school_role = 'admin' THEN
+    RAISE EXCEPTION 'Legacy School Admin memberships are retired; use the School Manager leadership appointment workflow';
+  END IF;
+  IF v_membership.school_role NOT IN ('manager', 'teacher', 'finance', 'parent', 'student') THEN
+    RAISE EXCEPTION 'This membership role is not managed by the network workspace';
+  END IF;
+  IF v_membership.school_role IN ('parent', 'student') THEN
+    IF p_status NOT IN ('active', 'suspended') THEN
+      RAISE EXCEPTION 'Network authority may only suspend or restore Parent and Student access; enrollment exits remain school-owned';
+    END IF;
+    IF v_membership.status NOT IN ('active', 'suspended') THEN
+      RAISE EXCEPTION 'Transferred, graduated, or deactivated memberships must be handled through school enrollment workflows';
+    END IF;
+  END IF;
+
+  UPDATE public.school_memberships
+  SET status = p_status,
+      ended_at = CASE WHEN p_status = 'deactivated' THEN coalesce(ended_at, now()) ELSE NULL END,
+      end_reason = CASE WHEN p_status = 'deactivated' THEN trim(p_reason) ELSE NULL END,
+      updated_at = now()
+  WHERE id = p_membership_id;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(),
+    'super_admin_membership_status_changed',
+    'school',
+    v_membership.school_id,
+    jsonb_build_object(
+      'membership_id', p_membership_id,
+      'user_id', v_membership.user_id,
+      'role', v_membership.school_role,
+      'previous_status', v_membership.status,
+      'status', p_status,
+      'reason', trim(p_reason)
+    )
+  );
+
+  RETURN true;
+END;
+$$;
+
