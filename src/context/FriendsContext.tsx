@@ -352,8 +352,13 @@ export const FriendsProvider = ({ children }: { children: ReactNode }) => {
     let results: UserProfile[] = [];
     try {
       const allowed = await runWithCommunityTerms(async () => {
+        // Student discovery uses its own guardian-safe RPC. Keep the existing
+        // staff-scoped lookup for teacher/admin workflows unchanged.
+        const discoveryRpc = user?.role === 'student'
+          ? 'search_students_for_friend_requests'
+          : 'find_student_by_username';
         const { data, error } = await db
-          .rpc('search_students_for_friend_requests', { _username: normalizedQuery });
+          .rpc(discoveryRpc, { _username: normalizedQuery });
 
         if (error) throw error;
 
