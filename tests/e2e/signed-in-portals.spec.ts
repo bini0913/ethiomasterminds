@@ -212,8 +212,8 @@ test('Super Admin network workspace exposes its live workflows across desktop, t
       await page.getByRole('button', { name: 'Open administration navigation' }).click();
     }
     await page.getByRole('button', { name: /Finance Read-only oversight/ }).click();
-    await expect(page.getByText('Recent school invoices')).toBeVisible();
-    await expect(page.getByText('Pending finance follow-ups')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recent school invoices', exact: false }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pending finance follow-ups', exact: false }).first()).toBeVisible();
   }
 
   expect(pageErrors, 'Unexpected browser errors in Super Admin desktop/tablet/mobile workspace').toEqual([]);
