@@ -1,6 +1,6 @@
 -- Allow eligible student accounts to discover other eligible students for friend requests.
 -- Keep guardian controls, community consent, account status, and block rules authoritative.
-CREATE OR REPLACE FUNCTION public.find_student_by_username(_username text)
+CREATE OR REPLACE FUNCTION public.search_students_for_friend_requests(_username text)
 RETURNS TABLE(id uuid, name text, username text, avatar text, level integer, xp integer)
 LANGUAGE plpgsql
 STABLE
@@ -46,6 +46,9 @@ BEGIN
   LIMIT 20;
 END;
 $function$;
+
+REVOKE ALL ON FUNCTION public.search_students_for_friend_requests(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_students_for_friend_requests(text) TO authenticated;
 
 -- Prevent bypassing the student-only discovery flow by calling the request RPC with
 -- arbitrary account IDs. Friend requests are a student-to-student feature.
