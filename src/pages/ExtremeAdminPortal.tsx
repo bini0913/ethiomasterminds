@@ -523,7 +523,7 @@ const ExtremeAdminPortal: React.FC = () => {
       activeKey={activeTab}
       navItems={navItems}
       onNavigate={setActiveTab}
-      onRefresh={() => void refreshAll()}
+      onRefresh={() => { void refreshAll(); void loadUsers(true); }}
       refreshing={loading}
       onLogout={async () => { await logout(); navigate("/", { replace: true }); }}
     >
