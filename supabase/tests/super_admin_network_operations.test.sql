@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(32);
+SELECT plan(34);
 
 SELECT ok(to_regprocedure('public.super_admin_list_network_people(uuid,text,text,integer,integer)') IS NOT NULL, 'network people directory RPC exists');
 SELECT ok(to_regprocedure('public.super_admin_get_school_analytics(uuid)') IS NOT NULL, 'school analytics RPC exists');
@@ -41,6 +41,10 @@ SELECT ok(position('admin_audit_logs' IN pg_get_functiondef('public.super_admin_
 
 SELECT ok(NOT has_function_privilege('anon', 'public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])', 'execute'), 'anonymous role cannot assign existing school accounts');
 SELECT ok(position('Only active accounts' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment rejects inactive global accounts');
+
+
+SELECT ok(position('school_role <> p_school_role' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment prevents conflicting active school roles');
+SELECT ok(position('ur.role::text NOT IN' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment preserves the existing global school role');
 
 SELECT * FROM finish();
 ROLLBACK;
