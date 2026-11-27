@@ -156,25 +156,16 @@ BEGIN
     'provider_failure_codes_24h', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('code', provider_code, 'failures', failures) ORDER BY failures DESC, provider_code)
       FROM (
-        SELECT failure->>'code' AS provider_code,
-          COALESCE(sum(
-            CASE WHEN failure->>'count' ~ '^[0-9]+$'
-              THEN (failure->>'count')::bigint
-              ELSE 0
-            END
-          ), 0)::bigint AS failures
+        SELECT item->>'code' AS provider_code,
+          sum(CASE WHEN item->>'count' ~ '^[0-9]+$' THEN (item->>'count')::bigint ELSE 0 END)::bigint AS failures
         FROM public.notification_events AS event
         CROSS JOIN LATERAL jsonb_array_elements(
-          CASE
-            WHEN jsonb_typeof(event.data->'provider_failure_codes') = 'array'
-              THEN event.data->'provider_failure_codes'
-            ELSE '[]'::jsonb
-          END
-        ) AS failure
+          CASE WHEN jsonb_typeof(event.data->'provider_failure_codes') = 'array'
+            THEN event.data->'provider_failure_codes' ELSE '[]'::jsonb END
+        ) AS item
         WHERE event.created_at >= now() - interval '24 hours'
-          AND NULLIF(failure->>'code', '') IS NOT NULL
-        GROUP BY failure->>'code'
-      ) codes
+        GROUP BY item->>'code'
+      ) provider_codes
     ), '[]'::jsonb),
     'recent_snapshots', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
