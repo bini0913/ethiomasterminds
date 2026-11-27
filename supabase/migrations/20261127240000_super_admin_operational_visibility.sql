@@ -290,6 +290,18 @@ BEGIN
     RAISE EXCEPTION 'Platform authority accounts cannot be assigned to a school';
   END IF;
   IF EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = p_user_id
+      AND ur.role::text NOT IN ('extreme_admin', 'super_admin', p_school_role)
+  ) OR EXISTS (
+    SELECT 1 FROM public.school_memberships sm
+    WHERE sm.user_id = p_user_id
+      AND sm.status = 'active'
+      AND sm.school_role <> p_school_role
+  ) THEN
+    RAISE EXCEPTION 'The existing account has a different active school role; use a matching account role';
+  END IF;
+  IF EXISTS (
     SELECT 1 FROM public.school_memberships sm
     WHERE sm.school_id = p_school_id AND sm.user_id = p_user_id
   ) THEN
