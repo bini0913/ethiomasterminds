@@ -199,8 +199,11 @@ async function loadFirebaseCompatScript(fileName: string): Promise<void> {
   });
 }
 
-async function registerWebPushNotifications(requestPermission: boolean): Promise<boolean> {
+async function registerWebPushNotifications(userId: string, requestPermission: boolean): Promise<boolean> {
   if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) return false;
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || authData.user?.id !== userId) return false;
+
   const firebaseSetup = firebaseWebConfig();
   if (!firebaseSetup) {
     console.warn("Web push is not configured: Firebase web app values and the VAPID public key are required.");
@@ -231,6 +234,9 @@ async function registerWebPushNotifications(requestPermission: boolean): Promise
     });
     if (!token) return false;
 
+    const { data: currentAuth, error: currentAuthError } = await supabase.auth.getUser();
+    if (currentAuthError || currentAuth.user?.id !== userId) return false;
+
     const { error } = await db.rpc("upsert_notification_device" as any, {
       p_token: token,
       p_platform: "web",
@@ -256,7 +262,7 @@ async function registerWebPushNotifications(requestPermission: boolean): Promise
 // event is short-lived, but pushNotificationReceived and
 // pushNotificationActionPerformed must remain attached after a token is saved.
 let nativePushEventListenersReady: Promise<void> | null = null;
-let nativeRegistrationInFlight: Promise<boolean> | null = null;
+const nativeRegistrationInFlight = new Map<string, Promise<boolean>>();
 
 async function ensureNativePushEventListeners(): Promise<void> {
   if (!nativePushEventListenersReady) {
@@ -265,7 +271,8 @@ async function ensureNativePushEventListeners(): Promise<void> {
         window.dispatchEvent(new CustomEvent("master-minds-notification", { detail: notification }));
       });
       await PushNotifications.addListener("pushNotificationActionPerformed", (action: ActionPerformed) => {
-        const route = typeof action.notification.data?.route === "string" ? action.notification.data.route : null;
+        const candidate = action.notification.data?.route;
+        const route = typeof candidate === "string" && candidate.startsWith("/") && !candidate.startsWith("//") ? candidate : null;
         if (route) window.dispatchEvent(new CustomEvent("master-minds-notification-route", { detail: route }));
       });
     })().catch((error) => {
@@ -332,14 +339,16 @@ async function registerNativePushNotifications(userId: string): Promise<boolean>
 }
 
 export async function registerForPushNotifications(userId: string, requestBrowserPermission = false): Promise<boolean> {
-  if (!isNative()) return registerWebPushNotifications(requestBrowserPermission);
-  if (nativeRegistrationInFlight) return nativeRegistrationInFlight;
+  if (!isNative()) return registerWebPushNotifications(userId, requestBrowserPermission);
+  const existing = nativeRegistrationInFlight.get(userId);
+  if (existing) return existing;
 
-  nativeRegistrationInFlight = registerNativePushNotifications(userId);
+  const registration = registerNativePushNotifications(userId);
+  nativeRegistrationInFlight.set(userId, registration);
   try {
-    return await nativeRegistrationInFlight;
+    return await registration;
   } finally {
-    nativeRegistrationInFlight = null;
+    if (nativeRegistrationInFlight.get(userId) === registration) nativeRegistrationInFlight.delete(userId);
   }
 }
 
