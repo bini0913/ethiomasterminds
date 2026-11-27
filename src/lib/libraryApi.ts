@@ -732,6 +732,36 @@ export async function analyzeBookPdf(
   return { units: [], pageCount: 0, method: "estimated", message: "This PDF has no readable pages." };
 }
 
+export async function saveBookFlashcards(payload: {
+  userId: string;
+  grade: number;
+  subject: string;
+  bookTitle: string;
+  cards: Array<{ front: string; back: string }>;
+}) {
+  const rows = payload.cards
+    .map((card) => ({
+      user_id: payload.userId,
+      created_by: payload.userId,
+      grade_level: Math.max(1, Math.min(12, Math.floor(payload.grade) || 9)),
+      subject: payload.subject.trim() || "General",
+      topic: payload.bookTitle.trim() || "Book study",
+      question: card.front.trim(),
+      answer: card.back.trim(),
+      difficulty: "medium",
+      is_public: false,
+    }))
+    .filter((card) => card.question && card.answer);
+
+  if (!rows.length) throw new Error("There are no complete flashcards to save.");
+  const { data, error } = await db
+    .from("flashcards")
+    .insert(rows)
+    .select("id,question,answer,subject,topic,difficulty,grade_level");
+  if (error) throw error;
+  return data || [];
+}
+
 export async function getPdfPublicUrl(path: string) {
   if (!path) return '';
 
