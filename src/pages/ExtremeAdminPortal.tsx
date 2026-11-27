@@ -266,9 +266,10 @@ const ExtremeAdminPortal: React.FC = () => {
       return toast.error("Platform owner roles are managed in the dedicated authority controls");
     }
     if (!statusReason.trim()) return toast.error("Enter a reason for the role change");
-    const { error } = await supabase.rpc("extreme_admin_update_user_role" as any, {
+    const { error } = await supabase.rpc("extreme_admin_set_role" as any, {
       p_user_id: targetUserId,
       p_role: targetRole,
+      p_reason: statusReason.trim(),
     });
     if (error) return toast.error(error.message || "Role could not be updated");
     toast.success("Account role updated");
