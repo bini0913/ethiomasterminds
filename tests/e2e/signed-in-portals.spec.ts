@@ -260,6 +260,7 @@ test('School Manager Part 1 workflows are reachable across desktop, tablet and m
       await page.getByRole('button', { name: section.nav, exact: true }).click();
       await expect(page.getByRole('heading', { name: section.heading, exact: true })).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText(section.content, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+      if (section.nav === 'Teacher Assignments') await expect(page.getByRole('heading', { name: 'Teacher assignment recommendations', exact: true })).toBeVisible();
     }
   }
 
