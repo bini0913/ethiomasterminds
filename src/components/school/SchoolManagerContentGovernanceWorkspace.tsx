@@ -146,7 +146,7 @@ export default function SchoolManagerContentGovernanceWorkspace({ schoolId, memb
       </div>
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
         {(["queue", "library", "history"] as const).map((item) => (
-          <button key={item} type="button" onClick={() => setTab(item)} aria-pressed={tab === item}
+          <button key={item} type="button" onClick={() => { setTab(item); if (item === "library") setStatusFilter("all"); else if (item === "queue") setStatusFilter("pending"); }} aria-pressed={tab === item}
             className={"rounded-lg px-4 py-2 text-sm font-semibold transition-colors " + (tab === item ? "bg-blue-700 text-white" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50")}>
             {item === "queue" ? "Review queue" : item === "library" ? "Resource catalog" : "Review history"}
           </button>
