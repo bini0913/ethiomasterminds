@@ -73,8 +73,8 @@ export default function SchoolManagerStudentProfile({ schoolId, student, profile
 
   useEffect(() => { void load(); }, [load]);
 
-  const publishedResults = useMemo(() => results.filter((item) => Boolean(item.published_at) && item.rank_position !== null), [results]);
-  const latestRank = publishedResults[0];
+  const publishedResults = useMemo(() => results.filter((item) => Boolean(item.published_at)), [results]);
+  const latestRank = publishedResults.find((item) => item.rank_position !== null);
   const attendanceCounts = attendance.reduce((acc: Record<string, number>, item) => {
     const key = String(item.attendance_status || "unmarked").toLowerCase();
     acc[key] = (acc[key] || 0) + 1;
