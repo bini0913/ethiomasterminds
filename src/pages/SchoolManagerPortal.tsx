@@ -641,8 +641,8 @@ export default function SchoolManagerPortal() {
     const academicYear = years.find((year) => year.id === termYearId);
     const name = termName.trim();
     const number = Number(termNumber);
-    if (!academicYear || !name || name.length > 80 || !Number.isInteger(number) || number < 1 || number < 1) {
-      return toast.error("Enter a term name and a term number to a positive whole number.");
+    if (!academicYear || !name || name.length > 80 || !Number.isInteger(number) || number < 1) {
+      return toast.error("Enter a term name and a positive whole-number term number.");
     }
     if (!termStart || !termEnd || termEnd < termStart || termStart < academicYear.starts_on || termEnd > academicYear.ends_on) {
       return toast.error("Term dates must be valid and fall within the selected academic year.");
@@ -653,7 +653,7 @@ export default function SchoolManagerPortal() {
     const overlaps = terms.some((term) => term.academic_year_id === termYearId && term.id !== editingTermId
       && termStart <= term.ends_on && termEnd >= term.starts_on);
     if (overlaps) return toast.error("Term dates cannot overlap another term in the same academic year.");
-    const payload = { name, term_number: number, starts_on: termStart, ends_on: termEnd };
+    const payload = { name, term_number: number, starts_on: termStart, ends_on: termEnd, academic_year_id: termYearId };
     const result = editingTermId
       ? await db.from("school_terms").update(payload).eq("id", editingTermId).eq("school_id", schoolId)
       : await db.from("school_terms").insert({ ...payload, school_id: schoolId, academic_year_id: termYearId });
