@@ -11,7 +11,7 @@ type QuizItem = {
   id: string; title: string; subject: string; grade: string | null; school_section_id: string | null;
   created_at: string; created_by: string; school_teacher_membership_id: string | null;
   school_review_status: string | null; school_review_feedback: string | null;
-  source_kind: string; source_name: string | null; source_year: number | null; source_verification_status: string;
+  source_kind: string; source_name: string | null; source_year: number | null; source_verification_status: string; is_approved: boolean | null;
 };
 type BookItem = {
   id: string; title: string; author: string; subject: string; grade_level: number | null;
@@ -51,7 +51,7 @@ export default function SchoolManagerContentGovernanceWorkspace({ schoolId, memb
     try {
       const [quizResult, bookResult, eventResult] = await Promise.all([
         db.from("quizzes")
-          .select("id,title,subject,grade,school_section_id,created_at,created_by,school_teacher_membership_id,school_review_status,school_review_feedback,source_kind,source_name,source_year,source_verification_status")
+          .select("id,title,subject,grade,school_section_id,created_at,created_by,school_teacher_membership_id,school_review_status,school_review_feedback,source_kind,source_name,source_year,source_verification_status,is_approved")
           .eq("school_id", schoolId).order("created_at", { ascending: false }).limit(1500),
         db.from("library_books")
           .select("id,title,author,subject,grade_level,school_grade_label,school_section_id,status,school_review_status,uploader_id,school_teacher_membership_id,created_at,book_category")
@@ -95,22 +95,24 @@ export default function SchoolManagerContentGovernanceWorkspace({ schoolId, memb
   };
   const quizGrade = useCallback((item: QuizItem) => item.grade || (sections.find((section) => section.id === item.school_section_id)?.grade_label ?? "—"), [sections]);
   const bookGrade = useCallback((item: BookItem) => item.school_grade_label || (item.grade_level ? "Grade " + item.grade_level : "—"), []);
-  const pendingQuizzes = quizzes.filter((item) => item.school_review_status === "pending");
-  const pendingBooks = books.filter((item) => item.school_review_status === "pending");
-  const approvedCount = quizzes.filter((item) => item.school_review_status === "approved").length
-    + books.filter((item) => item.school_review_status === "approved").length;
+  const quizStatus = (item: QuizItem) => item.school_review_status || (item.is_approved ? "approved" : "unreviewed");
+  const bookStatus = (item: BookItem) => item.school_review_status || item.status || "unknown";
+  const pendingQuizzes = quizzes.filter((item) => quizStatus(item) === "pending");
+  const pendingBooks = books.filter((item) => bookStatus(item) === "pending");
+  const approvedCount = quizzes.filter((item) => quizStatus(item) === "approved").length
+    + books.filter((item) => bookStatus(item) === "approved").length;
   const verifiedQuizSources = quizzes.filter((item) => item.source_verification_status === "verified").length;
   const filteredQueue = useMemo(() => {
     const rows = [
       ...quizzes.map((item) => ({
         id: item.id, kind: "quiz", title: item.title, subject: item.subject, grade: quizGrade(item),
-        sectionId: item.school_section_id, status: statusOf(item.school_review_status), createdAt: item.created_at,
+        sectionId: item.school_section_id, status: quizStatus(item), createdAt: item.created_at,
         submittedBy: memberName(item.school_teacher_membership_id), detail: item.source_name || item.source_kind,
         verification: item.source_verification_status, feedback: item.school_review_feedback,
       })),
       ...books.map((item) => ({
         id: item.id, kind: "library_book", title: item.title, subject: item.subject, grade: bookGrade(item),
-        sectionId: item.school_section_id, status: statusOf(item.school_review_status), createdAt: item.created_at,
+        sectionId: item.school_section_id, status: bookStatus(item), createdAt: item.created_at,
         submittedBy: memberName(item.school_teacher_membership_id), detail: item.author + " · " + item.book_category,
         verification: "not_applicable", feedback: null,
       })),
@@ -154,7 +156,7 @@ export default function SchoolManagerContentGovernanceWorkspace({ schoolId, memb
       {tab !== "history" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SchoolField label="Search content"><div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input className={schoolInputClass + " pl-9"} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Title, subject, grade or source" /></div></SchoolField>
         <SchoolField label="Content type"><select className={schoolSelectClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">All content</option><option value="quiz">Quizzes</option><option value="library_book">Library resources</option></select></SchoolField>
-        <SchoolField label="Review status"><select className={schoolSelectClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="draft">Draft</option></select></SchoolField>
+        <SchoolField label="Review status"><select className={schoolSelectClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="draft">Draft</option><option value="unreviewed">Unreviewed</option></select></SchoolField>
         <SchoolField label="Grade"><select className={schoolSelectClass} value={gradeFilter} onChange={(event) => setGradeFilter(event.target.value)}><option value="all">All grades</option>{gradeOptions.map((grade) => <option key={grade} value={grade}>{grade}</option>)}</select></SchoolField>
       </div>}
       {tab === "queue" && <SchoolPanel title="School content review queue" description="This is an oversight queue. The Manager can monitor submissions and follow-up status; approval and rejection are performed through the appointed academic leader workflow.">
