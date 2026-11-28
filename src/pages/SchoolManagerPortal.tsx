@@ -185,7 +185,7 @@ export default function SchoolManagerPortal() {
       db.from("school_subjects").select("id,academic_year_id,grade_label,subject_name,active").eq("school_id", schoolId).order("grade_label"),
       db.from("school_teacher_assignments").select("id,teacher_membership_id,section_id,subject_name,assignment_kind").eq("school_id", schoolId),
       db.from("school_fee_structures").select("id,academic_year_id,grade_label,fee_name,amount,currency,due_date,active").eq("school_id", schoolId).order("created_at", { ascending: false }),
-      db.from("school_student_invoices").select("id,invoice_number,student_membership_id,amount,paid_amount,balance,status,due_date,currency").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+      db.from("school_student_invoices").select("id,invoice_number,student_membership_id,amount,paid_amount,balance,status,due_date,currency").eq("school_id", schoolId).order("created_at", { ascending: false }).range(0, 499),
       db.from("school_staff_tasks").select("id,title,assigned_to_membership_id,assigned_by_membership_id,status,due_date,priority,task_type,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_staff_evaluations").select("id,target_membership_id,evaluation_type,rating,period_start,period_end,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(50),
       db.from("school_staff_change_requests").select("id,target_membership_id,request_type,status,reason,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(50),
@@ -197,6 +197,25 @@ export default function SchoolManagerPortal() {
       db.from("school_disciplinary_recommendations").select("id,target_membership_id,target_kind,submitted_by_membership_id,reason,recommendation,status,decision_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_teacher_assignment_recommendations").select("id,teacher_membership_id,submitted_by_membership_id,current_assignment_id,recommendation_type,requested_section_id,requested_subject_name,requested_assignment_kind,reason,status,manager_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
     ]);
+
+    // Load the complete school invoice ledger in bounded pages. Finance totals must not silently
+    // represent only the newest 100 invoices on schools with larger ledgers.
+    const allInvoices = [...(invoicesRes.data ?? [])];
+    for (let offset = 500; (invoicesRes.data?.length ?? 0) === 500; offset += 500) {
+      const { data: invoicePage, error: invoicePageError } = await db
+        .from("school_student_invoices")
+        .select("id,invoice_number,student_membership_id,amount,paid_amount,balance,status,due_date,currency")
+        .eq("school_id", schoolId)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + 499);
+      if (invoicePageError) {
+        toast.error(invoicePageError.message || "The complete school invoice ledger could not be loaded.");
+        setLoading(false);
+        return;
+      }
+      allInvoices.push(...(invoicePage ?? []));
+      if ((invoicePage ?? []).length < 500) break;
+    }
 
     const firstError = [membershipsRes, yearsRes, termsRes, sectionsRes, subjectsRes, assignmentsRes, feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, assignmentRecommendationsRes].find((result) => result.error)?.error;
     if (firstError) {
@@ -214,7 +233,7 @@ export default function SchoolManagerPortal() {
     setSubjects(subjectsRes.data ?? []);
     setAssignments(assignmentsRes.data ?? []);
     setFeeStructures(feesRes.data ?? []);
-    setInvoices(invoicesRes.data ?? []);
+    setInvoices(allInvoices);
     setTasks(tasksRes.data ?? []);
     setEvaluations(evaluationsRes.data ?? []);
     setChangeRequests(requestsRes.data ?? []);
