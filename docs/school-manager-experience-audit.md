@@ -54,3 +54,17 @@ No rank is inferred from XP, a profile-wide rank field, or unpublished term resu
 ## Acceptance still required
 
 CI and the isolated local Supabase fixtures cannot prove every production Manager permission and data state. Final acceptance still needs separate Manager, appointed-leader, teacher and student sessions; real populated records; denied unauthorized writes; and responsive manual checks. Empty production data must remain an honest empty state.
+
+
+## Part 4.1 — Finance Stage 3
+
+The School Manager Fees & Finance workspace includes read-only accountability and revenue-plan oversight sourced from the existing school finance ledger:
+
+- Fee structures are compared with invoices actually issued, confirmed collections reflected on invoices, and remaining balances. Each fee structure retains its own currency; no unlike currencies are summed.
+- The Manager can inspect the latest payment receipts, recording staff label, method, received time, status, and reversal reason. This is read-only; recording and reversing payments remain Finance-role operations.
+- The Manager can search the school-scoped finance audit history for fee-structure changes, invoice creation, payment recording, and payment updates/reversals. Actor names are resolved from available school profiles.
+- Payment and audit ledgers load in bounded 500-row pages; the visible accountability panels show the latest 100 rows and state the loaded record count.
+- This is fee-revenue oversight, not a general expense budget. The existing school finance schema does not provide an expense budget ledger, so no expenditure totals or forecast are fabricated.
+- No new schema or production database writes are introduced. Existing row-level security on the payment and finance audit tables remains authoritative.
+
+CI acceptance covers the Manager finance workspace at desktop, tablet, and mobile viewports. Production acceptance still requires real Finance and Manager accounts with populated payment and audit records, including a reversed payment, plus a check that Manager payment mutations remain denied.
