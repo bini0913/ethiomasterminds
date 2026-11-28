@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, School, BookOpen, UserCog, Wallet, ClipboardList,
-  FileBarChart, Settings, RefreshCw, CheckCircle2, Copy, AlertCircle, Scale, Percent, GraduationCap, Search,
+  FileBarChart, Settings, RefreshCw, CheckCircle2, Copy, AlertCircle, Scale, Percent, GraduationCap, Search, FileClock, UsersRound, CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,10 @@ const navItems: SchoolNavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "accounts", label: "People & Accounts", icon: Users },
   { id: "students", label: "Student Directory", icon: GraduationCap },
+  { id: "staff", label: "Staff Directory", icon: UsersRound },
+  { id: "assignments", label: "Teacher Assignments", icon: UserCog },
+  { id: "audit", label: "School Audit", icon: FileClock },
+  { id: "settings", label: "Manager Settings", icon: Settings },
   { id: "structure", label: "School Structure", icon: School },
   { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
@@ -44,6 +48,14 @@ export default function SchoolManagerPortal() {
   const [members, setMembers] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, any>>({});
   const [years, setYears] = useState<any[]>([]);
+  const [terms, setTerms] = useState<any[]>([]);
+  const [termYearId, setTermYearId] = useState("");
+  const [termName, setTermName] = useState("");
+  const [termNumber, setTermNumber] = useState("1");
+  const [termStart, setTermStart] = useState("");
+  const [termEnd, setTermEnd] = useState("");
+  const [editingTermId, setEditingTermId] = useState<string | null>(null);
+  const [yearEdit, setYearEdit] = useState<any>(null);
   const [sections, setSections] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -73,6 +85,16 @@ export default function SchoolManagerPortal() {
   const [studentActionStatus, setStudentActionStatus] = useState<"transferred" | "graduated" | "deactivated" | "">("");
   const [studentActionReason, setStudentActionReason] = useState("");
   const [studentActionLoading, setStudentActionLoading] = useState(false);
+  const [studentPlacementId, setStudentPlacementId] = useState<string | null>(null);
+  const [studentPlacementSectionId, setStudentPlacementSectionId] = useState("");
+  const [studentPlacementLoading, setStudentPlacementLoading] = useState(false);
+  const [staffSearch, setStaffSearch] = useState("");
+  const [staffRoleFilter, setStaffRoleFilter] = useState("all");
+  const [staffStatusFilter, setStaffStatusFilter] = useState("all");
+  const [recordEvents, setRecordEvents] = useState<any[]>([]);
+  const [structureEvents, setStructureEvents] = useState<any[]>([]);
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditError, setAuditError] = useState<string | null>(null);
 
   const [leadershipAppointments, setLeadershipAppointments] = useState<any[]>([]);
   const [leadershipActionEvents, setLeadershipActionEvents] = useState<any[]>([]);
@@ -161,11 +183,12 @@ export default function SchoolManagerPortal() {
     setLoading(true);
     try {
     const [
-      membershipsRes, yearsRes, sectionsRes, subjectsRes, assignmentsRes,
+      membershipsRes, yearsRes, termsRes, sectionsRes, subjectsRes, assignmentsRes,
       feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, staffConductRes, assignmentRecommendationsRes,
     ] = await Promise.all([
       db.from("school_memberships").select("id,user_id,school_role,status,grade_label,section_id,student_number,school_username,age_at_enrollment,end_reason,ended_at,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }),
       db.from("school_academic_years").select("id,name,starts_on,ends_on,is_current").eq("school_id", schoolId).order("starts_on", { ascending: false }),
+      db.from("school_terms").select("id,academic_year_id,name,term_number,starts_on,ends_on,created_at").eq("school_id", schoolId).order("term_number"),
       db.from("school_sections").select("id,academic_year_id,grade_label,section_name,homeroom_teacher_id").eq("school_id", schoolId).order("grade_label"),
       db.from("school_subjects").select("id,academic_year_id,grade_label,subject_name,active").eq("school_id", schoolId).order("grade_label"),
       db.from("school_teacher_assignments").select("id,teacher_membership_id,section_id,subject_name,assignment_kind").eq("school_id", schoolId),
@@ -184,7 +207,7 @@ export default function SchoolManagerPortal() {
       db.from("school_teacher_assignment_recommendations").select("id,teacher_membership_id,submitted_by_membership_id,current_assignment_id,recommendation_type,requested_section_id,requested_subject_name,requested_assignment_kind,reason,status,manager_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
     ]);
 
-    const firstError = [membershipsRes, yearsRes, sectionsRes, subjectsRes, assignmentsRes, feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, staffConductRes, assignmentRecommendationsRes].find((result) => result.error)?.error;
+    const firstError = [membershipsRes, yearsRes, termsRes, sectionsRes, subjectsRes, assignmentsRes, feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, staffConductRes, assignmentRecommendationsRes].find((result) => result.error)?.error;
     if (firstError) {
       toast.error(firstError.message || "Could not load school records");
       setLoading(false);
@@ -194,6 +217,8 @@ export default function SchoolManagerPortal() {
     const nextMembers = membershipsRes.data ?? [];
     setMembers(nextMembers);
     setYears(yearsRes.data ?? []);
+    setTerms(termsRes.data ?? []);
+    setTermYearId((current) => current || yearsRes.data?.find((year: any) => year.is_current)?.id || yearsRes.data?.[0]?.id || "");
     setSections(sectionsRes.data ?? []);
     setSubjects(subjectsRes.data ?? []);
     setAssignments(assignmentsRes.data ?? []);
@@ -380,6 +405,29 @@ export default function SchoolManagerPortal() {
     await loadLeadership();
   };
 
+  const loadManagerAudit = useCallback(async () => {
+    if (!schoolId) return;
+    const [recordRes, structureRes] = await Promise.all([
+      db.from("school_record_events")
+        .select("id,membership_id,event_type,details,actor_id,created_at")
+        .eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+      db.from("school_leadership_structure_events")
+        .select("id,actor_user_id,event_type,details,created_at")
+        .eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+    ]);
+    if (recordRes.error && structureRes.error) {
+      setAuditError("School audit history could not be loaded. Check your manager access and try again.");
+      setRecordEvents([]);
+      setStructureEvents([]);
+      return;
+    }
+    setAuditError(recordRes.error || structureRes.error ? "Some audit categories are unavailable; the available records are still shown." : null);
+    setRecordEvents(recordRes.data ?? []);
+    setStructureEvents(structureRes.data ?? []);
+  }, [schoolId, db]);
+
+  useEffect(() => { void loadManagerAudit(); }, [loadManagerAudit]);
+
   const activeMembers = members.filter((member) => member.status === "active");
   const students = activeMembers.filter((member) => member.school_role === "student");
   const appointedLeaderMembershipIds = new Set(leadershipAppointments.filter((appointment) => appointment.status === "active").map((appointment) => appointment.membership_id));
@@ -545,6 +593,86 @@ export default function SchoolManagerPortal() {
     const { error } = await db.rpc("school_set_current_academic_year", { p_academic_year_id: yearId });
     if (error) return toast.error(error.message);
     toast.success("Current academic year updated.");
+    await load();
+  };
+
+  const beginYearEdit = (year: any) => setYearEdit({
+    id: year.id, name: year.name, starts_on: year.starts_on, ends_on: year.ends_on,
+  });
+
+  const saveAcademicYear = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!yearEdit || !schoolId) return;
+    const name = String(yearEdit.name || "").trim();
+    const startsOn = String(yearEdit.starts_on || "");
+    const endsOn = String(yearEdit.ends_on || "");
+    if (!name || !startsOn || !endsOn || endsOn < startsOn) {
+      return toast.error("Enter a name and a valid academic-year date range.");
+    }
+    if (terms.some((term) => term.academic_year_id === yearEdit.id && (term.starts_on < startsOn || term.ends_on > endsOn))) {
+      return toast.error("The new academic-year dates must contain every existing term.");
+    }
+    const { error } = await db.from("school_academic_years")
+      .update({ name, starts_on: startsOn, ends_on: endsOn })
+      .eq("id", yearEdit.id).eq("school_id", schoolId);
+    if (error) return toast.error(error.message || "Academic year could not be updated.");
+    setYearEdit(null);
+    toast.success("Academic year details updated.");
+    await load();
+  };
+
+  const beginTermEdit = (term: any) => {
+    setEditingTermId(term.id);
+    setTermYearId(term.academic_year_id);
+    setTermName(term.name);
+    setTermNumber(String(term.term_number));
+    setTermStart(term.starts_on);
+    setTermEnd(term.ends_on);
+  };
+
+  const resetTermForm = () => {
+    setEditingTermId(null);
+    setTermName("");
+    setTermNumber("1");
+    setTermStart("");
+    setTermEnd("");
+  };
+
+  const saveTerm = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!schoolId || !termYearId) return toast.error("Choose the academic year for this term.");
+    const academicYear = years.find((year) => year.id === termYearId);
+    const name = termName.trim();
+    const number = Number(termNumber);
+    if (!academicYear || !name || name.length > 80 || !Number.isInteger(number) || number < 1) {
+      return toast.error("Enter a term name and a positive whole-number term number.");
+    }
+    if (!termStart || !termEnd || termEnd < termStart || termStart < academicYear.starts_on || termEnd > academicYear.ends_on) {
+      return toast.error("Term dates must be valid and fall within the selected academic year.");
+    }
+    const duplicateNumber = terms.some((term) => term.academic_year_id === termYearId
+      && Number(term.term_number) === number && term.id !== editingTermId);
+    if (duplicateNumber) return toast.error("That term number is already used in this academic year.");
+    const overlaps = terms.some((term) => term.academic_year_id === termYearId && term.id !== editingTermId
+      && termStart <= term.ends_on && termEnd >= term.starts_on);
+    if (overlaps) return toast.error("Term dates cannot overlap another term in the same academic year.");
+    const payload = { name, term_number: number, starts_on: termStart, ends_on: termEnd, academic_year_id: termYearId };
+    const result = editingTermId
+      ? await db.from("school_terms").update(payload).eq("id", editingTermId).eq("school_id", schoolId)
+      : await db.from("school_terms").insert({ ...payload, school_id: schoolId, academic_year_id: termYearId });
+    if (result.error) return toast.error(result.error.message || "Term could not be saved.");
+    toast.success(editingTermId ? "Academic term updated." : "Academic term created.");
+    resetTermForm();
+    await load();
+  };
+
+  const toggleSubjectActive = async (subject: any) => {
+    if (!schoolId) return;
+    const { error } = await db.from("school_subjects")
+      .update({ active: !subject.active, updated_at: new Date().toISOString() })
+      .eq("id", subject.id).eq("school_id", schoolId);
+    if (error) return toast.error(error.message || "Subject status could not be changed.");
+    toast.success(subject.active ? "Subject archived for new assignments." : "Subject reactivated.");
     await load();
   };
 
@@ -841,6 +969,35 @@ export default function SchoolManagerPortal() {
     }
   };
 
+  const saveStudentPlacement = async () => {
+    if (!schoolId || !studentPlacementId || !studentPlacementSectionId) {
+      return toast.error("Choose the student's new section.");
+    }
+    const student = members.find((member) => member.id === studentPlacementId && member.school_role === "student");
+    const section = sections.find((item) => item.id === studentPlacementSectionId);
+    if (!student || !section || !["active", "suspended"].includes(student.status)) {
+      return toast.error("This student or destination section is no longer available.");
+    }
+    if (student.section_id === section.id && student.grade_label === section.grade_label) {
+      return toast.info("The student is already placed in this section.");
+    }
+    setStudentPlacementLoading(true);
+    try {
+      const { error } = await db.from("school_memberships")
+        .update({ section_id: section.id, grade_label: section.grade_label })
+        .eq("id", student.id).eq("school_id", schoolId).eq("school_role", "student");
+      if (error) throw error;
+      toast.success("Student placement updated. Grade and section history are retained by the database.");
+      setStudentPlacementId(null);
+      setStudentPlacementSectionId("");
+      await load();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Student placement could not be updated.");
+    } finally {
+      setStudentPlacementLoading(false);
+    }
+  };
+
   const renderStudents = () => {
     const allStudents = members.filter((member) => member.school_role === "student");
     const normalizedSearch = studentSearch.trim().toLowerCase();
@@ -888,7 +1045,9 @@ export default function SchoolManagerPortal() {
               {visibleStudents.map((student) => {
                 const profile = profiles[student.user_id] ?? {};
                 const actionOpen = studentActionId === student.id;
-                const canExit = ["active", "suspended"].includes(student.status);
+                const placementOpen = studentPlacementId === student.id;
+                const canManagePlacement = ["active", "suspended"].includes(student.status);
+                const canExit = canManagePlacement;
                 return (
                   <div key={student.id} className="py-3">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -904,13 +1063,35 @@ export default function SchoolManagerPortal() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <SchoolStatus value={student.status} />
+                        {canManagePlacement && <SchoolSecondaryButton onClick={() => {
+                          setStudentPlacementId(placementOpen ? null : student.id);
+                          setStudentPlacementSectionId(student.section_id || "");
+                        }}>{placementOpen ? "Close placement" : "Change placement"}</SchoolSecondaryButton>}
                         {canExit && <SchoolSecondaryButton onClick={() => {
                           setStudentActionId(actionOpen ? null : student.id);
                           setStudentActionStatus("");
                           setStudentActionReason("");
-                        }}>{actionOpen ? "Close actions" : "Record student exit"}</SchoolSecondaryButton>}
+                        }}>{actionOpen ? "Close exit form" : "Record student exit"}</SchoolSecondaryButton>}
                       </div>
                     </div>
+                    {placementOpen && (
+                      <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                        <p className="text-sm font-semibold text-slate-900">Change grade or section placement</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">Choose a section in this school. The student's grade is taken from the selected section; database triggers preserve the previous section history and record grade changes.</p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                          <SchoolField label="New section">
+                            <select className={schoolSelectClass} value={studentPlacementSectionId} onChange={(event) => setStudentPlacementSectionId(event.target.value)}>
+                              <option value="">Choose destination section</option>
+                              {sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name} · {years.find((year) => year.id === section.academic_year_id)?.name || "Academic year"}</option>)}
+                            </select>
+                          </SchoolField>
+                          <div className="flex gap-2">
+                            <SchoolSecondaryButton onClick={() => { setStudentPlacementId(null); setStudentPlacementSectionId(""); }}>Cancel</SchoolSecondaryButton>
+                            <SchoolPrimaryButton onClick={() => void saveStudentPlacement()} disabled={studentPlacementLoading || !studentPlacementSectionId}>{studentPlacementLoading ? "Saving…" : "Save placement"}</SchoolPrimaryButton>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {actionOpen && (
                       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
                         <p className="text-sm font-semibold text-slate-900">Record an enrollment exit</p>
@@ -1019,30 +1200,104 @@ export default function SchoolManagerPortal() {
 
   const renderStructure = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="School structure" description="Manage academic years and the subject catalog. Division Directors create and organize class sections within their assigned grades." />
+      <SchoolPageHeading title="School structure" description="Manage academic years, terms, and the subject catalog. Division Directors create class sections within their authorized grades." />
       <div className="grid gap-4 xl:grid-cols-2">
-        <SchoolPanel title="Academic year">
+        <SchoolPanel title="Academic year" description="Create a school year and optionally make it the current year.">
           <form onSubmit={addAcademicYear} className="space-y-3">
-            <SchoolField label="Academic year name"><input className={schoolInputClass} value={yearName} onChange={(event) => setYearName(event.target.value)} placeholder="2026/2027" /></SchoolField>
-            <SchoolField label="Start date"><input type="date" className={schoolInputClass} value={yearStart} onChange={(event) => setYearStart(event.target.value)} /></SchoolField>
-            <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} /></SchoolField>
+            <SchoolField label="Academic year name"><input className={schoolInputClass} value={yearName} onChange={(event) => setYearName(event.target.value)} placeholder="2026/2027" maxLength={80} required /></SchoolField>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SchoolField label="Start date"><input type="date" className={schoolInputClass} value={yearStart} onChange={(event) => setYearStart(event.target.value)} required /></SchoolField>
+              <SchoolField label="End date"><input type="date" className={schoolInputClass} value={yearEnd} onChange={(event) => setYearEnd(event.target.value)} required /></SchoolField>
+            </div>
             <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={yearIsCurrent} onChange={(event) => setYearIsCurrent(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" /> Set as current academic year</label>
             <SchoolPrimaryButton type="submit">Add academic year</SchoolPrimaryButton>
           </form>
         </SchoolPanel>
-        <SchoolPanel title="Add subject">
+        <SchoolPanel title="Subject catalog" description="Subjects are scoped to an academic year and grade. Archiving preserves existing historical references.">
           <form onSubmit={addSubject} className="space-y-3">
-            <SchoolField label="Academic year"><select className={schoolSelectClass} value={subjectYearId} onChange={(event) => setSubjectYearId(event.target.value)}><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></SchoolField>
-            <SchoolField label="Grade"><input className={schoolInputClass} value={subjectGrade} onChange={(event) => setSubjectGrade(event.target.value)} placeholder="Grade 9" /></SchoolField>
-            <SchoolField label="Subject name"><input className={schoolInputClass} value={subjectName} onChange={(event) => setSubjectName(event.target.value)} placeholder="Mathematics" /></SchoolField>
+            <SchoolField label="Academic year"><select className={schoolSelectClass} value={subjectYearId} onChange={(event) => setSubjectYearId(event.target.value)} required><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></SchoolField>
+            <SchoolField label="Grade"><input className={schoolInputClass} value={subjectGrade} onChange={(event) => setSubjectGrade(event.target.value)} placeholder="Grade 9" maxLength={80} required /></SchoolField>
+            <SchoolField label="Subject name"><input className={schoolInputClass} value={subjectName} onChange={(event) => setSubjectName(event.target.value)} placeholder="Mathematics" maxLength={120} required /></SchoolField>
             <SchoolPrimaryButton type="submit">Add subject</SchoolPrimaryButton>
           </form>
         </SchoolPanel>
       </div>
+      <SchoolPanel title={editingTermId ? "Edit academic term" : "Academic terms"} description="Terms must fall within their academic year, use a unique number, and not overlap another term.">
+        <form onSubmit={saveTerm} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <SchoolField label="Academic year"><select className={schoolSelectClass} value={termYearId} onChange={(event) => setTermYearId(event.target.value)} required><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></SchoolField>
+          <SchoolField label="Term name"><input className={schoolInputClass} value={termName} onChange={(event) => setTermName(event.target.value)} placeholder="Term 1" maxLength={80} required /></SchoolField>
+          <SchoolField label="Term number"><input type="number" min="1" step="1" className={schoolInputClass} value={termNumber} onChange={(event) => setTermNumber(event.target.value)} required /></SchoolField>
+          <SchoolField label="Start date"><input type="date" className={schoolInputClass} value={termStart} onChange={(event) => setTermStart(event.target.value)} required /></SchoolField>
+          <SchoolField label="End date"><input type="date" className={schoolInputClass} value={termEnd} onChange={(event) => setTermEnd(event.target.value)} required /></SchoolField>
+          <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-5">
+            <SchoolPrimaryButton type="submit">{editingTermId ? "Save term changes" : "Create term"}</SchoolPrimaryButton>
+            {editingTermId && <SchoolSecondaryButton onClick={resetTermForm}>Cancel edit</SchoolSecondaryButton>}
+          </div>
+        </form>
+        <div className="mt-4 divide-y divide-slate-100">
+          {terms.map((term) => (
+            <div key={term.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">{term.name} · Term {term.term_number}</p>
+                <p className="mt-1 text-xs text-slate-500">{years.find((year) => year.id === term.academic_year_id)?.name || "Academic year"} · {term.starts_on} – {term.ends_on}</p>
+              </div>
+              <SchoolSecondaryButton onClick={() => beginTermEdit(term)}>Edit term</SchoolSecondaryButton>
+            </div>
+          ))}
+          {!terms.length && <div className="py-3"><SchoolEmptyState title="No academic terms configured" description="Add the school's first term for an academic year." /></div>}
+        </div>
+      </SchoolPanel>
       <div className="grid gap-4 xl:grid-cols-3">
-        <SchoolPanel title="Academic years"><div className="space-y-2">{years.map((year) => <div key={year.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-100 p-3"><div><p className="text-sm font-medium text-slate-800">{year.name}</p><p className="text-xs text-slate-500">{year.starts_on} – {year.ends_on}</p></div>{year.is_current ? <SchoolStatus value="active" /> : <button type="button" onClick={() => void setCurrentYear(year.id)} className="text-xs font-semibold text-blue-700 hover:underline">Set current</button>}</div>)}{!years.length && <SchoolEmptyState title="No years yet" description="Add the first academic year." />}</div></SchoolPanel>
-        <SchoolPanel title="Sections"><div className="space-y-2">{sections.map((section) => <div key={section.id} className="flex items-center justify-between rounded-md border border-slate-100 p-3"><p className="text-sm font-medium text-slate-800">{section.grade_label} {section.section_name}</p><span className="text-xs text-slate-500">{years.find((year) => year.id === section.academic_year_id)?.name || "Academic year"}</span></div>)}{!sections.length && <SchoolEmptyState title="No sections yet" description="The relevant Division Director can create sections for grades in their division." />}</div></SchoolPanel>
-        <SchoolPanel title="Subjects"><div className="space-y-2">{subjects.map((subject) => <div key={subject.id} className="flex items-center justify-between rounded-md border border-slate-100 p-3"><div><p className="text-sm font-medium text-slate-800">{subject.subject_name}</p><p className="text-xs text-slate-500">{subject.grade_label}</p></div><SchoolStatus value={subject.active ? "active" : "deactivated"} /></div>)}{!subjects.length && <SchoolEmptyState title="No subjects yet" description="Add subjects by grade and academic year." />}</div></SchoolPanel>
+        <SchoolPanel title="Academic years">
+          <div className="space-y-2">
+            {years.map((year) => (
+              <div key={year.id} className="rounded-md border border-slate-100 p-3">
+                {yearEdit?.id === year.id ? (
+                  <form onSubmit={saveAcademicYear} className="space-y-2">
+                    <SchoolField label="Year name"><input className={schoolInputClass} value={yearEdit.name} onChange={(event) => setYearEdit((current: any) => ({ ...current, name: event.target.value }))} maxLength={80} required /></SchoolField>
+                    <div className="grid grid-cols-2 gap-2">
+                      <SchoolField label="Start"><input type="date" className={schoolInputClass} value={yearEdit.starts_on} onChange={(event) => setYearEdit((current: any) => ({ ...current, starts_on: event.target.value }))} required /></SchoolField>
+                      <SchoolField label="End"><input type="date" className={schoolInputClass} value={yearEdit.ends_on} onChange={(event) => setYearEdit((current: any) => ({ ...current, ends_on: event.target.value }))} required /></SchoolField>
+                    </div>
+                    <div className="flex gap-2"><SchoolPrimaryButton type="submit">Save</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => setYearEdit(null)}>Cancel</SchoolSecondaryButton></div>
+                  </form>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div><p className="text-sm font-medium text-slate-800">{year.name}</p><p className="text-xs text-slate-500">{year.starts_on} – {year.ends_on}</p></div>
+                    <div className="flex items-center gap-2">
+                      {year.is_current ? <SchoolStatus value="active" /> : <SchoolSecondaryButton onClick={() => void setCurrentYear(year.id)}>Set current</SchoolSecondaryButton>}
+                      <SchoolSecondaryButton onClick={() => beginYearEdit(year)}>Edit</SchoolSecondaryButton>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {!years.length && <SchoolEmptyState title="No years yet" description="Add the first academic year." />}
+          </div>
+        </SchoolPanel>
+        <SchoolPanel title="Sections" description="Section creation is delegated to the assigned Division Directors. Managers can oversee section placement and staffing.">
+          <div className="space-y-2">
+            {sections.map((section) => {
+              const enrolledCount = students.filter((student) => student.section_id === section.id).length;
+              const division = divisionMappings.find((mapping) => mapping.grade_label === section.grade_label)?.division_scope;
+              return <div key={section.id} className="rounded-md border border-slate-100 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{section.grade_label} {section.section_name}</p><SchoolStatus value={division ? "mapped" : "unmapped"} /></div>
+                <p className="mt-1 text-xs text-slate-500">{years.find((year) => year.id === section.academic_year_id)?.name || "Academic year"} · {enrolledCount} active students</p>
+                <p className="mt-1 text-xs text-slate-500">Homeroom: {section.homeroom_teacher_id ? memberName(section.homeroom_teacher_id) : "Not assigned"}</p>
+              </div>;
+            })}
+            {!sections.length && <SchoolEmptyState title="No sections yet" description="Map grades to divisions in Leadership Team, then the relevant Division Director can create sections." />}
+          </div>
+        </SchoolPanel>
+        <SchoolPanel title="Subjects">
+          <div className="space-y-2">
+            {subjects.map((subject) => <div key={subject.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-100 p-3">
+              <div><p className="text-sm font-medium text-slate-800">{subject.subject_name}</p><p className="text-xs text-slate-500">{subject.grade_label} · {years.find((year) => year.id === subject.academic_year_id)?.name || "Academic year"}</p></div>
+              <div className="flex items-center gap-2"><SchoolStatus value={subject.active ? "active" : "deactivated"} /><SchoolSecondaryButton onClick={() => void toggleSubjectActive(subject)}>{subject.active ? "Archive" : "Reactivate"}</SchoolSecondaryButton></div>
+            </div>)}
+            {!subjects.length && <SchoolEmptyState title="No subjects yet" description="Add subjects by grade and academic year." />}
+          </div>
+        </SchoolPanel>
       </div>
     </div>
   );
@@ -1065,6 +1320,126 @@ export default function SchoolManagerPortal() {
     </div>
   );
 
+  const renderStaffDirectory = () => {
+    const staffMembers = members.filter((member) => ["teacher", "finance", "admin"].includes(member.school_role));
+    const normalizedSearch = staffSearch.trim().toLowerCase();
+    const visibleStaff = staffMembers.filter((member) => {
+      const profile = profiles[member.user_id] ?? {};
+      const appointment = leadershipAppointments.find((item) => item.membership_id === member.id && item.status === "active");
+      const assignmentSummary = assignments.filter((item) => item.teacher_membership_id === member.id)
+        .map((item) => `${sectionLabel(item.section_id)} ${item.subject_name}`).join(" ");
+      const searchable = [profile.name, profile.username, member.school_username, member.school_role, appointment?.position, assignmentSummary]
+        .filter(Boolean).join(" ").toLowerCase();
+      return (staffRoleFilter === "all" || member.school_role === staffRoleFilter)
+        && (staffStatusFilter === "all" || (staffStatusFilter === "active" ? member.status === "active" : member.status !== "active"))
+        && (!normalizedSearch || searchable.includes(normalizedSearch));
+    });
+    return (
+      <div className="space-y-5">
+        <SchoolPageHeading title="Staff directory" description="Review school staff memberships, leadership appointments, and teaching assignments. Account creation and existing-account linking remain in People & Accounts." action={<SchoolSecondaryButton onClick={() => setPage("accounts")}>Onboard staff</SchoolSecondaryButton>} />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <SchoolMetric label="Staff memberships" value={staffMembers.length} detail="Teachers, Finance, and legacy Admin records" icon={UsersRound} />
+          <SchoolMetric label="Active staff" value={staffMembers.filter((member) => member.status === "active").length} detail="Active school memberships" icon={CheckCircle2} />
+          <SchoolMetric label="Teacher assignments" value={assignments.length} detail="Subject and homeroom assignments" icon={UserCog} />
+        </div>
+        <SchoolPanel title="Find staff" description="Search by name, username, role, leadership position, subject, or section.">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px_190px]">
+            <input className={schoolInputClass} value={staffSearch} onChange={(event) => setStaffSearch(event.target.value)} placeholder="Search staff…" aria-label="Search school staff" />
+            <select className={schoolSelectClass} value={staffRoleFilter} onChange={(event) => setStaffRoleFilter(event.target.value)} aria-label="Filter staff by role">
+              <option value="all">All staff roles</option><option value="teacher">Teachers</option><option value="finance">Finance</option><option value="admin">Legacy Admin</option>
+            </select>
+            <select className={schoolSelectClass} value={staffStatusFilter} onChange={(event) => setStaffStatusFilter(event.target.value)} aria-label="Filter staff by membership status">
+              <option value="all">All membership statuses</option><option value="active">Active</option><option value="inactive">Inactive / suspended</option>
+            </select>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">{visibleStaff.length} of {staffMembers.length} staff memberships</p>
+          {visibleStaff.length ? <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Staff member</th><th className="pb-2">Role / leadership</th><th className="pb-2">Assignments</th><th className="pb-2">Status</th><th className="pb-2">Action</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {visibleStaff.map((member) => {
+                  const appointment = leadershipAppointments.find((item) => item.membership_id === member.id && item.status === "active");
+                  const memberAssignments = assignments.filter((item) => item.teacher_membership_id === member.id);
+                  return <tr key={member.id}>
+                    <td className="py-3"><p className="font-semibold text-slate-800">{memberName(member.id)}</p><p className="mt-1 text-xs text-slate-500">{profiles[member.user_id]?.username ? "@" + profiles[member.user_id].username : member.school_username || "No username"}</p></td>
+                    <td className="py-3"><p className="capitalize text-slate-700">{member.school_role === "admin" ? "Legacy Admin" : member.school_role}</p>{appointment && <p className="mt-1 text-xs text-blue-700">{appointment.position.replace(/_/g, " ")}{appointment.division_scope ? " · " + appointment.division_scope.replace(/_/g, " ") : ""}</p>}</td>
+                    <td className="py-3 text-slate-600">{member.school_role === "teacher" ? memberAssignments.length : "—"}</td>
+                    <td className="py-3"><SchoolStatus value={member.status} /></td>
+                    <td className="py-3"><SchoolSecondaryButton onClick={() => setPage("assignments")} disabled={member.school_role !== "teacher"}>Assignments</SchoolSecondaryButton></td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div> : <SchoolEmptyState title="No matching staff" description="Change the search or filters, or onboard a new staff member." />}
+        </SchoolPanel>
+      </div>
+    );
+  };
+
+  const renderManagerSettings = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Manager settings" description="Manage school-level operating policies while preserving network-controlled identity and platform access boundaries." />
+      <SchoolPanel title="School identity" description="These fields are managed by the school network and are read-only in the School Manager portal.">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border border-slate-100 p-3"><p className="text-xs font-semibold uppercase text-slate-500">School name</p><p className="mt-1 text-sm font-semibold text-slate-800">{activeSchool?.name || "Unavailable"}</p></div>
+          <div className="rounded-md border border-slate-100 p-3"><p className="text-xs font-semibold uppercase text-slate-500">School code</p><p className="mt-1 text-sm font-semibold text-slate-800">{activeSchool?.school_code || "Unavailable"}</p></div>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">For school name, code, network assignment, or school lifecycle changes, submit the request through the authorized network administration workflow.</p>
+      </SchoolPanel>
+      <SchoolPanel title="Attendance and parent notification policies" description="Attendance and behavior remain separate from academic marks by default. These settings control notifications and the absence review threshold.">
+        {policySettings ? <form onSubmit={savePolicySettings} className="space-y-3">
+          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.attendance_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, attendance_notifications_enabled: event.target.checked }))} />Send automatic parent notifications when homeroom attendance is submitted</label>
+          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.behavior_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, behavior_notifications_enabled: event.target.checked }))} />Notify parents after a behavior report is approved</label>
+          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.report_card_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, report_card_notifications_enabled: event.target.checked }))} />Notify parents when official report cards are published</label>
+          <SchoolField label="Absences requiring School Manager review"><input type="number" min="1" max="60" className={schoolInputClass} value={policySettings.absence_review_threshold} onChange={(event) => setPolicySettings((current: any) => ({ ...current, absence_review_threshold: event.target.value }))} /></SchoolField>
+          <SchoolPrimaryButton type="submit">Save school policies</SchoolPrimaryButton>
+        </form> : <SchoolEmptyState title="Policy settings unavailable" description="The school's policy settings row has not been created." />}
+      </SchoolPanel>
+      <SchoolPanel title="Manager authority and access" description="School Manager access is limited by the authenticated school membership and database policies.">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border border-slate-100 p-3"><p className="text-xs font-semibold uppercase text-slate-500">Your school role</p><p className="mt-1 text-sm font-semibold text-slate-800">{activeMembership?.school_role || "Unavailable"}</p></div>
+          <div className="rounded-md border border-slate-100 p-3"><p className="text-xs font-semibold uppercase text-slate-500">Membership status</p><div className="mt-1"><SchoolStatus value={activeMembership?.status || "unknown"} /></div></div>
+        </div>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-slate-600">
+          <li>Manager actions are restricted to this school; cross-school network controls remain with Super Admin.</li>
+          <li>Student exits preserve accounts and enrollment history and require a reason.</li>
+          <li>Leadership permissions and appointments use audited database workflows.</li>
+          <li>Class-section creation remains delegated to Division Directors after grade mapping.</li>
+        </ul>
+      </SchoolPanel>
+    </div>
+  );
+
+  const renderSchoolAudit = () => {
+    const combined = [
+      ...recordEvents.map((event) => ({ ...event, source: "Student / staff record", actor: event.actor_id, searchable: JSON.stringify(event.details || {}) + " " + event.event_type + " " + memberName(event.membership_id) })),
+      ...structureEvents.map((event) => ({ ...event, source: "School structure", actor: event.actor_user_id, searchable: JSON.stringify(event.details || {}) + " " + event.event_type })),
+      ...leadershipAuditEvents.map((event) => ({ ...event, source: "Leadership appointment", actor: event.actor_user_id, details: { reason: event.reason, after_state: event.after_state }, searchable: JSON.stringify(event.after_state || {}) + " " + (event.reason || "") + " " + event.event_type })),
+      ...leadershipActionEvents.map((event) => ({ ...event, event_type: event.action_type, source: "Leadership operation", actor: event.actor_user_id, details: { reason: event.reason, before_state: event.before_state, after_state: event.after_state }, searchable: JSON.stringify(event.before_state || {}) + " " + JSON.stringify(event.after_state || {}) + " " + (event.reason || "") + " " + event.action_type })),
+    ].filter((event) => !auditSearch.trim() || event.searchable.toLowerCase().includes(auditSearch.trim().toLowerCase()))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return (
+      <div className="space-y-5">
+        <SchoolPageHeading title="School audit history" description="Review the latest 100 records per available event stream for student lifecycle, grade-division mapping, leadership appointments, and leadership operations." action={<SchoolSecondaryButton onClick={() => void loadManagerAudit()}><RefreshCw className="mr-2 h-4 w-4" />Refresh audit</SchoolSecondaryButton>} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SchoolMetric label="Record lifecycle events" value={recordEvents.length} detail="Enrollment and membership history" icon={Users} /><SchoolMetric label="Structure events" value={structureEvents.length} detail="Grade and division changes" icon={CalendarDays} /><SchoolMetric label="Leadership appointments" value={leadershipAuditEvents.length} detail="Appointment and permission changes" icon={UserCog} /><SchoolMetric label="Leadership operations" value={leadershipActionEvents.length} detail="Audited school-leadership actions" icon={FileClock} /></div>
+        {auditError && <div role="status" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{auditError}</div>}
+        <SchoolPanel title="Audit events" description="Events are read-only. Sensitive actions remain recorded by the database.">
+          <input className={schoolInputClass} value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Search event type, member, or event details…" aria-label="Search school audit events" />
+          {combined.length ? <div className="mt-3 divide-y divide-slate-100">
+            {combined.map((event) => <div key={event.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold capitalize text-slate-800">{event.event_type.replace(/_/g, " ")}</p><SchoolStatus value={event.source === "School structure" ? "structure" : "record"} /></div>
+                <p className="mt-1 text-xs text-slate-500">{event.source}{event.membership_id ? " · " + memberName(event.membership_id) : ""} · By {profiles[event.actor]?.name || "School Manager"}</p>
+                <p className="mt-1 break-words text-xs text-slate-600">{JSON.stringify(event.details || {})}</p>
+              </div>
+              <span className="shrink-0 text-xs tabular-nums text-slate-500">{new Date(event.created_at).toLocaleString()}</span>
+            </div>)}
+          </div> : <SchoolEmptyState title="No matching audit events" description="Events will appear here when school lifecycle or structure changes are recorded." />}
+        </SchoolPanel>
+      </div>
+    );
+  };
+
   useEffect(() => {
     const policy = gradingPolicies.find((item) => item.academic_year_id === gradingYearId && item.grade_label === gradingGradeLabel);
     setPassMark(String(policy?.pass_mark ?? 50));
@@ -1074,7 +1449,7 @@ export default function SchoolManagerPortal() {
 
   const renderGrading = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Grading & school policies" description="Configure each grade's assessment weights, pass mark, ranking scope, grade scale, and parent notification policies." />
+      <SchoolPageHeading title="Grading & school policies" description="Configure each grade's assessment weights, pass mark, ranking scope, and grade scale." />
       <SchoolPanel title="Select academic year and grade">
         <div className="grid gap-3 sm:grid-cols-2">
           <SchoolField label="Academic year"><select className={schoolSelectClass} value={gradingYearId} onChange={(event) => setGradingYearId(event.target.value)}><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}{year.is_current ? " · Current" : ""}</option>)}</select></SchoolField>
@@ -1098,15 +1473,7 @@ export default function SchoolManagerPortal() {
         <div className="mb-3 overflow-x-auto"><table className="w-full min-w-[500px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Letter</th><th className="pb-2">Minimum</th><th className="pb-2">Maximum</th><th className="pb-2">Description</th></tr></thead><tbody className="divide-y divide-slate-100">{selectedGradeScales.map((scale) => <tr key={scale.id}><td className="py-2 font-semibold text-slate-800">{scale.letter_grade}</td><td className="py-2 text-slate-600">{scale.minimum_score}%</td><td className="py-2 text-slate-600">{scale.maximum_score}%</td><td className="py-2 text-slate-600">{scale.description || "—"}</td></tr>)}</tbody></table></div>
         <form onSubmit={addGradeScale} className="grid gap-2 sm:grid-cols-5 sm:items-end"><SchoolField label="Letter"><input className={schoolInputClass} value={newScaleLetter} onChange={(event) => setNewScaleLetter(event.target.value)} placeholder="A" /></SchoolField><SchoolField label="Minimum %"><input type="number" min="0" max="100" className={schoolInputClass} value={newScaleMin} onChange={(event) => setNewScaleMin(event.target.value)} /></SchoolField><SchoolField label="Maximum %"><input type="number" min="0" max="100" className={schoolInputClass} value={newScaleMax} onChange={(event) => setNewScaleMax(event.target.value)} /></SchoolField><SchoolField label="Description"><input className={schoolInputClass} value={newScaleDescription} onChange={(event) => setNewScaleDescription(event.target.value)} /></SchoolField><SchoolPrimaryButton type="submit">Add scale</SchoolPrimaryButton></form>
       </SchoolPanel>
-      <SchoolPanel title="Attendance and parent notification policies" description="Attendance and behavior remain separate from academic marks by default. These settings control notifications and the absence review threshold.">
-        {policySettings ? <form onSubmit={savePolicySettings} className="space-y-3">
-          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.attendance_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, attendance_notifications_enabled: event.target.checked }))} />Send automatic parent notifications when homeroom attendance is submitted</label>
-          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.behavior_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, behavior_notifications_enabled: event.target.checked }))} />Notify parents after a behavior report is approved</label>
-          <label className="flex items-center gap-3 rounded-md border border-slate-100 p-3 text-sm text-slate-700"><input type="checkbox" checked={Boolean(policySettings.report_card_notifications_enabled)} onChange={(event) => setPolicySettings((current: any) => ({ ...current, report_card_notifications_enabled: event.target.checked }))} />Notify parents when official report cards are published</label>
-          <SchoolField label="Absences requiring School Manager review"><input type="number" min="1" max="60" className={schoolInputClass} value={policySettings.absence_review_threshold} onChange={(event) => setPolicySettings((current: any) => ({ ...current, absence_review_threshold: event.target.value }))} /></SchoolField>
-          <SchoolPrimaryButton type="submit">Save school policies</SchoolPrimaryButton>
-        </form> : <SchoolEmptyState title="Policy settings unavailable" description="The school's policy settings row has not been created." />}
-      </SchoolPanel>
+
     </div>
   );
 
@@ -1461,6 +1828,10 @@ export default function SchoolManagerPortal() {
   switch (page) {
     case "accounts": content = renderAccounts(); break;
     case "students": content = renderStudents(); break;
+    case "staff": content = renderStaffDirectory(); break;
+    case "assignments": content = renderAssignments(); break;
+    case "audit": content = renderSchoolAudit(); break;
+    case "settings": content = renderManagerSettings(); break;
     case "structure": content = renderStructure(); break;
     case "grading": content = renderGrading(); break;
     case "finance": content = renderFinance(); break;
