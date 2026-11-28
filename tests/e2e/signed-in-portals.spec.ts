@@ -227,3 +227,41 @@ test('Super Admin is denied access to the Extreme Admin owner route', async ({ p
   await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('heading', { name: 'Executive control center' })).toHaveCount(0);
 });
+
+test('School Manager Part 1 workflows are reachable across desktop, tablet and mobile', async ({ page }) => {
+  test.setTimeout(120_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await authenticateAs(page, 'ci-manager@masterminds.test');
+
+  const sections = [
+    { nav: 'Student Directory', heading: 'Student directory', content: 'Search school student memberships' },
+    { nav: 'Staff Directory', heading: 'Staff directory', content: 'Review school staff memberships' },
+    { nav: 'Teacher Assignments', heading: 'Teacher assignments', content: 'Create assignment' },
+    { nav: 'School Structure', heading: 'School structure', content: 'Academic terms' },
+    { nav: 'Manager Settings', heading: 'Manager settings', content: 'Attendance and parent notification policies' },
+    { nav: 'School Audit', heading: 'School audit history', content: 'Audit events' },
+    { nav: 'Leadership Team', heading: 'School leadership team', content: 'Grade-to-division mapping' },
+  ];
+
+  for (const viewport of [
+    { name: 'desktop', width: 1440, height: 1000 },
+    { name: 'tablet', width: 768, height: 1024 },
+    { name: 'mobile', width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+
+    for (const section of sections) {
+      if (viewport.width < 1024) {
+        await page.getByRole('button', { name: 'Open navigation' }).click();
+      }
+      await page.getByRole('button', { name: section.nav, exact: true }).click();
+      await expect(page.getByRole('heading', { name: section.heading, exact: true })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(section.content, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+    }
+  }
+
+  expect(pageErrors, 'Unexpected browser errors in School Manager Part 1 desktop/tablet/mobile workflows').toEqual([]);
+});
