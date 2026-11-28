@@ -63,6 +63,16 @@ CREATE TABLE IF NOT EXISTS public.school_curriculum_progress (
     CHECK ((status = 'taught' AND completed_at IS NOT NULL) OR (status <> 'taught' AND completed_at IS NULL))
 );
 
+CREATE TABLE IF NOT EXISTS public.school_curriculum_unit_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  unit_id uuid NOT NULL,
+  actor_user_id uuid,
+  event_type text NOT NULL CHECK (event_type IN ('created','updated','archived','reactivated')),
+  unit_snapshot jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS public.school_curriculum_progress_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id uuid NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
@@ -130,6 +140,7 @@ CREATE INDEX IF NOT EXISTS school_academic_interventions_scope_idx
   ON public.school_academic_interventions (school_id, status, target_date, updated_at DESC);
 
 ALTER TABLE public.school_curriculum_units ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_curriculum_unit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_curriculum_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_curriculum_progress_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.school_academic_interventions ENABLE ROW LEVEL SECURITY;
@@ -147,6 +158,9 @@ FOR SELECT TO authenticated USING (
       AND public.school_can_teach_subject(school_curriculum_units.school_id, section.id, school_curriculum_units.subject_name)
   )
 );
+DROP POLICY IF EXISTS school_curriculum_unit_events_select ON public.school_curriculum_unit_events;
+CREATE POLICY school_curriculum_unit_events_select ON public.school_curriculum_unit_events
+FOR SELECT TO authenticated USING (public.is_school_manager_or_admin(school_id));
 DROP POLICY IF EXISTS school_curriculum_progress_select ON public.school_curriculum_progress;
 CREATE POLICY school_curriculum_progress_select ON public.school_curriculum_progress
 FOR SELECT TO authenticated USING (
@@ -169,12 +183,49 @@ DROP POLICY IF EXISTS school_academic_intervention_events_select ON public.schoo
 CREATE POLICY school_academic_intervention_events_select ON public.school_academic_intervention_events
 FOR SELECT TO authenticated USING (public.is_school_manager_or_admin(school_id));
 
-REVOKE ALL ON public.school_curriculum_units, public.school_curriculum_progress,
+REVOKE ALL ON public.school_curriculum_units, public.school_curriculum_unit_events, public.school_curriculum_progress,
   public.school_curriculum_progress_events, public.school_academic_interventions,
   public.school_academic_intervention_events FROM anon, authenticated;
-GRANT SELECT ON public.school_curriculum_units, public.school_curriculum_progress,
+GRANT SELECT ON public.school_curriculum_units, public.school_curriculum_unit_events, public.school_curriculum_progress,
   public.school_curriculum_progress_events, public.school_academic_interventions,
   public.school_academic_intervention_events TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.school_record_curriculum_unit_event()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $
+DECLARE
+  v_event_type text;
+  v_snapshot jsonb;
+BEGIN
+  v_event_type := CASE
+    WHEN TG_OP = 'INSERT' THEN 'created'
+    WHEN OLD.is_active AND NOT NEW.is_active THEN 'archived'
+    WHEN NOT OLD.is_active AND NEW.is_active THEN 'reactivated'
+    ELSE 'updated'
+  END;
+  v_snapshot := jsonb_build_object(
+    'academic_year_id', NEW.academic_year_id, 'grade_label', NEW.grade_label,
+    'subject_name', NEW.subject_name, 'unit_code', NEW.unit_code, 'title', NEW.title,
+    'description', NEW.description, 'sequence_number', NEW.sequence_number,
+    'source_type', NEW.source_type, 'source_title', NEW.source_title,
+    'source_url', NEW.source_url, 'source_verification', NEW.source_verification,
+    'expected_start', NEW.expected_start, 'expected_end', NEW.expected_end,
+    'is_active', NEW.is_active
+  );
+  INSERT INTO public.school_curriculum_unit_events(
+    school_id, unit_id, actor_user_id, event_type, unit_snapshot
+  ) VALUES (NEW.school_id, NEW.id, auth.uid(), v_event_type, v_snapshot);
+  RETURN NEW;
+END;
+$;
+DROP TRIGGER IF EXISTS school_curriculum_unit_audit ON public.school_curriculum_units;
+CREATE TRIGGER school_curriculum_unit_audit
+AFTER INSERT OR UPDATE ON public.school_curriculum_units
+FOR EACH ROW EXECUTE FUNCTION public.school_record_curriculum_unit_event();
+DROP TRIGGER IF EXISTS school_curriculum_unit_events_immutable ON public.school_curriculum_unit_events;
+CREATE TRIGGER school_curriculum_unit_events_immutable
+BEFORE UPDATE OR DELETE ON public.school_curriculum_unit_events
+FOR EACH ROW EXECUTE FUNCTION public.school_prevent_academic_event_mutation();
 
 CREATE OR REPLACE FUNCTION public.school_record_curriculum_progress_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
