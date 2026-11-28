@@ -9,6 +9,7 @@ import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
 import SchoolManagerAcademicWorkspace from "@/components/school/SchoolManagerAcademicWorkspace";
 import SchoolCurriculumWorkspace from "@/components/school/SchoolCurriculumWorkspace";
+import SchoolManagerAttendanceWorkspace from "@/components/school/SchoolManagerAttendanceWorkspace";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
@@ -26,6 +27,7 @@ const navItems: SchoolNavItem[] = [
   { id: "structure", label: "School Structure", icon: School },
   { id: "academics", label: "Academic Management", icon: BookOpen },
   { id: "curriculum", label: "Curriculum & Support", icon: BookOpen },
+  { id: "attendance", label: "Attendance & Daily Operations", icon: CalendarDays },
   { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
   { id: "tasks", label: "Staff Tasks", icon: ClipboardList },
@@ -1839,6 +1841,7 @@ export default function SchoolManagerPortal() {
     case "structure": content = renderStructure(); break;
     case "academics": content = <SchoolManagerAcademicWorkspace schoolId={schoolId} years={years} terms={terms} sections={sections} subjects={subjects} assignments={assignments} categories={gradingCategories} gradingPolicies={gradingPolicies} members={members} profiles={profiles} />; break;
     case "curriculum": content = <SchoolCurriculumWorkspace mode="manager" schoolId={schoolId} years={years} sections={sections} subjects={subjects} assignments={assignments} members={members} profiles={profiles} />; break;
+    case "attendance": content = <SchoolManagerAttendanceWorkspace schoolId={schoolId} years={years} sections={sections} members={members} profiles={profiles} />; break;
     case "grading": content = renderGrading(); break;
     case "finance": content = renderFinance(); break;
     case "tasks": content = renderTasks(); break;
