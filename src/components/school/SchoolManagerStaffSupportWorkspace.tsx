@@ -369,6 +369,35 @@ export default function SchoolManagerStaffSupportWorkspace({ schoolId, activeMem
     </div>
   );
 
+  const renderEscalations = () => (
+    <div className="space-y-5">
+      <SchoolPageHeading title="Manager escalations" description="Send formal staff responsibility requests to network administration and staff disciplinary recommendations to Super Admin. These are requests for review, not direct role or account changes." action={<SchoolSecondaryButton onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</SchoolSecondaryButton>} />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SchoolPanel title="Request a staff responsibility change" description="Network administration makes the final decision. This request does not change a staff member's role, account, or permissions.">
+          <form onSubmit={submitManagerChangeRequest} className="space-y-3">
+            <SchoolField label="Staff member"><select className={schoolSelectClass} value={requestTarget} onChange={(event) => setRequestTarget(event.target.value)} required><option value="">Choose active staff member</option>{staff.map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
+            <SchoolField label="Request type"><select className={schoolSelectClass} value={requestType} onChange={(event) => setRequestType(event.target.value)}><option value="responsibility_change">Responsibility change</option><option value="assignment_change">Assignment change</option><option value="role_change">Role change</option></select></SchoolField>
+            {requestType === "role_change" && <SchoolField label="Requested role"><select className={schoolSelectClass} value={requestedRole} onChange={(event) => setRequestedRole(event.target.value)}><option value="teacher">Teacher</option><option value="finance">Finance</option></select></SchoolField>}
+            <SchoolField label="Requested details (JSON object)"><textarea className={schoolTextareaClass} rows={3} maxLength={4000} value={requestDetails} onChange={(event) => setRequestDetails(event.target.value)} placeholder='{"new_section":"Grade 8A"}' /></SchoolField>
+            <SchoolField label="Reason"><textarea className={schoolTextareaClass} rows={3} maxLength={2000} required value={requestReason} onChange={(event) => setRequestReason(event.target.value)} /></SchoolField>
+            <SchoolPrimaryButton type="submit">Send request for review</SchoolPrimaryButton>
+          </form>
+        </SchoolPanel>
+        <SchoolPanel title="Recommend staff disciplinary review" description="This recommendation is routed to Super Admin. The Manager cannot directly apply staff disciplinary action.">
+          <form onSubmit={submitStaffDisciplineRecommendation} className="space-y-3">
+            <SchoolField label="Staff member"><select className={schoolSelectClass} value={disciplineTarget} onChange={(event) => setDisciplineTarget(event.target.value)} required><option value="">Choose active staff member</option>{staff.filter((member) => ["teacher", "finance"].includes(member.school_role)).map((member) => <option key={member.id} value={member.id}>{memberName(member.id)} · {member.school_role}</option>)}</select></SchoolField>
+            <SchoolField label="Reason"><textarea className={schoolTextareaClass} rows={3} maxLength={2000} required value={disciplineReason} onChange={(event) => setDisciplineReason(event.target.value)} /></SchoolField>
+            <SchoolField label="Recommendation"><textarea className={schoolTextareaClass} rows={4} maxLength={4000} required value={disciplineRecommendation} onChange={(event) => setDisciplineRecommendation(event.target.value)} /></SchoolField>
+            <SchoolPrimaryButton type="submit">Send recommendation to Super Admin</SchoolPrimaryButton>
+          </form>
+        </SchoolPanel>
+      </div>
+      <SchoolPanel title="Existing staff change requests" description="Track requests already submitted by school staff. Only network administration can approve or reject network-level role and account changes.">
+        {changeRequests.length ? <div className="space-y-2">{changeRequests.map((item) => <article key={item.id} className="rounded-xl border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{item.request_type.replace(/_/g, " ")} · {memberName(item.target_membership_id)}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-500">Requested by {memberName(item.requester_membership_id)} · {new Date(item.created_at).toLocaleString()}</p><p className="mt-2 text-sm text-slate-600">{item.reason}</p></article>)}</div> : <SchoolEmptyState title="No staff change requests" description="Submitted requests will appear here." />}
+      </SchoolPanel>
+    </div>
+  );
+
   return (
     <div className="space-y-5">
       {loadError && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{loadError}</div>}
@@ -377,8 +406,9 @@ export default function SchoolManagerStaffSupportWorkspace({ schoolId, activeMem
         <button type="button" role="tab" aria-selected={tab === "tasks"} onClick={() => setTab("tasks")} className={tab === "tasks" ? "rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white" : "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"}>Staff tasks</button>
         <button type="button" role="tab" aria-selected={tab === "staff"} onClick={() => setTab("staff")} className={tab === "staff" ? "rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white" : "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"}>Staff accountability</button>
         <button type="button" role="tab" aria-selected={tab === "student-support"} onClick={() => setTab("student-support")} className={tab === "student-support" ? "rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white" : "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"}>Student support</button>
+        <button type="button" role="tab" aria-selected={tab === "escalations"} onClick={() => setTab("escalations")} className={tab === "escalations" ? "rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white" : "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"}>Manager escalations</button>
       </div>
-      {tab === "tasks" ? renderTasks() : tab === "staff" ? renderStaff() : renderStudentSupport()}
+      {tab === "tasks" ? renderTasks() : tab === "staff" ? renderStaff() : tab === "student-support" ? renderStudentSupport() : renderEscalations()}
     </div>
   );
 }
