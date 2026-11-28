@@ -18,7 +18,7 @@ const requiredContracts = [
   ['student exit refreshes the authoritative records', /await load\(\);/],
   ['student exit actions preserve membership instead of deleting accounts', /does not delete the student's account/],
   ['academic terms are loaded from school-scoped records', /from\("school_terms"\).*?eq\("school_id", schoolId\)/s],
-  ['academic terms are created and updated', /const saveTerm[\s\S]*?school_terms[\s\S]*?insert[\s\S]*?school_terms[\s\S]*?update/],
+  ['academic terms are created and updated', /const saveTerm[\s\S]*?school_terms[\s\S]*?update[\s\S]*?school_terms[\s\S]*?insert/],
   ['term dates stay inside their academic year', /termStart < academicYear\.starts_on \|\| termEnd > academicYear\.ends_on/],
   ['term numbers are unique within the selected year', /duplicateNumber = terms\.some/],
   ['term date ranges cannot overlap', /const overlaps = terms\.some/],
