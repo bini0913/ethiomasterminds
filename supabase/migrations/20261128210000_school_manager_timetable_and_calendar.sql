@@ -68,6 +68,42 @@ create table if not exists public.school_calendar_events (
     references public.school_memberships(id, school_id) on delete restrict
 );
 
+
+create or replace function public.school_validate_calendar_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_grade text;
+begin
+  if not public.is_school_manager_or_admin(new.school_id) then
+    raise exception 'School Manager permission is required to manage the calendar';
+  end if;
+  if new.academic_year_id is not null and not exists (
+    select 1 from public.school_academic_years year
+    where year.id = new.academic_year_id and year.school_id = new.school_id
+  ) then
+    raise exception 'Academic year does not belong to this school';
+  end if;
+  if new.section_id is not null then
+    select section.grade_label into v_grade
+    from public.school_sections section
+    where section.id = new.section_id and section.school_id = new.school_id;
+    if v_grade is null or v_grade <> new.grade_label then
+      raise exception 'The selected section must belong to the selected grade and school';
+    end if;
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$;
+drop trigger if exists school_calendar_events_validate on public.school_calendar_events;
+create trigger school_calendar_events_validate
+before insert or update on public.school_calendar_events
+for each row execute function public.school_validate_calendar_event();
+
 create index if not exists school_calendar_events_school_start_idx
   on public.school_calendar_events (school_id, starts_at desc);
 create index if not exists school_calendar_events_year_idx
@@ -84,8 +120,6 @@ create table if not exists public.school_operations_audit_events (
   before_state jsonb,
   after_state jsonb,
   created_at timestamptz not null default now(),
-  constraint school_operations_audit_actor_fk foreign key (actor_membership_id, school_id)
-    references public.school_memberships(id, school_id) on delete set null
 );
 create index if not exists school_operations_audit_school_created_idx
   on public.school_operations_audit_events (school_id, created_at desc);
@@ -193,7 +227,7 @@ begin
     (school_id, actor_user_id, actor_membership_id, entity_type, entity_id, action_type, before_state, after_state)
   values
     (v_school_id, auth.uid(), public.school_my_membership_id(v_school_id), v_entity_type, v_entity_id,
-     lower(tg_op), v_before, v_after);
+     case tg_op when 'INSERT' then 'created' when 'UPDATE' then 'updated' else 'deleted' end, v_before, v_after);
   if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
