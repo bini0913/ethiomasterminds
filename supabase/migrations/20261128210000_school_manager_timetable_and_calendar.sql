@@ -81,11 +81,20 @@ begin
   if not public.is_school_manager_or_admin(new.school_id) then
     raise exception 'School Manager permission is required to manage the calendar';
   end if;
+  if tg_op = 'INSERT' then
+    new.created_by_membership_id := public.school_my_membership_id(new.school_id);
+  end if;
   if new.academic_year_id is not null and not exists (
     select 1 from public.school_academic_years year
     where year.id = new.academic_year_id and year.school_id = new.school_id
   ) then
     raise exception 'Academic year does not belong to this school';
+  end if;
+  if new.audience_type = 'grade' and not exists (
+    select 1 from public.school_sections section
+    where section.school_id = new.school_id and section.grade_label = new.grade_label
+  ) then
+    raise exception 'The selected grade does not exist in this school';
   end if;
   if new.section_id is not null then
     select section.grade_label into v_grade
@@ -135,6 +144,9 @@ declare
 begin
   if not public.is_school_manager_or_admin(new.school_id) then
     raise exception 'School Manager permission is required to manage the timetable';
+  end if;
+  if tg_op = 'INSERT' then
+    new.created_by_membership_id := public.school_my_membership_id(new.school_id);
   end if;
 
   select section.academic_year_id into v_section_year
@@ -266,3 +278,19 @@ using (public.is_school_manager_or_admin(school_id));
 grant select, insert, update, delete on public.school_timetable_slots to authenticated;
 grant select, insert, update, delete on public.school_calendar_events to authenticated;
 grant select on public.school_operations_audit_events to authenticated;
+
+create or replace function public.school_prevent_operations_audit_mutation()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  raise exception 'School operations audit events are immutable';
+end;
+$$;
+drop trigger if exists school_operations_audit_immutable on public.school_operations_audit_events;
+create trigger school_operations_audit_immutable
+before update or delete on public.school_operations_audit_events
+for each row execute function public.school_prevent_operations_audit_mutation();
+
+revoke insert, update, delete on public.school_operations_audit_events from authenticated, anon;
