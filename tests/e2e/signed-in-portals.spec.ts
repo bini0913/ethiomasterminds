@@ -388,3 +388,31 @@ test('School Manager timetable and calendar workflows are reachable across deskt
   }
   expect(pageErrors, 'Unexpected browser errors in School Manager timetable and calendar').toEqual([]);
 });
+
+
+test('School Manager parent communication oversight is reachable across desktop, tablet and mobile', async ({ page }) => {
+  test.setTimeout(90_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await authenticateAs(page, 'ci-manager@masterminds.test');
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('button', { name: 'Parent Communication', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Parent communication & announcements', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'School announcements', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Parent engagement', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Parent notification delivery', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Parent–student link coverage', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Messaging activity', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'School messaging activity', exact: true })).toBeVisible();
+  }
+  expect(pageErrors, 'Unexpected browser errors in School Manager parent communications').toEqual([]);
+});
