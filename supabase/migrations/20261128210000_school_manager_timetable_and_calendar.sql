@@ -135,7 +135,7 @@ create table if not exists public.school_operations_audit_events (
   action_type text not null check (action_type in ('created','updated','deleted')),
   before_state jsonb,
   after_state jsonb,
-  created_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
 );
 create index if not exists school_operations_audit_school_created_idx
   on public.school_operations_audit_events (school_id, created_at desc);
