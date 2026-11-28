@@ -188,7 +188,7 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Choose a section and academic year belonging to this school';
   END IF;
-  IF NOT EXISTS (
+  IF p_status = 'scheduled' AND NOT EXISTS (
     SELECT 1 FROM public.school_memberships teacher
     JOIN public.school_teacher_assignments assignment
       ON assignment.teacher_membership_id = teacher.id
