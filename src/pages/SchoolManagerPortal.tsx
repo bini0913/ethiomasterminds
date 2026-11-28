@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, School, BookOpen, UserCog, Wallet, ClipboardList,
-  FileBarChart, Settings, RefreshCw, CheckCircle2, Copy, AlertCircle, Scale, Percent, GraduationCap, Search, FileClock, UsersRound, CalendarDays,
+  FileBarChart, Settings, RefreshCw, CheckCircle2, Copy, AlertCircle, Scale, Percent, GraduationCap, Search, FileClock, UsersRound, CalendarDays, MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ import SchoolManagerAcademicWorkspace from "@/components/school/SchoolManagerAca
 import SchoolCurriculumWorkspace from "@/components/school/SchoolCurriculumWorkspace";
 import SchoolManagerAttendanceWorkspace from "@/components/school/SchoolManagerAttendanceWorkspace";
 import SchoolManagerTimetableCalendarWorkspace from "@/components/school/SchoolManagerTimetableCalendarWorkspace";
+import SchoolManagerParentCommunicationsWorkspace from "@/components/school/SchoolManagerParentCommunicationsWorkspace";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
@@ -30,6 +31,7 @@ const navItems: SchoolNavItem[] = [
   { id: "curriculum", label: "Curriculum & Support", icon: BookOpen },
   { id: "attendance", label: "Attendance & Daily Operations", icon: CalendarDays },
   { id: "timetable", label: "Timetable & Calendar", icon: CalendarDays },
+  { id: "communications", label: "Parent Communication", icon: MessageSquare },
   { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
   { id: "tasks", label: "Staff Tasks", icon: ClipboardList },
@@ -1845,6 +1847,7 @@ export default function SchoolManagerPortal() {
     case "curriculum": content = <SchoolCurriculumWorkspace mode="manager" schoolId={schoolId} years={years} sections={sections} subjects={subjects} assignments={assignments} members={members} profiles={profiles} />; break;
     case "attendance": content = <SchoolManagerAttendanceWorkspace schoolId={schoolId} years={years} sections={sections} members={members} profiles={profiles} />; break;
     case "timetable": content = <SchoolManagerTimetableCalendarWorkspace schoolId={schoolId} years={years} sections={sections} assignments={assignments} members={members} profiles={profiles} />; break;
+    case "communications": content = <SchoolManagerParentCommunicationsWorkspace schoolId={schoolId} members={members} profiles={profiles} sections={sections} />; break;
     case "grading": content = renderGrading(); break;
     case "finance": content = renderFinance(); break;
     case "tasks": content = renderTasks(); break;
