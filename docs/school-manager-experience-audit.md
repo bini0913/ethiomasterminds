@@ -12,7 +12,7 @@ The Manager sidebar is grouped into six areas. Each visible destination has one 
 | People & school | Student Directory | `students` | Search, lifecycle, placement, unified student profile |
 | People & school | People & Accounts | `accounts` | School account provisioning and account linking |
 | People & school | Staff Directory | `staff` | Searchable school staff directory |
-| People & school | Teacher Assignments | `assignments` | Section and subject assignments |
+| People & school | Teacher Assignments | `assignments` | Section and subject assignments, teacher-submitted assignment recommendation review |
 | People & school | Leadership Team | `leadership` | Appointments, division mappings, teams, permissions and audit |
 | Academic management | School Structure | `structure` | Academic years, terms, sections, subjects |
 | Academic management | Academic Management | `academics` | Assessment, marks, results, homework and learning oversight |
