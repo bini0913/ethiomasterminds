@@ -1414,11 +1414,13 @@ export default function SchoolManagerPortal() {
     const combined = [
       ...recordEvents.map((event) => ({ ...event, source: "Student / staff record", actor: event.actor_id, searchable: JSON.stringify(event.details || {}) + " " + event.event_type + " " + memberName(event.membership_id) })),
       ...structureEvents.map((event) => ({ ...event, source: "School structure", actor: event.actor_user_id, searchable: JSON.stringify(event.details || {}) + " " + event.event_type })),
+      ...leadershipAuditEvents.map((event) => ({ ...event, source: "Leadership appointment", actor: event.actor_user_id, details: { reason: event.reason, after_state: event.after_state }, searchable: JSON.stringify(event.after_state || {}) + " " + (event.reason || "") + " " + event.event_type })),
+      ...leadershipActionEvents.map((event) => ({ ...event, event_type: event.action_type, source: "Leadership operation", actor: event.actor_user_id, details: { reason: event.reason, before_state: event.before_state, after_state: event.after_state }, searchable: JSON.stringify(event.before_state || {}) + " " + JSON.stringify(event.after_state || {}) + " " + (event.reason || "") + " " + event.action_type })),
     ].filter((event) => !auditSearch.trim() || event.searchable.toLowerCase().includes(auditSearch.trim().toLowerCase()))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return (
       <div className="space-y-5">
-        <SchoolPageHeading title="School audit history" description="Review recorded student and staff lifecycle changes, grade-division mapping changes, and school structure actions." action={<SchoolSecondaryButton onClick={() => void loadManagerAudit()}><RefreshCw className="mr-2 h-4 w-4" />Refresh audit</SchoolSecondaryButton>} />
+        <SchoolPageHeading title="School audit history" description="Review student lifecycle, grade-division mapping, leadership appointment, and leadership operational events." action={<SchoolSecondaryButton onClick={() => void loadManagerAudit()}><RefreshCw className="mr-2 h-4 w-4" />Refresh audit</SchoolSecondaryButton>} />
         <div className="grid gap-3 sm:grid-cols-2"><SchoolMetric label="Record lifecycle events" value={recordEvents.length} detail="Enrollment and membership history" icon={Users} /><SchoolMetric label="Structure events" value={structureEvents.length} detail="Grade and division changes" icon={CalendarDays} /></div>
         {auditError && <div role="status" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{auditError}</div>}
         <SchoolPanel title="Audit events" description="Events are read-only. Sensitive actions remain recorded by the database.">
