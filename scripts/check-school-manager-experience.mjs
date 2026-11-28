@@ -10,6 +10,10 @@ const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const e2e = fs.readFileSync("tests/e2e/signed-in-portals.spec.ts", "utf8");
 
 assert.match(portal, /School command center/);
+assert.match(portal, /complete school invoice ledger in bounded pages/);
+assert.match(portal, /\.range\(0, 499\)/);
+assert.match(portal, /\.range\(offset, offset \+ 499\)/);
+assert.match(portal, /setInvoices\(allInvoices\)/);
 assert.match(portal, /Good day\. Here's what needs your attention/);
 assert.match(portal, /School setup checklist/);
 assert.match(portal, /SchoolManagerStudentProfile/);
