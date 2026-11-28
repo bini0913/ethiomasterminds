@@ -1283,6 +1283,16 @@ export default function SchoolManagerPortal() {
       <SchoolPanel title="Current assignments">
         {assignments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Teacher</th><th className="pb-2">Section</th><th className="pb-2">Subject / responsibility</th><th className="pb-2">Type</th><th className="pb-2">Action</th></tr></thead><tbody className="divide-y divide-slate-100">{assignments.map((assignment) => <tr key={assignment.id}><td className="py-3 font-medium text-slate-800">{memberName(assignment.teacher_membership_id)}</td><td className="py-3 text-slate-600">{sectionLabel(assignment.section_id)}</td><td className="py-3 text-slate-600">{assignment.subject_name}</td><td className="py-3 capitalize text-slate-600">{assignment.assignment_kind}</td><td className="py-3"><button type="button" onClick={() => void deleteTeacherAssignment(assignment)} className="text-xs font-semibold text-red-700 hover:underline">Remove</button></td></tr>)}</tbody></table></div> : <SchoolEmptyState title="No teacher assignments" description="Create assignments after teachers, sections, and subjects have been added." />}
       </SchoolPanel>
+      <SchoolPanel title="Teacher assignment recommendations" description="Review assignment requests submitted through the authorized teacher workflow. Accepting a recommendation records the decision; the actual assignment is still made above.">
+        {assignmentRecommendations.length ? <div className="space-y-3">{assignmentRecommendations.map((recommendation) => <article key={recommendation.id} className="rounded-xl border border-slate-100 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(recommendation.teacher_membership_id)} · {String(recommendation.recommendation_type).replace(/_/g, " ")}</p><SchoolStatus value={recommendation.status} /></div>
+          <p className="mt-1 text-xs text-slate-500">Submitted by {memberName(recommendation.submitted_by_membership_id)} · {new Date(recommendation.created_at).toLocaleString()}</p>
+          <p className="mt-2 text-sm text-slate-700">{recommendation.reason}</p>
+          <p className="mt-1 text-xs text-slate-500">Requested section: {sectionLabel(recommendation.requested_section_id)} · Subject: {recommendation.requested_subject_name || "Not specified"} · Type: {recommendation.requested_assignment_kind || "Not specified"}</p>
+          {recommendation.status === "pending" && <><textarea className={schoolTextareaClass + " mt-3"} rows={2} maxLength={2000} value={managerReviewNotes[recommendation.id] || ""} onChange={(event) => setManagerReviewNotes((current) => ({ ...current, [recommendation.id]: event.target.value }))} placeholder="Manager decision note (optional)…" /><div className="mt-2 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewAssignmentRecommendation(recommendation, true)}>Accept recommendation</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewAssignmentRecommendation(recommendation, false)}>Decline recommendation</SchoolSecondaryButton></div></>}
+          {recommendation.manager_note && <p className="mt-2 text-xs text-slate-600">Manager note: {recommendation.manager_note}</p>}
+        </article>)}</div> : <SchoolEmptyState title="No assignment recommendations" description="Teacher-submitted assignment recommendations will appear here for review." />}
+      </SchoolPanel>
     </div>
   );
 
@@ -1373,16 +1383,7 @@ export default function SchoolManagerPortal() {
           <li>Class-section creation remains delegated to Division Directors after grade mapping.</li>
         </ul>
       </SchoolPanel>
-      <SchoolPanel title="Teacher assignment recommendations" description="Review assignment requests submitted through the authorized teacher workflow. Accepting a recommendation records the decision; the actual assignment is still made above.">
-        {assignmentRecommendations.length ? <div className="space-y-3">{assignmentRecommendations.map((recommendation) => <article key={recommendation.id} className="rounded-xl border border-slate-100 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(recommendation.teacher_membership_id)} · {String(recommendation.recommendation_type).replace(/_/g, " ")}</p><SchoolStatus value={recommendation.status} /></div>
-          <p className="mt-1 text-xs text-slate-500">Submitted by {memberName(recommendation.submitted_by_membership_id)} · {new Date(recommendation.created_at).toLocaleString()}</p>
-          <p className="mt-2 text-sm text-slate-700">{recommendation.reason}</p>
-          <p className="mt-1 text-xs text-slate-500">Requested section: {sectionLabel(recommendation.requested_section_id)} · Subject: {recommendation.requested_subject_name || "Not specified"} · Type: {recommendation.requested_assignment_kind || "Not specified"}</p>
-          {recommendation.status === "pending" && <><textarea className={schoolTextareaClass + " mt-3"} rows={2} maxLength={2000} value={managerReviewNotes[recommendation.id] || ""} onChange={(event) => setManagerReviewNotes((current) => ({ ...current, [recommendation.id]: event.target.value }))} placeholder="Manager decision note (optional)…" /><div className="mt-2 flex flex-wrap gap-2"><SchoolPrimaryButton onClick={() => void reviewAssignmentRecommendation(recommendation, true)}>Accept recommendation</SchoolPrimaryButton><SchoolSecondaryButton onClick={() => void reviewAssignmentRecommendation(recommendation, false)}>Decline recommendation</SchoolSecondaryButton></div></>}
-          {recommendation.manager_note && <p className="mt-2 text-xs text-slate-600">Manager note: {recommendation.manager_note}</p>}
-        </article>)}</div> : <SchoolEmptyState title="No assignment recommendations" description="Teacher-submitted assignment recommendations will appear here for review." />}
-      </SchoolPanel>
+
     </div>
   );
 
