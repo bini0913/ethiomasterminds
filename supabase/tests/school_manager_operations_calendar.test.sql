@@ -1,0 +1,32 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(25);
+
+select ok(to_regclass('public.school_timetable_slots') is not null, 'school timetable slots table exists');
+select ok(to_regclass('public.school_calendar_events') is not null, 'school calendar events table exists');
+select ok(to_regclass('public.school_operations_audit_events') is not null, 'operations audit table exists');
+select ok((select relrowsecurity from pg_class where oid='public.school_timetable_slots'::regclass), 'timetable slots have RLS');
+select ok((select relrowsecurity from pg_class where oid='public.school_calendar_events'::regclass), 'calendar events have RLS');
+select ok((select relrowsecurity from pg_class where oid='public.school_operations_audit_events'::regclass), 'operations audit has RLS');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_timetable_slots' and policyname='school_timetable_slots_manager_all' and cmd='ALL' and coalesce(qual,'') like '%is_school_manager_or_admin%'), 'timetable mutations are manager scoped');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_calendar_events' and policyname='school_calendar_events_manager_all' and cmd='ALL' and coalesce(qual,'') like '%is_school_manager_or_admin%'), 'calendar mutations are manager scoped');
+select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='school_operations_audit_events' and policyname='school_operations_audit_manager_read' and cmd='SELECT'), 'audit reads are manager scoped');
+select ok(exists (select 1 from pg_trigger where tgname='school_timetable_slots_validate' and tgrelid='public.school_timetable_slots'::regclass and not tgisinternal), 'timetable validation trigger exists');
+select ok(exists (select 1 from pg_trigger where tgname='school_calendar_events_validate' and tgrelid='public.school_calendar_events'::regclass and not tgisinternal), 'calendar validation trigger exists');
+select ok(exists (select 1 from pg_trigger where tgname='school_timetable_slots_audit' and tgrelid='public.school_timetable_slots'::regclass and not tgisinternal), 'timetable audit trigger exists');
+select ok(exists (select 1 from pg_trigger where tgname='school_calendar_events_audit' and tgrelid='public.school_calendar_events'::regclass and not tgisinternal), 'calendar audit trigger exists');
+select ok(exists (select 1 from pg_trigger where tgname='school_operations_audit_immutable' and tgrelid='public.school_operations_audit_events'::regclass and not tgisinternal), 'operations audit events are immutable');
+select ok(exists (select 1 from pg_constraint where conrelid='public.school_timetable_slots'::regclass and conname='school_timetable_slots_time_check'), 'timetable slot requires positive duration');
+select ok(exists (select 1 from pg_constraint where conrelid='public.school_timetable_slots'::regclass and conname='school_timetable_slots_section_fk'), 'timetable section is school scoped');
+select ok(exists (select 1 from pg_constraint where conrelid='public.school_timetable_slots'::regclass and conname='school_timetable_slots_teacher_fk'), 'timetable teacher is school scoped');
+select ok(exists (select 1 from pg_constraint where conrelid='public.school_calendar_events'::regclass and conname='school_calendar_events_time_check'), 'calendar event requires positive duration');
+select ok(exists (select 1 from pg_constraint where conrelid='public.school_calendar_events'::regclass and conname='school_calendar_events_audience_check'), 'calendar event audience scope is validated');
+select ok(not has_table_privilege('authenticated','public.school_operations_audit_events','INSERT'), 'authenticated users cannot directly insert operations audit');
+select ok(not has_table_privilege('authenticated','public.school_operations_audit_events','UPDATE'), 'authenticated users cannot update operations audit');
+select ok(not has_table_privilege('authenticated','public.school_operations_audit_events','DELETE'), 'authenticated users cannot delete operations audit');
+select ok(has_table_privilege('authenticated','public.school_timetable_slots','INSERT'), 'authenticated manager sessions can attempt RLS-guarded timetable writes');
+select ok(has_table_privilege('authenticated','public.school_calendar_events','INSERT'), 'authenticated manager sessions can attempt RLS-guarded calendar writes');
+select ok(exists (select 1 from pg_proc where proname='school_validate_timetable_slot'), 'server-side timetable validation function exists');
+
+select * from finish();
+rollback;
