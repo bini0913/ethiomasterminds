@@ -235,7 +235,7 @@ test('School Manager Part 1 workflows are reachable across desktop, tablet and m
   await authenticateAs(page, 'ci-manager@masterminds.test');
 
   const sections = [
-    { nav: 'Student Directory', heading: 'Student directory', content: 'Search school student memberships' },
+    { nav: 'Student Directory', heading: 'Student directory', content: 'Search by student name, username, school ID' },
     { nav: 'Staff Directory', heading: 'Staff directory', content: 'Review school staff memberships' },
     { nav: 'Teacher Assignments', heading: 'Teacher assignments', content: 'Create assignment' },
     { nav: 'School Structure', heading: 'School structure', content: 'Academic terms' },
@@ -504,7 +504,7 @@ test('School Manager command center, grouped navigation, reports and student sea
     await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
     await expect(page.getByText('School setup checklist')).toBeVisible();
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
-    await expect(page.getByText('People & school', { exact: true })).toBeVisible();
+    await expect(page.getByText('People & school', { exact: true }).first()).toBeVisible();
     await page.getByRole('button', { name: 'Reports & Analytics', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Reports & analytics', exact: true })).toBeVisible();
     await expect(page.getByText('Enrollment distribution', { exact: true })).toBeVisible();
