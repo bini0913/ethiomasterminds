@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS public.school_curriculum_units (
   updated_by uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT school_curriculum_units_id_school_id_key UNIQUE (id, school_id),
   CONSTRAINT school_curriculum_unit_year_school_fk
     FOREIGN KEY (academic_year_id, school_id)
     REFERENCES public.school_academic_years(id, school_id) ON DELETE RESTRICT,
@@ -138,13 +139,13 @@ DROP POLICY IF EXISTS school_curriculum_units_select ON public.school_curriculum
 CREATE POLICY school_curriculum_units_select ON public.school_curriculum_units
 FOR SELECT TO authenticated USING (
   public.is_school_manager_or_admin(school_id)
-  OR public.school_can_teach_subject(school_id,
-    (SELECT section.id FROM public.school_sections section
-      WHERE section.school_id = school_curriculum_units.school_id
-        AND section.academic_year_id = school_curriculum_units.academic_year_id
-        AND section.grade_label = school_curriculum_units.grade_label
-      LIMIT 1),
-    subject_name)
+  OR EXISTS (
+    SELECT 1 FROM public.school_sections section
+    WHERE section.school_id = school_curriculum_units.school_id
+      AND section.academic_year_id = school_curriculum_units.academic_year_id
+      AND section.grade_label = school_curriculum_units.grade_label
+      AND public.school_can_teach_subject(school_curriculum_units.school_id, section.id, school_curriculum_units.subject_name)
+  )
 );
 DROP POLICY IF EXISTS school_curriculum_progress_select ON public.school_curriculum_progress;
 CREATE POLICY school_curriculum_progress_select ON public.school_curriculum_progress
