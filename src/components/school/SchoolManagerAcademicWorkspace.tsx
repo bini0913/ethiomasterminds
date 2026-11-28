@@ -104,7 +104,7 @@ export default function SchoolManagerAcademicWorkspace({
     const effectiveYear = yearId || term?.academic_year_id || section?.academic_year_id;
     const effectiveGrade = gradeLabel || section?.grade_label;
     return (!selectedYearId || effectiveYear === selectedYearId)
-      && (!selectedTermId || termId === selectedTermId)
+      && (!selectedTermId || !termId || termId === selectedTermId)
       && (selectedGrade === "all" || effectiveGrade === selectedGrade)
       && (selectedSectionId === "all" || sectionId === selectedSectionId);
   }, [sections, terms, selectedYearId, selectedTermId, selectedGrade, selectedSectionId]);
@@ -226,7 +226,7 @@ export default function SchoolManagerAcademicWorkspace({
         <SchoolMetric label="Textbook references" value={catalogRows.length} detail="Catalog entries matching this grade filter" icon={GraduationCap} />
       </div>
 
-      <SchoolPanel title="Assessment oversight" description="Review the real assessment workflow and its status. Approval remains restricted to the existing authorized academic-leader RPC.">
+      <SchoolPanel title="Assessment oversight" description="Review the real assessment workflow and its status. Approval remains restricted to an appointed academic leader with the required review permission.">
         {assessments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm">
           <thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Assessment</th><th className="pb-2">Class</th><th className="pb-2">Subject / category</th><th className="pb-2">Teacher</th><th className="pb-2">Marks</th><th className="pb-2">Status</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{assessments.slice(0, 40).map((item) => <tr key={item.id}>
@@ -238,7 +238,7 @@ export default function SchoolManagerAcademicWorkspace({
             <td className="py-3"><SchoolStatus value={item.status} /></td>
           </tr>)}</tbody>
         </table></div> : <SchoolEmptyState title="No assessments in this scope" description="Teacher-created assessments will appear here when they are submitted to the school workflow." />}
-        {pendingAssessments > 0 && <p className="mt-3 rounded-md border border-amber-100 bg-amber-50 p-3 text-xs text-amber-900"><AlertTriangle className="mr-1 inline h-4 w-4" />{pendingAssessments} assessment(s) await review by the Manager or an appointed academic leader with the required review permission. This view does not bypass approval controls.</p>}
+        {pendingAssessments > 0 && <p className="mt-3 rounded-md border border-amber-100 bg-amber-50 p-3 text-xs text-amber-900"><AlertTriangle className="mr-1 inline h-4 w-4" />{pendingAssessments} assessment(s) await review by an appointed academic leader with the required review permission. The Manager can monitor this queue but this view does not bypass approval controls.</p>}
       </SchoolPanel>
 
       <div className="grid gap-4 xl:grid-cols-2">
