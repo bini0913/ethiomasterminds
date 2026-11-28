@@ -30,6 +30,15 @@ assert.equal(navIds.length, new Set(navIds).size, "Manager navigation IDs must b
 assert.ok(navIds.every((id) => id === "overview" || routedIds.includes(id)), "Every visible Manager destination must have a route");
 assert.ok(["tasks", "evaluations", "requests", "discipline"].every((id) => !navIds.includes(id)), "Legacy standalone routes must not reappear as duplicate navigation entries");
 assert.match(profile, /school_term_results/);
+const staffSupport = fs.readFileSync("src/components/school/SchoolManagerStaffSupportWorkspace.tsx", "utf8");
+assert.match(staffSupport, /Manager escalations/);
+assert.match(staffSupport, /submitManagerChangeRequest/);
+assert.match(staffSupport, /submitStaffDisciplineRecommendation/);
+assert.match(staffSupport, /school_staff_change_requests/);
+assert.match(staffSupport, /target_kind: "staff"/);
+assert.match(staffSupport, /school_disciplinary_recommendations/);
+assert.doesNotMatch(portal, /const renderTasks =|const renderEvaluations =|const renderRequests =|const renderDiscipline =/);
+assert.doesNotMatch(portal, /case "tasks"|case "evaluations"|case "requests"|case "discipline"/);
 assert.match(profile, /school_student_marks/);
 assert.match(profile, /school_attendance_records/);
 assert.match(profile, /school_student_invoices/);
@@ -44,6 +53,7 @@ assert.match(primitives, /onClick\?: \(\) => void/);
 assert.equal(packageJson.scripts["check:school-manager-experience"], "node scripts/check-school-manager-experience.mjs");
 assert.match(workflow, /check:school-manager-experience/);
 assert.match(e2e, /School Manager command center, grouped navigation, reports and student search are usable across devices/);
+assert.match(e2e, /Manager escalations/);
 assert.match(e2e, /Search student records/);
 
 console.log("School Manager experience and student profile contract checks passed.");
