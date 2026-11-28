@@ -17,6 +17,20 @@ const requiredContracts = [
   ['student exit reason is sent to the database', /p_reason: reason/],
   ['student exit refreshes the authoritative records', /await load\(\);/],
   ['student exit actions preserve membership instead of deleting accounts', /does not delete the student's account/],
+  ['academic terms are loaded from school-scoped records', /from\("school_terms"\).*?eq\("school_id", schoolId\)/s],
+  ['academic terms are created and updated', /const saveTerm[\s\S]*?school_terms[\s\S]*?insert[\s\S]*?school_terms[\s\S]*?update/],
+  ['term dates stay inside their academic year', /termStart < academicYear\.starts_on \|\| termEnd > academicYear\.ends_on/],
+  ['term numbers are unique within the selected year', /duplicateNumber = terms\.some/],
+  ['term date ranges cannot overlap', /const overlaps = terms\.some/],
+  ['academic year edits preserve existing term date bounds', /terms\.some\(\(term\) => term\.academic_year_id === yearEdit\.id/],
+  ['subject archive/reactivation preserves catalog records', /toggleSubjectActive[\s\S]*?update\(\{ active: !subject\.active/],
+  ['teacher assignments are reachable from manager navigation', /id: "assignments", label: "Teacher Assignments"/],
+  ['staff directory supports search and role/status filters', /renderStaffDirectory[\s\S]*?staffRoleFilter[\s\S]*?staffStatusFilter/],
+  ['manager settings preserve network-controlled school identity', /renderManagerSettings[\s\S]*?read-only in the School Manager portal/],
+  ['manager settings update existing school policy rows', /school_policy_settings[\s\S]*?update\(\{/],
+  ['school audit is read-only and school-scoped', /loadManagerAudit[\s\S]*?school_record_events[\s\S]*?eq\("school_id", schoolId\)[\s\S]*?school_leadership_structure_events/],
+  ['school audit is reachable from manager navigation', /id: "audit", label: "School Audit"/],
+  ['manager settings are reachable from manager navigation', /id: "settings", label: "Manager Settings"/],
 ];
 
 for (const [label, pattern] of requiredContracts) {
