@@ -1049,7 +1049,7 @@ export default function SchoolManagerPortal() {
       acc[grade] = (acc[grade] || 0) + 1;
       return acc;
     }, {});
-    const gradeData = Object.entries(gradeCounts).map(([grade, count]) => ({ grade, students: count })).sort((a, b) => a.grade.localeCompare(b.grade));
+    const gradeData = (Object.entries(gradeCounts) as [string, number][]).map(([grade, count]) => ({ grade, students: count })).sort((a, b) => a.grade.localeCompare(b.grade));
     const attentionItems = [
       ...tasks.filter((task) => ["returned", "submitted", "open", "in_progress"].includes(task.status)).slice(0, 3).map((task) => ({
         id: task.id, title: task.title, detail: "Staff task · " + memberName(task.assigned_to_membership_id), status: task.status, page: "staff-support",
@@ -1736,7 +1736,7 @@ export default function SchoolManagerPortal() {
         </SchoolPanel>}
         <div className="grid gap-4 md:grid-cols-2">
           <SchoolPanel title="Outstanding balances" description="Open invoice balances, grouped by currency so unlike currencies are never combined.">
-            {Object.keys(balancesByCurrency).length ? <div className="space-y-3">{Object.entries(balancesByCurrency).map(([currency, amount]) => <div key={currency} className="flex items-center justify-between rounded-lg bg-slate-50 p-3"><span className="text-sm font-medium text-slate-700">{currency}</span><span className="text-lg font-bold tabular-nums text-slate-900">{amount.toLocaleString()}</span></div>)}</div> : <SchoolEmptyState title="No outstanding invoice balances" description="Unpaid and partial invoices will appear here when recorded." />}
+            {Object.keys(balancesByCurrency).length ? <div className="space-y-3">{(Object.entries(balancesByCurrency) as [string, number][]).map(([currency, amount]) => <div key={currency} className="flex items-center justify-between rounded-lg bg-slate-50 p-3"><span className="text-sm font-medium text-slate-700">{currency}</span><span className="text-lg font-bold tabular-nums text-slate-900">{amount.toLocaleString()}</span></div>)}</div> : <SchoolEmptyState title="No outstanding invoice balances" description="Unpaid and partial invoices will appear here when recorded." />}
           </SchoolPanel>
           <SchoolPanel title="Explore a workflow" description="Reports are linked to the operational pages where the underlying records are managed.">
             <div className="grid gap-2 sm:grid-cols-2">{[{ label: "Attendance", page: "attendance" }, { label: "Academic results", page: "academics" }, { label: "Fees & finance", page: "finance" }, { label: "Staff support", page: "staff-support" }].map((item) => <button key={item.page} type="button" onClick={() => setPage(item.page)} className="rounded-lg border border-slate-200 px-3 py-3 text-left text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50/40">{item.label}<span className="mt-1 block text-xs font-normal text-slate-500">Open workflow →</span></button>)}</div>
