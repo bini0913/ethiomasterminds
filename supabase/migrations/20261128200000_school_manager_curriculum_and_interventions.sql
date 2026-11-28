@@ -196,11 +196,11 @@ GRANT SELECT ON public.school_curriculum_units, public.school_curriculum_unit_ev
 
 CREATE OR REPLACE FUNCTION public.school_prevent_academic_event_mutation()
 RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public'
-AS $
+AS $function$
 BEGIN
   RAISE EXCEPTION 'Academic audit events are append-only';
 END;
-$;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.school_record_curriculum_unit_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
