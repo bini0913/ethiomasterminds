@@ -13,6 +13,7 @@ import SchoolManagerAttendanceWorkspace from "@/components/school/SchoolManagerA
 import SchoolManagerTimetableCalendarWorkspace from "@/components/school/SchoolManagerTimetableCalendarWorkspace";
 import SchoolManagerParentCommunicationsWorkspace from "@/components/school/SchoolManagerParentCommunicationsWorkspace";
 import SchoolManagerStaffSupportWorkspace from "@/components/school/SchoolManagerStaffSupportWorkspace";
+import SchoolManagerContentGovernanceWorkspace from "@/components/school/SchoolManagerContentGovernanceWorkspace";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
@@ -34,6 +35,7 @@ const navItems: SchoolNavItem[] = [
   { id: "timetable", label: "Timetable & Calendar", icon: CalendarDays },
   { id: "communications", label: "Parent Communication", icon: MessageSquare },
   { id: "staff-support", label: "Staff & Student Support", icon: ClipboardList },
+  { id: "content-governance", label: "Content Governance", icon: BookOpen },
   { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
   { id: "reports", label: "Reports", icon: FileBarChart },
@@ -1847,6 +1849,7 @@ export default function SchoolManagerPortal() {
     case "timetable": content = <SchoolManagerTimetableCalendarWorkspace schoolId={schoolId} years={years} sections={sections} assignments={assignments} members={members} profiles={profiles} />; break;
     case "communications": content = <SchoolManagerParentCommunicationsWorkspace schoolId={schoolId} members={members} profiles={profiles} sections={sections} />; break;
     case "staff-support": content = <SchoolManagerStaffSupportWorkspace schoolId={schoolId} activeMembershipId={activeMembership?.id} members={members} profiles={profiles} />; break;
+    case "content-governance": content = <SchoolManagerContentGovernanceWorkspace schoolId={schoolId} members={members} profiles={profiles} sections={sections} />; break;
     case "grading": content = renderGrading(); break;
     case "finance": content = renderFinance(); break;
     case "tasks": content = renderTasks(); break;

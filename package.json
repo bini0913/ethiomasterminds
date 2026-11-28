@@ -19,7 +19,8 @@
     "check:school-manager-part3-attendance": "node scripts/check-school-manager-part3-attendance.mjs",
     "check:school-manager-part3-timetable": "node scripts/check-school-manager-part3-timetable.mjs",
     "check:school-manager-part3-communications": "node scripts/check-school-manager-part3-communications.mjs",
-    "check:school-manager-part3-staff-support": "node scripts/check-school-manager-part3-staff-support.mjs"
+    "check:school-manager-part3-staff-support": "node scripts/check-school-manager-part3-staff-support.mjs",
+    "check:school-manager-part3-content-governance": "node scripts/check-school-manager-part3-content-governance.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

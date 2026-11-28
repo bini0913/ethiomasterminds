@@ -70,6 +70,9 @@ jobs:
       - name: Verify School Manager Part 3 staff and student support workflows
         run: npm run check:school-manager-part3-staff-support
 
+      - name: Verify School Manager Part 3 content governance workflows
+        run: npm run check:school-manager-part3-content-governance
+
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
