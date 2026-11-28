@@ -416,3 +416,38 @@ test('School Manager parent communication oversight is reachable across desktop,
   }
   expect(pageErrors, 'Unexpected browser errors in School Manager parent communications').toEqual([]);
 });
+
+
+test('School Manager staff and student support workflows are reachable across desktop, tablet and mobile', async ({ page }) => {
+  test.setTimeout(120_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await authenticateAs(page, 'ci-manager@masterminds.test');
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('button', { name: 'Staff & Student Support', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Staff task operations', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Assign a staff task', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Task register', exact: true })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Staff accountability' }).click();
+    await expect(page.getByRole('heading', { name: 'Staff accountability', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Record a staff evaluation', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Staff conduct reports', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Staff change requests', exact: true })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Student support' }).click();
+    await expect(page.getByRole('heading', { name: 'Student support & safeguarding oversight', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Behavior report monitoring', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Student disciplinary recommendations', exact: true })).toBeVisible();
+  }
+  expect(pageErrors, 'Unexpected browser errors in School Manager staff and student support').toEqual([]);
+});
