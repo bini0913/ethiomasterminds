@@ -10,6 +10,7 @@ export type SchoolNavItem = {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  group?: string;
 };
 
 type PortalRole = SchoolRole | "super_admin";
@@ -46,28 +47,31 @@ export default function SchoolPortalShell({
 
   const renderNavigation = (mobile = false) => (
     <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
-      {navItems.map((item) => {
+      {navItems.map((item, index) => {
         const Icon = item.icon;
         const active = activeItem === item.id;
+        const startsGroup = Boolean(item.group) && item.group !== navItems[index - 1]?.group;
         return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => {
-              onNavigate(item.id);
-              if (mobile) setMobileOpen(false);
-            }}
-            className={[
-              "group flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors",
-              active
-                ? "bg-blue-600 text-white shadow-sm"
-                : "text-slate-300 hover:bg-slate-800 hover:text-white",
-            ].join(" ")}
-            aria-current={active ? "page" : undefined}
-          >
-            <Icon className="h-[18px] w-[18px] shrink-0" />
-            <span>{item.label}</span>
-          </button>
+          <React.Fragment key={item.id}>
+            {startsGroup && <p className={["px-3 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[0.16em]", mobile ? "text-slate-500" : "text-slate-500"].join(" ")}>{item.group}</p>}
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate(item.id);
+                if (mobile) setMobileOpen(false);
+              }}
+              className={[
+                "group flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors",
+                active
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white",
+              ].join(" ")}
+              aria-current={active ? "page" : undefined}
+            >
+              <Icon className="h-[18px] w-[18px] shrink-0" />
+              <span>{item.label}</span>
+            </button>
+          </React.Fragment>
         );
       })}
     </nav>
