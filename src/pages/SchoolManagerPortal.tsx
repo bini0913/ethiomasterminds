@@ -1492,6 +1492,7 @@ export default function SchoolManagerPortal() {
       if (isOverdue(invoice)) bucket.overdue += Number(invoice.balance || 0);
       return totals;
     }, {});
+    const financeCurrencyTotals = Object.entries(financeTotals) as Array<[string, { invoiced: number; collected: number; outstanding: number; overdue: number }] >;
     const statusCounts = {
       unpaid: invoices.filter((invoice) => invoice.status === "unpaid").length,
       partial: invoices.filter((invoice) => invoice.status === "partial").length,
@@ -1503,11 +1504,11 @@ export default function SchoolManagerPortal() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <SchoolMetric label="Fee structures" value={feeStructures.length} detail={`${feeStructures.filter((fee) => fee.active).length} active configurations`} icon={Wallet} />
           <SchoolMetric label="Invoices" value={invoices.length} detail="Complete school invoice ledger" icon={ClipboardList} />
-          <SchoolMetric label="Collected" value={Object.entries(financeTotals).map(([currency, totals]) => `${currency} ${totals.collected.toLocaleString()}`).join(" · ") || "0"} detail="Recorded payments across invoices" icon={CheckCircle2} />
+          <SchoolMetric label="Collected" value={financeCurrencyTotals.map(([currency, totals]) => `${currency} ${totals.collected.toLocaleString()}`).join(" · ") || "0"} detail="Recorded payments across invoices" icon={CheckCircle2} />
           <SchoolMetric label="Outstanding" value={outstandingSummary} detail="Unpaid and partial balances" icon={Wallet} />
         </div>
         <SchoolPanel title="Collection & balance summary" description="Totals are separated by currency; collection rate is calculated from invoice amounts and recorded payments, not estimated cash flow.">
-          {Object.keys(financeTotals).length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{Object.entries(financeTotals).map(([currency, totals]) => {
+          {Object.keys(financeTotals).length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{financeCurrencyTotals.map(([currency, totals]) => {
             const collectionRate = totals.invoiced > 0 ? Math.round((totals.collected / totals.invoiced) * 100) : 0;
             return <div key={currency} className="rounded-xl border border-slate-200 p-4">
               <div className="flex items-center justify-between"><p className="text-sm font-semibold text-slate-800">{currency} ledger</p><span className="text-xs font-semibold text-blue-700">{collectionRate}% collected</span></div>
