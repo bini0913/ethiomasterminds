@@ -478,3 +478,32 @@ test('School Manager content governance oversight is reachable across desktop, t
   }
   expect(pageErrors, 'Unexpected browser errors in School Manager content governance').toEqual([]);
 });
+
+
+test('School Manager command center, grouped navigation, reports and student search are usable across devices', async ({ page }) => {
+  test.setTimeout(120_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await authenticateAs(page, 'ci-manager@masterminds.test');
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText('School setup checklist')).toBeVisible();
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(page.getByText('People & school', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Reports & Analytics', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Reports & analytics', exact: true })).toBeVisible();
+    await expect(page.getByText('Enrollment distribution', { exact: true })).toBeVisible();
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('button', { name: 'Student Directory', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Student directory', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Search student records' })).toBeVisible();
+  }
+  expect(pageErrors, 'Unexpected browser errors in School Manager command center and reports').toEqual([]);
+});
