@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, ClipboardList, FileText, MessageSquare, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { AlertCircle, CheckCircle2, ClipboardList, FileText, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -131,26 +131,27 @@ export default function SchoolManagerStaffSupportWorkspace({ schoolId, activeMem
       toast.error("Add a comment explaining what needs attention before returning this task.");
       return;
     }
+    if (status === "returned" && !(await addComment(task.id))) return;
     setSavingId(task.id);
     const { error } = await db.from("school_staff_tasks").update({ status }).eq("id", task.id).eq("school_id", schoolId);
     setSavingId(null);
     if (error) return toast.error(error.message || "Task status could not be updated.");
-    if (status === "returned" && commentDrafts[task.id]?.trim()) await addComment(task.id);
     toast.success(status === "verified" ? "Task verified." : status === "returned" ? "Task returned to its assignee." : "Task cancelled.");
     await load();
   };
 
-  const addComment = async (taskId: string) => {
+  const addComment = async (taskId: string): Promise<boolean> => {
     const body = commentDrafts[taskId]?.trim();
-    if (!schoolId || !activeMembershipId || !body) return;
+    if (!schoolId || !activeMembershipId || !body) return false;
     const { error } = await db.from("school_staff_task_comments").insert({
       school_id: schoolId, task_id: taskId, author_membership_id: activeMembershipId, body,
     });
     if (error) {
       toast.error(error.message || "Task comment could not be saved.");
-      return;
+      return false;
     }
     setCommentDrafts((current) => ({ ...current, [taskId]: "" }));
+    return true;
   };
 
   const createEvaluation = async (event: React.FormEvent) => {
