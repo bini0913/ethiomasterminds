@@ -343,8 +343,8 @@ BEGIN
     SELECT 1 FROM public.curriculum_textbook_catalog catalog
     WHERE catalog.id = p_source_catalog_id
       AND lower(catalog.subject) = lower(trim(p_subject_name))
-      AND (substring(trim(p_grade_label) from '([0-9]+)') IS NULL
-        OR catalog.grade_level = substring(trim(p_grade_label) from '([0-9]+)')::integer)
+      AND substring(trim(p_grade_label) from '([0-9]+)') IS NOT NULL
+      AND catalog.grade_level = substring(trim(p_grade_label) from '([0-9]+)')::integer
   ) THEN
     RAISE EXCEPTION 'Selected national textbook reference does not match this subject and grade';
   END IF;
