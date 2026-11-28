@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AlertTriangle, BookOpen, CheckCircle2, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   SchoolEmptyState, SchoolField, SchoolMetric, SchoolPageHeading, SchoolPanel, SchoolStatus,
@@ -20,7 +21,7 @@ type Props = {
 const initialUnit = {
   academicYearId: "", gradeLabel: "", subjectName: "", unitCode: "", title: "",
   description: "", sequence: "1", sourceType: "school_defined", sourceTitle: "",
-  sourceUrl: "", sourceVerification: "unverified", expectedStart: "", expectedEnd: "",
+  sourceUrl: "", sourceVerification: "unverified", expectedStart: "", expectedEnd: "", isActive: true,
 };
 
 export default function SchoolCurriculumWorkspace({
@@ -152,7 +153,7 @@ export default function SchoolCurriculumWorkspace({
       p_source_verification: unitForm.sourceVerification,
       p_expected_start: unitForm.expectedStart || null,
       p_expected_end: unitForm.expectedEnd || null,
-      p_is_active: true,
+      p_is_active: unitForm.isActive,
       p_unit_id: editingUnitId || null,
     });
     setSaving(false);
@@ -170,7 +171,7 @@ export default function SchoolCurriculumWorkspace({
       unitCode: unit.unit_code, title: unit.title, description: unit.description || "",
       sequence: String(unit.sequence_number), sourceType: unit.source_type, sourceTitle: unit.source_title || "",
       sourceUrl: unit.source_url || "", sourceVerification: unit.source_verification,
-      expectedStart: unit.expected_start || "", expectedEnd: unit.expected_end || "",
+      expectedStart: unit.expected_start || "", expectedEnd: unit.expected_end || "", isActive: unit.is_active,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -231,10 +232,10 @@ export default function SchoolCurriculumWorkspace({
       <div className="space-y-5">
         <SchoolPageHeading title="Curriculum and academic support" description="Manage school curriculum units, monitor teacher-reported delivery, and coordinate documented student support plans." />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <SchoolMetric label="Curriculum units" value={units.filter((unit) => unit.is_active).length} detail="Active school-defined units" />
-          <SchoolMetric label="Units reported taught" value={taughtCount} detail="Teacher-reported, not mastery" />
-          <SchoolMetric label="Classes needing support" value={supportCount} detail="Teacher-submitted support flags" />
-          <SchoolMetric label="Open student plans" value={openInterventions} detail="Open or in progress" />
+          <SchoolMetric label="Curriculum units" value={units.filter((unit) => unit.is_active).length} detail="Active school-defined units" icon={BookOpen} />
+          <SchoolMetric label="Units reported taught" value={taughtCount} detail="Teacher-reported, not mastery" icon={CheckCircle2} />
+          <SchoolMetric label="Classes needing support" value={supportCount} detail="Teacher-submitted support flags" icon={AlertTriangle} />
+          <SchoolMetric label="Open student plans" value={openInterventions} detail="Open or in progress" icon={ClipboardList} />
         </div>
         <SchoolPanel title={editingUnitId ? "Edit curriculum unit" : "Add curriculum unit"} description="Enter units from your school's approved curriculum or teaching plan. A source label and URL can be recorded; external verification is not automatic.">
           <form onSubmit={saveUnit} className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -248,6 +249,7 @@ export default function SchoolCurriculumWorkspace({
             <SchoolField label="Source title"><input className={schoolInputClass} value={unitForm.sourceTitle} onChange={(event) => setUnitForm({ ...unitForm, sourceTitle: event.target.value })} maxLength={240} /></SchoolField>
             <SchoolField label="Source URL"><input type="url" className={schoolInputClass} value={unitForm.sourceUrl} onChange={(event) => setUnitForm({ ...unitForm, sourceUrl: event.target.value })} placeholder="https://" /></SchoolField>
             <SchoolField label="Source verification"><select className={schoolSelectClass} value={unitForm.sourceVerification} onChange={(event) => setUnitForm({ ...unitForm, sourceVerification: event.target.value })}><option value="unverified">Not verified</option><option value="verified_by_school">Verified by our school</option></select></SchoolField>
+            <SchoolField label="Unit status"><select className={schoolSelectClass} value={unitForm.isActive ? "active" : "archived"} onChange={(event) => setUnitForm({ ...unitForm, isActive: event.target.value === "active" })}><option value="active">Active</option><option value="archived">Archived</option></select></SchoolField>
             <SchoolField label="Expected start"><input type="date" className={schoolInputClass} value={unitForm.expectedStart} onChange={(event) => setUnitForm({ ...unitForm, expectedStart: event.target.value })} /></SchoolField>
             <SchoolField label="Expected end"><input type="date" className={schoolInputClass} value={unitForm.expectedEnd} onChange={(event) => setUnitForm({ ...unitForm, expectedEnd: event.target.value })} /></SchoolField>
             <div className="md:col-span-2 xl:col-span-3"><SchoolField label="Description"><textarea rows={2} maxLength={4000} className={schoolTextareaClass} value={unitForm.description} onChange={(event) => setUnitForm({ ...unitForm, description: event.target.value })} /></SchoolField></div>
