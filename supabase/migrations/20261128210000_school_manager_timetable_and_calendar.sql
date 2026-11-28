@@ -74,7 +74,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $function$
 declare
   v_grade text;
   v_year_start date;
@@ -114,7 +114,7 @@ begin
   new.updated_at := now();
   return new;
 end;
-$;
+$function$;
 drop trigger if exists school_calendar_events_validate on public.school_calendar_events;
 create trigger school_calendar_events_validate
 before insert or update on public.school_calendar_events
