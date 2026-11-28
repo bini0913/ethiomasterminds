@@ -191,7 +191,6 @@ export default function SchoolManagerOperationsWorkspace({ schoolId, managerMemb
     <button key={id} type="button" onClick={() => setTab(id)} aria-pressed={tab === id}
       className={"rounded-lg px-3 py-2 text-sm font-medium " + (tab === id ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50")}>{label}</button>
   );
-  const memberLabel = (id?: string | null) => nameOf(id);
   const tabs = [
     ["timetable","Timetable"],["calendar","Calendar"],["announcements","Announcements"],
     ["families","Parent engagement"],["support","Student support"],["content","Content review"],["audit","Operations audit"],
