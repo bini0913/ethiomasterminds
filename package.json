@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint .",
     "preview": "vite preview",
-    "check:routes": "node scripts/check-routes.mjs"
+    "check:routes": "node scripts/check-routes.mjs",
+    "check:school-manager": "node scripts/check-school-manager-contracts.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
