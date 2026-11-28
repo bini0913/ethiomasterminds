@@ -1696,7 +1696,7 @@ export default function SchoolManagerPortal() {
       acc[grade] = (acc[grade] || 0) + 1;
       return acc;
     }, {});
-    const enrollmentData = Object.entries(gradeCounts).map(([grade, count]) => ({ grade, students: count })).sort((a, b) => a.grade.localeCompare(b.grade));
+    const enrollmentData = (Object.entries(gradeCounts) as [string, number][]).map(([grade, count]) => ({ grade, students: count })).sort((a, b) => a.grade.localeCompare(b.grade));
     const staffData = [
       { name: "Teachers", value: teachers.length },
       { name: "Finance", value: activeMembers.filter((member) => member.school_role === "finance").length },
