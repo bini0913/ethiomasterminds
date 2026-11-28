@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, BookOpen, CheckCircle2, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +38,7 @@ export default function SchoolCurriculumWorkspace({
   const [interventionEvents, setInterventionEvents] = useState<any[]>([]);
   const [textbookCatalog, setTextbookCatalog] = useState<any[]>([]);
   const [approvedBooks, setApprovedBooks] = useState<any[]>([]);
+  const requestSequence = useRef(0);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -61,8 +62,11 @@ export default function SchoolCurriculumWorkspace({
   const [outcome, setOutcome] = useState("");
 
   const load = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     if (!schoolId) {
       setUnits([]); setProgress([]); setInterventions([]); setUnitEvents([]); setInterventionEvents([]); setTextbookCatalog([]); setApprovedBooks([]);
+      setLoadError("");
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -80,6 +84,7 @@ export default function SchoolCurriculumWorkspace({
         ] : []),
       ]);
       const labels = manager ? ["Curriculum units", "Teaching progress", "Academic interventions", "Curriculum audit events", "Intervention audit events", "National textbook catalog", "Approved school library books"] : ["Curriculum units", "Teaching progress"];
+      if (requestId !== requestSequence.current) return;
       const errors = requests.flatMap((result: any, index: number) => result.error ? [labels[index] + ": " + result.error.message] : []);
       if (errors.length) setLoadError(errors.join(" · "));
       setUnits(requests[0].data || []);
@@ -90,9 +95,11 @@ export default function SchoolCurriculumWorkspace({
       setTextbookCatalog(manager ? requests[5]?.data || [] : []);
       setApprovedBooks(manager ? requests[6]?.data || [] : []);
     } catch (error: unknown) {
-      setLoadError(error instanceof Error ? error.message : "Academic workflows could not be loaded.");
+      if (requestId === requestSequence.current) {
+        setLoadError(error instanceof Error ? error.message : "Academic workflows could not be loaded.");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) setLoading(false);
     }
   }, [db, schoolId, manager]);
 
