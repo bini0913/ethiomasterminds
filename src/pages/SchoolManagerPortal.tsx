@@ -36,11 +36,7 @@ const navItems: SchoolNavItem[] = [
   { id: "staff-support", label: "Staff & Student Support", icon: ClipboardList },
   { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
-  { id: "tasks", label: "Staff Tasks", icon: ClipboardList },
-  { id: "evaluations", label: "Staff Evaluations", icon: CheckCircle2 },
-  { id: "requests", label: "Change Requests", icon: Settings },
   { id: "reports", label: "Reports", icon: FileBarChart },
-  { id: "discipline", label: "Disciplinary Reviews", icon: Scale },
   { id: "leadership", label: "Leadership Team", icon: UserCog },
 ];
 
