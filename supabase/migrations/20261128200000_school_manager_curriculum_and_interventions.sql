@@ -190,6 +190,14 @@ GRANT SELECT ON public.school_curriculum_units, public.school_curriculum_unit_ev
   public.school_curriculum_progress_events, public.school_academic_interventions,
   public.school_academic_intervention_events TO authenticated;
 
+CREATE OR REPLACE FUNCTION public.school_prevent_academic_event_mutation()
+RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public'
+AS $
+BEGIN
+  RAISE EXCEPTION 'Academic audit events are append-only';
+END;
+$;
+
 CREATE OR REPLACE FUNCTION public.school_record_curriculum_unit_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
 AS $
