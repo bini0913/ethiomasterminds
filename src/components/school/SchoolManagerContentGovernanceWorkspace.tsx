@@ -25,7 +25,6 @@ type ReviewEvent = {
   review_status: string; feedback: string | null; created_at: string;
 };
 const dateTime = (value?: string | null) => value ? new Date(value).toLocaleString() : "—";
-const statusOf = (value?: string | null) => value || "unknown";
 
 export default function SchoolManagerContentGovernanceWorkspace({ schoolId, members, profiles, sections }: Props) {
   const db = supabase as any;
