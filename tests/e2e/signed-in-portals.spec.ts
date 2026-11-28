@@ -359,3 +359,34 @@ test('School Manager attendance oversight is reachable across desktop, tablet an
   }
   expect(pageErrors, 'Unexpected browser errors in School Manager attendance oversight').toEqual([]);
 });
+
+test('School Manager timetable and community operations are reachable across devices', async ({ page }) => {
+  test.setTimeout(90_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await authenticateAs(page, 'ci-manager@masterminds.test');
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('button', { name: 'Timetable & Community', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'School operations & community', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Timetable', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Calendar', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Announcements', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Parent engagement', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Student support', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Content review', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Calendar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'School calendar', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Student support', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Student behavior reports', exact: true })).toBeVisible();
+  }
+  expect(pageErrors, 'Unexpected browser errors in School Manager operations workspace').toEqual([]);
+});
