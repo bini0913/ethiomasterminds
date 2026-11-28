@@ -172,7 +172,7 @@ FOR SELECT TO authenticated USING (
   OR EXISTS (
     SELECT 1 FROM public.school_memberships teacher
     WHERE teacher.id = school_curriculum_progress.teacher_membership_id
-      AND teacher.user_id = auth.uid()
+      AND teacher.user_id = (select auth.uid())
       AND teacher.school_role = 'teacher'
       AND teacher.status = 'active'
   )
