@@ -22,7 +22,7 @@ assert.match(portal, /onClick=\{\(event: any\) => \{ const grade = event\?\.acti
 assert.match(shell, /group\?: string/);
 assert.match(shell, /startsGroup/);
 const navStart = portal.indexOf("const navItems: SchoolNavItem[] = [");
-const navEnd = portal.indexOf("\\n];", navStart);
+const navEnd = portal.indexOf("\n];", navStart);
 const navBlock = navStart >= 0 && navEnd > navStart ? portal.slice(navStart, navEnd) : "";
 const navIds = [...navBlock.matchAll(/id: "([^"]+)"/g)].map((match) => match[1]);
 const routedIds = [...portal.matchAll(/case "([^"]+)"/g)].map((match) => match[1]);
