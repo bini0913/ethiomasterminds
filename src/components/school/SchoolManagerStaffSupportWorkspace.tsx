@@ -392,9 +392,6 @@ export default function SchoolManagerStaffSupportWorkspace({ schoolId, activeMem
           </form>
         </SchoolPanel>
       </div>
-      <SchoolPanel title="Existing staff change requests" description="Track requests already submitted by school staff. Only network administration can approve or reject network-level role and account changes.">
-        {changeRequests.length ? <div className="space-y-2">{changeRequests.map((item) => <article key={item.id} className="rounded-xl border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{item.request_type.replace(/_/g, " ")} · {memberName(item.target_membership_id)}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-500">Requested by {memberName(item.requester_membership_id)} · {new Date(item.created_at).toLocaleString()}</p><p className="mt-2 text-sm text-slate-600">{item.reason}</p></article>)}</div> : <SchoolEmptyState title="No staff change requests" description="Submitted requests will appear here." />}
-      </SchoolPanel>
     </div>
   );
 
