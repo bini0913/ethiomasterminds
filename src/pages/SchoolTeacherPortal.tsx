@@ -10,6 +10,7 @@ import { useUser } from "@/context/UserContext";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
 import SchoolLeadershipShortcut from "@/components/school/SchoolLeadershipShortcut";
+import SchoolCurriculumWorkspace from "@/components/school/SchoolCurriculumWorkspace";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
@@ -20,6 +21,7 @@ import { createBook } from "@/lib/libraryApi";
 const navItems: SchoolNavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "classes", label: "My Classes", icon: School },
+  { id: "curriculum", label: "Curriculum Delivery", icon: BookOpen },
   { id: "assessments", label: "Assessments & Marks", icon: ClipboardCheck },
   { id: "quizzes", label: "Questions & Quizzes", icon: BookOpen },
   { id: "homework", label: "Homework", icon: ClipboardList },
@@ -798,6 +800,7 @@ export default function SchoolTeacherPortal() {
   let content: React.ReactNode;
   switch (page) {
     case "classes": content = renderClasses(); break;
+    case "curriculum": content = <SchoolCurriculumWorkspace mode="teacher" schoolId={schoolId} years={[]} sections={sections} subjects={subjects} assignments={assignments} members={members} />; break;
     case "assessments": content = renderAssessments(); break;
     case "quizzes": content = renderQuizzes(); break;
     case "homework": content = renderHomework(); break;
