@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, BookOpen, ClipboardCheck, ClipboardList, FileText, GraduationCap, Library, RefreshCw, TrendingUp, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -52,6 +52,7 @@ export default function SchoolManagerAcademicWorkspace({
   const [selectedTermId, setSelectedTermId] = useState("");
   const [selectedGrade, setSelectedGrade] = useState("all");
   const [selectedSectionId, setSelectedSectionId] = useState("all");
+  const requestSequence = useRef(0);
 
   useEffect(() => {
     if (!selectedYearId && years.length) {
@@ -60,11 +61,15 @@ export default function SchoolManagerAcademicWorkspace({
   }, [years, selectedYearId]);
 
   const load = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     if (!schoolId) {
       setRows(emptyRows);
+      setLoadErrors([]);
+      setLoading(false);
       return;
     }
     setLoading(true);
+    try {
     const requests = await Promise.all([
       db.from("school_assessments").select("id,academic_year_id,term_id,section_id,category_id,subject_name,title,max_score,due_at,status,created_by_membership_id,review_feedback,created_at,reviewed_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(500),
       db.from("school_student_marks").select("id,assessment_id,student_membership_id,score,status,teacher_note,updated_at").eq("school_id", schoolId).order("updated_at", { ascending: false }).limit(2000),
@@ -75,6 +80,7 @@ export default function SchoolManagerAcademicWorkspace({
       db.from("library_books").select("id,title,author,subject,grade_level,school_grade_label,school_section_id,status,school_review_status,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(500),
       db.from("curriculum_textbook_catalog").select("id,grade_level,curriculum_year_ec,subject,book_title,resource_type,source_name,source_status,source_url,official_portal_url,notes").order("grade_level").order("subject").limit(500),
     ]);
+    if (requestId !== requestSequence.current) return;
     const labels = ["Assessments", "Student marks", "Term results", "Homework", "Homework submissions", "School quizzes", "School library", "National textbook catalog"];
     const errors = requests.flatMap((request, index) => request.error ? [labels[index] + ": " + request.error.message] : []);
     setLoadErrors(errors);
@@ -88,15 +94,24 @@ export default function SchoolManagerAcademicWorkspace({
       books: requests[6].data || [],
       catalog: requests[7].data || [],
     });
-    setLoading(false);
+    } catch (error: unknown) {
+      if (requestId === requestSequence.current) {
+        setLoadErrors([error instanceof Error ? error.message : "Academic records could not be loaded."]);
+      }
+    } finally {
+      if (requestId === requestSequence.current) setLoading(false);
+    }
   }, [db, schoolId]);
 
   useEffect(() => { void load(); }, [load]);
 
-  const filteredSections = useMemo(() => sections.filter((section) =>
+  const availableSections = useMemo(() => sections.filter((section) =>
     (!selectedYearId || section.academic_year_id === selectedYearId) &&
     (selectedGrade === "all" || section.grade_label === selectedGrade)
   ), [sections, selectedYearId, selectedGrade]);
+  const filteredSections = useMemo(() => availableSections.filter((section) =>
+    selectedSectionId === "all" || section.id === selectedSectionId
+  ), [availableSections, selectedSectionId]);
 
   const inScope = useCallback((sectionId?: string | null, termId?: string | null, yearId?: string | null, gradeLabel?: string | null) => {
     const section = sections.find((item) => item.id === sectionId);
@@ -136,7 +151,6 @@ export default function SchoolManagerAcademicWorkspace({
   const publishedResults = results.filter((item) => item.status === "published").length;
   const pendingHomework = homework.filter((item) => item.status === "pending").length;
   const awaitingSubmissions = submissions.filter((item) => item.status === "submitted").length;
-  const pendingContent = scopedQuizzes.filter((item) => item.school_review_status === "pending").length + scopedBooks.filter((item) => item.school_review_status === "pending").length;
 
   const subjectCoverage = useMemo(() => {
     return filteredSections.map((section) => {
@@ -209,7 +223,7 @@ export default function SchoolManagerAcademicWorkspace({
           <SchoolField label="Section">
             <select className={schoolSelectClass} value={selectedSectionId} onChange={(event) => setSelectedSectionId(event.target.value)}>
               <option value="all">All sections</option>
-              {filteredSections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}
+              {availableSections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name}</option>)}
             </select>
           </SchoolField>
         </div>
@@ -222,7 +236,7 @@ export default function SchoolManagerAcademicWorkspace({
         <SchoolMetric label="Homework" value={homework.length} detail={pendingHomework + " awaiting review"} icon={ClipboardList} />
         <SchoolMetric label="Student submissions" value={submissions.length} detail={awaitingSubmissions + " awaiting teacher grading"} icon={Users} />
         <SchoolMetric label="Learning resources" value={scopedBooks.length} detail={scopedBooks.filter((item) => item.school_review_status === "approved").length + " approved school resources"} icon={Library} />
-        <SchoolMetric label="School quizzes" value={scopedQuizzes.length} detail={pendingContent + " resources awaiting academic review"} icon={BookOpen} />
+        <SchoolMetric label="School quizzes" value={scopedQuizzes.length} detail={scopedQuizzes.filter((item) => item.school_review_status === "pending").length + " awaiting academic review"} icon={BookOpen} />
         <SchoolMetric label="Textbook references" value={catalogRows.length} detail="Catalog entries matching this grade filter" icon={GraduationCap} />
       </div>
 
