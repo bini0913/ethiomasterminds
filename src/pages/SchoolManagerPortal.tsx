@@ -10,6 +10,7 @@ import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPort
 import SchoolManagerAcademicWorkspace from "@/components/school/SchoolManagerAcademicWorkspace";
 import SchoolCurriculumWorkspace from "@/components/school/SchoolCurriculumWorkspace";
 import SchoolManagerAttendanceWorkspace from "@/components/school/SchoolManagerAttendanceWorkspace";
+import SchoolManagerOperationsWorkspace from "@/components/school/SchoolManagerOperationsWorkspace";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
