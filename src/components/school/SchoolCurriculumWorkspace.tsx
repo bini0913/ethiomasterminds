@@ -19,6 +19,7 @@ type Props = {
 };
 
 const gradeNumber = (label: string) => { const match = label.match(/[0-9]+/); return match ? Number(match[0]) : null; };
+const formatDate = (value?: string | null) => value ? new Date(value).toLocaleDateString() : "—";
 
 const initialUnit = {
   academicYearId: "", gradeLabel: "", subjectName: "", unitCode: "", title: "",
