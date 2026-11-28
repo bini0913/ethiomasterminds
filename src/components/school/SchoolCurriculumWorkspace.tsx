@@ -21,7 +21,7 @@ type Props = {
 const initialUnit = {
   academicYearId: "", gradeLabel: "", subjectName: "", unitCode: "", title: "",
   description: "", sequence: "1", sourceType: "school_defined", sourceTitle: "",
-  sourceUrl: "", sourceVerification: "unverified", expectedStart: "", expectedEnd: "", isActive: true,
+  sourceUrl: "", sourceCatalogId: "", sourceLibraryBookId: "", sourceVerification: "unverified", expectedStart: "", expectedEnd: "", isActive: true,
 };
 
 export default function SchoolCurriculumWorkspace({
@@ -34,6 +34,8 @@ export default function SchoolCurriculumWorkspace({
   const [interventions, setInterventions] = useState<any[]>([]);
   const [unitEvents, setUnitEvents] = useState<any[]>([]);
   const [interventionEvents, setInterventionEvents] = useState<any[]>([]);
+  const [textbookCatalog, setTextbookCatalog] = useState<any[]>([]);
+  const [approvedBooks, setApprovedBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -58,7 +60,7 @@ export default function SchoolCurriculumWorkspace({
 
   const load = useCallback(async () => {
     if (!schoolId) {
-      setUnits([]); setProgress([]); setInterventions([]); setUnitEvents([]); setInterventionEvents([]);
+      setUnits([]); setProgress([]); setInterventions([]); setUnitEvents([]); setInterventionEvents([]); setTextbookCatalog([]); setApprovedBooks([]);
       return;
     }
     setLoading(true);
@@ -71,9 +73,11 @@ export default function SchoolCurriculumWorkspace({
           db.from("school_academic_interventions").select("*").eq("school_id", schoolId).order("updated_at", { ascending: false }).limit(1000),
           db.from("school_curriculum_unit_events").select("id,unit_id,actor_user_id,event_type,unit_snapshot,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
           db.from("school_academic_intervention_events").select("id,intervention_id,actor_membership_id,previous_status,new_status,reason,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+          db.from("curriculum_textbook_catalog").select("id,grade_level,subject,book_title,source_name,source_url,official_portal_url,source_status").order("grade_level").order("subject").limit(1000),
+          db.from("library_books").select("id,title,author,subject,school_grade_label,grade_level,status,school_review_status").eq("school_id", schoolId).eq("status", "approved").eq("school_review_status", "approved").limit(1000),
         ] : []),
       ]);
-      const labels = manager ? ["Curriculum units", "Teaching progress", "Academic interventions", "Curriculum audit events", "Intervention audit events"] : ["Curriculum units", "Teaching progress"];
+      const labels = manager ? ["Curriculum units", "Teaching progress", "Academic interventions", "Curriculum audit events", "Intervention audit events", "National textbook catalog", "Approved school library books"] : ["Curriculum units", "Teaching progress"];
       const errors = requests.flatMap((result: any, index: number) => result.error ? [labels[index] + ": " + result.error.message] : []);
       if (errors.length) setLoadError(errors.join(" · "));
       setUnits(requests[0].data || []);
@@ -81,6 +85,8 @@ export default function SchoolCurriculumWorkspace({
       setInterventions(manager ? requests[2]?.data || [] : []);
       setUnitEvents(manager ? requests[3]?.data || [] : []);
       setInterventionEvents(manager ? requests[4]?.data || [] : []);
+      setTextbookCatalog(manager ? requests[5]?.data || [] : []);
+      setApprovedBooks(manager ? requests[6]?.data || [] : []);
     } catch (error: unknown) {
       setLoadError(error instanceof Error ? error.message : "Academic workflows could not be loaded.");
     } finally {
@@ -159,6 +165,8 @@ export default function SchoolCurriculumWorkspace({
       p_source_type: unitForm.sourceType,
       p_source_title: unitForm.sourceTitle,
       p_source_url: unitForm.sourceUrl || null,
+      p_source_catalog_id: unitForm.sourceCatalogId || null,
+      p_source_library_book_id: unitForm.sourceLibraryBookId || null,
       p_source_verification: unitForm.sourceVerification,
       p_expected_start: unitForm.expectedStart || null,
       p_expected_end: unitForm.expectedEnd || null,
@@ -179,7 +187,7 @@ export default function SchoolCurriculumWorkspace({
       academicYearId: unit.academic_year_id, gradeLabel: unit.grade_label, subjectName: unit.subject_name,
       unitCode: unit.unit_code, title: unit.title, description: unit.description || "",
       sequence: String(unit.sequence_number), sourceType: unit.source_type, sourceTitle: unit.source_title || "",
-      sourceUrl: unit.source_url || "", sourceVerification: unit.source_verification,
+      sourceUrl: unit.source_url || "", sourceCatalogId: unit.source_catalog_id || "", sourceLibraryBookId: unit.source_library_book_id || "", sourceVerification: unit.source_verification,
       expectedStart: unit.expected_start || "", expectedEnd: unit.expected_end || "", isActive: unit.is_active,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
