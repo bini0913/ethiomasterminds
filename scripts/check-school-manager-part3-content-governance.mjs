@@ -1,0 +1,37 @@
+import fs from "node:fs";
+import assert from "node:assert/strict";
+
+const workspace = fs.readFileSync("src/components/school/SchoolManagerContentGovernanceWorkspace.tsx", "utf8");
+const portal = fs.readFileSync("src/pages/SchoolManagerPortal.tsx", "utf8");
+const workflow = fs.readFileSync(".github/workflows/portal-reliability-tests.yml", "utf8");
+const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
+const e2e = fs.readFileSync("tests/e2e/signed-in-portals.spec.ts", "utf8");
+
+assert.match(portal, /SchoolManagerContentGovernanceWorkspace/);
+assert.match(portal, /id: "content-governance", label: "Content Governance"/);
+assert.match(portal, /case "content-governance"/);
+assert.match(workspace, /from\("quizzes"\)/);
+assert.match(workspace, /from\("library_books"\)/);
+assert.match(workspace, /from\("school_content_review_events"\)/);
+assert.match(workspace, /\.eq\("school_id", schoolId\)/);
+assert.match(workspace, /school_review_status/);
+assert.match(workspace, /source_verification_status/);
+assert.match(workspace, /reviewed_by_membership_id/);
+assert.match(workspace, /review_feedback/);
+assert.match(workspace, /Review queue/);
+assert.match(workspace, /Resource catalog/);
+assert.match(workspace, /Review history/);
+assert.match(workspace, /appointed academic leader/);
+assert.match(workspace, /requestSequence/);
+assert.match(workspace, /No content is approved, rejected, edited, or published/);
+assert.doesNotMatch(workspace, /\.rpc\(/);
+assert.doesNotMatch(workspace, /\.insert\(/);
+assert.doesNotMatch(workspace, /\.update\(/);
+assert.doesNotMatch(workspace, /\.delete\(/);
+assert.doesNotMatch(workspace, /pdf_path|thumbnail_path/);
+assert.equal(packageJson.scripts["check:school-manager-part3-content-governance"], "node scripts/check-school-manager-part3-content-governance.mjs");
+assert.match(workflow, /check:school-manager-part3-content-governance/);
+assert.match(e2e, /School Manager content governance oversight is reachable across desktop, tablet and mobile/);
+assert.match(e2e, /ci-manager@masterminds\.test/);
+
+console.log("School Manager Part 3 content governance contract checks passed.");
