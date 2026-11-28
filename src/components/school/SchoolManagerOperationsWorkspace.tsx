@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Clock3, RefreshCw, Plus, CalendarClock, Megaphone, Users, ShieldAlert, BookOpen, CheckCircle2, XCircle } from "lucide-react";
+import { CalendarDays, Clock3, RefreshCw, Megaphone, Users, ShieldAlert, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -9,6 +9,7 @@ import {
 
 type Props = {
   schoolId?: string;
+  managerMembershipId?: string;
   years: any[];
   sections: any[];
   members: any[];
@@ -29,7 +30,7 @@ const dateTime = (value?: string | null) => value ? new Date(value).toLocaleStri
 const dateOnly = (value?: string | null) => value ? new Date(value).toLocaleDateString() : "—";
 const timeOnly = (value?: string | null) => value ? value.slice(0, 5) : "—";
 
-export default function SchoolManagerOperationsWorkspace({ schoolId, years, sections, members, profiles }: Props) {
+export default function SchoolManagerOperationsWorkspace({ schoolId, managerMembershipId, years, sections, members, profiles }: Props) {
   const db = supabase as any;
   const [slots, setSlots] = useState<Slot[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -145,7 +146,7 @@ export default function SchoolManagerOperationsWorkspace({ schoolId, years, sect
       teacher_membership_id: slotTeacher || null, subject_name: slotSubject.trim(),
       weekday: Number(slotDay), starts_at: slotStart, ends_at: slotEnd,
       room_label: slotRoom.trim() || null, notes: slotNotes.trim() || null,
-      created_by_membership_id: members.find((member) => member.id === memberById.get(member.id)?.id && member.id === member.id)?.id,
+      created_by_membership_id: managerMembershipId,
     };
     const result = editingSlot
       ? await db.from("school_timetable_slots").update(payload).eq("id", editingSlot).eq("school_id", schoolId)
@@ -166,7 +167,7 @@ export default function SchoolManagerOperationsWorkspace({ schoolId, years, sect
     }
     if (eventAudience === "grade" && !eventGrade) { toast.error("Choose a grade for this event."); return; }
     if (eventAudience === "section" && (!eventGrade || !eventSection)) { toast.error("Choose a grade and section for this event."); return; }
-    const creator = members.find((member) => member.id === (window as any).__schoolManagerMembershipId)?.id;
+    const creator = managerMembershipId;
     const payload = {
       school_id: schoolId, academic_year_id: yearFilter === "all" ? null : yearFilter,
       title: eventTitle.trim(), description: eventDescription.trim() || null, event_type: eventType,
