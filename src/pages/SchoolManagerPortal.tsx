@@ -28,6 +28,7 @@ const navItems: SchoolNavItem[] = [
   { id: "academics", label: "Academic Management", icon: BookOpen },
   { id: "curriculum", label: "Curriculum & Support", icon: BookOpen },
   { id: "attendance", label: "Attendance & Daily Operations", icon: CalendarDays },
+  { id: "operations", label: "Timetable & Community", icon: CalendarDays },
   { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
   { id: "tasks", label: "Staff Tasks", icon: ClipboardList },
@@ -1842,6 +1843,7 @@ export default function SchoolManagerPortal() {
     case "academics": content = <SchoolManagerAcademicWorkspace schoolId={schoolId} years={years} terms={terms} sections={sections} subjects={subjects} assignments={assignments} categories={gradingCategories} gradingPolicies={gradingPolicies} members={members} profiles={profiles} />; break;
     case "curriculum": content = <SchoolCurriculumWorkspace mode="manager" schoolId={schoolId} years={years} sections={sections} subjects={subjects} assignments={assignments} members={members} profiles={profiles} />; break;
     case "attendance": content = <SchoolManagerAttendanceWorkspace schoolId={schoolId} years={years} sections={sections} members={members} profiles={profiles} />; break;
+    case "operations": content = <SchoolManagerOperationsWorkspace schoolId={schoolId} managerMembershipId={activeMembership?.id} years={years} sections={sections} members={members} profiles={profiles} />; break;
     case "grading": content = renderGrading(); break;
     case "finance": content = renderFinance(); break;
     case "tasks": content = renderTasks(); break;
