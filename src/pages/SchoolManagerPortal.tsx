@@ -74,13 +74,7 @@ export default function SchoolManagerPortal() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [financeFollowups, setFinanceFollowups] = useState<any[]>([]);
   const [disciplinaryRecommendations, setDisciplinaryRecommendations] = useState<any[]>([]);
-  const [staffConductReports, setStaffConductReports] = useState<any[]>([]);
   const [assignmentRecommendations, setAssignmentRecommendations] = useState<any[]>([]);
-  const [managerReviewNotes, setManagerReviewNotes] = useState<Record<string, string>>({});
-  const [staffDisciplineTargetId, setStaffDisciplineTargetId] = useState("");
-  const [staffDisciplineReason, setStaffDisciplineReason] = useState("");
-  const [staffDisciplineRecommendation, setStaffDisciplineRecommendation] = useState("");
-  const [disciplineReviewNotes, setDisciplineReviewNotes] = useState<Record<string, string>>({});
   const [tasks, setTasks] = useState<any[]>([]);
   const [evaluations, setEvaluations] = useState<any[]>([]);
   const [changeRequests, setChangeRequests] = useState<any[]>([]);
@@ -169,24 +163,8 @@ export default function SchoolManagerPortal() {
   const [feeCurrency, setFeeCurrency] = useState("ETB");
   const [feeDueDate, setFeeDueDate] = useState("");
 
-  const [taskTargetId, setTaskTargetId] = useState("");
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskDescription, setTaskDescription] = useState("");
-  const [taskType, setTaskType] = useState("follow_up");
-  const [taskDueDate, setTaskDueDate] = useState("");
-  const [taskPriority, setTaskPriority] = useState("normal");
 
-  const [evaluationTargetId, setEvaluationTargetId] = useState("");
-  const [evaluationRating, setEvaluationRating] = useState("3");
-  const [evaluationNotes, setEvaluationNotes] = useState("");
-  const [evaluationStart, setEvaluationStart] = useState("");
-  const [evaluationEnd, setEvaluationEnd] = useState("");
 
-  const [requestTargetId, setRequestTargetId] = useState("");
-  const [requestType, setRequestType] = useState("responsibility_change");
-  const [requestedRole, setRequestedRole] = useState("teacher");
-  const [requestDetails, setRequestDetails] = useState("");
-  const [requestReason, setRequestReason] = useState("");
 
   const db = supabase as any;
   const schoolId = activeSchool?.id;
@@ -197,7 +175,7 @@ export default function SchoolManagerPortal() {
     try {
     const [
       membershipsRes, yearsRes, termsRes, sectionsRes, subjectsRes, assignmentsRes,
-      feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, staffConductRes, assignmentRecommendationsRes,
+      feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, assignmentRecommendationsRes,
     ] = await Promise.all([
       db.from("school_memberships").select("id,user_id,school_role,status,grade_label,section_id,student_number,school_username,age_at_enrollment,end_reason,ended_at,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }),
       db.from("school_academic_years").select("id,name,starts_on,ends_on,is_current").eq("school_id", schoolId).order("starts_on", { ascending: false }),
@@ -216,11 +194,10 @@ export default function SchoolManagerPortal() {
       db.from("school_policy_settings").select("school_id,attendance_notifications_enabled,behavior_notifications_enabled,report_card_notifications_enabled,absence_review_threshold").eq("school_id", schoolId).maybeSingle(),
       db.from("school_finance_followups").select("id,invoice_id,student_membership_id,submitted_by_membership_id,note,status,reviewed_at,resolution_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_disciplinary_recommendations").select("id,target_membership_id,target_kind,submitted_by_membership_id,reason,recommendation,status,decision_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
-      db.from("school_staff_conduct_reports").select("id,target_teacher_membership_id,submitted_by_membership_id,report_type,severity,description,status,manager_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_teacher_assignment_recommendations").select("id,teacher_membership_id,submitted_by_membership_id,current_assignment_id,recommendation_type,requested_section_id,requested_subject_name,requested_assignment_kind,reason,status,manager_note,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
     ]);
 
-    const firstError = [membershipsRes, yearsRes, termsRes, sectionsRes, subjectsRes, assignmentsRes, feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, staffConductRes, assignmentRecommendationsRes].find((result) => result.error)?.error;
+    const firstError = [membershipsRes, yearsRes, termsRes, sectionsRes, subjectsRes, assignmentsRes, feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, assignmentRecommendationsRes].find((result) => result.error)?.error;
     if (firstError) {
       toast.error(firstError.message || "Could not load school records");
       setLoading(false);
@@ -246,7 +223,6 @@ export default function SchoolManagerPortal() {
     setPolicySettings(policySettingsRes.data ?? null);
     setFinanceFollowups(financeFollowupsRes.data ?? []);
     setDisciplinaryRecommendations(disciplinaryRes.data ?? []);
-    setStaffConductReports(staffConductRes.data ?? []);
     setAssignmentRecommendations(assignmentRecommendationsRes.data ?? []);
 
     const userIds = [...new Set(nextMembers.map((membership: any) => membership.user_id))];
@@ -815,14 +791,6 @@ export default function SchoolManagerPortal() {
     await load();
   };
 
-  const reviewStaffConductReport = async (report: any, status: "reviewed" | "resolved" | "dismissed") => {
-    const { error } = await db.rpc("school_review_staff_conduct_report", {
-      p_report_id: report.id, p_status: status, p_note: managerReviewNotes[report.id] || null,
-    });
-    if (error) return toast.error(error.message);
-    toast.success("Staff conduct report updated.");
-    await load();
-  };
 
   const reviewAssignmentRecommendation = async (recommendation: any, accept: boolean) => {
     const { error } = await db.rpc("school_review_teacher_assignment_recommendation", {
@@ -841,28 +809,7 @@ export default function SchoolManagerPortal() {
     await load();
   };
 
-  const submitStaffDisciplineRecommendation = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!staffDisciplineTargetId || !staffDisciplineReason.trim() || !staffDisciplineRecommendation.trim()) return toast.error("Choose a staff member and provide the reason and recommendation.");
-    const { error } = await db.from("school_disciplinary_recommendations").insert({
-      school_id: schoolId, target_membership_id: staffDisciplineTargetId, target_kind: "staff",
-      submitted_by_membership_id: activeMembership?.id, reason: staffDisciplineReason.trim(),
-      recommendation: staffDisciplineRecommendation.trim(), status: "pending",
-    });
-    if (error) return toast.error(error.message);
-    setStaffDisciplineReason(""); setStaffDisciplineRecommendation("");
-    toast.success("Staff disciplinary recommendation submitted to the Super Admin.");
-    await load();
-  };
 
-  const reviewStudentDisciplineRecommendation = async (item: any, accept: boolean) => {
-    const { error } = await db.rpc("school_review_disciplinary_recommendation", {
-      p_recommendation_id: item.id, p_accept: accept, p_note: disciplineReviewNotes[item.id] || null,
-    });
-    if (error) return toast.error(error.message);
-    toast.success(accept ? "Student disciplinary recommendation accepted." : "Student disciplinary recommendation rejected.");
-    await load();
-  };
 
   const resolveFinanceFollowup = async (followupId: string) => {
     const { error } = await db.rpc("school_resolve_finance_followup", { p_followup_id: followupId, p_note: "Reviewed by School Manager." });
@@ -889,56 +836,8 @@ export default function SchoolManagerPortal() {
     await load();
   };
 
-  const createTask = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!taskTargetId || !taskTitle.trim()) return toast.error("Choose a staff member and enter a task title.");
-    const { error } = await db.from("school_staff_tasks").insert({
-      school_id: schoolId, assigned_to_membership_id: taskTargetId,
-      assigned_by_membership_id: activeMembership?.id,
-      task_type: taskType, title: taskTitle.trim(), description: taskDescription.trim() || null,
-      due_date: taskDueDate || null, priority: taskPriority,
-    });
-    if (error) return toast.error(error.message);
-    setTaskTitle(""); setTaskDescription(""); setTaskDueDate("");
-    toast.success("Follow-up task assigned.");
-    await load();
-  };
 
-  const createEvaluation = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const rating = Number(evaluationRating);
-    if (!evaluationTargetId || !evaluationNotes.trim()) return toast.error("Choose a staff member and add evaluation notes.");
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return toast.error("Evaluation rating must be from 1 to 5.");
-    if (evaluationStart && evaluationEnd && evaluationEnd < evaluationStart) return toast.error("Evaluation end date must not be before its start date.");
-    const { error } = await db.from("school_staff_evaluations").insert({
-      school_id: schoolId, target_membership_id: evaluationTargetId,
-      reviewer_membership_id: activeMembership?.id, evaluation_type: "staff_performance",
-      rating, period_start: evaluationStart || null,
-      period_end: evaluationEnd || null, notes: evaluationNotes.trim(),
-    });
-    if (error) return toast.error(error.message);
-    setEvaluationNotes("");
-    toast.success("Staff evaluation saved.");
-    await load();
-  };
 
-  const createChangeRequest = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!requestTargetId || !requestReason.trim()) return toast.error("Choose a staff member and explain the request.");
-    let details: any = {};
-    try { details = requestDetails.trim() ? JSON.parse(requestDetails) : {}; }
-    catch { return toast.error("Requested details must be valid JSON."); }
-    const { error } = await db.from("school_staff_change_requests").insert({
-      school_id: schoolId, target_membership_id: requestTargetId,
-      requester_membership_id: activeMembership?.id, request_type: requestType,
-      requested_role: requestType === "role_change" ? requestedRole : null,
-      requested_details: details, reason: requestReason.trim(),
-    });
-    if (error) return toast.error(error.message);
-    setRequestReason(""); setRequestDetails("");
-    toast.success("Change request sent to the Super Admin for review.");
-    await load();
-  };
 
   const copyCredentials = async () => {
     const text = createdCredentials.map((item) => `${item.username}\t${item.initial_password}`).join("\n");
