@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, School, BookOpen, UserCog, Wallet, ClipboardList,
-  FileBarChart, Settings, RefreshCw, CheckCircle2, Copy, AlertCircle, Scale, Percent,
+  FileBarChart, Settings, RefreshCw, CheckCircle2, Copy, AlertCircle, Scale, Percent, GraduationCap, Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,7 @@ import {
 const navItems: SchoolNavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "accounts", label: "People & Accounts", icon: Users },
+  { id: "students", label: "Student Directory", icon: GraduationCap },
   { id: "structure", label: "School Structure", icon: School },
   { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
@@ -66,6 +67,12 @@ export default function SchoolManagerPortal() {
   const [policySettings, setPolicySettings] = useState<any>(null);
   const [createdCredentials, setCreatedCredentials] = useState<any[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentStatusFilter, setStudentStatusFilter] = useState("all");
+  const [studentActionId, setStudentActionId] = useState<string | null>(null);
+  const [studentActionStatus, setStudentActionStatus] = useState<"transferred" | "graduated" | "deactivated" | "">("");
+  const [studentActionReason, setStudentActionReason] = useState("");
+  const [studentActionLoading, setStudentActionLoading] = useState(false);
 
   const [leadershipAppointments, setLeadershipAppointments] = useState<any[]>([]);
   const [leadershipActionEvents, setLeadershipActionEvents] = useState<any[]>([]);
@@ -802,6 +809,141 @@ export default function SchoolManagerPortal() {
     }
   };
 
+  const completeStudentLifecycleAction = async () => {
+    if (!schoolId || !studentActionId || !studentActionStatus) return;
+    const reason = studentActionReason.trim();
+    if (reason.length < 5) {
+      toast.error("Enter a reason of at least 5 characters before updating this student record.");
+      return;
+    }
+    setStudentActionLoading(true);
+    try {
+      const { data, error } = await db.rpc("school_deactivate_student_membership", {
+        p_membership_id: studentActionId,
+        p_status: studentActionStatus,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      if (data !== true) throw new Error("The student record was not updated. Please refresh and try again.");
+      toast.success(
+        studentActionStatus === "transferred" ? "Student marked as transferred."
+          : studentActionStatus === "graduated" ? "Student marked as graduated."
+          : "Student enrollment deactivated."
+      );
+      setStudentActionId(null);
+      setStudentActionStatus("");
+      setStudentActionReason("");
+      await load();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not update the student record.");
+    } finally {
+      setStudentActionLoading(false);
+    }
+  };
+
+  const renderStudents = () => {
+    const allStudents = members.filter((member) => member.school_role === "student");
+    const normalizedSearch = studentSearch.trim().toLowerCase();
+    const visibleStudents = allStudents.filter((student) => {
+      const profile = profiles[student.user_id] ?? {};
+      const searchable = [profile.name, profile.username, student.school_username, student.student_number, student.grade_label, sectionLabel(student.section_id)]
+        .filter(Boolean).join(" ").toLowerCase();
+      return (studentStatusFilter === "all" || student.status === studentStatusFilter)
+        && (!normalizedSearch || searchable.includes(normalizedSearch));
+    });
+    return (
+      <div className="space-y-5">
+        <SchoolPageHeading
+          title="Student directory"
+          description="Search school student memberships, review their enrollment and placement, and record formal exits with a reason. Student account history is preserved."
+          action={<SchoolSecondaryButton onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</SchoolSecondaryButton>}
+        />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SchoolMetric label="All student records" value={allStudents.length} detail="Including previous enrollments" icon={GraduationCap} />
+          <SchoolMetric label="Active enrollment" value={allStudents.filter((student) => student.status === "active").length} detail="Currently enrolled" icon={Users} />
+          <SchoolMetric label="Transferred" value={allStudents.filter((student) => student.status === "transferred").length} detail="Exited to another school" icon={School} />
+          <SchoolMetric label="Graduated" value={allStudents.filter((student) => student.status === "graduated").length} detail="Completed school enrollment" icon={CheckCircle2} />
+        </div>
+        <SchoolPanel title="Find a student" description="Search by name, username, school username, student number, grade, or section.">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input className={schoolInputClass + " pl-9"} value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search student records…" aria-label="Search student records" />
+            </label>
+            <select className={schoolSelectClass} value={studentStatusFilter} onChange={(event) => setStudentStatusFilter(event.target.value)} aria-label="Filter students by enrollment status">
+              <option value="all">All enrollment statuses</option>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+              <option value="transferred">Transferred</option>
+              <option value="graduated">Graduated</option>
+              <option value="deactivated">Deactivated</option>
+            </select>
+          </div>
+          <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+            <span>{visibleStudents.length} of {allStudents.length} student records</span>
+            <span>School-scoped records</span>
+          </div>
+          {visibleStudents.length ? (
+            <div className="mt-3 divide-y divide-slate-100">
+              {visibleStudents.map((student) => {
+                const profile = profiles[student.user_id] ?? {};
+                const actionOpen = studentActionId === student.id;
+                const canExit = ["active", "suspended"].includes(student.status);
+                return (
+                  <div key={student.id} className="py-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">{profile.name || student.school_username || "Student account"}</p>
+                        <p className="mt-1 break-all text-xs text-slate-500">
+                          {profile.username ? "@" + profile.username : student.school_username || "No username"}
+                          {student.student_number ? " · " + student.student_number : ""}
+                          {" · "}{student.grade_label || "Grade not assigned"}
+                          {" · "}{sectionLabel(student.section_id)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">Enrolled {student.created_at ? new Date(student.created_at).toLocaleDateString() : "date unavailable"}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <SchoolStatus value={student.status} />
+                        {canExit && <SchoolSecondaryButton onClick={() => {
+                          setStudentActionId(actionOpen ? null : student.id);
+                          setStudentActionStatus("");
+                          setStudentActionReason("");
+                        }}>{actionOpen ? "Close actions" : "Record student exit"}</SchoolSecondaryButton>}
+                      </div>
+                    </div>
+                    {actionOpen && (
+                      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                        <p className="text-sm font-semibold text-slate-900">Record an enrollment exit</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">This closes the student's active school enrollment, ends active parent links where applicable, and preserves the membership and section history. It does not delete the student's account.</p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
+                          <SchoolField label="Exit type">
+                            <select className={schoolSelectClass} value={studentActionStatus} onChange={(event) => setStudentActionStatus(event.target.value as typeof studentActionStatus)}>
+                              <option value="">Choose exit type</option>
+                              <option value="transferred">Transferred to another school</option>
+                              <option value="graduated">Graduated</option>
+                              <option value="deactivated">Other / deactivated</option>
+                            </select>
+                          </SchoolField>
+                          <SchoolField label="Reason (required)">
+                            <input className={schoolInputClass} value={studentActionReason} onChange={(event) => setStudentActionReason(event.target.value)} minLength={5} maxLength={500} placeholder="Record the reason for this enrollment change" />
+                          </SchoolField>
+                        </div>
+                        <div className="mt-3 flex flex-wrap justify-end gap-2">
+                          <SchoolSecondaryButton onClick={() => { setStudentActionId(null); setStudentActionStatus(""); setStudentActionReason(""); }}>Cancel</SchoolSecondaryButton>
+                          <SchoolPrimaryButton onClick={() => void completeStudentLifecycleAction()} disabled={studentActionLoading || !studentActionStatus || studentActionReason.trim().length < 5}>{studentActionLoading ? "Saving…" : "Confirm student exit"}</SchoolPrimaryButton>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : <SchoolEmptyState title={allStudents.length ? "No matching students" : "No student records yet"} description={allStudents.length ? "Try a different search term or enrollment status." : "Student accounts enrolled in this school will appear here."} />}
+        </SchoolPanel>
+      </div>
+    );
+  };
+
   const renderOverview = () => (
     <div className="space-y-6">
       <SchoolPageHeading title="School overview" description="A live view of enrollment, staffing, academic structure, and school finance." action={<SchoolSecondaryButton onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</SchoolSecondaryButton>} />
@@ -1318,6 +1460,7 @@ export default function SchoolManagerPortal() {
   let content: React.ReactNode;
   switch (page) {
     case "accounts": content = renderAccounts(); break;
+    case "students": content = renderStudents(); break;
     case "structure": content = renderStructure(); break;
     case "grading": content = renderGrading(); break;
     case "finance": content = renderFinance(); break;
