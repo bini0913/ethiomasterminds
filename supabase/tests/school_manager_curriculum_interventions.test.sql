@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(32);
 
 select ok(to_regclass('public.school_curriculum_units') is not null, 'school curriculum units table exists');
 select ok(to_regclass('public.school_curriculum_unit_events') is not null, 'curriculum unit audit table exists');
@@ -33,6 +33,7 @@ select ok(not has_function_privilege('anon','public.school_manager_save_curricul
 select ok(exists (select 1 from pg_trigger where tgname='school_curriculum_unit_audit' and tgrelid='public.school_curriculum_units'::regclass and not tgisinternal), 'curriculum unit changes are audited');
 select ok(exists (select 1 from pg_trigger where tgname='school_curriculum_progress_audit' and tgrelid='public.school_curriculum_progress'::regclass and not tgisinternal), 'teacher progress changes are audited');
 select ok(exists (select 1 from pg_trigger where tgname='school_academic_intervention_audit' and tgrelid='public.school_academic_interventions'::regclass and not tgisinternal), 'intervention changes are audited');
+select ok(exists (select 1 from pg_trigger where tgname='school_curriculum_unit_events_immutable' and tgrelid='public.school_curriculum_unit_events'::regclass and not tgisinternal), 'curriculum unit audit events are immutable');
 select ok(exists (select 1 from pg_trigger where tgname='school_curriculum_progress_events_immutable' and tgrelid='public.school_curriculum_progress_events'::regclass and not tgisinternal), 'curriculum progress audit events are immutable');
 select ok(exists (select 1 from pg_trigger where tgname='school_academic_intervention_events_immutable' and tgrelid='public.school_academic_intervention_events'::regclass and not tgisinternal), 'intervention audit events are immutable');
 
