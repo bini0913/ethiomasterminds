@@ -223,6 +223,7 @@ export default function SchoolManagerPortal() {
       if ((invoicePage ?? []).length < 500) break;
     }
 
+    // Load the complete school payment ledger in bounded pages; the UI shows a recent accountability window.
     const allFinancePayments = [...(financePaymentsRes.data ?? [])];
     for (let offset = 500; (financePaymentsRes.data?.length ?? 0) === 500; offset += 500) {
       const { data: paymentPage, error: paymentPageError } = await db.from("school_fee_payments")
@@ -232,6 +233,7 @@ export default function SchoolManagerPortal() {
       allFinancePayments.push(...(paymentPage ?? []));
       if ((paymentPage ?? []).length < 500) break;
     }
+    // Load the complete school finance audit history in bounded pages; the UI shows a searchable recent window.
     const allFinanceAuditEvents = [...(financeAuditEventsRes.data ?? [])];
     for (let offset = 500; (financeAuditEventsRes.data?.length ?? 0) === 500; offset += 500) {
       const { data: auditPage, error: auditPageError } = await db.from("school_finance_audit_events")
