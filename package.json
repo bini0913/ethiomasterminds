@@ -16,7 +16,8 @@
     "check:school-manager-part1": "node scripts/check-school-manager-part1-complete.mjs",
     "check:school-manager-part2-academic": "node scripts/check-school-manager-part2-academic.mjs",
     "check:school-manager-part2-complete": "node scripts/check-school-manager-part2-complete.mjs",
-    "check:school-manager-part3-attendance": "node scripts/check-school-manager-part3-attendance.mjs"
+    "check:school-manager-part3-attendance": "node scripts/check-school-manager-part3-attendance.mjs",
+    "check:school-manager-part3-timetable": "node scripts/check-school-manager-part3-timetable.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
