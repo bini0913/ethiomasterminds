@@ -39,11 +39,11 @@ const checks = [
 
 let failed = 0;
 for (const [label, passed] of checks) {
-  console.log(\`\${passed ? "PASS" : "FAIL"} \${label}\`);
+  console.log(`${passed ? "PASS" : "FAIL"} ${label}`);
   if (!passed) failed++;
 }
 if (failed) {
-  console.error(\`\${failed} School Manager Part 3.4 contract check(s) failed.\`);
+  console.error(`${failed} School Manager Part 3.4 contract check(s) failed.`);
   process.exit(1);
 }
-console.log(\`All \${checks.length} School Manager Part 3.4 contract checks passed.\`);
+console.log(`All ${checks.length} School Manager Part 3.4 contract checks passed.`);
