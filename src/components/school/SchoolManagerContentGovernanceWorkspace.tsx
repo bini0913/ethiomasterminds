@@ -82,25 +82,23 @@ export default function SchoolManagerContentGovernanceWorkspace({ schoolId, memb
     return () => { requestSequence.current += 1; };
   }, [load]);
 
-  const memberName = (id?: string | null) => {
+  const memberName = useCallback((id?: string | null) => {
     if (!id) return "Unknown contributor";
     const member = members.find((item) => item.id === id);
     if (!member) return "School member";
     const profile = profiles[member.user_id] || {};
     return profile.name || profile.full_name || profile.username || member.school_username || "School member";
-  };
+  }, [members, profiles]);
   const sectionName = (id?: string | null) => {
     const section = sections.find((item) => item.id === id);
     return section ? section.grade_label + " · " + section.section_name : "—";
   };
-  const quizGrade = (item: QuizItem) => item.grade || (sections.find((section) => section.id === item.school_section_id)?.grade_label ?? "—");
-  const bookGrade = (item: BookItem) => item.school_grade_label || (item.grade_level ? "Grade " + item.grade_level : "—");
+  const quizGrade = useCallback((item: QuizItem) => item.grade || (sections.find((section) => section.id === item.school_section_id)?.grade_label ?? "—"), [sections]);
+  const bookGrade = useCallback((item: BookItem) => item.school_grade_label || (item.grade_level ? "Grade " + item.grade_level : "—"), []);
   const pendingQuizzes = quizzes.filter((item) => item.school_review_status === "pending");
   const pendingBooks = books.filter((item) => item.school_review_status === "pending");
   const approvedCount = quizzes.filter((item) => item.school_review_status === "approved").length
     + books.filter((item) => item.school_review_status === "approved").length;
-  const rejectedCount = quizzes.filter((item) => item.school_review_status === "rejected").length
-    + books.filter((item) => item.school_review_status === "rejected").length;
   const verifiedQuizSources = quizzes.filter((item) => item.source_verification_status === "verified").length;
   const filteredQueue = useMemo(() => {
     const rows = [
@@ -123,7 +121,7 @@ export default function SchoolManagerContentGovernanceWorkspace({ schoolId, memb
       && (gradeFilter === "all" || item.grade === gradeFilter)
       && (!search || (item.title + " " + item.subject + " " + item.grade + " " + item.detail).toLowerCase().includes(search.toLowerCase()))
     ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [quizzes, books, typeFilter, statusFilter, gradeFilter, search, members, profiles, sections]);
+  }, [quizzes, books, typeFilter, statusFilter, gradeFilter, search, memberName, quizGrade, bookGrade]);
   const gradeOptions = Array.from(new Set([
     ...quizzes.map(quizGrade), ...books.map(bookGrade),
   ].filter((value) => value && value !== "—"))).sort((a, b) => a.localeCompare(b));
@@ -143,7 +141,7 @@ export default function SchoolManagerContentGovernanceWorkspace({ schoolId, memb
         <SchoolMetric label="Pending quizzes" value={pendingQuizzes.length} detail="Awaiting authorized academic review" icon={FileQuestion} />
         <SchoolMetric label="Pending library items" value={pendingBooks.length} detail="Awaiting authorized academic review" icon={BookOpen} />
         <SchoolMetric label="Approved resources" value={approvedCount} detail="Quizzes and library items" icon={ShieldCheck} />
-        <SchoolMetric label="Rejected resources" value={rejectedCount} detail={verifiedQuizSources + " quizzes marked source-verified"} icon={ClipboardCheck} />
+        <SchoolMetric label="Verified quiz sources" value={verifiedQuizSources} detail={quizzes.length - verifiedQuizSources + " quizzes need source verification"} icon={ClipboardCheck} />
       </div>
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
         {(["queue", "library", "history"] as const).map((item) => (
