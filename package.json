@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "check:routes": "node scripts/check-routes.mjs",
     "check:school-manager": "node scripts/check-school-manager-contracts.mjs",
-    "check:school-manager-part1": "node scripts/check-school-manager-part1-complete.mjs"
+    "check:school-manager-part1": "node scripts/check-school-manager-part1-complete.mjs",
+    "check:school-manager-part2-academic": "node scripts/check-school-manager-part2-academic.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
