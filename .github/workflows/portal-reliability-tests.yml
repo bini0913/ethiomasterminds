@@ -64,6 +64,9 @@ jobs:
       - name: Verify School Manager Part 3 timetable and calendar workflows
         run: npm run check:school-manager-part3-timetable
 
+      - name: Verify School Manager Part 3 parent communication workflows
+        run: npm run check:school-manager-part3-communications
+
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
