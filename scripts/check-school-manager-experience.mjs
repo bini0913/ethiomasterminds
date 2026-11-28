@@ -19,7 +19,7 @@ assert.match(portal, /Finance payment accountability/);
 assert.match(portal, /Finance activity audit/);
 assert.match(portal, /complete school payment ledger in bounded pages/);
 assert.match(portal, /complete school finance audit history in bounded pages/);
-assert.match(portal, /read-only payment ledger/);
+assert.match(portal, /Read-only payment ledger/);
 assert.match(portal, /No budget or revenue forecast is invented/);
 assert.match(portal, /collectionRate/);
 assert.match(portal, /Overdue/);
