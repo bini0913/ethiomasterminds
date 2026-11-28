@@ -260,7 +260,7 @@ test('School Manager Part 1 workflows are reachable across desktop, tablet and m
       await page.getByRole('button', { name: section.nav, exact: true }).click();
       await expect(page.getByRole('heading', { name: section.heading, exact: true })).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText(section.content, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
-      if (section.nav === 'Teacher Assignments') await expect(page.getByRole('heading', { name: 'Teacher assignment recommendations', exact: true })).toBeVisible();
+      if (section.nav === 'Teacher Assignments') await expect(page.getByText('Teacher assignment recommendations', { exact: true })).toBeVisible();
     }
   }
 
@@ -504,7 +504,7 @@ test('School Manager command center, grouped navigation, reports and student sea
     await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
     await expect(page.getByText('School setup checklist')).toBeVisible();
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
-    await expect(page.getByText('People & school', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Student Directory', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Reports & Analytics', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Reports & analytics', exact: true })).toBeVisible();
     await expect(page.getByText('Enrollment distribution', { exact: true })).toBeVisible();
