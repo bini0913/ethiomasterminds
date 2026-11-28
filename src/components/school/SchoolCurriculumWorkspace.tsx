@@ -73,7 +73,8 @@ export default function SchoolCurriculumWorkspace({
           db.from("school_academic_intervention_events").select("id,intervention_id,actor_membership_id,previous_status,new_status,reason,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
         ] : []),
       ]);
-      const errors = requests.flatMap((result: any, index: number) => result.error ? [(index === 0 ? "Curriculum units" : index === 1 ? "Teaching progress" : "Academic interventions") + ": " + result.error.message] : []);
+      const labels = manager ? ["Curriculum units", "Teaching progress", "Academic interventions", "Curriculum audit events", "Intervention audit events"] : ["Curriculum units", "Teaching progress"];
+      const errors = requests.flatMap((result: any, index: number) => result.error ? [labels[index] + ": " + result.error.message] : []);
       if (errors.length) setLoadError(errors.join(" · "));
       setUnits(requests[0].data || []);
       setProgress(requests[1].data || []);
