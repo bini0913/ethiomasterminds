@@ -325,6 +325,10 @@ test('School Teacher curriculum delivery workspace is reachable', async ({ page 
   await authenticateAs(page, 'ci-teacher@masterminds.test');
   await page.goto('/school/teacher', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 25_000 });
+  // The responsive SchoolPortalShell moves navigation into a drawer on tablet/mobile.
+  if ((page.viewportSize()?.width ?? 1440) < 1024) {
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+  }
   await page.getByRole('button', { name: 'Curriculum Delivery', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Curriculum delivery', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'My assigned curriculum units', exact: true })).toBeVisible();
