@@ -151,7 +151,13 @@ DROP POLICY IF EXISTS school_curriculum_progress_select ON public.school_curricu
 CREATE POLICY school_curriculum_progress_select ON public.school_curriculum_progress
 FOR SELECT TO authenticated USING (
   public.is_school_manager_or_admin(school_id)
-  OR teacher_membership_id = public.school_my_membership_id(school_id)
+  OR EXISTS (
+    SELECT 1 FROM public.school_memberships teacher
+    WHERE teacher.id = school_curriculum_progress.teacher_membership_id
+      AND teacher.user_id = auth.uid()
+      AND teacher.school_role = 'teacher'
+      AND teacher.status = 'active'
+  )
 );
 DROP POLICY IF EXISTS school_curriculum_progress_events_select ON public.school_curriculum_progress_events;
 CREATE POLICY school_curriculum_progress_events_select ON public.school_curriculum_progress_events
@@ -271,6 +277,16 @@ BEGIN
   IF p_expected_start IS NOT NULL AND p_expected_end IS NOT NULL AND p_expected_end < p_expected_start THEN
     RAISE EXCEPTION 'Expected end date cannot be before expected start date';
   END IF;
+  IF p_unit_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.school_curriculum_progress progress
+    JOIN public.school_curriculum_units existing ON existing.id = progress.unit_id
+    WHERE existing.id = p_unit_id AND existing.school_id = p_school_id
+      AND (existing.academic_year_id IS DISTINCT FROM p_academic_year_id
+        OR existing.grade_label IS DISTINCT FROM trim(p_grade_label)
+        OR existing.subject_name IS DISTINCT FROM trim(p_subject_name))
+  ) THEN
+    RAISE EXCEPTION 'Grade, subject, and academic year cannot change after teachers have recorded delivery progress';
+  END IF;
   IF p_unit_id IS NULL THEN
     INSERT INTO public.school_curriculum_units(
       school_id, academic_year_id, grade_label, subject_name, unit_code, title, description,
@@ -312,7 +328,10 @@ DECLARE
 BEGIN
   SELECT * INTO v_unit FROM public.school_curriculum_units WHERE id=p_unit_id AND is_active;
   SELECT * INTO v_section FROM public.school_sections WHERE id=p_section_id;
-  v_teacher_id := public.school_my_membership_id(v_unit.school_id);
+  SELECT id INTO v_teacher_id FROM public.school_memberships
+  WHERE school_id = v_unit.school_id AND user_id = auth.uid()
+    AND school_role = 'teacher' AND status = 'active'
+  ORDER BY created_at DESC LIMIT 1;
   IF v_unit.id IS NULL OR v_section.id IS NULL OR v_section.school_id <> v_unit.school_id
     OR v_section.academic_year_id <> v_unit.academic_year_id
     OR v_section.grade_label <> v_unit.grade_label
@@ -371,6 +390,16 @@ BEGIN
     OR NOT EXISTS (SELECT 1 FROM public.school_academic_years year
       WHERE year.id=p_academic_year_id AND year.school_id=p_school_id) THEN
     RAISE EXCEPTION 'Student, section, and academic year must match this school';
+  END IF;
+  IF trim(COALESCE(p_subject_name,'')) <> '' AND NOT EXISTS (
+    SELECT 1 FROM public.school_sections section
+    JOIN public.school_subjects subject ON subject.school_id = section.school_id
+      AND subject.academic_year_id = section.academic_year_id
+      AND subject.grade_label = section.grade_label AND subject.active
+    WHERE section.id = p_section_id AND section.school_id = p_school_id
+      AND subject.subject_name = trim(p_subject_name)
+  ) THEN
+    RAISE EXCEPTION 'Select a subject configured for the student section and academic year';
   END IF;
   IF p_category NOT IN ('academic_performance','attendance_impact','homework_support','learning_support','other')
     OR length(trim(COALESCE(p_concern,''))) NOT BETWEEN 5 AND 2000
