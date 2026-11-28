@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS public.school_curriculum_units (
     CHECK (source_type IN ('official_curriculum', 'textbook', 'teacher_planned', 'school_defined', 'other')),
   source_title text NOT NULL DEFAULT '' CHECK (length(source_title) <= 240),
   source_url text,
+  source_catalog_id uuid REFERENCES public.curriculum_textbook_catalog(id) ON DELETE SET NULL,
+  source_library_book_id uuid REFERENCES public.library_books(id) ON DELETE SET NULL,
   source_verification text NOT NULL DEFAULT 'unverified'
     CHECK (source_verification IN ('unverified', 'verified_by_school')),
   expected_start date,
@@ -33,6 +35,8 @@ CREATE TABLE IF NOT EXISTS public.school_curriculum_units (
     CHECK (expected_start IS NULL OR expected_end IS NULL OR expected_end >= expected_start),
   CONSTRAINT school_curriculum_unit_source_url_check
     CHECK (source_url IS NULL OR source_url ~* '^https?://'),
+  CONSTRAINT school_curriculum_unit_single_linked_source_check
+    CHECK (source_catalog_id IS NULL OR source_library_book_id IS NULL),
   CONSTRAINT school_curriculum_unit_unique
     UNIQUE (school_id, academic_year_id, grade_label, subject_name, unit_code)
 );
@@ -216,7 +220,8 @@ BEGIN
     'subject_name', NEW.subject_name, 'unit_code', NEW.unit_code, 'title', NEW.title,
     'description', NEW.description, 'sequence_number', NEW.sequence_number,
     'source_type', NEW.source_type, 'source_title', NEW.source_title,
-    'source_url', NEW.source_url, 'source_verification', NEW.source_verification,
+    'source_url', NEW.source_url, 'source_catalog_id', NEW.source_catalog_id,
+    'source_library_book_id', NEW.source_library_book_id, 'source_verification', NEW.source_verification,
     'expected_start', NEW.expected_start, 'expected_end', NEW.expected_end,
     'is_active', NEW.is_active
   );
@@ -304,6 +309,7 @@ CREATE OR REPLACE FUNCTION public.school_manager_save_curriculum_unit(
   p_unit_code text, p_title text, p_description text, p_sequence_number integer,
   p_source_type text, p_source_title text, p_source_url text, p_source_verification text,
   p_expected_start date, p_expected_end date, p_is_active boolean,
+  p_source_catalog_id uuid DEFAULT NULL, p_source_library_book_id uuid DEFAULT NULL,
   p_unit_id uuid DEFAULT NULL
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $$
@@ -333,6 +339,29 @@ BEGIN
   IF p_source_url IS NOT NULL AND p_source_url !~* '^https?://' THEN
     RAISE EXCEPTION 'Source URL must use HTTP or HTTPS';
   END IF;
+  IF p_source_catalog_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.curriculum_textbook_catalog catalog
+    WHERE catalog.id = p_source_catalog_id
+      AND lower(catalog.subject) = lower(trim(p_subject_name))
+      AND (substring(trim(p_grade_label) from '([0-9]+)') IS NULL
+        OR catalog.grade_level = substring(trim(p_grade_label) from '([0-9]+)')::integer)
+  ) THEN
+    RAISE EXCEPTION 'Selected national textbook reference does not match this subject and grade';
+  END IF;
+  IF p_source_library_book_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.library_books book
+    WHERE book.id = p_source_library_book_id AND book.school_id = p_school_id
+      AND book.status = 'approved' AND book.school_review_status = 'approved'
+      AND lower(book.subject) = lower(trim(p_subject_name))
+      AND (book.school_grade_label = trim(p_grade_label)
+        OR (substring(trim(p_grade_label) from '([0-9]+)') IS NOT NULL
+          AND book.grade_level = substring(trim(p_grade_label) from '([0-9]+)')::integer))
+  ) THEN
+    RAISE EXCEPTION 'Selected school library book must be approved and match this grade and subject';
+  END IF;
+  IF p_source_catalog_id IS NOT NULL AND p_source_library_book_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Link one textbook source at a time';
+  END IF;
   IF p_expected_start IS NOT NULL AND p_expected_end IS NOT NULL AND p_expected_end < p_expected_start THEN
     RAISE EXCEPTION 'Expected end date cannot be before expected start date';
   END IF;
@@ -349,13 +378,13 @@ BEGIN
   IF p_unit_id IS NULL THEN
     INSERT INTO public.school_curriculum_units(
       school_id, academic_year_id, grade_label, subject_name, unit_code, title, description,
-      sequence_number, source_type, source_title, source_url, source_verification,
+      sequence_number, source_type, source_title, source_url, source_catalog_id, source_library_book_id, source_verification,
       expected_start, expected_end, is_active, created_by, updated_by
     ) VALUES (
       p_school_id, p_academic_year_id, trim(p_grade_label), trim(p_subject_name),
       trim(p_unit_code), trim(p_title), COALESCE(p_description,''), p_sequence_number,
       p_source_type, COALESCE(p_source_title,''), NULLIF(trim(COALESCE(p_source_url,'')),''),
-      p_source_verification, p_expected_start, p_expected_end, COALESCE(p_is_active,true),
+      p_source_catalog_id, p_source_library_book_id, p_source_verification, p_expected_start, p_expected_end, COALESCE(p_is_active,true),
       auth.uid(), auth.uid()
     ) RETURNING id INTO v_id;
   ELSE
@@ -365,6 +394,7 @@ BEGIN
       description=COALESCE(p_description,''), sequence_number=p_sequence_number,
       source_type=p_source_type, source_title=COALESCE(p_source_title,''),
       source_url=NULLIF(trim(COALESCE(p_source_url,'')),''),
+      source_catalog_id=p_source_catalog_id, source_library_book_id=p_source_library_book_id,
       source_verification=p_source_verification, expected_start=p_expected_start,
       expected_end=p_expected_end, is_active=COALESCE(p_is_active,true),
       updated_by=auth.uid(), updated_at=now()
@@ -496,10 +526,10 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.school_manager_save_curriculum_unit(uuid,uuid,text,text,text,text,text,integer,text,text,text,text,date,date,boolean,uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.school_manager_save_curriculum_unit(uuid,uuid,text,text,text,text,text,integer,text,text,text,text,date,date,boolean,uuid,uuid,uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_teacher_update_curriculum_progress(uuid,uuid,text,text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.school_manager_save_academic_intervention(uuid,uuid,uuid,uuid,text,text,text,text,date,text,text,uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.school_manager_save_curriculum_unit(uuid,uuid,text,text,text,text,text,integer,text,text,text,text,date,date,boolean,uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.school_manager_save_curriculum_unit(uuid,uuid,text,text,text,text,text,integer,text,text,text,text,date,date,boolean,uuid,uuid,uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_teacher_update_curriculum_progress(uuid,uuid,text,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.school_manager_save_academic_intervention(uuid,uuid,uuid,uuid,text,text,text,text,date,text,text,uuid) TO authenticated;
 
