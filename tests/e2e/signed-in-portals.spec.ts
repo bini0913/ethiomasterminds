@@ -359,3 +359,32 @@ test('School Manager attendance oversight is reachable across desktop, tablet an
   }
   expect(pageErrors, 'Unexpected browser errors in School Manager attendance oversight').toEqual([]);
 });
+
+
+test('School Manager timetable and calendar workflows are reachable across desktop, tablet and mobile', async ({ page }) => {
+  test.setTimeout(90_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await authenticateAs(page, 'ci-manager@masterminds.test');
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('button', { name: 'Timetable & Calendar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Timetable & school calendar', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Add timetable entry', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Weekly timetable', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Calendar events', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Create calendar event', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'School calendar', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Operations audit', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Timetable and calendar audit', exact: true })).toBeVisible();
+  }
+  expect(pageErrors, 'Unexpected browser errors in School Manager timetable and calendar').toEqual([]);
+});
