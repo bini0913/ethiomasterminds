@@ -525,3 +525,28 @@ test('School Manager command center, grouped navigation, reports and student sea
   }
   expect(pageErrors, 'Unexpected browser errors in School Manager command center and reports').toEqual([]);
 });
+
+ 
+test('School Manager finance accountability and fee budget oversight are reachable across devices', async ({ page }) => {
+  test.setTimeout(90_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await authenticateAs(page, 'ci-manager@masterminds.test');
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: /Good day\\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('button', { name: 'Fees & Finance', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'School fees & finance', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Fee plan and budget oversight', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Finance payment accountability', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Finance activity audit', exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Search finance audit events' })).toBeVisible();
+  }
+  expect(pageErrors, 'Unexpected browser errors in School Manager finance accountability').toEqual([]);
+});
