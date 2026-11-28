@@ -204,7 +204,7 @@ $function$;
 
 CREATE OR REPLACE FUNCTION public.school_record_curriculum_unit_event()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
-AS $
+AS $function$
 DECLARE
   v_event_type text;
   v_snapshot jsonb;
@@ -230,7 +230,7 @@ BEGIN
   ) VALUES (NEW.school_id, NEW.id, auth.uid(), v_event_type, v_snapshot);
   RETURN NEW;
 END;
-$;
+$function$;
 DROP TRIGGER IF EXISTS school_curriculum_unit_audit ON public.school_curriculum_units;
 CREATE TRIGGER school_curriculum_unit_audit
 AFTER INSERT OR UPDATE ON public.school_curriculum_units
