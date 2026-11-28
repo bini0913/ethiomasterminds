@@ -73,6 +73,29 @@ Deno.serve(async (req) => {
     const isExtremeAdmin = (globalRoles ?? []).some((row: { role: string }) => row.role === "extreme_admin");
     const isSuperAdmin = (globalRoles ?? []).some((row: { role: string }) => row.role === "super_admin");
     const canProvisionNetwork = isExtremeAdmin || isSuperAdmin;
+    let actorNetworkId: string | null = null;
+    if (isSuperAdmin && !isExtremeAdmin) {
+      const { data: network, error: networkError } = await admin
+        .from("school_networks")
+        .select("id")
+        .eq("network_key", true)
+        .single();
+      if (networkError || !network) return json({ error: "Your school network could not be verified" }, 503);
+      actorNetworkId = network.id;
+    }
+
+    const verifySchoolNetwork = async (schoolId: string): Promise<Response | null> => {
+      if (!actorNetworkId) return null;
+      const { data, error } = await admin
+        .from("schools")
+        .select("id")
+        .eq("id", schoolId)
+        .eq("network_id", actorNetworkId)
+        .maybeSingle();
+      if (error) return json({ error: "Unable to verify the school's network authority" }, 503);
+      if (!data) return json({ error: "This school is outside your network" }, 403);
+      return null;
+    };
 
     const createAuthAccount = async (name: string, username: string, grade?: string, age?: number) => {
       const password = randomString(18);
@@ -177,6 +200,8 @@ Deno.serve(async (req) => {
       if (!canProvisionNetwork) return json({ error: "Only the Super Admin or Extreme Admin can list school provisioning sections" }, 403);
       const schoolId = normalize(payload?.school_id);
       if (!schoolId) return json({ error: "A school is required" }, 400);
+      const scopeFailure = await verifySchoolNetwork(schoolId);
+      if (scopeFailure) return scopeFailure;
       const { data: school, error: schoolError } = await admin
         .from("schools")
         .select("id,status")
@@ -392,9 +417,11 @@ Deno.serve(async (req) => {
       const role = normalize(payload?.role) as SchoolRole;
       const reason = normalize(payload?.reason);
       const assignableRoles: SchoolRole[] = ["manager", "finance", "parent"];
-      if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64 || !assignableRoles.includes(role) || !reason) {
-        return json({ error: "Provide an active school, existing username, supported school role, and assignment reason" }, 400);
+      if (!schoolId || targetUsername.length < 3 || targetUsername.length > 64 || !assignableRoles.includes(role) || reason.length < 8) {
+        return json({ error: "Provide an active school, existing username, supported school role, and a reason of at least 8 characters" }, 400);
       }
+      const scopeFailure = await verifySchoolNetwork(schoolId);
+      if (scopeFailure) return scopeFailure;
       let studentMembershipIds: string[] = [];
       if (role === "parent") {
         try {
@@ -420,39 +447,53 @@ Deno.serve(async (req) => {
         return json({ error: "Platform authority accounts cannot be assigned to a school portal" }, 409);
       }
 
-      const { data: membershipId, error: attachError } = await admin.rpc("school_attach_account", {
-        p_actor_id: actorId,
-        p_school_id: schoolId,
-        p_user_id: targetProfile.id,
-        p_school_role: role,
-        p_school_username: targetProfile.username,
-        p_grade_label: null,
-        p_age_at_enrollment: null,
-        p_section_id: null,
-        p_student_number: null,
-        p_parent_membership_ids: [],
-        p_student_membership_ids: studentMembershipIds,
-        p_teacher_assignments: [],
-      });
-      if (attachError || !membershipId) {
-        return json({ error: attachError?.message || "The existing account could not be assigned to this school" }, 400);
+      let membershipId: string | null = null;
+      let auditRecorded = true;
+      if (isExtremeAdmin) {
+        const { data, error } = await admin.rpc("school_attach_account", {
+          p_actor_id: actorId,
+          p_school_id: schoolId,
+          p_user_id: targetProfile.id,
+          p_school_role: role,
+          p_school_username: targetProfile.username,
+          p_grade_label: null,
+          p_age_at_enrollment: null,
+          p_section_id: null,
+          p_student_number: null,
+          p_parent_membership_ids: [],
+          p_student_membership_ids: studentMembershipIds,
+          p_teacher_assignments: [],
+        });
+        if (error || !data) return json({ error: error?.message || "The existing account could not be assigned to this school" }, 400);
+        membershipId = data as string;
+        const { error: auditError } = await admin.from("admin_audit_logs").insert({
+          actor_id: actorId,
+          action: "school_network_existing_account_assigned",
+          target_type: "school_membership",
+          target_id: membershipId,
+          metadata: { school_id: schoolId, user_id: targetProfile.id, school_role: role, reason },
+        });
+        auditRecorded = !auditError;
+      } else {
+        const { data, error } = await userClient.rpc("super_admin_attach_existing_account", {
+          p_school_id: schoolId,
+          p_user_id: targetProfile.id,
+          p_school_role: role,
+          p_school_username: targetProfile.username,
+          p_reason: reason,
+          p_student_membership_ids: studentMembershipIds,
+        });
+        if (error || !data) return json({ error: error?.message || "The existing account could not be assigned to this school" }, 400);
+        membershipId = data as string;
       }
-
-      const { error: auditError } = await admin.from("admin_audit_logs").insert({
-        actor_id: actorId,
-        action: "school_network_existing_account_assigned",
-        target_type: "school_membership",
-        target_id: membershipId,
-        metadata: { school_id: schoolId, user_id: targetProfile.id, school_role: role, reason },
-      });
 
       return json({
         membership_id: membershipId,
         user_id: targetProfile.id,
         username: targetProfile.username,
         role,
-        audit_recorded: !auditError,
-        ...(auditError ? { warning: "The account was assigned, but the audit event could not be written. Review the audit log before repeating this action." } : {}),
+        audit_recorded: auditRecorded,
+        ...(!auditRecorded ? { warning: "The account was assigned, but the audit event could not be written. Review the audit log before repeating this action." } : {}),
       }, 201);
     }
 
@@ -463,6 +504,9 @@ Deno.serve(async (req) => {
       const validRoles: SchoolRole[] = ["manager", "teacher", "finance", "parent", "student"];
       if (!schoolId || !validRoles.includes(role) || !Array.isArray(accounts) || accounts.length < 1 || accounts.length > 100) {
         return json({ error: "Provide a school, valid role, and between 1 and 100 accounts" }, 400);
+      }
+      if (isSuperAdmin && !isExtremeAdmin && role !== "manager") {
+        return json({ error: "Super Admin can provision School Managers only; other school roles are managed inside the school" }, 403);
       }
       if (role === "teacher" && accounts.some((account) => !normalize(account?.leadership_position))) {
         return json({ error: "The School Manager creates Director accounts; Division Directors create Teacher accounts" }, 403);
@@ -483,8 +527,9 @@ Deno.serve(async (req) => {
       }
 
       const { data: school, error: schoolError } = await admin
-        .from("schools").select("id,school_code,status").eq("id", schoolId).maybeSingle();
+        .from("schools").select("id,school_code,status,network_id").eq("id", schoolId).maybeSingle();
       if (schoolError || !school || school.status !== "active") return json({ error: "School is unavailable" }, 404);
+      if (actorNetworkId && school.network_id !== actorNetworkId) return json({ error: "This school is outside your network" }, 403);
 
       const created: Array<Record<string, unknown>> = [];
       const failed: Array<{ index: number; message: string }> = [];

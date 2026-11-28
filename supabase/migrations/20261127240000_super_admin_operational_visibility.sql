@@ -1,0 +1,608 @@
+-- Complete the network-level people and school health summary.
+CREATE OR REPLACE FUNCTION public.super_admin_get_network_dashboard()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_network uuid;
+  v_result jsonb;
+BEGIN
+  IF NOT public._is_network_authority() THEN
+    RAISE EXCEPTION 'Network authority required';
+  END IF;
+
+  v_network := public.school_network_id();
+
+  SELECT jsonb_build_object(
+    'network_id', v_network,
+    'network_name', (SELECT n.name FROM public.school_networks n WHERE n.id = v_network),
+    'schools', (SELECT count(*) FROM public.schools s WHERE s.network_id = v_network),
+    'active_schools', (SELECT count(*) FROM public.schools s WHERE s.network_id = v_network AND s.status = 'active'),
+    'suspended_schools', (SELECT count(*) FROM public.schools s WHERE s.network_id = v_network AND s.status = 'suspended'),
+    'closed_schools', (SELECT count(*) FROM public.schools s WHERE s.network_id = v_network AND s.status = 'closed'),
+    'schools_without_active_manager', (
+      SELECT count(*) FROM public.schools s
+      WHERE s.network_id = v_network AND s.status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 FROM public.school_memberships sm
+          WHERE sm.school_id = s.id AND sm.school_role = 'manager' AND sm.status = 'active'
+        )
+    ),
+    'managers', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'manager' AND sm.status = 'active'
+    ),
+    'admins', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'admin' AND sm.status = 'active'
+    ),
+    'teachers', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'teacher' AND sm.status = 'active'
+    ),
+    'finance_staff', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'finance' AND sm.status = 'active'
+    ),
+    'parents', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'parent' AND sm.status = 'active'
+    ),
+    'active_staff', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network
+        AND sm.school_role IN ('manager', 'admin', 'teacher', 'finance')
+        AND sm.status = 'active'
+    ),
+    'active_students', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'student' AND sm.status = 'active'
+    ),
+    'enrolled_students', (
+      SELECT count(*) FROM public.school_memberships sm
+      JOIN public.schools s ON s.id = sm.school_id
+      WHERE s.network_id = v_network AND sm.school_role = 'student'
+        AND sm.status IN ('active', 'suspended')
+    )
+  ) INTO v_result;
+
+  RETURN v_result;
+END;
+$$;
+
+-- Expand Super Admin network visibility with safe operational alerts and finance detail.
+-- This remains read-only and scoped to the authenticated Super Admin's singleton network.
+CREATE OR REPLACE FUNCTION public.super_admin_get_network_finance()
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_result jsonb;
+BEGIN
+  IF NOT public._is_super_admin() THEN
+    RAISE EXCEPTION 'Super Admin access required';
+  END IF;
+
+  SELECT jsonb_build_object(
+    'invoice_count',
+      (SELECT count(*) FROM public.school_student_invoices i
+       JOIN public.schools s ON s.id = i.school_id
+       WHERE s.network_id = public.school_network_id()),
+    'confirmed_payments',
+      (SELECT count(*) FROM public.school_fee_payments p
+       JOIN public.school_student_invoices i
+         ON i.id = p.invoice_id AND i.school_id = p.school_id
+       JOIN public.schools s ON s.id = i.school_id
+       WHERE s.network_id = public.school_network_id()
+         AND p.status = 'confirmed'),
+    'pending_followups',
+      (SELECT count(*) FROM public.school_finance_followups f
+       JOIN public.schools s ON s.id = f.school_id
+       WHERE s.network_id = public.school_network_id()
+         AND f.status = 'pending'),
+    'overdue_invoice_count',
+      (SELECT count(*) FROM public.school_student_invoices i
+       JOIN public.schools s ON s.id = i.school_id
+       WHERE s.network_id = public.school_network_id()
+         AND i.balance > 0 AND i.due_date < current_date),
+    'currency_totals',
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'currency', totals.currency,
+          'invoice_count', totals.invoice_count,
+          'invoiced_amount', totals.invoiced_amount,
+          'paid_amount', totals.paid_amount,
+          'outstanding_balance', totals.outstanding_balance
+        ) ORDER BY totals.currency)
+        FROM (
+          SELECT upper(COALESCE(NULLIF(trim(i.currency), ''), 'ETB')) AS currency,
+                 count(*)::integer AS invoice_count,
+                 COALESCE(sum(i.amount), 0) AS invoiced_amount,
+                 COALESCE(sum(payment_totals.paid_amount), 0) AS paid_amount,
+                 COALESCE(sum(i.balance), 0) AS outstanding_balance
+          FROM public.school_student_invoices i
+          JOIN public.schools s ON s.id = i.school_id
+          LEFT JOIN LATERAL (
+            SELECT COALESCE(sum(p.amount), 0) AS paid_amount
+            FROM public.school_fee_payments p
+            WHERE p.invoice_id = i.id AND p.school_id = i.school_id
+              AND p.status = 'confirmed'
+          ) AS payment_totals ON true
+          WHERE s.network_id = public.school_network_id()
+          GROUP BY upper(COALESCE(NULLIF(trim(i.currency), ''), 'ETB'))
+        ) AS totals
+      ), '[]'::jsonb),
+    'overdue_by_currency',
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'currency', overdue.currency,
+          'invoice_count', overdue.invoice_count,
+          'outstanding_balance', overdue.outstanding_balance
+        ) ORDER BY overdue.currency)
+        FROM (
+          SELECT upper(COALESCE(NULLIF(trim(i.currency), ''), 'ETB')) AS currency,
+                 count(*)::integer AS invoice_count,
+                 COALESCE(sum(i.balance), 0) AS outstanding_balance
+          FROM public.school_student_invoices i
+          JOIN public.schools s ON s.id = i.school_id
+          WHERE s.network_id = public.school_network_id()
+            AND i.balance > 0 AND i.due_date < current_date
+          GROUP BY upper(COALESCE(NULLIF(trim(i.currency), ''), 'ETB'))
+        ) AS overdue
+      ), '[]'::jsonb),
+    'recent_invoices',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(r) ORDER BY r.created_at DESC)
+        FROM (
+          SELECT i.id AS invoice_id, i.invoice_number, s.name AS school_name,
+                 s.school_code, i.status, i.due_date, i.amount, i.paid_amount,
+                 i.balance, upper(COALESCE(NULLIF(trim(i.currency), ''), 'ETB')) AS currency,
+                 i.created_at
+          FROM public.school_student_invoices i
+          JOIN public.schools s ON s.id = i.school_id
+          WHERE s.network_id = public.school_network_id()
+          ORDER BY i.created_at DESC
+          LIMIT 50
+        ) AS r
+      ), '[]'::jsonb),
+    'recent_payments',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(r) ORDER BY r.received_at DESC)
+        FROM (
+          SELECT p.id AS payment_id, p.receipt_number, i.invoice_number,
+                 s.name AS school_name, s.school_code, p.payment_method,
+                 p.status, p.amount,
+                 upper(COALESCE(NULLIF(trim(i.currency), ''), 'ETB')) AS currency,
+                 p.received_at
+          FROM public.school_fee_payments p
+          JOIN public.school_student_invoices i
+            ON i.id = p.invoice_id AND i.school_id = p.school_id
+          JOIN public.schools s ON s.id = p.school_id
+          WHERE s.network_id = public.school_network_id()
+          ORDER BY p.received_at DESC
+          LIMIT 50
+        ) AS r
+      ), '[]'::jsonb),
+    'pending_followup_records',
+      COALESCE((
+        SELECT jsonb_agg(to_jsonb(r) ORDER BY r.created_at DESC)
+        FROM (
+          SELECT f.id AS followup_id, s.name AS school_name, s.school_code,
+                 i.invoice_number, f.status, f.created_at
+          FROM public.school_finance_followups f
+          JOIN public.schools s ON s.id = f.school_id
+          JOIN public.school_student_invoices i
+            ON i.id = f.invoice_id AND i.school_id = f.school_id
+          WHERE s.network_id = public.school_network_id()
+            AND f.status = 'pending'
+          ORDER BY f.created_at DESC
+          LIMIT 50
+        ) AS r
+      ), '[]'::jsonb)
+  ) INTO v_result;
+
+  RETURN v_result;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.super_admin_get_network_alerts()
+RETURNS TABLE(kind text, severity text, title text, detail text, school_id uuid, created_at timestamptz)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  SELECT alerts.kind, alerts.severity, alerts.title, alerts.detail, alerts.school_id, alerts.created_at
+  FROM (
+    SELECT
+      'school_status'::text AS kind,
+      'warning'::text AS severity,
+      'School access is suspended'::text AS title,
+      s.name || ' (' || s.school_code || ') is suspended and needs review' AS detail,
+      s.id AS school_id,
+      s.updated_at AS created_at
+    FROM public.schools s
+    WHERE public._is_super_admin()
+      AND s.network_id = public.school_network_id()
+      AND s.status = 'suspended'
+
+    UNION ALL
+
+    SELECT
+      'staffing'::text,
+      'warning'::text,
+      'School has no active Manager'::text,
+      s.name || ' (' || s.school_code || ') has no active Manager membership',
+      s.id,
+      s.updated_at
+    FROM public.schools s
+    WHERE public._is_super_admin()
+      AND s.network_id = public.school_network_id()
+      AND s.status = 'active'
+      AND NOT EXISTS (
+        SELECT 1 FROM public.school_memberships sm
+        WHERE sm.school_id = s.id
+          AND sm.school_role = 'manager'
+          AND sm.status = 'active'
+      )
+
+    UNION ALL
+
+    SELECT
+      'finance_followup'::text,
+      'info'::text,
+      'Pending finance follow-ups'::text,
+      count(*)::text || ' follow-up item(s) await review in ' || s.name || ' (' || s.school_code || ')',
+      f.school_id,
+      max(f.created_at)
+    FROM public.school_finance_followups f
+    JOIN public.schools s ON s.id = f.school_id
+    WHERE public._is_super_admin()
+      AND s.network_id = public.school_network_id()
+      AND f.status = 'pending'
+    GROUP BY f.school_id, s.name, s.school_code
+
+    UNION ALL
+
+    SELECT
+      'behavior_review'::text,
+      CASE WHEN count(*) FILTER (WHERE br.severity IN ('high', 'critical')) > 0
+        THEN 'warning' ELSE 'info' END,
+      'Pending behavior reports'::text,
+      count(*)::text || ' report(s) await review in ' || s.name || ' (' || s.school_code || ')',
+      br.school_id,
+      max(br.created_at)
+    FROM public.school_behavior_reports br
+    JOIN public.schools s ON s.id = br.school_id
+    WHERE public._is_super_admin()
+      AND s.network_id = public.school_network_id()
+      AND br.status = 'pending'
+    GROUP BY br.school_id, s.name, s.school_code
+  ) AS alerts
+  ORDER BY alerts.created_at DESC NULLS LAST
+  LIMIT 100;
+$$;
+
+REVOKE ALL ON FUNCTION public.super_admin_get_network_finance() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.super_admin_get_network_finance() TO authenticated;
+REVOKE ALL ON FUNCTION public.super_admin_get_network_alerts() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.super_admin_get_network_alerts() TO authenticated;
+
+
+-- Existing-account assignment is a distinct Super Admin workflow. Keep it
+-- network-scoped and auditable instead of reusing school-manager provisioning.
+CREATE OR REPLACE FUNCTION public.super_admin_attach_existing_account(
+  p_school_id uuid,
+  p_user_id uuid,
+  p_school_role text,
+  p_school_username text,
+  p_reason text,
+  p_student_membership_ids uuid[] DEFAULT '{}'::uuid[]
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_membership_id uuid;
+  v_account_status text;
+  v_profile_username text;
+  v_student_ids uuid[];
+  v_school_status text;
+BEGIN
+  IF NOT public._is_super_admin() THEN
+    RAISE EXCEPTION 'Super Admin access required';
+  END IF;
+
+  IF p_school_id IS NULL OR p_user_id IS NULL
+     OR p_school_role IS NULL
+     OR p_school_role NOT IN ('manager', 'finance', 'parent')
+     OR nullif(trim(p_school_username), '') IS NULL
+     OR length(trim(coalesce(p_reason, ''))) < 8 THEN
+    RAISE EXCEPTION 'A school, active account, supported role, username, and reason are required';
+  END IF;
+
+  IF p_user_id = auth.uid() THEN
+    RAISE EXCEPTION 'You cannot assign your own account to a school';
+  END IF;
+
+  SELECT s.status INTO v_school_status
+  FROM public.schools s
+  WHERE s.id = p_school_id
+    AND s.network_id = public.school_network_id()
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_school_status <> 'active' THEN
+    RAISE EXCEPTION 'School is not active in the current network';
+  END IF;
+
+  SELECT lower(trim(p.username)), coalesce(p.account_status, 'active')
+    INTO v_profile_username, v_account_status
+  FROM public.profiles p
+  WHERE p.id = p_user_id
+  FOR SHARE;
+
+  IF v_profile_username IS NULL THEN
+    RAISE EXCEPTION 'Existing account was not found';
+  END IF;
+  IF v_account_status <> 'active' THEN
+    RAISE EXCEPTION 'Only active accounts can be assigned to a school';
+  END IF;
+  IF v_profile_username <> lower(trim(p_school_username)) THEN
+    RAISE EXCEPTION 'School username does not match the existing account profile';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = p_user_id
+      AND ur.role IN ('extreme_admin'::public.app_role, 'super_admin'::public.app_role)
+  ) THEN
+    RAISE EXCEPTION 'Platform authority accounts cannot be assigned to a school';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = p_user_id
+      AND ur.role::text NOT IN ('extreme_admin', 'super_admin', p_school_role)
+  ) OR EXISTS (
+    SELECT 1 FROM public.school_memberships sm
+    WHERE sm.user_id = p_user_id
+      AND sm.status = 'active'
+      AND sm.school_role <> p_school_role
+  ) THEN
+    RAISE EXCEPTION 'The existing account has a different active school role; use a matching account role';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.school_memberships sm
+    WHERE sm.school_id = p_school_id AND sm.user_id = p_user_id
+  ) THEN
+    RAISE EXCEPTION 'This account already has a membership in the selected school';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.school_memberships sm
+    WHERE sm.school_id = p_school_id
+      AND lower(sm.school_username) = v_profile_username
+  ) THEN
+    RAISE EXCEPTION 'This school username is already in use';
+  END IF;
+
+  v_student_ids := ARRAY(
+    SELECT DISTINCT student_id
+    FROM unnest(coalesce(p_student_membership_ids, '{}'::uuid[])) AS ids(student_id)
+    WHERE student_id IS NOT NULL
+  );
+
+  IF p_school_role = 'parent' THEN
+    IF v_profile_username NOT LIKE 'pa%' THEN
+      RAISE EXCEPTION 'Existing Parent usernames must begin with pa';
+    END IF;
+    IF cardinality(v_student_ids) = 0 THEN
+      RAISE EXCEPTION 'A Parent account must be linked to at least one active student';
+    END IF;
+    IF EXISTS (
+      SELECT 1
+      FROM unnest(v_student_ids) AS ids(student_id)
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.school_memberships sm
+        WHERE sm.id = ids.student_id
+          AND sm.school_id = p_school_id
+          AND sm.school_role = 'student'
+          AND sm.status = 'active'
+      )
+    ) THEN
+      RAISE EXCEPTION 'Every linked student must be actively enrolled in this school';
+    END IF;
+  ELSIF cardinality(v_student_ids) > 0 THEN
+    RAISE EXCEPTION 'Student links are only valid for Parent assignments';
+  END IF;
+
+  INSERT INTO public.school_memberships(
+    school_id, user_id, school_role, status, school_username, created_by
+  )
+  VALUES (
+    p_school_id, p_user_id, p_school_role, 'active', v_profile_username, auth.uid()
+  )
+  RETURNING id INTO v_membership_id;
+
+  IF p_school_role = 'parent' THEN
+    INSERT INTO public.school_parent_student_links(
+      school_id, parent_membership_id, student_membership_id, linked_by
+    )
+    SELECT p_school_id, v_membership_id, ids.student_id, auth.uid()
+    FROM unnest(v_student_ids) AS ids(student_id);
+  END IF;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(),
+    'school_network_existing_account_assigned',
+    'school_membership',
+    v_membership_id,
+    jsonb_build_object(
+      'school_id', p_school_id,
+      'user_id', p_user_id,
+      'school_role', p_school_role,
+      'username', v_profile_username,
+      'reason', trim(p_reason),
+      'linked_student_count', cardinality(v_student_ids)
+    )
+  );
+
+  RETURN v_membership_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.super_admin_attach_existing_account(uuid, uuid, text, text, text, uuid[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.super_admin_attach_existing_account(uuid, uuid, text, text, text, uuid[]) TO authenticated;
+-- Network-level access holds for parent/student memberships are limited to
+-- suspend/restore. Enrollment exit, transfer, and graduation remain school-owned.
+CREATE OR REPLACE FUNCTION public.super_admin_set_school_membership_status(
+  p_membership_id uuid,
+  p_status text,
+  p_reason text DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_membership public.school_memberships%ROWTYPE;
+BEGIN
+  IF NOT public._is_super_admin() THEN
+    RAISE EXCEPTION 'Super Admin access required';
+  END IF;
+  IF p_status IS NULL OR p_status NOT IN ('active', 'suspended', 'deactivated') THEN
+    RAISE EXCEPTION 'Invalid membership status';
+  END IF;
+  IF length(trim(coalesce(p_reason, ''))) < 8 THEN
+    RAISE EXCEPTION 'A reason of at least 8 characters is required';
+  END IF;
+
+  SELECT sm.* INTO v_membership
+  FROM public.school_memberships sm
+  JOIN public.schools s ON s.id = sm.school_id
+  WHERE sm.id = p_membership_id
+    AND s.network_id = public.school_network_id()
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Membership is outside the current network';
+  END IF;
+
+  IF v_membership.school_role = 'admin' THEN
+    RAISE EXCEPTION 'Legacy School Admin memberships are retired; use the School Manager leadership appointment workflow';
+  END IF;
+  IF v_membership.school_role NOT IN ('manager', 'teacher', 'finance', 'parent', 'student') THEN
+    RAISE EXCEPTION 'This membership role is not managed by the network workspace';
+  END IF;
+  IF v_membership.school_role IN ('parent', 'student') THEN
+    IF p_status NOT IN ('active', 'suspended') THEN
+      RAISE EXCEPTION 'Network authority may only suspend or restore Parent and Student access; enrollment exits remain school-owned';
+    END IF;
+    IF v_membership.status NOT IN ('active', 'suspended') THEN
+      RAISE EXCEPTION 'Transferred, graduated, or deactivated memberships must be handled through school enrollment workflows';
+    END IF;
+  END IF;
+
+  UPDATE public.school_memberships
+  SET status = p_status,
+      ended_at = CASE WHEN p_status = 'deactivated' THEN coalesce(ended_at, now()) ELSE NULL END,
+      end_reason = CASE WHEN p_status = 'deactivated' THEN trim(p_reason) ELSE NULL END,
+      updated_at = now()
+  WHERE id = p_membership_id;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(),
+    'super_admin_membership_status_changed',
+    'school',
+    v_membership.school_id,
+    jsonb_build_object(
+      'membership_id', p_membership_id,
+      'user_id', v_membership.user_id,
+      'role', v_membership.school_role,
+      'previous_status', v_membership.status,
+      'status', p_status,
+      'reason', trim(p_reason)
+    )
+  );
+
+  RETURN true;
+END;
+$$;
+
+
+-- Close the legacy two-argument status path so every client-side school status
+-- change must supply an auditable reason through the network-scoped overload.
+CREATE OR REPLACE FUNCTION public.super_admin_set_school_status(
+  p_school_id uuid,
+  p_status text,
+  p_reason text DEFAULT NULL::text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_previous_status text;
+BEGIN
+  IF NOT public._is_super_admin() THEN
+    RAISE EXCEPTION 'Super Admin access required';
+  END IF;
+  IF p_school_id IS NULL OR p_status IS NULL
+     OR p_status NOT IN ('active', 'suspended', 'closed') THEN
+    RAISE EXCEPTION 'A valid school and status are required';
+  END IF;
+  IF length(trim(coalesce(p_reason, ''))) < 8 THEN
+    RAISE EXCEPTION 'A reason of at least 8 characters is required';
+  END IF;
+
+  SELECT s.status INTO v_previous_status
+  FROM public.schools s
+  WHERE s.id = p_school_id
+    AND s.network_id = public.school_network_id()
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'School not found in the current network';
+  END IF;
+
+  UPDATE public.schools
+  SET status = p_status, updated_at = now()
+  WHERE id = p_school_id;
+
+  INSERT INTO public.admin_audit_logs(actor_id, action, target_type, target_id, metadata)
+  VALUES (
+    auth.uid(),
+    'super_admin_set_school_status',
+    'school',
+    p_school_id,
+    jsonb_build_object(
+      'previous_status', v_previous_status,
+      'status', p_status,
+      'reason', trim(p_reason)
+    )
+  );
+
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.super_admin_set_school_status(uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.super_admin_set_school_status(uuid, text) TO service_role;
+REVOKE ALL ON FUNCTION public.super_admin_set_school_status(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.super_admin_set_school_status(uuid, text, text) TO authenticated;
+

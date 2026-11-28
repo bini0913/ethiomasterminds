@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(20);
+SELECT plan(41);
 
 SELECT ok(to_regprocedure('public.super_admin_list_network_people(uuid,text,text,integer,integer)') IS NOT NULL, 'network people directory RPC exists');
 SELECT ok(to_regprocedure('public.super_admin_get_school_analytics(uuid)') IS NOT NULL, 'school analytics RPC exists');
@@ -22,6 +22,42 @@ SELECT ok(position('network_key = true' IN pg_get_functiondef('public.super_admi
 SELECT ok(position('admin_audit_logs' IN pg_get_functiondef('public.super_admin_update_network_name(text)'::regprocedure)) > 0, 'settings mutation persists audit records');
 SELECT ok(position('currency_totals' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'network finance returns currency-separated totals');
 SELECT ok(position('outstanding_by_currency' IN pg_get_functiondef('public.super_admin_get_school_analytics(uuid)'::regprocedure)) > 0, 'school analytics returns currency-separated outstanding balances');
+
+
+
+SELECT ok(position('recent_invoices' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'network finance exposes recent invoice detail');
+SELECT ok(position('recent_payments' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'network finance exposes recent payment detail');
+SELECT ok(position('pending_followup_records' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'network finance exposes pending follow-up records');
+SELECT ok(position('overdue_by_currency' IN pg_get_functiondef('public.super_admin_get_network_finance()'::regprocedure)) > 0, 'overdue balances remain currency-separated');
+SELECT ok(position('school_behavior_reports' IN pg_get_functiondef('public.super_admin_get_network_alerts()'::regprocedure)) > 0, 'network alerts include pending behavior review counts');
+SELECT ok(position('no active Manager' IN pg_get_functiondef('public.super_admin_get_network_alerts()'::regprocedure)) > 0, 'network alerts identify schools without active Managers');
+
+
+SELECT ok(to_regprocedure('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])') IS NOT NULL, 'network-scoped existing-account assignment RPC exists');
+SELECT ok(position('_is_super_admin' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment requires Super Admin');
+SELECT ok(position('school_network_id' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment is restricted to the current network');
+SELECT ok(position('admin_audit_logs' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignments create an audit event');
+
+
+SELECT ok(NOT has_function_privilege('anon', 'public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])', 'execute'), 'anonymous role cannot assign existing school accounts');
+SELECT ok(position('Only active accounts' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment rejects inactive global accounts');
+
+
+SELECT ok(position('school_role <> p_school_role' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment prevents conflicting active school roles');
+SELECT ok(position('ur.role::text NOT IN' IN pg_get_functiondef('public.super_admin_attach_existing_account(uuid,uuid,text,text,text,uuid[])'::regprocedure)) > 0, 'existing-account assignment preserves the existing global school role');
+
+
+SELECT ok(position('schools_without_active_manager' IN pg_get_functiondef('public.super_admin_get_network_dashboard()'::regprocedure)) > 0, 'network dashboard identifies schools without active Managers');
+SELECT ok(position('active_staff' IN pg_get_functiondef('public.super_admin_get_network_dashboard()'::regprocedure)) > 0, 'network dashboard includes all active school staff');
+
+
+SELECT ok(position('Network authority may only suspend or restore Parent and Student access' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'network-level Parent and Student changes are limited to suspend and restore');
+SELECT ok(position('A reason of at least 8 characters is required' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'membership status changes require an audited reason server-side');
+SELECT ok(position('Legacy School Admin memberships are retired' IN pg_get_functiondef('public.super_admin_set_school_membership_status(uuid,text,text)'::regprocedure)) > 0, 'retired School Admin memberships cannot be reactivated through the network workflow');
+
+
+SELECT ok(position('A reason of at least 8 characters is required' IN pg_get_functiondef('public.super_admin_set_school_status(uuid,text,text)'::regprocedure)) > 0, 'school status changes require a reason server-side');
+SELECT ok(NOT has_function_privilege('authenticated', 'public.super_admin_set_school_status(uuid,text)', 'execute'), 'legacy reason-free school status RPC is unavailable to authenticated clients');
 
 SELECT * FROM finish();
 ROLLBACK;

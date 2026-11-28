@@ -24,6 +24,8 @@ type AdminCommandCenterShellProps = {
   onRefresh?: () => void;
   refreshing?: boolean;
   onLogout?: () => Promise<void> | void;
+  accessLabel?: string;
+  accessDescription?: string;
   children: React.ReactNode;
 };
 
@@ -100,6 +102,8 @@ export default function AdminCommandCenterShell({
   onRefresh,
   refreshing,
   onLogout,
+  accessLabel = "Owner access",
+  accessDescription = "One protected place for platform-wide decisions.",
   children,
 }: AdminCommandCenterShellProps) {
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -145,8 +149,8 @@ export default function AdminCommandCenterShell({
           </div>
         </div>
         <div className="mb-4 rounded-2xl border border-cyan-300/15 bg-cyan-300/5 px-3 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-cyan-200">Owner access</p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-300">One protected place for platform-wide decisions.</p>
+          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-cyan-200">{accessLabel}</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-300">{accessDescription}</p>
         </div>
         <div className="flex-1 overflow-y-auto pr-1">
           <Navigation items={navItems} activeKey={activeKey} onNavigate={onNavigate} />

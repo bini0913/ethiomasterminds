@@ -132,20 +132,20 @@ test('Extreme Admin executive workspace exposes Part 1 and Part 3 sections acros
   expect(pageErrors, 'Unexpected browser errors in Extreme Admin desktop/tablet/mobile workspace').toEqual([]);
 });
 
-test('Super Admin network workspace exposes its live operational sections across desktop, tablet and mobile', async ({ page }) => {
+test('Super Admin network workspace exposes its live workflows across desktop, tablet and mobile', async ({ page }) => {
   test.setTimeout(120_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await authenticateAs(page, 'ci-super-admin@masterminds.test');
   const sections = [
-    { tab: /Overview/, content: 'Network school comparison' },
-    { tab: /Schools/, content: 'Register school' },
-    { tab: /People/, content: 'Network people and staff' },
-    { tab: /Analytics/, content: 'School performance and academic analytics' },
-    { tab: /Finance/, content: 'Financial oversight by currency' },
-    { tab: /Audit/, content: 'Network audit history' },
-    { tab: /Settings/, content: 'Network configuration' },
+    { label: /Overview Network pulse/, content: 'Network school directory' },
+    { label: /Schools Register and oversee/, content: 'Register a school' },
+    { label: /People Staff and memberships/, content: 'People and school memberships' },
+    { label: /Analytics School performance/, content: 'School performance' },
+    { label: /Finance Read-only oversight/, content: 'Network finance oversight' },
+    { label: /Audit history Recorded changes/, content: 'Network audit history' },
+    { label: /Settings Network identity/, content: 'Network identity' },
   ];
 
   for (const viewport of [
@@ -156,15 +156,64 @@ test('Super Admin network workspace exposes its live operational sections across
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/super-admin', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('Network command center')).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText('Network-scoped access')).toBeVisible();
+    await expect(page.getByText('Owner access')).toHaveCount(0);
 
     for (const section of sections) {
-      await page.getByRole('tab', { name: section.tab }).click();
-      await expect(page.getByText(section.content, { exact: false })).toBeVisible();
+      if (viewport.width < 1024) {
+        await page.getByRole('button', { name: 'Open administration navigation' }).click();
+      }
+      await page.getByRole('button', { name: section.label }).click();
+      await expect(page.getByRole('heading', { name: section.content, exact: false }).first()).toBeVisible();
     }
 
-    await page.getByRole('tab', { name: /People/ }).click();
-    await page.getByRole('button', { name: 'All schools' }).click();
-    await expect(page.getByText('Network people and staff')).toBeVisible();
+    if (viewport.width < 1024) {
+      await page.getByRole('button', { name: 'Open administration navigation' }).click();
+    }
+    await page.getByRole('button', { name: /People Staff and memberships/ }).click();
+    await page.getByRole('combobox').nth(1).click();
+    await page.getByRole('option', { name: 'All schools' }).click();
+    await expect(page.getByText('People and school memberships')).toBeVisible();
+    await expect(page.getByText('Global account status is separate')).toBeVisible();
+    const accessSuspend = page.getByRole('button', { name: 'Suspend access', exact: true }).first();
+    if (await accessSuspend.count()) {
+      await accessSuspend.click();
+      await expect(page.getByRole('heading', { name: 'Confirm membership status change' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Confirm change' })).toBeDisabled();
+      await page.getByRole('button', { name: 'Cancel' }).click();
+    }
+    const legacyAdminRow = page.getByRole('row').filter({ hasText: /Legacy Admin role/ });
+    if (await legacyAdminRow.count()) await expect(legacyAdminRow.getByRole('button')).toHaveCount(0);
+    const staffSuspend = page.getByRole('button', { name: 'Suspend', exact: true }).first();
+    if (await staffSuspend.count()) {
+      await staffSuspend.click();
+      await expect(page.getByRole('heading', { name: 'Confirm membership status change' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Confirm change' })).toBeDisabled();
+      await page.getByRole('button', { name: 'Cancel' }).click();
+    }
+
+    if (viewport.width < 1024) {
+      await page.getByRole('button', { name: 'Open administration navigation' }).click();
+    }
+    await page.getByRole('button', { name: /Schools Register and oversee/ }).click();
+    await expect(page.getByText('Assign an existing account')).toBeVisible();
+    await page.getByRole('combobox').nth(1).click();
+    await page.getByRole('option', { name: 'Parent' }).click();
+    await expect(page.getByText('Enrolled student usernames')).toBeVisible();
+    const schoolSuspend = page.getByRole('button', { name: 'Suspend', exact: true }).first();
+    if (await schoolSuspend.count()) {
+      await schoolSuspend.click();
+      await expect(page.getByRole('heading', { name: 'Confirm school status change' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Confirm change' })).toBeDisabled();
+      await page.getByRole('button', { name: 'Cancel' }).click();
+    }
+
+    if (viewport.width < 1024) {
+      await page.getByRole('button', { name: 'Open administration navigation' }).click();
+    }
+    await page.getByRole('button', { name: /Finance Read-only oversight/ }).click();
+    await expect(page.getByRole('heading', { name: 'Recent school invoices', exact: false }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pending finance follow-ups', exact: false }).first()).toBeVisible();
   }
 
   expect(pageErrors, 'Unexpected browser errors in Super Admin desktop/tablet/mobile workspace').toEqual([]);
