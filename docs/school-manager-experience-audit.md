@@ -28,7 +28,7 @@ The Manager sidebar is grouped into six areas. Each visible destination has one 
 | Administration | School Audit | `audit` | Enrollment, structure and leadership history |
 | Administration | Manager Settings | `settings` | School policy settings; network-managed identity stays read-only |
 
-Legacy renderer functions for tasks, evaluations, requests and discipline remain in the page source while their capabilities are surfaced through the consolidated Staff & Student Support workspace. They are not separate sidebar destinations. Their unique actions must be reconciled before any legacy implementation is removed.
+The old standalone task, evaluation, request, and discipline renderer routes were removed from the Manager page. Their supported actions are consolidated in Staff & Student Support. Manager-submitted staff change requests and staff disciplinary recommendations are available under the dedicated Manager escalations tab; monitoring remains in Staff accountability. The Manager can submit requests for review but cannot approve network-level changes or directly apply staff discipline.
 
 ## Student profile data contract
 
