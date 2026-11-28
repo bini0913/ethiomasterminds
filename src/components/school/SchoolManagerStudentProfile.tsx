@@ -82,7 +82,8 @@ export default function SchoolManagerStudentProfile({ schoolId, student, profile
   }, {});
   const attendanceMarked = attendance.length;
   const attendancePresent = (attendanceCounts.present || 0) + (attendanceCounts.late || 0);
-  const attendanceRate = attendanceMarked ? Math.round((attendancePresent / attendanceMarked) * 100) : null;
+  const attendanceEligible = attendancePresent + (attendanceCounts.absent || 0);
+  const attendanceRate = attendanceEligible ? Math.round((attendancePresent / attendanceEligible) * 100) : null;
   const latestAverage = publishedResults.length ? Number(publishedResults[0].average_score || 0) : null;
   const balanceByCurrency = invoices.reduce((acc: Record<string, number>, invoice) => {
     const currency = invoice.currency || "ETB";
@@ -113,7 +114,7 @@ export default function SchoolManagerStudentProfile({ schoolId, student, profile
         <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><div className="flex items-center gap-2 text-xs font-medium text-slate-500"><Award className="h-4 w-4" />Published academic rank</div><p className="mt-2 text-2xl font-bold text-slate-900">{latestRank ? "#" + latestRank.rank_position : "—"}</p><p className="mt-1 text-xs text-slate-500">{latestRank ? termName(latestRank.term_id) + " · " + latestRank.subject_name : "No published rank available"}</p></div>
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><div className="flex items-center gap-2 text-xs font-medium text-slate-500"><TrendingUp className="h-4 w-4" />Latest published average</div><p className="mt-2 text-2xl font-bold text-slate-900">{latestAverage === null ? "—" : numberLabel(latestAverage) + "%"}</p><p className="mt-1 text-xs text-slate-500">Published term result only</p></div>
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><div className="flex items-center gap-2 text-xs font-medium text-slate-500"><CalendarCheck className="h-4 w-4" />Attendance rate</div><p className="mt-2 text-2xl font-bold text-slate-900">{attendanceRate === null ? "—" : attendanceRate + "%"}</p><p className="mt-1 text-xs text-slate-500">{attendanceMarked} recorded attendance entries</p></div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><div className="flex items-center gap-2 text-xs font-medium text-slate-500"><CalendarCheck className="h-4 w-4" />Attendance rate</div><p className="mt-2 text-2xl font-bold text-slate-900">{attendanceRate === null ? "—" : attendanceRate + "%"}</p><p className="mt-1 text-xs text-slate-500">{attendanceMarked} records · {attendanceCounts.excused || 0} excused</p></div>
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3"><div className="flex items-center gap-2 text-xs font-medium text-slate-500"><CreditCard className="h-4 w-4" />Outstanding fees</div><p className="mt-2 text-lg font-bold text-slate-900">{Object.keys(balanceByCurrency).length ? Object.entries(balanceByCurrency).map(([currency, amount]) => currency + " " + amount.toLocaleString()).join(" · ") : "No invoices"}</p><p className="mt-1 text-xs text-slate-500">Balances kept separate by currency</p></div>
         </div>
       </section>
