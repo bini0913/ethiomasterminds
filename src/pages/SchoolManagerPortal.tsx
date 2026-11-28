@@ -641,8 +641,8 @@ export default function SchoolManagerPortal() {
     const academicYear = years.find((year) => year.id === termYearId);
     const name = termName.trim();
     const number = Number(termNumber);
-    if (!academicYear || !name || name.length > 80 || !Number.isInteger(number) || number < 1 || number > 12) {
-      return toast.error("Enter a term name and a term number from 1 to 12.");
+    if (!academicYear || !name || name.length > 80 || !Number.isInteger(number) || number < 1 || number < 1) {
+      return toast.error("Enter a term name and a term number to a positive whole number.");
     }
     if (!termStart || !termEnd || termEnd < termStart || termStart < academicYear.starts_on || termEnd > academicYear.ends_on) {
       return toast.error("Term dates must be valid and fall within the selected academic year.");
@@ -1170,7 +1170,7 @@ export default function SchoolManagerPortal() {
         <form onSubmit={saveTerm} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <SchoolField label="Academic year"><select className={schoolSelectClass} value={termYearId} onChange={(event) => setTermYearId(event.target.value)} required><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></SchoolField>
           <SchoolField label="Term name"><input className={schoolInputClass} value={termName} onChange={(event) => setTermName(event.target.value)} placeholder="Term 1" maxLength={80} required /></SchoolField>
-          <SchoolField label="Term number"><input type="number" min="1" max="12" step="1" className={schoolInputClass} value={termNumber} onChange={(event) => setTermNumber(event.target.value)} required /></SchoolField>
+          <SchoolField label="Term number"><input type="number" min="1" step="1" className={schoolInputClass} value={termNumber} onChange={(event) => setTermNumber(event.target.value)} required /></SchoolField>
           <SchoolField label="Start date"><input type="date" className={schoolInputClass} value={termStart} onChange={(event) => setTermStart(event.target.value)} required /></SchoolField>
           <SchoolField label="End date"><input type="date" className={schoolInputClass} value={termEnd} onChange={(event) => setTermEnd(event.target.value)} required /></SchoolField>
           <div className="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-5">
@@ -1382,7 +1382,7 @@ export default function SchoolManagerPortal() {
 
   const renderGrading = () => (
     <div className="space-y-5">
-      <SchoolPageHeading title="Grading & school policies" description="Configure each grade's assessment weights, pass mark, ranking scope, grade scale, and parent notification policies." />
+      <SchoolPageHeading title="Grading & school policies" description="Configure each grade's assessment weights, pass mark, ranking scope, and grade scale." />
       <SchoolPanel title="Select academic year and grade">
         <div className="grid gap-3 sm:grid-cols-2">
           <SchoolField label="Academic year"><select className={schoolSelectClass} value={gradingYearId} onChange={(event) => setGradingYearId(event.target.value)}><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}{year.is_current ? " · Current" : ""}</option>)}</select></SchoolField>
