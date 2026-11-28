@@ -21,7 +21,7 @@ The Manager sidebar is grouped into six areas. Each visible destination has one 
 | Daily operations | Attendance | `attendance` | Attendance session and exception oversight |
 | Daily operations | Timetable & Calendar | `timetable` | Weekly timetable and school calendar |
 | Daily operations | Parent Communication | `communications` | Announcements, parent notifications, link coverage and messaging metadata |
-| Daily operations | Staff & Student Support | `staff-support` | Staff tasks, accountability and student support |
+| Daily operations | Staff & Student Support | `staff-support` | Staff tasks, accountability, student support and Manager escalations |
 | Daily operations | Content Governance | `content-governance` | School content review oversight and review history |
 | Finance & insights | Fees & Finance | `finance` | Fee structures, invoices, payments and follow-ups |
 | Finance & insights | Reports & Analytics | `reports` | Enrollment/staff charts, currency-separated balances and drill-down |
@@ -35,7 +35,7 @@ The old standalone task, evaluation, request, and discipline renderer routes wer
 The profile is a read-only aggregation of school-scoped records, all filtered by both `school_id` and the selected student membership ID:
 
 - Membership/profile identity and assigned school student number.
-- Published `school_term_results`; academic rank is displayed only when `published_at` and `rank_position` exist.
+- Published `school_term_results`; all published results remain visible, while academic rank is displayed only when `published_at` and `rank_position` exist.
 - `school_student_marks` joined to school assessment metadata.
 - `school_attendance_records` and matching session dates.
 - `school_homework_submissions` status, recorded grade and feedback; submission text and attachment paths are not exposed.
