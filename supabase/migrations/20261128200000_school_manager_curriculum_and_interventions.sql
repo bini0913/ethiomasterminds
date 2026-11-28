@@ -304,10 +304,11 @@ CREATE OR REPLACE FUNCTION public.school_teacher_update_curriculum_progress(
   p_unit_id uuid, p_section_id uuid, p_status text, p_teacher_note text DEFAULT ''
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $$
-DECLARE v_unit public.school_curriculum_units%ROWTYPE;
-DECLARE v_section public.school_sections%ROWTYPE;
-DECLARE v_teacher_id uuid;
-DECLARE v_progress_id uuid;
+DECLARE
+  v_unit public.school_curriculum_units%ROWTYPE;
+  v_section public.school_sections%ROWTYPE;
+  v_teacher_id uuid;
+  v_progress_id uuid;
 BEGIN
   SELECT * INTO v_unit FROM public.school_curriculum_units WHERE id=p_unit_id AND is_active;
   SELECT * INTO v_section FROM public.school_sections WHERE id=p_section_id;
@@ -351,8 +352,9 @@ CREATE OR REPLACE FUNCTION public.school_manager_save_academic_intervention(
   p_target_date date, p_status text, p_outcome text DEFAULT '', p_intervention_id uuid DEFAULT NULL
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $$
-DECLARE v_actor uuid;
-DECLARE v_id uuid;
+DECLARE
+  v_actor uuid;
+  v_id uuid;
 BEGIN
   IF auth.uid() IS NULL OR NOT public.is_school_manager_or_admin(p_school_id) THEN
     RAISE EXCEPTION 'School Manager or School Admin access required';
