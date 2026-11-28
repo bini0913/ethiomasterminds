@@ -77,6 +77,8 @@ set search_path = public, pg_temp
 as $
 declare
   v_grade text;
+  v_year_start date;
+  v_year_end date;
 begin
   if not public.is_school_manager_or_admin(new.school_id) then
     raise exception 'School Manager permission is required to manage the calendar';
@@ -84,11 +86,16 @@ begin
   if tg_op = 'INSERT' then
     new.created_by_membership_id := public.school_my_membership_id(new.school_id);
   end if;
-  if new.academic_year_id is not null and not exists (
-    select 1 from public.school_academic_years year
-    where year.id = new.academic_year_id and year.school_id = new.school_id
-  ) then
-    raise exception 'Academic year does not belong to this school';
+  if new.academic_year_id is not null then
+    select year.starts_on, year.ends_on into v_year_start, v_year_end
+    from public.school_academic_years year
+    where year.id = new.academic_year_id and year.school_id = new.school_id;
+    if v_year_start is null then
+      raise exception 'Academic year does not belong to this school';
+    end if;
+    if new.starts_at::date < v_year_start or new.ends_at::date > v_year_end then
+      raise exception 'Calendar event dates must fall within the selected academic year';
+    end if;
   end if;
   if new.audience_type = 'grade' and not exists (
     select 1 from public.school_sections section
@@ -179,7 +186,8 @@ begin
       where assignment.school_id = new.school_id
         and assignment.teacher_membership_id = new.teacher_membership_id
         and assignment.section_id = new.section_id
-        and (assignment.assignment_kind = 'homeroom' or lower(assignment.subject_name) = lower(new.subject_name))
+        and ((assignment.assignment_kind = 'subject' and lower(assignment.subject_name) = lower(new.subject_name))
+          or (assignment.assignment_kind = 'homeroom' and lower(new.subject_name) = 'homeroom'))
     ) then
       raise exception 'The teacher must already be assigned to this section and subject';
     end if;
