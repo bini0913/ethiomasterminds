@@ -85,6 +85,9 @@ export default function SchoolManagerPortal() {
   const [studentActionStatus, setStudentActionStatus] = useState<"transferred" | "graduated" | "deactivated" | "">("");
   const [studentActionReason, setStudentActionReason] = useState("");
   const [studentActionLoading, setStudentActionLoading] = useState(false);
+  const [studentPlacementId, setStudentPlacementId] = useState<string | null>(null);
+  const [studentPlacementSectionId, setStudentPlacementSectionId] = useState("");
+  const [studentPlacementLoading, setStudentPlacementLoading] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [staffRoleFilter, setStaffRoleFilter] = useState("all");
   const [staffStatusFilter, setStaffStatusFilter] = useState("all");
@@ -966,6 +969,35 @@ export default function SchoolManagerPortal() {
     }
   };
 
+  const saveStudentPlacement = async () => {
+    if (!schoolId || !studentPlacementId || !studentPlacementSectionId) {
+      return toast.error("Choose the student's new section.");
+    }
+    const student = members.find((member) => member.id === studentPlacementId && member.school_role === "student");
+    const section = sections.find((item) => item.id === studentPlacementSectionId);
+    if (!student || !section || !["active", "suspended"].includes(student.status)) {
+      return toast.error("This student or destination section is no longer available.");
+    }
+    if (student.section_id === section.id && student.grade_label === section.grade_label) {
+      return toast.info("The student is already placed in this section.");
+    }
+    setStudentPlacementLoading(true);
+    try {
+      const { error } = await db.from("school_memberships")
+        .update({ section_id: section.id, grade_label: section.grade_label })
+        .eq("id", student.id).eq("school_id", schoolId).eq("school_role", "student");
+      if (error) throw error;
+      toast.success("Student placement updated. Grade and section history are retained by the database.");
+      setStudentPlacementId(null);
+      setStudentPlacementSectionId("");
+      await load();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Student placement could not be updated.");
+    } finally {
+      setStudentPlacementLoading(false);
+    }
+  };
+
   const renderStudents = () => {
     const allStudents = members.filter((member) => member.school_role === "student");
     const normalizedSearch = studentSearch.trim().toLowerCase();
@@ -1013,7 +1045,9 @@ export default function SchoolManagerPortal() {
               {visibleStudents.map((student) => {
                 const profile = profiles[student.user_id] ?? {};
                 const actionOpen = studentActionId === student.id;
-                const canExit = ["active", "suspended"].includes(student.status);
+                const placementOpen = studentPlacementId === student.id;
+                const canManagePlacement = ["active", "suspended"].includes(student.status);
+                const canExit = canManagePlacement;
                 return (
                   <div key={student.id} className="py-3">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1029,13 +1063,35 @@ export default function SchoolManagerPortal() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <SchoolStatus value={student.status} />
+                        {canManagePlacement && <SchoolSecondaryButton onClick={() => {
+                          setStudentPlacementId(placementOpen ? null : student.id);
+                          setStudentPlacementSectionId(student.section_id || "");
+                        }}>{placementOpen ? "Close placement" : "Change placement"}</SchoolSecondaryButton>}
                         {canExit && <SchoolSecondaryButton onClick={() => {
                           setStudentActionId(actionOpen ? null : student.id);
                           setStudentActionStatus("");
                           setStudentActionReason("");
-                        }}>{actionOpen ? "Close actions" : "Record student exit"}</SchoolSecondaryButton>}
+                        }}>{actionOpen ? "Close exit form" : "Record student exit"}</SchoolSecondaryButton>}
                       </div>
                     </div>
+                    {placementOpen && (
+                      <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                        <p className="text-sm font-semibold text-slate-900">Change grade or section placement</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">Choose a section in this school. The student's grade is taken from the selected section; database triggers preserve the previous section history and record grade changes.</p>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                          <SchoolField label="New section">
+                            <select className={schoolSelectClass} value={studentPlacementSectionId} onChange={(event) => setStudentPlacementSectionId(event.target.value)}>
+                              <option value="">Choose destination section</option>
+                              {sections.map((section) => <option key={section.id} value={section.id}>{section.grade_label} {section.section_name} · {years.find((year) => year.id === section.academic_year_id)?.name || "Academic year"}</option>)}
+                            </select>
+                          </SchoolField>
+                          <div className="flex gap-2">
+                            <SchoolSecondaryButton onClick={() => { setStudentPlacementId(null); setStudentPlacementSectionId(""); }}>Cancel</SchoolSecondaryButton>
+                            <SchoolPrimaryButton onClick={() => void saveStudentPlacement()} disabled={studentPlacementLoading || !studentPlacementSectionId}>{studentPlacementLoading ? "Saving…" : "Save placement"}</SchoolPrimaryButton>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {actionOpen && (
                       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
                         <p className="text-sm font-semibold text-slate-900">Record an enrollment exit</p>
