@@ -1030,7 +1030,7 @@ export default function SchoolManagerPortal() {
       <div className="space-y-5">
         <SchoolPageHeading
           title="Student directory"
-          description="Search school student memberships, review their enrollment and placement, and record formal exits with a reason. Student account history is preserved."
+          description="Find any student by name, username, assigned school ID, student number, or record ID. Open one profile for academic results, published rank, attendance, homework, fees, and enrollment history."
           action={<SchoolSecondaryButton onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</SchoolSecondaryButton>}
         />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
