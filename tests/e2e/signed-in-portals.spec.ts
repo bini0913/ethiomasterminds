@@ -503,7 +503,17 @@ test('School Manager command center, grouped navigation, reports and student sea
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
     await page.getByRole('button', { name: 'Student Directory', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Student directory', exact: true })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'Search student records' })).toBeVisible();
+    const studentSearch = page.getByRole('textbox', { name: 'Search student records' });
+    await expect(studentSearch).toBeVisible();
+    await studentSearch.fill('ci_student');
+    await expect(page.getByText('CI Student', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Open profile', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Student profile', exact: true })).toBeVisible();
+    await expect(page.getByText('School student ID', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Published term results', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Attendance', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to directory', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Student directory', exact: true })).toBeVisible();
   }
   expect(pageErrors, 'Unexpected browser errors in School Manager command center and reports').toEqual([]);
 });
