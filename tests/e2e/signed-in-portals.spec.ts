@@ -265,3 +265,30 @@ test('School Manager Part 1 workflows are reachable across desktop, tablet and m
 
   expect(pageErrors, 'Unexpected browser errors in School Manager Part 1 desktop/tablet/mobile workflows').toEqual([]);
 });
+
+test('School Manager academic oversight is reachable on desktop, tablet and mobile', async ({ page }) => {
+  test.setTimeout(90_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await authenticateAs(page, 'ci-manager@masterminds.test');
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('button', { name: 'Academic Management', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Academic management', exact: true })).toBeVisible();
+    await expect(page.getByText('Academic scope', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Assessment oversight', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Subject coverage by section', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Ethiopian textbook reference catalog', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Academic follow-up candidates', exact: true })).toBeVisible();
+  }
+
+  expect(pageErrors, 'Unexpected browser errors in School Manager academic oversight').toEqual([]);
+});
