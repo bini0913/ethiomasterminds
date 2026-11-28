@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Clock3, RefreshCw, Plus, Pencil, CalendarCheck, BookOpen, MapPin, AlertTriangle, History } from "lucide-react";
+import { CalendarDays, Clock3, RefreshCw, Plus, Pencil, CalendarCheck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
