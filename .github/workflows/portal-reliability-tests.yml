@@ -61,6 +61,9 @@ jobs:
       - name: Verify School Manager Part 3 attendance workflows
         run: npm run check:school-manager-part3-attendance
 
+      - name: Verify School Manager Part 3 operations workflows
+        run: npm run check:school-manager-part3-operations
+
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
