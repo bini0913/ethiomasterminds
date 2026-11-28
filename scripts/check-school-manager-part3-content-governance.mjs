@@ -6,6 +6,7 @@ const portal = fs.readFileSync("src/pages/SchoolManagerPortal.tsx", "utf8");
 const workflow = fs.readFileSync(".github/workflows/portal-reliability-tests.yml", "utf8");
 const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const e2e = fs.readFileSync("tests/e2e/signed-in-portals.spec.ts", "utf8");
+const databaseTest = fs.readFileSync("supabase/tests/school_manager_content_governance.test.sql", "utf8");
 
 assert.match(portal, /SchoolManagerContentGovernanceWorkspace/);
 assert.match(portal, /id: "content-governance", label: "Content Governance"/);
@@ -33,5 +34,9 @@ assert.equal(packageJson.scripts["check:school-manager-part3-content-governance"
 assert.match(workflow, /check:school-manager-part3-content-governance/);
 assert.match(e2e, /School Manager content governance oversight is reachable across desktop, tablet and mobile/);
 assert.match(e2e, /ci-manager@masterminds\.test/);
+assert.match(databaseTest, /school_content_review_events_read/);
+assert.match(databaseTest, /clients cannot directly mutate content review history/);
+assert.match(databaseTest, /school_review_quiz/);
+assert.match(databaseTest, /school_review_library_book/);
 
 console.log("School Manager Part 3 content governance contract checks passed.");
