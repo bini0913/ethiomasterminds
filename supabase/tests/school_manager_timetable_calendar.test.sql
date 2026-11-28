@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(24);
 select ok(to_regclass('public.school_schedule_entries') is not null, 'school timetable table exists');
 select ok(to_regclass('public.school_calendar_events') is not null, 'school calendar table exists');
 select ok(to_regclass('public.school_operations_audit_events') is not null, 'school operations audit table exists');
