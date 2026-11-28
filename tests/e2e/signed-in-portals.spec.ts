@@ -235,7 +235,7 @@ test('School Manager Part 1 workflows are reachable across desktop, tablet and m
   await authenticateAs(page, 'ci-manager@masterminds.test');
 
   const sections = [
-    { nav: 'Student Directory', heading: 'Student directory', content: 'Search school student memberships' },
+    { nav: 'Student Directory', heading: 'Student directory', content: 'Search by student name, username, school ID' },
     { nav: 'Staff Directory', heading: 'Staff directory', content: 'Review school staff memberships' },
     { nav: 'Teacher Assignments', heading: 'Teacher assignments', content: 'Create assignment' },
     { nav: 'School Structure', heading: 'School structure', content: 'Academic terms' },
@@ -251,7 +251,7 @@ test('School Manager Part 1 workflows are reachable across desktop, tablet and m
   ]) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
 
     for (const section of sections) {
       if (viewport.width < 1024) {
@@ -260,6 +260,7 @@ test('School Manager Part 1 workflows are reachable across desktop, tablet and m
       await page.getByRole('button', { name: section.nav, exact: true }).click();
       await expect(page.getByRole('heading', { name: section.heading, exact: true })).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText(section.content, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+      if (section.nav === 'Teacher Assignments') await expect(page.getByText('Teacher assignment recommendations', { exact: true })).toBeVisible();
     }
   }
 
@@ -279,7 +280,7 @@ test('School Manager academic oversight is reachable on desktop, tablet and mobi
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
     await page.getByRole('button', { name: 'Academic Management', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Academic management', exact: true })).toBeVisible();
@@ -306,7 +307,7 @@ test('School Manager curriculum and intervention workflows are reachable across 
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
     await page.getByRole('button', { name: 'Curriculum & Support', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Curriculum and academic support', exact: true })).toBeVisible();
@@ -349,9 +350,9 @@ test('School Manager attendance oversight is reachable across desktop, tablet an
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
-    await page.getByRole('button', { name: 'Attendance & Daily Operations', exact: true }).click();
+    await page.getByRole('button', { name: 'Attendance', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Attendance & daily operations', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Filter attendance', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Attendance sessions', exact: true })).toBeVisible();
@@ -374,7 +375,7 @@ test('School Manager timetable and calendar workflows are reachable across deskt
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
     await page.getByRole('button', { name: 'Timetable & Calendar', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Timetable & school calendar', exact: true })).toBeVisible();
@@ -403,7 +404,7 @@ test('School Manager parent communication oversight is reachable across desktop,
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
     await page.getByRole('button', { name: 'Parent Communication', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Parent communication & announcements', exact: true })).toBeVisible();
@@ -431,7 +432,7 @@ test('School Manager staff and student support workflows are reachable across de
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
     await page.getByRole('button', { name: 'Staff & Student Support', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Staff task operations', exact: true })).toBeVisible();
@@ -443,6 +444,13 @@ test('School Manager staff and student support workflows are reachable across de
     await expect(page.getByRole('heading', { name: 'Record a staff evaluation', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Staff conduct reports', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Staff change requests', exact: true })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Manager escalations' }).click();
+    await expect(page.getByRole('heading', { name: 'Manager escalations', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Request a staff responsibility change', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recommend staff disciplinary review', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send request for review', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send recommendation to Super Admin', exact: true })).toBeVisible();
 
     await page.getByRole('tab', { name: 'Student support' }).click();
     await expect(page.getByRole('heading', { name: 'Student support & safeguarding oversight', exact: true })).toBeVisible();
@@ -466,7 +474,7 @@ test('School Manager content governance oversight is reachable across desktop, t
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'School overview' })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
     if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
     await page.getByRole('button', { name: 'Content Governance', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Content governance', exact: true })).toBeVisible();
@@ -477,4 +485,43 @@ test('School Manager content governance oversight is reachable across desktop, t
     await expect(page.getByRole('heading', { name: 'Content review history', exact: true })).toBeVisible();
   }
   expect(pageErrors, 'Unexpected browser errors in School Manager content governance').toEqual([]);
+});
+
+
+test('School Manager command center, grouped navigation, reports and student search are usable across devices', async ({ page }) => {
+  test.setTimeout(120_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await authenticateAs(page, 'ci-manager@masterminds.test');
+
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/school/manager', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: /Good day\. Here's what needs your attention/ })).toBeVisible({ timeout: 25_000 });
+    await expect(page.getByText('School setup checklist')).toBeVisible();
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(page.getByRole('button', { name: 'Student Directory', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Reports & Analytics', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Reports & analytics', exact: true })).toBeVisible();
+    await expect(page.getByText('Enrollment distribution', { exact: true })).toBeVisible();
+    if (viewport.width < 1024) await page.getByRole('button', { name: 'Open navigation' }).click();
+    await page.getByRole('button', { name: 'Student Directory', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Student directory', exact: true })).toBeVisible();
+    const studentSearch = page.getByRole('textbox', { name: 'Search student records' });
+    await expect(studentSearch).toBeVisible();
+    await studentSearch.fill('ci_student');
+    await expect(page.getByText('CI Student', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Open profile', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Student profile', exact: true })).toBeVisible();
+    await expect(page.getByText('School student ID', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Published term results', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Attendance', exact: true }).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Back to directory', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Student directory', exact: true })).toBeVisible();
+  }
+  expect(pageErrors, 'Unexpected browser errors in School Manager command center and reports').toEqual([]);
 });

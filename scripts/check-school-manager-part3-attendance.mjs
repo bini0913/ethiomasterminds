@@ -7,7 +7,7 @@ const portal = read("src/pages/SchoolManagerPortal.tsx");
 const workspace = read("src/components/school/SchoolManagerAttendanceWorkspace.tsx");
 const failures = [];
 const checks = [
-  ["Manager navigation exposes Attendance & Daily Operations", /id: "attendance", label: "Attendance & Daily Operations"/.test(portal)],
+  ["Manager navigation exposes Attendance & Daily Operations", /id: "attendance", label: "Attendance"/.test(portal)],
   ["Manager route renders the attendance workspace", /case "attendance": content = <SchoolManagerAttendanceWorkspace/.test(portal)],
   ["Attendance sessions are scoped to the active school", /from\("school_attendance_sessions"\)[\s\S]*?\.eq\("school_id", schoolId\)/.test(workspace)],
   ["Attendance records are scoped to the active school", /from\("school_attendance_records"\)[\s\S]*?\.eq\("school_id", schoolId\)/.test(workspace)],

@@ -16,20 +16,23 @@ export function SchoolPageHeading({
 }
 
 export function SchoolMetric({
-  label, value, detail, icon: Icon,
-}: { label: string; value: string | number; detail?: string; icon: LucideIcon }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
-          {detail && <p className="mt-1 text-xs text-slate-500">{detail}</p>}
-        </div>
-        <div className="rounded-md bg-blue-50 p-2 text-blue-700"><Icon className="h-4 w-4" /></div>
+  label, value, detail, icon: Icon, onClick,
+}: { label: string; value: string | number; detail?: string; icon: LucideIcon; onClick?: () => void }) {
+  const content = (
+    <div className="flex min-h-[112px] items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition duration-200 group-hover:-translate-y-0.5 group-hover:border-blue-200 group-hover:shadow-md">
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500">{label}</p>
+        <p className="mt-2 text-[26px] font-bold leading-none tabular-nums tracking-tight text-slate-950">{value}</p>
+        {detail && <p className="mt-2 text-xs leading-5 text-slate-500">{detail}</p>}
       </div>
+      <div className="rounded-xl bg-blue-50 p-2.5 text-blue-700 ring-1 ring-inset ring-blue-100"><Icon className="h-[18px] w-[18px]" /></div>
     </div>
   );
+  return onClick ? (
+    <button type="button" onClick={onClick} className="group block w-full rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label={label + ": " + value}>
+      {content}
+    </button>
+  ) : <div className="group">{content}</div>;
 }
 
 export function SchoolPanel({
