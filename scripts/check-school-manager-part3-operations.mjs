@@ -1,0 +1,40 @@
+import fs from "node:fs";
+import assert from "node:assert/strict";
+
+const migration = fs.readFileSync("supabase/migrations/20261128210000_school_manager_timetable_and_calendar.sql", "utf8");
+const workspace = fs.readFileSync("src/components/school/SchoolManagerOperationsWorkspace.tsx", "utf8");
+const portal = fs.readFileSync("src/pages/SchoolManagerPortal.tsx", "utf8");
+const workflow = fs.readFileSync(".github/workflows/portal-reliability-tests.yml", "utf8");
+const e2e = fs.readFileSync("tests/e2e/signed-in-portals.spec.ts", "utf8");
+
+assert.match(migration, /create table if not exists public\.school_timetable_slots/i);
+assert.match(migration, /create table if not exists public\.school_calendar_events/i);
+assert.match(migration, /create table if not exists public\.school_operations_audit_events/i);
+assert.match(migration, /is_school_manager_or_admin\(new\.school_id\)/i);
+assert.match(migration, /overlaps \(existing\.starts_at, existing\.ends_at\)/i);
+assert.match(migration, /teacher must already be assigned/i);
+assert.match(migration, /school_timetable_slots_manager_all/i);
+assert.match(migration, /school_calendar_events_manager_all/i);
+assert.match(migration, /school_operations_audit_manager_read/i);
+assert.match(migration, /school_operations_audit_immutable/i);
+assert.match(migration, /revoke insert, update, delete on public\.school_operations_audit_events/i);
+assert.match(migration, /school_record_operations_audit/i);
+assert.match(workspace, /school_timetable_slots/);
+assert.match(workspace, /school_calendar_events/);
+assert.match(workspace, /school_announcements/);
+assert.match(workspace, /school_parent_student_links/);
+assert.match(workspace, /school_parent_notifications/);
+assert.match(workspace, /school_behavior_reports/);
+assert.match(workspace, /school_disciplinary_recommendations/);
+assert.match(workspace, /school_content_review_events/);
+assert.match(workspace, /school_operations_audit_events/);
+assert.match(workspace, /managerMembershipId/);
+assert.match(workspace, /school_id", schoolId/);
+assert.match(workspace, /cannot bypass publication permissions/);
+assert.match(portal, /SchoolManagerOperationsWorkspace/);
+assert.match(portal, /id: "operations", label: "Timetable & Community"/);
+assert.match(portal, /case "operations"/);
+assert.match(workflow, /check:school-manager-part3-operations/);
+assert.match(e2e, /School Manager timetable and community operations are reachable across devices/);
+
+console.log("School Manager Part 3 operations contract checks passed.");
