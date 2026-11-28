@@ -22,7 +22,7 @@ type Props = {
   profiles: Record<string, { name?: string; username?: string }>;
 };
 
-type WorkspaceTab = "tasks" | "staff" | "student-support";
+type WorkspaceTab = "tasks" | "staff" | "student-support" | "escalations";
 
 const db = supabase as any;
 
@@ -54,6 +54,14 @@ export default function SchoolManagerStaffSupportWorkspace({ schoolId, activeMem
   const [evaluationEnd, setEvaluationEnd] = useState("");
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [requestTarget, setRequestTarget] = useState("");
+  const [requestType, setRequestType] = useState("responsibility_change");
+  const [requestedRole, setRequestedRole] = useState("teacher");
+  const [requestDetails, setRequestDetails] = useState("");
+  const [requestReason, setRequestReason] = useState("");
+  const [disciplineTarget, setDisciplineTarget] = useState("");
+  const [disciplineReason, setDisciplineReason] = useState("");
+  const [disciplineRecommendation, setDisciplineRecommendation] = useState("");
 
   const staff = useMemo(
     () => members.filter((member) => member.status === "active" && ["admin", "teacher", "finance"].includes(member.school_role)),
@@ -199,6 +207,59 @@ export default function SchoolManagerStaffSupportWorkspace({ schoolId, activeMem
     setSavingId(null);
     if (error) return toast.error(error.message || "Student-support recommendation could not be reviewed.");
     toast.success(accept ? "Student-support recommendation accepted." : "Student-support recommendation rejected.");
+    await load();
+  };
+
+  const submitManagerChangeRequest = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!schoolId || !activeMembershipId || !requestTarget || !requestReason.trim()) {
+      toast.error("Choose a staff member and explain the requested change.");
+      return;
+    }
+    let details: Record<string, unknown> = {};
+    try {
+      const parsed = requestDetails.trim() ? JSON.parse(requestDetails) : {};
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Details must be a JSON object.");
+      details = parsed;
+    } catch {
+      toast.error("Requested details must be a valid JSON object.");
+      return;
+    }
+    const { error } = await db.from("school_staff_change_requests").insert({
+      school_id: schoolId,
+      target_membership_id: requestTarget,
+      requester_membership_id: activeMembershipId,
+      request_type: requestType,
+      requested_role: requestType === "role_change" ? requestedRole : null,
+      requested_details: details,
+      reason: requestReason.trim(),
+    });
+    if (error) return toast.error(error.message || "The change request could not be submitted.");
+    setRequestReason("");
+    setRequestDetails("");
+    toast.success("Change request sent to network administration for review.");
+    await load();
+  };
+
+  const submitStaffDisciplineRecommendation = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!schoolId || !activeMembershipId || !disciplineTarget || !disciplineReason.trim() || !disciplineRecommendation.trim()) {
+      toast.error("Choose a staff member and provide both the reason and recommendation.");
+      return;
+    }
+    const { error } = await db.from("school_disciplinary_recommendations").insert({
+      school_id: schoolId,
+      target_membership_id: disciplineTarget,
+      target_kind: "staff",
+      submitted_by_membership_id: activeMembershipId,
+      reason: disciplineReason.trim(),
+      recommendation: disciplineRecommendation.trim(),
+      status: "pending",
+    });
+    if (error) return toast.error(error.message || "The staff recommendation could not be submitted.");
+    setDisciplineReason("");
+    setDisciplineRecommendation("");
+    toast.success("Staff disciplinary recommendation sent to Super Admin for review.");
     await load();
   };
 
