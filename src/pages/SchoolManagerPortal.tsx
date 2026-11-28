@@ -1039,7 +1039,7 @@ export default function SchoolManagerPortal() {
           <SchoolMetric label="Transferred" value={allStudents.filter((student) => student.status === "transferred").length} detail="Exited to another school" icon={School} />
           <SchoolMetric label="Graduated" value={allStudents.filter((student) => student.status === "graduated").length} detail="Completed school enrollment" icon={CheckCircle2} />
         </div>
-        <SchoolPanel title="Find a student" description="Search by name, username, school username, student number, grade, or section.">
+        <SchoolPanel title="Find a student" description="Search by student name, username, school ID, student number, grade, section, or record ID.">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
