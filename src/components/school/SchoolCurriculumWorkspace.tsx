@@ -32,6 +32,8 @@ export default function SchoolCurriculumWorkspace({
   const [units, setUnits] = useState<any[]>([]);
   const [progress, setProgress] = useState<any[]>([]);
   const [interventions, setInterventions] = useState<any[]>([]);
+  const [unitEvents, setUnitEvents] = useState<any[]>([]);
+  const [interventionEvents, setInterventionEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -56,7 +58,7 @@ export default function SchoolCurriculumWorkspace({
 
   const load = useCallback(async () => {
     if (!schoolId) {
-      setUnits([]); setProgress([]); setInterventions([]);
+      setUnits([]); setProgress([]); setInterventions([]); setUnitEvents([]); setInterventionEvents([]);
       return;
     }
     setLoading(true);
@@ -65,13 +67,19 @@ export default function SchoolCurriculumWorkspace({
       const requests = await Promise.all([
         db.from("school_curriculum_units").select("*").eq("school_id", schoolId).order("sequence_number").limit(1500),
         db.from("school_curriculum_progress").select("*").eq("school_id", schoolId).order("updated_at", { ascending: false }).limit(3000),
-        ...(manager ? [db.from("school_academic_interventions").select("*").eq("school_id", schoolId).order("updated_at", { ascending: false }).limit(1000)] : []),
+        ...(manager ? [
+          db.from("school_academic_interventions").select("*").eq("school_id", schoolId).order("updated_at", { ascending: false }).limit(1000),
+          db.from("school_curriculum_unit_events").select("id,unit_id,actor_user_id,event_type,unit_snapshot,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+          db.from("school_academic_intervention_events").select("id,intervention_id,actor_membership_id,previous_status,new_status,reason,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
+        ] : []),
       ]);
       const errors = requests.flatMap((result: any, index: number) => result.error ? [(index === 0 ? "Curriculum units" : index === 1 ? "Teaching progress" : "Academic interventions") + ": " + result.error.message] : []);
       if (errors.length) setLoadError(errors.join(" · "));
       setUnits(requests[0].data || []);
       setProgress(requests[1].data || []);
       setInterventions(manager ? requests[2]?.data || [] : []);
+      setUnitEvents(manager ? requests[3]?.data || [] : []);
+      setInterventionEvents(manager ? requests[4]?.data || [] : []);
     } catch (error: unknown) {
       setLoadError(error instanceof Error ? error.message : "Academic workflows could not be loaded.");
     } finally {
@@ -265,7 +273,7 @@ export default function SchoolCurriculumWorkspace({
             const reports = progressByUnit(unit.id);
             return <div key={unit.id} className="rounded-lg border border-slate-200 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-slate-900">{unit.unit_code} · {unit.title}</p><p className="text-xs text-slate-500">{unit.grade_label} · {unit.subject_name} · {unit.source_title || unit.source_type} · {unit.source_verification === "verified_by_school" ? "School verified" : "Unverified source"}</p><p className="mt-1 text-xs text-slate-500">Expected {unit.expected_start || "—"} to {unit.expected_end || "—"}</p></div><SchoolSecondaryButton onClick={() => editUnit(unit)}>Edit</SchoolSecondaryButton></div>
-              <div className="mt-3 flex flex-wrap gap-2">{reports.length ? reports.map((report) => <div key={report.id} className="rounded-md bg-slate-50 px-3 py-2 text-xs"><p className="font-medium text-slate-700">{sectionName(report.section_id)}</p><SchoolStatus value={report.status} /><p className="mt-1 text-slate-500">{report.teacher_note || "No teacher note"}</p></div>) : <p className="text-xs text-slate-500">No teacher delivery report yet.</p>}</div>
+              <div className="mt-3 flex flex-wrap gap-2">{reports.length ? reports.map((report) => <div key={report.id} className="rounded-md bg-slate-50 px-3 py-2 text-xs"><p className="font-medium text-slate-700">{sectionName(report.section_id)} · {memberName(report.teacher_membership_id)}</p><SchoolStatus value={report.status} /><p className="mt-1 text-slate-500">{report.teacher_note || "No teacher note"}</p></div>) : <p className="text-xs text-slate-500">No teacher delivery report yet.</p>}</div>
             </div>;
           })}</div> : <SchoolEmptyState title="No curriculum units entered" description="Add your verified curriculum units to begin tracking class delivery. No sample units are preloaded." />}
         </SchoolPanel>
@@ -284,6 +292,16 @@ export default function SchoolCurriculumWorkspace({
             <div className="md:col-span-2 flex gap-2"><SchoolPrimaryButton type="submit" disabled={saving}>{saving ? "Saving…" : interventionId ? "Update plan" : "Create plan"}</SchoolPrimaryButton>{interventionId && <SchoolSecondaryButton type="button" onClick={resetIntervention}>Cancel</SchoolSecondaryButton>}</div>
           </form>
           <div className="mt-4 space-y-2">{interventions.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 p-3"><div><p className="text-sm font-semibold text-slate-800">{memberName(item.student_membership_id)} · {item.subject_name || "General support"}</p><p className="text-xs text-slate-500">{item.concern}</p><p className="text-xs text-slate-500">Target {item.target_date || "—"} · {item.action_plan}</p><SchoolStatus value={item.status} /></div><SchoolSecondaryButton onClick={() => editIntervention(item)}>Update</SchoolSecondaryButton></div>)}</div>
+        </SchoolPanel>
+        <SchoolPanel title="Academic audit history" description="Recent curriculum and student-support changes recorded by the database. These events cannot be edited from the portal.">
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div><h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Curriculum changes</h4>
+              {unitEvents.length ? <div className="space-y-2">{unitEvents.slice(0,20).map((event) => <div key={event.id} className="rounded-md border border-slate-100 p-3"><p className="text-sm font-medium text-slate-800">{event.unit_snapshot?.unit_code} · {event.unit_snapshot?.title}</p><p className="text-xs text-slate-500">{event.event_type.replace(/_/g," ")} · {event.unit_snapshot?.grade_label} · {event.unit_snapshot?.subject_name} · {formatDate(event.created_at)}</p></div>)}</div> : <p className="text-sm text-slate-500">No curriculum changes recorded yet.</p>}
+            </div>
+            <div><h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Intervention changes</h4>
+              {interventionEvents.length ? <div className="space-y-2">{interventionEvents.slice(0,20).map((event) => <div key={event.id} className="rounded-md border border-slate-100 p-3"><p className="text-sm font-medium text-slate-800">{event.previous_status ? event.previous_status.replace(/_/g," ") + " → " : ""}{event.new_status.replace(/_/g," ")}</p><p className="text-xs text-slate-500">{event.reason} · {formatDate(event.created_at)}</p></div>)}</div> : <p className="text-sm text-slate-500">No intervention changes recorded yet.</p>}
+            </div>
+          </div>
         </SchoolPanel>
         <div className="flex justify-end"><SchoolSecondaryButton onClick={() => void load()} disabled={loading}>Refresh academic records</SchoolSecondaryButton></div>
       </div>
