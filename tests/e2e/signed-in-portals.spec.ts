@@ -444,6 +444,13 @@ test('School Manager staff and student support workflows are reachable across de
     await expect(page.getByRole('heading', { name: 'Staff conduct reports', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Staff change requests', exact: true })).toBeVisible();
 
+    await page.getByRole('tab', { name: 'Manager escalations' }).click();
+    await expect(page.getByRole('heading', { name: 'Manager escalations', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Request a staff responsibility change', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recommend staff disciplinary review', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send request for review', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send recommendation to Super Admin', exact: true })).toBeVisible();
+
     await page.getByRole('tab', { name: 'Student support' }).click();
     await expect(page.getByRole('heading', { name: 'Student support & safeguarding oversight', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Behavior report monitoring', exact: true })).toBeVisible();
