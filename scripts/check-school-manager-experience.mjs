@@ -1,0 +1,41 @@
+import fs from "node:fs";
+import assert from "node:assert/strict";
+
+const portal = fs.readFileSync("src/pages/SchoolManagerPortal.tsx", "utf8");
+const shell = fs.readFileSync("src/components/school/SchoolPortalShell.tsx", "utf8");
+const profile = fs.readFileSync("src/components/school/SchoolManagerStudentProfile.tsx", "utf8");
+const primitives = fs.readFileSync("src/components/school/SchoolPortalPrimitives.tsx", "utf8");
+const workflow = fs.readFileSync(".github/workflows/portal-reliability-tests.yml", "utf8");
+const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
+const e2e = fs.readFileSync("tests/e2e/signed-in-portals.spec.ts", "utf8");
+
+assert.match(portal, /School command center/);
+assert.match(portal, /Good day\. Here's what needs your attention/);
+assert.match(portal, /School setup checklist/);
+assert.match(portal, /SchoolManagerStudentProfile/);
+assert.match(portal, /selectedStudentId/);
+assert.match(portal, /student\.id, student\.user_id/);
+assert.match(portal, /Open profile/);
+assert.match(portal, /Reports & analytics/);
+assert.match(portal, /ResponsiveContainer/);
+assert.match(portal, /onClick=\{\(event: any\) => \{ const grade = event\?\.activePayload/);
+assert.match(shell, /group\?: string/);
+assert.match(shell, /startsGroup/);
+assert.match(profile, /school_term_results/);
+assert.match(profile, /school_student_marks/);
+assert.match(profile, /school_attendance_records/);
+assert.match(profile, /school_student_invoices/);
+assert.match(profile, /school_homework_submissions/);
+assert.match(profile, /school_record_events/);
+assert.match(profile, /published_at/);
+assert.match(profile, /rank_position/);
+assert.match(profile, /\.eq\("school_id", schoolId\)/);
+assert.doesNotMatch(profile, /attachment_path|response_text/);
+assert.match(primitives, /group-hover:-translate-y-0\.5/);
+assert.match(primitives, /onClick\?: \(\) => void/);
+assert.equal(packageJson.scripts["check:school-manager-experience"], "node scripts/check-school-manager-experience.mjs");
+assert.match(workflow, /check:school-manager-experience/);
+assert.match(e2e, /School Manager command center, grouped navigation, reports and student search are usable across devices/);
+assert.match(e2e, /Search student records/);
+
+console.log("School Manager experience and student profile contract checks passed.");
