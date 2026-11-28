@@ -14,6 +14,8 @@ import SchoolManagerTimetableCalendarWorkspace from "@/components/school/SchoolM
 import SchoolManagerParentCommunicationsWorkspace from "@/components/school/SchoolManagerParentCommunicationsWorkspace";
 import SchoolManagerStaffSupportWorkspace from "@/components/school/SchoolManagerStaffSupportWorkspace";
 import SchoolManagerContentGovernanceWorkspace from "@/components/school/SchoolManagerContentGovernanceWorkspace";
+import SchoolManagerStudentProfile from "@/components/school/SchoolManagerStudentProfile";
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
@@ -21,27 +23,26 @@ import {
 } from "@/components/school/SchoolPortalPrimitives";
 
 const navItems: SchoolNavItem[] = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "accounts", label: "People & Accounts", icon: Users },
-  { id: "students", label: "Student Directory", icon: GraduationCap },
-  { id: "staff", label: "Staff Directory", icon: UsersRound },
-  { id: "assignments", label: "Teacher Assignments", icon: UserCog },
-  { id: "audit", label: "School Audit", icon: FileClock },
-  { id: "settings", label: "Manager Settings", icon: Settings },
-  { id: "structure", label: "School Structure", icon: School },
-  { id: "academics", label: "Academic Management", icon: BookOpen },
-  { id: "curriculum", label: "Curriculum & Support", icon: BookOpen },
-  { id: "attendance", label: "Attendance & Daily Operations", icon: CalendarDays },
-  { id: "timetable", label: "Timetable & Calendar", icon: CalendarDays },
-  { id: "communications", label: "Parent Communication", icon: MessageSquare },
-  { id: "staff-support", label: "Staff & Student Support", icon: ClipboardList },
-  { id: "content-governance", label: "Content Governance", icon: BookOpen },
-  { id: "grading", label: "Grading & Policies", icon: Scale },
-  { id: "finance", label: "Fees & Finance", icon: Wallet },
-  { id: "reports", label: "Reports", icon: FileBarChart },
-  { id: "leadership", label: "Leadership Team", icon: UserCog },
+  { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Command center" },
+  { id: "students", label: "Student Directory", icon: GraduationCap, group: "People & school" },
+  { id: "accounts", label: "People & Accounts", icon: Users, group: "People & school" },
+  { id: "staff", label: "Staff Directory", icon: UsersRound, group: "People & school" },
+  { id: "assignments", label: "Teacher Assignments", icon: UserCog, group: "People & school" },
+  { id: "leadership", label: "Leadership Team", icon: UserCog, group: "People & school" },
+  { id: "structure", label: "School Structure", icon: School, group: "Academic management" },
+  { id: "academics", label: "Academic Management", icon: BookOpen, group: "Academic management" },
+  { id: "curriculum", label: "Curriculum & Support", icon: BookOpen, group: "Academic management" },
+  { id: "grading", label: "Grading & Policies", icon: Scale, group: "Academic management" },
+  { id: "attendance", label: "Attendance", icon: CalendarDays, group: "Daily operations" },
+  { id: "timetable", label: "Timetable & Calendar", icon: CalendarDays, group: "Daily operations" },
+  { id: "communications", label: "Parent Communication", icon: MessageSquare, group: "Daily operations" },
+  { id: "staff-support", label: "Staff & Student Support", icon: ClipboardList, group: "Daily operations" },
+  { id: "content-governance", label: "Content Governance", icon: BookOpen, group: "Daily operations" },
+  { id: "finance", label: "Fees & Finance", icon: Wallet, group: "Finance & insights" },
+  { id: "reports", label: "Reports & Analytics", icon: FileBarChart, group: "Finance & insights" },
+  { id: "audit", label: "School Audit", icon: FileClock, group: "Administration" },
+  { id: "settings", label: "Manager Settings", icon: Settings, group: "Administration" },
 ];
-
 type AccountRole = "finance" | "parent" | "student";
 type LeadershipPosition = "" | "vice_director" | "kg_director" | "elementary_director" | "middle_school_director" | "high_school_director" | "academic_director" | "hr_director";
 
@@ -90,6 +91,8 @@ export default function SchoolManagerPortal() {
   const [createdCredentials, setCreatedCredentials] = useState<any[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [reportGradeFilter, setReportGradeFilter] = useState("all");
   const [studentStatusFilter, setStudentStatusFilter] = useState("all");
   const [studentActionId, setStudentActionId] = useState<string | null>(null);
   const [studentActionStatus, setStudentActionStatus] = useState<"transferred" | "graduated" | "deactivated" | "">("");
@@ -1013,11 +1016,16 @@ export default function SchoolManagerPortal() {
     const normalizedSearch = studentSearch.trim().toLowerCase();
     const visibleStudents = allStudents.filter((student) => {
       const profile = profiles[student.user_id] ?? {};
-      const searchable = [profile.name, profile.username, student.school_username, student.student_number, student.grade_label, sectionLabel(student.section_id)]
+      const searchable = [profile.name, profile.username, student.school_username, student.student_number, student.grade_label, sectionLabel(student.section_id), student.id, student.user_id]
         .filter(Boolean).join(" ").toLowerCase();
       return (studentStatusFilter === "all" || student.status === studentStatusFilter)
         && (!normalizedSearch || searchable.includes(normalizedSearch));
     });
+    const selectedStudent = allStudents.find((student) => student.id === selectedStudentId);
+    if (selectedStudent) {
+      const selectedProfile = profiles[selectedStudent.user_id] ?? {};
+      return <SchoolManagerStudentProfile schoolId={schoolId} student={selectedStudent} profile={selectedProfile} sectionLabel={sectionLabel(selectedStudent.section_id)} terms={terms} onBack={() => setSelectedStudentId(null)} />;
+    }
     return (
       <div className="space-y-5">
         <SchoolPageHeading
@@ -1035,7 +1043,7 @@ export default function SchoolManagerPortal() {
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input className={schoolInputClass + " pl-9"} value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search student records…" aria-label="Search student records" />
+              <input className={schoolInputClass + " pl-9"} value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search name, school ID, student number, username or record ID…" aria-label="Search student records" />
             </label>
             <select className={schoolSelectClass} value={studentStatusFilter} onChange={(event) => setStudentStatusFilter(event.target.value)} aria-label="Filter students by enrollment status">
               <option value="all">All enrollment statuses</option>
@@ -1073,6 +1081,7 @@ export default function SchoolManagerPortal() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <SchoolStatus value={student.status} />
+                        <SchoolSecondaryButton onClick={() => setSelectedStudentId(student.id)}>Open profile</SchoolSecondaryButton>
                         {canManagePlacement && <SchoolSecondaryButton onClick={() => {
                           setStudentPlacementId(placementOpen ? null : student.id);
                           setStudentPlacementSectionId(student.section_id || "");
@@ -1135,29 +1144,76 @@ export default function SchoolManagerPortal() {
     );
   };
 
-  const renderOverview = () => (
-    <div className="space-y-6">
-      <SchoolPageHeading title="School overview" description="A live view of enrollment, staffing, academic structure, and school finance." action={<SchoolSecondaryButton onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</SchoolSecondaryButton>} />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SchoolMetric label="Enrolled students" value={students.length} detail="Active school memberships" icon={Users} />
-        <SchoolMetric label="Teachers" value={teachers.length} detail="Active teaching accounts" icon={UserCog} />
-        <SchoolMetric label="Parents" value={parents.length} detail="Active parent accounts" icon={Users} />
-        <SchoolMetric label="School sections" value={sections.length} detail="Across configured academic years" icon={School} />
-        <SchoolMetric label="Subjects" value={subjects.filter((subject) => subject.active).length} detail="Active subject catalog entries" icon={BookOpen} />
-        <SchoolMetric label="Teacher assignments" value={assignments.length} detail="Subject and homeroom assignments" icon={UserCog} />
-        <SchoolMetric label="Outstanding fees" value={outstandingSummary} detail={`${invoices.filter((invoice) => invoice.balance > 0).length} unpaid or partial invoices`} icon={Wallet} />
-        <SchoolMetric label="Open staff tasks" value={tasks.filter((task) => ["open", "in_progress", "submitted", "returned"].includes(task.status)).length} detail="Follow-ups awaiting completion or review" icon={ClipboardList} />
+  const renderOverview = () => {
+    const gradeCounts = students.reduce((acc: Record<string, number>, student) => {
+      const grade = student.grade_label || "Unassigned";
+      acc[grade] = (acc[grade] || 0) + 1;
+      return acc;
+    }, {});
+    const gradeData = Object.entries(gradeCounts).map(([grade, count]) => ({ grade, students: count })).sort((a, b) => a.grade.localeCompare(b.grade));
+    const attentionItems = [
+      ...tasks.filter((task) => ["returned", "submitted", "open", "in_progress"].includes(task.status)).slice(0, 3).map((task) => ({
+        id: task.id, title: task.title, detail: "Staff task · " + memberName(task.assigned_to_membership_id), status: task.status, page: "staff-support",
+      })),
+      ...changeRequests.filter((request) => ["pending", "submitted", "under_review"].includes(request.status)).slice(0, 2).map((request) => ({
+        id: request.id, title: "Staff change request", detail: memberName(request.target_membership_id) + " · " + request.request_type, status: request.status, page: "staff-support",
+      })),
+      ...disciplinaryRecommendations.filter((item) => item.target_kind === "student" && ["pending", "submitted", "under_review"].includes(item.status)).slice(0, 2).map((item) => ({
+        id: item.id, title: "Student support recommendation", detail: memberName(item.target_membership_id), status: item.status, page: "staff-support",
+      })),
+    ];
+    const openTaskCount = tasks.filter((task) => ["open", "in_progress", "submitted", "returned"].includes(task.status)).length;
+    const pendingRequestCount = changeRequests.filter((request) => ["pending", "submitted", "under_review"].includes(request.status)).length;
+    const unassignedStudents = students.filter((student) => !student.section_id).length;
+    return (
+      <div className="space-y-6">
+        <section className="overflow-hidden rounded-2xl bg-[#10294B] text-white shadow-sm">
+          <div className="grid gap-6 p-6 sm:p-8 xl:grid-cols-[minmax(0,1.35fr)_minmax(260px,.65fr)]">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">School command center</p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Good day. Here's what needs your attention.</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100">Manage the school from one place. Start with priority work, find any student, or jump directly to the workflow you need.</p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                <button type="button" onClick={() => setPage("students")} className="inline-flex min-h-10 items-center rounded-lg bg-white px-4 text-sm font-semibold text-[#10294B] hover:bg-blue-50"><Search className="mr-2 h-4 w-4" />Find a student</button>
+                <button type="button" onClick={() => setPage("attendance")} className="inline-flex min-h-10 items-center rounded-lg border border-white/25 px-4 text-sm font-semibold text-white hover:bg-white/10">Review attendance</button>
+                <button type="button" onClick={() => setPage("reports")} className="inline-flex min-h-10 items-center rounded-lg border border-white/25 px-4 text-sm font-semibold text-white hover:bg-white/10">View reports</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 self-end">
+              <div className="rounded-xl border border-white/10 bg-white/10 p-4"><p className="text-xs text-blue-100">Active students</p><p className="mt-2 text-3xl font-bold tabular-nums">{students.length}</p><p className="mt-1 text-xs text-blue-100">{unassignedStudents} without a section</p></div>
+              <div className="rounded-xl border border-white/10 bg-white/10 p-4"><p className="text-xs text-blue-100">Active staff</p><p className="mt-2 text-3xl font-bold tabular-nums">{staff.length}</p><p className="mt-1 text-xs text-blue-100">{teachers.length} teachers</p></div>
+              <div className="rounded-xl border border-white/10 bg-white/10 p-4"><p className="text-xs text-blue-100">Open follow-ups</p><p className="mt-2 text-3xl font-bold tabular-nums">{openTaskCount}</p><p className="mt-1 text-xs text-blue-100">Staff tasks to track</p></div>
+              <div className="rounded-xl border border-white/10 bg-white/10 p-4"><p className="text-xs text-blue-100">Requests to review</p><p className="mt-2 text-3xl font-bold tabular-nums">{pendingRequestCount}</p><p className="mt-1 text-xs text-blue-100">Staff change requests</p></div>
+            </div>
+          </div>
+        </section>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(300px,.7fr)]">
+          <SchoolPanel title="Priority work" description="A short list of open work from the records already available to your Manager account." action={<SchoolSecondaryButton onClick={() => setPage("staff-support")}>Open staff & student support</SchoolSecondaryButton>}>
+            {attentionItems.length ? <div className="space-y-2">{attentionItems.slice(0, 6).map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"><div className="min-w-0"><p className="text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.detail}</p></div><div className="flex items-center gap-2"><SchoolStatus value={item.status} /><SchoolSecondaryButton onClick={() => setPage(item.page)}>Review</SchoolSecondaryButton></div></div>)}</div> : <SchoolEmptyState title="No pending staff or student follow-ups" description="New tasks and review requests will appear here when they are recorded." />}
+          </SchoolPanel>
+          <SchoolPanel title="School setup checklist" description="A quick way to spot missing foundations.">
+            <div className="space-y-3">
+              {[
+                { label: "Academic year configured", done: years.length > 0, action: "structure" },
+                { label: "Sections created", done: sections.length > 0, action: "structure" },
+                { label: "Subjects configured", done: subjects.some((subject) => subject.active), action: "structure" },
+                { label: "Teachers assigned", done: assignments.length > 0, action: "assignments" },
+                { label: "Students placed in sections", done: students.length > 0 && unassignedStudents === 0, action: "students" },
+              ].map((item) => <button key={item.label} type="button" onClick={() => setPage(item.action)} className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-slate-50"><span className={"flex h-7 w-7 shrink-0 items-center justify-center rounded-full " + (item.done ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>{item.done ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}</span><span className="flex-1 text-sm text-slate-700">{item.label}</span><span className="text-xs font-semibold text-blue-700">{item.done ? "Done" : "Set up"}</span></button>)}
+            </div>
+          </SchoolPanel>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <SchoolPanel title="Enrollment by grade" description="Live active school memberships. Select a grade in Reports for the detailed roster." action={<SchoolSecondaryButton onClick={() => setPage("reports")}>Explore reports</SchoolSecondaryButton>}>
+            {gradeData.length ? <div className="space-y-3">{gradeData.slice(0, 8).map((item) => <div key={item.grade} className="flex items-center gap-3"><span className="w-28 shrink-0 truncate text-sm font-medium text-slate-700">{item.grade}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: (item.students / Math.max(1, students.length) * 100) + "%" }} /></div><span className="w-8 text-right text-sm font-semibold tabular-nums text-slate-700">{item.students}</span></div>)}</div> : <SchoolEmptyState title="No active student enrollment" description="Students will appear after enrollment records are created." />}
+          </SchoolPanel>
+          <SchoolPanel title="Recent staff activity" description="The latest follow-up work recorded in this school.">
+            {tasks.length ? <div className="space-y-2">{tasks.slice(0, 5).map((task) => <div key={task.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{task.title}</p><p className="mt-1 text-xs text-slate-500">{memberName(task.assigned_to_membership_id)}{task.due_date ? " · Due " + task.due_date : ""}</p></div><SchoolStatus value={task.status} /></div>)}</div> : <SchoolEmptyState title="No staff tasks yet" description="Create a follow-up task from Staff & Student Support when work needs an owner." />}
+          </SchoolPanel>
+        </div>
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <SchoolPanel title="Academic years" description="Current and previous school years">
-          {years.length ? <div className="divide-y divide-slate-100">{years.map((year) => <div key={year.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"><div><p className="text-sm font-medium text-slate-800">{year.name}</p><p className="mt-0.5 text-xs text-slate-500">{year.starts_on} – {year.ends_on}</p></div>{year.is_current && <SchoolStatus value="active" />}</div>)}</div> : <SchoolEmptyState title="No academic year configured" description="Create the school's first academic year under School Structure." />}
-        </SchoolPanel>
-        <SchoolPanel title="Recent staff tasks" description="Follow-up work across school roles">
-          {tasks.length ? <div className="divide-y divide-slate-100">{tasks.slice(0, 5).map((task) => <div key={task.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"><div className="min-w-0"><p className="truncate text-sm font-medium text-slate-800">{task.title}</p><p className="mt-0.5 text-xs text-slate-500">Assigned to {memberName(task.assigned_to_membership_id)}{task.due_date ? ` · Due ${task.due_date}` : ""}</p></div><SchoolStatus value={task.status} /></div>)}</div> : <SchoolEmptyState title="No staff tasks yet" description="Assign follow-up work to Admins, teachers, or Finance staff." />}
-        </SchoolPanel>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderAccounts = () => (
     <div className="space-y-5">
@@ -1819,20 +1875,61 @@ export default function SchoolManagerPortal() {
     );
   };
 
-  const renderReports = () => (
-    <div className="space-y-5">
-      <SchoolPageHeading title="School reports" description="Live operational records available to the School Manager." />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SchoolMetric label="Active staff" value={staff.length} detail="Admin, Teacher, and Finance" icon={Users} />
-        <SchoolMetric label="Suspended accounts" value={members.filter((member) => member.status === "suspended").length} detail="School memberships" icon={AlertCircle} />
-        <SchoolMetric label="Published fee structures" value={feeStructures.filter((fee) => fee.active).length} detail="Active fee rules" icon={Wallet} />
-        <SchoolMetric label="Evaluations" value={evaluations.length} detail="Recorded staff reviews" icon={CheckCircle2} />
+  const renderReports = () => {
+    const gradeCounts = students.reduce((acc: Record<string, number>, student) => {
+      const grade = student.grade_label || "Unassigned";
+      acc[grade] = (acc[grade] || 0) + 1;
+      return acc;
+    }, {});
+    const enrollmentData = Object.entries(gradeCounts).map(([grade, count]) => ({ grade, students: count })).sort((a, b) => a.grade.localeCompare(b.grade));
+    const staffData = [
+      { name: "Teachers", value: teachers.length },
+      { name: "Finance", value: activeMembers.filter((member) => member.school_role === "finance").length },
+      { name: "School admins", value: activeMembers.filter((member) => member.school_role === "admin").length },
+    ].filter((item) => item.value > 0);
+    const selectedStudents = reportGradeFilter === "all" ? [] : students.filter((student) => (student.grade_label || "Unassigned") === reportGradeFilter);
+    const activeInvoices = invoices.filter((invoice) => Number(invoice.balance || 0) > 0);
+    const balancesByCurrency = activeInvoices.reduce((acc: Record<string, number>, invoice) => {
+      const currency = invoice.currency || "ETB";
+      acc[currency] = (acc[currency] || 0) + Number(invoice.balance || 0);
+      return acc;
+    }, {});
+    return (
+      <div className="space-y-5">
+        <SchoolPageHeading title="Reports & analytics" description="Explore live school enrollment, staffing, and finance records. Select chart elements to drill into the underlying school records." action={<SchoolSecondaryButton onClick={() => { setReportGradeFilter("all"); void load(); }}><RefreshCw className="mr-2 h-4 w-4" />Refresh reports</SchoolSecondaryButton>} />
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <div><p className="text-xs text-slate-500">Active enrollment</p><p className="text-xl font-bold text-slate-900">{students.length}</p></div>
+          <div className="h-9 w-px bg-slate-200" />
+          <div><p className="text-xs text-slate-500">Active staff</p><p className="text-xl font-bold text-slate-900">{staff.length}</p></div>
+          <div className="h-9 w-px bg-slate-200" />
+          <div><p className="text-xs text-slate-500">Suspended memberships</p><p className="text-xl font-bold text-slate-900">{members.filter((member) => member.status === "suspended").length}</p></div>
+          <div className="h-9 w-px bg-slate-200" />
+          <div><p className="text-xs text-slate-500">Recorded evaluations</p><p className="text-xl font-bold text-slate-900">{evaluations.length}</p></div>
+          <div className="h-9 w-px bg-slate-200" />
+          <div><p className="text-xs text-slate-500">Active fee structures</p><p className="text-xl font-bold text-slate-900">{feeStructures.filter((fee) => fee.active).length}</p></div>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,.7fr)]">
+          <SchoolPanel title="Enrollment distribution" description="Choose a bar to open the students in that grade.">
+            {enrollmentData.length ? <div className="h-[300px] w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={enrollmentData} margin={{ top: 12, right: 12, bottom: 12, left: 0 }} onClick={(event: any) => { const grade = event?.activePayload?.[0]?.payload?.grade; if (grade) setReportGradeFilter(String(grade)); }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="grade" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={58} /><YAxis allowDecimals={false} width={32} /><Tooltip cursor={{ fill: "#eff6ff" }} /><Bar dataKey="students" name="Students" fill="#2563eb" radius={[7, 7, 0, 0]} cursor="pointer" /></BarChart></ResponsiveContainer></div> : <SchoolEmptyState title="No enrollment data yet" description="The chart will populate from active school student memberships." />}
+          </SchoolPanel>
+          <SchoolPanel title="Staff composition" description="Active school memberships by staff role.">
+            {staffData.length ? <div className="h-[260px] w-full"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={staffData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={88} innerRadius={52} paddingAngle={3}>{staffData.map((entry, index) => <Cell key={entry.name} fill={["#1d4ed8", "#0f766e", "#d97706"][index % 3]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="flex flex-wrap justify-center gap-4 text-xs text-slate-600">{staffData.map((item) => <span key={item.name}>{item.name}: <strong>{item.value}</strong></span>)}</div></div> : <SchoolEmptyState title="No active staff records" description="Staff role distribution will appear when staff memberships are active." />}
+          </SchoolPanel>
+        </div>
+        {reportGradeFilter !== "all" && <SchoolPanel title={reportGradeFilter + " student roster"} description={selectedStudents.length + " active student records. Use a student profile for academic rank, attendance, marks, homework, and fee details."} action={<div className="flex gap-2"><SchoolSecondaryButton onClick={() => setReportGradeFilter("all")}>Clear filter</SchoolSecondaryButton><SchoolSecondaryButton onClick={() => setPage("students")}>Open directory</SchoolSecondaryButton></div>}>
+          {selectedStudents.length ? <div className="grid gap-2 sm:grid-cols-2">{selectedStudents.map((student) => <button key={student.id} type="button" onClick={() => { setSelectedStudentId(student.id); setPage("students"); }} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3 text-left hover:border-blue-200 hover:bg-blue-50/40"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800">{profiles[student.user_id]?.name || student.school_username || "Student"}</span><span className="mt-1 block text-xs text-slate-500">ID {student.student_number || "not assigned"} · {sectionLabel(student.section_id)}</span></span><GraduationCap className="h-5 w-5 shrink-0 text-blue-700" /></button>)}</div> : <SchoolEmptyState title="No active students in this grade" description="Choose another grade in the chart." />}
+        </SchoolPanel>}
+        <div className="grid gap-4 md:grid-cols-2">
+          <SchoolPanel title="Outstanding balances" description="Open invoice balances, grouped by currency so unlike currencies are never combined.">
+            {Object.keys(balancesByCurrency).length ? <div className="space-y-3">{Object.entries(balancesByCurrency).map(([currency, amount]) => <div key={currency} className="flex items-center justify-between rounded-lg bg-slate-50 p-3"><span className="text-sm font-medium text-slate-700">{currency}</span><span className="text-lg font-bold tabular-nums text-slate-900">{amount.toLocaleString()}</span></div>)}</div> : <SchoolEmptyState title="No outstanding invoice balances" description="Unpaid and partial invoices will appear here when recorded." />}
+          </SchoolPanel>
+          <SchoolPanel title="Explore a workflow" description="Reports are linked to the operational pages where the underlying records are managed.">
+            <div className="grid gap-2 sm:grid-cols-2">{[{ label: "Attendance", page: "attendance" }, { label: "Academic results", page: "academics" }, { label: "Fees & finance", page: "finance" }, { label: "Staff support", page: "staff-support" }].map((item) => <button key={item.page} type="button" onClick={() => setPage(item.page)} className="rounded-lg border border-slate-200 px-3 py-3 text-left text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50/40">{item.label}<span className="mt-1 block text-xs font-normal text-slate-500">Open workflow →</span></button>)}</div>
+          </SchoolPanel>
+        </div>
       </div>
-      <SchoolPanel title="Enrollment by grade">
-        {students.length ? <div className="space-y-3">{Object.entries(students.reduce((acc: Record<string, number>, student) => { const grade = student.grade_label || "Unassigned"; acc[grade] = (acc[grade] || 0) + 1; return acc; }, {})).sort(([a], [b]) => a.localeCompare(b)).map(([grade, count]) => <div key={grade} className="flex items-center gap-3"><span className="w-28 shrink-0 text-sm font-medium text-slate-700">{grade}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, (Number(count) / Math.max(1, students.length)) * 100)}%` }} /></div><span className="w-8 text-right text-sm tabular-nums text-slate-600">{Number(count)}</span></div>)}</div> : <SchoolEmptyState title="No student enrollment data" description="Student enrollment totals will appear when accounts are created." />}
-      </SchoolPanel>
-    </div>
-  );
+    );
+  };
 
   let content: React.ReactNode;
   switch (page) {
