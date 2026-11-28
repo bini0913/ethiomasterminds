@@ -72,6 +72,9 @@ export default function SchoolManagerPortal() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [feeStructures, setFeeStructures] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [financePayments, setFinancePayments] = useState<any[]>([]);
+  const [financeAuditEvents, setFinanceAuditEvents] = useState<any[]>([]);
+  const [financeAuditSearch, setFinanceAuditSearch] = useState("");
   const [financeFollowups, setFinanceFollowups] = useState<any[]>([]);
   const [disciplinaryRecommendations, setDisciplinaryRecommendations] = useState<any[]>([]);
   const [assignmentRecommendations, setAssignmentRecommendations] = useState<any[]>([]);
@@ -177,7 +180,7 @@ export default function SchoolManagerPortal() {
     try {
     const [
       membershipsRes, yearsRes, termsRes, sectionsRes, subjectsRes, assignmentsRes,
-      feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, assignmentRecommendationsRes,
+      feesRes, invoicesRes, financePaymentsRes, financeAuditEventsRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, assignmentRecommendationsRes,
     ] = await Promise.all([
       db.from("school_memberships").select("id,user_id,school_role,status,grade_label,section_id,student_number,school_username,age_at_enrollment,end_reason,ended_at,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }),
       db.from("school_academic_years").select("id,name,starts_on,ends_on,is_current").eq("school_id", schoolId).order("starts_on", { ascending: false }),
@@ -186,7 +189,9 @@ export default function SchoolManagerPortal() {
       db.from("school_subjects").select("id,academic_year_id,grade_label,subject_name,active").eq("school_id", schoolId).order("grade_label"),
       db.from("school_teacher_assignments").select("id,teacher_membership_id,section_id,subject_name,assignment_kind").eq("school_id", schoolId),
       db.from("school_fee_structures").select("id,academic_year_id,grade_label,fee_name,amount,currency,due_date,active").eq("school_id", schoolId).order("created_at", { ascending: false }),
-      db.from("school_student_invoices").select("id,invoice_number,student_membership_id,amount,paid_amount,balance,status,due_date,currency").eq("school_id", schoolId).order("created_at", { ascending: false }).range(0, 499),
+      db.from("school_student_invoices").select("id,invoice_number,fee_structure_id,academic_year_id,student_membership_id,amount,paid_amount,balance,status,due_date,currency,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).range(0, 499),
+      db.from("school_fee_payments").select("id,invoice_id,amount,payment_method,reference,receipt_number,status,reversal_reason,recorded_by,received_at,created_at").eq("school_id", schoolId).order("received_at", { ascending: false }).range(0, 499),
+      db.from("school_finance_audit_events").select("id,actor_id,entity_type,entity_id,event_type,details,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).range(0, 499),
       db.from("school_staff_tasks").select("id,title,assigned_to_membership_id,assigned_by_membership_id,status,due_date,priority,task_type,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(100),
       db.from("school_staff_evaluations").select("id,target_membership_id,evaluation_type,rating,period_start,period_end,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(50),
       db.from("school_staff_change_requests").select("id,target_membership_id,request_type,status,reason,created_at").eq("school_id", schoolId).order("created_at", { ascending: false }).limit(50),
@@ -205,7 +210,7 @@ export default function SchoolManagerPortal() {
     for (let offset = 500; (invoicesRes.data?.length ?? 0) === 500; offset += 500) {
       const { data: invoicePage, error: invoicePageError } = await db
         .from("school_student_invoices")
-        .select("id,invoice_number,student_membership_id,amount,paid_amount,balance,status,due_date,currency")
+        .select("id,invoice_number,fee_structure_id,academic_year_id,student_membership_id,amount,paid_amount,balance,status,due_date,currency,created_at")
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false })
         .range(offset, offset + 499);
@@ -218,7 +223,25 @@ export default function SchoolManagerPortal() {
       if ((invoicePage ?? []).length < 500) break;
     }
 
-    const firstError = [membershipsRes, yearsRes, termsRes, sectionsRes, subjectsRes, assignmentsRes, feesRes, invoicesRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, assignmentRecommendationsRes].find((result) => result.error)?.error;
+    const allFinancePayments = [...(financePaymentsRes.data ?? [])];
+    for (let offset = 500; (financePaymentsRes.data?.length ?? 0) === 500; offset += 500) {
+      const { data: paymentPage, error: paymentPageError } = await db.from("school_fee_payments")
+        .select("id,invoice_id,amount,payment_method,reference,receipt_number,status,reversal_reason,recorded_by,received_at,created_at")
+        .eq("school_id", schoolId).order("received_at", { ascending: false }).range(offset, offset + 499);
+      if (paymentPageError) { toast.error(paymentPageError.message || "The complete school payment ledger could not be loaded."); setLoading(false); return; }
+      allFinancePayments.push(...(paymentPage ?? []));
+      if ((paymentPage ?? []).length < 500) break;
+    }
+    const allFinanceAuditEvents = [...(financeAuditEventsRes.data ?? [])];
+    for (let offset = 500; (financeAuditEventsRes.data?.length ?? 0) === 500; offset += 500) {
+      const { data: auditPage, error: auditPageError } = await db.from("school_finance_audit_events")
+        .select("id,actor_id,entity_type,entity_id,event_type,details,created_at")
+        .eq("school_id", schoolId).order("created_at", { ascending: false }).range(offset, offset + 499);
+      if (auditPageError) { toast.error(auditPageError.message || "The complete school finance audit history could not be loaded."); setLoading(false); return; }
+      allFinanceAuditEvents.push(...(auditPage ?? []));
+      if ((auditPage ?? []).length < 500) break;
+    }
+    const firstError = [membershipsRes, yearsRes, termsRes, sectionsRes, subjectsRes, assignmentsRes, feesRes, invoicesRes, financePaymentsRes, financeAuditEventsRes, tasksRes, evaluationsRes, requestsRes, categoriesRes, gradingPoliciesRes, gradeScalesRes, policySettingsRes, financeFollowupsRes, disciplinaryRes, assignmentRecommendationsRes].find((result) => result.error)?.error;
     if (firstError) {
       toast.error(firstError.message || "Could not load school records");
       setLoading(false);
@@ -235,6 +258,8 @@ export default function SchoolManagerPortal() {
     setAssignments(assignmentsRes.data ?? []);
     setFeeStructures(feesRes.data ?? []);
     setInvoices(allInvoices);
+    setFinancePayments(allFinancePayments);
+    setFinanceAuditEvents(allFinanceAuditEvents);
     setTasks(tasksRes.data ?? []);
     setEvaluations(evaluationsRes.data ?? []);
     setChangeRequests(requestsRes.data ?? []);
@@ -246,7 +271,7 @@ export default function SchoolManagerPortal() {
     setDisciplinaryRecommendations(disciplinaryRes.data ?? []);
     setAssignmentRecommendations(assignmentRecommendationsRes.data ?? []);
 
-    const userIds = [...new Set(nextMembers.map((membership: any) => membership.user_id))];
+    const userIds = [...new Set([...nextMembers.map((membership: any) => membership.user_id), ...allFinanceAuditEvents.map((event: any) => event.actor_id).filter(Boolean), ...allFinancePayments.map((payment: any) => payment.recorded_by).filter(Boolean)])];
     if (userIds.length) {
       const { data: profileRows, error: profileError } = await db.from("profiles").select("id,name,username,age,grade").in("id", userIds);
       if (profileError) toast.error("Some profile names could not be loaded");
@@ -1527,6 +1552,17 @@ export default function SchoolManagerPortal() {
           <SchoolMetric label="Partially paid" value={statusCounts.partial} detail="Payment balance remains" icon={Wallet} />
           <SchoolMetric label="Paid invoices" value={statusCounts.paid} detail="No remaining balance" icon={CheckCircle2} />
         </div>
+
+        <SchoolPanel title="Fee plan and budget oversight" description="Compare configured fee amounts with invoices actually issued and payments recorded. Figures remain separated by currency; this is fee-revenue oversight, not an expense budget.">
+          {feeStructures.length ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Fee structure</th><th className="pb-2">Grade / year</th><th className="pb-2">Configured per student</th><th className="pb-2">Invoices</th><th className="pb-2">Billed</th><th className="pb-2">Collected</th><th className="pb-2">Outstanding</th></tr></thead><tbody className="divide-y divide-slate-100">{feeStructures.map((fee) => {
+            const feeInvoices = invoices.filter((invoice) => invoice.fee_structure_id === fee.id);
+            const billed = feeInvoices.reduce((sum, invoice) => sum + Number(invoice.amount || 0), 0);
+            const collected = feeInvoices.reduce((sum, invoice) => sum + Number(invoice.paid_amount || 0), 0);
+            const outstanding = feeInvoices.reduce((sum, invoice) => sum + Number(invoice.balance || 0), 0);
+            const currency = fee.currency || "ETB";
+            return <tr key={fee.id}><td className="py-3"><p className="font-medium text-slate-800">{fee.fee_name}</p><p className="mt-1 text-xs text-slate-500">{fee.active ? "Active" : "Inactive"}</p></td><td className="py-3 text-slate-600">{fee.grade_label} · {years.find((year) => year.id === fee.academic_year_id)?.name || "Academic year"}</td><td className="py-3 tabular-nums text-slate-700">{currency} {Number(fee.amount).toLocaleString()}</td><td className="py-3 tabular-nums text-slate-700">{feeInvoices.length}</td><td className="py-3 tabular-nums text-slate-700">{currency} {billed.toLocaleString()}</td><td className="py-3 tabular-nums text-emerald-700">{currency} {collected.toLocaleString()}</td><td className="py-3 tabular-nums font-semibold text-slate-800">{currency} {outstanding.toLocaleString()}</td></tr>;
+          })}</tbody></table></div> : <SchoolEmptyState title="No fee plan configured" description="Configured fee structures will appear here. No budget or revenue forecast is invented." />}
+        </SchoolPanel>
         <SchoolPanel title="Create fee structure" description="Manager configures the fee; Finance generates invoices for enrolled students.">
           <form onSubmit={addFeeStructure} className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <SchoolField label="Academic year"><select className={schoolSelectClass} value={feeYearId} onChange={(event) => setFeeYearId(event.target.value)}><option value="">Choose year</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></SchoolField>
@@ -1543,6 +1579,31 @@ export default function SchoolManagerPortal() {
             const student = members.find((member) => member.id === invoice.student_membership_id);
             return <tr key={invoice.id}><td className="py-3 font-medium text-slate-800">{invoice.invoice_number}</td><td className="py-3 text-slate-600">{memberName(invoice.student_membership_id)}</td><td className="py-3 text-slate-600">{student ? `${student.grade_label || "—"} · ${sectionLabel(student.section_id)}` : "—"}</td><td className="py-3 text-slate-600">{invoice.due_date || "—"}{isOverdue(invoice) && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">Overdue</span>}</td><td className="py-3 text-slate-600">{invoice.currency} {Number(invoice.amount).toLocaleString()}</td><td className="py-3 text-emerald-700">{invoice.currency} {Number(invoice.paid_amount).toLocaleString()}</td><td className="py-3 font-medium text-slate-800">{invoice.currency} {Number(invoice.balance).toLocaleString()}</td><td className="py-3"><SchoolStatus value={invoice.status} /></td></tr>;
           })}</tbody></table></div> : <SchoolEmptyState title="No invoices match this filter" description="Choose another invoice status or wait for the Finance team to generate invoices." />}
+        </SchoolPanel>
+
+        <SchoolPanel title="Finance payment accountability" description="Read-only payment ledger from the Finance workflow. Reversals remain visible with their recorded reason; payment actions stay with authorized Finance staff.">
+          {financePayments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase text-slate-500"><th className="pb-2">Receipt</th><th className="pb-2">Invoice / student</th><th className="pb-2">Amount</th><th className="pb-2">Method</th><th className="pb-2">Recorded by</th><th className="pb-2">Received</th><th className="pb-2">Status / reason</th></tr></thead><tbody className="divide-y divide-slate-100">{financePayments.slice(0, 100).map((payment) => {
+            const invoice = invoices.find((item) => item.id === payment.invoice_id);
+            return <tr key={payment.id}><td className="py-3 font-medium text-slate-800">{payment.receipt_number}</td><td className="py-3 text-slate-600">{invoice?.invoice_number || "Invoice"} · {invoice ? memberName(invoice.student_membership_id) : "Student"}</td><td className="py-3 tabular-nums text-slate-700">{invoice?.currency || "—"} {Number(payment.amount || 0).toLocaleString()}</td><td className="py-3 capitalize text-slate-600">{String(payment.payment_method || "other").replace(/_/g, " ")}</td><td className="py-3 text-slate-600">{profiles[payment.recorded_by]?.name || "Finance staff"}</td><td className="py-3 text-slate-600">{payment.received_at ? new Date(payment.received_at).toLocaleString() : "—"}</td><td className="py-3"><SchoolStatus value={payment.status} />{payment.reversal_reason && <p className="mt-1 max-w-[220px] text-xs text-red-700">{payment.reversal_reason}</p>}</td></tr>;
+          })}</tbody></table><p className="mt-2 text-xs text-slate-500">Showing the latest {Math.min(100, financePayments.length)} of {financePayments.length} payment records. The complete ledger is loaded for finance totals.</p></div> : <SchoolEmptyState title="No payment records" description="Recorded payments and any later reversals will appear here from the Finance ledger." />}
+        </SchoolPanel>
+        <SchoolPanel title="Finance activity audit" description="Immutable finance audit events identify who changed a fee, issued an invoice, recorded a payment, or reversed a payment. Search the loaded school audit history.">
+          <input aria-label="Search finance audit events" className={schoolInputClass + " mb-3 max-w-md"} value={financeAuditSearch} onChange={(event) => setFinanceAuditSearch(event.target.value)} placeholder="Search event, actor, invoice, receipt…" />
+          {financeAuditEvents.filter((event) => {
+            const details = event.details || {};
+            const haystack = [event.event_type, event.entity_type, profiles[event.actor_id]?.name, details.invoice_number, details.receipt_number, details.fee_name, details.reversal_reason, details.grade].join(" ").toLowerCase();
+            return haystack.includes(financeAuditSearch.trim().toLowerCase());
+          }).length ? <div className="divide-y divide-slate-100">{financeAuditEvents.filter((event) => {
+            const details = event.details || {};
+            const haystack = [event.event_type, event.entity_type, profiles[event.actor_id]?.name, details.invoice_number, details.receipt_number, details.fee_name, details.reversal_reason, details.grade].join(" ").toLowerCase();
+            return haystack.includes(financeAuditSearch.trim().toLowerCase());
+          }).slice(0, 100).map((event) => {
+            const details = event.details || {};
+            const amount = details.amount != null ? `${details.currency || ""} ${Number(details.amount).toLocaleString()}`.trim() : "";
+            const reference = details.invoice_number || details.receipt_number || details.fee_name || "";
+            return <div key={event.id} className="flex flex-wrap items-start justify-between gap-3 py-3"><div className="min-w-0"><p className="text-sm font-semibold capitalize text-slate-800">{String(event.event_type || "Finance event").replace(/_/g, " ")}</p><p className="mt-1 text-xs text-slate-500">{event.entity_type} · {profiles[event.actor_id]?.name || "Finance / school staff"}{reference ? ` · ${reference}` : ""}{amount ? ` · ${amount}` : ""}</p>{details.reversal_reason && <p className="mt-1 text-xs text-red-700">Reversal reason: {details.reversal_reason}</p>}</div><span className="shrink-0 text-xs tabular-nums text-slate-500">{new Date(event.created_at).toLocaleString()}</span></div>;
+          })}</div> : <SchoolEmptyState title={financeAuditSearch ? "No matching finance events" : "No finance audit events"} description={financeAuditSearch ? "Try another event, staff name, invoice, or receipt." : "Fee, invoice, and payment activity will appear here when recorded."} />}
+          <p className="mt-2 text-xs text-slate-500">Showing up to 100 matching events from {financeAuditEvents.length} loaded audit records.</p>
         </SchoolPanel>
         <SchoolPanel title="Finance follow-ups from Finance staff" description="Review unpaid invoice reports and confirm that the school has addressed them. Resolving a follow-up does not alter invoice balances or record a payment.">
           {financeFollowups.length ? <div className="space-y-3">{financeFollowups.map((item) => <div key={item.id} className="rounded-md border border-slate-100 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-800">{memberName(item.student_membership_id)} · Invoice {item.invoice_id}</p><SchoolStatus value={item.status} /></div><p className="mt-1 text-xs text-slate-600">{item.note}</p>{item.status !== "resolved" && <div className="mt-2"><SchoolSecondaryButton onClick={() => void resolveFinanceFollowup(item.id)}>Mark resolved</SchoolSecondaryButton></div>}{item.resolution_note && <p className="mt-2 text-xs text-emerald-700">{item.resolution_note}</p>}</div>)}</div> : <SchoolEmptyState title="No finance follow-ups" description="Reports from the School Finance team will appear here." />}
