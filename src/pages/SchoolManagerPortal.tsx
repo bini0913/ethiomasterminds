@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolPortal } from "@/context/SchoolPortalContext";
 import SchoolPortalShell, { SchoolNavItem } from "@/components/school/SchoolPortalShell";
+import SchoolManagerAcademicWorkspace from "@/components/school/SchoolManagerAcademicWorkspace";
 import {
   SchoolPageHeading, SchoolMetric, SchoolPanel, SchoolStatus, SchoolEmptyState,
   SchoolPrimaryButton, SchoolSecondaryButton, SchoolField,
@@ -22,6 +23,7 @@ const navItems: SchoolNavItem[] = [
   { id: "audit", label: "School Audit", icon: FileClock },
   { id: "settings", label: "Manager Settings", icon: Settings },
   { id: "structure", label: "School Structure", icon: School },
+  { id: "academics", label: "Academic Management", icon: BookOpen },
   { id: "grading", label: "Grading & Policies", icon: Scale },
   { id: "finance", label: "Fees & Finance", icon: Wallet },
   { id: "tasks", label: "Staff Tasks", icon: ClipboardList },
@@ -1833,6 +1835,7 @@ export default function SchoolManagerPortal() {
     case "audit": content = renderSchoolAudit(); break;
     case "settings": content = renderManagerSettings(); break;
     case "structure": content = renderStructure(); break;
+    case "academics": content = <SchoolManagerAcademicWorkspace schoolId={schoolId} years={years} terms={terms} sections={sections} subjects={subjects} assignments={assignments} categories={gradingCategories} gradingPolicies={gradingPolicies} members={members} profiles={profiles} />; break;
     case "grading": content = renderGrading(); break;
     case "finance": content = renderFinance(); break;
     case "tasks": content = renderTasks(); break;
